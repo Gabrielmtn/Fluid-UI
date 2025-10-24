@@ -14,7 +14,7 @@ $width = isset($atts['width']) ? esc_attr($atts['width']) : '800';
 $height = isset($atts['height']) ? esc_attr($atts['height']) : '600';
 ?>
 
-<div class="fluid-simulation-container" style="max-width: 100%; overflow: hidden;">
+<div class="fluid-simulation-wrapper">
     <div id="canvas-area">
         <div id="canvas-wrapper" style="width: <?php echo $width; ?>px; height: <?php echo $height; ?>px;">
             <div id="canvas-size-display"><?php echo $width . ' × ' . $height; ?></div>

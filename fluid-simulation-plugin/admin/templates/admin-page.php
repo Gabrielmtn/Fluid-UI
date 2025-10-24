@@ -20,6 +20,7 @@ if (!defined('ABSPATH')) {
         <p><?php _e('To display the fluid simulation on any page or post, simply add the shortcode above.', 'fluid-simulation'); ?></p>
     </div>
 
+    <div class="fluid-simulation-wrapper">
     <div id="canvas-area">
         <div id="canvas-wrapper">
             <div id="canvas-size-display">800 × 600</div>
@@ -370,4 +371,5 @@ if (!defined('ABSPATH')) {
             </div>
         </div>
     </div>
-</div>
+    </div><!-- .fluid-simulation-wrapper -->
+</div><!-- .wrap -->
