@@ -517,11 +517,11 @@ customCursor.innerHTML = `
     </svg>
 `;
 
-function showPreview() {
+window.showPreview = function() {
     canvas.classList.add('hidden');
 }
 
-function hidePreview() {
+window.hidePreview = function() {
     canvas.classList.remove('hidden');
 }
 

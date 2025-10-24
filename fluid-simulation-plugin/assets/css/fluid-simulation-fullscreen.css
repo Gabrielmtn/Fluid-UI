@@ -67,3 +67,104 @@ body.fluid-simulation-fullscreen * {
     flex-direction: column;
     color-scheme: dark;
 }
+
+/* Resize handles for full-screen */
+.fluid-simulation-fullscreen-wrapper .resize-handle {
+    position: absolute;
+    background: rgba(100, 200, 255, 0.3);
+    border: 1px solid rgba(100, 200, 255, 0.6);
+    z-index: 200;
+    pointer-events: auto;
+    transition: background 0.2s;
+}
+
+.fluid-simulation-fullscreen-wrapper .resize-handle:hover {
+    background: rgba(100, 200, 255, 0.6);
+}
+
+.fluid-simulation-fullscreen-wrapper .resize-handle.corner {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    z-index: 201;
+}
+
+.fluid-simulation-fullscreen-wrapper .resize-handle.edge {
+    background: rgba(100, 200, 255, 0.2);
+    z-index: 199;
+}
+
+.fluid-simulation-fullscreen-wrapper .resize-handle.edge:hover {
+    background: rgba(100, 200, 255, 0.4);
+}
+
+.fluid-simulation-fullscreen-wrapper .resize-nw { top: -6px; left: -6px; cursor: nw-resize; }
+.fluid-simulation-fullscreen-wrapper .resize-n { top: -3px; left: 12px; right: 12px; height: 6px; cursor: n-resize; }
+.fluid-simulation-fullscreen-wrapper .resize-ne { top: -6px; right: -6px; cursor: ne-resize; }
+.fluid-simulation-fullscreen-wrapper .resize-e { right: -3px; top: 12px; bottom: 12px; width: 6px; cursor: e-resize; }
+.fluid-simulation-fullscreen-wrapper .resize-se { bottom: -6px; right: -6px; cursor: se-resize; }
+.fluid-simulation-fullscreen-wrapper .resize-s { bottom: -3px; left: 12px; right: 12px; height: 6px; cursor: s-resize; }
+.fluid-simulation-fullscreen-wrapper .resize-sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+.fluid-simulation-fullscreen-wrapper .resize-w { left: -3px; top: 12px; bottom: 12px; width: 6px; cursor: w-resize; }
+
+/* Preview toggle for full-screen */
+.fluid-simulation-fullscreen-wrapper .preview-toggle {
+    width: 100%;
+    padding: 30px 20px;
+    margin-top: 10px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.fluid-simulation-fullscreen-wrapper .preview-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: scale(1.02);
+}
+
+/* Hidden canvas for preview mode */
+.fluid-simulation-fullscreen-wrapper canvas.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Corner locks for full-screen */
+.fluid-simulation-fullscreen-wrapper .corner-lock {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(100, 200, 255, 0.4);
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-size: 12px;
+}
+
+.fluid-simulation-fullscreen-wrapper .corner-lock:hover {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: rgba(100, 200, 255, 0.8);
+    transform: scale(1.1);
+}
+
+.fluid-simulation-fullscreen-wrapper .corner-lock.locked {
+    background: rgba(255, 200, 100, 0.3);
+    border-color: rgba(255, 200, 100, 0.8);
+}
+
+.fluid-simulation-fullscreen-wrapper .corner-lock.locked:hover {
+    background: rgba(255, 200, 100, 0.5);
+}
+
+.fluid-simulation-fullscreen-wrapper .lock-nw { top: -28px; left: -28px; }
+.fluid-simulation-fullscreen-wrapper .lock-ne { top: -28px; right: -28px; }
+.fluid-simulation-fullscreen-wrapper .lock-se { bottom: -28px; right: -28px; }
+.fluid-simulation-fullscreen-wrapper .lock-sw { bottom: -28px; left: -28px; }
