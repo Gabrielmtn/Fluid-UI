@@ -157,15 +157,27 @@ function preseedPaletteOnLoad() {
 }
 
 function updateCanvasSize() {
-    const newWidth = canvasWrapper.clientWidth;
-    const newHeight = canvasWrapper.clientHeight;
-    
+    // Get dimensions with safety checks
+    let newWidth = canvasWrapper.clientWidth || canvasWrapper.offsetWidth || 800;
+    let newHeight = canvasWrapper.clientHeight || canvasWrapper.offsetHeight || 600;
+
+    // Constrain to reasonable limits (min 200x200, max 4096x4096)
+    newWidth = Math.max(200, Math.min(4096, newWidth));
+    newHeight = Math.max(200, Math.min(4096, newHeight));
+
+    // Extra safety: if dimensions are still absurd, use defaults
+    if (newWidth > 10000 || newHeight > 10000 || newWidth < 100 || newHeight < 100) {
+        console.warn('Invalid canvas dimensions detected, using defaults');
+        newWidth = 800;
+        newHeight = 600;
+    }
+
     canvas.width = newWidth;
     canvas.height = newHeight;
     trailCanvas.width = newWidth;
     trailCanvas.height = newHeight;
     sizeDisplay.textContent = `${newWidth} × ${newHeight}`;
-    
+
     // Flag to reinitialize framebuffers after WebGL context is set up
     window.needsFramebufferReinit = true;
 }
