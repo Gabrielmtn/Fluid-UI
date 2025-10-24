@@ -338,94 +338,174 @@ document.querySelectorAll('.resize-handle').forEach(handle => {
 
 document.addEventListener('mousemove', (e) => {
     if (!isResizing) return;
-    
+
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    
+
     let newWidth = startWidth;
     let newHeight = startHeight;
     let newLeft = startLeft;
     let newTop = startTop;
-    
-    // Check if any corners are locked (explicit or temporary auto lock)
-    const hasLockedCorner = Object.values(lockedCorners).some(locked => locked) || !!autoLockedCorner;
-    
-    if (hasLockedCorner && lockedCornerPos) {
-        // Find which corner is locked
-        let anchorCorner = null;
-        if (autoLockedCorner) {
-            anchorCorner = autoLockedCorner;
-        } else {
-            for (let corner in lockedCorners) {
-                if (lockedCorners[corner]) {
-                    anchorCorner = corner;
-                    break;
-                }
+
+    // Check if we're dragging a locked corner - if so, do nothing
+    const lockedCornersList = Object.keys(lockedCorners).filter(k => lockedCorners[k]);
+    if (lockedCornersList.includes(resizeDirection)) {
+        // Trying to drag a locked corner - prevent any movement
+        return;
+    }
+
+    // Check if any corners are locked (explicit, not auto)
+    const hasExplicitLock = Object.values(lockedCorners).some(locked => locked);
+
+    if (hasExplicitLock && lockedCornerPos) {
+        // Find which corner is explicitly locked
+        let lockedCorner = null;
+        for (let corner in lockedCorners) {
+            if (lockedCorners[corner]) {
+                lockedCorner = corner;
+                break;
             }
         }
-        
+
+        // Determine relationship between locked corner and resize direction
+        // If dragging an adjacent corner (shares an edge), constrain movement
+        const cornerRelations = {
+            'nw': { horizontal: ['ne'], vertical: ['sw'], diagonal: ['se'] },
+            'ne': { horizontal: ['nw'], vertical: ['se'], diagonal: ['sw'] },
+            'se': { horizontal: ['sw'], vertical: ['ne'], diagonal: ['nw'] },
+            'sw': { horizontal: ['se'], vertical: ['nw'], diagonal: ['ne'] }
+        };
+
+        const relations = cornerRelations[lockedCorner];
+
+        if (relations.horizontal.includes(resizeDirection)) {
+            // Dragging horizontal adjacent corner - only width changes, height and vertical position fixed
+            const areaRect = canvasArea.getBoundingClientRect();
+            const anchorX = lockedCornerPos.x;
+            const mouseX = e.clientX;
+
+            newWidth = Math.max(200, Math.abs(mouseX - anchorX));
+            newLeft = Math.min(mouseX, anchorX) - areaRect.left;
+            // Keep original height and top
+            newHeight = startHeight;
+            newTop = startTop;
+
+        } else if (relations.vertical.includes(resizeDirection)) {
+            // Dragging vertical adjacent corner - only height changes, width and horizontal position fixed
+            const areaRect = canvasArea.getBoundingClientRect();
+            const anchorY = lockedCornerPos.y;
+            const mouseY = e.clientY;
+
+            newHeight = Math.max(200, Math.abs(mouseY - anchorY));
+            newTop = Math.min(mouseY, anchorY) - areaRect.top;
+            // Keep original width and left
+            newWidth = startWidth;
+            newLeft = startLeft;
+
+        } else if (relations.diagonal.includes(resizeDirection)) {
+            // Dragging diagonal corner - both dimensions can change
+            const areaRect = canvasArea.getBoundingClientRect();
+            const anchorX = lockedCornerPos.x;
+            const anchorY = lockedCornerPos.y;
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+
+            newWidth = Math.max(200, Math.abs(mouseX - anchorX));
+            newHeight = Math.max(200, Math.abs(mouseY - anchorY));
+            newLeft = Math.min(mouseX, anchorX) - areaRect.left;
+            newTop = Math.min(mouseY, anchorY) - areaRect.top;
+
+        } else if (resizeDirection === 'n' || resizeDirection === 's' || resizeDirection === 'e' || resizeDirection === 'w') {
+            // Dragging an edge handle with a locked corner
+            // Determine which edge(s) are constrained
+            const lockedX = lockedCorner.includes('w') ? 'left' : 'right';
+            const lockedY = lockedCorner.includes('n') ? 'top' : 'bottom';
+
+            if (resizeDirection === 'n') {
+                // Dragging top edge
+                const proposedHeight = startHeight - dy;
+                if (proposedHeight >= 200) {
+                    newHeight = proposedHeight;
+                    newTop = startTop + dy;
+                } else {
+                    newHeight = 200;
+                    newTop = startTop + (startHeight - 200);
+                }
+                // Width and left unchanged
+            } else if (resizeDirection === 's') {
+                // Dragging bottom edge
+                newHeight = Math.max(200, startHeight + dy);
+                // Width and left unchanged
+            } else if (resizeDirection === 'e') {
+                // Dragging right edge
+                newWidth = Math.max(200, startWidth + dx);
+                // Height and top unchanged
+            } else if (resizeDirection === 'w') {
+                // Dragging left edge
+                const proposedWidth = startWidth - dx;
+                if (proposedWidth >= 200) {
+                    newWidth = proposedWidth;
+                    newLeft = startLeft + dx;
+                } else {
+                    newWidth = 200;
+                    newLeft = startLeft + (startWidth - 200);
+                }
+                // Height and top unchanged
+            }
+        }
+    } else if (autoLockedCorner && lockedCornerPos) {
+        // Auto-lock for corner drags (opposite corner anchor)
         const areaRect = canvasArea.getBoundingClientRect();
         const anchorX = lockedCornerPos.x;
         const anchorY = lockedCornerPos.y;
         const mouseX = e.clientX;
         const mouseY = e.clientY;
-        
-        // New size from distance between mouse and anchor
+
         newWidth = Math.max(200, Math.abs(mouseX - anchorX));
         newHeight = Math.max(200, Math.abs(mouseY - anchorY));
-        
-        // Position top-left at min(mouse, anchor) to keep opposite corner fixed
         newLeft = Math.min(mouseX, anchorX) - areaRect.left;
         newTop = Math.min(mouseY, anchorY) - areaRect.top;
     } else {
         // No locked corners - each edge moves independently
-        // Start with current values
         newWidth = startWidth;
         newHeight = startHeight;
         newLeft = startLeft;
         newTop = startTop;
-        
+
         // Handle horizontal resizing
         if (resizeDirection.includes('e')) {
-            // Dragging right edge - increase width, left stays same
             newWidth = Math.max(200, startWidth + dx);
         } else if (resizeDirection.includes('w')) {
-            // Dragging left edge - change both width and position
             const proposedWidth = startWidth - dx;
             if (proposedWidth >= 200) {
                 newWidth = proposedWidth;
                 newLeft = startLeft + dx;
-                console.log('West drag:', { dx, proposedWidth, newWidth, newLeft, startLeft });
             } else {
-                // Hit minimum width - stop at 200px
                 newWidth = 200;
                 newLeft = startLeft + (startWidth - 200);
             }
         }
-        
+
         // Handle vertical resizing
         if (resizeDirection.includes('s')) {
-            // Dragging bottom edge - increase height, top stays same
             newHeight = Math.max(200, startHeight + dy);
         } else if (resizeDirection.includes('n')) {
-            // Dragging top edge - change both height and position
             const proposedHeight = startHeight - dy;
             if (proposedHeight >= 200) {
                 newHeight = proposedHeight;
                 newTop = startTop + dy;
             } else {
-                // Hit minimum height - stop at 200px
                 newHeight = 200;
                 newTop = startTop + (startHeight - 200);
             }
         }
     }
-    
+
     canvasWrapper.style.width = newWidth + 'px';
     canvasWrapper.style.height = newHeight + 'px';
     canvasWrapper.style.left = newLeft + 'px';
     canvasWrapper.style.top = newTop + 'px';
-    
+
     updateCanvasSize();
 });
 
