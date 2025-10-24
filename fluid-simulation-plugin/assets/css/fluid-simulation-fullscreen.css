@@ -40,6 +40,17 @@ body.fluid-simulation-fullscreen * {
     height: 100vh !important;
 }
 
+/* Constrain canvas wrapper in full-screen */
+.fluid-simulation-fullscreen-wrapper #canvas-wrapper {
+    position: absolute;
+    width: 800px;
+    height: 600px;
+    min-width: 200px;
+    min-height: 200px;
+    max-width: 4096px;
+    max-height: 4096px;
+}
+
 /* Controls panel for full-screen */
 .fluid-simulation-fullscreen-wrapper .controls {
     flex: 0 0 280px;

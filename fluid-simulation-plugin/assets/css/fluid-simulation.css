@@ -32,6 +32,8 @@
     height: 600px;
     min-width: 200px;
     min-height: 200px;
+    max-width: 4096px;
+    max-height: 4096px;
 }
 
 .fluid-simulation-wrapper .resize-handle {
