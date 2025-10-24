@@ -505,13 +505,13 @@ customCursor.innerHTML = `
     </svg>
 `;
 
-window.showPreview = function() {
+function showPreview() {
     canvas.classList.add('hidden');
-};
+}
 
-window.hidePreview = function() {
+function hidePreview() {
     canvas.classList.remove('hidden');
-};
+}
 
 let recEnabled = false;
 let recLayers = [];
