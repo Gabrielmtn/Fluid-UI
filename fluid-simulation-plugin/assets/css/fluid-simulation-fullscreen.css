@@ -51,6 +51,29 @@ body.fluid-simulation-fullscreen * {
     max-height: 4096px;
 }
 
+/* Canvas size display */
+.fluid-simulation-fullscreen-wrapper #canvas-size-display {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: monospace;
+    pointer-events: none;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 11;
+}
+
+.fluid-simulation-fullscreen-wrapper #canvas-wrapper:hover #canvas-size-display {
+    opacity: 1;
+}
+
 /* Controls panel for full-screen */
 .fluid-simulation-fullscreen-wrapper .controls {
     flex: 0 0 280px;
@@ -168,3 +191,368 @@ body.fluid-simulation-fullscreen * {
 .fluid-simulation-fullscreen-wrapper .lock-ne { top: -28px; right: -28px; }
 .fluid-simulation-fullscreen-wrapper .lock-se { bottom: -28px; right: -28px; }
 .fluid-simulation-fullscreen-wrapper .lock-sw { bottom: -28px; left: -28px; }
+
+/* Layers container */
+.fluid-simulation-fullscreen-wrapper #layers-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.fluid-simulation-fullscreen-wrapper .background-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: 100% 100%;
+    background-position: 0 0;
+    background-repeat: no-repeat;
+    display: none;
+    pointer-events: none;
+    transition: box-shadow 0.2s;
+    transform-origin: top left;
+}
+
+.fluid-simulation-fullscreen-wrapper .background-layer.active {
+    pointer-events: auto;
+    cursor: move;
+    box-shadow: 0 0 0 3px rgba(100, 200, 255, 0.8),
+                0 0 20px rgba(100, 200, 255, 0.4);
+    outline: 2px dashed rgba(100, 200, 255, 0.6);
+    outline-offset: -2px;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-resize-handle {
+    position: absolute;
+    background: rgba(100, 200, 255, 0.4);
+    border: 1px solid rgba(100, 200, 255, 0.8);
+    z-index: 10001;
+    transition: background 0.2s;
+    pointer-events: auto;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-resize-handle:hover {
+    background: rgba(100, 200, 255, 0.7);
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-resize-handle.corner {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-resize-handle.edge {
+    background: rgba(100, 200, 255, 0.3);
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-resize-handle.edge:hover {
+    background: rgba(100, 200, 255, 0.5);
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-resize-nw { top: -5px; left: -5px; cursor: nw-resize; }
+.fluid-simulation-fullscreen-wrapper .layer-resize-n { top: -3px; left: 10px; right: 10px; height: 6px; cursor: n-resize; }
+.fluid-simulation-fullscreen-wrapper .layer-resize-ne { top: -5px; right: -5px; cursor: ne-resize; }
+.fluid-simulation-fullscreen-wrapper .layer-resize-e { right: -3px; top: 10px; bottom: 10px; width: 6px; cursor: e-resize; }
+.fluid-simulation-fullscreen-wrapper .layer-resize-se { bottom: -5px; right: -5px; cursor: se-resize; }
+.fluid-simulation-fullscreen-wrapper .layer-resize-s { bottom: -3px; left: 10px; right: 10px; height: 6px; cursor: s-resize; }
+.fluid-simulation-fullscreen-wrapper .layer-resize-sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+.fluid-simulation-fullscreen-wrapper .layer-resize-w { left: -3px; top: 10px; bottom: 10px; width: 6px; cursor: w-resize; }
+
+/* Control groups */
+.fluid-simulation-fullscreen-wrapper .control-group {
+    margin-bottom: 15px;
+}
+
+.fluid-simulation-fullscreen-wrapper .control-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+    text-transform: uppercase;
+    opacity: 0.8;
+    letter-spacing: 0.5px;
+}
+
+/* Input styles */
+.fluid-simulation-fullscreen-wrapper input[type="range"] {
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.fluid-simulation-fullscreen-wrapper input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+}
+
+.fluid-simulation-fullscreen-wrapper input[type="color"] {
+    width: 100%;
+    height: 40px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.fluid-simulation-fullscreen-wrapper input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* Button styles */
+.fluid-simulation-fullscreen-wrapper button {
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s;
+}
+
+.fluid-simulation-fullscreen-wrapper button:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+.fluid-simulation-fullscreen-wrapper button:active {
+    transform: translateY(0);
+}
+
+.fluid-simulation-fullscreen-wrapper .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fluid-simulation-fullscreen-wrapper .presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+/* Layer items */
+.fluid-simulation-fullscreen-wrapper .layer-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: grab;
+    transition: all 0.2s;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-item:active {
+    cursor: grabbing;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-item.active-layer {
+    background: rgba(100, 200, 255, 0.2);
+    border: 2px solid rgba(100, 200, 255, 0.6);
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-item-header {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-item.drag-over {
+    border-top: 3px solid rgba(100, 200, 255, 0.8);
+    margin-top: 8px;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-item.dragging {
+    opacity: 0.5;
+}
+
+.fluid-simulation-fullscreen-wrapper .drop-zone {
+    height: 40px;
+    border: 2px dashed rgba(100, 200, 255, 0.3);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    transition: all 0.2s;
+    background: rgba(100, 200, 255, 0.05);
+}
+
+.fluid-simulation-fullscreen-wrapper .drop-zone:hover,
+.fluid-simulation-fullscreen-wrapper .drop-zone.drag-over {
+    border-color: rgba(100, 200, 255, 0.8);
+    background: rgba(100, 200, 255, 0.15);
+    color: rgba(255, 255, 255, 0.8);
+    height: 50px;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-thumbnail {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    background-size: cover;
+    background-position: center;
+    flex-shrink: 0;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-title {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 4px 6px;
+    border-radius: 4px;
+    width: 100%;
+    font-size: 11px;
+    font-family: inherit;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+    min-width: auto;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-threshold {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    opacity: 0.8;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-threshold input[type="range"] {
+    flex: 1;
+    height: 3px;
+}
+
+.fluid-simulation-fullscreen-wrapper .layer-threshold span {
+    min-width: 30px;
+}
+
+/* Collapsible sections */
+.fluid-simulation-fullscreen-wrapper .collapsible-section {
+    margin-bottom: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.fluid-simulation-fullscreen-wrapper .collapsible-header {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.fluid-simulation-fullscreen-wrapper .collapsible-header:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.fluid-simulation-fullscreen-wrapper .collapsible-header .title {
+    font-weight: bold;
+    font-size: 13px;
+}
+
+.fluid-simulation-fullscreen-wrapper .collapsible-header .icon {
+    transition: transform 0.2s;
+    font-size: 12px;
+}
+
+.fluid-simulation-fullscreen-wrapper .collapsible-section.collapsed .icon {
+    transform: rotate(-90deg);
+}
+
+.fluid-simulation-fullscreen-wrapper .collapsible-content {
+    max-height: 2000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+    padding: 10px;
+}
+
+.fluid-simulation-fullscreen-wrapper .collapsible-section.collapsed .collapsible-content {
+    max-height: 0;
+    padding: 0 10px;
+}
+
+/* Color palette styles */
+.fluid-simulation-fullscreen-wrapper .color-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.fluid-simulation-fullscreen-wrapper .color-actions button {
+    flex: 1;
+    padding: 6px;
+    font-size: 10px;
+}
+
+.fluid-simulation-fullscreen-wrapper .saved-colors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    min-height: 40px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+}
+
+.fluid-simulation-fullscreen-wrapper .color-swatch {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.fluid-simulation-fullscreen-wrapper .color-swatch:hover {
+    border-color: white;
+    transform: scale(1.1);
+}
+
+.fluid-simulation-fullscreen-wrapper .palette-row { display: flex; gap: 8px; align-items: center; }
+.fluid-simulation-fullscreen-wrapper #paletteSelector { width: 100%; height: 32px; border-radius: 6px; background: linear-gradient(180deg, #0f141b, #0b0f14); color: #e6edf3; border: 1px solid rgba(255,255,255,0.2); padding: 0 8px; -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+.fluid-simulation-fullscreen-wrapper .palette-preview { display: flex; gap: 6px; margin-top: 8px; }
+.fluid-simulation-fullscreen-wrapper .palette-chip { width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.3); cursor: pointer; transition: transform 0.2s; }
+.fluid-simulation-fullscreen-wrapper .palette-chip:hover { transform: scale(1.1); border-color: white; }
+.fluid-simulation-fullscreen-wrapper .palette-step { display: none; gap: 8px; align-items: center; margin-top: 6px; font-size: 11px; opacity: 0.9; }
+.fluid-simulation-fullscreen-wrapper .palette-step .chip { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.3); }
+.fluid-simulation-fullscreen-wrapper .controls select { width: 100%; height: 32px; border-radius: 6px; background: linear-gradient(180deg, #0f141b, #0b0f14); color: #e6edf3; border: 1px solid rgba(255,255,255,0.1); padding: 6px 8px; -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+.fluid-simulation-fullscreen-wrapper .controls select option { background: #0b0f14; color: #e6edf3; }
+.fluid-simulation-fullscreen-wrapper .controls select option:checked, .controls select option:hover { background: #11161e; color: #ffffff; }
+.fluid-simulation-fullscreen-wrapper .controls select:hover { filter: brightness(1.06); }
+.fluid-simulation-fullscreen-wrapper .controls select:focus { outline: none; box-shadow: 0 0 0 2px rgba(88,166,255,0.3); }
