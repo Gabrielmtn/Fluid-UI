@@ -74,6 +74,37 @@ body.fluid-simulation-fullscreen * {
     opacity: 1;
 }
 
+/* Canvas and trail canvas positioning */
+.fluid-simulation-fullscreen-wrapper #canvas,
+.fluid-simulation-fullscreen-wrapper #trailCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.fluid-simulation-fullscreen-wrapper #canvas {
+    pointer-events: auto;
+}
+
+.fluid-simulation-fullscreen-wrapper #trailCanvas {
+    pointer-events: none;
+}
+
+/* Custom cursor */
+.fluid-simulation-fullscreen-wrapper #customCursor {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    pointer-events: none;
+    display: none;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
 /* Controls panel for full-screen */
 .fluid-simulation-fullscreen-wrapper .controls {
     flex: 0 0 280px;
