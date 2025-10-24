@@ -3,7 +3,7 @@
  * Plugin Name: Fluid Simulation
  * Plugin URI: https://github.com/Gabrielmtn/Fluid-UI
  * Description: Interactive WebGL2-based fluid simulation with advanced controls, layer management, and recording capabilities.
- * Version: 1.0.4
+ * Version: 1.0.5
  * Author: Your Name
  * Author URI: https://github.com/Gabrielmtn
  * License: GPL v2 or later
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FLUID_SIM_VERSION', '1.0.4');
+define('FLUID_SIM_VERSION', '1.0.5');
 define('FLUID_SIM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FLUID_SIM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('FLUID_SIM_PLUGIN_FILE', __FILE__);
