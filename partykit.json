@@ -1,8 +1,5 @@
 {
   "name": "fluid-ui-multiplayer",
   "main": "party/index.ts",
-  "parties": {
-    "fluid": "party/index.ts"
-  },
-  "serve": "."
+  "compatibilityDate": "2025-10-25"
 }
