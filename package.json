@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "Fluid simulation with multiplayer support via PartyKit",
   "scripts": {
-    "dev": "partykit dev",
-    "deploy": "partykit deploy"
+    "dev": "partykit dev --serve .",
+    "deploy": "partykit deploy",
+    "party": "partykit dev",
+    "serve": "npx http-server -p 8080 -c-1"
   },
   "dependencies": {
     "partykit": "^0.0.111"

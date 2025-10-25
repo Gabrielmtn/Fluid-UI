@@ -8,6 +8,8 @@ let clientId = null;
 let remoteCursors = new Map(); // Map of clientId -> cursor data
 
 // Configuration
+// If running on localhost, PartyKit server is always on port 1999
+// regardless of which port the static files are served from
 const PARTYKIT_HOST = window.location.hostname === 'localhost'
     ? 'localhost:1999'
     : 'YOUR_PARTYKIT_HOST.partykit.dev';

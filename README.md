@@ -29,7 +29,7 @@ npm install
 
 ### Running Locally
 
-Start the PartyKit development server:
+**Option 1: Combined Server (Recommended)**
 
 ```bash
 npm run dev
@@ -39,7 +39,23 @@ This will start:
 - PartyKit server on `localhost:1999`
 - Static file server for the HTML/JS files
 
-Open your browser to the URL shown in the terminal (typically `http://localhost:1999`)
+Open your browser to `http://localhost:1999`
+
+**Option 2: Separate Servers (If Option 1 fails on Windows)**
+
+If you encounter path-related errors on Windows, run these in separate terminals:
+
+Terminal 1 - PartyKit server:
+```bash
+npm run party
+```
+
+Terminal 2 - Static file server:
+```bash
+npm run serve
+```
+
+Then open `http://localhost:8080` and the app will connect to PartyKit at `localhost:1999`
 
 ### Using Multiplayer
 
