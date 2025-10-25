@@ -292,7 +292,31 @@
             <input type="checkbox" id="recToggle">
             <label for="recToggle" style="margin: 0">Enable Recorded Layers</label>
         </div>
-        
+
+        <div class="control-group" style="margin-top: 20px; padding: 15px; background: rgba(100, 150, 255, 0.1); border-radius: 8px;">
+            <label style="font-weight: bold; margin-bottom: 10px; display: block;">Multiplayer</label>
+
+            <div class="control-group checkbox-group" style="margin-top: 5px;">
+                <input type="checkbox" id="multiplayerToggle" onchange="initMultiplayer()">
+                <label for="multiplayerToggle" style="margin: 0">Enable Multiplayer</label>
+            </div>
+
+            <div id="multiplayerInfo" style="margin-top: 10px; font-size: 12px;">
+                <div style="margin-bottom: 5px;">
+                    <strong>Room:</strong> <span id="roomName">default-room</span>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong>Status:</strong> <span id="multiplayerStatus">Disconnected</span>
+                </div>
+                <button id="copyRoomBtn" onclick="copyRoomUrl()" style="width: 100%; font-size: 12px; padding: 6px;">
+                    Copy Room URL
+                </button>
+                <div style="margin-top: 8px; opacity: 0.7; font-size: 11px;">
+                    Share the room URL to collaborate with others in real-time!
+                </div>
+            </div>
+        </div>
+
         <div class="control-group" style="margin-top: 20px">
             <label>Layers</label>
             <div class="layers-panel" id="layersPanel"></div>
@@ -364,5 +388,6 @@
     <script src="js/03-recording.js"></script>
     <script src="js/04-ui-interactions.js"></script>
     <script src="js/05-fluid-sim.js"></script>
+    <script src="js/06-multiplayer.js"></script>
 </body>
 </html>

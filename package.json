@@ -1,0 +1,13 @@
+{
+  "name": "fluid-ui-multiplayer",
+  "version": "1.0.0",
+  "description": "Fluid simulation with multiplayer support via PartyKit",
+  "scripts": {
+    "dev": "partykit dev",
+    "deploy": "partykit deploy"
+  },
+  "dependencies": {
+    "partykit": "^0.0.111"
+  },
+  "devDependencies": {}
+}

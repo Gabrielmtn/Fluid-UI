@@ -1,0 +1,8 @@
+{
+  "name": "fluid-ui-multiplayer",
+  "main": "party/index.ts",
+  "parties": {
+    "fluid": "party/index.ts"
+  },
+  "serve": "."
+}

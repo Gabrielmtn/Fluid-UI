@@ -124,9 +124,14 @@
         window.applyPreset = (name) => {
             const preset = presets[name];
             if (!preset) return;
-            
+
             activePreset = name;
             updatePresetButtons();
+
+            // Broadcast to multiplayer clients
+            if (typeof broadcastPreset === 'function') {
+                broadcastPreset(name);
+            }
             
             const initialConfig = { ...config };
             const startTime = performance.now();
@@ -1221,6 +1226,10 @@
         
         window.clearCanvas = () => {
             wipeSimulation();
+            // Broadcast to multiplayer clients
+            if (typeof broadcastClear === 'function') {
+                broadcastClear();
+            }
         };
         
         window.togglePause = () => {

@@ -327,7 +327,12 @@
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
-            
+
+            // Broadcast cursor position to multiplayer clients
+            if (typeof broadcastCursor === 'function') {
+                broadcastCursor(coords.x / canvas.width, coords.y / canvas.height);
+            }
+
             if (pointer.down) {
                 trackMouseMovement(e);
                 if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
@@ -448,25 +453,36 @@
         function multiSplat(x, y, dx, dy, color) {
             const centerX = canvas.width * 0.5;
             const centerY = canvas.height * 0.5;
-            
+
             for (let i = 0; i < animationMultiplier; i++) {
                 const angle = (i / animationMultiplier) * Math.PI * 2;
-                
+
                 // Translate to center, rotate, translate back
                 const relX = x - centerX;
                 const relY = y - centerY;
-                
+
                 const rotatedX = relX * Math.cos(angle) - relY * Math.sin(angle);
                 const rotatedY = relX * Math.sin(angle) + relY * Math.cos(angle);
-                
+
                 const finalX = rotatedX + centerX;
                 const finalY = rotatedY + centerY;
-                
+
                 // Rotate velocity vector too
                 const rotatedDx = dx * Math.cos(angle) - dy * Math.sin(angle);
                 const rotatedDy = dx * Math.sin(angle) + dy * Math.cos(angle);
-                
+
                 splat(finalX, finalY, rotatedDx, rotatedDy, color);
+            }
+
+            // Broadcast to multiplayer clients (send normalized coordinates)
+            if (typeof broadcastSplat === 'function') {
+                broadcastSplat(
+                    x / canvas.width,
+                    y / canvas.height,
+                    dx / canvas.width,
+                    dy / canvas.height,
+                    color
+                );
             }
         }
         
