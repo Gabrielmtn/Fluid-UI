@@ -1,4 +1,3 @@
-        };
         
         function updateCornerPositions() {
             const rect = canvasWrapper.getBoundingClientRect();

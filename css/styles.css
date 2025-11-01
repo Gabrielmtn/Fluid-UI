@@ -723,3 +723,36 @@
         .hotkey-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 16px; font-size: 13px; }
         .hotkey-body h3 { margin: 0 0 8px 0; font-size: 13px; color: #9ab; }
         .hotkey-body ul { margin: 0; padding-left: 18px; line-height: 1.6; }
+        
+        /* Kaleidoscope Panel */
+        #kaleidoPanel {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
+            margin: 0;
+        }
+        
+        #kaleidoPanel.open {
+            min-height: 570px;
+            opacity: 1;
+            margin-top: 10px;
+        }
+        
+        /* Checkbox group styling */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .checkbox-group label {
+            cursor: pointer;
+            user-select: none;
+        }

@@ -70,6 +70,7 @@
         <div class="rec-header" style="gap:6px;">
             <div class="rec-left" style="gap:6px;">
                 <button id="recRecordBtn">⏺ Record</button>
+                <button id="recMultiRecordBtn">⏺ Multi Artist Record</button>
                 <button id="recPlayBtn">▶ Play Layer</button>
                 <button id="recPlayAllBtn">▶▶ Play All</button>
                 <button id="recStopBtn">⏹ Stop</button>
@@ -155,6 +156,60 @@
             <label>✨ Multiplier</label>
             <input type="range" id="multiplier" min="1" max="8" value="1" step="1">
             <span id="multiplierValue" style="font-size: 10px; opacity: 0.7;">1x</span>
+        </div>
+        
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="kaleidoToggle">
+            <label for="kaleidoToggle" style="margin: 0">Kaleido</label>
+        </div>
+        <div id="kaleidoPanel" class="collapsible">
+            <div class="control-group">
+                <label>Kaleido</label>
+                <input type="range" id="kaleidoSegments" min="1" max="24" value="12" step="1">
+                <span id="kaleidoValue" style="font-size: 10px; opacity: 0.7;">12</span>
+            </div>
+            <div class="control-group">
+                <label>Kaleidoscope Mode</label>
+                <select id="kaleidoMode">
+                    <option value="1" selected>Wedge</option>
+                    <option value="2">Mirror H</option>
+                    <option value="3">Mirror V</option>
+                    <option value="4">Mirror Quad</option>
+                    <option value="5">Spiral</option>
+                    <option value="0">Off</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Angle</label>
+                <input type="range" id="kAngle" min="-180" max="180" value="0" step="1">
+                <span id="kAngleValue" style="font-size: 10px; opacity: 0.7;">0°</span>
+            </div>
+            <div class="control-group checkbox-group">
+                <input type="checkbox" id="kAnimateRot">
+                <label for="kAnimateRot" style="margin: 0">Animate Rotation</label>
+            </div>
+            <div class="control-group">
+                <label>Spin Speed</label>
+                <input type="range" id="kSpinSpeed" min="-180" max="180" value="30" step="1">
+                <span id="kSpinSpeedValue" style="font-size: 10px; opacity: 0.7;">30°/s</span>
+            </div>
+            <div class="control-group">
+                <label>Twist</label>
+                <input type="range" id="kTwist" min="0" max="10" value="0" step="0.1">
+                <span id="kTwistValue" style="font-size: 10px; opacity: 0.7;">0.0</span>
+            </div>
+            
+            <div class="control-group">
+                <label>Zoom</label>
+                <input type="range" id="kZoom" min="0.5" max="2" value="1" step="0.01">
+                <span id="kZoomValue" style="font-size: 10px; opacity: 0.7;">1.00</span>
+            </div>
+            
+            <div class="control-group">
+                <label>Blend</label>
+                <input type="range" id="kBlend" min="0" max="1" value="1" step="0.01">
+                <span id="kBlendValue" style="font-size: 10px; opacity: 0.7;">1.00</span>
+            </div>
         </div>
         
         <div class="control-group">
@@ -294,11 +349,11 @@
         </div>
 
         <div class="control-group" style="margin-top: 20px; padding: 15px; background: rgba(100, 150, 255, 0.1); border-radius: 8px;">
-            <label style="font-weight: bold; margin-bottom: 10px; display: block;">Multiplayer</label>
+            <label style="font-weight: bold; margin-bottom: 10px; display: block;">Multi Artist</label>
 
             <div class="control-group checkbox-group" style="margin-top: 5px;">
                 <input type="checkbox" id="multiplayerToggle" onchange="initMultiplayer()">
-                <label for="multiplayerToggle" style="margin: 0">Enable Multiplayer</label>
+                <label for="multiplayerToggle" style="margin: 0">Enable Multi Artist</label>
             </div>
 
             <div id="multiplayerInfo" style="margin-top: 10px; font-size: 12px;">
@@ -312,7 +367,7 @@
                     Copy Room URL
                 </button>
                 <div style="margin-top: 8px; opacity: 0.7; font-size: 11px;">
-                    Share the room URL to collaborate with others in real-time!
+                    Share the room URL to collaborate with other artists in real-time!
                 </div>
             </div>
         </div>
@@ -383,11 +438,16 @@
     </div>
 
 
+    <script src="Style Refactor/theme-toggle.js"></script>
+    <script src="Style Refactor/complexity-manager.js"></script>
+    <script src="js/00-engine.js"></script>
     <script src="js/01-config.js"></script>
     <script src="js/02-palettes.js"></script>
     <script src="js/03-recording.js"></script>
     <script src="js/04-ui-interactions.js"></script>
+    <script src="js/engine/gl.js"></script>
     <script src="js/05-fluid-sim.js"></script>
     <script src="js/06-multiplayer.js"></script>
+    <script src="js/07-turns.js"></script>
 </body>
 </html>

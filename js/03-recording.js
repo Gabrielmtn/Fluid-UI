@@ -635,3 +635,4 @@
             recSetupTimelineInteractions();
             recSetupResizeHandle();
             window.addEventListener('resize', () => { recResizeTimelineCanvas(); recUpdateHeadsUI(); recDrawTimeline(); recResizeAllMiniTimelines(); recDrawMiniTimelines(); });
+        }

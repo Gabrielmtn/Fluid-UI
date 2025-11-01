@@ -1,4 +1,4 @@
-        }
+        
         
         window.saveColor = () => {
             const color = document.getElementById('colorPicker').value;
@@ -1404,3 +1404,4 @@
             e.target.value = '';
         });
         
+

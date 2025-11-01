@@ -32,7 +32,7 @@
         }
         
         const baseVert = `#version 300 es
-            in vec2 aPos;
+            layout (location = 0) in vec2 aPos;
             out vec2 vUv, vL, vR, vT, vB;
             uniform vec2 texelSize;
             void main() {
@@ -52,8 +52,85 @@
             uniform sampler2D uTexture;
             uniform float preserveOpacity;
             uniform float backgroundTransparency;
+            uniform float kaleidoEnabled;
+            uniform float segments;
+            uniform int kMode; // 0=Off,1=Wedge,2=MirrorH,3=MirrorV,4=MirrorQuad,5=Spiral
+            uniform float kAngle; // radians
+            uniform float kTwist; // radians per unit radius
+            uniform float kZoom;  // scale
+            uniform float kBlend; // 0..1
+            
+            const float PI = 3.141592653589793;
+            
+            vec2 kaleidoWedge(vec2 uv) {
+                vec2 center = vec2(0.5);
+                vec2 p = uv - center;
+                // rotate by kAngle
+                float ca = cos(kAngle), sa = sin(kAngle);
+                p = mat2(ca, -sa, sa, ca) * p;
+                float r = length(p) * max(0.0001, kZoom);
+                float a = atan(p.y, p.x);
+                // twist proportional to radius
+                a += r * kTwist;
+                float segs = max(1.0, segments);
+                float segAngle = 2.0 * PI / segs;
+                a = mod(a + 2.0 * PI, 2.0 * PI);
+                a = mod(a, segAngle);
+                a = abs(a - segAngle * 0.5);
+                vec2 dir = vec2(cos(a), sin(a));
+                vec2 mapped = dir * r;
+                return mapped + center;
+            }
+            
+            vec2 spiral(vec2 uv) {
+                vec2 center = vec2(0.5);
+                vec2 p = uv - center;
+                float ca = cos(kAngle), sa = sin(kAngle);
+                p = mat2(ca, -sa, sa, ca) * p;
+                float r = length(p) * max(0.0001, kZoom);
+                float a = atan(p.y, p.x) + r * kTwist;
+                vec2 mapped = vec2(cos(a), sin(a)) * r;
+                return mapped + center;
+            }
+            
             void main() {
-                vec4 color = texture(uTexture, vUv);
+                vec4 base = texture(uTexture, vUv);
+                vec4 kcol = base;
+                bool doK = (kMode != 0) && (kaleidoEnabled > 0.5);
+                if (doK) {
+                    vec2 uv2;
+                    if (kMode == 1) {
+                        uv2 = kaleidoWedge(vUv);
+                    } else if (kMode == 2) {
+                        // Mirror Horizontal (mirror across vertical axis)
+                        vec2 uvz = vUv - vec2(0.5);
+                        float ca2 = cos(kAngle), sa2 = sin(kAngle);
+                        uvz = mat2(ca2, -sa2, sa2, ca2) * uvz;
+                        uvz = uvz * max(0.0001, kZoom) + vec2(0.5);
+                        uv2 = vec2(0.5 + abs(uvz.x - 0.5), uvz.y);
+                    } else if (kMode == 3) {
+                        // Mirror Vertical (mirror across horizontal axis)
+                        vec2 uvz = vUv - vec2(0.5);
+                        float ca3 = cos(kAngle), sa3 = sin(kAngle);
+                        uvz = mat2(ca3, -sa3, sa3, ca3) * uvz;
+                        uvz = uvz * max(0.0001, kZoom) + vec2(0.5);
+                        uv2 = vec2(uvz.x, 0.5 + abs(uvz.y - 0.5));
+                    } else if (kMode == 4) {
+                        // Mirror Quad
+                        vec2 uvz = vUv - vec2(0.5);
+                        float ca4 = cos(kAngle), sa4 = sin(kAngle);
+                        uvz = mat2(ca4, -sa4, sa4, ca4) * uvz;
+                        uvz = uvz * max(0.0001, kZoom) + vec2(0.5);
+                        uv2 = vec2(0.5 + abs(uvz.x - 0.5), 0.5 + abs(uvz.y - 0.5));
+                    } else if (kMode == 5) {
+                        // Spiral (no wedge folding)
+                        uv2 = spiral(vUv);
+                    } else {
+                        uv2 = vUv;
+                    }
+                    kcol = texture(uTexture, uv2);
+                }
+                vec4 color = mix(base, kcol, clamp(kBlend, 0.0, 1.0));
                 float intensity = max(max(color.r, color.g), color.b);
                 
                 if (preserveOpacity > 0.5) {
@@ -317,6 +394,16 @@
             pointer.dy = 0;
             updateColor();
             if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
+            splat(pointer.x, pointer.y, 0, 0, pointer.color);
+            if (typeof broadcastSplat === 'function') {
+                broadcastSplat(
+                    coords.x / canvas.width,
+                    coords.y / canvas.height,
+                    0,
+                    0,
+                    pointer.color
+                );
+            }
         });
         
         canvas.addEventListener('mousemove', (e) => {
@@ -371,6 +458,16 @@
             pointer.dy = 0;
             updateColor();
             if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
+            splat(pointer.x, pointer.y, 0, 0, pointer.color);
+            if (typeof broadcastSplat === 'function') {
+                broadcastSplat(
+                    coords.x / canvas.width,
+                    coords.y / canvas.height,
+                    0,
+                    0,
+                    pointer.color
+                );
+            }
         });
         
         canvas.addEventListener('touchmove', (e) => {
@@ -447,6 +544,162 @@
                 animationMultiplier = parseInt(e.target.value);
                 multiplierValue.textContent = animationMultiplier + 'x';
             });
+        }
+        
+        window.kaleidoEnabled = false;
+        window.kaleidoSegments = 6;
+        const kaleidoToggleEl = document.getElementById('kaleidoToggle');
+        const kaleidoSegmentsEl = document.getElementById('kaleidoSegments');
+        const kaleidoValueEl = document.getElementById('kaleidoValue');
+        
+        if (kaleidoToggleEl) {
+            kaleidoToggleEl.addEventListener('change', (e) => {
+                window.kaleidoEnabled = e.target.checked;
+                if (e.target.checked) {
+                    window._prevMultiplier = animationMultiplier;
+                    if (!window._kaleidoBootstrapped) {
+                        animationMultiplier = 8;
+                        if (multiplierSlider) {
+                            multiplierSlider.value = 8;
+                            if (multiplierValue) multiplierValue.textContent = '8x';
+                        }
+                        window.kaleidoSegments = 16;
+                        if (kaleidoSegmentsEl) {
+                            kaleidoSegmentsEl.value = '16';
+                            kaleidoSegmentsEl.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                        if (kaleidoValueEl) kaleidoValueEl.textContent = '16';
+                        window._kaleidoBootstrapped = true;
+                    }
+                } else {
+                    if (typeof window._prevMultiplier === 'number') {
+                        animationMultiplier = window._prevMultiplier;
+                        if (multiplierSlider) {
+                            multiplierSlider.value = String(animationMultiplier);
+                            if (multiplierValue) multiplierValue.textContent = animationMultiplier + 'x';
+                        }
+                    }
+                }
+            });
+        }
+        if (kaleidoSegmentsEl) {
+            const setVal = () => { if (kaleidoValueEl) kaleidoValueEl.textContent = String(window.kaleidoSegments); };
+            kaleidoSegmentsEl.addEventListener('input', (e) => {
+                window.kaleidoSegments = parseInt(e.target.value, 10) || 1;
+                setVal();
+            });
+            window.kaleidoSegments = parseInt(kaleidoSegmentsEl.value, 10) || 1;
+            setVal();
+        }
+        const kaleidoPanel = document.getElementById('kaleidoPanel');
+        function syncKaleidoPanel() {
+            if (kaleidoPanel) kaleidoPanel.classList.toggle('open', !!window.kaleidoEnabled);
+            if (window.kaleidoEnabled) {
+                setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 60);
+            }
+        }
+        if (kaleidoToggleEl) {
+            window.kaleidoEnabled = !!kaleidoToggleEl.checked;
+            syncKaleidoPanel();
+            kaleidoToggleEl.addEventListener('change', () => syncKaleidoPanel());
+        }
+        const kAngleEl = document.getElementById('kAngle');
+        const kAngleValueEl = document.getElementById('kAngleValue');
+        if (kAngleEl) {
+            kAngleEl.addEventListener('input', (e) => {
+                const deg = parseFloat(e.target.value);
+                window.kAngle = deg * Math.PI / 180;
+                if (kAngleValueEl) kAngleValueEl.textContent = deg + '°';
+            });
+        }
+        const kSpinSpeedEl = document.getElementById('kSpinSpeed');
+        const kSpinSpeedValueEl = document.getElementById('kSpinSpeedValue');
+        if (kSpinSpeedEl) {
+            kSpinSpeedEl.addEventListener('input', (e) => {
+                const degs = parseFloat(e.target.value);
+                window.kSpinSpeed = degs;
+                if (kSpinSpeedValueEl) kSpinSpeedValueEl.textContent = degs + '°/s';
+            });
+        }
+        const kTwistEl = document.getElementById('kTwist');
+        const kTwistValueEl = document.getElementById('kTwistValue');
+        if (kTwistEl) {
+            kTwistEl.addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                window.kTwist = v;
+                if (kTwistValueEl) kTwistValueEl.textContent = v.toFixed(1);
+            });
+        }
+        const kZoomEl = document.getElementById('kZoom');
+        const kZoomValueEl = document.getElementById('kZoomValue');
+        if (kZoomEl) {
+            kZoomEl.addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                window.kZoom = v;
+                if (kZoomValueEl) kZoomValueEl.textContent = v.toFixed(2);
+            });
+        }
+        const kBlendEl = document.getElementById('kBlend');
+        const kBlendValueEl = document.getElementById('kBlendValue');
+        if (kBlendEl) {
+            kBlendEl.addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                window.kBlend = v;
+                if (kBlendValueEl) kBlendValueEl.textContent = v.toFixed(2);
+            });
+        }
+        // Initial defaults (middling), applied without requiring user interaction
+        (function initKaleidoDefaults(){
+            // Angle
+            if (kAngleEl) {
+                const deg = parseFloat(kAngleEl.value || '0');
+                window.kAngle = (isFinite(deg) ? deg : 0) * Math.PI / 180;
+                if (kAngleValueEl) kAngleValueEl.textContent = (isFinite(deg)?deg:0) + '°';
+            } else {
+                window.kAngle = 0;
+            }
+            // Spin
+            if (kSpinSpeedEl) {
+                const s = parseFloat(kSpinSpeedEl.value || '30');
+                window.kSpinSpeed = isFinite(s) ? s : 30;
+                if (kSpinSpeedValueEl) kSpinSpeedValueEl.textContent = (isFinite(s)?s:30) + '°/s';
+            } else {
+                window.kSpinSpeed = 30;
+            }
+            // Twist
+            if (kTwistEl) {
+                const t = parseFloat(kTwistEl.value || '0');
+                window.kTwist = isFinite(t) ? t : 0;
+                if (kTwistValueEl) kTwistValueEl.textContent = (isFinite(t)?t:0).toFixed(1);
+            } else {
+                window.kTwist = 0;
+            }
+            // Zoom
+            if (kZoomEl) {
+                const z = parseFloat(kZoomEl.value || '1');
+                window.kZoom = isFinite(z) ? z : 1;
+                if (kZoomValueEl) kZoomValueEl.textContent = (isFinite(z)?z:1).toFixed(2);
+            } else {
+                window.kZoom = 1;
+            }
+            // Blend - default to 1
+            if (kBlendEl) {
+                const b = parseFloat(kBlendEl.value || '1');
+                window.kBlend = isFinite(b) ? b : 1;
+                if (kBlendValueEl) kBlendValueEl.textContent = (isFinite(b)?b:1).toFixed(2);
+            } else {
+                window.kBlend = 1;
+            }
+        })();
+        const kAnimateRotEl = document.getElementById('kAnimateRot');
+        if (kAnimateRotEl) {
+            window.kAnimateRot = !!kAnimateRotEl.checked;
+            kAnimateRotEl.addEventListener('change', (e) => { window.kAnimateRot = e.target.checked; });
+        }
+        const kaleidoModeEl = document.getElementById('kaleidoMode');
+        if (kaleidoModeEl) {
+            window.kaleidoMode = parseInt(kaleidoModeEl.value || '1', 10);
+            kaleidoModeEl.addEventListener('change', (e) => { window.kaleidoMode = parseInt(e.target.value || '1', 10); });
         }
         
         // Helper function to create rotated instances of a splat
@@ -711,7 +964,9 @@
         
         Object.entries(sliderConfig).forEach(([id, cfg]) => {
             const slider = document.getElementById(id);
-            const valueSpan = document.getElementById(id.replace('Dissipation', '').replace('Iteration', '') + 'Value');
+            const valueSpanId = id === 'pressureIteration' ? 'iterationValue' : 
+                                id.replace('Dissipation', '') + 'Value';
+            const valueSpan = document.getElementById(valueSpanId);
             
             slider.addEventListener('input', (e) => {
                 let val = parseFloat(e.target.value);
@@ -788,7 +1043,9 @@
             Object.entries(sliderConfig).forEach(([id, cfg]) => {
                 const val = config[cfg.key];
                 document.getElementById(id).value = val;
-                document.getElementById(id.replace('Dissipation', '').replace('Iteration', '') + 'Value').textContent = 
+                const valueSpanId = id === 'pressureIteration' ? 'iterationValue' : 
+                                    id.replace('Dissipation', '') + 'Value';
+                document.getElementById(valueSpanId).textContent = 
                     cfg.decimals === 0 ? Math.round(val) : val.toFixed(cfg.decimals);
             });
             document.getElementById('brushSize').value = config.SPLAT_RADIUS * 1000;
@@ -825,6 +1082,9 @@
         function update() {
             const dt = Math.min((Date.now() - lastTime) / 1000, 0.016);
             lastTime = Date.now();
+            if (window.kAnimateRot && window.kSpinSpeed) {
+                window.kAngle = (window.kAngle || 0) + dt * window.kSpinSpeed * Math.PI / 180;
+            }
             
             const targetWidth = canvasWrapper.clientWidth;
             const targetHeight = canvasWrapper.clientHeight;
@@ -942,6 +1202,19 @@
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
             gl.uniform1f(displayProg.uniforms.preserveOpacity, window.preserveFluidOpacity ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.backgroundTransparency, window.backgroundTransparency || 0.0);
+            gl.uniform1f(displayProg.uniforms.kaleidoEnabled, window.kaleidoEnabled ? 1.0 : 0.0);
+            gl.uniform1f(displayProg.uniforms.segments, (window.kaleidoSegments || 1));
+            gl.uniform1i(
+                displayProg.uniforms.kMode,
+                (typeof window.kaleidoMode === 'number' && isFinite(window.kaleidoMode)) ? window.kaleidoMode : 1
+            );
+            gl.uniform1f(displayProg.uniforms.kAngle, window.kAngle || 0.0);
+            gl.uniform1f(displayProg.uniforms.kTwist, window.kTwist || 0.0);
+            gl.uniform1f(displayProg.uniforms.kZoom, window.kZoom || 1.0);
+            gl.uniform1f(
+                displayProg.uniforms.kBlend,
+                (typeof window.kBlend === 'number' && isFinite(window.kBlend)) ? window.kBlend : 1.0
+            );
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
             blit(null);
