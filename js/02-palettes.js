@@ -65,20 +65,31 @@
             });
         }
         
-        // Resize functionality
+        // Resize functionality (Pointer Events)
         let isResizing = false;
         let resizeDirection = null;
         let startX, startY, startWidth, startHeight, startLeft, startTop;
         let lockedCornerPos = null;
         let autoLockedCorner = null; // temporary anchor during corner drags
+        let activeResizePointerId = null;
+        let activeResizeHandle = null;
         
         document.querySelectorAll('.resize-handle').forEach(handle => {
-            handle.addEventListener('mousedown', (e) => {
+            // Improve pen/touch UX
+            handle.style.touchAction = 'none';
+            handle.style.userSelect = 'none';
+            
+            handle.addEventListener('pointerdown', (e) => {
+                // Allow pen/touch; restrict mouse to left button
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
                 e.preventDefault();
                 e.stopPropagation();
                 if (bordersLocked) return;
                 if (typeof pushUndo === 'function') pushUndo();
                 isResizing = true;
+                activeResizePointerId = e.pointerId;
+                activeResizeHandle = handle;
+                try { handle.setPointerCapture(e.pointerId); } catch (_) {}
                 {
                     const dirClass = Array.from(handle.classList).find(c => /^resize-(n|s|e|w|nw|ne|se|sw)$/.test(c));
                     resizeDirection = dirClass ? dirClass.replace('resize-', '') : '';
@@ -122,8 +133,8 @@
             });
         });
         
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
+        document.addEventListener('pointermove', (e) => {
+            if (!isResizing || (activeResizePointerId !== null && e.pointerId !== activeResizePointerId)) return;
             
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
@@ -215,11 +226,16 @@
             updateCanvasSize();
         });
         
-        document.addEventListener('mouseup', () => {
-            if (isResizing) {
+        document.addEventListener('pointerup', (e) => {
+            if (isResizing && (activeResizePointerId === null || e.pointerId === activeResizePointerId)) {
                 isResizing = false;
                 resizeDirection = null;
                 autoLockedCorner = null; // clear temporary lock
+                
+                // Release capture
+                try { if (activeResizeHandle) activeResizeHandle.releasePointerCapture(e.pointerId); } catch (_) {}
+                activeResizePointerId = null;
+                activeResizeHandle = null;
                 
                 // Ensure final canvas size update
                 updateCanvasSize();
@@ -229,6 +245,17 @@
                         sizeDisplay.style.opacity = '0';
                     }
                 }, 100);
+            }
+        });
+        document.addEventListener('pointercancel', (e) => {
+            if (isResizing && (activeResizePointerId === null || e.pointerId === activeResizePointerId)) {
+                isResizing = false;
+                resizeDirection = null;
+                autoLockedCorner = null;
+                try { if (activeResizeHandle) activeResizeHandle.releasePointerCapture(e.pointerId); } catch (_) {}
+                activeResizePointerId = null;
+                activeResizeHandle = null;
+                sizeDisplay.style.opacity = '0';
             }
         });
         
@@ -320,3 +347,4 @@
         let recLastPlaybackTime = Date.now();
         let recPlaybackSpeed = 1;
         let recRenderQueued = false;
+        let recRecordSource = 'single';

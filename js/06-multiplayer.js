@@ -86,6 +86,15 @@ function onMultiplayerMessage(event) {
                 }
                 break;
 
+            case 'stroke':
+                // Receive full stroke replay from another client
+                if (data.clientId !== clientId && Array.isArray(data.data?.events)) {
+                    if (typeof window.scheduleStrokeReplay === 'function') {
+                        window.scheduleStrokeReplay(data.data.events);
+                    }
+                }
+                break;
+
             case 'cursor':
                 // Receive cursor position from another client
                 if (data.clientId !== clientId) {
@@ -125,14 +134,14 @@ function onMultiplayerError(error) {
 }
 
 // Send local interaction to other clients
-function broadcastSplat(x, y, dx, dy, color) {
+function broadcastSplat(x, y, dx, dy, color, mult, radius) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
         return;
     }
 
     partySocket.send(JSON.stringify({
         type: 'splat',
-        data: { x, y, dx, dy, color },
+        data: { x, y, dx, dy, color, mult, radius },
         timestamp: Date.now()
     }));
 }
@@ -182,23 +191,32 @@ function broadcastPreset(presetName) {
 // Handle splat from remote client
 function handleRemoteSplat(data) {
     if (typeof splat === 'function') {
-        const { x, y, dx, dy, color } = data.data;
+        const { x, y, dx, dy, color, mult, radius } = data.data;
         // Convert normalized coordinates back to canvas coordinates
         const canvasX = x * canvas.width;
         const canvasY = y * canvas.height;
         const canvasDx = dx * canvas.width;
         const canvasDy = dy * canvas.height;
 
-        // Apply the splat with the remote color
-        if (color) {
-            const oldColor = config.POINTER_COLOR;
-            config.POINTER_COLOR = color;
-            splat(canvasX, canvasY, canvasDx, canvasDy);
-            config.POINTER_COLOR = oldColor;
+        // Apply as multiplied multi-splat if helper exists or fallback
+        if (typeof window.applyMultiSplatWith === 'function') {
+            window.applyMultiSplatWith(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0], mult || 1, typeof radius === 'number' ? radius : undefined);
         } else {
-            splat(canvasX, canvasY, canvasDx, canvasDy);
+            splat(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0]);
         }
     }
+}
+
+// Broadcast a full stroke (array of normalized events)
+function broadcastReplayStroke(events) {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
+        return;
+    }
+    partySocket.send(JSON.stringify({
+        type: 'stroke',
+        data: { events },
+        timestamp: Date.now()
+    }));
 }
 
 // Handle cursor from remote client

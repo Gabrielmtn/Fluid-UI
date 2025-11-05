@@ -62,18 +62,17 @@
             
             const float PI = 3.141592653589793;
             
+            // Mode 1: Wedge - Facets create angular reflections
             vec2 kaleidoWedge(vec2 uv) {
                 vec2 center = vec2(0.5);
                 vec2 p = uv - center;
-                // rotate by kAngle
                 float ca = cos(kAngle), sa = sin(kAngle);
                 p = mat2(ca, -sa, sa, ca) * p;
                 float r = length(p) * max(0.0001, kZoom);
                 float a = atan(p.y, p.x);
-                // twist proportional to radius
                 a += r * kTwist;
-                float segs = max(1.0, segments);
-                float segAngle = 2.0 * PI / segs;
+                float facets = max(1.0, segments);
+                float segAngle = 2.0 * PI / facets;
                 a = mod(a + 2.0 * PI, 2.0 * PI);
                 a = mod(a, segAngle);
                 a = abs(a - segAngle * 0.5);
@@ -82,14 +81,64 @@
                 return mapped + center;
             }
             
-            vec2 spiral(vec2 uv) {
+            // Mode 2/3: Mirror - Layers create stacked reflections with depth
+            vec2 mirrorLayers(vec2 uv, bool horizontal) {
+                vec2 uvz = uv - vec2(0.5);
+                float ca = cos(kAngle), sa = sin(kAngle);
+                uvz = mat2(ca, -sa, sa, ca) * uvz;
+                uvz = uvz * max(0.0001, kZoom);
+                
+                // Layers create repeating reflections with offset
+                float layers = max(1.0, segments);
+                float layerSize = 1.0 / layers;
+                
+                if (horizontal) {
+                    float xPos = mod(abs(uvz.x) + 0.5, layerSize * 2.0);
+                    if (xPos > layerSize) xPos = layerSize * 2.0 - xPos;
+                    uvz.x = xPos - layerSize * 0.5;
+                } else {
+                    float yPos = mod(abs(uvz.y) + 0.5, layerSize * 2.0);
+                    if (yPos > layerSize) yPos = layerSize * 2.0 - yPos;
+                    uvz.y = yPos - layerSize * 0.5;
+                }
+                
+                return uvz + vec2(0.5);
+            }
+            
+            // Mode 4: Quad - Reflections multiply the quad mirror effect
+            vec2 quadReflections(vec2 uv) {
+                vec2 uvz = uv - vec2(0.5);
+                float ca = cos(kAngle), sa = sin(kAngle);
+                uvz = mat2(ca, -sa, sa, ca) * uvz;
+                uvz = uvz * max(0.0001, kZoom);
+                
+                // Reflections create nested quad patterns
+                float reflections = max(1.0, segments);
+                float scale = pow(2.0, reflections - 1.0) * 0.5;
+                uvz = uvz * scale;
+                uvz = vec2(0.5 - abs(mod(uvz.x + 0.5, 1.0) - 0.5), 
+                          0.5 - abs(mod(uvz.y + 0.5, 1.0) - 0.5));
+                
+                return uvz;
+            }
+            
+            // Mode 5: Spiral - Rings create concentric spiral bands
+            vec2 spiralRings(vec2 uv) {
                 vec2 center = vec2(0.5);
                 vec2 p = uv - center;
                 float ca = cos(kAngle), sa = sin(kAngle);
                 p = mat2(ca, -sa, sa, ca) * p;
                 float r = length(p) * max(0.0001, kZoom);
-                float a = atan(p.y, p.x) + r * kTwist;
-                vec2 mapped = vec2(cos(a), sin(a)) * r;
+                float a = atan(p.y, p.x);
+                
+                // Rings create banded spiral effect
+                float rings = max(1.0, segments);
+                float ringSize = 0.5 / rings;
+                float bandedR = mod(r, ringSize * 2.0);
+                if (bandedR > ringSize) bandedR = ringSize * 2.0 - bandedR;
+                
+                a += bandedR * kTwist * rings;
+                vec2 mapped = vec2(cos(a), sin(a)) * bandedR;
                 return mapped + center;
             }
             
@@ -100,31 +149,20 @@
                 if (doK) {
                     vec2 uv2;
                     if (kMode == 1) {
+                        // Wedge - Facets control angular divisions
                         uv2 = kaleidoWedge(vUv);
                     } else if (kMode == 2) {
-                        // Mirror Horizontal (mirror across vertical axis)
-                        vec2 uvz = vUv - vec2(0.5);
-                        float ca2 = cos(kAngle), sa2 = sin(kAngle);
-                        uvz = mat2(ca2, -sa2, sa2, ca2) * uvz;
-                        uvz = uvz * max(0.0001, kZoom) + vec2(0.5);
-                        uv2 = vec2(0.5 + abs(uvz.x - 0.5), uvz.y);
+                        // Mirror H - Layers control horizontal stacking
+                        uv2 = mirrorLayers(vUv, true);
                     } else if (kMode == 3) {
-                        // Mirror Vertical (mirror across horizontal axis)
-                        vec2 uvz = vUv - vec2(0.5);
-                        float ca3 = cos(kAngle), sa3 = sin(kAngle);
-                        uvz = mat2(ca3, -sa3, sa3, ca3) * uvz;
-                        uvz = uvz * max(0.0001, kZoom) + vec2(0.5);
-                        uv2 = vec2(uvz.x, 0.5 + abs(uvz.y - 0.5));
+                        // Mirror V - Layers control vertical stacking
+                        uv2 = mirrorLayers(vUv, false);
                     } else if (kMode == 4) {
-                        // Mirror Quad
-                        vec2 uvz = vUv - vec2(0.5);
-                        float ca4 = cos(kAngle), sa4 = sin(kAngle);
-                        uvz = mat2(ca4, -sa4, sa4, ca4) * uvz;
-                        uvz = uvz * max(0.0001, kZoom) + vec2(0.5);
-                        uv2 = vec2(0.5 + abs(uvz.x - 0.5), 0.5 + abs(uvz.y - 0.5));
+                        // Quad - Reflections control nested depth
+                        uv2 = quadReflections(vUv);
                     } else if (kMode == 5) {
-                        // Spiral (no wedge folding)
-                        uv2 = spiral(vUv);
+                        // Spiral - Rings control concentric bands
+                        uv2 = spiralRings(vUv);
                     } else {
                         uv2 = vUv;
                     }
@@ -294,6 +332,19 @@
         
         let dyeTexWidth, dyeTexHeight, simTexWidth, simTexHeight;
         
+        // Expose for stats panel
+        function exposeSimStats() {
+            window.simTexWidth = simTexWidth;
+            window.simTexHeight = simTexHeight;
+            window.dyeTexWidth = dyeTexWidth;
+            window.dyeTexHeight = dyeTexHeight;
+            window.density = density;
+            window.velocity = velocity;
+            window.pressure = pressure;
+            window.divergence = divergence;
+            window.curl = curl;
+        }
+        
         function createFBO(w, h, internalFormat, format, type, filter) {
             const texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -330,6 +381,7 @@
             const aspect = displayW / Math.max(1, displayH);
             const dyeBase = config.DYE_RESOLUTION || 1024;
             const simBase = config.SIM_RESOLUTION || 128;
+            console.log('initFramebuffers called - DYE:', dyeBase, 'SIM:', simBase);
             // Compute absolute internal sizes: long side = base, short side scaled by aspect
             if (displayW >= displayH) {
                 dyeTexWidth = dyeBase; dyeTexHeight = Math.max(1, Math.round(dyeBase / aspect));
@@ -355,8 +407,13 @@
         }
         
         initFramebuffers();
+        exposeSimStats(); // Expose to window for stats panel
         
-        const buffer = gl.createBuffer();
+        // Also expose on resize
+        window.needsFramebufferReinit = false;
+        
+        // Pointer handling
+        buffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
         
@@ -373,6 +430,91 @@
         }
         
         let pointer = { x: 0, y: 0, dx: 0, dy: 0, down: false, moved: false, color: [1, 0, 0] };
+        window.pointer = pointer; // Expose for stats panel
+        // Stroke tracking for right-click replay
+        let strokeEvents = [];
+        let strokeStartTime = 0;
+        let replayStartTime = 0;
+        let replayIndex = 0;
+
+        function startStroke(x, y) {
+            strokeEvents = [];
+            strokeStartTime = Date.now();
+        }
+
+        function pushStrokeEvent(x, y, dx, dy, color) {
+            const t = Date.now() - strokeStartTime;
+            strokeEvents.push({ t, x, y, dx, dy, color: color.slice(), mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1), radius: config.SPLAT_RADIUS });
+        }
+
+        // Called from mousemove path when drawing (stroke capture only)
+        function trackStrokeMove(e) {
+            // pointer state already updated
+            pushStrokeEvent(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+        }
+
+        function replayStroke(broadcast = true) {
+            if (!strokeEvents.length) { isReplayActive = false; return; }
+            replayIndex = 0;
+            replayStartTime = Date.now();
+            isReplayActive = true;
+            // Broadcast full stroke to multiplayer
+            if (broadcast && typeof broadcastReplayStroke === 'function') {
+                const norm = strokeEvents.map(ev => ({
+                    t: ev.t,
+                    x: ev.x / canvas.width,
+                    y: ev.y / canvas.height,
+                    dx: ev.dx / canvas.width,
+                    dy: ev.dy / canvas.height,
+                    color: ev.color,
+                    mult: ev.mult,
+                    radius: ev.radius
+                }));
+                try { broadcastReplayStroke(norm); } catch(_){}
+            }
+        }
+
+        function processReplay() {
+            if (!isReplayActive) return;
+            const elapsed = Date.now() - replayStartTime;
+            while (replayIndex < strokeEvents.length && strokeEvents[replayIndex].t <= elapsed) {
+                const ev = strokeEvents[replayIndex++];
+                if (typeof window.applyMultiSplatWith === 'function') {
+                    window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, ev.color, ev.mult, ev.radius);
+                } else {
+                    const prevM = animationMultiplier; const prevR = config.SPLAT_RADIUS;
+                    animationMultiplier = ev.mult; config.SPLAT_RADIUS = ev.radius;
+                    multiSplat(ev.x, ev.y, ev.dx, ev.dy, ev.color);
+                    animationMultiplier = prevM; config.SPLAT_RADIUS = prevR;
+                }
+                if (typeof recRecordInteraction === 'function' && recEnabled) {
+                    try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}
+                }
+            }
+            if (replayIndex >= strokeEvents.length) {
+                // If right button still held, loop replay without rebroadcast
+                if (isRightMouseDown) {
+                    replayStroke(false);
+                } else {
+                    isReplayActive = false;
+                }
+            }
+        }
+
+        // Allow multiplayer to schedule a stroke replay with normalized events
+        window.scheduleStrokeReplay = function(normalizedEvents) {
+            strokeEvents = (normalizedEvents || []).map(ev => ({
+                t: ev.t || 0,
+                x: (ev.x || 0) * canvas.width,
+                y: (ev.y || 0) * canvas.height,
+                dx: (ev.dx || 0) * canvas.width,
+                dy: (ev.dy || 0) * canvas.height,
+                color: Array.isArray(ev.color) ? ev.color.slice() : pointer.color.slice(),
+                mult: Math.max(1, Math.round(ev.mult || 1)),
+                radius: (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS
+            }));
+            replayStroke(false);
+        };
         
         canvas.addEventListener('mousedown', (e) => {
             if (isPaused) return;
@@ -381,7 +523,7 @@
                 e.preventDefault();
                 isRightMouseDown = true;
                 isReplayActive = true;
-                replayMovements();
+                replayStroke(true);
                 return;
             }
             
@@ -393,6 +535,9 @@
             pointer.dx = 0;
             pointer.dy = 0;
             updateColor();
+            // Begin stroke recording and include initial splat
+            startStroke(pointer.x, pointer.y);
+            pushStrokeEvent(pointer.x, pointer.y, 0, 0, pointer.color);
             if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
             splat(pointer.x, pointer.y, 0, 0, pointer.color);
             if (typeof broadcastSplat === 'function') {
@@ -401,7 +546,9 @@
                     coords.y / canvas.height,
                     0,
                     0,
-                    pointer.color
+                    pointer.color,
+                    (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
+                    config.SPLAT_RADIUS
                 );
             }
         });
@@ -421,7 +568,7 @@
             }
 
             if (pointer.down) {
-                trackMouseMovement(e);
+                trackStrokeMove(e);
                 if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
             }
         });
@@ -542,9 +689,43 @@
         if (multiplierSlider) {
             multiplierSlider.addEventListener('input', (e) => {
                 animationMultiplier = parseInt(e.target.value);
+                window.animationMultiplier = animationMultiplier; // Expose for stats
                 multiplierValue.textContent = animationMultiplier + 'x';
             });
         }
+        
+        // Hotkeys: 1-8 set Multiplier 1x-8x
+        function setMultiplierHotkey(val) {
+            const n = Math.max(1, Math.min(8, parseInt(val)));
+            if (!Number.isFinite(n)) return;
+            animationMultiplier = n;
+            window.animationMultiplier = n;
+            if (multiplierSlider) {
+                multiplierSlider.value = String(n);
+                try { multiplierSlider.style.setProperty('--val', n); } catch (_) {}
+            }
+            if (multiplierValue) multiplierValue.textContent = n + 'x';
+        }
+        document.addEventListener('keydown', (e) => {
+            // Ignore when typing in inputs/textareas or contenteditable
+            const t = e.target;
+            const tag = t && t.tagName ? t.tagName.toUpperCase() : '';
+            const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable);
+            if (isEditable) return;
+            
+            const code = e.code;
+            if (code && (code.startsWith('Digit') || code.startsWith('Numpad'))) {
+                const d = code.replace(/^(Digit|Numpad)/, '');
+                const num = parseInt(d, 10);
+                if (num >= 1 && num <= 8) {
+                    e.preventDefault();
+                    setMultiplierHotkey(num);
+                }
+            }
+        });
+        
+        // Expose initial value
+        window.animationMultiplier = animationMultiplier;
         
         window.kaleidoEnabled = false;
         window.kaleidoSegments = 6;
@@ -559,13 +740,16 @@
                     window._prevMultiplier = animationMultiplier;
                     if (!window._kaleidoBootstrapped) {
                         animationMultiplier = 8;
+                        window.animationMultiplier = 8;
                         if (multiplierSlider) {
                             multiplierSlider.value = 8;
+                            multiplierSlider.style.setProperty('--val', 8);
                             if (multiplierValue) multiplierValue.textContent = '8x';
                         }
                         window.kaleidoSegments = 16;
                         if (kaleidoSegmentsEl) {
                             kaleidoSegmentsEl.value = '16';
+                            kaleidoSegmentsEl.style.setProperty('--val', 16);
                             kaleidoSegmentsEl.dispatchEvent(new Event('input', { bubbles: true }));
                         }
                         if (kaleidoValueEl) kaleidoValueEl.textContent = '16';
@@ -574,8 +758,10 @@
                 } else {
                     if (typeof window._prevMultiplier === 'number') {
                         animationMultiplier = window._prevMultiplier;
+                        window.animationMultiplier = animationMultiplier;
                         if (multiplierSlider) {
                             multiplierSlider.value = String(animationMultiplier);
+                            multiplierSlider.style.setProperty('--val', animationMultiplier);
                             if (multiplierValue) multiplierValue.textContent = animationMultiplier + 'x';
                         }
                     }
@@ -603,15 +789,34 @@
             syncKaleidoPanel();
             kaleidoToggleEl.addEventListener('change', () => syncKaleidoPanel());
         }
+        let lastAngleSnapTime = 0;
+        const ANGLE_STICK_MS = 1500;
+        const ANGLE_STICK_TOL = 1.0;
         const kAngleEl = document.getElementById('kAngle');
         const kAngleValueEl = document.getElementById('kAngleValue');
         if (kAngleEl) {
             kAngleEl.addEventListener('input', (e) => {
-                const deg = parseFloat(e.target.value);
-                window.kAngle = deg * Math.PI / 180;
-                if (kAngleValueEl) kAngleValueEl.textContent = deg + '°';
+                let deg = parseFloat(e.target.value);
+                const now = Date.now();
+                const withinTol = Math.abs(deg) <= ANGLE_STICK_TOL;
+                const stickActive = (now - lastAngleSnapTime) < ANGLE_STICK_MS;
+
+                if (!stickActive && withinTol) {
+                    deg = 0;
+                    lastAngleSnapTime = now;
+                } else if (stickActive) {
+                    deg = 0;
+                }
+
+                if (!Number.isNaN(deg)) {
+                    e.target.value = String(deg);
+                    try { e.target.style.setProperty('--val', deg); } catch (_){}
+                    window.kAngle = deg * Math.PI / 180;
+                    if (kAngleValueEl) kAngleValueEl.textContent = deg + '°';
+                }
             });
         }
+        
         const kSpinSpeedEl = document.getElementById('kSpinSpeed');
         const kSpinSpeedValueEl = document.getElementById('kSpinSpeedValue');
         if (kSpinSpeedEl) {
@@ -697,9 +902,43 @@
             kAnimateRotEl.addEventListener('change', (e) => { window.kAnimateRot = e.target.checked; });
         }
         const kaleidoModeEl = document.getElementById('kaleidoMode');
+        const segmentsLabelEl = document.querySelector('#kaleidoPanel .control-group:first-child label');
+        
+        // Update segments label based on kaleidoscope mode
+        function updateSegmentsLabel(mode) {
+            if (!segmentsLabelEl) return;
+            
+            switch(mode) {
+                case 0: // Off
+                    segmentsLabelEl.textContent = 'Segments';
+                    break;
+                case 1: // Wedge
+                    segmentsLabelEl.textContent = 'Facets';
+                    break;
+                case 2: // Mirror H
+                    segmentsLabelEl.textContent = 'Layers';
+                    break;
+                case 3: // Mirror V
+                    segmentsLabelEl.textContent = 'Layers';
+                    break;
+                case 4: // Mirror Quad
+                    segmentsLabelEl.textContent = 'Reflections';
+                    break;
+                case 5: // Spiral
+                    segmentsLabelEl.textContent = 'Rings';
+                    break;
+                default:
+                    segmentsLabelEl.textContent = 'Segments';
+            }
+        }
+        
         if (kaleidoModeEl) {
             window.kaleidoMode = parseInt(kaleidoModeEl.value || '1', 10);
-            kaleidoModeEl.addEventListener('change', (e) => { window.kaleidoMode = parseInt(e.target.value || '1', 10); });
+            updateSegmentsLabel(window.kaleidoMode);
+            kaleidoModeEl.addEventListener('change', (e) => { 
+                window.kaleidoMode = parseInt(e.target.value || '1', 10);
+                updateSegmentsLabel(window.kaleidoMode);
+            });
         }
         
         // Helper function to create rotated instances of a splat
@@ -734,10 +973,24 @@
                     y / canvas.height,
                     dx / canvas.width,
                     dy / canvas.height,
-                    color
+                    color,
+                    (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
+                    config.SPLAT_RADIUS
                 );
             }
         }
+        
+        // Helper to apply a multiSplat with specific multiplier and radius, restoring after
+        window.applyMultiSplatWith = function(x, y, dx, dy, color, mult, radius) {
+            const prevM = (typeof animationMultiplier === 'number') ? animationMultiplier : 1;
+            const prevR = config.SPLAT_RADIUS;
+            animationMultiplier = Math.max(1, Math.round(mult || 1));
+            config.SPLAT_RADIUS = (typeof radius === 'number') ? radius : prevR;
+            try { multiSplat(x, y, dx, dy, color); } finally {
+                animationMultiplier = prevM;
+                config.SPLAT_RADIUS = prevR;
+            }
+        };
         
         const trailToggle = document.getElementById('trailToggle');
         const cursorToggle = document.getElementById('cursorToggle');
@@ -852,6 +1105,7 @@
             velocityDissipation: { key: 'VELOCITY_DISSIPATION', decimals: 4 },
             pressureDissipation: { key: 'PRESSURE_DISSIPATION', decimals: 3 },
             pressureIteration: { key: 'PRESSURE_ITERATIONS', decimals: 0 },
+            velocityInfluence: { key: 'VELOCITY_INFLUENCE', decimals: 1 },
             curl: { key: 'CURL', decimals: 0 }
         };
         
@@ -861,48 +1115,202 @@
 
         // Resolution dropdowns (absolute resolution, independent of display canvas size)
         const visualResSel = document.getElementById('visualResolution');
+        const visualResCustom = document.getElementById('visualResolutionCustom');
         if (visualResSel) {
-            visualResSel.value = String(config.DYE_RESOLUTION);
+            // Check if current value exists in options, otherwise use custom
+            const currentVal = String(config.DYE_RESOLUTION);
+            const hasOption = Array.from(visualResSel.options).some(opt => opt.value === currentVal);
+            if (hasOption) {
+                visualResSel.value = currentVal;
+            } else {
+                visualResSel.value = 'custom';
+                if (visualResCustom) {
+                    visualResCustom.style.display = 'block';
+                    visualResCustom.value = config.DYE_RESOLUTION;
+                }
+            }
+            
             visualResSel.addEventListener('change', (e) => {
-                const v = parseInt(e.target.value, 10);
-                if (isFinite(v)) {
-                    config.DYE_RESOLUTION = v;
-                    window.needsFramebufferReinit = true;
+                if (e.target.value === 'custom') {
+                    if (visualResCustom) {
+                        visualResCustom.style.display = 'block';
+                        // Restore from session or use current
+                        const sessionVal = window.settingsManager?.getSession('temp.visualResolutionCustom');
+                        visualResCustom.value = sessionVal || config.DYE_RESOLUTION;
+                        visualResCustom.focus();
+                    }
+                } else {
+                    if (visualResCustom) visualResCustom.style.display = 'none';
+                    const v = parseInt(e.target.value, 10);
+                    if (isFinite(v)) {
+                        config.DYE_RESOLUTION = v;
+                        window.needsFramebufferReinit = true;
+                    }
                 }
             });
-        }
-        const physicsResSel = document.getElementById('physicsResolution');
-        if (physicsResSel) {
-            physicsResSel.value = String(config.SIM_RESOLUTION);
-            physicsResSel.addEventListener('change', (e) => {
-                const v = parseInt(e.target.value, 10);
-                if (isFinite(v)) {
-                    config.SIM_RESOLUTION = v;
-                    window.needsFramebufferReinit = true;
-                }
-            });
+            
+            if (visualResCustom) {
+                visualResCustom.addEventListener('input', (e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (isFinite(v) && v >= 64) {
+                        console.log('Setting DYE_RESOLUTION to:', v);
+                        config.DYE_RESOLUTION = v;
+                        window.needsFramebufferReinit = true;
+                        // Save to session storage
+                        window.settingsManager?.setSession('temp.visualResolutionCustom', v);
+                    }
+                });
+            }
         }
         
-        // Scrollwheel to adjust brush size or density (with Shift) on canvas area
+        const physicsResSel = document.getElementById('physicsResolution');
+        const physicsResCustom = document.getElementById('physicsResolutionCustom');
+        if (physicsResSel) {
+            // Check if current value exists in options, otherwise use custom
+            const currentVal = String(config.SIM_RESOLUTION);
+            const hasOption = Array.from(physicsResSel.options).some(opt => opt.value === currentVal);
+            if (hasOption) {
+                physicsResSel.value = currentVal;
+            } else {
+                physicsResSel.value = 'custom';
+                if (physicsResCustom) {
+                    physicsResCustom.style.display = 'block';
+                    physicsResCustom.value = config.SIM_RESOLUTION;
+                }
+            }
+            
+            physicsResSel.addEventListener('change', (e) => {
+                if (e.target.value === 'custom') {
+                    if (physicsResCustom) {
+                        physicsResCustom.style.display = 'block';
+                        // Restore from session or use current
+                        const sessionVal = window.settingsManager?.getSession('temp.physicsResolutionCustom');
+                        physicsResCustom.value = sessionVal || config.SIM_RESOLUTION;
+                        physicsResCustom.focus();
+                    }
+                } else {
+                    if (physicsResCustom) physicsResCustom.style.display = 'none';
+                    const v = parseInt(e.target.value, 10);
+                    if (isFinite(v)) {
+                        config.SIM_RESOLUTION = v;
+                        window.needsFramebufferReinit = true;
+                    }
+                }
+            });
+            
+            if (physicsResCustom) {
+                physicsResCustom.addEventListener('input', (e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (isFinite(v) && v >= 16) {
+                        console.log('Setting SIM_RESOLUTION to:', v);
+                        config.SIM_RESOLUTION = v;
+                        window.needsFramebufferReinit = true;
+                        // Save to session storage
+                        window.settingsManager?.setSession('temp.physicsResolutionCustom', v);
+                    }
+                });
+            }
+        }
+        
+        // Scrollwheel to adjust brush size, density (Shift), or motion isolation (Ctrl+Shift) on canvas area
         let lastDensitySnapTime = 0;
         
         canvasArea.addEventListener('wheel', (e) => {
             e.preventDefault();
             
-            if (e.shiftKey) {
-                // Shift+Scroll: Adjust density
+            if (e.ctrlKey && e.shiftKey) {
+                // Ctrl+Shift+Scroll: Adjust Motion Isolation (Velocity Influence)
+                const velSlider = document.getElementById('velocityInfluence');
+                const velValueSpan = document.getElementById('velocityInfluenceValue');
+                if (velSlider) {
+                    let currentValue = parseFloat(velSlider.value);
+                    const minValue = parseFloat(velSlider.min);
+                    const maxValue = parseFloat(velSlider.max);
+                    const stepSize = parseFloat(velSlider.step) || 0.5;
+                    
+                    let newValue;
+                    if (e.deltaY < 0) {
+                        // Scrolling up - increase motion isolation influence
+                        newValue = currentValue + stepSize;
+                        if (newValue > maxValue) newValue = maxValue;
+                    } else {
+                        // Scrolling down - decrease motion isolation influence
+                        newValue = currentValue - stepSize;
+                        if (newValue < minValue) newValue = minValue;
+                    }
+                    
+                    // Update slider and config
+                    velSlider.value = String(newValue);
+                    velSlider.style.setProperty('--val', newValue);
+                    config.VELOCITY_INFLUENCE = newValue;
+                    if (velValueSpan) velValueSpan.textContent = newValue.toFixed(1);
+                }
+            } else if (e.ctrlKey && e.altKey) {
+                // Ctrl+Alt+Scroll: Adjust Curl
+                const cSlider = document.getElementById('curl');
+                const cSpan = document.getElementById('curlValue');
+                if (cSlider) {
+                    let currentValue = parseFloat(cSlider.value);
+                    const minValue = parseFloat(cSlider.min);
+                    const maxValue = parseFloat(cSlider.max);
+                    const stepSize = parseFloat(cSlider.step) || 1;
+
+                    let newValue;
+                    if (e.deltaY < 0) {
+                        newValue = currentValue + stepSize;
+                        if (newValue > maxValue) newValue = maxValue;
+                    } else {
+                        newValue = currentValue - stepSize;
+                        if (newValue < minValue) newValue = minValue;
+                    }
+
+                    cSlider.value = String(newValue);
+                    cSlider.style.setProperty('--val', newValue);
+                    config.CURL = newValue;
+                    if (cSpan) cSpan.textContent = newValue.toFixed(0);
+                }
+            } else if (e.altKey && e.shiftKey) {
+                // Alt+Shift+Scroll: Adjust Velocity Sustain (Velocity Dissipation) with higher sensitivity
+                const vSlider = document.getElementById('velocityDissipation');
+                const vSpan = document.getElementById('velocityValue');
+                if (vSlider) {
+                    let currentValue = parseFloat(vSlider.value);
+                    const minValue = parseFloat(vSlider.min);
+                    const maxValue = parseFloat(vSlider.max);
+                    const baseStep = parseFloat(vSlider.step) || 0.0001;
+                    const stepSize = baseStep * 10; // faster changes via scroll
+                    
+                    let newValue;
+                    if (e.deltaY < 0) {
+                        // Scrolling up - increase sustain
+                        newValue = currentValue + stepSize;
+                        if (newValue > maxValue) newValue = maxValue;
+                    } else {
+                        // Scrolling down - decrease sustain
+                        newValue = currentValue - stepSize;
+                        if (newValue < minValue) newValue = minValue;
+                    }
+                    
+                    // Update slider and config
+                    vSlider.value = String(newValue);
+                    vSlider.style.setProperty('--val', newValue);
+                    config.VELOCITY_DISSIPATION = newValue;
+                    if (vSpan) vSpan.textContent = newValue.toFixed(4);
+                }
+            } else if (e.shiftKey) {
+                // Shift+Scroll: Adjust density (less sensitive) with momentary stick at 1.0
                 const densitySlider = document.getElementById('densityDissipation');
                 const densityValueSpan = document.getElementById('densityValue');
                 let currentValue = parseFloat(densitySlider.value);
                 const minValue = parseFloat(densitySlider.min);
                 const maxValue = parseFloat(densitySlider.max);
-                const stepSize = 0.002; // Small increment for fine control
-                
-                // Magnetic snap parameters
-                const snapTarget = 1.0;
-                const snapRange = 0.003; // Range to trigger snap
-                const snapCooldown = 300; // ms before snap can trigger again
-                
+                const stepSize = 0.001; // reduced sensitivity
+                // Stick parameters (reuse lastDensitySnapTime)
+                const stickTarget = 1.0;
+                const stickCooldown = 1500; // ms window to prevent overshoot past 1.0
+                const now = Date.now();
+                const stickActive = (now - lastDensitySnapTime) < stickCooldown;
+
                 let newValue;
                 if (e.deltaY < 0) {
                     // Scrolling up - increase density
@@ -914,18 +1322,17 @@
                     if (newValue < minValue) newValue = minValue;
                 }
                 
-                // Apply momentary magnetic snap to 1.0
-                const now = Date.now();
-                const timeSinceLastSnap = now - lastDensitySnapTime;
-                
-                // Only snap if we're crossing through 1.0 and cooldown has passed
-                if (timeSinceLastSnap > snapCooldown && Math.abs(newValue - snapTarget) < snapRange) {
-                    newValue = snapTarget;
-                    lastDensitySnapTime = now;
+                // Momentary stick: simple debounce at 1.0 for stickCooldown ms
+                if (!stickActive && newValue >= stickTarget) {
+                    newValue = stickTarget;
+                    lastDensitySnapTime = now; // start stick window
+                } else if (stickActive) {
+                    newValue = stickTarget; // hold at 1.0 until cooldown expires
                 }
                 
                 // Update slider and config
                 densitySlider.value = newValue;
+                densitySlider.style.setProperty('--val', newValue);
                 config.DENSITY_DISSIPATION = newValue;
                 densityValueSpan.textContent = newValue.toFixed(4);
                 
@@ -953,6 +1360,7 @@
                 }
                 
                 brushSizeSlider.value = newValue;
+                brushSizeSlider.style.setProperty('--val', newValue);
                 config.SPLAT_RADIUS = newValue / 1000;
             }
         }, { passive: false });
@@ -988,6 +1396,7 @@
                         // Snap to 1.0
                         val = snapTarget;
                         slider.value = snapTarget;
+                        slider.style.setProperty('--val', snapTarget);
                         densityIsSnapped = true;
                         
                         // Set a timeout to allow breaking free
@@ -1002,6 +1411,7 @@
                         if (Math.abs(val - snapTarget) < pushThrough) {
                             val = snapTarget;
                             slider.value = snapTarget;
+                            slider.style.setProperty('--val', snapTarget);
                         }
                     }
                     
@@ -1042,13 +1452,18 @@
         function updateSliderValues() {
             Object.entries(sliderConfig).forEach(([id, cfg]) => {
                 const val = config[cfg.key];
-                document.getElementById(id).value = val;
+                const slider = document.getElementById(id);
+                slider.value = val;
+                slider.style.setProperty('--val', val);
                 const valueSpanId = id === 'pressureIteration' ? 'iterationValue' : 
                                     id.replace('Dissipation', '') + 'Value';
                 document.getElementById(valueSpanId).textContent = 
                     cfg.decimals === 0 ? Math.round(val) : val.toFixed(cfg.decimals);
             });
-            document.getElementById('brushSize').value = config.SPLAT_RADIUS * 1000;
+            const brushSlider = document.getElementById('brushSize');
+            const brushValue = config.SPLAT_RADIUS * 1000;
+            brushSlider.value = brushValue;
+            brushSlider.style.setProperty('--val', brushValue);
         }
         
         function splat(x, y, dx, dy, color) {
@@ -1095,15 +1510,18 @@
                 trailCanvas.width = targetWidth;
                 trailCanvas.height = targetHeight;
                 initFramebuffers();
+                exposeSimStats(); // Update stats after resize
                 window.needsFramebufferReinit = false;
             }
             
             if (!isPaused) {
-                
                 if (pointer.moved) {
                     multiSplat(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
                     pointer.moved = false;
                 }
+                
+                // Process right-click replay events before recording and physics
+                processReplay();
                 
                 if (recEnabled) {
                     recUpdatePlayback();
@@ -1112,7 +1530,8 @@
                 advectionProg.bind();
                 // Velocity advection at physics resolution
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
-                gl.uniform2f(advectionProg.uniforms.texelSize, 22.0 / simTexWidth, 22.0 / simTexHeight);
+                const velInfluence = config.VELOCITY_INFLUENCE || 22.0;
+                gl.uniform2f(advectionProg.uniforms.texelSize, velInfluence / simTexWidth, velInfluence / simTexHeight);
                 gl.uniform1f(advectionProg.uniforms.dt, dt);
                 
                 // Velocity pass
@@ -1127,7 +1546,7 @@
                 
                 // Density pass (advected by velocity field at sim resolution)
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
-                gl.uniform2f(advectionProg.uniforms.texelSize, 22.0 / simTexWidth, 22.0 / simTexHeight);
+                gl.uniform2f(advectionProg.uniforms.texelSize, velInfluence / simTexWidth, velInfluence / simTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
                 gl.uniform1i(advectionProg.uniforms.uSource, 1);
@@ -1243,7 +1662,8 @@
             layerOrder.forEach((item, idx) => {
                 const element = document.createElement('div');
                 element.className = 'layer-item';
-                element.draggable = true;
+                // Only header is draggable; the whole item is NOT draggable to avoid slider conflicts
+                element.draggable = false;
                 element.dataset.orderIndex = idx; // Store position in order array
                 
                 if (item.type === 'sim') {
@@ -1254,15 +1674,20 @@
                                 🌊
                             </div>
                             <div class="layer-info">
-                                <input type="text" class="layer-title" value="Sim Layer" readonly style="cursor: default;">
+                                <input type="text" class="layer-title" value="Sim Layer" readonly>
                             </div>
                             <div class="layer-controls">
-                                <button class="layer-btn" onclick="toggleSimLayer()">
-                                    ${canvas.style.display !== 'none' ? '👁️' : '👁️‍🗨️'}
-                                </button>
+                                <button class="layer-btn" onclick="toggleSimLayer()">${canvas.style.display !== 'none' ? '👁️' : '👁️‍🗨️'}</button>
                             </div>
                         </div>
                     `;
+                    const headerElSim = element.querySelector('.layer-item-header');
+                    if (headerElSim) headerElSim.draggable = true;
+                    const titleInput = element.querySelector('.layer-title');
+                    if (titleInput) {
+                        const prev = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
+                        ['dragstart','mousedown','pointerdown','touchstart'].forEach(evt => titleInput.addEventListener(evt, prev, { capture: true }));
+                    }
                 } else {
                     const layer = layers.find(l => l.index === item.id);
                     if (!layer) return; // Skip if layer not found
@@ -1291,14 +1716,45 @@
                         </div>
                         <div class="layer-threshold">
                             <span>Mask:</span>
-                            <input type="range" min="0" max="100" value="${layer.threshold}" 
-                                   oninput="updateLayerThreshold(${layer.index}, this.value); this.nextElementSibling.textContent = this.value + '%'">
-                            <span>${layer.threshold}%</span>
+                            <div class="layer-slider-host"></div>
+                            <span class="layer-slider-value">${layer.threshold}%</span>
                         </div>
                     `;
+                    
+                    // Create encapsulated slider in host
+                    const host = element.querySelector('.layer-slider-host');
+                    const valueEl = element.querySelector('.layer-slider-value');
+                    const headerEl = element.querySelector('.layer-item-header');
+                    if (headerEl) headerEl.draggable = true;
+                    if (host && valueEl) {
+                        const slider = buildEncapsulatedRange({ min: 0, max: 100, value: layer.threshold, step: 1, className: 'encapsulated-slider slider-gray' });
+                        host.appendChild(slider);
+                        slider.addEventListener('input', () => {
+                            valueEl.textContent = slider.value + '%';
+                            updateLayerThreshold(layer.index, slider.value);
+                        });
+                        // Temporarily disable parent draggable while interacting with slider to avoid HTML5 DnD starting
+                        const itemEl = element; // .layer-item
+                        const disable = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; if (itemEl) itemEl.dataset.sliderActive = '1'; };
+                        const enable = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; if (itemEl) delete itemEl.dataset.sliderActive; };
+                        ['pointerdown','mousedown','touchstart'].forEach(evt => slider.addEventListener(evt, disable, { passive: true }));
+                        ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => slider.addEventListener(evt, enable, { passive: true }));
+                    }
                 }
                 
-                element.addEventListener('dragstart', handleDragStart);
+                // Only start drags from the header
+                const headerEl = element.querySelector('.layer-item-header');
+                if (headerEl) headerEl.addEventListener('dragstart', handleDragStart);
+                // Guard: block dragstart initiated anywhere else in the item (capture)
+                element.addEventListener('dragstart', (e) => {
+                    if (isLayerSliderActive || !e.target.closest('.layer-item-header')) { e.preventDefault(); e.stopPropagation(); }
+                }, true);
+                // Guard: prevent header text input from initiating drags
+                const titleInput = element.querySelector('.layer-title');
+                if (titleInput) {
+                    const prev = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
+                    ['dragstart','mousedown','pointerdown','touchstart'].forEach(evt => titleInput.addEventListener(evt, prev, { capture: true }));
+                }
                 element.addEventListener('dragover', handleDragOver);
                 element.addEventListener('drop', handleDrop);
                 element.addEventListener('dragend', handleDragEnd);
@@ -1321,11 +1777,27 @@
         }
         
         let draggedElement = null;
+        let isLayerSliderActive = false;
+        let layerDragGuardInstalled = false;
+        if (!layerDragGuardInstalled) {
+            document.addEventListener('dragstart', (e) => {
+                if (isLayerSliderActive) { e.preventDefault(); e.stopPropagation(); }
+            }, true);
+            document.addEventListener('selectstart', (e) => {
+                if (isLayerSliderActive) { e.preventDefault(); e.stopPropagation(); }
+            }, true);
+            layerDragGuardInstalled = true;
+        }
         
         function handleDragStart(e) {
-            draggedElement = this;
-            this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
+            // If slider is active on this item, cancel
+            const item = (e.currentTarget && e.currentTarget.closest) ? e.currentTarget.closest('.layer-item') : null;
+            if (item && item.dataset.sliderActive === '1') { e.preventDefault(); return; }
+            // Do not start drag from interactive controls
+            if (e.target && (e.target.closest('button') || e.target.closest('input') || e.target.closest('select'))) { e.preventDefault(); return; }
+            draggedElement = item || this;
+            if (draggedElement && draggedElement.classList) draggedElement.classList.add('dragging');
+            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
         }
         
         function handleDragOver(e) {
@@ -1406,6 +1878,25 @@
             return false;
         }
         
+        // Build a slider that doesn't bubble events (encapsulated component)
+        function buildEncapsulatedRange({ min = 0, max = 100, value = 0, step = 1, className = '' } = {}) {
+            const input = document.createElement('input');
+            input.type = 'range';
+            input.min = String(min);
+            input.max = String(max);
+            input.step = String(step);
+            input.value = String(value);
+            input.className = className || '';
+            input.setAttribute('draggable', 'false');
+            // Prevent bubbling into layer drag/resize
+            const stop = (ev) => { ev.stopPropagation(); };
+            const stopAndPrevent = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+            ['mousedown','mouseup','click','dblclick','pointerdown','pointerup','pointermove','touchstart','touchmove','touchend','wheel','dragstart','contextmenu','keydown','keyup'].forEach(evt => {
+                input.addEventListener(evt, evt === 'wheel' || evt === 'dragstart' ? stopAndPrevent : stop, { passive: false });
+            });
+            return input;
+        }
+
         function updateLayerZIndices() {
             // layerOrder[0] = top (closest to viewer) = highest z-index
             // layerOrder[last] = bottom (furthest from viewer) = lowest z-index
@@ -1544,7 +2035,10 @@
                 div.className = `layer-resize-handle ${handle.class}`;
                 div.dataset.direction = handle.dir;
                 div.dataset.layerIndex = index;
-                div.addEventListener('mousedown', handleLayerResizeStart);
+                // Improve pen/touch UX
+                div.style.touchAction = 'none';
+                div.style.userSelect = 'none';
+                div.addEventListener('pointerdown', handleLayerResizeStart);
                 layerDiv.appendChild(div);
             });
         }
@@ -1567,14 +2061,21 @@
         let layerResizeStartScaleY = 1;
         let layerResizeStartPosX = 0;
         let layerResizeStartPosY = 0;
+        let layerResizePointerId = null;
+        let layerResizeHandleEl = null;
         
         function handleLayerResizeStart(e) {
+            // Allow pen/touch; restrict mouse to left button
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
             e.preventDefault();
             e.stopPropagation();
             
             isResizingLayer = true;
             layerResizeDirection = e.target.dataset.direction;
             resizeLayerIndex = parseInt(e.target.dataset.layerIndex);
+            layerResizePointerId = e.pointerId;
+            layerResizeHandleEl = e.currentTarget || e.target;
+            try { if (layerResizeHandleEl && layerResizeHandleEl.setPointerCapture) layerResizeHandleEl.setPointerCapture(e.pointerId); } catch (_) {}
             
             const layer = layers.find(l => l.index === resizeLayerIndex);
             if (!layer) return;
@@ -1587,12 +2088,17 @@
             layerResizeStartPosY = layer.y;
         }
         
-        // Add mouse event listeners to canvas wrapper for layer dragging
-        canvasWrapper.addEventListener('mousedown', (e) => {
+        // Add pointer event listeners to canvas wrapper for layer dragging
+        canvasWrapper.style.touchAction = 'none';
+        canvasWrapper.addEventListener('pointerdown', (e) => {
+            // Do not start layer dragging if the target is a slider
+            if (e.target && e.target.closest && e.target.closest('input[type="range"]')) return;
             if (activeLayerIndex === null) return;
             
             // Don't start dragging if clicking on a resize handle 
             if (e.target.classList.contains('layer-resize-handle')) return;
+            // Allow pen/touch; restrict mouse to left button
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
             
             const layer = layers.find(l => l.index === activeLayerIndex);
             if (!layer || !layer.active) return;
@@ -1606,13 +2112,16 @@
             layerDragStartY = e.clientY;
             layerStartX = layer.x;
             layerStartY = layer.y;
+            layerDragPointerId = e.pointerId;
+            layerDragCaptureEl = canvasWrapper;
+            try { if (layerDragCaptureEl && layerDragCaptureEl.setPointerCapture) layerDragCaptureEl.setPointerCapture(e.pointerId); } catch (_) {}
             
             e.preventDefault();
         });
         
-        document.addEventListener('mousemove', (e) => {
+        document.addEventListener('pointermove', (e) => {
             // Handle layer resizing
-            if (isResizingLayer && resizeLayerIndex !== null) {
+            if (isResizingLayer && resizeLayerIndex !== null && (layerResizePointerId == null || e.pointerId === layerResizePointerId)) {
                 const layer = layers.find(l => l.index === resizeLayerIndex);
                 if (!layer) return;
                 
@@ -1668,7 +2177,7 @@
             }
             
             // Handle layer dragging
-            if (!isDraggingLayer || activeLayerIndex === null) return;
+            if (!isDraggingLayer || activeLayerIndex === null || (layerDragPointerId != null && e.pointerId !== layerDragPointerId)) return;
             
             const layer = layers.find(l => l.index === activeLayerIndex);
             if (!layer) return;
@@ -1682,14 +2191,36 @@
             updateLayerPosition(activeLayerIndex);
         });
         
-        document.addEventListener('mouseup', () => {
-            if (isDraggingLayer) {
+        document.addEventListener('pointerup', (e) => {
+            if (isDraggingLayer && (layerDragPointerId == null || e.pointerId === layerDragPointerId)) {
                 isDraggingLayer = false;
+                try { if (layerDragCaptureEl && layerDragCaptureEl.releasePointerCapture) layerDragCaptureEl.releasePointerCapture(e.pointerId); } catch (_) {}
+                layerDragPointerId = null;
+                layerDragCaptureEl = null;
             }
-            if (isResizingLayer) {
+            if (isResizingLayer && (layerResizePointerId == null || e.pointerId === layerResizePointerId)) {
                 isResizingLayer = false;
                 layerResizeDirection = null;
                 resizeLayerIndex = null;
+                try { if (layerResizeHandleEl && layerResizeHandleEl.releasePointerCapture) layerResizeHandleEl.releasePointerCapture(e.pointerId); } catch (_) {}
+                layerResizePointerId = null;
+                layerResizeHandleEl = null;
+            }
+        });
+        document.addEventListener('pointercancel', (e) => {
+            if (isDraggingLayer && (layerDragPointerId == null || e.pointerId === layerDragPointerId)) {
+                isDraggingLayer = false;
+                try { if (layerDragCaptureEl && layerDragCaptureEl.releasePointerCapture) layerDragCaptureEl.releasePointerCapture(e.pointerId); } catch (_) {}
+                layerDragPointerId = null;
+                layerDragCaptureEl = null;
+            }
+            if (isResizingLayer && (layerResizePointerId == null || e.pointerId === layerResizePointerId)) {
+                isResizingLayer = false;
+                layerResizeDirection = null;
+                resizeLayerIndex = null;
+                try { if (layerResizeHandleEl && layerResizeHandleEl.releasePointerCapture) layerResizeHandleEl.releasePointerCapture(e.pointerId); } catch (_) {}
+                layerResizePointerId = null;
+                layerResizeHandleEl = null;
             }
         });
         
@@ -1799,7 +2330,7 @@
         function getState() {
             const rect = getWrapperRectState();
             return {
-                paletteIndex: (document.getElementById('paletteSelector')?.value) ? parseInt(document.getElementById('paletteSelector').value, 10) : 0,
+                paletteIndex: (typeof currentPaletteIndex !== 'undefined') ? currentPaletteIndex : 0,
                 savedColors: Array.isArray(savedColors) ? savedColors.slice() : [],
                 randomOn: !!document.getElementById('randomColor')?.checked,
                 stepOn: !!document.getElementById('stepPalette')?.checked,
@@ -1828,11 +2359,10 @@
                 const lockEl = document.getElementById('lockCanvasBorders');
                 const visualSel = document.getElementById('visualResolution');
                 const physSel = document.getElementById('physicsResolution');
-                const paletteSel = document.getElementById('paletteSelector');
                 const cp = document.getElementById('colorPicker');
                 
-                if (paletteSel && typeof applyPalette === 'function') {
-                    applyPalette(String(s.paletteIndex));
+                if (typeof applyPalette === 'function' && typeof s.paletteIndex === 'number') {
+                    applyPalette(s.paletteIndex);
                 }
                 if (Array.isArray(s.savedColors) && typeof colorStorage?.save === 'function') {
                     colorStorage.save(s.savedColors.slice());
@@ -1845,7 +2375,11 @@
                 if (typeof updateColor === 'function') updateColor();
                 
                 const brushEl = document.getElementById('brushSize');
-                if (brushEl) { brushEl.value = String(s.brushSize); config.SPLAT_RADIUS = s.brushSize / 1000; }
+                if (brushEl) { 
+                    brushEl.value = String(s.brushSize); 
+                    brushEl.style.setProperty('--val', s.brushSize);
+                    config.SPLAT_RADIUS = s.brushSize / 1000; 
+                }
                 
                 if (visualSel) { visualSel.value = String(s.visualRes); visualSel.dispatchEvent(new Event('change')); }
                 if (physSel) { physSel.value = String(s.physicsRes); physSel.dispatchEvent(new Event('change')); }
@@ -1923,6 +2457,7 @@
             v = Math.min(max, Math.max(min, v + delta * step));
             pushUndo();
             el.value = String(v);
+            el.style.setProperty('--val', v);
             config.SPLAT_RADIUS = v / 1000;
         }
         function stepPaletteOnce(forward=true) {
@@ -2011,16 +2546,7 @@
             // Palette cycling
             if (ctrlOrMeta && (key === 'ArrowLeft' || key === 'ArrowRight')) {
                 e.preventDefault();
-                const sel = document.getElementById('paletteSelector');
-                if (sel) {
-                    pushUndo();
-                    let idx = sel.selectedIndex;
-                    if (key === 'ArrowLeft') idx = Math.max(0, idx - 1); else idx = Math.min(sel.options.length - 1, idx + 1);
-                    if (idx !== sel.selectedIndex) {
-                        sel.selectedIndex = idx;
-                        sel.dispatchEvent(new Event('change'));
-                    }
-                }
+                if (typeof window.cyclePalette === 'function') { pushUndo(); window.cyclePalette(key === 'ArrowLeft' ? -1 : 1); }
                 return;
             }
             
