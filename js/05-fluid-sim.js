@@ -17,6 +17,10 @@
                 gl.attachShader(this.program, vertShader);
                 gl.attachShader(this.program, fragShader);
                 gl.linkProgram(this.program);
+                if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
+                    const info = gl.getProgramInfoLog(this.program) || 'Unknown link error';
+                    console.error('Program link failed:', info);
+                }
                 
                 this.uniforms = {};
                 const count = gl.getProgramParameter(this.program, gl.ACTIVE_UNIFORMS);
@@ -34,6 +38,7 @@
         const PRECISION = (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "mediump" : "highp");
 
         const baseVert = `#version 300 es
+            precision ${PRECISION} float;
             layout (location = 0) in vec2 aPos;
             out vec2 vUv, vL, vR, vT, vB;
             uniform vec2 texelSize;
@@ -407,7 +412,8 @@
             const rgba = { internalFormat: gl.RGBA16F, format: gl.RGBA };
             const rg = { internalFormat: gl.RG16F, format: gl.RG };
             const r = { internalFormat: gl.R16F, format: gl.RED };
-            const filter = linearExt ? gl.LINEAR : gl.NEAREST;
+            const _linearOk = (typeof window !== 'undefined' && window.linearExt) || gl.getExtension('OES_texture_float_linear');
+            const filter = _linearOk ? gl.LINEAR : gl.NEAREST;
             
             // Visual dye buffers at dye resolution
             density = createDoubleFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
@@ -1715,8 +1721,7 @@
                 advectionProg.bind();
                 // Velocity advection at physics resolution
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
-                const velInfluence = config.VELOCITY_INFLUENCE || 22.0;
-                gl.uniform2f(advectionProg.uniforms.texelSize, velInfluence / simTexWidth, velInfluence / simTexHeight);
+                gl.uniform2f(advectionProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(advectionProg.uniforms.dt, dt);
                 
                 // Velocity pass
@@ -1731,7 +1736,7 @@
                 
                 // Density pass (advected by velocity field at sim resolution)
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
-                gl.uniform2f(advectionProg.uniforms.texelSize, velInfluence / simTexWidth, velInfluence / simTexHeight);
+                gl.uniform2f(advectionProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
                 gl.uniform1i(advectionProg.uniforms.uSource, 1);

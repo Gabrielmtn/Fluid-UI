@@ -114,6 +114,7 @@
         
         gl.getExtension('EXT_color_buffer_float');
         const linearExt = gl.getExtension('OES_texture_float_linear');
+        try { window.linearExt = linearExt; } catch(_) {}
         gl.clearColor(0, 0, 0, 0);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
