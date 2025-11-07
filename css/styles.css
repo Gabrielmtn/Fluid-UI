@@ -12,6 +12,8 @@
             padding: 0;
             display: flex;
             height: 100vh;
+            height: 100dvh;
+            overscroll-behavior: none;
         }
         
         #canvas-area {
@@ -21,6 +23,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            touch-action: none;
+            overscroll-behavior: none;
         }
         
         #canvas-wrapper {
@@ -105,6 +109,7 @@
             position: absolute;
             top: 0;
             left: 0;
+            touch-action: none;
         }
         
         #canvas {
@@ -224,9 +229,14 @@
         .controls {
             flex: 0 0 280px;
             height: 100vh;
+            height: 100dvh;
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(10px);
             padding: 10px;
+            padding-top: calc(10px + env(safe-area-inset-top));
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            padding-left: calc(10px + env(safe-area-inset-left));
+            padding-right: calc(10px + env(safe-area-inset-right));
             color: white;
             box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
             z-index: 100;

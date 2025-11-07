@@ -31,6 +31,8 @@
             }
         }
         
+        const PRECISION = (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "mediump" : "highp");
+
         const baseVert = `#version 300 es
             layout (location = 0) in vec2 aPos;
             out vec2 vUv, vL, vR, vT, vB;
@@ -44,9 +46,9 @@
                 gl_Position = vec4(aPos, 0.0, 1.0);
             }
         `;
-        
+
         const displayFrag = `#version 300 es
-            precision highp float;
+            precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTexture;
@@ -181,9 +183,9 @@
                 }
             }
         `;
-        
+
         const splatFrag = `#version 300 es
-            precision highp float;
+            precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTarget;
@@ -198,9 +200,9 @@
                 fragColor = vec4(base + splat * 0.2, 1.0);
             }
         `;
-        
+
         const advectionFrag = `#version 300 es
-            precision highp float;
+            precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uVelocity, uSource;
@@ -237,9 +239,9 @@
                 fragColor = color;
             }
         `;
-        
+
         const divergenceFrag = `#version 300 es
-            precision highp float;
+            precision ${PRECISION} float;
             in vec2 vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uVelocity;
@@ -257,7 +259,7 @@
         `;
         
         const curlFrag = `#version 300 es
-            precision highp float;
+            precision ${PRECISION} float;
             in vec2 vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uVelocity;
@@ -268,7 +270,7 @@
         `;
         
         const vorticityFrag = `#version 300 es
-            precision highp float;
+            precision ${PRECISION} float;
             in vec2 vUv, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uVelocity, uCurl;
@@ -283,7 +285,7 @@
         `;
         
         const pressureFrag = `#version 300 es
-            precision highp float;
+            precision ${PRECISION} float;
             in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uPressure, uDivergence;
@@ -298,7 +300,7 @@
         `;
         
         const gradientFrag = `#version 300 es
-            precision highp float;
+            precision ${PRECISION} float;
             in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uPressure, uVelocity;
@@ -312,7 +314,7 @@
         `;
         
         const clearFrag = `#version 300 es
-            precision highp float;
+            precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTexture;
@@ -584,7 +586,7 @@
                     0,
                     pointer.color,
                     (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
-                    config.SPLAT_RADIUS * canvas.width
+                    config.SPLAT_RADIUS
                 );
             }
         });
@@ -615,7 +617,7 @@
                             pointer.dy / canvas.height,
                             pointer.color,
                             (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
-                            config.SPLAT_RADIUS * canvas.width
+                            config.SPLAT_RADIUS
                         );
                         canvas._lastBroadcast = Date.now();
                     }
@@ -667,10 +669,10 @@
                     0,
                     pointer.color,
                     (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
-                    config.SPLAT_RADIUS * canvas.width
+                    config.SPLAT_RADIUS
                 );
             }
-        });
+        }, { passive: false });
         
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
@@ -695,13 +697,13 @@
                             pointer.dy / canvas.height,
                             pointer.color,
                             (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
-                            config.SPLAT_RADIUS * canvas.width
+                            config.SPLAT_RADIUS
                         );
                         canvas._lastTouchBroadcast = now;
                     }
                 }
             }
-        });
+        }, { passive: false });
         
         window.addEventListener('touchend', () => {
             if (pointer.down) {
@@ -730,7 +732,7 @@
             backgroundColorPicker.addEventListener('input', (e) => {
                 const color = e.target.value;
                 canvasArea.style.backgroundColor = color;
-                document.body.style.backgroundColor = color;
+                
             });
         }
         
@@ -1587,6 +1589,83 @@
         let fpsTimes = [];
         window.fpsCap = (typeof window.fpsCap === 'number') ? window.fpsCap : 0; // 0 = uncapped
         window.__stats = window.__stats || {}; // { fps, frametime, lastCpuMs }
+        // Adaptive quality control state
+        const DYE_LEVELS = [8192, 6144, 4096, 3072, 2048, 1536, 1024, 512, 256, 128];
+        const SIM_LEVELS = [4096, 3072, 2048, 1536, 1024, 768, 512, 384, 256, 128, 64, 32, 16];
+        let qualityCtrl = { lowMs: 0, highMs: 0 };
+        function nextLower(val, levels) {
+            const i = levels.findIndex(v => v === val);
+            if (i < 0) {
+                // If not exact, find first lower
+                for (let k = 0; k < levels.length; k++) { if (levels[k] < val) return levels[k]; }
+                return val;
+            }
+            return (i === levels.length - 1) ? levels[i] : levels[i + 1];
+        }
+        function nextHigher(val, levels, maxVal) {
+            const i = levels.findIndex(v => v === val);
+            if (i < 0) {
+                // If not exact, find first higher not exceeding maxVal
+                for (let k = levels.length - 1; k >= 0; k--) { if (levels[k] > val && levels[k] <= maxVal) return levels[k]; }
+                return val;
+            }
+            if (i === 0) return levels[i];
+            const candidate = levels[i - 1];
+            return Math.min(candidate, maxVal);
+        }
+        function setSelectValue(id, value) {
+            try {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                const v = String(value);
+                const has = Array.from(sel.options).some(o => o.value === v);
+                sel.value = has ? v : 'custom';
+                if (!has) {
+                    const custom = document.getElementById(id + 'Custom');
+                    if (custom) { custom.style.display = 'block'; custom.value = value; }
+                } else {
+                    const custom = document.getElementById(id + 'Custom');
+                    if (custom) custom.style.display = 'none';
+                }
+            } catch(_) {}
+        }
+        function stepDownQuality() {
+            const base = window.baselineConfig || { DYE_RESOLUTION: window.config?.DYE_RESOLUTION, SIM_RESOLUTION: window.config?.SIM_RESOLUTION, PRESSURE_ITERATIONS: window.config?.PRESSURE_ITERATIONS };
+            const beforeDye = window.config?.DYE_RESOLUTION;
+            const beforeSim = window.config?.SIM_RESOLUTION;
+            const newDye = nextLower(beforeDye, DYE_LEVELS);
+            const newSim = nextLower(beforeSim, SIM_LEVELS);
+            let changed = false;
+            if (typeof window.config === 'object') {
+                if (newDye !== beforeDye) { window.config.DYE_RESOLUTION = newDye; changed = true; setSelectValue('visualResolution', newDye); }
+                if (newSim !== beforeSim) { window.config.SIM_RESOLUTION = newSim; changed = true; setSelectValue('physicsResolution', newSim); }
+                window.config.PRESSURE_ITERATIONS = Math.max(20, Math.round((window.config.PRESSURE_ITERATIONS || base.PRESSURE_ITERATIONS) - 10));
+            }
+            if (changed) {
+                window.needsFramebufferReinit = true;
+                if (typeof updateSliderValues === 'function') { try { updateSliderValues(); } catch(_){} }
+                console.log('[Adaptive] Stepped down quality:', { dye: beforeDye+'->'+newDye, sim: beforeSim+'->'+newSim, iter: window.config?.PRESSURE_ITERATIONS });
+            }
+        }
+        function stepUpQuality() {
+            const base = window.baselineConfig || { DYE_RESOLUTION: window.config?.DYE_RESOLUTION, SIM_RESOLUTION: window.config?.SIM_RESOLUTION, PRESSURE_ITERATIONS: window.config?.PRESSURE_ITERATIONS };
+            const beforeDye = window.config?.DYE_RESOLUTION;
+            const beforeSim = window.config?.SIM_RESOLUTION;
+            const newDye = nextHigher(beforeDye, DYE_LEVELS, base.DYE_RESOLUTION || beforeDye);
+            const newSim = nextHigher(beforeSim, SIM_LEVELS, base.SIM_RESOLUTION || beforeSim);
+            let changed = false;
+            if (typeof window.config === 'object') {
+                if (newDye !== beforeDye) { window.config.DYE_RESOLUTION = newDye; changed = true; setSelectValue('visualResolution', newDye); }
+                if (newSim !== beforeSim) { window.config.SIM_RESOLUTION = newSim; changed = true; setSelectValue('physicsResolution', newSim); }
+                const baseIter = base.PRESSURE_ITERATIONS || window.config.PRESSURE_ITERATIONS;
+                window.config.PRESSURE_ITERATIONS = Math.min(baseIter, Math.round((window.config.PRESSURE_ITERATIONS || baseIter) + 10));
+            }
+            if (changed) {
+                window.needsFramebufferReinit = true;
+                if (typeof updateSliderValues === 'function') { try { updateSliderValues(); } catch(_){} }
+                console.log('[Adaptive] Stepped up quality:', { dye: beforeDye+'->'+newDye, sim: beforeSim+'->'+newSim, iter: window.config?.PRESSURE_ITERATIONS });
+            }
+        }
         
         function update() {
             const cpuStart = performance.now();
@@ -1756,6 +1835,28 @@
             }
             const cpuMs = performance.now() - cpuStart;
             window.__stats = { fps: fpsVal, frametime: frametimeMs, lastCpuMs: cpuMs };
+
+            // FPS-based adaptive quality with hysteresis
+            if (Number.isFinite(fpsVal) && Number.isFinite(frametimeMs)) {
+                if (fpsVal < 28) {
+                    qualityCtrl.lowMs += frametimeMs || 0;
+                    qualityCtrl.highMs = 0;
+                } else if (fpsVal > 56) {
+                    qualityCtrl.highMs += frametimeMs || 0;
+                    qualityCtrl.lowMs = 0;
+                } else {
+                    // in mid band, slowly decay accumulators
+                    qualityCtrl.lowMs = Math.max(0, qualityCtrl.lowMs - (frametimeMs || 0) * 0.5);
+                    qualityCtrl.highMs = Math.max(0, qualityCtrl.highMs - (frametimeMs || 0) * 0.5);
+                }
+                if (qualityCtrl.lowMs > 1500) { // ~1.5s sustained low fps
+                    stepDownQuality();
+                    qualityCtrl.lowMs = 0; qualityCtrl.highMs = 0;
+                } else if (qualityCtrl.highMs > 3000) { // ~3s sustained high fps
+                    stepUpQuality();
+                    qualityCtrl.lowMs = 0; qualityCtrl.highMs = 0;
+                }
+            }
 
             requestAnimationFrame(update);
         }

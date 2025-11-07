@@ -30,6 +30,7 @@
             });
         }
         
+        let nextTrailDrawAt = 0;
         function trackMouseMovement(e) {
             if (!pointer.down || isReplayActive) return;
             
@@ -48,6 +49,13 @@
             mousePositions = mousePositions.filter(pos => pos.timestamp >= cutoff);
             
             if (showTrail && mousePositions.length > 1) {
+                const stats = window.__stats || {};
+                const fps = (typeof stats.fps === 'number' && isFinite(stats.fps)) ? stats.fps : 60;
+                const now = Date.now();
+                let interval = 0;
+                if (fps < 26) interval = 100; else if (fps < 36) interval = 50;
+                if (now < nextTrailDrawAt) return;
+                nextTrailDrawAt = now + interval;
                 const lastPos = mousePositions[mousePositions.length - 2];
                 trailCtx.beginPath();
                 trailCtx.strokeStyle = currentTrailColorCss;
@@ -125,6 +133,33 @@
         
         // Expose for stats panel
         window.config = config;
+        // Snapshot baseline for potential adaptive logic
+        window.baselineConfig = {
+            DYE_RESOLUTION: config.DYE_RESOLUTION,
+            SIM_RESOLUTION: config.SIM_RESOLUTION,
+            PRESSURE_ITERATIONS: config.PRESSURE_ITERATIONS
+        };
+        
+        // Mobile defaults: reduce load for iOS/Android WebKit and smaller GPUs
+        (function applyMobileDefaults(){
+            try {
+                const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+                if (isMobile) {
+                    config.DYE_RESOLUTION = 1024; // Visual quality
+                    config.SIM_RESOLUTION = 256;  // Physics resolution
+                    config.PRESSURE_ITERATIONS = 40; // Solver steps
+                    // Slightly smaller default brush so initial tap isn't too large on mobile
+                    config.SPLAT_RADIUS = 0.009;
+                    // Default trail off on mobile to save fill-rate
+                    try { showTrail = false; } catch(_) {}
+                    // Sync UI when ready
+                    window.addEventListener('load', () => {
+                        const tgl = document.getElementById('trailToggle');
+                        if (tgl) tgl.checked = false;
+                    });
+                }
+            } catch(_) {}
+        })();
         
         const presets = {
             silky: { DENSITY_DISSIPATION: 0.9995, VELOCITY_DISSIPATION: 1.0001, PRESSURE_DISSIPATION: 0.8, PRESSURE_ITERATIONS: 20, CURL: 30, SPLAT_RADIUS: 0.011 },
@@ -1268,6 +1303,64 @@
             btn.textContent = isPaused ? 'Resume' : 'Pause';
             btn.style.background = isPaused ? 'rgba(100, 200, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)';
         };
+        
+        // Respect reduced motion preferences
+        (function setupReducedMotion(){
+            try {
+                const mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+                function applyReducedMotion(on) {
+                    if (!on) return;
+                    // Disable kaleido, set multiplier=1, slightly reduce motion
+                    window.kaleidoEnabled = false;
+                    const kt = document.getElementById('kaleidoToggle');
+                    if (kt) kt.checked = false;
+                    animationMultiplier = 1;
+                    window.animationMultiplier = 1;
+                    const ms = document.getElementById('multiplier');
+                    const mv = document.getElementById('multiplierValue');
+                    if (ms) { ms.value = '1'; try { ms.style.setProperty('--val', 1); } catch(_){} }
+                    if (mv) mv.textContent = '1x';
+                    if (typeof config === 'object') {
+                        // Nudge velocity influence to moderate motion
+                        config.VELOCITY_INFLUENCE = Math.min(config.VELOCITY_INFLUENCE || 22.0, 20.0);
+                    }
+                }
+                if (mq) {
+                    applyReducedMotion(!!mq.matches);
+                    if (mq.addEventListener) mq.addEventListener('change', (e) => applyReducedMotion(!!e.matches));
+                    else if (mq.addListener) mq.addListener((e) => applyReducedMotion(!!e.matches));
+                }
+            } catch(_) {}
+        })();
+        
+        // Page Visibility: auto-pause when hidden, resume if we paused it
+        (function setupVisibilityPause(){
+            try {
+                let pausedByVisibility = false;
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        if (!isPaused) { pausedByVisibility = true; window.togglePause(); }
+                    } else {
+                        if (pausedByVisibility && isPaused) { window.togglePause(); }
+                        pausedByVisibility = false;
+                    }
+                });
+            } catch(_) {}
+        })();
+        
+        // WebGL context loss handling: prevent default loss, reload on restore
+        (function setupContextLossHandling(){
+            try {
+                if (!canvas) return;
+                canvas.addEventListener('webglcontextlost', (e) => {
+                    try { e.preventDefault(); } catch(_){}
+                }, false);
+                canvas.addEventListener('webglcontextrestored', () => {
+                    // Simplest reliable recovery across modules
+                    try { window.location.reload(); } catch(_){}
+                }, false);
+            } catch(_) {}
+        })();
         
         window.captureLayer = () => {
             const ok = typeof doCaptureFromRegion === 'function' ? doCaptureFromRegion() : false;

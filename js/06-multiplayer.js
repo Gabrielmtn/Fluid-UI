@@ -222,7 +222,7 @@ function handleRemoteSplat(data) {
         const canvasY = y * canvas.height;
         const canvasDx = dx * canvas.width;
         const canvasDy = dy * canvas.height;
-        const normalizedRadius = (typeof radius === 'number' ? radius / canvas.width : undefined);
+        const normalizedRadius = (typeof radius === 'number' ? radius : undefined);
 
         if (!handleRemoteSplat._logged) {
             console.log('[Multiplayer] Remote splat settings:', { mult, radius, normalizedRadius, localMult: window.animationMultiplier, localRadius: window.config?.SPLAT_RADIUS });
