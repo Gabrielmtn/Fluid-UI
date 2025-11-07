@@ -179,22 +179,36 @@
             
             const buttons = presetContainer.querySelectorAll('button');
             buttons.forEach(btn => {
-                if (btn.textContent === activePreset) {
-                    btn.style.background = 'rgba(100, 200, 255, 0.4)';
-                    btn.style.transform = 'scale(1.05)';
+                const presetName = btn.textContent.trim().toLowerCase();
+                if (presetName === activePreset) {
+                    btn.classList.add('active');
                 } else {
-                    btn.style.background = 'rgba(255, 255, 255, 0.15)';
-                    btn.style.transform = 'scale(1)';
+                    btn.classList.remove('active');
                 }
             });
         }
+        
+        // Clear active preset when user manually changes settings
+        function clearActivePreset() {
+            if (activePreset) {
+                activePreset = null;
+                updatePresetButtons();
+            }
+        }
+        
+        // Expose to window for slider listeners
+        window.clearActivePreset = clearActivePreset;
         
         window.toggleFreeze = () => {
             const freezeBtn = document.getElementById('freezeBtn');
             const isUnfreezing = freezeBtn.textContent.includes('Unfreeze');
             
             freezeBtn.textContent = isUnfreezing ? '❄️ Freeze' : '🔥 Unfreeze';
-            freezeBtn.style.background = isUnfreezing ? 'rgba(255, 255, 255, 0.15)' : 'rgba(100, 200, 255, 0.4)';
+            if (isUnfreezing) {
+                freezeBtn.classList.remove('active');
+            } else {
+                freezeBtn.classList.add('active');
+            }
             
             const startTime = performance.now();
             const duration = 300;
@@ -1337,7 +1351,8 @@
                     x: 0,
                     y: 0,
                     scaleX: 1,
-                    scaleY: 1
+                    scaleY: 1,
+                    rotation: 0
                 };
                 
                 layers.push(layer);
@@ -1610,7 +1625,8 @@
                 x: 0,
                 y: 0,
                 scaleX: 1,
-                scaleY: 1
+                scaleY: 1,
+                rotation: 0
             };
             layers.push(layer);
             const simIndex = layerOrder.findIndex(item => item.type === 'sim');

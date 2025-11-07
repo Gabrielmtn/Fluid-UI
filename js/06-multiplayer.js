@@ -5,14 +5,21 @@ let partySocket = null;
 let isMultiplayerEnabled = false;
 let connectedClients = 0;
 let clientId = null;
-let remoteCursors = new Map(); // Map of clientId -> cursor data
+let remoteCursors = new Map();
+let isProcessingRemoteEvent = false;
+let remoteLastPositions = new Map();
 
 // Configuration
 // If running on localhost, PartyKit server is always on port 1999
 // regardless of which port the static files are served from
-const PARTYKIT_HOST = window.location.hostname === 'localhost'
-    ? 'localhost:1999'
-    : 'YOUR_PARTYKIT_HOST.partykit.dev';
+const PARTYKIT_HOST = (function() {
+    if (window.PARTYKIT_HOST && typeof window.PARTYKIT_HOST === 'string') return window.PARTYKIT_HOST;
+    const host = window.location.host;
+    const hn = window.location.hostname;
+    if (hn === 'localhost' || hn === '127.0.0.1') return 'localhost:1999';
+    if (/\.partykit\.dev$/.test(host)) return host;
+    return 'fluid-ui-multiplayer.gabrielmtn.partykit.dev';
+})();
 const ROOM_NAME = window.location.hash ? window.location.hash.substring(1) : 'default-room';
 
 // Initialize multiplayer
@@ -96,9 +103,14 @@ function onMultiplayerMessage(event) {
                 break;
 
             case 'cursor':
-                // Receive cursor position from another client
                 if (data.clientId !== clientId) {
                     handleRemoteCursor(data);
+                }
+                break;
+
+            case 'pointer-up':
+                if (data.clientId !== clientId) {
+                    handleRemotePointerUp(data);
                 }
                 break;
 
@@ -133,26 +145,29 @@ function onMultiplayerError(error) {
     updateMultiplayerStatus('Connection error');
 }
 
-// Send local interaction to other clients
 function broadcastSplat(x, y, dx, dy, color, mult, radius) {
-    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
+        return;
+    }
+
+    const now = Date.now();
+    if (broadcastSplat.lastSent && now - broadcastSplat.lastSent < 33) {
         return;
     }
 
     partySocket.send(JSON.stringify({
         type: 'splat',
         data: { x, y, dx, dy, color, mult, radius },
-        timestamp: Date.now()
+        timestamp: now
     }));
+    broadcastSplat.lastSent = now;
 }
 
-// Send cursor position to other clients
 function broadcastCursor(x, y) {
-    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
         return;
     }
 
-    // Throttle cursor updates (send max every 50ms)
     if (!broadcastCursor.lastSent || Date.now() - broadcastCursor.lastSent > 50) {
         partySocket.send(JSON.stringify({
             type: 'cursor',
@@ -161,6 +176,18 @@ function broadcastCursor(x, y) {
         }));
         broadcastCursor.lastSent = Date.now();
     }
+}
+
+function broadcastPointerUp() {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
+        return;
+    }
+
+    console.log('[Multiplayer] Broadcasting pointer-up');
+    partySocket.send(JSON.stringify({
+        type: 'pointer-up',
+        timestamp: Date.now()
+    }));
 }
 
 // Send clear event
@@ -188,21 +215,56 @@ function broadcastPreset(presetName) {
     }));
 }
 
-// Handle splat from remote client
 function handleRemoteSplat(data) {
     if (typeof splat === 'function') {
         const { x, y, dx, dy, color, mult, radius } = data.data;
-        // Convert normalized coordinates back to canvas coordinates
         const canvasX = x * canvas.width;
         const canvasY = y * canvas.height;
         const canvasDx = dx * canvas.width;
         const canvasDy = dy * canvas.height;
+        const normalizedRadius = (typeof radius === 'number' ? radius / canvas.width : undefined);
 
-        // Apply as multiplied multi-splat if helper exists or fallback
-        if (typeof window.applyMultiSplatWith === 'function') {
-            window.applyMultiSplatWith(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0], mult || 1, typeof radius === 'number' ? radius : undefined);
-        } else {
-            splat(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0]);
+        if (!handleRemoteSplat._logged) {
+            console.log('[Multiplayer] Remote splat settings:', { mult, radius, normalizedRadius, localMult: window.animationMultiplier, localRadius: window.config?.SPLAT_RADIUS });
+            handleRemoteSplat._logged = true;
+            setTimeout(() => { handleRemoteSplat._logged = false; }, 5000);
+        }
+
+        isProcessingRemoteEvent = true;
+        try {
+            const lastPos = remoteLastPositions.get(data.clientId);
+            
+            if (lastPos && lastPos.x !== undefined && lastPos.y !== undefined) {
+                const distX = canvasX - lastPos.x;
+                const distY = canvasY - lastPos.y;
+                const distance = Math.sqrt(distX * distX + distY * distY);
+                
+                if (distance > 1) {
+                    const steps = Math.min(Math.floor(distance / 2), 30);
+                    
+                    for (let i = 1; i <= steps; i++) {
+                        const t = i / (steps + 1);
+                        const interpX = lastPos.x + distX * t;
+                        const interpY = lastPos.y + distY * t;
+                        
+                        if (typeof window.applyMultiSplatWith === 'function') {
+                            window.applyMultiSplatWith(interpX, interpY, canvasDx, canvasDy, color || [1,0,0], mult || 1, normalizedRadius);
+                        } else {
+                            splat(interpX, interpY, canvasDx, canvasDy, color || [1,0,0]);
+                        }
+                    }
+                }
+            }
+            
+            if (typeof window.applyMultiSplatWith === 'function') {
+                window.applyMultiSplatWith(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0], mult || 1, normalizedRadius);
+            } else {
+                splat(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0]);
+            }
+            
+            remoteLastPositions.set(data.clientId, { x: canvasX, y: canvasY });
+        } finally {
+            isProcessingRemoteEvent = false;
         }
     }
 }
@@ -219,11 +281,19 @@ function broadcastReplayStroke(events) {
     }));
 }
 
-// Handle cursor from remote client
 function handleRemoteCursor(data) {
     const { x, y } = data.data;
     remoteCursors.set(data.clientId, { x, y, timestamp: data.timestamp });
     updateRemoteCursors();
+}
+
+function handleRemotePointerUp(data) {
+    console.log('[Multiplayer] Received pointer-up from client:', data.clientId);
+    const cursor = remoteCursors.get(data.clientId);
+    if (cursor) {
+        cursor.pointerDown = false;
+    }
+    remoteLastPositions.delete(data.clientId);
 }
 
 // Update remote cursor display
@@ -304,6 +374,14 @@ function initMultiplayerUI() {
         roomNameEl.textContent = ROOM_NAME;
     }
 }
+
+window.isProcessingRemoteEvent = function() { return isProcessingRemoteEvent; };
+window.broadcastSplat = broadcastSplat;
+window.broadcastCursor = broadcastCursor;
+window.broadcastPointerUp = broadcastPointerUp;
+window.broadcastClear = broadcastClear;
+window.broadcastPreset = broadcastPreset;
+window.broadcastReplayStroke = broadcastReplayStroke;
 
 console.log('Multiplayer module loaded. Room:', ROOM_NAME);
 

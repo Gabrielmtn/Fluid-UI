@@ -64,6 +64,11 @@ class Draggable {
         // Allow pen/touch; restrict mouse to left button
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         
+        // Don't start drag if clicking on buttons or interactive elements
+        if (e.target && e.target.closest && (e.target.closest('button') || e.target.closest('input') || e.target.closest('select'))) {
+            return;
+        }
+        
         e.preventDefault();
         
         this.isDragging = true;

@@ -6,42 +6,10 @@
             cornerPositions.se = { x: rect.right, y: rect.bottom };
             cornerPositions.sw = { x: rect.left, y: rect.bottom };
         }
-        
-        document.querySelectorAll('.corner-lock').forEach(lock => {
-            lock.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const corner = lock.dataset.corner;
-                
-                // Unlock all other corners first
-                for (let c in lockedCorners) {
-                    if (c !== corner) {
-                        lockedCorners[c] = false;
-                        const otherLock = document.querySelector(`.corner-lock[data-corner="${c}"]`);
-                        if (otherLock) {
-                            otherLock.classList.remove('locked');
-                            otherLock.textContent = '🔓';
-                        }
-                    }
-                }
-                
-                lockedCorners[corner] = !lockedCorners[corner];
-                
-                if (lockedCorners[corner]) {
-                    lock.classList.add('locked');
-                    lock.textContent = '🔒';
-                    lock.title = `Unlock ${corner.replace('n', 'top-').replace('s', 'bottom-').replace('w', 'left').replace('e', 'right')} corner`;
-                    updateCornerPositions();
-                } else {
-                    lock.classList.remove('locked');
-                    lock.textContent = '🔓';
-                    lock.title = `Lock ${corner.replace('n', 'top-').replace('s', 'bottom-').replace('w', 'left').replace('e', 'right')} corner`;
-                }
-            });
-        });
 
         // Show/Hide canvas border & handles
         function applyHandlesVisibility(show) {
-            document.querySelectorAll('.resize-handle, .corner-lock').forEach(el => {
+            document.querySelectorAll('.resize-handle').forEach(el => {
                 if (el) el.style.display = show ? '' : 'none';
             });
             if (!show) {
@@ -59,9 +27,17 @@
         }
 
         // Lock/unlock canvas borders
+        function updateLockState(locked) {
+            bordersLocked = locked;
+            document.querySelectorAll('.resize-handle').forEach(handle => {
+                handle.style.cursor = locked ? 'default' : '';
+            });
+        }
+        
         if (lockCanvasBorders) {
+            updateLockState(lockCanvasBorders.checked);
             lockCanvasBorders.addEventListener('change', (e) => {
-                bordersLocked = e.target.checked;
+                updateLockState(e.target.checked);
             });
         }
         

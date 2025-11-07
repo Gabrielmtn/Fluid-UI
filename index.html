@@ -8,15 +8,10 @@
     <link rel="stylesheet" href="css/slider-styles.css">
 </head>
 <body>
+    <button id="mobileMenuToggle" aria-label="Toggle Menu"></button>
     <div id="canvas-area">
         <div id="canvas-wrapper">
             <div id="canvas-size-display">800 × 600</div>
-            
-            <!-- Corner locks -->
-            <div class="corner-lock lock-nw" data-corner="nw" title="Lock top-left corner">🔓</div>
-            <div class="corner-lock lock-ne" data-corner="ne" title="Lock top-right corner">🔓</div>
-            <div class="corner-lock lock-se" data-corner="se" title="Lock bottom-right corner">🔓</div>
-            <div class="corner-lock lock-sw" data-corner="sw" title="Lock bottom-left corner">🔓</div>
             
             <!-- Resize handles -->
             <div class="resize-handle corner resize-nw"></div>
@@ -48,9 +43,9 @@
         <!-- Stats For Nerds Panel -->
         <div id="statsPanel" class="stats-panel" style="display: none;">
             <div class="stats-header">
-                <span class="stats-title-text">Stats For Nerds 🤓</span>
-                <button id="statsPinBtn" class="stats-pin-btn" title="Pin panel">📌</button>
+                <span class="stats-drag-handle">Stats For Nerds 🤓</span>
             </div>
+            <button id="statsCloseBtn" class="stats-close-btn" title="Close panel">✕</button>
             <div class="stats-content">
                 <div class="stats-section">
                     <div class="stats-title">Performance</div>
@@ -156,6 +151,7 @@
     </div>
     
     <div class="controls">
+        <button id="mobileMenuClose" class="mobile-menu-close" aria-label="Close Menu">✕</button>
         <div class="control-group">
             <label for="brushSize">Brush Size</label>
             <input type="range" id="brushSize" min="1" max="30" value="11" step="0.1">
@@ -163,12 +159,16 @@
         <div class="control-group">
             <label for="visualResolution">Visual Quality</label>
             <select id="visualResolution">
-                <option value="2048" selected>Ultra High (2048)</option>
-                <option value="1536">Very High (1536)</option>
-                <option value="1024">High (1024)</option>
-                <option value="512">Medium (512)</option>
-                <option value="256">Low (256)</option>
-                <option value="128">Very Low (128)</option>
+                <option value="8192">Extreme (Flagship Hardware)</option>
+                <option value="6144">Ultra Maximum</option>
+                <option value="4096">Ultra High</option>
+                <option value="3072">Very High</option>
+                <option value="2048" selected>High</option>
+                <option value="1536">Medium-High</option>
+                <option value="1024">Medium</option>
+                <option value="512">Low</option>
+                <option value="256">Very Low</option>
+                <option value="128">Minimum</option>
                 <option value="custom">Custom...</option>
             </select>
             <input type="number" id="visualResolutionCustom" min="64" step="64" placeholder="Enter resolution" style="display:none; margin-top:8px; width:100%; padding:8px; border-radius:6px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.3);">
@@ -176,16 +176,35 @@
         <div class="control-group">
             <label for="physicsResolution">Physics Resolution</label>
             <select id="physicsResolution">
-                <option value="512" selected>512 (Extreme precision)</option>
-                <option value="384">384 (Very High)</option>
-                <option value="256">256 (High quality)</option>
-                <option value="128">128 (Balanced)</option>
-                <option value="64">64 (Performance)</option>
-                <option value="32">32 (Fast)</option>
-                <option value="16">16 (Maximum speed)</option>
+                <option value="4096">Extreme (Flagship Hardware)</option>
+                <option value="3072">Ultra Maximum</option>
+                <option value="2048">Ultra High</option>
+                <option value="1536">Very High</option>
+                <option value="1024">High</option>
+                <option value="768">Medium-High</option>
+                <option value="512" selected>Medium</option>
+                <option value="384">Medium-Low</option>
+                <option value="256">Low</option>
+                <option value="128">Very Low</option>
+                <option value="64">Minimum</option>
+                <option value="32">Mobile</option>
+                <option value="16">Maximum Compatibility</option>
                 <option value="custom">Custom...</option>
             </select>
             <input type="number" id="physicsResolutionCustom" min="16" step="16" placeholder="Enter resolution" style="display:none; margin-top:8px; width:100%; padding:8px; border-radius:6px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.3);">
+        </div>
+        <div class="control-group">
+            <label for="fpsCap">FPS Cap</label>
+            <select id="fpsCap">
+                <option value="0" selected>Uncapped</option>
+                <option value="30">30 fps</option>
+                <option value="60">60 fps</option>
+                <option value="90">90 fps</option>
+                <option value="120">120 fps</option>
+                <option value="144">144 fps</option>
+                <option value="165">165 fps</option>
+                <option value="240">240 fps</option>
+            </select>
         </div>
         
         <div class="control-group">
@@ -416,7 +435,7 @@
         </div>
         
         <button id="portalBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 100, 255, 0.2); padding: 8px; line-height: 1.3;">
-            <div style="font-size: 1.1em; margin-bottom: 2px;">🌀 Portal</div>
+            <div style="font-size: 1.1em; margin-bottom: 2px;">🌌 Portal</div>
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Swoop | Right: Expand</div>
         </button>
         
@@ -601,6 +620,7 @@
     <script src="js/10-draggable.js"></script>
     <script src="js/08-stats-panel.js"></script>
     <script src="js/12-save-load.js"></script>
+    <script src="js/13-mobile-mode.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">

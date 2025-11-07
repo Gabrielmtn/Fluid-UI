@@ -381,15 +381,25 @@
             const aspect = displayW / Math.max(1, displayH);
             const dyeBase = config.DYE_RESOLUTION || 1024;
             const simBase = config.SIM_RESOLUTION || 128;
-            console.log('initFramebuffers called - DYE:', dyeBase, 'SIM:', simBase);
+            
+            // Check WebGL texture size limits
+            const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+            console.log('initFramebuffers called - DYE:', dyeBase, 'SIM:', simBase, 'Max Texture Size:', maxTextureSize);
+            
             // Compute absolute internal sizes: long side = base, short side scaled by aspect
             if (displayW >= displayH) {
-                dyeTexWidth = dyeBase; dyeTexHeight = Math.max(1, Math.round(dyeBase / aspect));
-                simTexWidth = simBase; simTexHeight = Math.max(1, Math.round(simBase / aspect));
+                dyeTexWidth = Math.min(dyeBase, maxTextureSize); 
+                dyeTexHeight = Math.max(1, Math.min(Math.round(dyeBase / aspect), maxTextureSize));
+                simTexWidth = Math.min(simBase, maxTextureSize); 
+                simTexHeight = Math.max(1, Math.min(Math.round(simBase / aspect), maxTextureSize));
             } else {
-                dyeTexHeight = dyeBase; dyeTexWidth = Math.max(1, Math.round(dyeBase * aspect));
-                simTexHeight = simBase; simTexWidth = Math.max(1, Math.round(simBase * aspect));
+                dyeTexHeight = Math.min(dyeBase, maxTextureSize); 
+                dyeTexWidth = Math.max(1, Math.min(Math.round(dyeBase * aspect), maxTextureSize));
+                simTexHeight = Math.min(simBase, maxTextureSize); 
+                simTexWidth = Math.max(1, Math.min(Math.round(simBase * aspect), maxTextureSize));
             }
+            
+            console.log('Actual texture sizes - Dye:', dyeTexWidth, 'x', dyeTexHeight, 'Sim:', simTexWidth, 'x', simTexHeight);
             
             const texType = gl.HALF_FLOAT;
             const rgba = { internalFormat: gl.RGBA16F, format: gl.RGBA };
@@ -473,6 +483,32 @@
                 try { broadcastReplayStroke(norm); } catch(_){}
             }
         }
+        
+        // FPS Cap dropdown
+        function initFpsCapControl() {
+            const fpsCapSel = document.getElementById('fpsCap');
+            if (!fpsCapSel) { setTimeout(initFpsCapControl, 100); return; }
+            let saved = 0;
+            try {
+                if (window.Settings && typeof window.Settings.loadSelect === 'function') {
+                    const sv = window.Settings.loadSelect('fpsCap', '0');
+                    const num = parseInt(sv, 10);
+                    if (Number.isFinite(num)) saved = num;
+                }
+            } catch (_) {}
+            fpsCapSel.value = String(saved);
+            window.fpsCap = saved;
+            fpsCapSel.addEventListener('change', (e) => {
+                const v = parseInt(e.target.value, 10);
+                window.fpsCap = Number.isFinite(v) ? v : 0;
+                try {
+                    if (window.Settings && typeof window.Settings.saveSelect === 'function') {
+                        window.Settings.saveSelect('fpsCap', String(window.fpsCap));
+                    }
+                } catch (_) {}
+            });
+        }
+        initFpsCapControl();
 
         function processReplay() {
             if (!isReplayActive) return;
@@ -484,7 +520,7 @@
                 } else {
                     const prevM = animationMultiplier; const prevR = config.SPLAT_RADIUS;
                     animationMultiplier = ev.mult; config.SPLAT_RADIUS = ev.radius;
-                    multiSplat(ev.x, ev.y, ev.dx, ev.dy, ev.color);
+                    multiSplat(ev.x, ev.y, ev.dx, ev.dy, ev.color, false);
                     animationMultiplier = prevM; config.SPLAT_RADIUS = prevR;
                 }
                 if (typeof recRecordInteraction === 'function' && recEnabled) {
@@ -548,7 +584,7 @@
                     0,
                     pointer.color,
                     (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
-                    config.SPLAT_RADIUS
+                    config.SPLAT_RADIUS * canvas.width
                 );
             }
         });
@@ -562,7 +598,6 @@
             pointer.x = coords.x;
             pointer.y = coords.y;
 
-            // Broadcast cursor position to multiplayer clients
             if (typeof broadcastCursor === 'function') {
                 broadcastCursor(coords.x / canvas.width, coords.y / canvas.height);
             }
@@ -570,6 +605,21 @@
             if (pointer.down) {
                 trackStrokeMove(e);
                 if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                
+                if (typeof broadcastSplat === 'function') {
+                    if (!canvas._lastBroadcast || Date.now() - canvas._lastBroadcast > 33) {
+                        broadcastSplat(
+                            coords.x / canvas.width,
+                            coords.y / canvas.height,
+                            pointer.dx / canvas.width,
+                            pointer.dy / canvas.height,
+                            pointer.color,
+                            (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
+                            config.SPLAT_RADIUS * canvas.width
+                        );
+                        canvas._lastBroadcast = Date.now();
+                    }
+                }
             }
         });
         
@@ -580,6 +630,9 @@
                 customCursor.style.opacity = '0';
                 trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
             } else if (e.button === 0) {
+                if (pointer.down && typeof broadcastPointerUp === 'function') {
+                    broadcastPointerUp();
+                }
                 pointer.down = false;
                 pointer.moved = false;
                 setTimeout(() => {
@@ -612,7 +665,9 @@
                     coords.y / canvas.height,
                     0,
                     0,
-                    pointer.color
+                    pointer.color,
+                    (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
+                    config.SPLAT_RADIUS * canvas.width
                 );
             }
         });
@@ -627,12 +682,45 @@
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
-            if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+            if (pointer.down) {
+                if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                
+                if (typeof broadcastSplat === 'function') {
+                    const now = Date.now();
+                    if (!canvas._lastTouchBroadcast || now - canvas._lastTouchBroadcast > 50) {
+                        broadcastSplat(
+                            coords.x / canvas.width,
+                            coords.y / canvas.height,
+                            pointer.dx / canvas.width,
+                            pointer.dy / canvas.height,
+                            pointer.color,
+                            (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
+                            config.SPLAT_RADIUS * canvas.width
+                        );
+                        canvas._lastTouchBroadcast = now;
+                    }
+                }
+            }
         });
         
-        canvas.addEventListener('touchend', () => {
-            pointer.down = false;
-            pointer.moved = false;
+        window.addEventListener('touchend', () => {
+            if (pointer.down) {
+                pointer.down = false;
+                pointer.moved = false;
+                if (typeof broadcastPointerUp === 'function') {
+                    broadcastPointerUp();
+                }
+            }
+        });
+        
+        window.addEventListener('touchcancel', () => {
+            if (pointer.down) {
+                pointer.down = false;
+                pointer.moved = false;
+                if (typeof broadcastPointerUp === 'function') {
+                    broadcastPointerUp();
+                }
+            }
         });
         
         // Background color picker
@@ -935,21 +1023,20 @@
         if (kaleidoModeEl) {
             window.kaleidoMode = parseInt(kaleidoModeEl.value || '1', 10);
             updateSegmentsLabel(window.kaleidoMode);
-            kaleidoModeEl.addEventListener('change', (e) => { 
-                window.kaleidoMode = parseInt(e.target.value || '1', 10);
-                updateSegmentsLabel(window.kaleidoMode);
+            kaleidoModeEl.addEventListener('change', (e) => {
+                const mode = parseInt(e.target.value, 10);
+                window.kaleidoMode = mode;
+                updateSegmentsLabel(mode);
             });
         }
         
-        // Helper function to create rotated instances of a splat
-        function multiSplat(x, y, dx, dy, color) {
+        function multiSplat(x, y, dx, dy, color, shouldBroadcast) {
             const centerX = canvas.width * 0.5;
             const centerY = canvas.height * 0.5;
 
             for (let i = 0; i < animationMultiplier; i++) {
-                const angle = (i / animationMultiplier) * Math.PI * 2;
+                const angle = (Math.PI * 2 * i) / animationMultiplier;
 
-                // Translate to center, rotate, translate back
                 const relX = x - centerX;
                 const relY = y - centerY;
 
@@ -959,15 +1046,13 @@
                 const finalX = rotatedX + centerX;
                 const finalY = rotatedY + centerY;
 
-                // Rotate velocity vector too
                 const rotatedDx = dx * Math.cos(angle) - dy * Math.sin(angle);
                 const rotatedDy = dx * Math.sin(angle) + dy * Math.cos(angle);
 
                 splat(finalX, finalY, rotatedDx, rotatedDy, color);
             }
 
-            // Broadcast to multiplayer clients (send normalized coordinates)
-            if (typeof broadcastSplat === 'function') {
+            if (shouldBroadcast && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     x / canvas.width,
                     y / canvas.height,
@@ -986,7 +1071,7 @@
             const prevR = config.SPLAT_RADIUS;
             animationMultiplier = Math.max(1, Math.round(mult || 1));
             config.SPLAT_RADIUS = (typeof radius === 'number') ? radius : prevR;
-            try { multiSplat(x, y, dx, dy, color); } finally {
+            try { multiSplat(x, y, dx, dy, color, false); } finally {
                 animationMultiplier = prevM;
                 config.SPLAT_RADIUS = prevR;
             }
@@ -1379,6 +1464,11 @@
             slider.addEventListener('input', (e) => {
                 let val = parseFloat(e.target.value);
                 
+                // Clear active preset when manually adjusting sliders
+                if (typeof window.clearActivePreset === 'function') {
+                    window.clearActivePreset();
+                }
+                
                 // Magnetic snap to 1.0 for density slider
                 if (id === 'densityDissipation') {
                     const snapTarget = 1.0;
@@ -1492,11 +1582,27 @@
             density.swap();
         }
         
-        let lastTime = Date.now();
+        let lastTime = performance.now();
+        let lastDrawTimeMs = 0;
+        let fpsTimes = [];
+        window.fpsCap = (typeof window.fpsCap === 'number') ? window.fpsCap : 0; // 0 = uncapped
+        window.__stats = window.__stats || {}; // { fps, frametime, lastCpuMs }
         
         function update() {
-            const dt = Math.min((Date.now() - lastTime) / 1000, 0.016);
-            lastTime = Date.now();
+            const cpuStart = performance.now();
+            const nowMs = performance.now();
+            const cap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 0;
+            const desiredMs = cap ? (1000 / cap) : 0;
+            if (desiredMs && lastDrawTimeMs) {
+                const since = nowMs - lastDrawTimeMs;
+                const epsilonMs = 0.1;
+                if (since < (desiredMs - epsilonMs)) {
+                    requestAnimationFrame(update);
+                    return;
+                }
+            }
+            const dt = Math.min((nowMs - lastTime) / 1000, 0.016);
+            lastTime = nowMs;
             if (window.kAnimateRot && window.kSpinSpeed) {
                 window.kAngle = (window.kAngle || 0) + dt * window.kSpinSpeed * Math.PI / 180;
             }
@@ -1516,7 +1622,7 @@
             
             if (!isPaused) {
                 if (pointer.moved) {
-                    multiSplat(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                    multiSplat(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color, false);
                     pointer.moved = false;
                 }
                 
@@ -1638,6 +1744,19 @@
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
             blit(null);
             
+            // Draw occurred: update stats based on actual render cadence
+            lastDrawTimeMs = performance.now();
+            fpsTimes.push(lastDrawTimeMs);
+            const oneSecondAgo = lastDrawTimeMs - 1000;
+            fpsTimes = fpsTimes.filter(t => t > oneSecondAgo);
+            const fpsVal = fpsTimes.length;
+            let frametimeMs = 0;
+            if (fpsTimes.length >= 2) {
+                frametimeMs = fpsTimes[fpsTimes.length - 1] - fpsTimes[fpsTimes.length - 2];
+            }
+            const cpuMs = performance.now() - cpuStart;
+            window.__stats = { fps: fpsVal, frametime: frametimeMs, lastCpuMs: cpuMs };
+
             requestAnimationFrame(update);
         }
         
@@ -1747,7 +1866,7 @@
                 if (headerEl) headerEl.addEventListener('dragstart', handleDragStart);
                 // Guard: block dragstart initiated anywhere else in the item (capture)
                 element.addEventListener('dragstart', (e) => {
-                    if (isLayerSliderActive || !e.target.closest('.layer-item-header')) { e.preventDefault(); e.stopPropagation(); }
+                    if (isLayerSliderActive || !(e.target && e.target.closest && e.target.closest('.layer-item-header'))) { e.preventDefault(); e.stopPropagation(); }
                 }, true);
                 // Guard: prevent header text input from initiating drags
                 const titleInput = element.querySelector('.layer-title');
@@ -1794,7 +1913,7 @@
             const item = (e.currentTarget && e.currentTarget.closest) ? e.currentTarget.closest('.layer-item') : null;
             if (item && item.dataset.sliderActive === '1') { e.preventDefault(); return; }
             // Do not start drag from interactive controls
-            if (e.target && (e.target.closest('button') || e.target.closest('input') || e.target.closest('select'))) { e.preventDefault(); return; }
+            if (e.target && e.target.closest && (e.target.closest('button') || e.target.closest('input') || e.target.closest('select'))) { e.preventDefault(); return; }
             draggedElement = item || this;
             if (draggedElement && draggedElement.classList) draggedElement.classList.add('dragging');
             if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
@@ -1911,6 +2030,7 @@
                 if (item.type === 'sim') {
                     canvas.style.zIndex = zIndex;
                     trailCanvas.style.zIndex = zIndex;
+                    trailCanvas.style.pointerEvents = 'none';
                     console.log(`Sim at visual position ${visualIndex}: z-index ${zIndex}`);
                 } else {
                     const layer = layers.find(l => l.index === item.id);
@@ -2003,14 +2123,42 @@
                 layerDiv.classList.add('active');
                 activeLayerIndex = index;
                 createLayerResizeHandles(index);
+                // Don't disable canvas pointer events just for selecting layer
+                // Only disable when actually dragging/resizing
             } else {
                 layerDiv.classList.remove('active');
                 activeLayerIndex = null;
                 removeLayerResizeHandles(index);
+                // Re-enable canvas pointer events when deactivating
+                canvas.style.pointerEvents = 'auto';
             }
             
             renderLayers();
         };
+        
+        function disablePointerEventsExceptActive(activeIndex) {
+            canvas.style.pointerEvents = 'none';
+            trailCanvas.style.pointerEvents = 'none';
+            
+            layers.forEach(l => {
+                const div = document.getElementById(`layer${l.index}`);
+                if (div && l.index !== activeIndex) {
+                    div.style.pointerEvents = 'none';
+                }
+            });
+        }
+        
+        function enableAllPointerEvents() {
+            canvas.style.pointerEvents = 'auto';
+            trailCanvas.style.pointerEvents = 'none';
+            
+            layers.forEach(l => {
+                const div = document.getElementById(`layer${l.index}`);
+                if (div) {
+                    div.style.pointerEvents = l.visible ? 'none' : 'none';
+                }
+            });
+        }
         
         function createLayerResizeHandles(index) {
             const layerDiv = document.getElementById(`layer${index}`);
@@ -2035,19 +2183,27 @@
                 div.className = `layer-resize-handle ${handle.class}`;
                 div.dataset.direction = handle.dir;
                 div.dataset.layerIndex = index;
-                // Improve pen/touch UX
                 div.style.touchAction = 'none';
                 div.style.userSelect = 'none';
                 div.addEventListener('pointerdown', handleLayerResizeStart);
                 layerDiv.appendChild(div);
             });
+            
+            const rotateHandle = document.createElement('div');
+            rotateHandle.className = 'layer-rotate-handle';
+            rotateHandle.dataset.layerIndex = index;
+            rotateHandle.style.touchAction = 'none';
+            rotateHandle.style.userSelect = 'none';
+            rotateHandle.innerHTML = '🔄';
+            rotateHandle.addEventListener('pointerdown', handleLayerRotateStart);
+            layerDiv.appendChild(rotateHandle);
         }
         
         function removeLayerResizeHandles(index) {
             const layerDiv = document.getElementById(`layer${index}`);
             if (!layerDiv) return;
             
-            const handles = layerDiv.querySelectorAll('.layer-resize-handle');
+            const handles = layerDiv.querySelectorAll('.layer-resize-handle, .layer-rotate-handle');
             handles.forEach(handle => handle.remove());
         }
         
@@ -2058,6 +2214,14 @@
         let layerResizeStartX = 0;
         let layerResizeStartY = 0;
         let layerResizeStartScaleX = 1;
+        
+        // Layer rotation functionality
+        let isRotatingLayer = false;
+        let rotateLayerIndex = null;
+        let layerRotateStartAngle = 0;
+        let layerRotateStartRotation = 0;
+        let layerRotatePointerId = null;
+        let layerRotateHandleEl = null;
         let layerResizeStartScaleY = 1;
         let layerResizeStartPosX = 0;
         let layerResizeStartPosY = 0;
@@ -2065,7 +2229,6 @@
         let layerResizeHandleEl = null;
         
         function handleLayerResizeStart(e) {
-            // Allow pen/touch; restrict mouse to left button
             if (e.pointerType === 'mouse' && e.button !== 0) return;
             e.preventDefault();
             e.stopPropagation();
@@ -2086,26 +2249,59 @@
             layerResizeStartScaleY = layer.scaleY;
             layerResizeStartPosX = layer.x;
             layerResizeStartPosY = layer.y;
+            
+            disablePointerEventsExceptActive(resizeLayerIndex);
+        }
+        
+        function handleLayerRotateStart(e) {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isRotatingLayer = true;
+            rotateLayerIndex = parseInt(e.target.dataset.layerIndex);
+            layerRotatePointerId = e.pointerId;
+            layerRotateHandleEl = e.currentTarget || e.target;
+            try { if (layerRotateHandleEl && layerRotateHandleEl.setPointerCapture) layerRotateHandleEl.setPointerCapture(e.pointerId); } catch (_) {}
+            
+            const layer = layers.find(l => l.index === rotateLayerIndex);
+            
+            disablePointerEventsExceptActive(rotateLayerIndex);
+            if (!layer) return;
+            
+            const layerDiv = document.getElementById(`layer${rotateLayerIndex}`);
+            if (!layerDiv) return;
+            
+            const rect = layerDiv.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            layerRotateStartAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+            layerRotateStartRotation = layer.rotation || 0;
         }
         
         // Add pointer event listeners to canvas wrapper for layer dragging
         canvasWrapper.style.touchAction = 'none';
         canvasWrapper.addEventListener('pointerdown', (e) => {
-            // Do not start layer dragging if the target is a slider
             if (e.target && e.target.closest && e.target.closest('input[type="range"]')) return;
             if (activeLayerIndex === null) return;
             
-            // Don't start dragging if clicking on a resize handle 
-            if (e.target.classList.contains('layer-resize-handle')) return;
-            // Allow pen/touch; restrict mouse to left button
+            if (e.target.classList.contains('layer-resize-handle') || e.target.classList.contains('layer-rotate-handle')) return;
             if (e.pointerType === 'mouse' && e.button !== 0) return;
             
             const layer = layers.find(l => l.index === activeLayerIndex);
             if (!layer || !layer.active) return;
             
-            // Check if clicking on the active layer
             const layerDiv = document.getElementById(`layer${activeLayerIndex}`);
             if (!layerDiv) return;
+            
+            const rect = layerDiv.getBoundingClientRect();
+            const clickX = e.clientX;
+            const clickY = e.clientY;
+            
+            if (clickX < rect.left || clickX > rect.right || clickY < rect.top || clickY > rect.bottom) {
+                return;
+            }
             
             isDraggingLayer = true;
             layerDragStartX = e.clientX;
@@ -2116,10 +2312,33 @@
             layerDragCaptureEl = canvasWrapper;
             try { if (layerDragCaptureEl && layerDragCaptureEl.setPointerCapture) layerDragCaptureEl.setPointerCapture(e.pointerId); } catch (_) {}
             
+            layerDiv.classList.add('dragging');
+            disablePointerEventsExceptActive(activeLayerIndex);
+            
             e.preventDefault();
         });
         
         document.addEventListener('pointermove', (e) => {
+            // Handle layer rotation
+            if (isRotatingLayer && rotateLayerIndex !== null && (layerRotatePointerId == null || e.pointerId === layerRotatePointerId)) {
+                const layer = layers.find(l => l.index === rotateLayerIndex);
+                if (!layer) return;
+                
+                const layerDiv = document.getElementById(`layer${rotateLayerIndex}`);
+                if (!layerDiv) return;
+                
+                const rect = layerDiv.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                const angleDelta = currentAngle - layerRotateStartAngle;
+                
+                layer.rotation = layerRotateStartRotation + angleDelta;
+                updateLayerPosition(rotateLayerIndex);
+                return;
+            }
+            
             // Handle layer resizing
             if (isResizingLayer && resizeLayerIndex !== null && (layerResizePointerId == null || e.pointerId === layerResizePointerId)) {
                 const layer = layers.find(l => l.index === resizeLayerIndex);
@@ -2143,32 +2362,26 @@
                     case 'sw': // Bottom-left
                         layer.scaleX = Math.max(0.1, layerResizeStartScaleX - scaleFactorX * 2);
                         layer.scaleY = Math.max(0.1, layerResizeStartScaleY + scaleFactorY * 2);
-                        layer.x = layerResizeStartPosX + deltaX;
                         break;
                     case 'ne': // Top-right
                         layer.scaleX = Math.max(0.1, layerResizeStartScaleX + scaleFactorX * 2);
                         layer.scaleY = Math.max(0.1, layerResizeStartScaleY - scaleFactorY * 2);
-                        layer.y = layerResizeStartPosY + deltaY;
                         break;
                     case 'nw': // Top-left
                         layer.scaleX = Math.max(0.1, layerResizeStartScaleX - scaleFactorX * 2);
                         layer.scaleY = Math.max(0.1, layerResizeStartScaleY - scaleFactorY * 2);
-                        layer.x = layerResizeStartPosX + deltaX;
-                        layer.y = layerResizeStartPosY + deltaY;
                         break;
                     case 'e': // Right edge
                         layer.scaleX = Math.max(0.1, layerResizeStartScaleX + scaleFactorX * 2);
                         break;
                     case 'w': // Left edge
                         layer.scaleX = Math.max(0.1, layerResizeStartScaleX - scaleFactorX * 2);
-                        layer.x = layerResizeStartPosX + deltaX;
                         break;
                     case 's': // Bottom edge
                         layer.scaleY = Math.max(0.1, layerResizeStartScaleY + scaleFactorY * 2);
                         break;
                     case 'n': // Top edge
                         layer.scaleY = Math.max(0.1, layerResizeStartScaleY - scaleFactorY * 2);
-                        layer.y = layerResizeStartPosY + deltaY;
                         break;
                 }
                 
@@ -2197,6 +2410,11 @@
                 try { if (layerDragCaptureEl && layerDragCaptureEl.releasePointerCapture) layerDragCaptureEl.releasePointerCapture(e.pointerId); } catch (_) {}
                 layerDragPointerId = null;
                 layerDragCaptureEl = null;
+                if (activeLayerIndex !== null) {
+                    const layerDiv = document.getElementById(`layer${activeLayerIndex}`);
+                    if (layerDiv) layerDiv.classList.remove('dragging');
+                }
+                enableAllPointerEvents();
             }
             if (isResizingLayer && (layerResizePointerId == null || e.pointerId === layerResizePointerId)) {
                 isResizingLayer = false;
@@ -2205,6 +2423,15 @@
                 try { if (layerResizeHandleEl && layerResizeHandleEl.releasePointerCapture) layerResizeHandleEl.releasePointerCapture(e.pointerId); } catch (_) {}
                 layerResizePointerId = null;
                 layerResizeHandleEl = null;
+                enableAllPointerEvents();
+            }
+            if (isRotatingLayer && (layerRotatePointerId == null || e.pointerId === layerRotatePointerId)) {
+                isRotatingLayer = false;
+                rotateLayerIndex = null;
+                try { if (layerRotateHandleEl && layerRotateHandleEl.releasePointerCapture) layerRotateHandleEl.releasePointerCapture(e.pointerId); } catch (_) {}
+                layerRotatePointerId = null;
+                layerRotateHandleEl = null;
+                enableAllPointerEvents();
             }
         });
         document.addEventListener('pointercancel', (e) => {
@@ -2213,6 +2440,11 @@
                 try { if (layerDragCaptureEl && layerDragCaptureEl.releasePointerCapture) layerDragCaptureEl.releasePointerCapture(e.pointerId); } catch (_) {}
                 layerDragPointerId = null;
                 layerDragCaptureEl = null;
+                if (activeLayerIndex !== null) {
+                    const layerDiv = document.getElementById(`layer${activeLayerIndex}`);
+                    if (layerDiv) layerDiv.classList.remove('dragging');
+                }
+                enableAllPointerEvents();
             }
             if (isResizingLayer && (layerResizePointerId == null || e.pointerId === layerResizePointerId)) {
                 isResizingLayer = false;
@@ -2221,6 +2453,15 @@
                 try { if (layerResizeHandleEl && layerResizeHandleEl.releasePointerCapture) layerResizeHandleEl.releasePointerCapture(e.pointerId); } catch (_) {}
                 layerResizePointerId = null;
                 layerResizeHandleEl = null;
+                enableAllPointerEvents();
+            }
+            if (isRotatingLayer && (layerRotatePointerId == null || e.pointerId === layerRotatePointerId)) {
+                isRotatingLayer = false;
+                rotateLayerIndex = null;
+                try { if (layerRotateHandleEl && layerRotateHandleEl.releasePointerCapture) layerRotateHandleEl.releasePointerCapture(e.pointerId); } catch (_) {}
+                layerRotatePointerId = null;
+                layerRotateHandleEl = null;
+                enableAllPointerEvents();
             }
         });
         
@@ -2231,7 +2472,8 @@
             const layerDiv = document.getElementById(`layer${index}`);
             if (!layerDiv) return;
             
-            layerDiv.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scaleX}, ${layer.scaleY})`;
+            const rotation = layer.rotation || 0;
+            layerDiv.style.transform = `translate(${layer.x}px, ${layer.y}px) rotate(${rotation}deg) scale(${layer.scaleX}, ${layer.scaleY})`;
         }
         
         window.updateLayerTitle = (index, title) => {

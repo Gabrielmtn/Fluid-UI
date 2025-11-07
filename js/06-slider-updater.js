@@ -1,39 +1,76 @@
-/**
- * Slider Value Updater
- * Updates CSS custom properties for slider position tracking
- */
+(function () {
+  'use strict';
 
-(function initSliderValueTracking() {
-    // Update slider CSS variables on input
-    function updateSliderValue(slider) {
-        const min = parseFloat(slider.min) || 0;
-        const max = parseFloat(slider.max) || 100;
-        const val = parseFloat(slider.value) || 0;
-        
-        slider.style.setProperty('--min', min);
-        slider.style.setProperty('--max', max);
-        slider.style.setProperty('--val', val);
-    }
-    
-    // Initialize all range sliders
-    function initSliders() {
-        const sliders = document.querySelectorAll('input[type="range"]');
-        
-        sliders.forEach(slider => {
-            // Set initial value
-            updateSliderValue(slider);
-            
-            // Update on input
-            slider.addEventListener('input', () => {
-                updateSliderValue(slider);
-            });
-        });
-    }
-    
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSliders);
-    } else {
-        initSliders();
-    }
+  function toNumber(val, fallback) {
+    var n = Number(val);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function setSliderVars(el) {
+    var min = toNumber(el.getAttribute('min'), 0);
+    var max = toNumber(el.getAttribute('max'), 100);
+    var val = toNumber(el.value, (min + max) / 2);
+
+    try { el.style.setProperty('--min', String(min)); } catch (_) {}
+    try { el.style.setProperty('--max', String(max)); } catch (_) {}
+    try { el.style.setProperty('--val', String(val)); } catch (_) {}
+  }
+
+  function onInput(e) {
+    var el = e && e.target ? e.target : null;
+    if (!el || el.type !== 'range') return;
+    var v = toNumber(el.value, 0);
+    try { el.style.setProperty('--val', String(v)); } catch (_) {}
+  }
+
+  function initRangeInput(el) {
+    if (!el || el._sliderVarsInit) return;
+    el._sliderVarsInit = true;
+    setSliderVars(el);
+    el.addEventListener('input', onInput, { passive: true });
+    el.addEventListener('change', onInput, { passive: true });
+  }
+
+  function initAll() {
+    var sliders = document.querySelectorAll('input[type="range"]');
+    for (var i = 0; i < sliders.length; i++) initRangeInput(sliders[i]);
+  }
+
+  var mo;
+  function startObserver() {
+    try {
+      mo = new MutationObserver(function (mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          var m = mutations[i];
+          if (m.type === 'childList') {
+            for (var j = 0; j < m.addedNodes.length; j++) {
+              var node = m.addedNodes[j];
+              if (!(node instanceof Element)) continue;
+              if (node.matches && node.matches('input[type="range"]')) initRangeInput(node);
+              var nested = node.querySelectorAll ? node.querySelectorAll('input[type="range"]') : [];
+              for (var k = 0; k < nested.length; k++) initRangeInput(nested[k]);
+            }
+          } else if (m.type === 'attributes' && m.target && m.target.matches && m.target.matches('input[type="range"]')) {
+            setSliderVars(m.target);
+          }
+        }
+      });
+      mo.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['min', 'max']
+      });
+    } catch (_) {}
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      initAll();
+      startObserver();
+    });
+  } else {
+    initAll();
+    startObserver();
+  }
 })();

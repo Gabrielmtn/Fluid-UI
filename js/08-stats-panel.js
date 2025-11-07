@@ -6,7 +6,7 @@
 (function initStatsPanel() {
     const statsToggle = document.getElementById('statsToggle');
     const statsPanel = document.getElementById('statsPanel');
-    const statsPinBtn = document.getElementById('statsPinBtn');
+    const statsCloseBtn = document.getElementById('statsCloseBtn');
     
     if (!statsToggle || !statsPanel) {
         console.warn('Stats panel elements not found');
@@ -14,7 +14,6 @@
     }
     
     let isEnabled = false;
-    let isPinned = false;
     let updateInterval = null;
     let draggable = null;
     
@@ -25,6 +24,7 @@
     let lastFrameTime = 0;
     let updateTime = 0;
     let frames = [];
+    let lastRafTS = 0;
     
     // Kaleidoscope mode names
     const kaleidoModes = ['Off', 'Wedge', 'Mirror H', 'Mirror V', 'Mirror Quad', 'Spiral'];
@@ -39,28 +39,23 @@
         window.requestAnimationFrame = function(callback) {
             return originalRAF.call(window, function(timestamp) {
                 const start = performance.now();
-                
-                // Track frame
-                frameCount++;
-                frames.push(timestamp);
-                
-                // Calculate FPS every second
-                const now = performance.now();
-                if (now - lastFPSTime >= 1000) {
-                    // Filter frames from last second
+                const isNewFrame = (timestamp !== lastRafTS);
+                if (isNewFrame) {
+                    frameCount++;
+                    frames.push(timestamp);
                     const oneSecondAgo = timestamp - 1000;
                     frames = frames.filter(t => t > oneSecondAgo);
                     fps = frames.length;
-                    lastFPSTime = now;
+                    if (frames.length >= 2) {
+                        lastFrameTime = frames[frames.length - 1] - frames[frames.length - 2];
+                    }
+                    lastRafTS = timestamp;
                 }
                 
-                // Execute callback
                 callback(timestamp);
                 
-                // Measure update time
                 const end = performance.now();
                 updateTime = end - start;
-                lastFrameTime = updateTime;
             });
         };
     }
@@ -75,7 +70,7 @@
         }
         
         draggable = new Draggable(statsPanel, {
-            handle: '.stats-header',
+            handle: '.stats-drag-handle',
             savePosition: 'statsPanel.position',
             constrainToViewport: true
         });
@@ -90,49 +85,34 @@
             return;
         }
         
-        const state = window.Settings.loadPanel('statsPanel');
-        isPinned = state.pinned;
-        isEnabled = state.enabled;
-        
-        updatePinState();
-        
-        if (isEnabled) {
-            statsToggle.checked = true;
-            statsPanel.style.display = 'block';
-            startUpdating();
+        try {
+            const state = window.Settings.loadPanel('statsPanel');
+            isEnabled = state.enabled || false;
+            
+            if (isEnabled) {
+                statsToggle.checked = true;
+                statsPanel.style.display = 'block';
+                startUpdating();
+            } else {
+                statsToggle.checked = false;
+                statsPanel.style.display = 'none';
+            }
+        } catch (e) {
+            console.warn('Failed to load stats panel state:', e);
+            isEnabled = false;
+            statsToggle.checked = false;
+            statsPanel.style.display = 'none';
         }
     }
     
     loadPanelState();
     
-    // Pin button handler
-    if (statsPinBtn) {
-        statsPinBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent drag
-            isPinned = !isPinned;
-            
-            if (window.Settings) {
-                window.Settings.savePanel('statsPanel', { pinned: isPinned });
-            }
-            
-            updatePinState();
+    // Close button handler
+    if (statsCloseBtn) {
+        statsCloseBtn.addEventListener('click', () => {
+            statsToggle.checked = false;
+            statsToggle.dispatchEvent(new Event('change'));
         });
-    }
-    
-    function updatePinState() {
-        if (isPinned) {
-            statsPanel.classList.add('pinned');
-            if (statsPinBtn) {
-                statsPinBtn.classList.add('pinned');
-                statsPinBtn.title = 'Unpin panel';
-            }
-        } else {
-            statsPanel.classList.remove('pinned');
-            if (statsPinBtn) {
-                statsPinBtn.classList.remove('pinned');
-                statsPinBtn.title = 'Pin panel';
-            }
-        }
     }
     
     // Toggle handler
@@ -184,10 +164,17 @@
             window._statsDebugLogged = true;
         }
         
-        // Performance stats
-        setText('stat-fps', fps + ' fps');
-        setText('stat-frametime', lastFrameTime.toFixed(2) + ' ms');
-        setText('stat-updatetime', updateTime.toFixed(2) + ' ms');
+        // Performance stats (prefer main-loop provided stats if available)
+        const s = window.__stats;
+        if (s && typeof s.fps === 'number') {
+            setText('stat-fps', s.fps + ' fps');
+            setText('stat-frametime', ((s.frametime || 0)).toFixed(2) + ' ms');
+            setText('stat-updatetime', ((s.lastCpuMs != null ? s.lastCpuMs : updateTime)).toFixed(2) + ' ms');
+        } else {
+            setText('stat-fps', fps + ' fps');
+            setText('stat-frametime', lastFrameTime.toFixed(2) + ' ms');
+            setText('stat-updatetime', updateTime.toFixed(2) + ' ms');
+        }
         
         // Simulation stats
         const canvas = document.getElementById('canvas');
