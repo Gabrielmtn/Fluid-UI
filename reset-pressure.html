@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reset Pressure Iterations</title>
+</head>
+<body>
+    <h1>Resetting Pressure Iterations to 20...</h1>
+    <p id="status">Working...</p>
+    <script>
+        // Clear the saved pressure iteration setting
+        localStorage.removeItem('settings.PRESSURE_ITERATIONS');
+        localStorage.removeItem('pressureIteration');
+        
+        // Also clear from settings manager if it exists
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+            if (key.includes('pressure') || key.includes('PRESSURE')) {
+                console.log('Removing:', key);
+                localStorage.removeItem(key);
+            }
+        });
+        
+        document.getElementById('status').innerHTML = 
+            '<strong style="color: green;">✓ Cleared!</strong><br>' +
+            'Pressure iterations will reset to 20 on next load.<br>' +
+            '<a href="index.html">Return to app</a>';
+        
+        console.log('Pressure iteration settings cleared');
+    </script>
+</body>
+</html>

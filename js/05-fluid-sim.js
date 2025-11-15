@@ -149,6 +149,22 @@
                 return mapped + center;
             }
             
+            // Tone mapping to prevent white blowout when colors accumulate
+            vec3 toneMap(vec3 color) {
+                // Reinhard tone mapping with slight desaturation for very bright areas
+                float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+                
+                // Apply Reinhard on luminance
+                float mappedLuminance = luminance / (1.0 + luminance);
+                
+                // Preserve some color saturation even in bright areas
+                vec3 mappedColor = color / (1.0 + color);
+                
+                // Blend between per-channel and luminance-based mapping
+                // This prevents complete desaturation while avoiding clipping
+                return mix(mappedColor, color * (mappedLuminance / max(luminance, 0.001)), 0.5);
+            }
+            
             void main() {
                 vec4 base = texture(uTexture, vUv);
                 vec4 kcol = base;
@@ -176,6 +192,10 @@
                     kcol = texture(uTexture, uv2);
                 }
                 vec4 color = mix(base, kcol, clamp(kBlend, 0.0, 1.0));
+                
+                // Apply tone mapping to prevent white blowout
+                color.rgb = toneMap(color.rgb);
+                
                 float intensity = max(max(color.r, color.g), color.b);
                 
                 if (preserveOpacity > 0.5) {
@@ -196,13 +216,23 @@
             uniform sampler2D uTarget;
             uniform vec2 point;
             uniform vec3 color;
-            uniform float radius, aspectRatio;
+            uniform float radius, aspectRatio, velocityInfluence;
+            uniform int isVelocity; // 1 for velocity, 0 for density
             void main() {
                 vec2 p = vUv - point;
                 p.x *= aspectRatio;
-                vec3 splat = exp(-dot(p, p) / radius) * color;
+                
+                // For velocity: higher velocityInfluence = tighter radius (more isolated)
+                // For density: always use full radius (visual quality)
+                float effectiveRadius = radius;
+                if (isVelocity == 1) {
+                    // Higher value = smaller radius = more isolated
+                    effectiveRadius = radius / max(1.0, velocityInfluence / 22.0);
+                }
+                
+                vec3 splat = exp(-dot(p, p) / effectiveRadius) * color;
                 vec3 base = texture(uTarget, vUv).xyz;
-                fragColor = vec4(base + splat * 0.2, 1.0);
+                fragColor = vec4(base + splat, 1.0);
             }
         `;
 
@@ -496,19 +526,31 @@
         function initFpsCapControl() {
             const fpsCapSel = document.getElementById('fpsCap');
             if (!fpsCapSel) { setTimeout(initFpsCapControl, 100); return; }
-            let saved = 0;
+            let saved = 60; // Default to 60 FPS
             try {
                 if (window.Settings && typeof window.Settings.loadSelect === 'function') {
-                    const sv = window.Settings.loadSelect('fpsCap', '0');
+                    const sv = window.Settings.loadSelect('fpsCap', '60');
                     const num = parseInt(sv, 10);
                     if (Number.isFinite(num)) saved = num;
                 }
             } catch (_) {}
             fpsCapSel.value = String(saved);
             window.fpsCap = saved;
+            console.log(`🎯 FPS Cap initialized to: ${window.fpsCap}`);
+            console.log(`   Dropdown value: "${fpsCapSel.value}"`);
+            console.log(`   Available options:`, Array.from(fpsCapSel.options).map(o => o.value));
+            
+            // Force reset cap logging so we see it again
+            window.__capLogged = false;
+            
             fpsCapSel.addEventListener('change', (e) => {
                 const v = parseInt(e.target.value, 10);
                 window.fpsCap = Number.isFinite(v) ? v : 0;
+                console.log(`🎯 FPS Cap changed to: ${window.fpsCap}`);
+                console.log(`   Dropdown now shows: "${e.target.value}"`);
+                
+                // Reset logging to see new cap in update loop
+                window.__capLogged = false;
                 try {
                     if (window.Settings && typeof window.Settings.saveSelect === 'function') {
                         window.Settings.saveSelect('fpsCap', String(window.fpsCap));
@@ -733,12 +775,16 @@
         
         // Background color picker
         const backgroundColorPicker = document.getElementById('backgroundColorPicker');
+        let lastBackgroundColor = '#000000';
         
         if (backgroundColorPicker) {
+            lastBackgroundColor = backgroundColorPicker.value || '#000000';
             backgroundColorPicker.addEventListener('input', (e) => {
                 const color = e.target.value;
-                canvasArea.style.backgroundColor = color;
-                
+                lastBackgroundColor = color;
+                if (!document.body.classList.contains('transparent-mode')) {
+                    canvasArea.style.backgroundColor = color;
+                }
             });
         }
         
@@ -1164,26 +1210,53 @@
             });
         }
         
+        // Generate vibrant random color (avoids washed out/pale colors)
+        function generateVibrantColor() {
+            // Use HSL to control saturation and lightness
+            const hue = Math.random() * 360; // Full spectrum
+            const sat = 0.7 + Math.random() * 0.3; // 70-100% saturation (vibrant)
+            const light = 0.45 + Math.random() * 0.2; // 45-65% lightness (not too bright/dark)
+            
+            // Convert HSL to RGB
+            const c = (1 - Math.abs(2 * light - 1)) * sat;
+            const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
+            const m = light - c / 2;
+            
+            let r, g, b;
+            if (hue < 60) { r = c; g = x; b = 0; }
+            else if (hue < 120) { r = x; g = c; b = 0; }
+            else if (hue < 180) { r = 0; g = c; b = x; }
+            else if (hue < 240) { r = 0; g = x; b = c; }
+            else if (hue < 300) { r = x; g = 0; b = c; }
+            else { r = c; g = 0; b = x; }
+            
+            return [r + m, g + m, b + m];
+        }
+        
         function updateColor() {
             const stepEl = document.getElementById('stepPalette');
             const rndEl = document.getElementById('randomColor');
             if (stepEl && stepEl.checked) {
                 const list = getStepColorList();
                 if (list.length > 0) {
-                    const hex = list[paletteStepIndex % list.length];
-                    paletteStepIndex = (paletteStepIndex + 1) % list.length;
-                    const cp = document.getElementById('colorPicker');
-                    if (cp) cp.value = hex;
-                    const r = parseInt(hex.slice(1, 3), 16) / 255;
-                    const g = parseInt(hex.slice(3, 5), 16) / 255;
-                    const b = parseInt(hex.slice(5, 7), 16) / 255;
-                    pointer.color = [r, g, b];
-                    updatePaletteStepIndicator();
+                    const len = list.length;
+                    const idx = paletteStepIndex % len;
+                    const col = list[idx];
+                    paletteStepIndex = (paletteStepIndex + 1) % len;
+                    if (col) {
+                        const r = parseInt(col.slice(1, 3), 16) / 255;
+                        const g = parseInt(col.slice(3, 5), 16) / 255;
+                        const b = parseInt(col.slice(5, 7), 16) / 255;
+                        pointer.color = [r, g, b];
+                    }
+                    if (typeof updatePaletteStepIndicator === 'function') {
+                        updatePaletteStepIndicator();
+                    }
                     return;
                 }
             }
             if (rndEl && rndEl.checked) {
-                pointer.color = [Math.random(), Math.random(), Math.random()];
+                pointer.color = generateVibrantColor();
                 return;
             }
             const hex = document.getElementById('colorPicker').value;
@@ -1191,6 +1264,23 @@
             const g = parseInt(hex.slice(3, 5), 16) / 255;
             const b = parseInt(hex.slice(5, 7), 16) / 255;
             pointer.color = [r, g, b];
+        }
+        
+        // Expose globally for other scripts
+        window.generateVibrantColor = generateVibrantColor;
+        
+        // FORCE RESET pressure iterations to 20 (clear bad saved value)
+        config.PRESSURE_ITERATIONS = 20;
+        if (window.Settings && typeof window.Settings.saveSlider === 'function') {
+            window.Settings.saveSlider('pressureIteration', 20);
+        }
+        const pressIterSlider = document.getElementById('pressureIteration');
+        if (pressIterSlider) {
+            pressIterSlider.value = 20;
+            pressIterSlider.style.setProperty('--val', 20);
+            const iterValueEl = document.getElementById('iterationValue');
+            if (iterValueEl) iterValueEl.textContent = '20';
+            console.log(' FORCED pressure iterations to 20 (was saved as 95)');
         }
         
         const sliderConfig = {
@@ -1205,6 +1295,42 @@
         document.getElementById('brushSize').addEventListener('input', (e) => {
             config.SPLAT_RADIUS = e.target.value / 1000;
         });
+        
+        // Transparent Mode checkbox (controls canvas-area transparency)
+        const transparentModeCheckbox = document.getElementById('transparentMode');
+        if (transparentModeCheckbox) {
+            const applyTransparentMode = (enabled) => {
+                if (enabled) {
+                    document.body.classList.add('transparent-mode');
+                    canvasArea.style.backgroundColor = 'transparent';
+                } else {
+                    document.body.classList.remove('transparent-mode');
+                    const color = (backgroundColorPicker && backgroundColorPicker.value) || lastBackgroundColor || '#000000';
+                    canvasArea.style.backgroundColor = color;
+                }
+            };
+
+            transparentModeCheckbox.addEventListener('change', (e) => {
+                applyTransparentMode(e.target.checked);
+                
+                // Save to settings
+                if (window.Settings && typeof window.Settings.saveCheckbox === 'function') {
+                    window.Settings.saveCheckbox('transparentMode', e.target.checked);
+                }
+            });
+            
+            // Load saved value
+            if (window.Settings && typeof window.Settings.loadCheckbox === 'function') {
+                const saved = window.Settings.loadCheckbox('transparentMode', false);
+                transparentModeCheckbox.checked = saved;
+                applyTransparentMode(saved);
+            } else {
+                // Ensure initial background matches picker when no settings are available
+                if (canvasArea && backgroundColorPicker && !transparentModeCheckbox.checked) {
+                    canvasArea.style.backgroundColor = backgroundColorPicker.value;
+                }
+            }
+        }
 
         // Resolution dropdowns (absolute resolution, independent of display canvas size)
         const visualResSel = document.getElementById('visualResolution');
@@ -1571,9 +1697,11 @@
             gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
             gl.uniform2f(splatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
             gl.uniform1f(splatProg.uniforms.radius, config.SPLAT_RADIUS);
-            // Write velocity at physics resolution
-            gl.viewport(0, 0, simTexWidth, simTexHeight);
+            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 22.0);
             
+            // Write velocity at physics resolution (with isolation applied)
+            gl.viewport(0, 0, simTexWidth, simTexHeight);
+            gl.uniform1i(splatProg.uniforms.isVelocity, 1); // Velocity pass
             gl.uniform1i(splatProg.uniforms.uTarget, 0);
             gl.uniform3f(splatProg.uniforms.color, dx, -dy, 1.0);
             gl.activeTexture(gl.TEXTURE0);
@@ -1581,8 +1709,9 @@
             blit(velocity.write.fbo);
             velocity.swap();
             
-            // Write density at dye resolution
+            // Write density at dye resolution (full radius for visual quality)
             gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+            gl.uniform1i(splatProg.uniforms.isVelocity, 0); // Density pass
             gl.uniform1i(splatProg.uniforms.uTarget, 0);
             gl.uniform3fv(splatProg.uniforms.color, color);
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
@@ -1593,99 +1722,72 @@
         let lastTime = performance.now();
         let lastDrawTimeMs = 0;
         let fpsTimes = [];
-        window.fpsCap = (typeof window.fpsCap === 'number') ? window.fpsCap : 0; // 0 = uncapped
+        // DEFAULT to 60 FPS, not uncapped!
+        window.fpsCap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 60;
         window.__stats = window.__stats || {}; // { fps, frametime, lastCpuMs }
-        // Adaptive quality control state
-        const DYE_LEVELS = [8192, 6144, 4096, 3072, 2048, 1536, 1024, 512, 256, 128];
-        const SIM_LEVELS = [4096, 3072, 2048, 1536, 1024, 768, 512, 384, 256, 128, 64, 32, 16];
-        let qualityCtrl = { lowMs: 0, highMs: 0 };
-        function nextLower(val, levels) {
-            const i = levels.findIndex(v => v === val);
-            if (i < 0) {
-                // If not exact, find first lower
-                for (let k = 0; k < levels.length; k++) { if (levels[k] < val) return levels[k]; }
-                return val;
-            }
-            return (i === levels.length - 1) ? levels[i] : levels[i + 1];
-        }
-        function nextHigher(val, levels, maxVal) {
-            const i = levels.findIndex(v => v === val);
-            if (i < 0) {
-                // If not exact, find first higher not exceeding maxVal
-                for (let k = levels.length - 1; k >= 0; k--) { if (levels[k] > val && levels[k] <= maxVal) return levels[k]; }
-                return val;
-            }
-            if (i === 0) return levels[i];
-            const candidate = levels[i - 1];
-            return Math.min(candidate, maxVal);
-        }
-        function setSelectValue(id, value) {
-            try {
-                const sel = document.getElementById(id);
-                if (!sel) return;
-                const v = String(value);
-                const has = Array.from(sel.options).some(o => o.value === v);
-                sel.value = has ? v : 'custom';
-                if (!has) {
-                    const custom = document.getElementById(id + 'Custom');
-                    if (custom) { custom.style.display = 'block'; custom.value = value; }
-                } else {
-                    const custom = document.getElementById(id + 'Custom');
-                    if (custom) custom.style.display = 'none';
-                }
-            } catch(_) {}
-        }
-        function stepDownQuality() {
-            const base = window.baselineConfig || { DYE_RESOLUTION: window.config?.DYE_RESOLUTION, SIM_RESOLUTION: window.config?.SIM_RESOLUTION, PRESSURE_ITERATIONS: window.config?.PRESSURE_ITERATIONS };
-            const beforeDye = window.config?.DYE_RESOLUTION;
-            const beforeSim = window.config?.SIM_RESOLUTION;
-            const newDye = nextLower(beforeDye, DYE_LEVELS);
-            const newSim = nextLower(beforeSim, SIM_LEVELS);
-            let changed = false;
-            if (typeof window.config === 'object') {
-                if (newDye !== beforeDye) { window.config.DYE_RESOLUTION = newDye; changed = true; setSelectValue('visualResolution', newDye); }
-                if (newSim !== beforeSim) { window.config.SIM_RESOLUTION = newSim; changed = true; setSelectValue('physicsResolution', newSim); }
-                window.config.PRESSURE_ITERATIONS = Math.max(20, Math.round((window.config.PRESSURE_ITERATIONS || base.PRESSURE_ITERATIONS) - 10));
-            }
-            if (changed) {
-                window.needsFramebufferReinit = true;
-                if (typeof updateSliderValues === 'function') { try { updateSliderValues(); } catch(_){} }
-                console.log('[Adaptive] Stepped down quality:', { dye: beforeDye+'->'+newDye, sim: beforeSim+'->'+newSim, iter: window.config?.PRESSURE_ITERATIONS });
-            }
-        }
-        function stepUpQuality() {
-            const base = window.baselineConfig || { DYE_RESOLUTION: window.config?.DYE_RESOLUTION, SIM_RESOLUTION: window.config?.SIM_RESOLUTION, PRESSURE_ITERATIONS: window.config?.PRESSURE_ITERATIONS };
-            const beforeDye = window.config?.DYE_RESOLUTION;
-            const beforeSim = window.config?.SIM_RESOLUTION;
-            const newDye = nextHigher(beforeDye, DYE_LEVELS, base.DYE_RESOLUTION || beforeDye);
-            const newSim = nextHigher(beforeSim, SIM_LEVELS, base.SIM_RESOLUTION || beforeSim);
-            let changed = false;
-            if (typeof window.config === 'object') {
-                if (newDye !== beforeDye) { window.config.DYE_RESOLUTION = newDye; changed = true; setSelectValue('visualResolution', newDye); }
-                if (newSim !== beforeSim) { window.config.SIM_RESOLUTION = newSim; changed = true; setSelectValue('physicsResolution', newSim); }
-                const baseIter = base.PRESSURE_ITERATIONS || window.config.PRESSURE_ITERATIONS;
-                window.config.PRESSURE_ITERATIONS = Math.min(baseIter, Math.round((window.config.PRESSURE_ITERATIONS || baseIter) + 10));
-            }
-            if (changed) {
-                window.needsFramebufferReinit = true;
-                if (typeof updateSliderValues === 'function') { try { updateSliderValues(); } catch(_){} }
-                console.log('[Adaptive] Stepped up quality:', { dye: beforeDye+'->'+newDye, sim: beforeSim+'->'+newSim, iter: window.config?.PRESSURE_ITERATIONS });
-            }
-        }
+        // REMOVED: Adaptive quality control - was interfering with FPS display
+        
+        let perfLog = { advection: 0, divergence: 0, pressure: 0, gradient: 0, curl: 0, vorticity: 0, display: 0, total: 0, count: 0 };
         
         function update() {
+            const frameStart = performance.now();
             const cpuStart = performance.now();
             const nowMs = performance.now();
+            
+            // FPS Cap: Skip frame if not enough time has passed
             const cap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 0;
-            const desiredMs = cap ? (1000 / cap) : 0;
-            if (desiredMs && lastDrawTimeMs) {
+            
+            // Debug: Log cap value once
+            if (!window.__capLogged) {
+                console.log(`🎯 Active FPS Cap: ${cap === 0 ? 'Uncapped' : cap}`);
+                console.log(`   window.fpsCap = ${window.fpsCap}`);
+                console.log(`   Cap from variable: ${cap}`);
+                console.log(`   Type check: ${typeof window.fpsCap}`);
+                console.log(`🖥️ Hardware: ${navigator.hardwareConcurrency || '?'} cores`);
+                console.log(`📊 Display refresh: ${window.screen?.refreshRate || 'unknown'} Hz`);
+                console.log(`🔧 Pressure iterations will be forced to 20`);
+                window.__capLogged = true;
+            }
+            
+            // Every 300 frames, log if frames are being skipped
+            if (!window.__skipLog) window.__skipLog = 0;
+            window.__skipLog++;
+            if (window.__skipLog === 300) {
+                console.log(`⏭️ FPS Cap Status: cap=${cap}, fpsCap=${window.fpsCap}, skipping frames: ${cap > 0 ? 'YES' : 'NO'}`);
+                window.__skipLog = 0;
+            }
+            
+            // FPS Cap: Skip frame if not enough time has passed
+            if (cap > 0) {
+                const desiredMs = 1000 / cap;
                 const since = nowMs - lastDrawTimeMs;
-                const epsilonMs = 0.1;
-                if (since < (desiredMs - epsilonMs)) {
+                if (since < desiredMs) {
                     requestAnimationFrame(update);
-                    return;
+                    return; // Skip this frame
                 }
             }
+            
+            // Frame is running - update timestamp immediately
+            lastDrawTimeMs = nowMs;
+            
+            // Log ONLY rendered frames (after cap check)
+            if (!window.__frameLog) window.__frameLog = { times: [], count: 0 };
+            window.__frameLog.times.push(nowMs);
+            window.__frameLog.count++;
+            if (window.__frameLog.count >= 60) {
+                const times = window.__frameLog.times;
+                const deltas = [];
+                for (let i = 1; i < times.length; i++) {
+                    deltas.push(times[i] - times[i-1]);
+                }
+                const avgDelta = deltas.reduce((a,b) => a+b, 0) / deltas.length;
+                const actualFPS = 1000 / avgDelta;
+                console.log(`✅ RENDERED frame time: ${avgDelta.toFixed(2)}ms = ${actualFPS.toFixed(1)} FPS (cap=${cap})`);
+                window.__frameLog = { times: [], count: 0 };
+            }
+            
+            // Physics timestep: Cap at 16ms to prevent instability at low FPS
+            // Without this cap, 30 FPS = 33ms timestep = simulation explodes!
             const dt = Math.min((nowMs - lastTime) / 1000, 0.016);
             lastTime = nowMs;
             if (window.kAnimateRot && window.kSpinSpeed) {
@@ -1786,12 +1888,23 @@
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, divergence.texture);
                 
+                const pressureStart = performance.now();
                 for (let i = 0; i < config.PRESSURE_ITERATIONS; i++) {
                     gl.uniform1i(pressureProg.uniforms.uPressure, 1);
                     gl.activeTexture(gl.TEXTURE1);
                     gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
                     blit(pressure.write.fbo);
                     pressure.swap();
+                }
+                const pressureTime = performance.now() - pressureStart;
+                
+                // Log performance every 60 frames
+                perfLog.pressure += pressureTime;
+                perfLog.count++;
+                if (perfLog.count >= 60) {
+                    console.log(`⚡ Pressure solver: ${(perfLog.pressure / perfLog.count).toFixed(2)}ms avg (${config.PRESSURE_ITERATIONS} iterations)`);
+                    perfLog.pressure = 0;
+                    perfLog.count = 0;
                 }
                 
                 gradientProg.bind();
@@ -1829,7 +1942,7 @@
             blit(null);
             
             // Draw occurred: update stats based on actual render cadence
-            lastDrawTimeMs = performance.now();
+            // (lastDrawTimeMs already set at start of update() for FPS cap)
             fpsTimes.push(lastDrawTimeMs);
             const oneSecondAgo = lastDrawTimeMs - 1000;
             fpsTimes = fpsTimes.filter(t => t > oneSecondAgo);
@@ -1840,27 +1953,25 @@
             }
             const cpuMs = performance.now() - cpuStart;
             window.__stats = { fps: fpsVal, frametime: frametimeMs, lastCpuMs: cpuMs };
-
-            // FPS-based adaptive quality with hysteresis
-            if (Number.isFinite(fpsVal) && Number.isFinite(frametimeMs)) {
-                if (fpsVal < 28) {
-                    qualityCtrl.lowMs += frametimeMs || 0;
-                    qualityCtrl.highMs = 0;
-                } else if (fpsVal > 56) {
-                    qualityCtrl.highMs += frametimeMs || 0;
-                    qualityCtrl.lowMs = 0;
-                } else {
-                    // in mid band, slowly decay accumulators
-                    qualityCtrl.lowMs = Math.max(0, qualityCtrl.lowMs - (frametimeMs || 0) * 0.5);
-                    qualityCtrl.highMs = Math.max(0, qualityCtrl.highMs - (frametimeMs || 0) * 0.5);
-                }
-                if (qualityCtrl.lowMs > 1500) { // ~1.5s sustained low fps
-                    stepDownQuality();
-                    qualityCtrl.lowMs = 0; qualityCtrl.highMs = 0;
-                } else if (qualityCtrl.highMs > 3000) { // ~3s sustained high fps
-                    stepUpQuality();
-                    qualityCtrl.lowMs = 0; qualityCtrl.highMs = 0;
-                }
+            
+            // DIAGNOSTIC: Log every 120 frames to compare
+            if (!window.__statsLogCount) window.__statsLogCount = 0;
+            window.__statsLogCount++;
+            if (window.__statsLogCount === 120) {
+                const now = performance.now();
+                const actualMs = window.__frameLog?.times?.length >= 2 
+                    ? (window.__frameLog.times[window.__frameLog.times.length - 1] - window.__frameLog.times[0]) / window.__frameLog.times.length
+                    : 0;
+                const actualFPS = actualMs > 0 ? 1000 / actualMs : 0;
+                
+                console.log(`📊 FPS MISMATCH DIAGNOSTIC:`);
+                console.log(`   ✅ RENDERED frames (from frame log): ${actualFPS.toFixed(1)} FPS`);
+                console.log(`   ❌ window.__stats.fps (title bar uses): ${fpsVal} FPS`);
+                console.log(`   📋 fpsTimes array length: ${fpsTimes.length}`);
+                console.log(`   📋 fpsTimes oldest: ${fpsTimes[0]}, newest: ${fpsTimes[fpsTimes.length-1]}`);
+                console.log(`   📋 Time range: ${(fpsTimes[fpsTimes.length-1] - fpsTimes[0]).toFixed(2)}ms`);
+                console.log(`   🎯 Expected FPS from cap: ${cap || 'uncapped'}`);
+                window.__statsLogCount = 0;
             }
 
             requestAnimationFrame(update);
@@ -2853,6 +2964,18 @@
             const lower = key.length === 1 ? key.toLowerCase() : key;
             const ctrlOrMeta = e.ctrlKey || e.metaKey;
             
+            // Chromium fullscreen (F11)
+            if (key === 'F11') {
+                e.preventDefault();
+                if (!document.fullscreenElement) {
+                    const el = document.documentElement;
+                    if (el.requestFullscreen) el.requestFullscreen();
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen();
+                }
+                return;
+            }
+
             // Hotkey modal
             if (key === 'F1' || (e.shiftKey && (key === '?' || key === '/'))) {
                 e.preventDefault();

@@ -44,20 +44,15 @@
         const checkboxes = {};
         [
             'trailToggle','cursorToggle','showCanvasHandles','lockCanvasBorders',
-            'preserveFluidOpacity','statsToggle','randomColor','stepPalette','kaleidoToggle','kAnimateRot'
+            'preserveFluidOpacity','statsToggle','randomColor','stepPalette','kaleidoToggle','kAnimateRot','transparentMode'
         ].forEach(id => { const el = $(id); if (el) checkboxes[id] = !!el.checked; });
 
         const selects = {};
         ['visualResolution','physicsResolution','kaleidoMode'].forEach(id => {
             const el = $(id);
             if (!el) return;
-            let v = el.value;
-            // If custom, get value from custom input
-            if (v === 'custom') {
-                const customEl = $(id + 'Custom');
-                if (customEl && customEl.value) v = customEl.value;
-            }
-            if (v !== undefined) selects[id] = v;
+            const v = el.value;
+            if (v !== undefined && v !== '') selects[id] = v;
         });
 
         const colors = {
@@ -151,7 +146,7 @@
         });
 
         // Checkboxes
-        const checkboxIds = ['trailToggle','cursorToggle','showCanvasHandles','lockCanvasBorders','preserveFluidOpacity','statsToggle','randomColor','stepPalette','kaleidoToggle','kAnimateRot'];
+        const checkboxIds = ['trailToggle','cursorToggle','showCanvasHandles','lockCanvasBorders','preserveFluidOpacity','statsToggle','randomColor','stepPalette','kaleidoToggle','kAnimateRot','transparentMode'];
         checkboxIds.forEach(id => {
             const v = window.settingsManager.get(`checkbox.${id}`);
             if (typeof v === 'boolean') setCheck(id, v);
@@ -169,14 +164,22 @@
                 if (hasOption) {
                     setVal(id, v, 'change');
                 } else {
-                    // Use custom option
-                    el.value = 'custom';
-                    const customEl = $(id + 'Custom');
-                    if (customEl) {
-                        customEl.style.display = 'block';
-                        customEl.value = v;
-                        // Trigger input event to apply
-                        customEl.dispatchEvent(new Event('input'));
+                    // Value doesn't exist in options - find closest match for resolution dropdowns
+                    if (id === 'visualResolution' || id === 'physicsResolution') {
+                        const numVal = parseInt(v, 10);
+                        if (!isNaN(numVal)) {
+                            // Find closest option
+                            const options = Array.from(el.options).map(opt => parseInt(opt.value, 10)).filter(n => !isNaN(n));
+                            const closest = options.reduce((prev, curr) => 
+                                Math.abs(curr - numVal) < Math.abs(prev - numVal) ? curr : prev
+                            );
+                            setVal(id, String(closest), 'change');
+                        }
+                    } else {
+                        // For other selects, just use first option as fallback
+                        if (el.options.length > 0) {
+                            setVal(id, el.options[0].value, 'change');
+                        }
                     }
                 }
             }
@@ -207,7 +210,17 @@
         // Canvas wrapper rect
         const wr = window.settingsManager.get('canvas.wrapperRect');
         if (wr) {
-            const wrap = $('canvas-wrapper'); if (wrap) { wrap.style.left = wr.left + 'px'; wrap.style.top = wr.top + 'px'; wrap.style.width = wr.width + 'px'; wrap.style.height = wr.height + 'px'; }
+            const wrap = $('canvas-wrapper');
+            if (wrap) {
+                wrap.style.left = wr.left + 'px';
+                wrap.style.top = wr.top + 'px';
+                wrap.style.width = wr.width + 'px';
+                wrap.style.height = wr.height + 'px';
+                // Ensure internal canvas size and framebuffers are updated
+                if (typeof window.updateCanvasSize === 'function') {
+                    window.updateCanvasSize();
+                }
+            }
         }
 
         // Kaleidoscope runtime

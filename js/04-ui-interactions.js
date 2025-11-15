@@ -368,7 +368,7 @@
             
             // Generate random colors
             const color1 = pointer.color;
-            const color2 = [Math.random(), Math.random(), Math.random()];
+            const color2 = window.generateVibrantColor ? window.generateVibrantColor() : [Math.random(), Math.random(), Math.random()];
             
             // Left side smash (comes in first)
             setTimeout(() => {
@@ -431,7 +431,7 @@
             for (let pulse = 0; pulse < pulseCount; pulse++) {
                 setTimeout(() => {
                     const steps = 12;
-                    const randomColor = [Math.random(), Math.random(), Math.random()];
+                    const randomColor = window.generateVibrantColor ? window.generateVibrantColor() : [Math.random(), Math.random(), Math.random()];
                     
                     // Random base velocity for this pulse
                     const baseVelocity = -10 - Math.random() * 6;
@@ -497,7 +497,7 @@
                         
                         // Medium pulses (4-5 pulses)
                         const pulseCount = 4 + Math.floor(Math.random() * 2);
-                        const jellyfishColor = [Math.random(), Math.random(), Math.random()];
+                        const jellyfishColor = window.generateVibrantColor ? window.generateVibrantColor() : [Math.random(), Math.random(), Math.random()];
                         
                         // Stronger velocity for nice jelly shapes
                         const baseVelocity = -7 - Math.random() * 3;
@@ -784,7 +784,7 @@
                 }
                 
                 // Random color for each cycle
-                const color = [Math.random(), Math.random(), Math.random()];
+                const color = window.generateVibrantColor ? window.generateVibrantColor() : [Math.random(), Math.random(), Math.random()];
                 
                 // Strong upward velocity for long flows
                 const dx = randomnessEnabled ? Math.sin(listingPhase) * 0.8 : 0;

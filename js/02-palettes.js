@@ -194,6 +194,21 @@
                 }
             }
             
+            // Constrain to window bounds (Electron fix)
+            const areaRect = canvasArea.getBoundingClientRect();
+            const maxRight = areaRect.width - 20;
+            const maxBottom = areaRect.height - 20;
+            
+            // Ensure canvas stays within bounds
+            if (newLeft + newWidth > maxRight) {
+                newWidth = maxRight - newLeft;
+            }
+            if (newTop + newHeight > maxBottom) {
+                newHeight = maxBottom - newTop;
+            }
+            if (newLeft < 20) newLeft = 20;
+            if (newTop < 20) newTop = 20;
+            
             canvasWrapper.style.width = newWidth + 'px';
             canvasWrapper.style.height = newHeight + 'px';
             canvasWrapper.style.left = newLeft + 'px';
@@ -207,6 +222,13 @@
                 isResizing = false;
                 resizeDirection = null;
                 autoLockedCorner = null; // clear temporary lock
+                
+                // Save canvas size on resize end
+                if (window.Settings && typeof window.Settings.saveCanvasSize === 'function') {
+                    const w = canvasWrapper.offsetWidth;
+                    const h = canvasWrapper.offsetHeight;
+                    window.Settings.saveCanvasSize(w, h);
+                }
                 
                 // Release capture
                 try { if (activeResizeHandle) activeResizeHandle.releasePointerCapture(e.pointerId); } catch (_) {}

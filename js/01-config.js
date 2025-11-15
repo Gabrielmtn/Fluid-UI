@@ -515,24 +515,57 @@
             const newWidth = canvasWrapper.clientWidth;
             const newHeight = canvasWrapper.clientHeight;
             
+            // Set canvas resolution (internal pixels)
             canvas.width = newWidth;
             canvas.height = newHeight;
             trailCanvas.width = newWidth;
             trailCanvas.height = newHeight;
+            
+            // Also set CSS size explicitly to match (fixes scaling issues)
+            canvas.style.width = newWidth + 'px';
+            canvas.style.height = newHeight + 'px';
+            trailCanvas.style.width = newWidth + 'px';
+            trailCanvas.style.height = newHeight + 'px';
+            
             sizeDisplay.textContent = `${newWidth} × ${newHeight}`;
             
             // Flag to reinitialize framebuffers after WebGL context is set up
             window.needsFramebufferReinit = true;
         }
+
+        // Expose for other modules (e.g. save/load) to force a resize after restoring state
+        window.updateCanvasSize = updateCanvasSize;
         
-        // Initialize canvas wrapper position (centered)
+        // Initialize canvas wrapper position (centered and constrained)
         function initializeCanvasPosition() {
-            const areaRect = canvasArea.getBoundingClientRect();
-            const wrapperWidth = canvasWrapper.offsetWidth;
-            const wrapperHeight = canvasWrapper.offsetHeight;
+            // Load saved canvas size if available
+            if (window.Settings && typeof window.Settings.loadCanvasSize === 'function') {
+                const saved = window.Settings.loadCanvasSize();
+                if (saved && saved.width && saved.height) {
+                    canvasWrapper.style.width = saved.width + 'px';
+                    canvasWrapper.style.height = saved.height + 'px';
+                }
+            }
             
-            const centerLeft = (areaRect.width - wrapperWidth) / 2;
-            const centerTop = (areaRect.height - wrapperHeight) / 2;
+            const areaRect = canvasArea.getBoundingClientRect();
+            let wrapperWidth = canvasWrapper.offsetWidth;
+            let wrapperHeight = canvasWrapper.offsetHeight;
+            
+            // Constrain canvas to fit within window (Electron fix)
+            const maxWidth = areaRect.width - 40; // Leave margin
+            const maxHeight = areaRect.height - 40;
+            
+            if (wrapperWidth > maxWidth) {
+                wrapperWidth = maxWidth;
+                canvasWrapper.style.width = maxWidth + 'px';
+            }
+            if (wrapperHeight > maxHeight) {
+                wrapperHeight = maxHeight;
+                canvasWrapper.style.height = maxHeight + 'px';
+            }
+            
+            const centerLeft = Math.max(0, (areaRect.width - wrapperWidth) / 2);
+            const centerTop = Math.max(20, (areaRect.height - wrapperHeight) / 2);
             
             canvasWrapper.style.left = centerLeft + 'px';
             canvasWrapper.style.top = centerTop + 'px';
@@ -540,6 +573,11 @@
         
         initializeCanvasPosition();
         updateCanvasSize();
+        
+        // Re-center on window resize (Electron)
+        window.addEventListener('resize', () => {
+            setTimeout(initializeCanvasPosition, 100);
+        });
         
         // Corner locking functionality
         const lockedCorners = {

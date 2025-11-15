@@ -3,19 +3,181 @@
             padding: 0;
             box-sizing: border-box;
         }
+
+        html {
+            /* Allow Electron's transparent window to show desktop behind the page */
+            background: transparent;
+        }
+        
+        /* Custom Title Bar */
+        #custom-titlebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 32px;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            user-select: none;
+        }
+        
+        body.transparent-mode #custom-titlebar {
+            background: rgba(0, 0, 0, 0.92);
+            backdrop-filter: blur(10px);
+        }
+        
+        .titlebar-drag-region {
+            flex: 1;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding-left: 12px;
+            -webkit-app-region: drag;
+        }
+        
+        .titlebar-title {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .window-controls {
+            display: flex;
+            height: 100%;
+            -webkit-app-region: no-drag;
+        }
+        
+        .titlebar-button {
+            width: 46px;
+            height: 100%;
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s ease;
+        }
+        
+        .titlebar-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .titlebar-button.close:hover {
+            background: #e81123;
+            color: white;
+        }
+        
+        .titlebar-button svg {
+            pointer-events: none;
+        }
+
+        /* Window-level resize handles for frameless, transparent window */
+        .window-resize-edge,
+        .window-resize-corner {
+            position: fixed;
+            z-index: 9999;
+            -webkit-app-region: no-drag;
+            pointer-events: auto;
+            /* Mostly invisible, but slightly visible on hover for debugging */
+            background: transparent;
+        }
+
+        .window-resize-edge:hover,
+        .window-resize-corner:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .edge-top {
+            /* Place just below the custom titlebar so it isn't hidden */
+            top: 32px;
+            left: 0;
+            right: 0;
+            height: 4px;
+            cursor: n-resize;
+        }
+
+        .edge-right {
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 4px;
+            cursor: e-resize;
+        }
+
+        .edge-bottom {
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 4px;
+            cursor: s-resize;
+        }
+
+        .edge-left {
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 4px;
+            cursor: w-resize;
+        }
+
+        .corner-nw {
+            /* Align with top edge resize strip, below the titlebar */
+            top: 32px;
+            left: 0;
+            width: 10px;
+            height: 10px;
+            cursor: nw-resize;
+        }
+
+        .corner-ne {
+            top: 32px;
+            right: 0;
+            width: 10px;
+            height: 10px;
+            cursor: ne-resize;
+        }
+
+        .corner-se {
+            bottom: 0;
+            right: 0;
+            width: 10px;
+            height: 10px;
+            cursor: se-resize;
+        }
+
+        .corner-sw {
+            bottom: 0;
+            left: 0;
+            width: 10px;
+            height: 10px;
+            cursor: sw-resize;
+        }
         
         body {
             overflow: hidden;
-            background: #000;
+            background: #0f141b;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             margin: 0;
             padding: 0;
+            padding-top: 32px; /* Account for title bar */
             display: flex;
             height: 100vh;
             height: 100dvh;
             overscroll-behavior: none;
+            transition: background 0.3s ease;
         }
-        
+
+        body.transparent-mode {
+            /* In transparent mode, let areas outside UI/canvas be see-through */
+            background: transparent;
+        }
+
         #canvas-area {
             flex: 1;
             position: relative;
@@ -26,23 +188,16 @@
             touch-action: none;
             overscroll-behavior: none;
         }
-        
-        #canvas-wrapper {
-            position: absolute;
-            width: 800px;
-            height: 600px;
-            min-width: 200px;
-            min-height: 200px;
-            /* Will be positioned by JavaScript on load */
-        }
-        
+
         .resize-handle {
             position: absolute;
             background: rgba(100, 200, 255, 0.3);
             border: 1px solid rgba(100, 200, 255, 0.6);
-            z-index: 200;
+            cursor: pointer;
             pointer-events: auto;
             transition: background 0.2s;
+            -webkit-app-region: no-drag; /* Fix for Electron */
+            user-select: none;
         }
         
         .resize-handle:hover {
@@ -65,15 +220,26 @@
             background: rgba(100, 200, 255, 0.4);
         }
         
-        .resize-nw { top: -6px; left: -6px; cursor: nw-resize; }
+        .resize-nw { top: -12px; left: -12px; cursor: nw-resize; }
         .resize-n { top: -1.5px; left: 12px; right: 12px; height: 3px; cursor: n-resize; }
-        .resize-ne { top: -6px; right: -6px; cursor: ne-resize; }
+        .resize-ne { top: -12px; right: -12px; cursor: ne-resize; }
         .resize-e { right: -1.5px; top: 12px; bottom: 12px; width: 3px; cursor: e-resize; }
-        .resize-se { bottom: -6px; right: -6px; cursor: se-resize; }
+        .resize-se { bottom: -12px; right: -12px; cursor: se-resize; }
         .resize-s { bottom: -1.5px; left: 12px; right: 12px; height: 3px; cursor: s-resize; }
-        .resize-sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+        .resize-sw { bottom: -12px; left: -12px; cursor: sw-resize; }
         .resize-w { left: -1.5px; top: 12px; bottom: 12px; width: 3px; cursor: w-resize; }
         
+        #canvas-wrapper {
+            position: absolute;
+            width: 608px;  /* slightly smaller than 640px (~5% reduction) */
+            height: 456px; /* slightly smaller than 480px (~5% reduction) */
+            max-width: calc(100vw - 360px); /* Leave room for controls sidebar */
+            max-height: calc(100vh - 80px);  /* Leave room for margins */
+            min-width: 200px;
+            min-height: 200px;
+            /* Will be positioned by JavaScript on load */
+        }
+
         #canvas-size-display {
             position: absolute;
             top: -30px;
@@ -117,6 +283,15 @@
             z-index: 2;
         }
         
+        #customCursor {
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 3;
+        }
+
         #customCursor svg {
             width: 100%;
             height: 100%;
@@ -230,7 +405,7 @@
             flex: 0 0 280px;
             height: 100vh;
             height: 100dvh;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(10px);
             padding: 10px;
             padding-top: calc(10px + env(safe-area-inset-top));
@@ -247,25 +422,31 @@
             color-scheme: dark;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, background 0.3s ease;
             position: relative;
         }
+
+        /* Slim, dark scrollbar for the right controls panel */
+        .controls::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .controls::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        .controls::-webkit-scrollbar-thumb {
+            background: rgba(80, 80, 96, 0.9);
+            border-radius: 4px;
+        }
+
+        .controls::-webkit-scrollbar-thumb:hover {
+            background: rgba(110, 110, 128, 0.95);
+        }
         
-        .controls .sidebar {
-            width: 280px;
-            background: rgba(20, 20, 30, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 20px;
-            color: white;
-            box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
-            z-index: 100;
-            overflow-y: auto;
-            overflow-x: hidden;
-            display: flex;
-            flex-direction: column;
-            color-scheme: dark;
-            -webkit-overflow-scrolling: touch;
-            overscroll-behavior: contain;
+        body.transparent-mode .controls {
+            background: rgba(0, 0, 0, 0.92);
+            backdrop-filter: blur(16px);
         }
         
         .control-group {

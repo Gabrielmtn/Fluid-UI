@@ -6,148 +6,118 @@
     <title>Fluid Simulation - Full Featured</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/slider-styles.css">
+    <link rel="stylesheet" href="css/battery-styles.css">
 </head>
 <body>
-    <button id="mobileMenuToggle" aria-label="Toggle Menu"></button>
-    <div id="canvas-area">
-        <div id="canvas-wrapper">
-            <div id="canvas-size-display">800 × 600</div>
-            
-            <!-- Resize handles -->
-            <div class="resize-handle corner resize-nw"></div>
-            <div class="resize-handle edge resize-n"></div>
-            <div class="resize-handle corner resize-ne"></div>
-            <div class="resize-handle edge resize-e"></div>
-            <div class="resize-handle corner resize-se"></div>
-            <div class="resize-handle edge resize-s"></div>
-            <div class="resize-handle corner resize-sw"></div>
-            <div class="resize-handle edge resize-w"></div>
-            
-            <div id="layers-container">
-                <div class="background-layer" id="layer0"></div>
-                <div class="background-layer" id="layer1"></div>
-                <div class="background-layer" id="layer2"></div>
-                <div class="background-layer" id="layer3"></div>
-                <div class="background-layer" id="layer4"></div>
-                <div class="background-layer" id="layer5"></div>
-                <div class="background-layer" id="layer6"></div>
-                <div class="background-layer" id="layer7"></div>
-                <div class="background-layer" id="layer8"></div>
-                <div class="background-layer" id="layer9"></div>
-            </div>
-            <canvas id="canvas"></canvas>
-            <canvas id="trailCanvas"></canvas>
-            <div id="customCursor"></div>
+    <!-- Custom Title Bar for Frameless Window -->
+    <div id="custom-titlebar">
+        <div class="titlebar-drag-region">
+            <span class="titlebar-title">Fluid Simulation</span>
         </div>
-        
-        <!-- Stats For Nerds Panel -->
-        <div id="statsPanel" class="stats-panel" style="display: none;">
-            <div class="stats-header">
-                <span class="stats-drag-handle">Stats For Nerds 🤓</span>
-            </div>
-            <button id="statsCloseBtn" class="stats-close-btn" title="Close panel">✕</button>
-            <div class="stats-content">
-                <div class="stats-section">
-                    <div class="stats-title">Performance</div>
-                    <div class="stat-row"><span class="stat-label">FPS:</span> <span id="stat-fps">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Frame Time:</span> <span id="stat-frametime">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Update Time:</span> <span id="stat-updatetime">--</span></div>
-                </div>
-                
-                <div class="stats-section">
-                    <div class="stats-title">Simulation</div>
-                    <div class="stat-row"><span class="stat-label">Sim Resolution:</span> <span id="stat-simres">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Dye Resolution:</span> <span id="stat-dyeres">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Canvas Size:</span> <span id="stat-canvassize">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Velocity Dissipation:</span> <span id="stat-veldiss">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Density Dissipation:</span> <span id="stat-dendiss">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Pressure Iterations:</span> <span id="stat-pressure">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Curl:</span> <span id="stat-curl">--</span></div>
-                </div>
-                
-                <div class="stats-section">
-                    <div class="stats-title">Kaleidoscope</div>
-                    <div class="stat-row"><span class="stat-label">Mode:</span> <span id="stat-kmode">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Segments:</span> <span id="stat-ksegments">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Angle:</span> <span id="stat-kangle">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Zoom:</span> <span id="stat-kzoom">--</span></div>
-                </div>
-                
-                <div class="stats-section">
-                    <div class="stats-title">Input</div>
-                    <div class="stat-row"><span class="stat-label">Pointer Position:</span> <span id="stat-pointerpos">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Pointer Velocity:</span> <span id="stat-pointervel">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Splat Radius:</span> <span id="stat-splatradius">--</span></div>
-                    <div class="stat-row"><span class="stat-label">Multiplier:</span> <span id="stat-multiplier">--</span></div>
-                </div>
-                
-                <div class="stats-section">
-                    <div class="stats-title">Memory</div>
-                    <div class="stat-row"><span class="stat-label">Textures:</span> <span id="stat-textures">--</span></div>
-                    <div class="stat-row"><span class="stat-label">WebGL Context:</span> <span id="stat-webgl">--</span></div>
-                </div>
-            </div>
+        <div class="window-controls">
+            <button id="min-button" class="titlebar-button" title="Minimize">
+                <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+            </button>
+            <button id="max-button" class="titlebar-button" title="Maximize">
+                <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0" y="0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+            </button>
+            <button id="close-button" class="titlebar-button close" title="Close">
+                <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1"/></svg>
+            </button>
         </div>
     </div>
+
+    <!-- Invisible window resize handles (for frameless, transparent window) -->
+    <div class="window-resize-edge edge-top"    data-resize="n"></div>
+    <div class="window-resize-edge edge-right"  data-resize="e"></div>
+    <div class="window-resize-edge edge-bottom" data-resize="s"></div>
+    <div class="window-resize-edge edge-left"   data-resize="w"></div>
+
+    <div class="window-resize-corner corner-nw" data-resize="nw"></div>
+    <div class="window-resize-corner corner-ne" data-resize="ne"></div>
+    <div class="window-resize-corner corner-se" data-resize="se"></div>
+    <div class="window-resize-corner corner-sw" data-resize="sw"></div>
     
-    <!-- Recorded Layers Drawer (full-width) -->
-    <div id="recDrawer" class="rec-drawer">
-        <div id="recResizeHandle" class="rec-resize-handle"><div class="rec-grabber"></div></div>
-        <div class="rec-header">
-            <div class="rec-left">
-                <strong>Recorded Layers</strong>
-                <span id="recStatus" style="font-size:12px; opacity:0.7; margin-left:8px;">Ready</span>
-            </div>
-            <div class="rec-right">
-                <label for="recPlaybackSpeed" style="font-size:12px; opacity:0.8;">Speed</label>
-                <select id="recPlaybackSpeed">
-                    <option value="0.25">0.25x</option>
-                    <option value="0.5">0.5x</option>
-                    <option value="1" selected>1x</option>
-                    <option value="2">2x</option>
-                    <option value="4">4x</option>
-                </select>
-                <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;">Max</label>
-                <input type="text" id="recMaxDuration" class="time-input" value="00:10:000" placeholder="mm:ss:ms" style="width:110px;">
-                <button id="recCloseBtn" class="rec-close">✕</button>
-            </div>
-        </div>
-        <div class="rec-header" style="gap:6px;">
-            <div class="rec-left" style="gap:6px;">
-                <button id="recRecordBtn">⏺ Record</button>
-                <button id="recMultiRecordBtn">⏺ Multi Artist Record</button>
-                <button id="recPlayBtn">▶ Play Layer</button>
-                <button id="recPlayAllBtn">▶▶ Play All</button>
-                <button id="recStopBtn">⏹ Stop</button>
-                <button id="recAddLayerBtn">➕ Add Layer</button>
-                <button id="recDuplicateLayerBtn">📋 Duplicate</button>
-                <button id="recDeleteLayerBtn">🗑 Delete</button>
-                <button id="recClearBtn">🧹 Clear Active</button>
-                <button id="recExportBtn">💾 Export</button>
-                <button id="recImportBtn">📁 Import</button>
-                <input type="file" id="recImportFile" accept=".json" style="display:none;" />
-            </div>
-        </div>
-        <div class="rec-header" style="gap:6px;">
-            <div class="rec-left" style="gap:6px; align-items:center;">
-                <label for="recPresetSelect" style="font-size:12px; opacity:0.8;">Preset</label>
-                <select id="recPresetSelect" style="min-width:200px;"></select>
-                <button id="recSavePresetBtn">Save as New</button>
-                <div id="recPresetNameRow" style="display:none; gap:6px; align-items:center;">
-                    <input type="text" id="recNewPresetName" placeholder="Enter Preset Name" style="width:200px;">
-                    <button id="recPresetConfirmBtn">Save</button>
-                    <button id="recPresetCancelBtn">Cancel</button>
+    <button id="mobileMenuToggle" aria-label="Toggle Menu"></button>
+    <div id="canvas-area">
+                <div id="canvas-wrapper">
+                    <div id="canvas-size-display">800 × 600</div>
+                    
+                    <!-- Resize handles -->
+                    <div class="resize-handle corner resize-nw"></div>
+                    <div class="resize-handle edge resize-n"></div>
+                    <div class="resize-handle corner resize-ne"></div>
+                    <div class="resize-handle edge resize-e"></div>
+                    <div class="resize-handle corner resize-se"></div>
+                    <div class="resize-handle edge resize-s"></div>
+                    <div class="resize-handle corner resize-sw"></div>
+                    <div class="resize-handle edge resize-w"></div>
+                    
+                    <div id="layers-container">
+                        <div class="background-layer" id="layer0"></div>
+                        <div class="background-layer" id="layer1"></div>
+                        <div class="background-layer" id="layer2"></div>
+                        <div class="background-layer" id="layer3"></div>
+                        <div class="background-layer" id="layer4"></div>
+                        <div class="background-layer" id="layer5"></div>
+                        <div class="background-layer" id="layer6"></div>
+                        <div class="background-layer" id="layer7"></div>
+                        <div class="background-layer" id="layer8"></div>
+                        <div class="background-layer" id="layer9"></div>
+                    </div>
+                    <canvas id="canvas"></canvas>
+                    <canvas id="trailCanvas"></canvas>
+                    <div id="customCursor"></div>
                 </div>
-            </div>
-        </div>
-        <div class="rec-timeline-wrap">
-            <canvas id="recTimelineCanvas" class="rec-timeline"></canvas>
-            <div id="recPlayhead" class="rec-playhead" style="left:0;"></div>
-            <div id="recRecordhead" class="rec-recordhead" style="left:0;"></div>
-        </div>
-        <div class="rec-body">
-            <div id="recLayersList" class="layers-panel"></div>
-        </div>
+                
+                <!-- Stats For Nerds Panel -->
+                <div id="statsPanel" class="stats-panel" style="display: none;">
+                    <div class="stats-header">
+                        <span class="stats-drag-handle">Stats For Nerds 🤓</span>
+                    </div>
+                    <button id="statsCloseBtn" class="stats-close-btn" title="Close panel">✕</button>
+                    <div class="stats-content">
+                        <div class="stats-section">
+                            <div class="stats-title">Performance</div>
+                            <div class="stat-row"><span class="stat-label">FPS:</span> <span id="stat-fps">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Frame Time:</span> <span id="stat-frametime">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Update Time:</span> <span id="stat-updatetime">--</span></div>
+                        </div>
+                        
+                        <div class="stats-section">
+                            <div class="stats-title">Simulation</div>
+                            <div class="stat-row"><span class="stat-label">Sim Resolution:</span> <span id="stat-simres">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Dye Resolution:</span> <span id="stat-dyeres">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Canvas Size:</span> <span id="stat-canvassize">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Velocity Dissipation:</span> <span id="stat-veldiss">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Density Dissipation:</span> <span id="stat-dendiss">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Pressure Iterations:</span> <span id="stat-pressure">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Curl:</span> <span id="stat-curl">--</span></div>
+                        </div>
+                        
+                        <div class="stats-section">
+                            <div class="stats-title">Kaleidoscope</div>
+                            <div class="stat-row"><span class="stat-label">Mode:</span> <span id="stat-kmode">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Segments:</span> <span id="stat-ksegments">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Angle:</span> <span id="stat-kangle">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Zoom:</span> <span id="stat-kzoom">--</span></div>
+                        </div>
+                        
+                        <div class="stats-section">
+                            <div class="stats-title">Input</div>
+                            <div class="stat-row"><span class="stat-label">Pointer Position:</span> <span id="stat-pointerpos">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Pointer Velocity:</span> <span id="stat-pointervel">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Splat Radius:</span> <span id="stat-splatradius">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Multiplier:</span> <span id="stat-multiplier">--</span></div>
+                        </div>
+                        
+                        <div class="stats-section">
+                            <div class="stats-title">Memory</div>
+                            <div class="stat-row"><span class="stat-label">Textures:</span> <span id="stat-textures">--</span></div>
+                            <div class="stat-row"><span class="stat-label">WebGL Context:</span> <span id="stat-webgl">--</span></div>
+                        </div>
+                    </div>
+                </div>
     </div>
     
     <div class="controls">
@@ -156,92 +126,107 @@
             <label for="brushSize">Brush Size</label>
             <input type="range" id="brushSize" min="1" max="30" value="11" step="0.1">
         </div>
+        
+        <div class="control-group">
+            <label for="colorPicker">Fluid Color</label>
+            <input type="color" id="colorPicker" value="#ff0000">
+            <div class="color-actions">
+                <button onclick="saveColor()">Save Color</button>
+                <button onclick="clearColors()">Clear All</button>
+            </div>
+            <div class="saved-colors" id="savedColors"></div>
+            <div class="control-group checkbox-group" style="margin-top: 8px;">
+                <input type="checkbox" id="randomColor" checked>
+                <label for="randomColor" style="margin: 0">Random Colors</label>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Palette <span id="paletteImportStatus" class="import-status"></span></label>
+                <div class="palette-carousel" id="paletteCarousel"></div>
+                <div class="palette-row-split">
+                    <div class="palette-left">
+                        <div class="palette-preview" id="palettePreview"></div>
+                        <div class="palette-step" id="paletteStepIndicator"></div>
+                    </div>
+                    <div class="palette-right">
+                        <div class="palette-create" id="paletteCreateRow">
+                            <button id="saveNewPaletteBtn">+ Save as New</button>
+                            <div class="palette-name-input" id="paletteNameInput" style="display:none;">
+                                <input type="text" id="newPaletteName" placeholder="Enter Palette Name" />
+                                <div class="palette-name-input-buttons">
+                                    <button id="confirmSaveBtn">Save</button>
+                                    <button id="cancelSaveBtn">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="palette-actions">
+                    <button onclick="exportCurrentPaletteFluid()">Export Current</button>
+                    <button onclick="exportAllPalettesFluid()">Export All</button>
+                    <button onclick="document.getElementById('paletteFluidFile').click()">Import</button>
+                    <input type="file" id="paletteFluidFile" accept=".fluid,text/plain" style="display:none" onchange="importPalettesFluidFromFile(this.files[0]); this.value='';" />
+                </div>
+            </div>
+        </div>
+        
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="stepPalette">
+            <label for="stepPalette" style="margin: 0">Step through palette</label>
+        </div>
+        
         <div class="control-group">
             <label for="visualResolution">Visual Quality</label>
             <select id="visualResolution">
-                <option value="8192">Extreme (Flagship Hardware)</option>
-                <option value="6144">Ultra Maximum</option>
-                <option value="4096">Ultra High</option>
-                <option value="3072">Very High</option>
-                <option value="2048" selected>High</option>
-                <option value="1536">Medium-High</option>
-                <option value="1024">Medium</option>
-                <option value="512">Low</option>
-                <option value="256">Very Low</option>
-                <option value="128">Minimum</option>
-                <option value="custom">Custom...</option>
+                <option value="2048">High (2K)</option>
+                <option value="1024" selected>Medium (1K) - Recommended</option>
+                <option value="512">Low (512)</option>
             </select>
-            <input type="number" id="visualResolutionCustom" min="64" step="64" placeholder="Enter resolution" style="display:none; margin-top:8px; width:100%; padding:8px; border-radius:6px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.3);">
         </div>
         <div class="control-group">
-            <label for="physicsResolution">Physics Resolution</label>
+            <label for="physicsResolution">Physics Detail</label>
             <select id="physicsResolution">
-                <option value="4096">Extreme (Flagship Hardware)</option>
-                <option value="3072">Ultra Maximum</option>
-                <option value="2048">Ultra High</option>
-                <option value="1536">Very High</option>
                 <option value="1024">High</option>
-                <option value="768">Medium-High</option>
-                <option value="512" selected>Medium</option>
-                <option value="384">Medium-Low</option>
+                <option value="512" selected>Medium - Recommended</option>
                 <option value="256">Low</option>
-                <option value="128">Very Low</option>
-                <option value="64">Minimum</option>
-                <option value="32">Mobile</option>
-                <option value="16">Maximum Compatibility</option>
-                <option value="custom">Custom...</option>
             </select>
-            <input type="number" id="physicsResolutionCustom" min="16" step="16" placeholder="Enter resolution" style="display:none; margin-top:8px; width:100%; padding:8px; border-radius:6px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.3);">
         </div>
         <div class="control-group">
-            <label for="fpsCap">FPS Cap</label>
+            <label for="fpsCap">FPS Limit</label>
             <select id="fpsCap">
-                <option value="0" selected>Uncapped</option>
-                <option value="30">30 fps</option>
-                <option value="60">60 fps</option>
-                <option value="90">90 fps</option>
-                <option value="120">120 fps</option>
-                <option value="144">144 fps</option>
-                <option value="165">165 fps</option>
-                <option value="240">240 fps</option>
+                <option value="30">30 fps (Battery Saver)</option>
+                <option value="60" selected>60 fps - Recommended</option>
+                <option value="120">120 fps (High Refresh)</option>
+                <option value="144">144 fps (Gaming)</option>
             </select>
         </div>
-        
         <div class="control-group">
             <label for="densityDissipation">Density Sustain <span id="densityValue" class="value-display">0.9960</span></label>
             <input type="range" id="densityDissipation" min="0.85" max="1.005" value="0.996" step="0.0001">
         </div>
-        
         <div class="control-group">
             <label for="velocityDissipation">Velocity Sustain <span id="velocityValue" class="value-display">0.9990</span></label>
             <input type="range" id="velocityDissipation" min="0.9" max="1.0009" value="0.999" step="0.0001">
         </div>
-        
         <div class="control-group">
             <label for="pressureDissipation">Pressure Dissipation <span id="pressureValue" class="value-display">0.944</span></label>
             <input type="range" id="pressureDissipation" min="0.9" max="1.0333" value="0.944" step="0.001">
         </div>
-        
         <div class="control-group">
-            <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">95</span></label>
-            <input type="range" id="pressureIteration" min="1" max="150" value="95" step="1">
+            <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">20</span></label>
+            <input type="range" id="pressureIteration" min="1" max="50" value="20" step="1">
         </div>
-        
         <div class="control-group">
             <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">22.0</span></label>
             <input type="range" id="velocityInfluence" min="1" max="50" value="22" step="0.5">
         </div>
-        
         <div class="control-group">
             <label for="curl">Curl <span id="curlValue" class="value-display">40</span></label>
             <input type="range" id="curl" min="0" max="60" value="40" step="1">
         </div>
-        
         <div class="control-group">
             <label for="multiplier">✨ Multiplier <span id="multiplierValue" class="value-display">1x</span></label>
             <input type="range" id="multiplier" min="1" max="8" value="1" step="1">
         </div>
-        
         <div class="control-group checkbox-group">
             <input type="checkbox" id="kaleidoToggle">
             <label for="kaleidoToggle" style="margin: 0">Kaleido</label>
@@ -278,112 +263,57 @@
                 <label for="kTwist">Twist <span id="kTwistValue" class="value-display">0.0</span></label>
                 <input type="range" id="kTwist" min="0" max="10" value="0" step="0.1" class="slider-star">
             </div>
-            
             <div class="control-group">
                 <label for="kZoom">Zoom <span id="kZoomValue" class="value-display">1.00</span></label>
                 <input type="range" id="kZoom" min="0.5" max="2" value="1" step="0.01" class="slider-star">
             </div>
-            
             <div class="control-group">
                 <label for="kBlend">Blend <span id="kBlendValue" class="value-display">1.00</span></label>
                 <input type="range" id="kBlend" min="0" max="1" value="1" step="0.01">
             </div>
         </div>
-        
-        <div class="control-group">
-            <label for="colorPicker">Fluid Color</label>
-            <input type="color" id="colorPicker" value="#ff0000">
-            <div class="color-actions">
-                <button onclick="saveColor()">Save Color</button>
-                <button onclick="clearColors()">Clear All</button>
-            </div>
-            <div class="saved-colors" id="savedColors"></div>
-            <div class="control-group checkbox-group" style="margin-top: 8px;">
-                <input type="checkbox" id="randomColor" checked>
-                <label for="randomColor" style="margin: 0">Random Colors</label>
-            </div>
-            <div style="margin-top: 10px;">
-                <label>Palette <span id="paletteImportStatus" class="import-status"></span></label> <!-- Section header -->
-                <div class="palette-carousel" id="paletteCarousel"></div>
-                <div class="palette-row-split">
-                    <div class="palette-left">
-                        <div class="palette-preview" id="palettePreview"></div>
-                        <div class="palette-step" id="paletteStepIndicator"></div>
-                    </div>
-                    <div class="palette-right">
-                        <div class="palette-create" id="paletteCreateRow">
-                            <button id="saveNewPaletteBtn">+ Save as New</button>
-                            <div class="palette-name-input" id="paletteNameInput" style="display:none;">
-                                <input type="text" id="newPaletteName" placeholder="Enter Palette Name" />
-                                <div class="palette-name-input-buttons">
-                                    <button id="confirmSaveBtn">Save</button>
-                                    <button id="cancelSaveBtn">Cancel</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="palette-actions">
-                    <button onclick="exportCurrentPaletteFluid()">Export Current</button>
-                    <button onclick="exportAllPalettesFluid()">Export All</button>
-                    <button onclick="document.getElementById('paletteFluidFile').click()">Import</button>
-                    <input type="file" id="paletteFluidFile" accept=".fluid,text/plain" style="display:none" onchange="importPalettesFluidFromFile(this.files[0]); this.value='';" />
-                </div>
-            </div>
-        </div>
-        
-        <div class="control-group checkbox-group">
-            <input type="checkbox" id="stepPalette">
-            <label for="stepPalette" style="margin: 0">Step through palette</label>
-        </div>
-        
         <div class="control-group" style="margin-top: 10px;">
             <label for="backgroundColorPicker">Background Color</label>
             <input type="color" id="backgroundColorPicker" value="#000000">
+            <div class="control-group checkbox-group" style="margin-top: 8px;">
+                <input type="checkbox" id="transparentMode">
+                <label for="transparentMode" style="margin: 0">Transparent Background</label>
+            </div>
         </div>
-        
         <div class="control-group" style="margin-top: 10px;">
             <label for="canvasOpacity">Canvas Opacity (Sim Visibility) <span id="opacityValue" class="value-display">100%</span></label>
             <input type="range" id="canvasOpacity" min="0" max="100" value="100" step="1">
         </div>
-        
         <div class="control-group checkbox-group" style="margin-top: 5px; margin-left: 10px;">
             <input type="checkbox" id="preserveFluidOpacity">
             <label for="preserveFluidOpacity" style="margin: 0">Preserve Fluid Opacity</label>
         </div>
-        
         <div class="control-group" style="margin-top: 10px;">
             <label for="captureDimming">Background Transparency <span id="dimmingValue" class="value-display">80%</span></label>
             <input type="range" id="captureDimming" min="0" max="100" value="80" step="1">
         </div>
-        
         <div class="control-group checkbox-group">
             <input type="checkbox" id="trailToggle" checked>
             <label for="trailToggle" style="margin: 0">Show Trail</label>
         </div>
-        
         <div class="control-group checkbox-group">
             <input type="checkbox" id="cursorToggle" checked>
             <label for="cursorToggle" style="margin: 0">Show Cursor</label>
         </div>
-        
         <div class="control-group checkbox-group">
             <input type="checkbox" id="showCanvasHandles" checked>
             <label for="showCanvasHandles" style="margin: 0">Show Canvas Border & Handles</label>
         </div>
-        
         <div class="control-group checkbox-group">
             <input type="checkbox" id="statsToggle">
             <label for="statsToggle" style="margin: 0">Stats For Nerds</label>
         </div>
-        
         <div class="control-group checkbox-group">
             <input type="checkbox" id="lockCanvasBorders">
             <label for="lockCanvasBorders" style="margin: 0">Lock Canvas Borders</label>
         </div>
-        
         <div class="control-group" style="margin-top: 15px;">
-            <label>Settings</label> <!-- Section header, no associated input -->
+            <label>Settings</label>
             <div style="display: flex; gap: 8px;">
                 <button id="saveSettingsBtn" style="flex: 1;">💾 Save</button>
                 <button id="loadSettingsBtn" style="flex: 1;">📂 Load</button>
@@ -394,9 +324,8 @@
                 <label for="autoloadSettings" style="margin: 0">Load saved on start</label>
             </div>
         </div>
-        
         <div class="control-group">
-            <label>Presets</label> <!-- Section header, no associated input -->
+            <label>Presets</label>
             <div class="presets">
                 <button onclick="applyPreset('silky')">Silky</button>
                 <button onclick="applyPreset('thick')">Thick</button>
@@ -406,6 +335,27 @@
                 <button onclick="applyPreset('turbulent')">Turbulent</button>
                 <button onclick="applyPreset('marble')">Marble</button>
                 <button onclick="applyPreset('electric')">Electric</button>
+            </div>
+        </div>
+        <div class="control-group" style="margin-top: 20px; padding: 15px; background: rgba(100, 150, 255, 0.1); border-radius: 8px;">
+            <label style="font-weight: bold; margin-bottom: 10px; display: block;">Multi Artist</label>
+            <div class="control-group checkbox-group" style="margin-top: 5px;">
+                <input type="checkbox" id="multiplayerToggle" onchange="initMultiplayer()">
+                <label for="multiplayerToggle" style="margin: 0">Enable Multi Artist</label>
+            </div>
+            <div id="multiplayerInfo" style="margin-top: 10px; font-size: 12px;">
+                <div style="margin-bottom: 5px;">
+                    <strong>Room:</strong> <span id="roomName">default-room</span>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong>Status:</strong> <span id="multiplayerStatus">Disconnected</span>
+                </div>
+                <button id="copyRoomBtn" onclick="copyRoomUrl()" style="width: 100%; font-size: 12px; padding: 6px;">
+                    Copy Room URL
+                </button>
+                <div style="margin-top: 8px; opacity: 0.7; font-size: 11px;">
+                    Share the room URL to collaborate with other artists in real-time!
+                </div>
             </div>
         </div>
         
@@ -504,33 +454,69 @@
             </div>
         </div>
 
-        <div class="control-group" style="margin-top: 20px; padding: 15px; background: rgba(100, 150, 255, 0.1); border-radius: 8px;">
-            <label style="font-weight: bold; margin-bottom: 10px; display: block;">Multi Artist</label> <!-- Section header -->
-
-            <div class="control-group checkbox-group" style="margin-top: 5px;">
-                <input type="checkbox" id="multiplayerToggle" onchange="initMultiplayer()">
-                <label for="multiplayerToggle" style="margin: 0">Enable Multi Artist</label>
+        <div class="control-group" style="margin-top: 20px">
+            <label>Layers</label>
+            <div class="layers-panel" id="layersPanel"></div>
+        </div>
+    </div>
+    
+    <!-- Recorded Layers Drawer (full-width) -->
+    <div id="recDrawer" class="rec-drawer">
+        <div id="recResizeHandle" class="rec-resize-handle"><div class="rec-grabber"></div></div>
+        <div class="rec-header">
+            <div class="rec-left">
+                <strong>Recorded Layers</strong>
+                <span id="recStatus" style="font-size:12px; opacity:0.7; margin-left:8px;">Ready</span>
             </div>
-
-            <div id="multiplayerInfo" style="margin-top: 10px; font-size: 12px;">
-                <div style="margin-bottom: 5px;">
-                    <strong>Room:</strong> <span id="roomName">default-room</span>
-                </div>
-                <div style="margin-bottom: 8px;">
-                    <strong>Status:</strong> <span id="multiplayerStatus">Disconnected</span>
-                </div>
-                <button id="copyRoomBtn" onclick="copyRoomUrl()" style="width: 100%; font-size: 12px; padding: 6px;">
-                    Copy Room URL
-                </button>
-                <div style="margin-top: 8px; opacity: 0.7; font-size: 11px;">
-                    Share the room URL to collaborate with other artists in real-time!
+            <div class="rec-right">
+                <label for="recPlaybackSpeed" style="font-size:12px; opacity:0.8;">Speed</label>
+                <select id="recPlaybackSpeed">
+                    <option value="0.25">0.25x</option>
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="2">2x</option>
+                    <option value="4">4x</option>
+                </select>
+                <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;">Max</label>
+                <input type="text" id="recMaxDuration" class="time-input" value="00:10:000" placeholder="mm:ss:ms" style="width:110px;">
+                <button id="recCloseBtn" class="rec-close">✕</button>
+            </div>
+        </div>
+        <div class="rec-header" style="gap:6px;">
+            <div class="rec-left" style="gap:6px;">
+                <button id="recRecordBtn">⏺ Record</button>
+                <button id="recMultiRecordBtn">⏺ Multi Artist Record</button>
+                <button id="recPlayBtn">▶ Play Layer</button>
+                <button id="recPlayAllBtn">▶▶ Play All</button>
+                <button id="recStopBtn">⏹ Stop</button>
+                <button id="recAddLayerBtn">➕ Add Layer</button>
+                <button id="recDuplicateLayerBtn">📋 Duplicate</button>
+                <button id="recDeleteLayerBtn">🗑 Delete</button>
+                <button id="recClearBtn">🧹 Clear Active</button>
+                <button id="recExportBtn">💾 Export</button>
+                <button id="recImportBtn">📁 Import</button>
+                <input type="file" id="recImportFile" accept=".json" style="display:none;" />
+            </div>
+        </div>
+        <div class="rec-header" style="gap:6px;">
+            <div class="rec-left" style="gap:6px; align-items:center;">
+                <label for="recPresetSelect" style="font-size:12px; opacity:0.8;">Preset</label>
+                <select id="recPresetSelect" style="min-width:200px;"></select>
+                <button id="recSavePresetBtn">Save as New</button>
+                <div id="recPresetNameRow" style="display:none; gap:6px; align-items:center;">
+                    <input type="text" id="recNewPresetName" placeholder="Enter Preset Name" style="width:200px;">
+                    <button id="recPresetConfirmBtn">Save</button>
+                    <button id="recPresetCancelBtn">Cancel</button>
                 </div>
             </div>
         </div>
-
-        <div class="control-group" style="margin-top: 20px">
-            <label>Layers</label> <!-- Section header, no associated input -->
-            <div class="layers-panel" id="layersPanel"></div>
+        <div class="rec-timeline-wrap">
+            <canvas id="recTimelineCanvas" class="rec-timeline"></canvas>
+            <div id="recPlayhead" class="rec-playhead" style="left:0;"></div>
+            <div id="recRecordhead" class="rec-recordhead" style="left:0;"></div>
+        </div>
+        <div class="rec-body">
+            <div id="recLayersList" class="layers-panel"></div>
         </div>
     </div>
 
@@ -608,6 +594,7 @@
 
 
     
+    <script src="js/00-window-controls.js"></script>
     <script src="js/01-config.js"></script>
     <script src="js/02-palettes.js"></script>
     <script src="js/03-recording.js"></script>
@@ -621,6 +608,8 @@
     <script src="js/08-stats-panel.js"></script>
     <script src="js/12-save-load.js"></script>
     <script src="js/13-mobile-mode.js"></script>
+    <script src="js/14-battery-manager.js"></script>
+    <script src="js/electron-performance.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">
