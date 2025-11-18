@@ -209,6 +209,53 @@
             }
         `;
 
+        const sharpenFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform sampler2D uVelocity;
+            uniform float sharpness;
+            uniform vec2 texelSize;
+            
+            void main() {
+                vec3 center = texture(uTexture, vUv).rgb;
+                
+                // Early exit if pixel is nearly black (no sharpening needed)
+                float centerIntensity = dot(center, vec3(0.299, 0.587, 0.114));
+                if (centerIntensity < 0.01) {
+                    fragColor = vec4(center, 1.0);
+                    return;
+                }
+                
+                // Sample neighbors for detail extraction (unsharp mask technique)
+                vec3 blur = vec3(0.0);
+                blur += texture(uTexture, vUv + vec2(texelSize.x, 0.0)).rgb;
+                blur += texture(uTexture, vUv - vec2(texelSize.x, 0.0)).rgb;
+                blur += texture(uTexture, vUv + vec2(0.0, texelSize.y)).rgb;
+                blur += texture(uTexture, vUv - vec2(0.0, texelSize.y)).rgb;
+                blur *= 0.25;
+                
+                // Extract high-frequency detail
+                vec3 detail = center - blur;
+                
+                // Velocity-adaptive sharpening (sharpen more where fluid moves)
+                vec2 vel = texture(uVelocity, vUv).xy;
+                float velocityMag = length(vel);
+                float adaptiveStrength = sharpness * (0.8 + min(velocityMag * 3.0, 1.2));
+                
+                // Apply sharpening with clamping to prevent overshooting
+                vec3 sharpened = center + detail * adaptiveStrength;
+                
+                // Clamp to valid range [0, max(center * 2.0, 1.0)]
+                // This prevents white halos while allowing brightening
+                vec3 maxVal = max(center * 2.0, vec3(1.0));
+                sharpened = clamp(sharpened, vec3(0.0), maxVal);
+                
+                fragColor = vec4(sharpened, 1.0);
+            }
+        `;
+
         const splatFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
@@ -384,6 +431,7 @@
         `;
         
         const displayProg = new Program(baseVert, displayFrag);
+        const sharpenProg = new Program(baseVert, sharpenFrag);
         const splatProg = new Program(baseVert, splatFrag);
         const advectionProg = new Program(baseVert, advectionFrag);
         const divergenceProg = new Program(baseVert, divergenceFrag);
@@ -436,7 +484,7 @@
             };
         }
         
-        let density, velocity, divergence, curl, pressure;
+        let density, velocity, divergence, curl, pressure, sharpened;
         
         function initFramebuffers() {
             const displayW = gl.drawingBufferWidth;
@@ -473,6 +521,8 @@
             
             // Visual dye buffers at dye resolution
             density = createDoubleFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
+            // Sharpness buffer at dye resolution
+            sharpened = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Physics buffers at simulation resolution
             velocity = createDoubleFBO(simTexWidth, simTexHeight, rg.internalFormat, rg.format, texType, filter);
             divergence = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
@@ -1316,7 +1366,8 @@
             pressureDissipation: { key: 'PRESSURE_DISSIPATION', decimals: 3 },
             pressureIteration: { key: 'PRESSURE_ITERATIONS', decimals: 0 },
             velocityInfluence: { key: 'VELOCITY_INFLUENCE', decimals: 3 },
-            curl: { key: 'CURL', decimals: 0 }
+            curl: { key: 'CURL', decimals: 0 },
+            sharpness: { key: 'SHARPNESS', decimals: 1 }
         };
         
         const brushSizeSlider = document.getElementById('brushSize');
@@ -2061,6 +2112,25 @@
                 velocity.swap();
             }
             
+            // Apply sharpness pass if enabled (config.SHARPNESS > 0)
+            const sharpnessEnabled = config.SHARPNESS > 0;
+            let displayTexture = density.read.texture;
+            
+            if (sharpnessEnabled) {
+                gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                sharpenProg.bind();
+                gl.uniform1i(sharpenProg.uniforms.uTexture, 0);
+                gl.uniform1i(sharpenProg.uniforms.uVelocity, 1);
+                gl.uniform1f(sharpenProg.uniforms.sharpness, config.SHARPNESS);
+                gl.uniform2f(sharpenProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                blit(sharpened.fbo);
+                displayTexture = sharpened.texture;
+            }
+            
             gl.viewport(0, 0, canvas.width, canvas.height);
             displayProg.bind();
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
@@ -2080,7 +2150,7 @@
                 (typeof window.kBlend === 'number' && isFinite(window.kBlend)) ? window.kBlend : 1.0
             );
             gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+            gl.bindTexture(gl.TEXTURE_2D, displayTexture);
             blit(null);
             
             // Draw occurred: update stats based on actual render cadence

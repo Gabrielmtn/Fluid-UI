@@ -127,6 +127,7 @@
             PRESSURE_ITERATIONS: 95,
             CURL: 10,
             SPLAT_RADIUS: 0.011,
+            SHARPNESS: 0.8,  // Adaptive sharpness (0.0 = off, 1.0 = moderate, 2.0 = aggressive)
             DYE_RESOLUTION: 2048,
             SIM_RESOLUTION: 512,
             VELOCITY_INFLUENCE: 1.2  // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
@@ -149,6 +150,7 @@
                     config.DYE_RESOLUTION = 1024; // Visual quality
                     config.SIM_RESOLUTION = 256;  // Physics resolution
                     config.PRESSURE_ITERATIONS = 40; // Solver steps
+                    config.SHARPNESS = 0.5; // Less aggressive sharpening on mobile
                     // Slightly smaller default brush so initial tap isn't too large on mobile
                     config.SPLAT_RADIUS = 0.009;
                     // Default trail off on mobile to save fill-rate
