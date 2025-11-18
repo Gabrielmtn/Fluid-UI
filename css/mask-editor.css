@@ -1,0 +1,411 @@
+/* Layer Masking System Styles */
+
+.mask-zoom-btn {
+    background: linear-gradient(180deg, #2a3340, #1f2632);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: #c9d1d9;
+    font-size: 18px;
+    font-weight: 600;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.mask-zoom-btn:hover {
+    background: linear-gradient(180deg, #3a4350, #2f3642);
+    border-color: rgba(88, 166, 255, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(88, 166, 255, 0.2);
+}
+
+.mask-zoom-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.mask-editor-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 10003;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    animation: maskFadeIn 0.3s ease;
+}
+
+@keyframes maskFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.mask-editor-panel {
+    background: linear-gradient(180deg, #1a1f2a, #0f141b);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    width: 90vw;
+    max-width: 1200px;
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+    color: #e6edf3;
+    overflow: hidden;
+}
+
+.mask-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: linear-gradient(180deg, rgba(26, 31, 42, 0.95), rgba(15, 20, 27, 0.95));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mask-editor-header h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #58a6ff;
+}
+
+.mask-close-btn {
+    background: linear-gradient(#2a2f3a, #1f2430);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #e6edf3;
+    font-size: 18px;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.mask-close-btn:hover {
+    background: linear-gradient(#3a3f4a, #2f3440);
+    transform: scale(1.05);
+}
+
+.mask-editor-controls {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    padding: 16px 20px;
+    background: rgba(13, 17, 23, 0.6);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-wrap: wrap;
+}
+
+.mask-mode-toggle {
+    display: flex;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 6px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mask-mode-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.mask-mode-toggle input[type="radio"] {
+    display: none;
+}
+
+.mask-mode-toggle input[type="radio"]:checked + span {
+    color: #fff;
+}
+
+.mask-mode-toggle label:has(input:checked) {
+    background: linear-gradient(135deg, #58a6ff, #1a7cff);
+    box-shadow: 0 2px 8px rgba(88, 166, 255, 0.3);
+}
+
+.mask-mode-toggle label:not(:has(input:checked)) {
+    background: transparent;
+    color: #8b949e;
+}
+
+.mask-mode-toggle label:not(:has(input:checked)):hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #c9d1d9;
+}
+
+.mask-shape-tools {
+    display: flex;
+    gap: 8px;
+}
+
+.mask-tool-btn {
+    background: linear-gradient(#2a2f3a, #1f2430);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: #e6edf3;
+    font-size: 24px;
+    width: 48px;
+    height: 48px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.mask-tool-btn:hover {
+    background: linear-gradient(#3a3f4a, #2f3440);
+    border-color: #58a6ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(88, 166, 255, 0.2);
+}
+
+.mask-tool-btn:active {
+    transform: translateY(0);
+}
+
+.mask-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.mask-action-btn {
+    background: linear-gradient(#2a2f3a, #1f2430);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #e6edf3;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mask-action-btn:hover:not(:disabled) {
+    background: linear-gradient(#3a3f4a, #2f3440);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.mask-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: linear-gradient(#1a1f2a, #141921);
+}
+
+.mask-canvas-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.mask-editor-canvas {
+    max-width: 100%;
+    max-height: 100%;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    background: #000;
+}
+
+.mask-editor-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    background: linear-gradient(180deg, rgba(15, 20, 27, 0.95), rgba(13, 17, 23, 0.95));
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mask-cancel-btn,
+.mask-apply-btn {
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid;
+}
+
+.mask-cancel-btn {
+    background: linear-gradient(#2a2f3a, #1f2430);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #8b949e;
+}
+
+.mask-cancel-btn:hover {
+    background: linear-gradient(#3a3f4a, #2f3440);
+    color: #c9d1d9;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.mask-apply-btn {
+    background: linear-gradient(135deg, #4caf50, #2e7d32);
+    border-color: rgba(76, 175, 80, 0.5);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.mask-apply-btn:hover {
+    background: linear-gradient(135deg, #5cb85f, #3e8e41);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+.mask-apply-btn:active {
+    transform: translateY(0);
+}
+
+/* Layer item mask button */
+.layer-mask-btn {
+    background: linear-gradient(#1f2733, #151b24);
+    color: #8b949e;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.layer-mask-btn.has-mask {
+    opacity: 1;
+    color: #e6edf3;
+}
+
+.layer-mask-btn:hover {
+    background: linear-gradient(#2f3743, #1f2530);
+    border-color: #58a6ff;
+    opacity: 1;
+}
+
+.layer-mask-btn.active {
+    background: linear-gradient(135deg, #58a6ff, #1a7cff);
+    border-color: rgba(88, 166, 255, 0.6);
+    box-shadow: 0 0 12px rgba(88, 166, 255, 0.3);
+    color: #fff;
+    opacity: 1;
+}
+
+/* Mask control buttons row */
+.layer-mask-controls {
+    animation: maskControlsSlideIn 0.3s ease;
+}
+
+@keyframes maskControlsSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.mask-control-btn {
+    background: linear-gradient(#2a2f3a, #1f2430);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #e6edf3;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.mask-control-btn:hover {
+    background: linear-gradient(#3a3f4a, #2f3440);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.mask-control-btn:active {
+    transform: translateY(0);
+}
+
+.mask-create-btn {
+    background: linear-gradient(135deg, #7b61ff, #4a33d1);
+    border-color: rgba(123, 97, 255, 0.5);
+    color: #fff;
+}
+
+.mask-create-btn:hover {
+    background: linear-gradient(135deg, #8b71ff, #5a43e1);
+    box-shadow: 0 2px 8px rgba(123, 97, 255, 0.3);
+}
+
+.mask-clear-btn {
+    color: #ff7b72;
+    border-color: rgba(255, 123, 114, 0.3);
+}
+
+.mask-clear-btn:hover {
+    background: linear-gradient(#3a2f2f, #2f2424);
+    border-color: rgba(255, 123, 114, 0.5);
+    color: #ff9b8a;
+}
+
+/* Smart Select Button */
+.mask-mode-btn {
+    padding: 10px 16px;
+    background: linear-gradient(180deg, #2a3340, #1f2632);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: #c9d1d9;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.mask-mode-btn:hover {
+    background: linear-gradient(180deg, #3a4350, #2f3642);
+    border-color: rgba(88, 166, 255, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(88, 166, 255, 0.2);
+}
+
+.mask-mode-btn:active {
+    transform: translateY(0);
+}

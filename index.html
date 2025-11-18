@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/slider-styles.css">
     <link rel="stylesheet" href="css/battery-styles.css">
+    <link rel="stylesheet" href="css/mask-editor.css">
 </head>
 <body>
     <!-- Custom Title Bar for Frameless Window -->
@@ -124,7 +125,7 @@
         <button id="mobileMenuClose" class="mobile-menu-close" aria-label="Close Menu">✕</button>
         <div class="control-group">
             <label for="brushSize">Brush Size</label>
-            <input type="range" id="brushSize" min="1" max="30" value="11" step="0.1">
+            <input type="range" id="brushSize" min="0.1" max="30" value="11" step="0.1">
         </div>
         
         <div class="control-group">
@@ -200,8 +201,8 @@
             </select>
         </div>
         <div class="control-group">
-            <label for="densityDissipation">Density Sustain <span id="densityValue" class="value-display">0.9960</span></label>
-            <input type="range" id="densityDissipation" min="0.85" max="1.005" value="0.996" step="0.0001">
+            <label for="densityDissipation">Density Sustain <span id="densityValue" class="value-display">0.9930</span></label>
+            <input type="range" id="densityDissipation" min="0.85" max="1.005" value="0.993" step="0.0001">
         </div>
         <div class="control-group">
             <label for="velocityDissipation">Velocity Sustain <span id="velocityValue" class="value-display">0.9990</span></label>
@@ -216,12 +217,12 @@
             <input type="range" id="pressureIteration" min="1" max="50" value="20" step="1">
         </div>
         <div class="control-group">
-            <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">22.0</span></label>
-            <input type="range" id="velocityInfluence" min="1" max="50" value="22" step="0.5">
+            <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">1.200</span></label>
+            <input type="range" id="velocityInfluence" min="1" max="5" value="1.2" step="0.001">
         </div>
         <div class="control-group">
-            <label for="curl">Curl <span id="curlValue" class="value-display">40</span></label>
-            <input type="range" id="curl" min="0" max="60" value="40" step="1">
+            <label for="curl">Curl <span id="curlValue" class="value-display">10</span></label>
+            <input type="range" id="curl" min="0" max="60" value="10" step="1">
         </div>
         <div class="control-group">
             <label for="multiplier">✨ Multiplier <span id="multiplierValue" class="value-display">1x</span></label>
@@ -285,8 +286,8 @@
             <input type="range" id="canvasOpacity" min="0" max="100" value="100" step="1">
         </div>
         <div class="control-group checkbox-group" style="margin-top: 5px; margin-left: 10px;">
-            <input type="checkbox" id="preserveFluidOpacity">
-            <label for="preserveFluidOpacity" style="margin: 0">Preserve Fluid Opacity</label>
+            <input type="checkbox" id="preserveFluidOpacity" checked>
+            <label for="preserveFluidOpacity" style="margin: 0">Empty Alpha Locked</label>
         </div>
         <div class="control-group" style="margin-top: 10px;">
             <label for="captureDimming">Background Transparency <span id="dimmingValue" class="value-display">80%</span></label>
@@ -607,8 +608,12 @@
     <script src="js/10-draggable.js"></script>
     <script src="js/08-stats-panel.js"></script>
     <script src="js/12-save-load.js"></script>
+    <script src="js/13-drag-scroll.js"></script>
     <script src="js/13-mobile-mode.js"></script>
     <script src="js/14-battery-manager.js"></script>
+    <script src="js/15-layer-masking.js"></script>
+    <!-- SAM Integration (Transformers.js bundles its own ONNX Runtime) -->
+    <script type="module" src="js/16-sam-integration.js"></script>
     <script src="js/electron-performance.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">

@@ -109,6 +109,11 @@
                 visible: true,
                 isLooping: true,
                 loopMaxMs: (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000),
+                mask: {
+                    enabled: false,
+                    mode: 'show', // 'show' or 'hide'
+                    shapes: []
+                },
                 timeline: {
                     interactions: [],
                     duration: 0,
@@ -133,6 +138,10 @@
             nl.timeline.duration = a.timeline.duration;
             nl.isLooping = a.isLooping;
             nl.loopMaxMs = a.loopMaxMs;
+            // Copy mask data
+            if (a.mask) {
+                nl.mask = JSON.parse(JSON.stringify(a.mask));
+            }
             recRenderUI();
         }
         
@@ -305,6 +314,11 @@
                 const cappedCurr = Math.min(currentTime, eff);
                 const events = layer.timeline.interactions.filter(i => i.timestamp > cappedPrev && i.timestamp <= cappedCurr);
                 events.forEach(i => {
+                    // Check if this interaction passes through the layer's mask
+                    if (typeof window.checkMaskPoint === 'function' && !window.checkMaskPoint(layer.id, i.x, i.y)) {
+                        return; // Skip this interaction if masked out
+                    }
+                    
                     const x = i.x * canvas.width;
                     const y = i.y * canvas.height;
                     if (typeof window.applyMultiSplatWith === 'function') {
@@ -341,6 +355,7 @@
                 el.className = 'rec-item' + (layer.id === recActiveLayerId ? ' active-layer' : '');
                 el.setAttribute('data-id', layer.id);
                 el.setAttribute('data-action', 'set-active');
+                const hasMask = layer.mask?.shapes?.length > 0;
                 el.innerHTML = `
                     <div class="layer-item-header">
                         <div class="layer-thumbnail" style="background: linear-gradient(135deg, rgba(100,200,255,0.4), rgba(150,100,255,0.4)); display:flex; align-items:center; justify-content:center; font-size: 18px;">🎬</div>
@@ -351,9 +366,21 @@
                             <button class="layer-btn" data-action="toggle-visibility" data-id="${layer.id}">${layer.visible ? '👁️' : '👁️‍🗨️'}</button>
                             <button class="layer-btn" data-action="toggle-play" data-id="${layer.id}">${layer.timeline.isPlaying ? '⏸' : '▶'}</button>
                             <button class="layer-btn" data-action="toggle-loop" data-id="${layer.id}">${layer.isLooping ? '🔁' : '⏹'}</button>
+                            <button class="layer-btn layer-mask-btn ${hasMask ? 'has-mask' : ''} ${layer.mask?.enabled ? 'active' : ''}" data-action="toggle-mask-enable" data-id="${layer.id}" title="${hasMask ? (layer.mask?.enabled ? 'Disable Mask' : 'Enable Mask') : 'No mask defined'}">✂️</button>
                         </div>
                     </div>
-                    <div id="recLayerMeta-${layer.id}" style="font-size:12px; opacity:0.85; margin-bottom:4px;">${layer.timeline.interactions.length} interactions | ${(recGetEffectiveDuration(layer)/1000).toFixed(1)}s</div>
+                    <div id="recLayerMeta-${layer.id}" style="font-size:12px; opacity:0.85; margin-bottom:4px;">${layer.timeline.interactions.length} interactions | ${(recGetEffectiveDuration(layer)/1000).toFixed(1)}s${layer.mask?.enabled ? ' | 🎭 Masked' : ''}</div>
+                    ${hasMask ? `
+                    <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
+                        <button class="mask-control-btn" data-action="edit-mask" data-id="${layer.id}" title="Edit Mask">✏️ Edit Mask</button>
+                        <button class="mask-control-btn mask-clear-btn" data-action="clear-mask" data-id="${layer.id}" title="Clear Mask">🗑️ Clear</button>
+                        <span style="font-size:11px; opacity:0.7;">${layer.mask.shapes.length} shape${layer.mask.shapes.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    ` : `
+                    <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px;">
+                        <button class="mask-control-btn mask-create-btn" data-action="edit-mask" data-id="${layer.id}" title="Create Mask">✂️ Create Mask</button>
+                    </div>
+                    `}
                     <div class="layer-max-row" style="margin-bottom:6px; display:flex; align-items:center; gap:6px;">
                         <label style="font-size:11px; opacity:0.85;">Max
                             <input type="text" class="time-input layer-max" data-id="${layer.id}" value="${recFormatTime((typeof layer.loopMaxMs === 'number' ? layer.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : layer.timeline.duration || 0)))}" style="margin-left:6px; width:110px;">
@@ -436,6 +463,25 @@
                 } else if (action === 'toggle-loop') {
                     const layer = recLayers.find(l => l.id === id);
                     if (layer) { layer.isLooping = !layer.isLooping; recScheduleRender(); }
+                } else if (action === 'toggle-mask-enable') {
+                    const layer = recLayers.find(l => l.id === id);
+                    if (layer && layer.mask) {
+                        layer.mask.enabled = !layer.mask.enabled;
+                        recScheduleRender();
+                    }
+                } else if (action === 'edit-mask') {
+                    if (typeof window.enterMaskMode === 'function') {
+                        window.enterMaskMode(id);
+                    }
+                } else if (action === 'clear-mask') {
+                    const layer = recLayers.find(l => l.id === id);
+                    if (layer && layer.mask) {
+                        if (confirm('Clear mask for this layer?')) {
+                            layer.mask.shapes = [];
+                            layer.mask.enabled = false;
+                            recScheduleRender();
+                        }
+                    }
                 } else if (action === 'set-active') {
                     const container = e.target.closest('.rec-item');
                     const cid = container ? parseInt(container.getAttribute('data-id'), 10) : id;
@@ -770,13 +816,18 @@
             // Ensure active layer's pending Max edit is committed
             try { recCommitActiveLayerMaxFromUI(); } catch(_){}
             const data = {
-                version: '2.0',
+                version: '2.1',
                 layers: recLayers.map(layer => ({
                     id: layer.id,
                     name: layer.name,
                     visible: layer.visible,
                     isLooping: layer.isLooping,
                     loopMaxMs: layer.loopMaxMs,
+                    mask: layer.mask ? {
+                        enabled: layer.mask.enabled,
+                        mode: layer.mask.mode,
+                        shapes: layer.mask.shapes
+                    } : undefined,
                     timeline: {
                         interactions: layer.timeline.interactions,
                         duration: layer.timeline.duration
@@ -801,12 +852,20 @@
                 try {
                     const data = JSON.parse(e.target.result);
                     recLayers = [];
-                    if (data.version === '2.0' && Array.isArray(data.layers)) {
+                    if ((data.version === '2.0' || data.version === '2.1') && Array.isArray(data.layers)) {
                         data.layers.forEach(ld => {
                             const layer = recCreateLayer(ld.name);
                             layer.visible = !!ld.visible;
                             layer.isLooping = ld.isLooping !== undefined ? !!ld.isLooping : true;
                             layer.loopMaxMs = (typeof ld.loopMaxMs === 'number') ? ld.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000);
+                            // Import mask data if present (v2.1+)
+                            if (ld.mask) {
+                                layer.mask = {
+                                    enabled: !!ld.mask.enabled,
+                                    mode: ld.mask.mode || 'show',
+                                    shapes: ld.mask.shapes || []
+                                };
+                            }
                             layer.timeline.interactions = ld.timeline?.interactions || [];
                             layer.timeline.duration = ld.timeline?.duration || 0;
                             layer.timeline.playbackPosition = 0;

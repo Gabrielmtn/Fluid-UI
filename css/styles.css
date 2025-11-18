@@ -646,6 +646,11 @@
             margin-top: 10px;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
+            cursor: grab;
+        }
+        
+        .layers-panel:active {
+            cursor: grabbing;
         }
         
         .layer-item {
@@ -889,7 +894,8 @@
             box-shadow: inset 0 1px rgba(255,255,255,0.9);
         }
         .rec-header .rec-left, .rec-header .rec-right { display: flex; gap: 6px; align-items: center; }
-        .rec-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+        .rec-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; cursor: grab; }
+        .rec-body:active { cursor: grabbing; }
         .rec-body #recLayersList { display: flex; flex-direction: column; gap: 5px; overflow-x: hidden; }
         .rec-layers-container { display: flex; flex-direction: column; gap: 10px; }
         .rec-item {

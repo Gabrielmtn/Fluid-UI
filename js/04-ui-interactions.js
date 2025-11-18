@@ -121,15 +121,15 @@
         
         let config = {
             TEXTURE_DOWNSAMPLE: 1,
-            DENSITY_DISSIPATION: 0.996,
+            DENSITY_DISSIPATION: 0.993,
             VELOCITY_DISSIPATION: 0.999,
             PRESSURE_DISSIPATION: 0.944,
             PRESSURE_ITERATIONS: 95,
-            CURL: 40,
+            CURL: 10,
             SPLAT_RADIUS: 0.011,
             DYE_RESOLUTION: 2048,
             SIM_RESOLUTION: 512,
-            VELOCITY_INFLUENCE: 22.0  // How far velocity spreads (lower = more isolated)
+            VELOCITY_INFLUENCE: 1.2  // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
         };
         
         // Expose for stats panel
@@ -1323,7 +1323,7 @@
                     if (mv) mv.textContent = '1x';
                     if (typeof config === 'object') {
                         // Nudge velocity influence to moderate motion
-                        config.VELOCITY_INFLUENCE = Math.min(config.VELOCITY_INFLUENCE || 22.0, 20.0);
+                        config.VELOCITY_INFLUENCE = Math.min(config.VELOCITY_INFLUENCE || 3.0, 4.0);
                     }
                 }
                 if (mq) {
@@ -1441,6 +1441,11 @@
                     originalData: dataUrl,
                     visible: true,
                     threshold: 0,
+                    mask: {
+                        enabled: false,
+                        mode: 'show',
+                        shapes: []
+                    },
                     active: false,
                     x: 0,
                     y: 0,

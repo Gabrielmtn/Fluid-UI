@@ -3,6 +3,32 @@
         let layerOrder = []; // Array of items in visual order: [{type: 'sim'} or {type: 'layer', id: layerIndex}]
         let currentLayerIndex = 0;
         let savedColors = [];
+        
+        // Expose layers for mask system via getter
+        Object.defineProperty(window, 'layers', {
+            get: function() { return layers; },
+            set: function(val) { layers = val; }
+        });
+        
+        // Initialize mask property for all layers
+        function ensureLayerMasks() {
+            layers.forEach(layer => {
+                if (!layer.mask) {
+                    layer.mask = {
+                        enabled: false,
+                        mode: 'show',
+                        shapes: []
+                    };
+                }
+            });
+        }
+        
+        // Run initialization on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', ensureLayerMasks);
+        } else {
+            setTimeout(ensureLayerMasks, 100);
+        }
         let isPaused = false;
         let animationMultiplier = 1;
         

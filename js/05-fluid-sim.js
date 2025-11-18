@@ -222,17 +222,43 @@
                 vec2 p = vUv - point;
                 p.x *= aspectRatio;
                 
-                // For velocity: higher velocityInfluence = tighter radius (more isolated)
-                // For density: always use full radius (visual quality)
-                float effectiveRadius = radius;
-                if (isVelocity == 1) {
-                    // Higher value = smaller radius = more isolated
-                    effectiveRadius = radius / max(1.0, velocityInfluence / 22.0);
-                }
-                
-                vec3 splat = exp(-dot(p, p) / effectiveRadius) * color;
                 vec3 base = texture(uTarget, vUv).xyz;
-                fragColor = vec4(base + splat, 1.0);
+                
+                if (isVelocity == 1) {
+                    // Motion Isolation: prevent new velocity from affecting areas with existing velocity
+                    // Higher velocityInfluence = more isolation (less impact on existing areas)
+                    // Range: 1.0 (no isolation) to 5.0 (maximum isolation)
+                    
+                    // Calculate splat intensity
+                    float dist = dot(p, p);
+                    float splatIntensity = exp(-dist / radius);
+                    vec3 splat = splatIntensity * color;
+                    
+                    // Measure existing velocity magnitude
+                    float existingVelMag = length(base.xy);
+                    
+                    // Exponential curve for smooth, gradual isolation increase
+                    // At 1.0: isolationStrength = 0 (full fluid motion)
+                    // At 2.0: isolationStrength ≈ 0.025 (very slight protection)
+                    // At 3.0: isolationStrength ≈ 0.15 (moderate protection)
+                    // At 4.0: isolationStrength ≈ 0.5 (strong protection)
+                    // At 5.0: isolationStrength = 1.0 (maximum protection)
+                    float normalizedInfluence = clamp((velocityInfluence - 1.0) / 4.0, 0.0, 1.0);
+                    float isolationStrength = pow(normalizedInfluence, 2.5); // Exponential curve for gradual ramp-up
+                    
+                    // Gradual velocity-based falloff
+                    // Recent paints (low velocity) maintain motion longer
+                    // Older paints (high velocity) are protected more
+                    float velocityFactor = pow(existingVelMag, 2.0);
+                    float impactReduction = 1.0 - (velocityFactor * isolationStrength * 0.75);
+                    impactReduction = max(0.2, impactReduction); // Minimum 20% impact always allowed
+                    
+                    fragColor = vec4(base + splat * impactReduction, 1.0);
+                } else {
+                    // For density: always use full radius and full impact (visual quality)
+                    vec3 splat = exp(-dot(p, p) / radius) * color;
+                    fragColor = vec4(base + splat, 1.0);
+                }
             }
         `;
 
@@ -801,9 +827,9 @@
             });
         }
         
-        // Preserve fluid opacity checkbox
-        window.preserveFluidOpacity = false;
+        // Preserve fluid opacity checkbox ("Empty Alpha Locked")
         const preserveFluidOpacityCheckbox = document.getElementById('preserveFluidOpacity');
+        window.preserveFluidOpacity = preserveFluidOpacityCheckbox ? !!preserveFluidOpacityCheckbox.checked : true;
         
         if (preserveFluidOpacityCheckbox) {
             preserveFluidOpacityCheckbox.addEventListener('change', (e) => {
@@ -1085,6 +1111,7 @@
         }
         
         function multiSplat(x, y, dx, dy, color, shouldBroadcast) {
+            // Kaleidoscope behavior
             const centerX = canvas.width * 0.5;
             const centerY = canvas.height * 0.5;
 
@@ -1288,11 +1315,12 @@
             velocityDissipation: { key: 'VELOCITY_DISSIPATION', decimals: 4 },
             pressureDissipation: { key: 'PRESSURE_DISSIPATION', decimals: 3 },
             pressureIteration: { key: 'PRESSURE_ITERATIONS', decimals: 0 },
-            velocityInfluence: { key: 'VELOCITY_INFLUENCE', decimals: 1 },
+            velocityInfluence: { key: 'VELOCITY_INFLUENCE', decimals: 3 },
             curl: { key: 'CURL', decimals: 0 }
         };
         
-        document.getElementById('brushSize').addEventListener('input', (e) => {
+        const brushSizeSlider = document.getElementById('brushSize');
+        brushSizeSlider.addEventListener('input', (e) => {
             config.SPLAT_RADIUS = e.target.value / 1000;
         });
         
@@ -1462,7 +1490,7 @@
                     velSlider.value = String(newValue);
                     velSlider.style.setProperty('--val', newValue);
                     config.VELOCITY_INFLUENCE = newValue;
-                    if (velValueSpan) velValueSpan.textContent = newValue.toFixed(1);
+                    if (velValueSpan) velValueSpan.textContent = newValue.toFixed(3);
                 }
             } else if (e.ctrlKey && e.altKey) {
                 // Ctrl+Alt+Scroll: Adjust Curl
@@ -1673,6 +1701,120 @@
             }
         });
         
+        // Load saved slider values from Settings
+        function loadSavedSliderValues() {
+            if (!window.Settings || typeof window.Settings.loadSlider !== 'function') return;
+            
+            // Load main sliders
+            Object.entries(sliderConfig).forEach(([id, cfg]) => {
+                const savedValue = window.Settings.loadSlider(id, null);
+                if (savedValue !== null) {
+                    const slider = document.getElementById(id);
+                    if (slider) {
+                        slider.value = savedValue;
+                        slider.style.setProperty('--val', savedValue);
+                        config[cfg.key] = cfg.decimals === 0 ? parseInt(savedValue) : savedValue;
+                        
+                        const valueSpanId = id === 'pressureIteration' ? 'iterationValue' : 
+                                            id.replace('Dissipation', '') + 'Value';
+                        const valueSpan = document.getElementById(valueSpanId);
+                        if (valueSpan) {
+                            valueSpan.textContent = cfg.decimals === 0 ? Math.round(savedValue) : savedValue.toFixed(cfg.decimals);
+                        }
+                    }
+                }
+            });
+            
+            // Load brush size
+            const savedBrushSize = window.Settings.loadSlider('brushSize', null);
+            if (savedBrushSize !== null && brushSizeSlider) {
+                brushSizeSlider.value = savedBrushSize;
+                brushSizeSlider.style.setProperty('--val', savedBrushSize);
+                config.SPLAT_RADIUS = savedBrushSize / 1000;
+            }
+            
+            // Load multiplier
+            const savedMultiplier = window.Settings.loadSlider('multiplier', null);
+            if (savedMultiplier !== null && multiplierSlider) {
+                const val = parseInt(savedMultiplier);
+                multiplierSlider.value = val;
+                multiplierSlider.style.setProperty('--val', val);
+                animationMultiplier = val;
+                window.animationMultiplier = val;
+                if (multiplierValue) multiplierValue.textContent = val + 'x';
+            }
+            
+            // Load canvas opacity
+            const savedCanvasOpacity = window.Settings.loadSlider('canvasOpacity', null);
+            if (savedCanvasOpacity !== null && canvasOpacitySlider) {
+                canvasOpacitySlider.value = savedCanvasOpacity;
+                canvasOpacitySlider.style.setProperty('--val', savedCanvasOpacity);
+                canvas.style.opacity = savedCanvasOpacity / 100;
+                if (opacityValueDisplay) opacityValueDisplay.textContent = `${savedCanvasOpacity}%`;
+            }
+            
+            // Load capture dimming
+            const savedCaptureDimming = window.Settings.loadSlider('captureDimming', null);
+            if (savedCaptureDimming !== null && captureDimmingSlider) {
+                captureDimmingSlider.value = savedCaptureDimming;
+                captureDimmingSlider.style.setProperty('--val', savedCaptureDimming);
+                window.backgroundTransparency = savedCaptureDimming / 100;
+                if (dimmingValueDisplay) dimmingValueDisplay.textContent = `${savedCaptureDimming}%`;
+            }
+            
+            // Load kaleidoscope sliders
+            const savedKaleidoSegments = window.Settings.loadSlider('kaleidoSegments', null);
+            if (savedKaleidoSegments !== null && kaleidoSegmentsEl) {
+                kaleidoSegmentsEl.value = savedKaleidoSegments;
+                kaleidoSegmentsEl.style.setProperty('--val', savedKaleidoSegments);
+                window.kaleidoSegments = parseInt(savedKaleidoSegments);
+                if (kaleidoValueEl) kaleidoValueEl.textContent = String(savedKaleidoSegments);
+            }
+            
+            const savedKAngle = window.Settings.loadSlider('kAngle', null);
+            if (savedKAngle !== null && kAngleEl) {
+                kAngleEl.value = savedKAngle;
+                kAngleEl.style.setProperty('--val', savedKAngle);
+                window.kAngle = savedKAngle * Math.PI / 180;
+                if (kAngleValueEl) kAngleValueEl.textContent = savedKAngle + '°';
+            }
+            
+            const savedKSpinSpeed = window.Settings.loadSlider('kSpinSpeed', null);
+            if (savedKSpinSpeed !== null && kSpinSpeedEl) {
+                kSpinSpeedEl.value = savedKSpinSpeed;
+                kSpinSpeedEl.style.setProperty('--val', savedKSpinSpeed);
+                window.kSpinSpeed = savedKSpinSpeed;
+                if (kSpinSpeedValueEl) kSpinSpeedValueEl.textContent = savedKSpinSpeed + '°/s';
+            }
+            
+            const savedKTwist = window.Settings.loadSlider('kTwist', null);
+            if (savedKTwist !== null && kTwistEl) {
+                kTwistEl.value = savedKTwist;
+                kTwistEl.style.setProperty('--val', savedKTwist);
+                window.kTwist = savedKTwist;
+                if (kTwistValueEl) kTwistValueEl.textContent = savedKTwist.toFixed(1);
+            }
+            
+            const savedKZoom = window.Settings.loadSlider('kZoom', null);
+            if (savedKZoom !== null && kZoomEl) {
+                kZoomEl.value = savedKZoom;
+                kZoomEl.style.setProperty('--val', savedKZoom);
+                window.kZoom = savedKZoom;
+                if (kZoomValueEl) kZoomValueEl.textContent = savedKZoom.toFixed(2);
+            }
+            
+            const savedKBlend = window.Settings.loadSlider('kBlend', null);
+            if (savedKBlend !== null && kBlendEl) {
+                kBlendEl.value = savedKBlend;
+                kBlendEl.style.setProperty('--val', savedKBlend);
+                window.kBlend = savedKBlend;
+                if (kBlendValueEl) kBlendValueEl.textContent = savedKBlend.toFixed(2);
+            }
+        }
+        
+        // Expose loadSavedSliderValues globally so save-load.js can call it when needed
+        window.loadSavedSliderValues = loadSavedSliderValues;
+        
         function updateSliderValues() {
             Object.entries(sliderConfig).forEach(([id, cfg]) => {
                 const val = config[cfg.key];
@@ -1697,7 +1839,7 @@
             gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
             gl.uniform2f(splatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
             gl.uniform1f(splatProg.uniforms.radius, config.SPLAT_RADIUS);
-            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 22.0);
+            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
             
             // Write velocity at physics resolution (with isolation applied)
             gl.viewport(0, 0, simTexWidth, simTexHeight);
@@ -1978,6 +2120,11 @@
         }
         
         function renderLayers() {
+            // Ensure all layers have mask property
+            if (typeof ensureLayerMasks === 'function') {
+                ensureLayerMasks();
+            }
+            
             const panel = document.getElementById('layersPanel');
             panel.innerHTML = '';
             
@@ -2033,6 +2180,7 @@
                         element.classList.add('active-layer');
                     }
                     
+                    const hasMask = layer.mask?.shapes?.length > 0;
                     element.innerHTML = `
                         <div class="layer-item-header">
                             <div class="layer-thumbnail" style="background-image: url(${layer.data})"></div>
@@ -2047,11 +2195,23 @@
                                 <button class="layer-btn" onclick="toggleLayer(${layer.index})">
                                     ${layer.visible ? '👁️' : '👁️‍🗨️'}
                                 </button>
+                                <button class="layer-btn layer-mask-btn ${hasMask ? 'has-mask' : ''} ${layer.mask?.enabled ? 'active' : ''}" onclick="toggleImageLayerMask(${layer.index})" title="${hasMask ? (layer.mask?.enabled ? 'Disable Mask' : 'Enable Mask') : 'No mask defined'}">✂️</button>
                                 <button class="layer-btn" onclick="deleteLayer(${layer.index})">🗑️</button>
                             </div>
                         </div>
+                        ${hasMask ? `
+                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
+                            <button class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">✏️ Edit Mask</button>
+                            <button class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">🗑️ Clear</button>
+                            <span style="font-size:11px; opacity:0.7;">${layer.mask.shapes.length} shape${layer.mask.shapes.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        ` : `
+                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px;">
+                            <button class="mask-control-btn mask-create-btn" onclick="editImageLayerMask(${layer.index})" title="Create Mask">✂️ Create Mask</button>
+                        </div>
+                        `}
                         <div class="layer-threshold">
-                            <span>Mask:</span>
+                            <span>Feather:</span>
                             <div class="layer-slider-host"></div>
                             <span class="layer-slider-value">${layer.threshold}%</span>
                         </div>
@@ -2265,6 +2425,9 @@
                                 layerDiv.classList.remove('active');
                             }
                             
+                            // Apply mask if enabled
+                            applyLayerMask(layer.index);
+                            
                             console.log(`Layer ${layer.index} at visual position ${visualIndex}: z-index ${zIndex}`);
                         }
                     }
@@ -2306,6 +2469,33 @@
             
             // Re-render and update z-indices
             renderLayers();
+        };
+        
+        // Image layer mask functions
+        window.toggleImageLayerMask = (index) => {
+            const layer = layers.find(l => l.index === index);
+            if (layer && layer.mask) {
+                layer.mask.enabled = !layer.mask.enabled;
+                applyLayerMask(index);
+                renderLayers();
+            }
+        };
+        
+        window.editImageLayerMask = (index) => {
+            if (typeof window.enterImageLayerMaskMode === 'function') {
+                window.enterImageLayerMaskMode(index);
+            }
+        };
+        
+        window.clearImageLayerMask = (index) => {
+            const layer = layers.find(l => l.index === index);
+            if (layer && layer.mask) {
+                if (confirm('Clear mask for this layer?')) {
+                    layer.mask.shapes = [];
+                    layer.mask.enabled = false;
+                    renderLayers();
+                }
+            }
         };
         
         // Layer positioning functionality
@@ -2691,6 +2881,287 @@
             
             const rotation = layer.rotation || 0;
             layerDiv.style.transform = `translate(${layer.x}px, ${layer.y}px) rotate(${rotation}deg) scale(${layer.scaleX}, ${layer.scaleY})`;
+            
+            // Apply mask if enabled
+            applyLayerMask(index);
+        }
+        
+        // Apply mask to a layer
+        window.applyLayerMask = function applyLayerMask(index) {
+            const layer = layers.find(l => l.index === index);
+            if (!layer) return;
+            
+            const layerDiv = document.getElementById(`layer${index}`);
+            if (!layerDiv) return;
+            
+            // If mask is not enabled or no shapes, use original image
+            if (!layer.mask || !layer.mask.enabled || !layer.mask.shapes || layer.mask.shapes.length === 0) {
+                if (layer.originalData) {
+                    layerDiv.style.backgroundImage = `url(${layer.originalData})`;
+                }
+                return;
+            }
+            
+            // Create a canvas to render the masked image
+            const maskCanvas = document.createElement('canvas');
+            const canvasElement = document.getElementById('canvas');
+            maskCanvas.width = canvasElement ? canvasElement.width : 1920;
+            maskCanvas.height = canvasElement ? canvasElement.height : 1080;
+            const ctx = maskCanvas.getContext('2d');
+            
+            // Load and draw the original image
+            const img = new Image();
+            img.onload = () => {
+                if (layer.mask.mode === 'show') {
+                    // For SHOW mode: Draw shapes first, then composite image on top
+                    ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+                    
+                    // Draw all mask shapes as white (shapes stored in original canvas coordinates)
+                    layer.mask.shapes.forEach(shape => {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+                        
+                        // Apply rotation if needed
+                        const rotation = shape.rotation || 0;
+                        const centerX = shape.x + shape.width / 2;
+                        const centerY = shape.y + shape.height / 2;
+                        
+                        if (rotation !== 0) {
+                            ctx.save();
+                            ctx.translate(centerX, centerY);
+                            ctx.rotate((rotation * Math.PI) / 180);
+                            ctx.translate(-centerX, -centerY);
+                        }
+                        
+                        drawMaskShape(ctx, shape);
+                        
+                        if (rotation !== 0) {
+                            ctx.restore();
+                        }
+                    });
+                    
+                    // Now composite the image only where shapes exist
+                    ctx.globalCompositeOperation = 'source-in';
+                    ctx.drawImage(img, 0, 0, maskCanvas.width, maskCanvas.height);
+                } else {
+                    // For HIDE mode: Draw image first, then cut out shapes
+                    ctx.drawImage(img, 0, 0, maskCanvas.width, maskCanvas.height);
+                    
+                    // Cut out the mask shapes
+                    ctx.globalCompositeOperation = 'destination-out';
+                    
+                    layer.mask.shapes.forEach(shape => {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+                        
+                        // Apply rotation if needed
+                        const rotation = shape.rotation || 0;
+                        const centerX = shape.x + shape.width / 2;
+                        const centerY = shape.y + shape.height / 2;
+                        
+                        if (rotation !== 0) {
+                            ctx.save();
+                            ctx.translate(centerX, centerY);
+                            ctx.rotate((rotation * Math.PI) / 180);
+                            ctx.translate(-centerX, -centerY);
+                        }
+                        
+                        drawMaskShape(ctx, shape);
+                        
+                        if (rotation !== 0) {
+                            ctx.restore();
+                        }
+                    });
+                }
+
+                const feather = typeof layer.threshold === 'number' ? layer.threshold : 0;
+                if (feather > 0) {
+                    const radius = Math.max(1, Math.round((feather / 100) * 20));
+                    featherMaskAlpha(ctx, maskCanvas.width, maskCanvas.height, radius);
+                }
+
+                layerDiv.style.backgroundImage = `url(${maskCanvas.toDataURL()})`;
+            };
+            
+            img.src = layer.originalData || layer.data;
+        }
+        
+        // Helper function to draw mask shapes (supports all shape types)
+        function drawMaskShape(ctx, shape) {
+            const cx = shape.x + shape.width / 2;
+            const cy = shape.y + shape.height / 2;
+
+            // Special handling for pixel-based SAM masks: draw from the
+            // samMask bitmap instead of treating the shape as a solid rect.
+            if (shape.type === 'sam-mask' && shape.samMask && shape.samMaskWidth && shape.samMaskHeight) {
+                const w = shape.samMaskWidth;
+                const h = shape.samMaskHeight;
+
+                // Draw into a temporary canvas, then blit into the main mask
+                // canvas. We only need an alpha mask here, so use white where
+                // the SAM mask is active.
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = w;
+                tempCanvas.height = h;
+                const tempCtx = tempCanvas.getContext('2d');
+                const imageData = tempCtx.createImageData(w, h);
+                const data = imageData.data;
+
+                let nonZero = 0;
+                const totalPixels = w * h;
+                for (let i = 0; i < totalPixels; i++) {
+                    const v = Number(shape.samMask[i] || 0);
+                    if (v > 0) {
+                        nonZero++;
+                        const idx = i * 4;
+                        data[idx] = 255;       // R
+                        data[idx + 1] = 255;   // G
+                        data[idx + 2] = 255;   // B
+                        data[idx + 3] = 255;   // A
+                    }
+                }
+
+                // If the mask is empty for some reason, fall back to the
+                // bounding box so we don't silently do nothing.
+                if (nonZero === 0) {
+                    ctx.beginPath();
+                    ctx.rect(shape.x, shape.y, shape.width, shape.height);
+                    ctx.fill();
+                    return;
+                }
+
+                tempCtx.putImageData(imageData, 0, 0);
+                ctx.drawImage(tempCanvas, shape.x, shape.y, w, h);
+                return;
+            }
+
+            ctx.beginPath();
+
+            switch (shape.type) {
+                case 'rect':
+                    ctx.rect(shape.x, shape.y, shape.width, shape.height);
+                    break;
+
+                case 'roundrect':
+                    const radius = Math.min(shape.width, shape.height) * 0.15;
+                    if (ctx.roundRect) {
+                        ctx.roundRect(shape.x, shape.y, shape.width, shape.height, radius);
+                    } else {
+                        // Fallback for older browsers
+                        ctx.rect(shape.x, shape.y, shape.width, shape.height);
+                    }
+                    break;
+
+                case 'circle':
+                    ctx.arc(cx, cy, shape.width / 2, 0, Math.PI * 2);
+                    break;
+
+                case 'ellipse':
+                    ctx.ellipse(cx, cy, shape.width / 2, shape.height / 2, 0, 0, Math.PI * 2);
+                    break;
+
+                case 'triangle':
+                    ctx.moveTo(cx, shape.y);
+                    ctx.lineTo(shape.x + shape.width, shape.y + shape.height);
+                    ctx.lineTo(shape.x, shape.y + shape.height);
+                    ctx.closePath();
+                    break;
+
+                case 'pentagon':
+                    drawMaskPolygon(ctx, cx, cy, 5, Math.min(shape.width, shape.height) / 2);
+                    break;
+
+                case 'hexagon':
+                    drawMaskPolygon(ctx, cx, cy, 6, Math.min(shape.width, shape.height) / 2);
+                    break;
+
+                case 'star':
+                    drawMaskStar(ctx, cx, cy, 5, Math.min(shape.width, shape.height) / 2, Math.min(shape.width, shape.height) / 4);
+                    break;
+
+                default:
+                    ctx.rect(shape.x, shape.y, shape.width, shape.height);
+            }
+
+            ctx.fill();
+        }
+        
+        // Helper to draw regular polygon
+        function drawMaskPolygon(ctx, cx, cy, sides, radius) {
+            const angle = (Math.PI * 2) / sides;
+            const startAngle = -Math.PI / 2;
+            
+            for (let i = 0; i <= sides; i++) {
+                const a = startAngle + angle * i;
+                const x = cx + Math.cos(a) * radius;
+                const y = cy + Math.sin(a) * radius;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+        }
+
+        function featherMaskAlpha(ctx, width, height, radius) {
+            if (!radius || radius <= 0) return;
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            const w = width;
+            const h = height;
+            const tmp = new Uint8ClampedArray(w * h);
+            const out = new Uint8ClampedArray(w * h);
+            const windowSize = radius * 2 + 1;
+
+            for (let y = 0; y < h; y++) {
+                let sum = 0;
+                const rowOffset = y * w;
+                for (let x = -radius; x <= radius; x++) {
+                    const xx = x < 0 ? 0 : (x >= w ? w - 1 : x);
+                    sum += data[(rowOffset + xx) * 4 + 3];
+                }
+                for (let x = 0; x < w; x++) {
+                    tmp[rowOffset + x] = sum / windowSize;
+                    const xRemove = x - radius;
+                    const xAdd = x + radius + 1;
+                    const xr = xRemove < 0 ? 0 : (xRemove >= w ? w - 1 : xRemove);
+                    const xa = xAdd < 0 ? 0 : (xAdd >= w ? w - 1 : xAdd);
+                    sum += data[(rowOffset + xa) * 4 + 3] - data[(rowOffset + xr) * 4 + 3];
+                }
+            }
+
+            for (let x = 0; x < w; x++) {
+                let sum = 0;
+                for (let y = -radius; y <= radius; y++) {
+                    const yy = y < 0 ? 0 : (y >= h ? h - 1 : y);
+                    sum += tmp[yy * w + x];
+                }
+                for (let y = 0; y < h; y++) {
+                    out[y * w + x] = sum / windowSize;
+                    const yRemove = y - radius;
+                    const yAdd = y + radius + 1;
+                    const yr = yRemove < 0 ? 0 : (yRemove >= h ? h - 1 : yRemove);
+                    const ya = yAdd < 0 ? 0 : (yAdd >= h ? h - 1 : yAdd);
+                    sum += tmp[ya * w + x] - tmp[yr * w + x];
+                }
+            }
+
+            for (let i = 0, len = w * h; i < len; i++) {
+                data[i * 4 + 3] = out[i];
+            }
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        // Helper to draw star
+        function drawMaskStar(ctx, cx, cy, points, outerRadius, innerRadius) {
+            const angle = Math.PI / points;
+            const startAngle = -Math.PI / 2;
+            
+            for (let i = 0; i < points * 2; i++) {
+                const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                const a = startAngle + angle * i;
+                const x = cx + Math.cos(a) * radius;
+                const y = cy + Math.sin(a) * radius;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
         }
         
         window.updateLayerTitle = (index, title) => {
@@ -2701,51 +3172,12 @@
         window.updateLayerThreshold = (index, threshold) => {
             const layer = layers.find(l => l.index === index);
             if (!layer) return;
-            
-            layer.threshold = parseInt(threshold);
-            
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = img.width;
-                tempCanvas.height = img.height;
-                const ctx = tempCanvas.getContext('2d');
-                
-                ctx.drawImage(img, 0, 0);
-                const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                const data = imageData.data;
-                
-                const thresholdValue = (threshold / 100) * 255;
-                const featherRange = 50;
-                
-                for (let i = 0; i < data.length; i += 4) {
-                    const brightness = Math.max(data[i], data[i + 1], data[i + 2]);
-                    const originalAlpha = data[i + 3];
-                    
-                    if (brightness <= thresholdValue - featherRange) {
-                        data[i + 3] = 0;
-                    } else if (brightness >= thresholdValue) {
-                        data[i + 3] = originalAlpha;
-                    } else {
-                        const distance = brightness - (thresholdValue - featherRange);
-                        const fadePercent = distance / featherRange;
-                        data[i + 3] = Math.floor(originalAlpha * fadePercent);
-                    }
-                }
-                
-                ctx.putImageData(imageData, 0, 0);
-                const processedData = tempCanvas.toDataURL('image/png');
-                
-                layer.data = processedData;
-                
-                const layerDiv = document.getElementById(`layer${index}`);
-                if (layerDiv) {
-                    layerDiv.style.backgroundImage = `url(${processedData})`;
-                }
-            };
-            
-            img.src = layer.originalData;
+
+            layer.threshold = parseInt(threshold, 10) || 0;
+
+            if (layer.mask && layer.mask.enabled) {
+                applyLayerMask(index);
+            }
         };
         
         // Hotkeys modal + Undo/Redo implementation

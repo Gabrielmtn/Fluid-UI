@@ -48,6 +48,8 @@ function createWindow() {
             offscreen: false, // Use hardware rendering
             webgl: true,
             experimentalFeatures: true,
+            webSecurity: true, // Keep security but allow WASM
+            allowRunningInsecureContent: false,
             cache: false, // Disable cache in dev mode
         },
         transparent: true, // Allow desktop to show through
