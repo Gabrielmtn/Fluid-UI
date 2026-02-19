@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="css/slider-styles.css">
     <link rel="stylesheet" href="css/battery-styles.css">
     <link rel="stylesheet" href="css/mask-editor.css">
+    <link rel="stylesheet" href="css/light-source.css">
+    <link rel="stylesheet" href="css/mixer-layout.css">
 </head>
 <body>
     <!-- Custom Title Bar for Frameless Window -->
@@ -67,7 +69,6 @@
                         <div class="background-layer" id="layer9"></div>
                     </div>
                     <canvas id="canvas"></canvas>
-                    <canvas id="trailCanvas"></canvas>
                     <div id="customCursor"></div>
                 </div>
                 
@@ -82,7 +83,9 @@
                             <div class="stats-title">Performance</div>
                             <div class="stat-row"><span class="stat-label">FPS:</span> <span id="stat-fps">--</span></div>
                             <div class="stat-row"><span class="stat-label">Frame Time:</span> <span id="stat-frametime">--</span></div>
-                            <div class="stat-row"><span class="stat-label">Update Time:</span> <span id="stat-updatetime">--</span></div>
+                            <div class="stat-row"><span class="stat-label">CPU Time:</span> <span id="stat-updatetime">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Frame Budget:</span> <span id="stat-budget">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Display:</span> <span id="stat-displayhz">--</span></div>
                         </div>
                         
                         <div class="stats-section">
@@ -150,7 +153,10 @@
                     </div>
                     <div class="palette-right">
                         <div class="palette-create" id="paletteCreateRow">
-                            <button id="saveNewPaletteBtn">+ Save as New</button>
+                            <div class="palette-btn-row">
+                                <button id="updatePaletteBtn">Update</button>
+                                <button id="saveNewPaletteBtn">+ Save as New</button>
+                            </div>
                             <div class="palette-name-input" id="paletteNameInput" style="display:none;">
                                 <input type="text" id="newPaletteName" placeholder="Enter Palette Name" />
                                 <div class="palette-name-input-buttons">
@@ -178,26 +184,35 @@
         <div class="control-group">
             <label for="visualResolution">Visual Quality</label>
             <select id="visualResolution">
-                <option value="2048">High (2K)</option>
-                <option value="1024" selected>Medium (1K) - Recommended</option>
-                <option value="512">Low (512)</option>
+                <option value="4096">Cinematic (4K)</option>
+                <option value="2048">Ultra (2K)</option>
+                <option value="1024" selected>High (1K) - Recommended</option>
+                <option value="512">Medium (512)</option>
+                <option value="256">Low (256)</option>
             </select>
         </div>
         <div class="control-group">
             <label for="physicsResolution">Physics Detail</label>
             <select id="physicsResolution">
-                <option value="1024">High</option>
-                <option value="512" selected>Medium - Recommended</option>
-                <option value="256">Low</option>
+                <option value="1024">Extreme (1K)</option>
+                <option value="512">Ultra (512)</option>
+                <option value="384" selected>High (384) - Recommended</option>
+                <option value="256">Standard (256)</option>
+                <option value="128">Medium (128)</option>
+                <option value="64">Low (64)</option>
             </select>
         </div>
         <div class="control-group">
             <label for="fpsCap">FPS Limit</label>
             <select id="fpsCap">
-                <option value="30">30 fps (Battery Saver)</option>
-                <option value="60" selected>60 fps - Recommended</option>
-                <option value="120">120 fps (High Refresh)</option>
-                <option value="144">144 fps (Gaming)</option>
+                <option value="30">30 fps — Battery Saver</option>
+                <option value="60" selected>60 fps — Standard</option>
+                <option value="120">120 fps</option>
+                <option value="144">144 fps</option>
+                <option value="165">165 fps</option>
+                <option value="240">240 fps</option>
+                <option value="native">Native (Match Display)</option>
+                <option value="0">Uncapped</option>
             </select>
         </div>
         <div class="control-group">
@@ -213,20 +228,38 @@
             <input type="range" id="pressureDissipation" min="0.9" max="1.0333" value="0.944" step="0.001">
         </div>
         <div class="control-group">
-            <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">20</span></label>
-            <input type="range" id="pressureIteration" min="1" max="50" value="20" step="1">
+            <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">32</span></label>
+            <input type="range" id="pressureIteration" min="1" max="50" value="32" step="1">
         </div>
         <div class="control-group">
-            <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">1.200</span></label>
-            <input type="range" id="velocityInfluence" min="1" max="5" value="1.2" step="0.001">
+            <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">2.500</span></label>
+            <input type="range" id="velocityInfluence" min="1" max="5" value="2.5" step="0.001">
+        </div>
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="turbulenceMode">
+            <label for="turbulenceMode" style="margin: 0">☁️ Billowing Clouds (Turbulence)</label>
         </div>
         <div class="control-group">
-            <label for="curl">Curl <span id="curlValue" class="value-display">10</span></label>
-            <input type="range" id="curl" min="0" max="60" value="10" step="1">
+            <label for="curl">Curl <span id="curlValue" class="value-display">25</span></label>
+            <input type="range" id="curl" min="0" max="60" value="25" step="1">
         </div>
         <div class="control-group">
             <label for="sharpness">Viscosity <span id="sharpnessValue" class="value-display">0.8</span></label>
-            <input type="range" id="sharpness" min="0" max="2" value="0.8" step="0.1" class="slider-star">
+            <input type="range" id="sharpness" min="0" max="2" value="0.8" step="0.1">
+        </div>
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="microDetailToggle">
+            <label for="microDetailToggle" style="margin: 0">Micro Detail</label>
+        </div>
+        <div id="microDetailPanel" class="collapsible" style="display:none;">
+            <div class="control-group">
+                <label for="clarity">Clarity <span id="clarityValue" class="value-display">0.0</span></label>
+                <input type="range" id="clarity" min="0" max="1" value="0" step="0.05">
+            </div>
+            <div class="control-group">
+                <label for="vibrance">Vibrance <span id="vibranceValue" class="value-display">0.0</span></label>
+                <input type="range" id="vibrance" min="0" max="1" value="0" step="0.05">
+            </div>
         </div>
         <div class="control-group">
             <label for="multiplier">✨ Multiplier <span id="multiplierValue" class="value-display">1x</span></label>
@@ -261,7 +294,10 @@
                 <label for="kAnimateRot" style="margin: 0">Animate Rotation</label>
             </div>
             <div class="control-group">
-                <label for="kSpinSpeed">Spin Speed <span id="kSpinSpeedValue" class="value-display">30°/s</span></label>
+                <label>
+                    Spin Speed
+                    <span class="value-display" id="kSpinSpeedValue">30°/s</span>
+                </label>
                 <input type="range" id="kSpinSpeed" min="-180" max="180" value="30" step="1" class="slider-star">
             </div>
             <div class="control-group">
@@ -298,10 +334,6 @@
             <input type="range" id="captureDimming" min="0" max="100" value="80" step="1">
         </div>
         <div class="control-group checkbox-group">
-            <input type="checkbox" id="trailToggle" checked>
-            <label for="trailToggle" style="margin: 0">Show Trail</label>
-        </div>
-        <div class="control-group checkbox-group">
             <input type="checkbox" id="cursorToggle" checked>
             <label for="cursorToggle" style="margin: 0">Show Cursor</label>
         </div>
@@ -313,6 +345,117 @@
             <input type="checkbox" id="statsToggle">
             <label for="statsToggle" style="margin: 0">Stats For Nerds</label>
         </div>
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="enableLighting">
+            <label for="enableLighting" style="margin: 0">💡 Light Source (Depth Effect)</label>
+        </div>
+        
+        <!-- Light Source Controls (compact, inline) -->
+        <div id="lightSourceControls" class="light-source-controls" style="display: none; margin-left: 20px; margin-top: 8px; padding: 12px; background: rgba(100, 150, 255, 0.05); border-left: 2px solid rgba(100, 150, 255, 0.3); border-radius: 4px;">
+            <div class="control-group" style="margin-bottom: 8px;">
+                <label style="font-size: 12px; margin-bottom: 4px;">Mode</label>
+                <select id="lightMode" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid rgba(100,150,255,0.3); color: white; border-radius: 4px;">
+                    <option value="manual">Manual</option>
+                    <option value="random">Random</option>
+                </select>
+            </div>
+            
+            <div class="light-grid-container" id="lightGridContainer" style="width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, rgba(20, 30, 50, 0.5), rgba(30, 20, 50, 0.5)); border: 1px solid rgba(100, 150, 255, 0.3); border-radius: 4px; position: relative; margin-bottom: 8px; cursor: crosshair;">
+                <div class="light-grid" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+                    <div class="grid-line vertical" style="position: absolute; width: 1px; height: 100%; background: rgba(100, 150, 255, 0.15); left: 50%;"></div>
+                    <div class="grid-line horizontal" style="position: absolute; height: 1px; width: 100%; background: rgba(100, 150, 255, 0.15); top: 50%;"></div>
+                </div>
+                <div class="light-dot" id="lightDot" style="position: absolute; width: 16px; height: 16px; background: radial-gradient(circle, rgba(255, 255, 200, 1) 0%, rgba(255, 220, 100, 0.9) 40%, rgba(255, 200, 50, 0.6) 70%, transparent 100%); border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 0 8px rgba(255, 255, 200, 0.8); z-index: 10; left: 50%; top: 50%;"></div>
+                <div class="light-gradient-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+            </div>
+            
+            <div class="control-group" id="lightSpeedControl" style="display: none;">
+                <label>
+                    Speed
+                    <span class="value-display" id="lightSpeedValue">0.50</span>
+                </label>
+                <input type="range" id="lightSpeed" class="slider-blue" min="0.1" max="2" step="0.1" value="0.5">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    Intensity
+                    <span class="value-display" id="lightIntensityValue">0.50</span>
+                </label>
+                <input type="range" id="lightIntensity" class="slider-blue" min="0" max="1" step="0.01" value="0.5">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    Ambient
+                    <span class="value-display" id="lightAmbientValue">0.30</span>
+                </label>
+                <input type="range" id="lightAmbient" class="slider-blue" min="0" max="1" step="0.01" value="0.3">
+            </div>
+        </div>
+        
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="enableLightShift">
+            <label for="enableLightShift" style="margin: 0">🌈 Light Shift (Color Overexposure)</label>
+        </div>
+        
+        <!-- Light Shift Controls -->
+        <div id="lightShiftControls" style="display: none; margin-left: 20px; margin-top: 8px; padding: 12px; background: rgba(255, 150, 100, 0.05); border-left: 2px solid rgba(255, 150, 100, 0.3); border-radius: 4px;">
+            <div style="text-align: center; margin-bottom: 8px;">
+                <label style="font-size: 11px; color: rgba(255, 255, 255, 0.7);">Draw a path through colors</label>
+            </div>
+            
+            <div style="display: flex; justify-content: center; margin-bottom: 12px;">
+                <canvas id="lightShiftWheel" style="border: 1px solid rgba(255, 150, 100, 0.3); border-radius: 4px; cursor: crosshair;"></canvas>
+            </div>
+            
+            <div class="control-group" style="margin-bottom: 8px;">
+                <label style="font-size: 12px; margin-bottom: 4px;">Blend Mode</label>
+                <select id="lightShiftMode" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,150,100,0.3); color: white; border-radius: 4px;">
+                    <option value="replace">Replace</option>
+                    <option value="tint">Tint</option>
+                    <option value="overlay">Overlay</option>
+                    <option value="multiply">Multiply</option>
+                    <option value="screen">Screen</option>
+                    <option value="add">Additive</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    Speed
+                    <span class="value-display" id="lightShiftSpeedValue">0.50</span>
+                </label>
+                <input type="range" id="lightShiftSpeed" class="slider-orange" min="0.1" max="2" step="0.1" value="0.5">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    Threshold
+                    <span class="value-display" id="lightShiftThresholdValue">0.85</span>
+                </label>
+                <input type="range" id="lightShiftThreshold" class="slider-orange" min="0.5" max="1" step="0.01" value="0.85">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    Intensity
+                    <span class="value-display" id="lightShiftIntensityValue">0.50</span>
+                </label>
+                <input type="range" id="lightShiftIntensity" class="slider-orange" min="0" max="1" step="0.01" value="0.5">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    Saturation
+                    <span class="value-display" id="lightShiftSaturationValue">1.00</span>
+                </label>
+                <input type="range" id="lightShiftSaturation" class="slider-orange" min="0" max="1" step="0.01" value="1.0">
+            </div>
+            
+            <button id="clearLightShiftPath" style="width: 100%; padding: 6px; background: rgba(255, 100, 100, 0.2); border: 1px solid rgba(255, 100, 100, 0.4); color: white; border-radius: 4px; cursor: pointer; font-size: 11px;">Clear Path</button>
+        </div>
+        
         <div class="control-group checkbox-group">
             <input type="checkbox" id="lockCanvasBorders">
             <label for="lockCanvasBorders" style="margin: 0">Lock Canvas Borders</label>
@@ -329,7 +472,7 @@
                 <label for="autoloadSettings" style="margin: 0">Load saved on start</label>
             </div>
         </div>
-        <div class="control-group">
+        <div class="control-group" id="presetsGroup">
             <label>Presets</label>
             <div class="presets">
                 <button onclick="applyPreset('silky')">Silky</button>
@@ -341,26 +484,43 @@
                 <button onclick="applyPreset('marble')">Marble</button>
                 <button onclick="applyPreset('electric')">Electric</button>
             </div>
-        </div>
-        <div class="control-group" style="margin-top: 20px; padding: 15px; background: rgba(100, 150, 255, 0.1); border-radius: 8px;">
-            <label style="font-weight: bold; margin-bottom: 10px; display: block;">Multi Artist</label>
-            <div class="control-group checkbox-group" style="margin-top: 5px;">
-                <input type="checkbox" id="multiplayerToggle" onchange="initMultiplayer()">
-                <label for="multiplayerToggle" style="margin: 0">Enable Multi Artist</label>
+            <div id="userPresetsList" class="user-presets-list" style="margin-top: 6px;"></div>
+            <div id="userPresetSaveRow" style="margin-top: 6px;">
+                <button id="saveAsPresetBtn" style="width: 100%; font-size: 10px; padding: 6px;">+ Save Current as Preset</button>
             </div>
-            <div id="multiplayerInfo" style="margin-top: 10px; font-size: 12px;">
-                <div style="margin-bottom: 5px;">
-                    <strong>Room:</strong> <span id="roomName">default-room</span>
+            <div id="userPresetNameRow" style="display: none; gap: 6px; margin-top: 6px;">
+                <input type="text" id="userPresetNameInput" placeholder="Preset name..." maxlength="32" spellcheck="false" autocomplete="off" style="flex: 1; padding: 6px 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; font-size: 11px;">
+                <button id="userPresetConfirmBtn" style="padding: 6px 10px;">Save</button>
+                <button id="userPresetCancelBtn" style="padding: 6px 10px; background: rgba(255,100,100,0.2); border: 1px solid rgba(255,100,100,0.3);">Cancel</button>
+            </div>
+            <div id="userPresetStatus" style="display: none; font-size: 10px; margin-top: 4px; color: #3fb950; text-align: center;"></div>
+        </div>
+        <input type="checkbox" id="multiplayerToggle" style="display:none">
+        <div id="multiArtistPanel">
+            <!-- Disconnected state -->
+            <div id="mpDisconnected">
+                <button id="createRoomBtn" class="mp-btn-create">🎨 Create Room</button>
+                <div class="mp-join-row">
+                    <input type="text" id="joinRoomInput" placeholder="Enter room code..." maxlength="6" spellcheck="false" autocomplete="off">
+                    <button id="joinRoomBtn">Join</button>
                 </div>
-                <div style="margin-bottom: 8px;">
-                    <strong>Status:</strong> <span id="multiplayerStatus">Disconnected</span>
+                <div id="mpError" class="mp-error" style="display:none"></div>
+            </div>
+            <!-- Connected state -->
+            <div id="mpConnected" style="display:none">
+                <div class="mp-status-row">
+                    <div id="connectionDot" class="mp-dot mp-dot-connected"></div>
+                    <span id="multiplayerStatus">Connected</span>
                 </div>
-                <button id="copyRoomBtn" onclick="copyRoomUrl()" style="width: 100%; font-size: 12px; padding: 6px;">
-                    Copy Room URL
-                </button>
-                <div style="margin-top: 8px; opacity: 0.7; font-size: 11px;">
-                    Share the room URL to collaborate with other artists in real-time!
+                <div class="mp-room-display">
+                    <div class="mp-room-label">Room Code</div>
+                    <div class="mp-room-code" id="roomName">------</div>
                 </div>
+                <div class="mp-action-row">
+                    <button id="copyRoomBtn" class="mp-btn-share">📋 Copy Link</button>
+                    <button id="disconnectBtn" class="mp-btn-disconnect">Disconnect</button>
+                </div>
+                <div id="connectedUsers" class="mp-users">1 user</div>
             </div>
         </div>
         
@@ -382,17 +542,64 @@
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Clockwise | Right: Counter</div>
         </button>
         
-        <button id="ascendToggle" style="width: 100%; margin-top: 10px; background: rgba(150, 255, 200, 0.2);">⬆️ Ascend</button>
-        
-        <div class="control-group checkbox-group" style="margin-top: 5px; margin-left: 10px;">
-            <input type="checkbox" id="ascendRandomness">
-            <label for="ascendRandomness" style="margin: 0">Ascend Randomness</label>
-        </div>
-        
         <button id="portalBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 100, 255, 0.2); padding: 8px; line-height: 1.3;">
             <div style="font-size: 1.1em; margin-bottom: 2px;">🌌 Portal</div>
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Swoop | Right: Expand</div>
         </button>
+
+        <!-- Toggle animations -->
+        <div id="ascendToggleWrap">
+            <div class="anim-toggle-row" style="background:rgba(150,255,200,0.1);">
+                <span class="anim-toggle-label">⬆️ Ascend</span>
+                <label class="anim-switch"><input type="checkbox" id="ascendToggle"><span class="anim-switch-track"></span></label>
+            </div>
+            <div class="anim-settings" id="ascendSettings">
+                <div class="control-group checkbox-group" style="margin-top:4px;">
+                    <input type="checkbox" id="ascendRandomness">
+                    <label for="ascendRandomness" style="margin:0;text-transform:none;opacity:1;font-size:11px;">Randomness</label>
+                </div>
+            </div>
+        </div>
+
+        <div id="shootingStarWrap">
+            <div class="anim-toggle-row" style="background:rgba(255,220,100,0.1);">
+                <span class="anim-toggle-label">🌠 Shooting Star</span>
+                <label class="anim-switch"><input type="checkbox" id="shootingStarToggle"><span class="anim-switch-track"></span></label>
+            </div>
+            <div class="anim-settings" id="shootingStarSettings">
+                <div class="control-group">
+                    <label for="ssFrequency">Frequency <span class="value-display" id="ssFreqVal">2.0/s</span></label>
+                    <input type="range" id="ssFrequency" min="0.2" max="8" step="0.1" value="2">
+                </div>
+                <div class="control-group">
+                    <label for="ssAngle">Angle <span class="value-display" id="ssAngleVal">120°</span></label>
+                    <input type="range" id="ssAngle" min="0" max="360" step="1" value="120">
+                </div>
+                <div class="control-group">
+                    <label for="ssLength">Length <span class="value-display" id="ssLengthVal">0.4s</span></label>
+                    <input type="range" id="ssLength" min="0.1" max="3.0" step="0.05" value="0.4">
+                </div>
+                <div class="control-group">
+                    <label for="ssSize">Size <span class="value-display" id="ssSizeVal">0.5x</span></label>
+                    <input type="range" id="ssSize" min="0.1" max="2.0" step="0.05" value="0.5">
+                </div>
+                <label style="font-size:10px;text-transform:uppercase;letter-spacing:0.3px;opacity:0.7;margin:6px 0 3px;display:block;">Origin</label>
+                <div class="ss-origin-picker" id="ssOriginPicker">
+                    <div class="ss-origin-frame" id="ssOriginFrame">
+                        <div class="ss-origin-dot" id="ssOriginDot"></div>
+                    </div>
+                    <div class="ss-origin-coords" id="ssOriginCoords">-30%, 0%</div>
+                </div>
+                <div class="control-group">
+                    <label for="ssVariance">Variance <span class="value-display" id="ssVarianceVal">15%</span></label>
+                    <input type="range" id="ssVariance" min="0" max="60" step="1" value="15">
+                </div>
+                <div class="control-group">
+                    <label for="ssGravity">Gravity <span class="value-display" id="ssGravityVal">0.10</span></label>
+                    <input type="range" id="ssGravity" min="0" max="1.0" step="0.01" value="0.10">
+                </div>
+            </div>
+        </div>
         
         <button id="captureBtn" style="width: 100%; margin-top: 10px; background: rgba(100, 255, 100, 0.2);">Capture Layer</button>
         
@@ -612,13 +819,40 @@
     <script src="js/10-draggable.js"></script>
     <script src="js/08-stats-panel.js"></script>
     <script src="js/12-save-load.js"></script>
+    <script src="js/13-light-source.js"></script>
+    <script src="js/14-light-shift.js"></script>
+    <script src="js/17-hotkey-reminder.js"></script>
     <script src="js/13-drag-scroll.js"></script>
     <script src="js/13-mobile-mode.js"></script>
+    <!-- Component System -->
+    <script src="js/components/base/UIComponent.js"></script>
+    <script src="js/components/base/ComponentRegistry.js"></script>
+    <script src="js/components/controls/SliderControl.js"></script>
+    <script src="js/components/controls/CheckboxControl.js"></script>
+    <script src="js/components/controls/SelectControl.js"></script>
+    <script src="js/components/controls/ButtonControl.js"></script>
+    <script src="js/components/groups/ColorGroup.js"></script>
+    <script src="js/components/groups/QualityGroup.js"></script>
+    <script src="js/components/groups/SimulationGroup.js"></script>
+    <script src="js/components/groups/KaleidoscopeGroup.js"></script>
+    <script src="js/components/groups/CanvasDisplayGroup.js"></script>
+    <script src="js/components/groups/ActionsGroup.js"></script>
+    <script src="js/components/groups/AnimationsGroup.js"></script>
+    <script src="js/components/groups/EffectsGroup.js"></script>
+    <script src="js/components/groups/LayersGroup.js"></script>
+    <script src="js/components/groups/SettingsManagementGroup.js"></script>
+    <script src="js/19-component-init.js"></script>
     <script src="js/14-battery-manager.js"></script>
     <script src="js/15-layer-masking.js"></script>
     <!-- SAM Integration (Transformers.js bundles its own ONNX Runtime) -->
     <script type="module" src="js/16-sam-integration.js"></script>
+    <!-- Depth Collision (shares Transformers.js with SAM) -->
+    <script type="module" src="js/23-depth-collision.js"></script>
     <script src="js/electron-performance.js"></script>
+    <script src="js/21-focus-mode.js"></script>
+    <script src="js/22-audio-reactive.js"></script>
+    <script src="js/23-branding-overlays.js"></script>
+    <script src="js/20-mixer-layout.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">

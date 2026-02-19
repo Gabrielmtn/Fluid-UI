@@ -32,6 +32,9 @@
         if (!Array.isArray(shapes)) return [];
         return shapes.map(shape => {
             const cloned = { ...shape };
+            if (shape.depthData instanceof Uint8Array) {
+                cloned.depthData = new Uint8Array(shape.depthData);
+            }
             if (shape.samMask instanceof Uint8Array) {
                 cloned.samMask = new Uint8Array(shape.samMask);
             } else if (shape.samMask && typeof shape.samMask === 'object' && cloned.samMaskWidth && cloned.samMaskHeight) {
@@ -881,13 +884,6 @@
                 }
             }
             
-            console.log('👁️ Drawing SAM preview:', {
-                totalPixels: mask.data.length,
-                nonZeroPixels: previewNonZero,
-                coverage: (previewNonZero / mask.data.length * 100).toFixed(1) + '%',
-                dimensions: [maskWidth, maskHeight]
-            });
-            
             tempCtx.putImageData(imageData, 0, 0);
             
             // Now draw the temp canvas with transforms applied
@@ -951,6 +947,54 @@
         const cx = shape.x + shape.width / 2;
         const cy = shape.y + shape.height / 2;
         
+        // Handle depth-mask pixel data specially
+        if (shape.type === 'depth-mask' && shape.depthData && shape.depthWidth && shape.depthHeight) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = shape.depthWidth;
+            tempCanvas.height = shape.depthHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            const imageData = tempCtx.createImageData(shape.depthWidth, shape.depthHeight);
+            const data = imageData.data;
+            const threshold = shape.threshold || 128;
+            const invert = shape.invert || false;
+
+            const fillColor = ctx.fillStyle;
+            let r = 255, g = 140, b = 80, a = 0.4;
+            if (fillColor.includes('rgba')) {
+                const match = fillColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+                if (match) { r = parseInt(match[1]); g = parseInt(match[2]); b = parseInt(match[3]); a = match[4] ? parseFloat(match[4]) : 1.0; }
+            }
+
+            var dw = shape.depthWidth;
+            var dh = shape.depthHeight;
+            for (let y = 0; y < dh; y++) {
+                const srcY = dh - 1 - y; // flip vertically
+                for (let x = 0; x < dw; x++) {
+                    const srcI = srcY * dw + x;
+                    const dstI = y * dw + x;
+                    const dv = shape.depthData[srcI] || 0;
+                    const isObstacle = invert ? (dv < threshold) : (dv >= threshold);
+                    const idx = dstI * 4;
+                    if (isObstacle) {
+                        data[idx] = r; data[idx + 1] = g; data[idx + 2] = b;
+                        data[idx + 3] = Math.floor(a * 255);
+                    } else {
+                        data[idx] = dv; data[idx + 1] = dv; data[idx + 2] = dv;
+                        data[idx + 3] = 40;
+                    }
+                }
+            }
+
+            tempCtx.putImageData(imageData, 0, 0);
+            ctx.drawImage(tempCanvas, shape.x, shape.y, shape.width, shape.height);
+
+            // Bounding box stroke
+            ctx.beginPath();
+            ctx.rect(shape.x, shape.y, shape.width, shape.height);
+            ctx.stroke();
+            return;
+        }
+
         // Handle SAM pixel masks specially
         if (shape.type === 'sam-mask' && shape.samMask) {
             // Create temporary canvas for the mask
@@ -1431,6 +1475,20 @@
 
     // Helper to check if point is in shape (using canvas coordinates)
     function isPointInShapeMask(shape, x, y) {
+        // If shape has depth mask data, check depth value against threshold
+        if (shape.type === 'depth-mask' && shape.depthData && shape.depthWidth && shape.depthHeight) {
+            const relX = (x - shape.x) / shape.width * shape.depthWidth;
+            const relY = (y - shape.y) / shape.height * shape.depthHeight;
+            if (relX < 0 || relY < 0 || relX >= shape.depthWidth || relY >= shape.depthHeight) {
+                return false;
+            }
+            const pixelIndex = Math.floor(relY) * shape.depthWidth + Math.floor(relX);
+            const depthVal = shape.depthData[pixelIndex] || 0;
+            const threshold = shape.threshold || 128;
+            const invert = shape.invert || false;
+            return invert ? (depthVal < threshold) : (depthVal >= threshold);
+        }
+
         // If shape has SAM pixel mask data, use it for precise checking
         if (shape.samMask && shape.samMaskWidth && shape.samMaskHeight) {
             // Convert canvas coordinates to mask-relative coordinates

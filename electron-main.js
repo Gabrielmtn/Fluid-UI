@@ -8,27 +8,27 @@ require('@electron/remote/main').initialize();
 // ⚡ PERFORMANCE BOOST: Enable all GPU acceleration
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('enable-accelerated-2d-canvas'); // Hardware-accelerated 2D canvas
+app.commandLine.appendSwitch('enable-gpu-memory-buffer-compositor-resources'); // Faster compositing
 app.commandLine.appendSwitch('disable-gpu-vsync'); // Uncap FPS
 app.commandLine.appendSwitch('disable-frame-rate-limit'); // CRITICAL: Remove FPS cap
 app.commandLine.appendSwitch('enable-webgl2-compute-context');
-app.commandLine.appendSwitch('enable-unsafe-webgpu'); // Experimental WebGPU
 
 // ⚡ NUCLEAR: Force disable ALL frame limiting
 app.commandLine.appendSwitch('max-gum-fps', '1000'); // Remove media FPS cap
 app.commandLine.appendSwitch('disable-renderer-backgrounding'); // Keep rendering at full speed
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows'); // No throttling when covered
-app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor'); // Disable display compositor
 app.commandLine.appendSwitch('use-angle', 'gl'); // Force OpenGL instead of D3D
 app.commandLine.appendSwitch('disable-software-rasterizer'); // Force hardware rendering
 
 // ⚡ Memory and Performance Flags
 app.commandLine.appendSwitch('max-old-space-size', '4096'); // 4GB heap
-app.commandLine.appendSwitch('js-flags', '--expose-gc'); // Manual GC control
+app.commandLine.appendSwitch('js-flags', '--expose-gc --max-semi-space-size=128'); // Manual GC + larger young gen
 
-// ⚡ Additional uncapping flags
+// ⚡ Additional GPU flags
 app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
-app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder');
+app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,CanvasOopRasterization'); // Out-of-process rasterization
 
 console.log('🚀 Electron performance flags applied');
 console.log('   - GPU VSync: DISABLED');
@@ -50,7 +50,7 @@ function createWindow() {
             experimentalFeatures: true,
             webSecurity: true, // Keep security but allow WASM
             allowRunningInsecureContent: false,
-            cache: false, // Disable cache in dev mode
+            // cache: true by default — preserves localStorage/settings across restarts
         },
         transparent: true, // Allow desktop to show through
         frame: false, // Use custom title bar (frameless window)
@@ -67,49 +67,40 @@ function createWindow() {
         mainWindow.webContents.setFrameRate(144); // Try to set frame rate directly
     });
     
-    // Aggressive cache busting for development
-    mainWindow.webContents.session.clearCache().then(() => {
-        // Also clear storage data
-        mainWindow.webContents.session.clearStorageData({
-            storages: ['cookies', 'cachestorage', 'localstorage', 'serviceworkers']
-        }).catch(() => {});
-    });
-    
-    // Intercept and add no-cache headers
-    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-        callback({
-            responseHeaders: {
-                ...details.responseHeaders,
-                'Cache-Control': ['no-cache, no-store, must-revalidate'],
-                'Pragma': ['no-cache'],
-                'Expires': ['0']
-            }
-        });
-    });
+    // NOTE: Cache and localStorage are preserved across restarts.
+    // Use Ctrl+Shift+D in the app to force-clear everything for debugging.
     
     // Show window when ready (prevents flash)
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
     });
 
-    // Load your index.html with cache-busting timestamp
-    const timestamp = Date.now();
-    mainWindow.loadFile('index.html').then(() => {
-        mainWindow.webContents.executeJavaScript(`
-            // Force reload all scripts with timestamp
-            console.log('🔄 Cache-busted reload at ${timestamp}');
-        `);
-    });
+    // Load the app
+    mainWindow.loadFile('index.html');
 
     // Open DevTools in development (optional)
     // mainWindow.webContents.openDevTools();
     
     // Development shortcuts
     mainWindow.webContents.on('before-input-event', (event, input) => {
-        // Ctrl+Shift+R or F5 = Hard reload (clear cache)
-        if ((input.control && input.shift && input.key === 'r') || input.key === 'F5') {
+        // F5 = Reload (preserves settings)
+        if (input.key === 'F5' && !input.control && !input.shift) {
+            mainWindow.webContents.reload();
+        }
+        // Ctrl+Shift+R = Hard reload (clear file cache, keep localStorage)
+        if (input.control && input.shift && input.key === 'R') {
             mainWindow.webContents.session.clearCache().then(() => {
                 mainWindow.webContents.reload();
+            });
+        }
+        // Ctrl+Shift+D = Nuclear reset (clear everything including localStorage)
+        if (input.control && input.shift && input.key === 'D') {
+            mainWindow.webContents.session.clearCache().then(() => {
+                mainWindow.webContents.session.clearStorageData({
+                    storages: ['cookies', 'cachestorage', 'localstorage', 'serviceworkers']
+                }).then(() => {
+                    mainWindow.webContents.reload();
+                });
             });
         }
     });

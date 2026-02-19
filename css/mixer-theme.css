@@ -1,0 +1,695 @@
+/* ========================================
+   MIXER AESTHETIC THEME
+   Professional audio mixer inspired design
+   ======================================== */
+
+:root {
+    --mixer-primary: #f6b018;
+    --mixer-secondary: #fff686;
+    --mixer-accent: #FFA412;
+    --mixer-bg-dark: #161616;
+    --mixer-bg-gradient: linear-gradient(90deg, rgba(43, 43, 43, 1) 0%, rgba(31, 31, 31, 1) 100%);
+    --mixer-inset-top: #100e0f;
+    --mixer-inset-bottom: #3b393a;
+    --mixer-button-gradient: linear-gradient(180deg, rgba(35, 35, 35, 1) 0%, rgba(16, 14, 15, 1) 46.24%, rgba(18, 16, 17, 1) 71.46%, rgba(26, 25, 25, 1) 85.73%, rgba(39, 38, 39, 1) 97.23%, rgba(43, 43, 43, 1) 100%);
+    --mixer-text-primary: #8E8E8E;
+    --mixer-text-secondary: #7a7a7a;
+}
+
+/* ========================================
+   CONTROL BOX STRUCTURE
+   ======================================== */
+
+.controllerBox {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+}
+
+.controllerBox h3.title {
+    box-sizing: border-box;
+    font-size: 14px;
+    background: var(--mixer-bg-dark);
+    border-radius: 5px 5px 0px 0px;
+    color: var(--mixer-text-primary);
+    margin: 0;
+    padding: 10px;
+    padding-bottom: 9px;
+    text-transform: uppercase;
+    background-repeat: no-repeat;
+    background-position: right 10px top 10px;
+    background-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+}
+
+.controllerBox .box {
+    box-sizing: border-box;
+    flex-grow: 1;
+    padding: 18px 18px 10px 18px;
+    background: var(--mixer-bg-gradient);
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* ========================================
+   INSET CONTROLS (Sliders, Displays)
+   ======================================== */
+
+.mixer-inset,
+.controllerBox .dotDisplay,
+.controllerBox .progressSlider,
+.controllerBox .buttonContainer,
+.controllerBox .toggle + label {
+    border-top: 3px solid var(--mixer-inset-top);
+    border-bottom: 2px solid var(--mixer-inset-bottom);
+    background: var(--mixer-inset-top);
+    padding: 6px 10px;
+    margin: 10px 0;
+    border-radius: 6px;
+}
+
+/* ========================================
+   DOT DISPLAY (Value readouts)
+   ======================================== */
+
+.controllerBox .dotDisplay {
+    position: relative;
+    color: var(--mixer-primary);
+    text-transform: lowercase;
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 14px;
+    min-width: 60px;
+    text-align: center;
+}
+
+/* ========================================
+   PROGRESS SLIDER (Range inputs)
+   ======================================== */
+
+.controllerBox .progressSlider {
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+    padding-bottom: 5px;
+    border-radius: 12px;
+    margin-top: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.progressSlider span {
+    display: inline-block;
+    color: var(--mixer-text-secondary);
+    font-size: 10px;
+    margin-top: 1px;
+    min-width: 35px;
+}
+
+.progressSlider input[type=range] {
+    flex: 1;
+    margin: 0 10px;
+    border: 1px solid #565656;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: 6px;
+    height: 10px;
+    --progress-percent: 0%;
+    background-image: linear-gradient(90deg,
+        var(--mixer-primary) var(--progress-percent),
+        black var(--progress-percent)
+    );
+    transition: all 0.3s linear;
+    cursor: pointer;
+}
+
+.progressSlider input[type="range"]::-moz-range-track {
+    background: none;
+    outline: none;
+}
+
+.progressSlider input[type=range]:focus {
+    outline: none;
+}
+
+.progressSlider input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none !important;
+    background-color: #df7164;
+    height: 13px;
+    width: 13px;
+    border-radius: 50%;
+    visibility: hidden;
+}
+
+.progressSlider input[type=range]::-moz-range-thumb {
+    -moz-appearance: none !important;
+    background-color: #df7164;
+    border: none;
+    height: 13px;
+    width: 13px;
+    border-radius: 50%;
+    visibility: hidden;
+}
+
+/* ========================================
+   RADIAL SLIDER (Jog/Knob controls)
+   ======================================== */
+
+.radialSlider {
+    position: relative;
+    width: 100px;
+    min-width: 100px;
+    display: flex;
+    flex-direction: column;
+    margin: 10px;
+}
+
+.radialSlider svg {
+    pointer-events: none;
+    margin-top: 8px;
+}
+
+.radialSlider .jogContainer {
+    transform-origin: center;
+    cursor: pointer;
+    pointer-events: all;
+    touch-action: none;
+}
+
+.radialSlider input {
+    display: none;
+}
+
+.radialSlider label {
+    display: block;
+    color: var(--mixer-text-primary);
+    margin: 0;
+    padding: 0px;
+    text-align: center;
+    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.radialSlider .jog {
+    fill: url(#jogGradient);
+    stroke: #545454;
+    stroke-width: 1.3855;
+    stroke-miterlimit: 10;
+}
+
+.radialSlider .bar,
+.radialSlider .barActive {
+    fill: none;
+    stroke: var(--mixer-accent);
+    stroke-width: 1.4431;
+    stroke-miterlimit: 10;
+    stroke-dasharray: 191;
+}
+
+.radialSlider .bar {
+    stroke: var(--mixer-text-secondary);
+}
+
+.radialSlider .thumb {
+    fill: var(--mixer-accent);
+}
+
+.radialSlider .dotDisplay {
+    align-self: center;
+    margin-top: 3px;
+    text-align: center;
+    width: 50px;
+    font-size: 12px;
+}
+
+/* ========================================
+   BUTTON CONTAINER (Action buttons)
+   ======================================== */
+
+.controllerBox .buttonContainer {
+    display: inline-flex;
+    padding: 0px 3px 3px 4px;
+    height: 36px;
+    margin: 10px 0;
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    gap: 2px;
+}
+
+.buttonContainer button {
+    border: 0;
+    width: 36px;
+    height: 36px;
+    background: var(--mixer-button-gradient);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease-out;
+    flex-shrink: 0;
+}
+
+.buttonContainer button:hover {
+    background: var(--mixer-secondary);
+}
+
+.buttonContainer button.active {
+    background: var(--mixer-primary);
+}
+
+.buttonContainer button.active path,
+.buttonContainer button:hover path {
+    stroke: none;
+    fill: black;
+}
+
+.buttonContainer button svg {
+    width: 60%;
+    height: 60%;
+}
+
+.buttonContainer button path {
+    fill: none;
+    stroke: #666666;
+    stroke-width: 0.7003;
+    stroke-miterlimit: 10;
+}
+
+/* ========================================
+   TOGGLE SWITCHES
+   ======================================== */
+
+.controllerBox .toggle {
+    display: none;
+}
+
+.toggleContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 10px 0;
+}
+
+.toggleContainer .title {
+    color: var(--mixer-text-primary);
+    margin: 0;
+    padding: 0px;
+    text-align: center;
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.controllerBox .toggle + label {
+    display: inline-block;
+    position: relative;
+    width: 80px;
+    height: 27px;
+    border-radius: 50px;
+    cursor: pointer;
+    margin: 0;
+}
+
+.toggle + label:before {
+    position: absolute;
+    top: 0;
+    left: 3px;
+    content: "";
+    width: 57px;
+    height: 36px;
+    background: var(--mixer-button-gradient);
+    border-radius: 50px;
+    transition: all 0.2s ease-out;
+}
+
+.toggle:checked + label:before {
+    left: 39px;
+    background: var(--mixer-primary);
+}
+
+/* ========================================
+   ROW LAYOUTS
+   ======================================== */
+
+.row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin: 15px 0;
+    width: 100%;
+}
+
+.row.center {
+    justify-content: center;
+    gap: 15px;
+}
+
+/* ========================================
+   MIXER-STYLED CONTROLS PANEL
+   ======================================== */
+
+.controls.mixer-style {
+    background: linear-gradient(180deg, #505050 0%, #606060 50%, #505050 100%);
+    padding: 15px;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3), -4px 0 16px rgba(0, 0, 0, 0.3);
+    border-left: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+.controls.mixer-style .control-group {
+    background: transparent;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 12px;
+}
+
+.controls.mixer-style .control-group:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Override existing slider styles for mixer theme */
+.mixer-style input[type=range] {
+    background: var(--mixer-inset-top);
+    border-top: 3px solid var(--mixer-inset-top);
+    border-bottom: 2px solid var(--mixer-inset-bottom);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Mixer-themed buttons */
+.mixer-style button {
+    background: var(--mixer-button-gradient);
+    color: #cccccc;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px rgba(255, 255, 255, 0.1);
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    transition: all 0.2s ease-out;
+}
+
+.mixer-style button:hover {
+    background: linear-gradient(180deg, var(--mixer-secondary), var(--mixer-primary));
+    color: #000;
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.mixer-style button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.mixer-style button.active {
+    background: linear-gradient(180deg, var(--mixer-primary), #d89a10);
+    color: #000;
+    box-shadow: 0 0 12px rgba(246, 176, 24, 0.6), inset 0 1px rgba(255, 255, 255, 0.3);
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.5);
+    border-color: rgba(246, 176, 24, 0.8);
+}
+
+/* Preset buttons grid */
+.mixer-style .presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.mixer-style .presets button {
+    padding: 8px 6px;
+    font-size: 10px;
+}
+
+/* Mixer-themed select dropdowns */
+.mixer-style select {
+    background: var(--mixer-button-gradient);
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    color: white;
+    padding: 8px;
+    border-radius: 6px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Mixer-themed checkboxes */
+.mixer-style input[type="checkbox"] {
+    accent-color: var(--mixer-primary);
+}
+
+/* Mixer-themed labels */
+.mixer-style .control-group label {
+    color: var(--mixer-text-primary);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.mixer-style .control-group label .value-display {
+    color: var(--mixer-primary);
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(0, 0, 0, 0.4);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Mixer-themed color inputs */
+.mixer-style input[type="color"] {
+    border: 2px solid var(--mixer-inset-top);
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.mixer-style input[type="color"]:hover {
+    box-shadow: 0 2px 10px rgba(246, 176, 24, 0.3), inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    border-color: var(--mixer-primary);
+}
+
+/* ========================================
+   COMPACT MIXER SECTIONS
+   ======================================== */
+
+.mixer-section {
+    background: var(--mixer-bg-gradient);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.mixer-section-header {
+    background: var(--mixer-bg-dark);
+    color: var(--mixer-text-primary);
+    padding: 8px 10px;
+    border-radius: 5px 5px 0 0;
+    margin: -12px -12px 10px -12px;
+    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* ========================================
+   MIXER-THEMED PALETTE & COLOR CONTROLS
+   ======================================== */
+
+.mixer-style .saved-colors {
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid var(--mixer-inset-top);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+    padding: 10px;
+}
+
+.mixer-style .color-swatch {
+    border: 2px solid rgba(0, 0, 0, 0.5);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.2);
+    transition: all 0.2s ease;
+}
+
+.mixer-style .color-swatch:hover {
+    border-color: var(--mixer-primary);
+    box-shadow: 0 0 8px rgba(246, 176, 24, 0.6), inset 0 1px rgba(255, 255, 255, 0.3);
+    transform: scale(1.15);
+}
+
+.mixer-style .palette-tag {
+    background: var(--mixer-button-gradient);
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    color: var(--mixer-text-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.mixer-style .palette-tag:hover {
+    background: linear-gradient(180deg, rgba(60, 60, 60, 1), rgba(40, 40, 40, 1));
+    border-color: var(--mixer-primary);
+}
+
+.mixer-style .palette-tag.active {
+    background: linear-gradient(180deg, var(--mixer-primary), #d89a10);
+    color: #000;
+    border-color: var(--mixer-primary);
+    box-shadow: 0 0 8px rgba(246, 176, 24, 0.6), inset 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.mixer-style .palette-chip {
+    border: 2px solid rgba(0, 0, 0, 0.5);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
+}
+
+.mixer-style .palette-chip:hover {
+    border-color: var(--mixer-primary);
+    box-shadow: 0 0 6px rgba(246, 176, 24, 0.5);
+}
+
+/* ========================================
+   MIXER-THEMED SCROLLBAR
+   ======================================== */
+
+.controls.mixer-style::-webkit-scrollbar {
+    width: 10px;
+}
+
+.controls.mixer-style::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.4);
+    border-left: 1px solid rgba(0, 0, 0, 0.6);
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+.controls.mixer-style::-webkit-scrollbar-thumb {
+    background: var(--mixer-button-gradient);
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    border-radius: 5px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.controls.mixer-style::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--mixer-secondary), var(--mixer-primary));
+}
+
+.controls.mixer-style::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, var(--mixer-primary), #d89a10);
+}
+
+/* ========================================
+   ANIMATIONS & MICRO-INTERACTIONS
+   ======================================== */
+
+@keyframes glow-pulse {
+    0%, 100% {
+        box-shadow: 0 0 8px rgba(246, 176, 24, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(246, 176, 24, 0.8);
+    }
+}
+
+.mixer-style button.active {
+    animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -100% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.controllerBox h3.title::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+    );
+    transition: left 0.5s;
+}
+
+.controllerBox:hover h3.title::after {
+    left: 100%;
+}
+
+/* Smooth value transitions */
+.dotDisplay {
+    transition: color 0.3s ease, transform 0.1s ease;
+}
+
+.dotDisplay:hover {
+    transform: scale(1.05);
+    color: var(--mixer-secondary);
+}
+
+/* Button press effect */
+.buttonContainer button {
+    position: relative;
+    overflow: hidden;
+}
+
+.buttonContainer button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+}
+
+.buttonContainer button:active::before {
+    width: 100%;
+    height: 100%;
+}
+
+/* ========================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================== */
+
+@media (max-width: 768px) {
+    .radialSlider {
+        width: 80px;
+        min-width: 80px;
+    }
+    
+    .controllerBox .box {
+        padding: 12px;
+    }
+    
+    .row {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    /* Disable animations on mobile for performance */
+    .mixer-style button.active {
+        animation: none;
+    }
+}

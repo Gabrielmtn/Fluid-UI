@@ -6,7 +6,8 @@
 (function() {
     const mobileMenuToggle = document.getElementById('mobileMenuToggle');
     const mobileMenuClose = document.getElementById('mobileMenuClose');
-    const controls = document.querySelector('.controls');
+    function getControls() { return document.getElementById('sidebar-right') || document.querySelector('.controls'); }
+    let controls = getControls(); // initial ref, updated after layout
     let tapTimeout = null;
     let isMobileMode = false;
 
@@ -88,6 +89,9 @@
 
     // Initialize
     function init() {
+        // Re-bind controls to pick up #sidebar-right if mixer layout has created it
+        setTimeout(function() { controls = getControls(); }, 100);
+
         // Check if mobile on load
         if (isMobileDevice()) {
             enableMobileMode();

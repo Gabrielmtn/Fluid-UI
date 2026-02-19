@@ -185,7 +185,7 @@
          * @param {object} data - Preset data
          */
         savePreset(presetName, data) {
-            settings.set(`preset.${presetName}`, data);
+            return settings.set(`preset.${presetName}`, data);
         },
 
         /**

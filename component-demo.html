@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Component System Demo</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/slider-styles.css">
+    <style>
+        body {
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        
+        .demo-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .demo-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .demo-section h2 {
+            margin-top: 0;
+            color: #f6b018;
+        }
+        
+        .component-container {
+            background: #1a1a1a;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .code-block {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 10px 0;
+        }
+        
+        .output {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #0f0;
+        }
+        
+        button {
+            background: #f6b018;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #fff686;
+        }
+        
+        .controls-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>🧩 Component System Demo</h1>
+        
+        <div class="demo-section">
+            <h2>1. Basic Slider Component</h2>
+            <p>Create a slider component with automatic value display and event handling.</p>
+            
+            <div class="code-block">
+const slider = ComponentRegistry.create('slider', {
+    id: 'demoSlider',
+    label: 'Demo Slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    value: 50,
+    unit: '%'
+});
+
+slider.mount(container);
+slider.on('change', (value) => {
+    console.log('Value changed:', value);
+});
+            </div>
+            
+            <div class="component-container" id="demo1"></div>
+            <div class="output" id="output1">Waiting for interaction...</div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>2. Synced Slider</h2>
+            <p>Component synced with an external input element (bidirectional).</p>
+            
+            <div class="code-block">
+const syncedSlider = ComponentRegistry.create('slider', {
+    id: 'syncedSlider',
+    label: 'Synced Slider',
+    min: 0,
+    max: 10,
+    step: 0.1,
+    value: 5
+});
+
+syncedSlider.mount(container);
+syncedSlider.syncWith('externalInput');
+            </div>
+            
+            <div class="component-container" id="demo2"></div>
+            
+            <p>External Input (synced):</p>
+            <input type="range" id="externalInput" min="0" max="10" step="0.1" value="5" style="width: 100%;">
+            <div class="output" id="output2">Synced value: 5.0</div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>3. Component Groups</h2>
+            <p>Create multiple related components in a group.</p>
+            
+            <div class="code-block">
+// Create simulation parameter group
+['density', 'velocity', 'pressure'].forEach(param => {
+    const slider = ComponentRegistry.create('slider', {
+        id: `${param}Slider`,
+        label: param.charAt(0).toUpperCase() + param.slice(1),
+        min: 0.8,
+        max: 1.0,
+        step: 0.001,
+        value: 0.95,
+        group: 'simulation'
+    });
+    slider.mount(container);
+});
+            </div>
+            
+            <div class="component-container" id="demo3"></div>
+            
+            <div class="controls-row">
+                <button onclick="mountGroup()">Mount Group</button>
+                <button onclick="unmountGroup()">Unmount Group</button>
+                <button onclick="exportStates()">Export States</button>
+                <button onclick="debugRegistry()">Debug Registry</button>
+            </div>
+            <div class="output" id="output3">Group controls ready</div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>4. Component Lifecycle</h2>
+            <p>Demonstrate component creation, mounting, updating, and destruction.</p>
+            
+            <div class="component-container" id="demo4"></div>
+            
+            <div class="controls-row">
+                <button onclick="createComponent()">Create</button>
+                <button onclick="updateComponent()">Update Value</button>
+                <button onclick="destroyComponent()">Destroy</button>
+            </div>
+            <div class="output" id="output4">No component created</div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>5. Registry Status</h2>
+            <p>View the current state of the component registry.</p>
+            
+            <div class="output" id="registryStatus" style="max-height: 300px; overflow-y: auto;">
+                Loading...
+            </div>
+            
+            <button onclick="refreshStatus()">Refresh Status</button>
+        </div>
+    </div>
+    
+    <!-- Load component system -->
+    <script src="js/components/base/UIComponent.js"></script>
+    <script src="js/components/base/ComponentRegistry.js"></script>
+    <script src="js/components/controls/SliderControl.js"></script>
+    
+    <script>
+        // Register components
+        ComponentRegistry.register('slider', SliderControl, {
+            description: 'Generic slider control with label and value display',
+            category: 'controls',
+            version: '1.0.0'
+        });
+        
+        // Demo 1: Basic Slider
+        const slider1 = ComponentRegistry.create('slider', {
+            id: 'demoSlider',
+            label: 'Demo Slider',
+            min: 0,
+            max: 100,
+            step: 1,
+            value: 50,
+            unit: '%'
+        });
+        
+        slider1.mount(document.getElementById('demo1'));
+        slider1.on('change', (value) => {
+            document.getElementById('output1').textContent = `Value changed: ${value}%`;
+        });
+        
+        // Demo 2: Synced Slider
+        const slider2 = ComponentRegistry.create('slider', {
+            id: 'syncedSlider',
+            label: 'Synced Slider',
+            min: 0,
+            max: 10,
+            step: 0.1,
+            value: 5
+        });
+        
+        slider2.mount(document.getElementById('demo2'));
+        slider2.syncWith('externalInput');
+        
+        slider2.on('change', (value) => {
+            document.getElementById('output2').textContent = `Synced value: ${value.toFixed(1)}`;
+        });
+        
+        // Demo 3: Component Groups
+        const params = [
+            { id: 'densitySlider', label: 'Density', value: 0.993 },
+            { id: 'velocitySlider', label: 'Velocity', value: 0.999 },
+            { id: 'pressureSlider', label: 'Pressure', value: 0.944 }
+        ];
+        
+        params.forEach(param => {
+            const slider = ComponentRegistry.create('slider', {
+                ...param,
+                min: 0.8,
+                max: 1.0,
+                step: 0.001,
+                group: 'simulation'
+            });
+            slider.mount(document.getElementById('demo3'));
+        });
+        
+        function mountGroup() {
+            ComponentRegistry.mountGroup('simulation', document.getElementById('demo3'));
+            document.getElementById('output3').textContent = 'Group mounted';
+        }
+        
+        function unmountGroup() {
+            ComponentRegistry.unmountGroup('simulation');
+            document.getElementById('output3').textContent = 'Group unmounted';
+        }
+        
+        function exportStates() {
+            const states = ComponentRegistry.exportStates();
+            document.getElementById('output3').textContent = JSON.stringify(states, null, 2);
+        }
+        
+        function debugRegistry() {
+            ComponentRegistry.debug();
+            document.getElementById('output3').textContent = 'Check console for debug info';
+        }
+        
+        // Demo 4: Lifecycle
+        let lifecycleComponent = null;
+        
+        function createComponent() {
+            if (lifecycleComponent) {
+                document.getElementById('output4').textContent = 'Component already exists';
+                return;
+            }
+            
+            lifecycleComponent = ComponentRegistry.create('slider', {
+                id: 'lifecycleSlider',
+                label: 'Lifecycle Demo',
+                min: 0,
+                max: 100,
+                value: 25
+            });
+            
+            lifecycleComponent.mount(document.getElementById('demo4'));
+            document.getElementById('output4').textContent = 'Component created and mounted';
+        }
+        
+        function updateComponent() {
+            if (!lifecycleComponent) {
+                document.getElementById('output4').textContent = 'No component to update';
+                return;
+            }
+            
+            const newValue = Math.floor(Math.random() * 100);
+            lifecycleComponent.setValue(newValue);
+            document.getElementById('output4').textContent = `Updated value to: ${newValue}`;
+        }
+        
+        function destroyComponent() {
+            if (!lifecycleComponent) {
+                document.getElementById('output4').textContent = 'No component to destroy';
+                return;
+            }
+            
+            ComponentRegistry.destroy(lifecycleComponent.id);
+            lifecycleComponent = null;
+            document.getElementById('output4').textContent = 'Component destroyed';
+        }
+        
+        // Demo 5: Registry Status
+        function refreshStatus() {
+            const metadata = ComponentRegistry.getAllMetadata();
+            const instances = ComponentRegistry.getAll();
+            
+            let html = '<strong>Registered Components:</strong><br>';
+            metadata.forEach(m => {
+                html += `- ${m.name} (${m.category}) v${m.version}<br>`;
+            });
+            
+            html += '<br><strong>Active Instances:</strong><br>';
+            instances.forEach(i => {
+                html += `- ${i.id}: ${i.constructor.name} (mounted: ${i.mounted})<br>`;
+            });
+            
+            html += '<br><strong>Groups:</strong><br>';
+            const groups = ComponentRegistry.groups;
+            groups.forEach((group, name) => {
+                html += `- ${name}: ${group.size} components<br>`;
+            });
+            
+            document.getElementById('registryStatus').innerHTML = html;
+        }
+        
+        // Initial status
+        refreshStatus();
+        
+        // Auto-refresh status every 2 seconds
+        setInterval(refreshStatus, 2000);
+    </script>
+</body>
+</html>

@@ -30,7 +30,6 @@
             });
         }
         
-        let nextTrailDrawAt = 0;
         function trackMouseMovement(e) {
             if (!pointer.down || isReplayActive) return;
             
@@ -47,34 +46,10 @@
             mousePositions.push(position);
             const cutoff = position.timestamp - FADE_END;
             mousePositions = mousePositions.filter(pos => pos.timestamp >= cutoff);
-            
-            if (showTrail && mousePositions.length > 1) {
-                const stats = window.__stats || {};
-                const fps = (typeof stats.fps === 'number' && isFinite(stats.fps)) ? stats.fps : 60;
-                const now = Date.now();
-                let interval = 0;
-                if (fps < 26) interval = 100; else if (fps < 36) interval = 50;
-                if (now < nextTrailDrawAt) return;
-                nextTrailDrawAt = now + interval;
-                const lastPos = mousePositions[mousePositions.length - 2];
-                trailCtx.beginPath();
-                trailCtx.strokeStyle = currentTrailColorCss;
-                trailCtx.lineWidth = 2;
-                trailCtx.lineCap = 'round';
-                trailCtx.lineJoin = 'round';
-                trailCtx.moveTo(lastPos.x, lastPos.y);
-                trailCtx.lineTo(position.x, position.y);
-                trailCtx.stroke();
-                
-                setTimeout(() => {
-                    trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
-                }, FADE_END);
-            }
         }
         
         function replayMovements() {
             if (!isRightMouseDown || !isReplayActive) {
-                trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
                 customCursor.style.display = 'none';
                 return;
             }
@@ -82,8 +57,6 @@
             customCursor.style.opacity = showCursor ? '1' : '0';
             const now = Date.now();
             const replayProgress = (now % 500) / 500;
-            
-            trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
             
             mousePositions.forEach((pos, index) => {
                 const progress = index / (mousePositions.length - 1);
@@ -106,7 +79,9 @@
             depth: false,
             stencil: false,
             antialias: false,
-            preserveDrawingBuffer: true
+            preserveDrawingBuffer: false,  // Disabled for performance (enable if canvas export needed)
+            desynchronized: true,          // Lower latency rendering
+            powerPreference: 'high-performance'
         });
         
         // Expose for stats panel
@@ -124,13 +99,15 @@
             DENSITY_DISSIPATION: 0.993,
             VELOCITY_DISSIPATION: 0.999,
             PRESSURE_DISSIPATION: 0.944,
-            PRESSURE_ITERATIONS: 95,
-            CURL: 10,
+            PRESSURE_ITERATIONS: 32,  // 32 gives clean incompressible flow without being expensive
+            CURL: 25,                 // Strong vortices for visually interesting fluid on first load
             SPLAT_RADIUS: 0.011,
-            SHARPNESS: 0.8,  // Adaptive sharpness (0.0 = off, 1.0 = moderate, 2.0 = aggressive)
-            DYE_RESOLUTION: 2048,
-            SIM_RESOLUTION: 512,
-            VELOCITY_INFLUENCE: 1.2  // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
+            SHARPNESS: 0.8,           // Adaptive sharpness (0.0 = off, 1.0 = moderate, 2.0 = aggressive)
+            CLARITY: 0,               // Local contrast enhancement (0 = off, 1.0 = max)
+            VIBRANCE: 0,              // Selective saturation boost (0 = off, 1.0 = max)
+            DYE_RESOLUTION: 1024,     // 1024 looks great, 2048 is overkill
+            SIM_RESOLUTION: 384,      // 384 gives noticeably better physics detail than 256
+            VELOCITY_INFLUENCE: 2.5   // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
         };
         
         // Expose for stats panel
@@ -147,32 +124,24 @@
             try {
                 const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
                 if (isMobile) {
-                    config.DYE_RESOLUTION = 1024; // Visual quality
-                    config.SIM_RESOLUTION = 256;  // Physics resolution
-                    config.PRESSURE_ITERATIONS = 40; // Solver steps
-                    config.SHARPNESS = 0.5; // Less aggressive sharpening on mobile
-                    // Slightly smaller default brush so initial tap isn't too large on mobile
-                    config.SPLAT_RADIUS = 0.009;
-                    // Default trail off on mobile to save fill-rate
-                    try { showTrail = false; } catch(_) {}
-                    // Sync UI when ready
-                    window.addEventListener('load', () => {
-                        const tgl = document.getElementById('trailToggle');
-                        if (tgl) tgl.checked = false;
-                    });
+                    config.DYE_RESOLUTION = 512;   // Lower for mobile (was 1024)
+                    config.SIM_RESOLUTION = 128;   // Lower for mobile (was 256)
+                    config.PRESSURE_ITERATIONS = 15; // Fewer iterations (was 40)
+                    config.SHARPNESS = 0.0;        // Disable sharpening on mobile
+                    config.SPLAT_RADIUS = 0.012;   // Slightly larger for touch
                 }
             } catch(_) {}
         })();
         
         const presets = {
             silky: { DENSITY_DISSIPATION: 0.9995, VELOCITY_DISSIPATION: 1.0001, PRESSURE_DISSIPATION: 0.8, PRESSURE_ITERATIONS: 20, CURL: 30, SPLAT_RADIUS: 0.011 },
-            thick: { DENSITY_DISSIPATION: 0.999, VELOCITY_DISSIPATION: 0.99, PRESSURE_DISSIPATION: 0.95, PRESSURE_ITERATIONS: 120, CURL: 1, SPLAT_RADIUS: 0.015 },
-            wispy: { DENSITY_DISSIPATION: 0.9972, VELOCITY_DISSIPATION: 0.9996, PRESSURE_DISSIPATION: 0.92, PRESSURE_ITERATIONS: 40, CURL: 60, SPLAT_RADIUS: 0.01 },
+            thick: { DENSITY_DISSIPATION: 0.999, VELOCITY_DISSIPATION: 0.99, PRESSURE_DISSIPATION: 0.95, PRESSURE_ITERATIONS: 35, CURL: 1, SPLAT_RADIUS: 0.015 },  // Was 120
+            wispy: { DENSITY_DISSIPATION: 0.9972, VELOCITY_DISSIPATION: 0.9996, PRESSURE_DISSIPATION: 0.92, PRESSURE_ITERATIONS: 25, CURL: 60, SPLAT_RADIUS: 0.01 },  // Was 40
             chaotic: { DENSITY_DISSIPATION: 0.996, VELOCITY_DISSIPATION: 0.9938, PRESSURE_DISSIPATION: 0.934, PRESSURE_ITERATIONS: 25, CURL: 12, SPLAT_RADIUS: 0.0151 },
             ethereal: { DENSITY_DISSIPATION: 0.9998, VELOCITY_DISSIPATION: 1.0005, PRESSURE_DISSIPATION: 0.75, PRESSURE_ITERATIONS: 15, CURL: 45, SPLAT_RADIUS: 0.008 },
-            turbulent: { DENSITY_DISSIPATION: 0.994, VELOCITY_DISSIPATION: 0.997, PRESSURE_DISSIPATION: 0.88, PRESSURE_ITERATIONS: 60, CURL: 55, SPLAT_RADIUS: 0.013 },
-            marble: { DENSITY_DISSIPATION: 0.9992, VELOCITY_DISSIPATION: 0.9985, PRESSURE_DISSIPATION: 0.98, PRESSURE_ITERATIONS: 100, CURL: 8, SPLAT_RADIUS: 0.018 },
-            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.82, PRESSURE_ITERATIONS: 35, CURL: 52, SPLAT_RADIUS: 0.006 }
+            turbulent: { DENSITY_DISSIPATION: 0.994, VELOCITY_DISSIPATION: 0.997, PRESSURE_DISSIPATION: 0.88, PRESSURE_ITERATIONS: 30, CURL: 55, SPLAT_RADIUS: 0.013 },  // Was 60
+            marble: { DENSITY_DISSIPATION: 0.9992, VELOCITY_DISSIPATION: 0.9985, PRESSURE_DISSIPATION: 0.98, PRESSURE_ITERATIONS: 35, CURL: 8, SPLAT_RADIUS: 0.018 },  // Was 100
+            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.82, PRESSURE_ITERATIONS: 25, CURL: 52, SPLAT_RADIUS: 0.006 }  // Was 35
         };
         
         window.applyPreset = (name) => {
@@ -180,35 +149,20 @@
             if (!preset) return;
 
             activePreset = name;
+            
+            // Instant application - zero overhead
+            Object.assign(config, preset);
+            
+            // Single DOM update
+            updateSliderValues();
+            
+            // Update button states
             updatePresetButtons();
 
             // Broadcast to multiplayer clients
             if (typeof broadcastPreset === 'function') {
                 broadcastPreset(name);
             }
-            
-            const initialConfig = { ...config };
-            const startTime = performance.now();
-            const duration = 800;
-            
-            function animate(currentTime) {
-                const elapsed = currentTime - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                const easing = (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-                const t = easing(progress);
-                
-                Object.keys(preset).forEach((key) => {
-                    config[key] = initialConfig[key] + (preset[key] - initialConfig[key]) * t;
-                });
-                
-                updateSliderValues();
-                
-                if (progress < 1) {
-                    requestAnimationFrame(animate);
-                }
-            }
-            
-            requestAnimationFrame(animate);
         };
         
         function updatePresetButtons() {
@@ -248,42 +202,20 @@
                 freezeBtn.classList.add('active');
             }
             
-            const startTime = performance.now();
-            const duration = 300;
-            
-            let startDensity, endDensity, startVelocity, endVelocity;
-            
             if (!isUnfreezing) {
+                // Freeze: save current values and set to freeze state
                 savedDensity = config.DENSITY_DISSIPATION;
                 savedVelocity = config.VELOCITY_DISSIPATION;
-                startDensity = config.DENSITY_DISSIPATION;
-                startVelocity = config.VELOCITY_DISSIPATION;
-                endDensity = 1.0;
-                endVelocity = 0.9;
+                config.DENSITY_DISSIPATION = 1.0;
+                config.VELOCITY_DISSIPATION = 0.9;
             } else {
-                startDensity = config.DENSITY_DISSIPATION;
-                startVelocity = config.VELOCITY_DISSIPATION;
-                endDensity = savedDensity;
-                endVelocity = savedVelocity;
+                // Unfreeze: restore saved values
+                config.DENSITY_DISSIPATION = savedDensity;
+                config.VELOCITY_DISSIPATION = savedVelocity;
             }
             
-            function animate(currentTime) {
-                const elapsed = currentTime - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                const easing = (t) => t * (2 - t);
-                const easedProgress = easing(progress);
-                
-                config.DENSITY_DISSIPATION = startDensity + (endDensity - startDensity) * easedProgress;
-                config.VELOCITY_DISSIPATION = startVelocity + (endVelocity - startVelocity) * easedProgress;
-                
-                updateSliderValues();
-                
-                if (progress < 1) {
-                    requestAnimationFrame(animate);
-                }
-            }
-            
-            requestAnimationFrame(animate);
+            // Single DOM update
+            updateSliderValues();
         };
         
         window.playExpandAnimation = () => {
@@ -718,55 +650,48 @@
             playJellyfishSwarm();
         });
         
-        // Ascend animation state
+        // ── Ascend animation (toggle) ─────────────────────────────
         let ascendActive = false;
         let ascendAnimationId = null;
         
-        window.toggleAscend = () => {
-            ascendActive = !ascendActive;
-            const ascendBtn = document.getElementById('ascendToggle');
+        window.toggleAscend = (forceState) => {
+            ascendActive = typeof forceState === 'boolean' ? forceState : !ascendActive;
+            const cb = document.getElementById('ascendToggle');
+            if (cb) cb.checked = ascendActive;
+            const panel = document.getElementById('ascendSettings');
+            if (panel) panel.classList.toggle('open', ascendActive);
             
             if (ascendActive) {
-                ascendBtn.style.background = 'rgba(150, 255, 200, 0.5)';
-                ascendBtn.textContent = '⬆️ Ascend (Active)';
                 startAscendAnimation();
-            } else {
-                ascendBtn.style.background = 'rgba(150, 255, 200, 0.2)';
-                ascendBtn.textContent = '⬆️ Ascend';
-                if (ascendAnimationId) {
-                    clearTimeout(ascendAnimationId);
-                    ascendAnimationId = null;
-                }
+            } else if (ascendAnimationId) {
+                clearTimeout(ascendAnimationId);
+                ascendAnimationId = null;
             }
         };
         
         function startAscendAnimation() {
             if (!ascendActive) return;
             
-            // Save original settings
             const originalDensity = config.DENSITY_DISSIPATION;
             const originalVelocity = config.VELOCITY_DISSIPATION;
             const originalBrush = config.SPLAT_RADIUS;
             
-            // Set long-lasting flow settings
-            config.DENSITY_DISSIPATION = 0.999;  // Very high density sustain
-            config.VELOCITY_DISSIPATION = 1.0;   // Maximum velocity sustain - fluid never slows down
-            config.SPLAT_RADIUS = 0.008;         // Medium brush size
+            config.DENSITY_DISSIPATION = 0.999;
+            config.VELOCITY_DISSIPATION = 1.0;
+            config.SPLAT_RADIUS = 0.008;
             
             const centerX = canvas.width * 0.5;
             const startY = canvas.height * 0.95;
             const endY = canvas.height * 0.05;
-            const duration = 30000; // 30 seconds
-            const steps = 600; // 50ms per step
+            const steps = 600;
             const randomnessEnabled = document.getElementById('ascendRandomness').checked;
             
             let currentStep = 0;
-            let listingPhase = 0; // For gradual left-right listing
-            let spurtCounter = 0; // Counter for occasional spurts
+            let listingPhase = 0;
+            let spurtCounter = 0;
             
             function animateStep() {
                 if (!ascendActive) {
-                    // Restore original settings when stopped
                     config.DENSITY_DISSIPATION = originalDensity;
                     config.VELOCITY_DISSIPATION = originalVelocity;
                     config.SPLAT_RADIUS = originalBrush;
@@ -776,77 +701,345 @@
                 const progress = currentStep / steps;
                 const y = startY - (startY - endY) * progress;
                 
-                // Calculate x position with optional randomness
                 let x = centerX;
                 if (randomnessEnabled) {
-                    // Gradual listing left and right using sine wave
                     listingPhase += 0.05;
-                    const listingAmount = Math.sin(listingPhase) * 50;
-                    x = centerX + listingAmount;
+                    x = centerX + Math.sin(listingPhase) * 50;
                 }
                 
-                // Random color for each cycle
                 const color = window.generateVibrantColor ? window.generateVibrantColor() : [Math.random(), Math.random(), Math.random()];
-                
-                // Strong upward velocity for long flows
                 const dx = randomnessEnabled ? Math.sin(listingPhase) * 0.8 : 0;
                 const dy = -8;
-                
                 splat(x, y, dx, dy, color);
                 
-                // Occasional spurts from the origin (every 3-5 seconds)
                 spurtCounter++;
-                if (spurtCounter >= 60 + Math.random() * 40) { // 3-5 seconds at 50ms intervals
+                if (spurtCounter >= 60 + Math.random() * 40) {
                     spurtCounter = 0;
-                    
-                    // Create a quick spurt of 8-12 splats shooting up from origin
                     const spurtCount = 8 + Math.floor(Math.random() * 5);
-                    
-                    // Pick a vibrant pure color (avoid white/gray)
-                    const spurtColorChoice = Math.floor(Math.random() * 6);
-                    const spurtColors = [
-                        [0.9, 0.1, 0.2],  // Pure red
-                        [0.1, 0.9, 0.2],  // Pure green
-                        [0.1, 0.2, 0.9],  // Pure blue
-                        [0.9, 0.9, 0.1],  // Pure yellow
-                        [0.9, 0.1, 0.9],  // Pure magenta
-                        [0.1, 0.9, 0.9]   // Pure cyan
-                    ];
-                    const spurtColor = spurtColors[spurtColorChoice];
-                    
+                    const spurtColors = [[0.9,0.1,0.2],[0.1,0.9,0.2],[0.1,0.2,0.9],[0.9,0.9,0.1],[0.9,0.1,0.9],[0.1,0.9,0.9]];
+                    const spurtColor = spurtColors[Math.floor(Math.random() * 6)];
                     for (let i = 0; i < spurtCount; i++) {
                         setTimeout(() => {
                             const spurtX = centerX + (Math.random() - 0.5) * 20;
-                            const spurtY = startY;
-                            const spurtDx = (Math.random() - 0.5) * 2;
-                            // Velocity ramps up smoothly - final splat gets full 2.2x boost
-                            const progress = i / (spurtCount - 1); // 0 to 1
-                            const velocityMultiplier = 1 + (progress * 1.2); // 1x to 2.2x
-                            const spurtDy = (-12 - Math.random() * 4) * velocityMultiplier;
-                            
-                            splat(spurtX, spurtY, spurtDx, spurtDy, spurtColor);
+                            const p = i / (spurtCount - 1);
+                            const spurtDy = (-12 - Math.random() * 4) * (1 + p * 1.2);
+                            splat(spurtX, startY, (Math.random() - 0.5) * 2, spurtDy, spurtColor);
                         }, i * 30);
                     }
                 }
                 
                 currentStep++;
-                
-                // Check if we've reached the top
-                if (currentStep >= steps) {
-                    // Reset and start over
-                    currentStep = 0;
-                    listingPhase = 0;
-                }
-                
-                // Continue animation
+                if (currentStep >= steps) { currentStep = 0; listingPhase = 0; }
                 ascendAnimationId = setTimeout(animateStep, 50);
             }
-            
             animateStep();
         }
         
-        // Setup ascend toggle button
-        document.getElementById('ascendToggle').addEventListener('click', toggleAscend);
+        // Wire ascend toggle (now a checkbox) — clicking anywhere on the row toggles it
+        const ascendCb = document.getElementById('ascendToggle');
+        if (ascendCb) {
+            ascendCb.addEventListener('change', () => toggleAscend(ascendCb.checked));
+            const ascendRow = ascendCb.closest('.anim-toggle-row') || ascendCb.parentElement?.parentElement;
+            if (ascendRow) {
+                ascendRow.addEventListener('click', (e) => {
+                    if (e.target.closest('.anim-switch')) return; // already handled by label/input
+                    ascendCb.checked = !ascendCb.checked;
+                    ascendCb.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
+        }
+        
+        // ── Shooting Star animation (toggle) ─────────────────────
+        let ssActive = false;
+        let ssTimerId = null;
+        let ssStars = []; // active shooting star arcs
+        
+        // Config read from sliders
+        let ssFrequency = 2.0;  // stars per second
+        let ssAngleDeg = 120;   // launch angle in degrees (120° = down-left in canvas coords)
+        let ssLength = 0.4;     // arc duration in seconds
+        let ssSize = 0.5;       // size multiplier
+        let ssGravity = 0.10;    // downward pull (0 = straight, 1 = heavy droop)
+        // Origin as % of canvas: 0,0 = top-left corner of frame, 100,100 = bottom-right
+        // Values outside 0-100 are off-screen (the whole point)
+        let ssOriginX = -30;    // default: 30% off the left edge
+        let ssOriginY = 0;      // default: top edge
+        let ssVariance = 15;    // scatter radius in % of canvas
+        
+        window.toggleShootingStar = (forceState) => {
+            ssActive = typeof forceState === 'boolean' ? forceState : !ssActive;
+            const cb = document.getElementById('shootingStarToggle');
+            if (cb) cb.checked = ssActive;
+            const panel = document.getElementById('shootingStarSettings');
+            if (panel) panel.classList.toggle('open', ssActive);
+            
+            if (ssActive) {
+                startShootingStars();
+            } else {
+                if (ssTimerId) { clearInterval(ssTimerId); ssTimerId = null; }
+                ssStars.length = 0;
+            }
+        };
+        
+        function startShootingStars() {
+            if (ssTimerId) clearInterval(ssTimerId);
+            scheduleNextStar();
+        }
+        
+        function scheduleNextStar() {
+            if (!ssActive) return;
+            const intervalMs = 1000 / Math.max(0.2, ssFrequency);
+            // Add ±30% jitter so stars don't feel mechanical
+            const jitter = intervalMs * (0.7 + Math.random() * 0.6);
+            ssTimerId = setTimeout(() => {
+                if (!ssActive) return;
+                launchStar();
+                scheduleNextStar();
+            }, jitter);
+        }
+        
+        function launchStar() {
+            const cw = canvas.width;
+            const ch = canvas.height;
+            
+            // Travel direction: angle in canvas coords (0°=right, 90°=down)
+            // Add ±15° randomization for natural spread
+            const angleRad = (ssAngleDeg + (Math.random() - 0.5) * 30) * Math.PI / 180;
+            
+            // Spawn at the user-picked origin (% of canvas) + random scatter from variance
+            const varPx = (ssVariance / 100) * cw;
+            const varPy = (ssVariance / 100) * ch;
+            const sx = (ssOriginX / 100) * cw + (Math.random() - 0.5) * 2 * varPx;
+            const sy = (ssOriginY / 100) * ch + (Math.random() - 0.5) * 2 * varPy;
+            
+            // Streak length in pixels (based on canvas diagonal and Length slider)
+            const diag = Math.sqrt(cw * cw + ch * ch);
+            const streakLen = diag * (0.25 + ssLength * 0.5); // 25-75% of diagonal
+            
+            // High tick rate for smooth thin trails
+            const FPS = 60;
+            const totalSteps = Math.max(8, Math.round(ssLength * FPS));
+            const stepMs = (ssLength * 1000) / totalSteps;
+            const stepDist = streakLen / totalSteps;
+            
+            // Gravity: always bends downward (toward +Y in canvas coords)
+            // Determine which perpendicular direction is "down" relative to travel
+            const perpDown = Math.cos(angleRad) >= 0 ? 1 : -1;
+            const curvature = perpDown * ssGravity * Math.PI;
+            
+            // Pick a bright color — bias toward whites/warm tones like real meteors
+            let color;
+            if (window.generateVibrantColor) {
+                color = window.generateVibrantColor();
+                // Brighten toward white for star-like appearance
+                color = [
+                    Math.min(1, color[0] + 0.4),
+                    Math.min(1, color[1] + 0.3),
+                    Math.min(1, color[2] + 0.2)
+                ];
+            } else {
+                color = [1, 0.95, 0.8]; // warm white
+            }
+            
+            let step = 0;
+            let px = sx, py = sy;
+            
+            const star = { id: Date.now() + Math.random() };
+            ssStars.push(star);
+            
+            function tick() {
+                if (!ssActive || step >= totalSteps) {
+                    const idx = ssStars.indexOf(star);
+                    if (idx !== -1) ssStars.splice(idx, 1);
+                    return;
+                }
+                
+                const t = step / totalSteps; // 0→1
+                
+                // Gentle arc bend
+                const curAngle = angleRad + curvature * t;
+                
+                // Fast head, fading tail
+                const speedMult = 1.0 - t * 0.3;
+                const dist = stepDist * speedMult;
+                
+                const nx = px + Math.cos(curAngle) * dist;
+                const ny = py + Math.sin(curAngle) * dist;
+                
+                // High velocity aligned with travel → elongated thin splats
+                const velScale = dist * 0.6;
+                const dx = Math.cos(curAngle) * velScale;
+                const dy = Math.sin(curAngle) * velScale;
+                
+                // Tiny radius: bright pinpoint head → vanishing tail
+                const baseRadius = 0.0003 + (1 - t) * 0.0009;
+                const headRadius = baseRadius * ssSize;
+                
+                // Fade opacity along the tail (bright head, dim tail)
+                const fade = 1.0 - t * 0.7;
+                const tailColor = [
+                    color[0] * fade,
+                    color[1] * fade,
+                    color[2] * fade * 0.8
+                ];
+                
+                if (typeof window.applyMultiSplatWith === 'function') {
+                    window.applyMultiSplatWith(nx, ny, dx, dy, tailColor, 1, headRadius);
+                } else {
+                    splat(nx, ny, dx, dy, tailColor);
+                }
+                
+                px = nx;
+                py = ny;
+                step++;
+                
+                setTimeout(tick, stepMs);
+            }
+            
+            tick();
+        }
+        
+        // Wire shooting star toggle + sliders
+        const ssCb = document.getElementById('shootingStarToggle');
+        if (ssCb) {
+            ssCb.addEventListener('change', () => toggleShootingStar(ssCb.checked));
+            const ssRow = ssCb.closest('.anim-toggle-row') || ssCb.parentElement?.parentElement;
+            if (ssRow) {
+                ssRow.addEventListener('click', (e) => {
+                    if (e.target.closest('.anim-switch')) return;
+                    ssCb.checked = !ssCb.checked;
+                    ssCb.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
+        }
+        const ssFreqSlider = document.getElementById('ssFrequency');
+        const ssAngleSlider = document.getElementById('ssAngle');
+        const ssLengthSlider = document.getElementById('ssLength');
+        if (ssFreqSlider) {
+            ssFreqSlider.addEventListener('input', () => {
+                ssFrequency = parseFloat(ssFreqSlider.value);
+                const el = document.getElementById('ssFreqVal');
+                if (el) el.textContent = ssFrequency.toFixed(1) + '/s';
+            });
+        }
+        if (ssAngleSlider) {
+            ssAngleSlider.addEventListener('input', () => {
+                ssAngleDeg = parseInt(ssAngleSlider.value);
+                const el = document.getElementById('ssAngleVal');
+                if (el) el.textContent = ssAngleDeg + '°';
+            });
+        }
+        if (ssLengthSlider) {
+            ssLengthSlider.addEventListener('input', () => {
+                ssLength = parseFloat(ssLengthSlider.value);
+                const el = document.getElementById('ssLengthVal');
+                if (el) el.textContent = ssLength.toFixed(1) + 's';
+            });
+        }
+        const ssSizeSlider = document.getElementById('ssSize');
+        if (ssSizeSlider) {
+            ssSizeSlider.addEventListener('input', () => {
+                ssSize = parseFloat(ssSizeSlider.value);
+                const el = document.getElementById('ssSizeVal');
+                if (el) el.textContent = ssSize.toFixed(1) + 'x';
+            });
+        }
+        
+        // ── Origin picker drag interaction ───────────────────────
+        // The .ss-origin-frame element represents 0-100% of canvas.
+        // The surrounding margin (20px) is the off-screen zone.
+        // The dot can be dragged anywhere in the picker area (including the margin).
+        // Origin coords are stored as % of canvas: <0 or >100 = off-screen.
+        const ssFrame = document.getElementById('ssOriginFrame');
+        const ssDot = document.getElementById('ssOriginDot');
+        const ssCoords = document.getElementById('ssOriginCoords');
+        
+        function updateOriginDot() {
+            if (!ssFrame || !ssDot) return;
+            // Map ssOriginX/Y (% of canvas) → CSS left/top (% of frame element)
+            ssDot.style.left = ssOriginX + '%';
+            ssDot.style.top = ssOriginY + '%';
+            if (ssCoords) ssCoords.textContent = Math.round(ssOriginX) + '%, ' + Math.round(ssOriginY) + '%';
+        }
+        
+        function originFromPointer(e) {
+            if (!ssFrame) return;
+            const rect = ssFrame.getBoundingClientRect();
+            // Pointer position relative to the frame element as % (can go outside 0-100)
+            const px = ((e.clientX - rect.left) / rect.width) * 100;
+            const py = ((e.clientY - rect.top) / rect.height) * 100;
+            // Clamp to roughly -60% to 160% (generous off-screen range)
+            ssOriginX = Math.max(-60, Math.min(160, px));
+            ssOriginY = Math.max(-60, Math.min(160, py));
+            updateOriginDot();
+        }
+        
+        // Sync origin frame aspect ratio to actual canvas dimensions
+        function syncFrameRatio() {
+            if (!ssFrame || !canvas) return;
+            const cw = canvas.width || 1;
+            const ch = canvas.height || 1;
+            ssFrame.style.setProperty('--ss-frame-ratio', (cw / ch).toFixed(4));
+        }
+        syncFrameRatio();
+        // Watch for canvas size changes
+        if (typeof ResizeObserver !== 'undefined' && canvas) {
+            new ResizeObserver(syncFrameRatio).observe(canvas);
+        }
+        // Also hook into the global updateCanvasSize if available
+        const origUpdateCanvasSize = window.updateCanvasSize;
+        if (typeof origUpdateCanvasSize === 'function') {
+            window.updateCanvasSize = function() {
+                origUpdateCanvasSize.apply(this, arguments);
+                syncFrameRatio();
+            };
+        }
+        
+        if (ssFrame) {
+            // Use the picker container (which includes margin) as the hit area
+            const ssPickerEl = document.getElementById('ssOriginPicker');
+            let draggingOrigin = false;
+            
+            const startDrag = (e) => {
+                draggingOrigin = true;
+                originFromPointer(e.touches ? e.touches[0] : e);
+                e.preventDefault();
+            };
+            const moveDrag = (e) => {
+                if (!draggingOrigin) return;
+                originFromPointer(e.touches ? e.touches[0] : e);
+                e.preventDefault();
+            };
+            const endDrag = () => { draggingOrigin = false; };
+            
+            (ssPickerEl || ssFrame).addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', moveDrag);
+            document.addEventListener('mouseup', endDrag);
+            (ssPickerEl || ssFrame).addEventListener('touchstart', startDrag, { passive: false });
+            document.addEventListener('touchmove', moveDrag, { passive: false });
+            document.addEventListener('touchend', endDrag);
+            
+            // Set initial dot position
+            updateOriginDot();
+        }
+        
+        // Variance slider
+        const ssGravitySlider = document.getElementById('ssGravity');
+        if (ssGravitySlider) {
+            ssGravitySlider.addEventListener('input', () => {
+                ssGravity = parseFloat(ssGravitySlider.value);
+                const el = document.getElementById('ssGravityVal');
+                if (el) el.textContent = ssGravity.toFixed(2);
+            });
+        }
+        const ssVarianceSlider = document.getElementById('ssVariance');
+        if (ssVarianceSlider) {
+            ssVarianceSlider.addEventListener('input', () => {
+                ssVariance = parseInt(ssVarianceSlider.value);
+                const el = document.getElementById('ssVarianceVal');
+                if (el) el.textContent = ssVariance + '%';
+            });
+        }
         
         // Portal animation
         let portalAlternate = false; // Track left/right alternation
@@ -1075,34 +1268,17 @@
             const originalVelocity = config.VELOCITY_DISSIPATION;
             const originalCurl = config.CURL;
             
-            // Helper to animate slider changes
+            // Helper to instantly apply settings (zero overhead)
             function animateSettings(targetBrush, targetDensity, targetVelocity, targetCurl, duration) {
-                const startBrush = config.SPLAT_RADIUS;
-                const startDensity = config.DENSITY_DISSIPATION;
-                const startVelocity = config.VELOCITY_DISSIPATION;
-                const startCurl = config.CURL;
-                const startTime = performance.now();
+                // Instant application - ignore duration parameter
+                config.SPLAT_RADIUS = targetBrush;
+                config.DENSITY_DISSIPATION = targetDensity;
+                config.VELOCITY_DISSIPATION = targetVelocity;
+                config.CURL = targetCurl;
                 
-                return new Promise(resolve => {
-                    function animate(currentTime) {
-                        const elapsed = currentTime - startTime;
-                        const progress = Math.min(elapsed / duration, 1);
-                        
-                        config.SPLAT_RADIUS = startBrush + (targetBrush - startBrush) * progress;
-                        config.DENSITY_DISSIPATION = startDensity + (targetDensity - startDensity) * progress;
-                        config.VELOCITY_DISSIPATION = startVelocity + (targetVelocity - startVelocity) * progress;
-                        config.CURL = startCurl + (targetCurl - startCurl) * progress;
-                        
-                        updateSliderValues();
-                        
-                        if (progress < 1) {
-                            requestAnimationFrame(animate);
-                        } else {
-                            resolve();
-                        }
-                    }
-                    requestAnimationFrame(animate);
-                });
+                updateSliderValues();
+                
+                return Promise.resolve();
             }
             
             // Helper to draw a curved line
@@ -1654,7 +1830,6 @@
 
         function doCaptureFromRegion() {
             const canvasRect = canvas.getBoundingClientRect();
-            const trailRect = trailCanvas.getBoundingClientRect();
             // Use detached region if present and visible; fallback to full canvas if no intersection
             let region = null;
             if (detachToggle && detachToggle.checked && captureAreaEl && getComputedStyle(captureAreaEl).display !== 'none') {
@@ -1675,15 +1850,9 @@
             temp.width = sw;
             temp.height = sh;
             const ctx = temp.getContext('2d');
-            // Composite trail and main canvas in order (trail on top)
+            // Draw canvas content
             try {
                 ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-            } catch (e) { /* ignore */ }
-            try {
-                // Align trail with canvas coords (assumed same rect sizing)
-                const tsx = Math.round(region.left - trailRect.left);
-                const tsy = Math.round(region.top - trailRect.top);
-                ctx.drawImage(trailCanvas, tsx, tsy, sw, sh, 0, 0, sw, sh);
             } catch (e) { /* ignore */ }
 
             let dataUrl = null;

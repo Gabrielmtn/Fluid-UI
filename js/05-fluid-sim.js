@@ -256,6 +256,377 @@
             }
         `;
 
+        // ─── Micro Detail Pass ─────────────────────────────────────
+        // Clarity + Vibrance only. Keeps fluid texture sharp through
+        // TikTok / H.264 encoding without color artifacts.
+        const microDetailFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform sampler2D uVelocity;
+            uniform vec2 texelSize;
+            uniform float clarity;    // 0–1: local contrast boost
+            uniform float vibrance;   // 0–1: selective saturation
+            
+            void main() {
+                vec3 center = texture(uTexture, vUv).rgb;
+                vec3 lumaW = vec3(0.299, 0.587, 0.114);
+                float centerLuma = dot(center, lumaW);
+                
+                if (centerLuma < 0.005) {
+                    fragColor = vec4(center, 1.0);
+                    return;
+                }
+                
+                vec3 result = center;
+                
+                // ── Clarity — Wide-kernel unsharp mask ──
+                // Same proven additive approach as the sharpening pass
+                // but with a wider 2-ring kernel for mid-frequency contrast.
+                if (clarity > 0.0) {
+                    vec2 t = texelSize;
+                    vec2 t2 = t * 2.0;
+                    
+                    // 12-tap weighted blur (8 inner + 4 outer at half weight)
+                    vec3 blur = vec3(0.0);
+                    blur += texture(uTexture, vUv + vec2(-t.x, -t.y)).rgb;
+                    blur += texture(uTexture, vUv + vec2( 0.0, -t.y)).rgb;
+                    blur += texture(uTexture, vUv + vec2( t.x, -t.y)).rgb;
+                    blur += texture(uTexture, vUv + vec2(-t.x,  0.0)).rgb;
+                    blur += texture(uTexture, vUv + vec2( t.x,  0.0)).rgb;
+                    blur += texture(uTexture, vUv + vec2(-t.x,  t.y)).rgb;
+                    blur += texture(uTexture, vUv + vec2( 0.0,  t.y)).rgb;
+                    blur += texture(uTexture, vUv + vec2( t.x,  t.y)).rgb;
+                    blur += texture(uTexture, vUv + vec2(-t2.x, 0.0)).rgb * 0.5;
+                    blur += texture(uTexture, vUv + vec2( t2.x, 0.0)).rgb * 0.5;
+                    blur += texture(uTexture, vUv + vec2(0.0, -t2.y)).rgb * 0.5;
+                    blur += texture(uTexture, vUv + vec2(0.0,  t2.y)).rgb * 0.5;
+                    blur /= 10.0;
+                    
+                    // Extract detail and apply (same as sharpening pass)
+                    vec3 detail = center - blur;
+                    
+                    // Velocity-adaptive strength
+                    float velMag = length(texture(uVelocity, vUv).xy);
+                    float adaptiveStrength = clarity * (1.0 + min(velMag * 3.0, 1.5));
+                    
+                    // Additive unsharp mask with clamping
+                    result = center + detail * adaptiveStrength * 1.5;
+                    vec3 maxVal = max(center * 2.0, vec3(1.0));
+                    result = clamp(result, vec3(0.0), maxVal);
+                }
+                
+                // ── Vibrance — RGB-space selective saturation ──
+                if (vibrance > 0.0) {
+                    float gray = dot(result, lumaW);
+                    float maxC = max(result.r, max(result.g, result.b));
+                    float minC = min(result.r, min(result.g, result.b));
+                    float sat = maxC > 0.001 ? (maxC - minC) / maxC : 0.0;
+                    float boost = vibrance * (1.0 - sat * sat) * 1.2;
+                    result = mix(vec3(gray), result, 1.0 + boost);
+                    result = max(result, vec3(0.0));
+                }
+                
+                fragColor = vec4(result, 1.0);
+            }
+        `;
+
+        const lightingFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR, vT, vB;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform sampler2D uVelocity;
+            uniform vec2 lightPos;
+            uniform float intensity;
+            uniform float ambient;
+            uniform vec2 texelSize;
+            
+            // Light Shift uniforms
+            uniform bool lightShiftEnabled;
+            uniform vec3 lightShiftColor;
+            uniform float lightShiftThreshold;
+            uniform float lightShiftIntensity;
+            uniform int lightShiftMode; // 0=replace, 1=tint, 2=overlay, 3=multiply, 4=screen, 5=add
+            
+            // Calculate very subtle pseudo-normal from color gradients
+            vec3 calculateNormal(vec2 uv) {
+                float left = dot(texture(uTexture, vL).rgb, vec3(0.299, 0.587, 0.114));
+                float right = dot(texture(uTexture, vR).rgb, vec3(0.299, 0.587, 0.114));
+                float top = dot(texture(uTexture, vT).rgb, vec3(0.299, 0.587, 0.114));
+                float bottom = dot(texture(uTexture, vB).rgb, vec3(0.299, 0.587, 0.114));
+                
+                // Very subtle gradients
+                float dx = (right - left) * 0.3;
+                float dy = (top - bottom) * 0.3;
+                
+                // Mostly flat normal with slight tilt
+                return normalize(vec3(dx, dy, 1.0));
+            }
+            
+            void main() {
+                vec4 color = texture(uTexture, vUv);
+                vec2 vel = texture(uVelocity, vUv).xy;
+                
+                if (color.a < 0.01) {
+                    fragColor = color;
+                    return;
+                }
+                
+                // Direction and distance to light
+                vec2 toLight = lightPos - vUv;
+                float dist = length(toLight);
+                vec2 lightDir = normalize(toLight + 0.0001);
+                
+                // Pseudo-depth
+                float colorDepth = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                float velMag = length(vel);
+                float depth = colorDepth * (1.0 + velMag * 0.15);
+                
+                // Soft distance falloff
+                float falloff = 1.0 / (1.0 + dist * dist * 4.0);
+                
+                // === DIFFUSE LIGHTING (main effect) ===
+                vec3 normal = calculateNormal(vUv);
+                vec3 lightDir3D = normalize(vec3(lightDir.x, lightDir.y, 0.5));
+                
+                // Lambertian diffuse (N · L) - this is the key lighting term
+                float diffuse = max(0.0, dot(normal, lightDir3D));
+                diffuse = mix(1.0, diffuse, 0.5); // More directional influence
+                
+                // === COMBINE LIGHTING ===
+                // Diffuse is the primary lighting component (shadows removed for performance)
+                float lightContribution = falloff * diffuse * intensity * 0.6;
+                
+                // Brightness: ambient + subtle directional boost
+                float brightness = ambient + lightContribution * (1.0 - ambient);
+                
+                // === SUBTLE COLOR TEMPERATURE ===
+                vec3 warmShift = vec3(1.03, 1.015, 0.99);  // Very subtle warm
+                vec3 coolShift = vec3(0.98, 0.99, 1.02);   // Very subtle cool
+                float colorShiftAmount = lightContribution * 0.4;
+                vec3 colorShift = mix(coolShift, warmShift, colorShiftAmount);
+                
+                // Apply base lighting
+                vec3 litColor = color.rgb * brightness * colorShift;
+                
+                // === SUBTLE RIM LIGHT (complementary) ===
+                vec3 viewDir = vec3(0.0, 0.0, 1.0);
+                float rimDot = 1.0 - max(0.0, dot(normal, viewDir));
+                float rimLight = pow(rimDot, 4.0) * diffuse * falloff * intensity * 0.1;
+                litColor += vec3(rimLight) * vec3(1.1, 1.05, 1.0);
+                
+                // === SUBTLE SPECULAR (complementary) ===
+                vec3 halfVec = normalize(lightDir3D + viewDir);
+                float specular = pow(max(0.0, dot(normal, halfVec)), 24.0);
+                specular *= falloff * intensity * depth * 0.08;
+                litColor += vec3(specular) * 0.5;
+                
+                // Soft clamp
+                litColor = min(litColor, vec3(1.2));
+                
+                // === LIGHT SHIFT (color overexposure) ===
+                if (lightShiftEnabled) {
+                    // Calculate brightness of lit color
+                    float litBrightness = dot(litColor, vec3(0.299, 0.587, 0.114));
+                    
+                    // If brightness exceeds threshold, apply color shift
+                    if (litBrightness > lightShiftThreshold) {
+                        // Calculate how much over the threshold we are (0-1)
+                        float overexposure = (litBrightness - lightShiftThreshold) / (1.2 - lightShiftThreshold);
+                        overexposure = clamp(overexposure, 0.0, 1.0);
+                        float shiftAmount = overexposure * lightShiftIntensity;
+                        
+                        vec3 shiftedColor;
+                        
+                        // Apply different blend modes
+                        if (lightShiftMode == 0) {
+                            // Replace: Direct color replacement
+                            shiftedColor = mix(litColor, lightShiftColor * litBrightness, shiftAmount);
+                        } else if (lightShiftMode == 1) {
+                            // Tint: Preserve luminance, shift hue
+                            shiftedColor = mix(litColor, lightShiftColor * litBrightness * 0.8 + litColor * 0.2, shiftAmount);
+                        } else if (lightShiftMode == 2) {
+                            // Overlay: Photoshop-style overlay blend
+                            vec3 overlay;
+                            for (int i = 0; i < 3; i++) {
+                                if (litColor[i] < 0.5) {
+                                    overlay[i] = 2.0 * litColor[i] * lightShiftColor[i];
+                                } else {
+                                    overlay[i] = 1.0 - 2.0 * (1.0 - litColor[i]) * (1.0 - lightShiftColor[i]);
+                                }
+                            }
+                            shiftedColor = mix(litColor, overlay, shiftAmount);
+                        } else if (lightShiftMode == 3) {
+                            // Multiply: Darken with color
+                            shiftedColor = mix(litColor, litColor * lightShiftColor, shiftAmount);
+                        } else if (lightShiftMode == 4) {
+                            // Screen: Lighten with color
+                            vec3 screen = vec3(1.0) - (vec3(1.0) - litColor) * (vec3(1.0) - lightShiftColor);
+                            shiftedColor = mix(litColor, screen, shiftAmount);
+                        } else {
+                            // Add: Additive blend
+                            shiftedColor = mix(litColor, litColor + lightShiftColor * shiftAmount, shiftAmount);
+                        }
+                        
+                        litColor = shiftedColor;
+                    }
+                }
+                
+                fragColor = vec4(litColor, color.a);
+            }
+        `;
+
+        // Standalone Light Shift shader (works without lighting)
+        // Applies color to overexposed/bright areas above threshold
+        const lightShiftFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform vec3 lightShiftColor;
+            uniform float lightShiftThreshold;
+            uniform float lightShiftIntensity;
+            uniform int lightShiftMode; // 0=replace, 1=tint, 2=overlay, 3=multiply, 4=screen, 5=add
+            
+            // Standard blend mode functions
+            vec3 blendMultiply(vec3 base, vec3 blend) {
+                return base * blend;
+            }
+            
+            vec3 blendScreen(vec3 base, vec3 blend) {
+                return 1.0 - (1.0 - base) * (1.0 - blend);
+            }
+            
+            vec3 blendOverlay(vec3 base, vec3 blend) {
+                vec3 result;
+                result.r = base.r < 0.5 ? (2.0 * base.r * blend.r) : (1.0 - 2.0 * (1.0 - base.r) * (1.0 - blend.r));
+                result.g = base.g < 0.5 ? (2.0 * base.g * blend.g) : (1.0 - 2.0 * (1.0 - base.g) * (1.0 - blend.g));
+                result.b = base.b < 0.5 ? (2.0 * base.b * blend.b) : (1.0 - 2.0 * (1.0 - base.b) * (1.0 - blend.b));
+                return result;
+            }
+            
+            vec3 blendSoftLight(vec3 base, vec3 blend) {
+                vec3 result;
+                result.r = blend.r < 0.5 ? (2.0 * base.r * blend.r + base.r * base.r * (1.0 - 2.0 * blend.r)) : (sqrt(base.r) * (2.0 * blend.r - 1.0) + 2.0 * base.r * (1.0 - blend.r));
+                result.g = blend.g < 0.5 ? (2.0 * base.g * blend.g + base.g * base.g * (1.0 - 2.0 * blend.g)) : (sqrt(base.g) * (2.0 * blend.g - 1.0) + 2.0 * base.g * (1.0 - blend.g));
+                result.b = blend.b < 0.5 ? (2.0 * base.b * blend.b + base.b * base.b * (1.0 - 2.0 * blend.b)) : (sqrt(base.b) * (2.0 * blend.b - 1.0) + 2.0 * base.b * (1.0 - blend.b));
+                return result;
+            }
+            
+            vec3 blendAdd(vec3 base, vec3 blend) {
+                return min(base + blend, 1.0);
+            }
+            
+            void main() {
+                vec4 color = texture(uTexture, vUv);
+                
+                // Skip fully transparent pixels
+                if (color.a < 0.01) {
+                    fragColor = color;
+                    return;
+                }
+                
+                // Multiple methods to detect "overblown" / bright areas:
+                
+                // 1. Luminance (perceived brightness)
+                float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                
+                // 2. Max channel (catches saturated bright colors)
+                float maxChannel = max(max(color.r, color.g), color.b);
+                
+                // 3. Average (simple brightness)
+                float avgBrightness = (color.r + color.g + color.b) / 3.0;
+                
+                // 4. "Clipping" detection - how close channels are to 1.0
+                //    This catches areas that WOULD be overblown if not clamped
+                float clipR = smoothstep(0.9, 1.0, color.r);
+                float clipG = smoothstep(0.9, 1.0, color.g);
+                float clipB = smoothstep(0.9, 1.0, color.b);
+                float clipping = max(max(clipR, clipG), clipB);
+                
+                // 5. Saturation loss detection - white areas have low saturation
+                float minChannel = min(min(color.r, color.g), color.b);
+                float saturation = maxChannel > 0.001 ? (maxChannel - minChannel) / maxChannel : 0.0;
+                float desaturated = 1.0 - saturation; // High when approaching white
+                
+                // Combine detection methods:
+                // - Use max of luminance and maxChannel for general brightness
+                // - Weight by clipping detection for near-white areas
+                // - Consider desaturation (white = bright + desaturated)
+                float brightness = max(luminance, maxChannel);
+                
+                // Boost detection for desaturated bright areas (actual white/overblown)
+                float overblownFactor = brightness;
+                if (brightness > 0.7 && desaturated > 0.5) {
+                    // This is likely an overblown area - boost the factor
+                    overblownFactor = mix(brightness, 1.0, desaturated * 0.5);
+                }
+                
+                // Also consider clipping
+                overblownFactor = max(overblownFactor, clipping * 0.9 + brightness * 0.1);
+                
+                // Check against threshold
+                if (overblownFactor > lightShiftThreshold) {
+                    // Calculate blend strength - how far above threshold
+                    float t = (overblownFactor - lightShiftThreshold) / (1.0 - lightShiftThreshold + 0.001);
+                    t = clamp(t, 0.0, 1.0);
+                    
+                    // Smooth transition
+                    t = t * t * (3.0 - 2.0 * t); // smoothstep curve
+                    
+                    // Final blend amount
+                    float blendAmount = t * lightShiftIntensity;
+                    
+                    // For very bright/white areas, increase the effect
+                    if (desaturated > 0.7 && brightness > 0.85) {
+                        blendAmount = min(blendAmount * 1.5, 1.0);
+                    }
+                    
+                    vec3 blendedColor;
+                    
+                    if (lightShiftMode == 0) {
+                        // Replace: Direct color replacement in bright areas
+                        // Scale shift color by brightness to maintain some variation
+                        float brightnessScale = 0.7 + luminance * 0.5;
+                        blendedColor = mix(color.rgb, lightShiftColor * brightnessScale, blendAmount);
+                        
+                    } else if (lightShiftMode == 1) {
+                        // Tint: Colorize while preserving luminance structure
+                        vec3 tinted = lightShiftColor * luminance;
+                        blendedColor = mix(color.rgb, tinted, blendAmount);
+                        
+                    } else if (lightShiftMode == 2) {
+                        // Overlay: Standard Photoshop overlay blend
+                        vec3 overlayed = blendOverlay(color.rgb, lightShiftColor);
+                        blendedColor = mix(color.rgb, overlayed, blendAmount);
+                        
+                    } else if (lightShiftMode == 3) {
+                        // Multiply: Darkens and colorizes
+                        vec3 multiplied = blendMultiply(color.rgb, lightShiftColor);
+                        blendedColor = mix(color.rgb, multiplied, blendAmount);
+                        
+                    } else if (lightShiftMode == 4) {
+                        // Screen: Lightens and colorizes (good for glows)
+                        vec3 screened = blendScreen(color.rgb, lightShiftColor);
+                        blendedColor = mix(color.rgb, screened, blendAmount);
+                        
+                    } else {
+                        // Add: Additive glow effect
+                        vec3 added = blendAdd(color.rgb, lightShiftColor * blendAmount);
+                        blendedColor = added;
+                    }
+                    
+                    // Clamp to valid range
+                    fragColor = vec4(clamp(blendedColor, 0.0, 1.0), color.a);
+                } else {
+                    // Below threshold, pass through unchanged
+                    fragColor = color;
+                }
+            }
+        `;
+
         const splatFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
@@ -284,21 +655,22 @@
                     // Measure existing velocity magnitude
                     float existingVelMag = length(base.xy);
                     
-                    // Exponential curve for smooth, gradual isolation increase
-                    // At 1.0: isolationStrength = 0 (full fluid motion)
-                    // At 2.0: isolationStrength ≈ 0.025 (very slight protection)
-                    // At 3.0: isolationStrength ≈ 0.15 (moderate protection)
-                    // At 4.0: isolationStrength ≈ 0.5 (strong protection)
-                    // At 5.0: isolationStrength = 1.0 (maximum protection)
+                    // Smoother isolation curve using pow(x, 1.5)
+                    // At 1.0: isolationStrength = 0.00 (full fluid motion)
+                    // At 1.5: isolationStrength ≈ 0.04 (very light protection)
+                    // At 2.0: isolationStrength ≈ 0.09 (light protection)
+                    // At 2.5: isolationStrength ≈ 0.17 (noticeable protection)
+                    // At 3.0: isolationStrength ≈ 0.28 (moderate protection)
+                    // At 4.0: isolationStrength ≈ 0.58 (strong protection)
+                    // At 5.0: isolationStrength = 1.00 (maximum protection)
                     float normalizedInfluence = clamp((velocityInfluence - 1.0) / 4.0, 0.0, 1.0);
-                    float isolationStrength = pow(normalizedInfluence, 2.5); // Exponential curve for gradual ramp-up
+                    float isolationStrength = pow(normalizedInfluence, 1.5);
                     
-                    // Gradual velocity-based falloff
-                    // Recent paints (low velocity) maintain motion longer
-                    // Older paints (high velocity) are protected more
-                    float velocityFactor = pow(existingVelMag, 2.0);
-                    float impactReduction = 1.0 - (velocityFactor * isolationStrength * 0.75);
-                    impactReduction = max(0.2, impactReduction); // Minimum 20% impact always allowed
+                    // Velocity-based falloff using smoothstep for natural gradient
+                    // Areas with existing motion are shielded proportional to their speed
+                    float velShield = smoothstep(0.0, 0.5, existingVelMag);
+                    float impactReduction = 1.0 - (velShield * isolationStrength * 0.85);
+                    impactReduction = max(0.15, impactReduction); // Minimum 15% impact always allowed
                     
                     fragColor = vec4(base + splat * impactReduction, 1.0);
                 } else {
@@ -377,17 +749,71 @@
             }
         `;
         
+        // Alternative turbulence shader for billowing clouds effect
+        const turbulenceFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR, vT, vB;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity;
+            uniform float time;
+            
+            // Simple noise function for turbulence
+            float hash(vec2 p) {
+                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+            }
+            
+            float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                
+                float a = hash(i);
+                float b = hash(i + vec2(1.0, 0.0));
+                float c = hash(i + vec2(0.0, 1.0));
+                float d = hash(i + vec2(1.0, 1.0));
+                
+                return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+            }
+            
+            void main() {
+                // Get velocity field
+                vec2 vel = texture(uVelocity, vUv).xy;
+                float velMag = length(vel);
+                
+                // Large-scale turbulence based on velocity
+                vec2 noiseCoord = vUv * 2.5 + vel * 0.3 + time * 0.02;
+                float n1 = noise(noiseCoord) * 2.0 - 1.0;
+                float n2 = noise(noiseCoord * 1.7 + vec2(5.2, 1.3)) * 2.0 - 1.0;
+                
+                // Create swirling turbulence
+                float turbulence = n1 * 0.7 + n2 * 0.3;
+                
+                // Scale by velocity magnitude for more dynamic effect
+                turbulence *= (0.5 + velMag * 2.0);
+                
+                fragColor = vec4(turbulence, 0.0, 0.0, 1.0);
+            }
+        `;
+        
         const vorticityFrag = `#version 300 es
             precision ${PRECISION} float;
-            in vec2 vUv, vT, vB;
+            in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uVelocity, uCurl;
             uniform float curl, dt;
             void main() {
+                float L = texture(uCurl, vL).x;
+                float R = texture(uCurl, vR).x;
                 float T = texture(uCurl, vT).x;
                 float B = texture(uCurl, vB).x;
                 float C = texture(uCurl, vUv).x;
-                vec2 force = vec2(abs(T) - abs(B), 0.0) * curl * C / (length(vec2(abs(T) - abs(B), 0.0)) + 0.00001);
+                // Full 2D gradient of |curl| (eta vector)
+                vec2 eta = vec2(abs(R) - abs(L), abs(T) - abs(B));
+                // Normalize with safety epsilon
+                eta = eta / (length(eta) + 0.00001);
+                // Vorticity confinement: force = curl_strength * (eta × omega)
+                // In 2D, cross(eta, omega_z) = vec2(eta.y, -eta.x) * omega_z
+                vec2 force = curl * vec2(eta.y, -eta.x) * C;
                 fragColor = vec4(texture(uVelocity, vUv).xy + force * dt, 0.0, 1.0);
             }
         `;
@@ -430,16 +856,38 @@
             void main() { fragColor = value * texture(uTexture, vUv); }
         `;
         
+        // Standalone obstacle damping — runs as a separate pass after normal physics
+        // so the existing shaders are completely untouched.
+        const obstacleDampFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity;
+            uniform sampler2D uObstacle;
+            void main() {
+                vec2 vel = texture(uVelocity, vUv).xy;
+                float obs = texture(uObstacle, vUv).r;
+                // Damp velocity inside obstacle regions: 0 = free, 1 = fully blocked
+                vel *= (1.0 - obs);
+                fragColor = vec4(vel, 0.0, 1.0);
+            }
+        `;
+        
         const displayProg = new Program(baseVert, displayFrag);
         const sharpenProg = new Program(baseVert, sharpenFrag);
+        const microDetailProg = new Program(baseVert, microDetailFrag);
+        const lightingProg = new Program(baseVert, lightingFrag);
+        const lightShiftProg = new Program(baseVert, lightShiftFrag);
         const splatProg = new Program(baseVert, splatFrag);
         const advectionProg = new Program(baseVert, advectionFrag);
         const divergenceProg = new Program(baseVert, divergenceFrag);
         const curlProg = new Program(baseVert, curlFrag);
+        const turbulenceProg = new Program(baseVert, turbulenceFrag);
         const vorticityProg = new Program(baseVert, vorticityFrag);
         const pressureProg = new Program(baseVert, pressureFrag);
         const gradientProg = new Program(baseVert, gradientFrag);
         const clearProg = new Program(baseVert, clearFrag);
+        const obstacleDampProg = new Program(baseVert, obstacleDampFrag);
         
         let dyeTexWidth, dyeTexHeight, simTexWidth, simTexHeight;
         
@@ -484,7 +932,7 @@
             };
         }
         
-        let density, velocity, divergence, curl, pressure, sharpened;
+        let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, lightShifted, obstacle;
         
         function initFramebuffers() {
             const displayW = gl.drawingBufferWidth;
@@ -495,7 +943,6 @@
             
             // Check WebGL texture size limits
             const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-            console.log('initFramebuffers called - DYE:', dyeBase, 'SIM:', simBase, 'Max Texture Size:', maxTextureSize);
             
             // Compute absolute internal sizes: long side = base, short side scaled by aspect
             if (displayW >= displayH) {
@@ -510,8 +957,6 @@
                 simTexWidth = Math.max(1, Math.min(Math.round(simBase * aspect), maxTextureSize));
             }
             
-            console.log('Actual texture sizes - Dye:', dyeTexWidth, 'x', dyeTexHeight, 'Sim:', simTexWidth, 'x', simTexHeight);
-            
             const texType = gl.HALF_FLOAT;
             const rgba = { internalFormat: gl.RGBA16F, format: gl.RGBA };
             const rg = { internalFormat: gl.RG16F, format: gl.RG };
@@ -523,15 +968,76 @@
             density = createDoubleFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Sharpness buffer at dye resolution
             sharpened = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
+            // Micro detail buffer at dye resolution
+            detailed = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
+            // Lighting buffer at dye resolution
+            lit = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
+            // Light shift buffer at dye resolution
+            lightShifted = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Physics buffers at simulation resolution
             velocity = createDoubleFBO(simTexWidth, simTexHeight, rg.internalFormat, rg.format, texType, filter);
             divergence = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             curl = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             pressure = createDoubleFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
+            // Obstacle texture for collision layers (single-channel, sim resolution)
+            obstacle = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.LINEAR);
         }
         
         initFramebuffers();
         exposeSimStats(); // Expose to window for stats panel
+        
+        // Obstacle texture upload for collision layers
+        // Cached buffers to avoid per-frame allocations (GPU crash prevention)
+        var _obsTempCanvas = null, _obsTempCtx = null;
+        var _obsFloatBuf = null;     // cached Float32Array
+        var _obsZeroBuf = null;      // cached zeros for clear
+        var _obsLastW = 0, _obsLastH = 0;
+        
+        function _obsEnsureBuffers(w, h) {
+            if (_obsLastW === w && _obsLastH === h && _obsTempCanvas) return;
+            _obsTempCanvas = document.createElement('canvas');
+            _obsTempCanvas.width = w;
+            _obsTempCanvas.height = h;
+            _obsTempCtx = _obsTempCanvas.getContext('2d', { willReadFrequently: true });
+            _obsFloatBuf = new Float32Array(w * h);
+            _obsZeroBuf = new Float32Array(w * h); // stays zeroed
+            _obsLastW = w;
+            _obsLastH = h;
+        }
+        
+        window.updateObstacleTexture = function (sourceCanvas) {
+            if (!obstacle || gl.isContextLost()) return;
+            try {
+                var w = obstacle.width;
+                var h = obstacle.height;
+                _obsEnsureBuffers(w, h);
+                _obsTempCtx.clearRect(0, 0, w, h);
+                _obsTempCtx.drawImage(sourceCanvas, 0, 0, w, h);
+                var imgData = _obsTempCtx.getImageData(0, 0, w, h);
+                var d = imgData.data;
+                var f = _obsFloatBuf;
+                for (var i = 0, n = w * h; i < n; i++) {
+                    f[i] = d[i * 4 + 3] * (1 / 255);
+                }
+                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RED, gl.FLOAT, f);
+            } catch (e) {
+                console.warn('⚠️ Obstacle texture upload failed:', e.message);
+            }
+        };
+        
+        window.clearObstacleTexture = function () {
+            if (!obstacle || gl.isContextLost()) return;
+            try {
+                var w = obstacle.width;
+                var h = obstacle.height;
+                _obsEnsureBuffers(w, h);
+                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RED, gl.FLOAT, _obsZeroBuf);
+            } catch (e) {
+                console.warn('⚠️ Obstacle texture clear failed:', e.message);
+            }
+        };
         
         // Also expose on resize
         window.needsFramebufferReinit = false;
@@ -560,31 +1066,171 @@
         let strokeStartTime = 0;
         let replayStartTime = 0;
         let replayIndex = 0;
+        // History of completed strokes for time-based replay
+        let strokeHistory = [];
+        let lastSplatTime = 0; // for brush refresh rate throttle
+        
+        // ─── Splat Envelope ───────────────────────────────────────────
+        // Controls how splats ramp in (on press) and fade out (on release).
+        // Modes: 'instant' (default), 'linear', 'easing'
+        let splatDownTime = 0;
+        let splatUpTime = 0;
+        let splatOutActive = false;
+        let splatOutX = 0, splatOutY = 0, splatOutDx = 0, splatOutDy = 0;
+        let splatOutColor = [1, 0, 0];
+        const SPLAT_IN_DURATION = 250;  // ms
+        const SPLAT_OUT_DURATION = 350; // ms
+        
+        window.splatInMode = window.splatInMode || 'instant';
+        window.splatOutMode = window.splatOutMode || 'instant';
+        
+        function smoothstep(t) {
+            return t * t * (3.0 - 2.0 * t);
+        }
+        
+        function getSplatInMult() {
+            if (window.splatInMode === 'instant') return 1.0;
+            const elapsed = Date.now() - splatDownTime;
+            const t = Math.min(elapsed / SPLAT_IN_DURATION, 1.0);
+            if (window.splatInMode === 'linear') return t;
+            return smoothstep(t); // easing
+        }
+        
+        function getSplatOutMult() {
+            if (window.splatOutMode === 'instant') return 0.0;
+            const elapsed = Date.now() - splatUpTime;
+            const t = Math.min(elapsed / SPLAT_OUT_DURATION, 1.0);
+            if (t >= 1.0) return 0.0;
+            const remaining = 1.0 - t;
+            if (window.splatOutMode === 'linear') return remaining;
+            return smoothstep(remaining); // easing
+        }
+        
+        function splatWithRadius(x, y, dx, dy, color, radius) {
+            const saved = config.SPLAT_RADIUS;
+            config.SPLAT_RADIUS = radius;
+            splat(x, y, dx, dy, color);
+            config.SPLAT_RADIUS = saved;
+        }
+
+        let strokeArchived = false;
+
+        function archiveCurrentStroke() {
+            if (strokeArchived || strokeEvents.length === 0) return;
+            strokeHistory.push({ events: strokeEvents.slice(), startTime: strokeStartTime, endTime: Date.now() });
+            strokeArchived = true;
+            // Cap history at 200 strokes to limit memory (oldest first)
+            while (strokeHistory.length > 200) {
+                strokeHistory.shift();
+            }
+        }
 
         function startStroke(x, y) {
+            archiveCurrentStroke();
             strokeEvents = [];
             strokeStartTime = Date.now();
+            strokeArchived = false;
         }
 
         function pushStrokeEvent(x, y, dx, dy, color) {
+            if (isReplayActive) return; // Don't record during replay
             const t = Date.now() - strokeStartTime;
             strokeEvents.push({ t, x, y, dx, dy, color: color.slice(), mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1), radius: config.SPLAT_RADIUS });
         }
 
-        // Called from mousemove path when drawing (stroke capture only)
-        function trackStrokeMove(e) {
-            // pointer state already updated
-            pushStrokeEvent(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+
+        function deepCopyEvent(ev) {
+            return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(), mult: ev.mult, radius: ev.radius };
+        }
+
+        function buildTimeReplayEvents() {
+            var period = (window.replayTimePeriod || 5) * 1000;
+
+            // Collect all strokes: history + current (if not yet archived)
+            var allStrokes = [];
+            for (var i = 0; i < strokeHistory.length; i++) {
+                allStrokes.push(strokeHistory[i].events);
+            }
+            if (!strokeArchived && strokeEvents.length > 0) {
+                allStrokes.push(strokeEvents);
+            }
+            if (allStrokes.length === 0) return [];
+
+            // Each stroke's duration is its last event's t value (ms since stroke start).
+            // Work backwards from the newest stroke, accumulating painting time
+            // until we fill the budget. Gaps between strokes are irrelevant.
+            var budget = period;
+            var startIdx = allStrokes.length; // will walk backwards
+            var startEventOffset = 0;        // partial-stroke trim point
+            for (var s = allStrokes.length - 1; s >= 0 && budget > 0; s--) {
+                var evs = allStrokes[s];
+                if (evs.length === 0) continue;
+                var dur = evs[evs.length - 1].t; // stroke painting duration
+                if (dur <= budget) {
+                    // Whole stroke fits
+                    budget -= dur;
+                    startIdx = s;
+                    startEventOffset = 0;
+                } else {
+                    // Partial fit — trim the beginning of this stroke
+                    var trimPoint = evs[evs.length - 1].t - budget;
+                    startIdx = s;
+                    startEventOffset = trimPoint;
+                    budget = 0;
+                }
+            }
+
+            // Stitch selected strokes back-to-back, collapsing all gaps
+            var allEvents = [];
+            var cursor = 0; // running playback time
+            for (var si = startIdx; si < allStrokes.length; si++) {
+                var evs2 = allStrokes[si];
+                for (var j = 0; j < evs2.length; j++) {
+                    var ev = evs2[j];
+                    // Skip events before the trim point in the first partial stroke
+                    if (si === startIdx && ev.t < startEventOffset) continue;
+                    var localT = ev.t - (si === startIdx ? startEventOffset : 0);
+                    allEvents.push({
+                        t: cursor + localT,
+                        x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy,
+                        color: ev.color.slice(), mult: ev.mult, radius: ev.radius
+                    });
+                }
+                // Advance cursor by this stroke's contributed duration
+                if (evs2.length > 0) {
+                    var strokeDur = evs2[evs2.length - 1].t - (si === startIdx ? startEventOffset : 0);
+                    cursor += strokeDur;
+                }
+            }
+            return allEvents;
         }
 
         function replayStroke(broadcast = true) {
-            if (!strokeEvents.length) { isReplayActive = false; return; }
+            var eventsToReplay;
+            if (!broadcast && window._activeReplayEvents && window._activeReplayEvents.length) {
+                // Looping — reuse the snapshot from the initial trigger
+                eventsToReplay = window._activeReplayEvents;
+            } else if (window.replayMode === 'time') {
+                eventsToReplay = buildTimeReplayEvents();
+            } else {
+                // Deep-copy so replay is fully isolated from source data
+                eventsToReplay = strokeEvents.map(deepCopyEvent);
+            }
+            if (!eventsToReplay || !eventsToReplay.length) {
+                // Fallback: try the most recent stroke from history
+                if (strokeHistory.length > 0) {
+                    eventsToReplay = strokeHistory[strokeHistory.length - 1].events.map(deepCopyEvent);
+                }
+            }
+            if (!eventsToReplay || !eventsToReplay.length) { isReplayActive = false; return; }
+            // Store the active replay events for processReplay
+            window._activeReplayEvents = eventsToReplay;
             replayIndex = 0;
             replayStartTime = Date.now();
             isReplayActive = true;
             // Broadcast full stroke to multiplayer
             if (broadcast && typeof broadcastReplayStroke === 'function') {
-                const norm = strokeEvents.map(ev => ({
+                const norm = eventsToReplay.map(ev => ({
                     t: ev.t,
                     x: ev.x / canvas.width,
                     y: ev.y / canvas.height,
@@ -598,74 +1244,99 @@
             }
         }
         
-        // FPS Cap dropdown
+        // FPS Cap dropdown (supports numeric values + 'native' for display-matched)
+        function applyFpsCap(val) {
+            if (val === 'native') {
+                // 0 = uncapped; the render loop will run at display Hz naturally
+                window.fpsCap = 0;
+                window.__fpsCapMode = 'native';
+            } else {
+                const num = parseInt(val, 10);
+                window.fpsCap = Number.isFinite(num) ? num : 60;
+                window.__fpsCapMode = 'fixed';
+            }
+        }
+        
         function initFpsCapControl() {
             const fpsCapSel = document.getElementById('fpsCap');
             if (!fpsCapSel) { setTimeout(initFpsCapControl, 100); return; }
-            let saved = 60; // Default to 60 FPS
+            
+            let savedVal = '60';
             try {
                 if (window.Settings && typeof window.Settings.loadSelect === 'function') {
-                    const sv = window.Settings.loadSelect('fpsCap', '60');
-                    const num = parseInt(sv, 10);
-                    if (Number.isFinite(num)) saved = num;
+                    savedVal = window.Settings.loadSelect('fpsCap', '60');
                 }
             } catch (_) {}
-            fpsCapSel.value = String(saved);
-            window.fpsCap = saved;
-            console.log(`🎯 FPS Cap initialized to: ${window.fpsCap}`);
-            console.log(`   Dropdown value: "${fpsCapSel.value}"`);
-            console.log(`   Available options:`, Array.from(fpsCapSel.options).map(o => o.value));
             
-            // Force reset cap logging so we see it again
-            window.__capLogged = false;
+            fpsCapSel.value = savedVal;
+            // If the saved value doesn't match any option, fall back to '60'
+            if (fpsCapSel.value !== savedVal) {
+                fpsCapSel.value = '60';
+                savedVal = '60';
+            }
+            applyFpsCap(savedVal);
             
             fpsCapSel.addEventListener('change', (e) => {
-                const v = parseInt(e.target.value, 10);
-                window.fpsCap = Number.isFinite(v) ? v : 0;
-                console.log(`🎯 FPS Cap changed to: ${window.fpsCap}`);
-                console.log(`   Dropdown now shows: "${e.target.value}"`);
-                
-                // Reset logging to see new cap in update loop
-                window.__capLogged = false;
+                const val = e.target.value;
+                applyFpsCap(val);
                 try {
                     if (window.Settings && typeof window.Settings.saveSelect === 'function') {
-                        window.Settings.saveSelect('fpsCap', String(window.fpsCap));
+                        window.Settings.saveSelect('fpsCap', val);
                     }
                 } catch (_) {}
             });
+            
+            // Update "Native" label once display Hz is detected
+            const nativeOpt = fpsCapSel.querySelector('option[value="native"]');
+            if (nativeOpt) {
+                const updateNativeLabel = setInterval(() => {
+                    if (window.__displayHz && window.__displayHz !== 60 || document.visibilityState === 'visible') {
+                        nativeOpt.textContent = 'Native (' + (window.__displayHz || 60) + ' Hz)';
+                    }
+                    // Stop polling after detection settles (after ~2s)
+                    if (typeof window.__displayHz === 'number' && performance.now() > 3000) {
+                        nativeOpt.textContent = 'Native (' + window.__displayHz + ' Hz)';
+                        clearInterval(updateNativeLabel);
+                    }
+                }, 1000);
+            }
         }
         initFpsCapControl();
 
         function processReplay() {
             if (!isReplayActive) return;
-            const elapsed = Date.now() - replayStartTime;
-            while (replayIndex < strokeEvents.length && strokeEvents[replayIndex].t <= elapsed) {
-                const ev = strokeEvents[replayIndex++];
-                if (typeof window.applyMultiSplatWith === 'function') {
-                    window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, ev.color, ev.mult, ev.radius);
-                } else {
-                    const prevM = animationMultiplier; const prevR = config.SPLAT_RADIUS;
-                    animationMultiplier = ev.mult; config.SPLAT_RADIUS = ev.radius;
+            var events = window._activeReplayEvents;
+            if (!events || !events.length) { isReplayActive = false; return; }
+            try {
+                const elapsed = Date.now() - replayStartTime;
+                while (replayIndex < events.length && events[replayIndex].t <= elapsed) {
+                    const ev = events[replayIndex++];
+                    // Use current live settings (brush size, multiplier) so changes
+                    // during replay are reflected immediately. Position, velocity,
+                    // timing and color come from the recording.
                     multiSplat(ev.x, ev.y, ev.dx, ev.dy, ev.color, false);
-                    animationMultiplier = prevM; config.SPLAT_RADIUS = prevR;
+                    if (typeof recRecordInteraction === 'function' && recEnabled) {
+                        try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}
+                    }
                 }
-                if (typeof recRecordInteraction === 'function' && recEnabled) {
-                    try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}
+                if (replayIndex >= events.length) {
+                    // If right button still held, loop replay without rebroadcast
+                    if (isRightMouseDown) {
+                        replayStroke(false);
+                    } else {
+                        isReplayActive = false;
+                        window._activeReplayEvents = null;
+                    }
                 }
-            }
-            if (replayIndex >= strokeEvents.length) {
-                // If right button still held, loop replay without rebroadcast
-                if (isRightMouseDown) {
-                    replayStroke(false);
-                } else {
-                    isReplayActive = false;
-                }
+            } catch (err) {
+                isReplayActive = false;
+                window._activeReplayEvents = null;
             }
         }
 
         // Allow multiplayer to schedule a stroke replay with normalized events
         window.scheduleStrokeReplay = function(normalizedEvents) {
-            strokeEvents = (normalizedEvents || []).map(ev => ({
+            var remoteEvents = (normalizedEvents || []).map(ev => ({
                 t: ev.t || 0,
                 x: (ev.x || 0) * canvas.width,
                 y: (ev.y || 0) * canvas.height,
@@ -675,12 +1346,15 @@
                 mult: Math.max(1, Math.round(ev.mult || 1)),
                 radius: (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS
             }));
-            replayStroke(false);
+            if (!remoteEvents.length) return;
+            window._activeReplayEvents = remoteEvents;
+            replayIndex = 0;
+            replayStartTime = Date.now();
+            isReplayActive = true;
         };
         
         canvas.addEventListener('mousedown', (e) => {
-            if (isPaused) return;
-            
+            // Right-click replay always works, even when paused
             if (e.button === 2) {
                 e.preventDefault();
                 isRightMouseDown = true;
@@ -688,6 +1362,8 @@
                 replayStroke(true);
                 return;
             }
+            // Only process left-clicks that actually target the canvas (not click-throughs from UI)
+            if (isPaused || e.target !== canvas) return;
             
             const coords = getCanvasCoordinates(e);
             pointer.down = true;
@@ -696,12 +1372,15 @@
             pointer.y = coords.y;
             pointer.dx = 0;
             pointer.dy = 0;
-            updateColor();
+            splatDownTime = Date.now();
+            splatOutActive = false;
+            applyPickerColor();
             // Begin stroke recording and include initial splat
             startStroke(pointer.x, pointer.y);
             pushStrokeEvent(pointer.x, pointer.y, 0, 0, pointer.color);
             if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
-            splat(pointer.x, pointer.y, 0, 0, pointer.color);
+            const inMult = getSplatInMult();
+            splatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
             if (typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
@@ -718,7 +1397,6 @@
         canvas.addEventListener('mousemove', (e) => {
             if (isPaused || isReplayActive) return;
             const coords = getCanvasCoordinates(e);
-            pointer.moved = pointer.down;
             pointer.dx = (coords.x - pointer.x) * 10.0;
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
@@ -729,7 +1407,16 @@
             }
 
             if (pointer.down) {
-                trackStrokeMove(e);
+                // Brush refresh rate throttle
+                var rate = window.brushRefreshRate || 0;
+                if (rate > 0) {
+                    var now = Date.now();
+                    if (now - lastSplatTime < rate) {
+                        return; // pointer.moved stays false → no splat in render loop
+                    }
+                    lastSplatTime = now;
+                }
+                pointer.moved = true;
                 if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
                 
                 if (typeof broadcastSplat === 'function') {
@@ -753,17 +1440,28 @@
             if (e.button === 2) {
                 isRightMouseDown = false;
                 isReplayActive = false;
+                window._activeReplayEvents = null;
                 customCursor.style.opacity = '0';
-                trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
             } else if (e.button === 0) {
-                if (pointer.down && typeof broadcastPointerUp === 'function') {
+                var wasDown = pointer.down;
+                if (wasDown && typeof broadcastPointerUp === 'function') {
                     broadcastPointerUp();
+                }
+                if (wasDown && window.splatOutMode !== 'instant') {
+                    splatUpTime = Date.now();
+                    splatOutActive = true;
+                    splatOutX = pointer.x;
+                    splatOutY = pointer.y;
+                    splatOutDx = pointer.dx;
+                    splatOutDy = pointer.dy;
+                    splatOutColor = pointer.color.slice();
                 }
                 pointer.down = false;
                 pointer.moved = false;
-                setTimeout(() => {
-                    trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
-                }, FADE_END);
+                if (wasDown) {
+                    archiveCurrentStroke();
+                    advanceColor();
+                }
             }
         });
         
@@ -782,9 +1480,12 @@
             pointer.y = coords.y;
             pointer.dx = 0;
             pointer.dy = 0;
-            updateColor();
+            splatDownTime = Date.now();
+            splatOutActive = false;
+            applyPickerColor();
             if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
-            splat(pointer.x, pointer.y, 0, 0, pointer.color);
+            const inMult = getSplatInMult();
+            splatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
             if (typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
@@ -803,12 +1504,19 @@
             if (isPaused) return;
             const touch = e.touches[0];
             const coords = getCanvasCoordinates(touch);
-            pointer.moved = pointer.down;
             pointer.dx = (coords.x - pointer.x) * 10.0;
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
             if (pointer.down) {
+                // Brush refresh rate throttle (same as mousemove)
+                var rate = window.brushRefreshRate || 0;
+                if (rate > 0) {
+                    var now = Date.now();
+                    if (now - lastSplatTime < rate) return;
+                    lastSplatTime = now;
+                }
+                pointer.moved = true;
                 if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
                 
                 if (typeof broadcastSplat === 'function') {
@@ -831,8 +1539,19 @@
         
         window.addEventListener('touchend', () => {
             if (pointer.down) {
+                if (window.splatOutMode !== 'instant') {
+                    splatUpTime = Date.now();
+                    splatOutActive = true;
+                    splatOutX = pointer.x;
+                    splatOutY = pointer.y;
+                    splatOutDx = pointer.dx;
+                    splatOutDy = pointer.dy;
+                    splatOutColor = pointer.color.slice();
+                }
                 pointer.down = false;
                 pointer.moved = false;
+                archiveCurrentStroke();
+                advanceColor();
                 if (typeof broadcastPointerUp === 'function') {
                     broadcastPointerUp();
                 }
@@ -848,6 +1567,46 @@
                 }
             }
         });
+        
+        // Turbulence mode toggle
+        window.useTurbulenceMode = false;
+        const turbulenceToggle = document.getElementById('turbulenceMode');
+        if (turbulenceToggle) {
+            turbulenceToggle.addEventListener('change', (e) => {
+                window.useTurbulenceMode = e.target.checked;
+            });
+        }
+        
+        // Micro Detail toggle
+        const microDetailToggle = document.getElementById('microDetailToggle');
+        const microDetailPanel = document.getElementById('microDetailPanel');
+        if (microDetailToggle) {
+            microDetailToggle.addEventListener('change', (e) => {
+                const on = e.target.checked;
+                if (microDetailPanel) microDetailPanel.style.display = on ? '' : 'none';
+                if (!on) {
+                    // Reset to zero when disabled
+                    config.CLARITY = 0;
+                    config.VIBRANCE = 0;
+                    ['clarity', 'vibrance'].forEach(id => {
+                        const sl = document.getElementById(id);
+                        if (sl) { sl.value = 0; sl.style.setProperty('--val', 0); }
+                        const sp = document.getElementById(id + 'Value');
+                        if (sp) sp.textContent = '0.00';
+                    });
+                } else {
+                    // Set sensible defaults on enable
+                    const defaults = { clarity: 0.35, vibrance: 0.25 };
+                    Object.entries(defaults).forEach(([id, val]) => {
+                        config[id.toUpperCase()] = val;
+                        const sl = document.getElementById(id);
+                        if (sl) { sl.value = val; sl.style.setProperty('--val', val); }
+                        const sp = document.getElementById(id + 'Value');
+                        if (sp) sp.textContent = val.toFixed(2);
+                    });
+                }
+            });
+        }
         
         // Background color picker
         const backgroundColorPicker = document.getElementById('backgroundColorPicker');
@@ -945,8 +1704,15 @@
         // Expose initial value
         window.animationMultiplier = animationMultiplier;
         
+        // Initialize all kaleidoscope variables with defaults
         window.kaleidoEnabled = false;
         window.kaleidoSegments = 6;
+        window.kaleidoMode = 1;  // Default to Wedge mode
+        window.kAngle = 0;
+        window.kTwist = 0;
+        window.kZoom = 1;
+        window.kBlend = 1;
+        window.kAnimateRot = false;
         const kaleidoToggleEl = document.getElementById('kaleidoToggle');
         const kaleidoSegmentsEl = document.getElementById('kaleidoSegments');
         const kaleidoValueEl = document.getElementById('kaleidoValue');
@@ -998,9 +1764,7 @@
         const kaleidoPanel = document.getElementById('kaleidoPanel');
         function syncKaleidoPanel() {
             if (kaleidoPanel) kaleidoPanel.classList.toggle('open', !!window.kaleidoEnabled);
-            if (window.kaleidoEnabled) {
-                setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 60);
-            }
+            // Note: Removed resize dispatch - it was clearing fluid data via initFramebuffers()
         }
         if (kaleidoToggleEl) {
             window.kaleidoEnabled = !!kaleidoToggleEl.checked;
@@ -1120,39 +1884,57 @@
             kAnimateRotEl.addEventListener('change', (e) => { window.kAnimateRot = e.target.checked; });
         }
         const kaleidoModeEl = document.getElementById('kaleidoMode');
-        const segmentsLabelEl = document.querySelector('#kaleidoPanel .control-group:first-child label');
         
         // Update segments label based on kaleidoscope mode
         function updateSegmentsLabel(mode) {
+            const segmentsLabelEl = document.querySelector('label[for="kaleidoSegments"]');
             if (!segmentsLabelEl) return;
             
+            const valueSpan = segmentsLabelEl.querySelector('.value-display');
+            const currentValue = valueSpan ? valueSpan.textContent : '';
+            
+            let labelText = 'Segments';
             switch(mode) {
                 case 0: // Off
-                    segmentsLabelEl.textContent = 'Segments';
+                    labelText = 'Segments';
                     break;
                 case 1: // Wedge
-                    segmentsLabelEl.textContent = 'Facets';
+                    labelText = 'Facets';
                     break;
                 case 2: // Mirror H
-                    segmentsLabelEl.textContent = 'Layers';
+                    labelText = 'Layers';
                     break;
                 case 3: // Mirror V
-                    segmentsLabelEl.textContent = 'Layers';
+                    labelText = 'Layers';
                     break;
                 case 4: // Mirror Quad
-                    segmentsLabelEl.textContent = 'Reflections';
+                    labelText = 'Reflections';
                     break;
                 case 5: // Spiral
-                    segmentsLabelEl.textContent = 'Rings';
+                    labelText = 'Rings';
                     break;
                 default:
-                    segmentsLabelEl.textContent = 'Segments';
+                    labelText = 'Segments';
+            }
+            
+            // Update only the text node before the value span (preserve the live span element)
+            if (valueSpan) {
+                // Find or create the text node before the span
+                const textNode = segmentsLabelEl.firstChild;
+                if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                    textNode.textContent = labelText + ' ';
+                } else {
+                    segmentsLabelEl.insertBefore(document.createTextNode(labelText + ' '), valueSpan);
+                }
+            } else {
+                segmentsLabelEl.textContent = labelText;
             }
         }
         
         if (kaleidoModeEl) {
             window.kaleidoMode = parseInt(kaleidoModeEl.value || '1', 10);
-            updateSegmentsLabel(window.kaleidoMode);
+            // Delay label update to ensure DOM is ready
+            setTimeout(() => updateSegmentsLabel(window.kaleidoMode), 0);
             kaleidoModeEl.addEventListener('change', (e) => {
                 const mode = parseInt(e.target.value, 10);
                 window.kaleidoMode = mode;
@@ -1208,15 +1990,7 @@
             }
         };
         
-        const trailToggle = document.getElementById('trailToggle');
         const cursorToggle = document.getElementById('cursorToggle');
-        
-        trailToggle.addEventListener('change', (e) => {
-            showTrail = e.target.checked;
-            if (!showTrail) {
-                trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
-            }
-        });
         
         cursorToggle.addEventListener('change', (e) => {
             showCursor = e.target.checked;
@@ -1229,7 +2003,6 @@
                 document.getElementById('canvas-area'),
                 document.getElementById('canvas-wrapper'),
                 document.getElementById('canvas'),
-                document.getElementById('trailCanvas'),
                 document.getElementById('canvas-size-display'),
                 document.getElementById('layers-container'),
                 ...document.querySelectorAll('.background-layer'),
@@ -1262,7 +2035,7 @@
                 if (rnd) rnd.checked = false;
                 const stepEl = document.getElementById('stepPalette');
                 if (stepEl) stepEl.checked = false;
-                updateColor();
+                applyPickerColor();
                 updatePaletteStepIndicator();
             });
         }
@@ -1272,6 +2045,7 @@
                 if (e.target.checked) {
                     const stepEl = document.getElementById('stepPalette');
                     if (stepEl) stepEl.checked = false;
+                    advanceColor();
                 }
                 updatePaletteStepIndicator();
             });
@@ -1282,6 +2056,7 @@
                 if (e.target.checked) {
                     const rnd = document.getElementById('randomColor');
                     if (rnd) rnd.checked = false;
+                    advanceColor();
                 }
                 updatePaletteStepIndicator();
             });
@@ -1310,7 +2085,30 @@
             return [r + m, g + m, b + m];
         }
         
-        function updateColor() {
+        function rgbToHex(r, g, b) {
+            var hr = Math.round(r * 255).toString(16).padStart(2, '0');
+            var hg = Math.round(g * 255).toString(16).padStart(2, '0');
+            var hb = Math.round(b * 255).toString(16).padStart(2, '0');
+            return '#' + hr + hg + hb;
+        }
+
+        function syncPickerIndicator(r, g, b) {
+            var cp = document.getElementById('colorPicker');
+            if (cp) cp.value = rgbToHex(r, g, b);
+        }
+
+        // Read whatever the picker currently shows into pointer.color
+        function applyPickerColor() {
+            const hex = document.getElementById('colorPicker').value;
+            const r = parseInt(hex.slice(1, 3), 16) / 255;
+            const g = parseInt(hex.slice(3, 5), 16) / 255;
+            const b = parseInt(hex.slice(5, 7), 16) / 255;
+            pointer.color = [r, g, b];
+        }
+
+        // Advance step/random to the NEXT color and sync the picker
+        // (called on mouseup so the picker shows what's coming next)
+        function advanceColor() {
             const stepEl = document.getElementById('stepPalette');
             const rndEl = document.getElementById('randomColor');
             if (stepEl && stepEl.checked) {
@@ -1321,10 +2119,11 @@
                     const col = list[idx];
                     paletteStepIndex = (paletteStepIndex + 1) % len;
                     if (col) {
-                        const r = parseInt(col.slice(1, 3), 16) / 255;
-                        const g = parseInt(col.slice(3, 5), 16) / 255;
-                        const b = parseInt(col.slice(5, 7), 16) / 255;
-                        pointer.color = [r, g, b];
+                        syncPickerIndicator(
+                            parseInt(col.slice(1, 3), 16) / 255,
+                            parseInt(col.slice(3, 5), 16) / 255,
+                            parseInt(col.slice(5, 7), 16) / 255
+                        );
                     }
                     if (typeof updatePaletteStepIndicator === 'function') {
                         updatePaletteStepIndicator();
@@ -1333,32 +2132,20 @@
                 }
             }
             if (rndEl && rndEl.checked) {
-                pointer.color = generateVibrantColor();
+                var c = generateVibrantColor();
+                syncPickerIndicator(c[0], c[1], c[2]);
                 return;
             }
-            const hex = document.getElementById('colorPicker').value;
-            const r = parseInt(hex.slice(1, 3), 16) / 255;
-            const g = parseInt(hex.slice(3, 5), 16) / 255;
-            const b = parseInt(hex.slice(5, 7), 16) / 255;
-            pointer.color = [r, g, b];
+        }
+
+        // Legacy wrapper — reads picker then advances (used by non-pointer callers)
+        function updateColor() {
+            applyPickerColor();
+            advanceColor();
         }
         
         // Expose globally for other scripts
         window.generateVibrantColor = generateVibrantColor;
-        
-        // FORCE RESET pressure iterations to 20 (clear bad saved value)
-        config.PRESSURE_ITERATIONS = 20;
-        if (window.Settings && typeof window.Settings.saveSlider === 'function') {
-            window.Settings.saveSlider('pressureIteration', 20);
-        }
-        const pressIterSlider = document.getElementById('pressureIteration');
-        if (pressIterSlider) {
-            pressIterSlider.value = 20;
-            pressIterSlider.style.setProperty('--val', 20);
-            const iterValueEl = document.getElementById('iterationValue');
-            if (iterValueEl) iterValueEl.textContent = '20';
-            console.log(' FORCED pressure iterations to 20 (was saved as 95)');
-        }
         
         const sliderConfig = {
             densityDissipation: { key: 'DENSITY_DISSIPATION', decimals: 4 },
@@ -1367,7 +2154,9 @@
             pressureIteration: { key: 'PRESSURE_ITERATIONS', decimals: 0 },
             velocityInfluence: { key: 'VELOCITY_INFLUENCE', decimals: 3 },
             curl: { key: 'CURL', decimals: 0 },
-            sharpness: { key: 'SHARPNESS', decimals: 1 }
+            sharpness: { key: 'SHARPNESS', decimals: 1 },
+            clarity: { key: 'CLARITY', decimals: 2 },
+            vibrance: { key: 'VIBRANCE', decimals: 2 }
         };
         
         const brushSizeSlider = document.getElementById('brushSize');
@@ -1451,7 +2240,6 @@
                 visualResCustom.addEventListener('input', (e) => {
                     const v = parseInt(e.target.value, 10);
                     if (isFinite(v) && v >= 64) {
-                        console.log('Setting DYE_RESOLUTION to:', v);
                         config.DYE_RESOLUTION = v;
                         window.needsFramebufferReinit = true;
                         // Save to session storage
@@ -1500,7 +2288,6 @@
                 physicsResCustom.addEventListener('input', (e) => {
                     const v = parseInt(e.target.value, 10);
                     if (isFinite(v) && v >= 16) {
-                        console.log('Setting SIM_RESOLUTION to:', v);
                         config.SIM_RESOLUTION = v;
                         window.needsFramebufferReinit = true;
                         // Save to session storage
@@ -1518,23 +2305,26 @@
             
             if (e.ctrlKey && e.shiftKey) {
                 // Ctrl+Shift+Scroll: Adjust Motion Isolation (Velocity Influence)
+                // Uses eased acceleration: faster scroll = bigger jumps
                 const velSlider = document.getElementById('velocityInfluence');
                 const velValueSpan = document.getElementById('velocityInfluenceValue');
                 if (velSlider) {
                     let currentValue = parseFloat(velSlider.value);
                     const minValue = parseFloat(velSlider.min);
                     const maxValue = parseFloat(velSlider.max);
-                    const stepSize = parseFloat(velSlider.step) || 0.5;
+                    const range = maxValue - minValue;
+                    
+                    // Eased step: base 0.1 + acceleration from scroll speed
+                    // deltaY is typically 100-150 for normal scroll, higher for fast scroll
+                    const scrollMagnitude = Math.min(Math.abs(e.deltaY) / 100, 3); // Cap at 3x
+                    const easedStep = 0.1 + (scrollMagnitude - 1) * 0.15; // 0.1 to 0.4 range
+                    const stepSize = easedStep * (range / 4); // Scale to slider range
                     
                     let newValue;
                     if (e.deltaY < 0) {
-                        // Scrolling up - increase motion isolation influence
-                        newValue = currentValue + stepSize;
-                        if (newValue > maxValue) newValue = maxValue;
+                        newValue = Math.min(currentValue + stepSize, maxValue);
                     } else {
-                        // Scrolling down - decrease motion isolation influence
-                        newValue = currentValue - stepSize;
-                        if (newValue < minValue) newValue = minValue;
+                        newValue = Math.max(currentValue - stepSize, minValue);
                     }
                     
                     // Update slider and config
@@ -1639,23 +2429,26 @@
                     wipeSimulation();
                 }
             } else {
-                // Normal scroll: Adjust brush size
+                // Normal scroll: Adjust brush size with smooth proportional steps
                 const brushSizeSlider = document.getElementById('brushSize');
                 const currentValue = parseFloat(brushSizeSlider.value);
                 const minValue = parseFloat(brushSizeSlider.min);
                 const maxValue = parseFloat(brushSizeSlider.max);
-                const stepSize = 0.5;
+                
+                // Proportional step: ~8% of current value, clamped to [0.1, 2.0]
+                // Gives fine control at small sizes, snappier at large sizes
+                const scrollSpeed = Math.min(Math.abs(e.deltaY) / 100, 2); // 1–2× from scroll velocity
+                const stepSize = Math.max(0.1, Math.min(currentValue * 0.08 * scrollSpeed, 2.0));
                 
                 let newValue;
                 if (e.deltaY < 0) {
-                    // Scrolling up - increase brush size
-                    newValue = currentValue + stepSize;
-                    if (newValue > maxValue) newValue = maxValue;
+                    newValue = Math.min(currentValue + stepSize, maxValue);
                 } else {
-                    // Scrolling down - decrease brush size
-                    newValue = currentValue - stepSize;
-                    if (newValue < minValue) newValue = minValue;
+                    newValue = Math.max(currentValue - stepSize, minValue);
                 }
+                
+                // Round to one decimal for clean slider display
+                newValue = Math.round(newValue * 10) / 10;
                 
                 brushSizeSlider.value = newValue;
                 brushSizeSlider.style.setProperty('--val', newValue);
@@ -1670,8 +2463,21 @@
         
         Object.entries(sliderConfig).forEach(([id, cfg]) => {
             const slider = document.getElementById(id);
-            const valueSpanId = id === 'pressureIteration' ? 'iterationValue' : 
-                                id.replace('Dissipation', '') + 'Value';
+            if (!slider) return; // Skip if slider doesn't exist
+            
+            // Map slider IDs to their value span IDs
+            const valueSpanMap = {
+                'densityDissipation': 'densityValue',
+                'velocityDissipation': 'velocityValue',
+                'pressureDissipation': 'pressureValue',
+                'pressureIteration': 'iterationValue',
+                'velocityInfluence': 'velocityInfluenceValue',
+                'curl': 'curlValue',
+                'sharpness': 'sharpnessValue',
+                'clarity': 'clarityValue',
+                'vibrance': 'vibranceValue'
+            };
+            const valueSpanId = valueSpanMap[id] || (id + 'Value');
             const valueSpan = document.getElementById(valueSpanId);
             
             slider.addEventListener('input', (e) => {
@@ -1722,7 +2528,9 @@
                 }
                 
                 config[cfg.key] = cfg.decimals === 0 ? parseInt(val) : val;
-                valueSpan.textContent = cfg.decimals === 0 ? val : val.toFixed(cfg.decimals);
+                if (valueSpan) {
+                    valueSpan.textContent = cfg.decimals === 0 ? val : val.toFixed(cfg.decimals);
+                }
                 
                 // Auto-wipe simulation when density sustain gets very low
                 if (id === 'densityDissipation' && val < 0.88) {
@@ -1914,69 +2722,99 @@
         
         let lastTime = performance.now();
         let lastDrawTimeMs = 0;
-        let fpsTimes = [];
+        
+        // ─── FPS Ring Buffer (zero-GC) ────────────────────────────────
+        const FPS_RING_SIZE = 360;
+        const fpsRing = new Float64Array(FPS_RING_SIZE);
+        let fpsRingHead = 0;
+        let fpsRingCount = 0;
+        
+        function pushFrameTimestamp(ms) {
+            fpsRing[fpsRingHead] = ms;
+            fpsRingHead = (fpsRingHead + 1) % FPS_RING_SIZE;
+            if (fpsRingCount < FPS_RING_SIZE) fpsRingCount++;
+        }
+        
+        function countRecentFrames(nowMs) {
+            const cutoff = nowMs - 1000;
+            let count = 0;
+            for (let i = 0; i < fpsRingCount; i++) {
+                const idx = (fpsRingHead - 1 - i + FPS_RING_SIZE) % FPS_RING_SIZE;
+                if (fpsRing[idx] >= cutoff) count++;
+                else break;
+            }
+            return count;
+        }
+        
+        function getLastFrameTime() {
+            if (fpsRingCount < 2) return 0;
+            const curr = (fpsRingHead - 1 + FPS_RING_SIZE) % FPS_RING_SIZE;
+            const prev = (fpsRingHead - 2 + FPS_RING_SIZE) % FPS_RING_SIZE;
+            return fpsRing[curr] - fpsRing[prev];
+        }
+        
+        // ─── Display Refresh Rate Detection ───────────────────────────
+        // Uses its own timestamp (lastRafMs) to measure raw rAF intervals,
+        // independent of FPS cap (which may skip rendered frames).
+        const rafSamples = [];
+        let lastRafMs = 0;
+        let displayHz = 60;
+        let displayHzDetected = false;
+        window.__displayHz = 60;
+        
+        function detectDisplayHz(nowMs) {
+            if (displayHzDetected) return;
+            if (lastRafMs > 0) {
+                const dt = nowMs - lastRafMs;
+                // Only accept plausible rAF intervals (1-50ms = 20-1000Hz)
+                if (dt > 1 && dt < 50) {
+                    rafSamples.push(dt);
+                }
+            }
+            lastRafMs = nowMs;
+            if (rafSamples.length >= 20) {
+                displayHzDetected = true;
+                const sorted = rafSamples.slice().sort((a, b) => a - b);
+                const median = sorted[Math.floor(sorted.length / 2)];
+                const raw = Math.round(1000 / median);
+                const standards = [30, 48, 60, 72, 75, 90, 100, 120, 144, 165, 180, 200, 240, 360];
+                let closest = 60, minDiff = Infinity;
+                for (let i = 0; i < standards.length; i++) {
+                    const d = Math.abs(raw - standards[i]);
+                    if (d < minDiff) { minDiff = d; closest = standards[i]; }
+                }
+                displayHz = closest;
+                window.__displayHz = closest;
+            }
+        }
+        
         // DEFAULT to 60 FPS, not uncapped!
         window.fpsCap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 60;
-        window.__stats = window.__stats || {}; // { fps, frametime, lastCpuMs }
-        // REMOVED: Adaptive quality control - was interfering with FPS display
-        
-        let perfLog = { advection: 0, divergence: 0, pressure: 0, gradient: 0, curl: 0, vorticity: 0, display: 0, total: 0, count: 0 };
+        window.__stats = { fps: 0, frametime: 0, lastCpuMs: 0, targetFps: 60, displayHz: 60, budgetPct: 0 };
         
         function update() {
-            const frameStart = performance.now();
-            const cpuStart = performance.now();
             const nowMs = performance.now();
+            const cpuStart = nowMs;
             
-            // FPS Cap: Skip frame if not enough time has passed
+            // Detect display refresh rate from first ~20 frames
+            detectDisplayHz(nowMs);
+            
+            // FPS Cap: skip frame if interval hasn't elapsed (with epsilon tolerance)
             const cap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 0;
-            
-            // Debug: Log cap value once
-            if (!window.__capLogged) {
-                console.log(`🎯 Active FPS Cap: ${cap === 0 ? 'Uncapped' : cap}`);
-                console.log(`   window.fpsCap = ${window.fpsCap}`);
-                console.log(`   Cap from variable: ${cap}`);
-                console.log(`   Type check: ${typeof window.fpsCap}`);
-                console.log(`🖥️ Hardware: ${navigator.hardwareConcurrency || '?'} cores`);
-                console.log(`📊 Display refresh: ${window.screen?.refreshRate || 'unknown'} Hz`);
-                console.log(`🔧 Pressure iterations will be forced to 20`);
-                window.__capLogged = true;
-            }
-            
-            // Every 300 frames, log if frames are being skipped
-            if (!window.__skipLog) window.__skipLog = 0;
-            window.__skipLog++;
-            if (window.__skipLog === 300) {
-                console.log(`⏭️ FPS Cap Status: cap=${cap}, fpsCap=${window.fpsCap}, skipping frames: ${cap > 0 ? 'YES' : 'NO'}`);
-                window.__skipLog = 0;
-            }
-            
-            // FPS Cap: Skip frame if not enough time has passed
             if (cap > 0) {
                 const desiredMs = 1000 / cap;
-                const since = nowMs - lastDrawTimeMs;
-                if (since < desiredMs) {
+                if (nowMs - lastDrawTimeMs < desiredMs - 0.5) {
                     requestAnimationFrame(update);
-                    return; // Skip this frame
+                    return;
                 }
-            }
-            
-            // Frame is running - update timestamp immediately
-            lastDrawTimeMs = nowMs;
-            
-            // Log ONLY rendered frames (after cap check)
-            if (!window.__frameLog) window.__frameLog = { times: [], count: 0 };
-            window.__frameLog.times.push(nowMs);
-            window.__frameLog.count++;
-            if (window.__frameLog.count >= 60) {
-                const times = window.__frameLog.times;
-                const deltas = [];
-                for (let i = 1; i < times.length; i++) {
-                    deltas.push(times[i] - times[i-1]);
+                // Drift-aligned advance: step by interval instead of snapping to now
+                lastDrawTimeMs += desiredMs;
+                // If we fell too far behind (tab hidden, etc.), snap to now
+                if (nowMs - lastDrawTimeMs > desiredMs) {
+                    lastDrawTimeMs = nowMs;
                 }
-                const avgDelta = deltas.reduce((a,b) => a+b, 0) / deltas.length;
-                const actualFPS = 1000 / avgDelta;
-                console.log(`✅ RENDERED frame time: ${avgDelta.toFixed(2)}ms = ${actualFPS.toFixed(1)} FPS (cap=${cap})`);
-                window.__frameLog = { times: [], count: 0 };
+            } else {
+                lastDrawTimeMs = nowMs;
             }
             
             // Physics timestep: Cap at 16ms to prevent instability at low FPS
@@ -1993,25 +2831,43 @@
             if (canvas.width !== targetWidth || canvas.height !== targetHeight || window.needsFramebufferReinit) {
                 canvas.width = targetWidth;
                 canvas.height = targetHeight;
-                trailCanvas.width = targetWidth;
-                trailCanvas.height = targetHeight;
                 initFramebuffers();
                 exposeSimStats(); // Update stats after resize
                 window.needsFramebufferReinit = false;
             }
             
+            // Process replay even when paused so right-click replay always works
+            processReplay();
+            
             if (!isPaused) {
                 if (pointer.moved) {
+                    const inMult = getSplatInMult();
+                    const savedR = config.SPLAT_RADIUS;
+                    config.SPLAT_RADIUS = savedR * inMult;
                     multiSplat(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color, false);
+                    config.SPLAT_RADIUS = savedR;
+                    pushStrokeEvent(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
                     pointer.moved = false;
                 }
                 
-                // Process right-click replay events before recording and physics
-                processReplay();
+                // Splat-out: continue splatting with decaying radius after release
+                if (splatOutActive) {
+                    const outMult = getSplatOutMult();
+                    if (outMult <= 0.001) {
+                        splatOutActive = false;
+                    } else {
+                        splatWithRadius(splatOutX, splatOutY, splatOutDx * 0.9, splatOutDy * 0.9, splatOutColor, config.SPLAT_RADIUS * outMult);
+                        splatOutDx *= 0.9;
+                        splatOutDy *= 0.9;
+                    }
+                }
                 
                 if (recEnabled) {
                     recUpdatePlayback();
                 }
+                
+                // Disable blend for physics passes (pure overwrite, no alpha needed)
+                gl.disable(gl.BLEND);
                 
                 advectionProg.bind();
                 // Velocity advection at physics resolution
@@ -2041,10 +2897,17 @@
                 blit(density.write.fbo);
                 density.swap();
                 
-                curlProg.bind();
+                // Use turbulence or curl based on toggle
+                const useTurbulence = window.useTurbulenceMode || false;
+                const curlProgram = useTurbulence ? turbulenceProg : curlProg;
+                
+                curlProgram.bind();
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
-                gl.uniform2f(curlProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
-                gl.uniform1i(curlProg.uniforms.uVelocity, 0);
+                gl.uniform2f(curlProgram.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform1i(curlProgram.uniforms.uVelocity, 0);
+                if (useTurbulence) {
+                    gl.uniform1f(curlProgram.uniforms.time, performance.now() * 0.001);
+                }
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(curl.fbo);
@@ -2081,23 +2944,12 @@
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, divergence.texture);
                 
-                const pressureStart = performance.now();
                 for (let i = 0; i < config.PRESSURE_ITERATIONS; i++) {
                     gl.uniform1i(pressureProg.uniforms.uPressure, 1);
                     gl.activeTexture(gl.TEXTURE1);
                     gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
                     blit(pressure.write.fbo);
                     pressure.swap();
-                }
-                const pressureTime = performance.now() - pressureStart;
-                
-                // Log performance every 60 frames
-                perfLog.pressure += pressureTime;
-                perfLog.count++;
-                if (perfLog.count >= 60) {
-                    console.log(`⚡ Pressure solver: ${(perfLog.pressure / perfLog.count).toFixed(2)}ms avg (${config.PRESSURE_ITERATIONS} iterations)`);
-                    perfLog.pressure = 0;
-                    perfLog.count = 0;
                 }
                 
                 gradientProg.bind();
@@ -2110,6 +2962,23 @@
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(velocity.write.fbo);
                 velocity.swap();
+                
+                // Obstacle damping pass — runs only when collision layers are active.
+                // Completely separate from the core physics shaders.
+                if (window.collisionLayers && window.collisionLayers.enabled && obstacle) {
+                    obstacleDampProg.bind();
+                    gl.uniform1i(obstacleDampProg.uniforms.uVelocity, 0);
+                    gl.uniform1i(obstacleDampProg.uniforms.uObstacle, 1);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    blit(velocity.write.fbo);
+                    velocity.swap();
+                }
+                
+                // Re-enable blend for post-processing and display passes
+                gl.enable(gl.BLEND);
             }
             
             // Apply sharpness pass if enabled (config.SHARPNESS > 0)
@@ -2129,6 +2998,88 @@
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(sharpened.fbo);
                 displayTexture = sharpened.texture;
+            }
+            
+            // Apply micro detail pass if clarity or vibrance is active
+            const mdClarity = config.CLARITY || 0;
+            const mdVibrance = config.VIBRANCE || 0;
+            const microDetailEnabled = mdClarity > 0 || mdVibrance > 0;
+            
+            if (microDetailEnabled) {
+                gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                microDetailProg.bind();
+                gl.uniform1i(microDetailProg.uniforms.uTexture, 0);
+                gl.uniform1i(microDetailProg.uniforms.uVelocity, 1);
+                gl.uniform2f(microDetailProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
+                gl.uniform1f(microDetailProg.uniforms.clarity, mdClarity);
+                gl.uniform1f(microDetailProg.uniforms.vibrance, mdVibrance);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, displayTexture);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                blit(detailed.fbo);
+                displayTexture = detailed.texture;
+            }
+            
+            // Apply lighting pass if enabled
+            const lightingEnabled = window.lightSource && window.lightSource.enabled;
+            if (lightingEnabled) {
+                gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                lightingProg.bind();
+                gl.uniform1i(lightingProg.uniforms.uTexture, 0);
+                gl.uniform1i(lightingProg.uniforms.uVelocity, 1);
+                gl.uniform2f(lightingProg.uniforms.lightPos, 
+                    window.lightSource.x || 0.5, 
+                    1.0 - (window.lightSource.y || 0.5)); // Flip Y for GL coords
+                gl.uniform1f(lightingProg.uniforms.intensity, window.lightSource.intensity || 0.5);
+                gl.uniform1f(lightingProg.uniforms.ambient, window.lightSource.ambient || 0.3);
+                gl.uniform2f(lightingProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
+                
+                // Light Shift uniforms
+                const lightShiftEnabled = window.lightShift && window.lightShift.enabled && window.lightShift.colorPath.length > 0;
+                gl.uniform1i(lightingProg.uniforms.lightShiftEnabled, lightShiftEnabled ? 1 : 0);
+                if (lightShiftEnabled) {
+                    const shiftColor = window.lightShift.getCurrentColor();
+                    gl.uniform3f(lightingProg.uniforms.lightShiftColor, shiftColor.r, shiftColor.g, shiftColor.b);
+                    gl.uniform1f(lightingProg.uniforms.lightShiftThreshold, window.lightShift.threshold || 0.85);
+                    gl.uniform1f(lightingProg.uniforms.lightShiftIntensity, window.lightShift.intensity || 0.5);
+                    
+                    // Blend mode: convert string to int
+                    const modeMap = { 'replace': 0, 'tint': 1, 'overlay': 2, 'multiply': 3, 'screen': 4, 'add': 5 };
+                    const modeInt = modeMap[window.lightShift.mode] || 0;
+                    gl.uniform1i(lightingProg.uniforms.lightShiftMode, modeInt);
+                }
+                
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, displayTexture);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                blit(lit.fbo);
+                displayTexture = lit.texture;
+            }
+            // If light shift is enabled but lighting is NOT, apply standalone light shift
+            else {
+                const lightShiftEnabled = window.lightShift && window.lightShift.enabled && window.lightShift.colorPath.length > 0;
+                if (lightShiftEnabled) {
+                    gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                    lightShiftProg.bind();
+                    gl.uniform1i(lightShiftProg.uniforms.uTexture, 0);
+                    
+                    const shiftColor = window.lightShift.getCurrentColor();
+                    gl.uniform3f(lightShiftProg.uniforms.lightShiftColor, shiftColor.r, shiftColor.g, shiftColor.b);
+                    gl.uniform1f(lightShiftProg.uniforms.lightShiftThreshold, window.lightShift.threshold || 0.85);
+                    gl.uniform1f(lightShiftProg.uniforms.lightShiftIntensity, window.lightShift.intensity || 0.5);
+                    
+                    // Blend mode: convert string to int
+                    const modeMap = { 'replace': 0, 'tint': 1, 'overlay': 2, 'multiply': 3, 'screen': 4, 'add': 5 };
+                    const modeInt = modeMap[window.lightShift.mode] || 0;
+                    gl.uniform1i(lightShiftProg.uniforms.lightShiftMode, modeInt);
+                    
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, displayTexture);
+                    blit(lightShifted.fbo);
+                    displayTexture = lightShifted.texture;
+                }
             }
             
             gl.viewport(0, 0, canvas.width, canvas.height);
@@ -2153,38 +3104,22 @@
             gl.bindTexture(gl.TEXTURE_2D, displayTexture);
             blit(null);
             
-            // Draw occurred: update stats based on actual render cadence
-            // (lastDrawTimeMs already set at start of update() for FPS cap)
-            fpsTimes.push(lastDrawTimeMs);
-            const oneSecondAgo = lastDrawTimeMs - 1000;
-            fpsTimes = fpsTimes.filter(t => t > oneSecondAgo);
-            const fpsVal = fpsTimes.length;
-            let frametimeMs = 0;
-            if (fpsTimes.length >= 2) {
-                frametimeMs = fpsTimes[fpsTimes.length - 1] - fpsTimes[fpsTimes.length - 2];
-            }
+            // ─── Stats update (ring buffer, zero-GC) ──────────────────
+            pushFrameTimestamp(nowMs);
+            const fpsVal = countRecentFrames(nowMs);
+            const frametimeMs = getLastFrameTime();
             const cpuMs = performance.now() - cpuStart;
-            window.__stats = { fps: fpsVal, frametime: frametimeMs, lastCpuMs: cpuMs };
-            
-            // DIAGNOSTIC: Log every 120 frames to compare
-            if (!window.__statsLogCount) window.__statsLogCount = 0;
-            window.__statsLogCount++;
-            if (window.__statsLogCount === 120) {
-                const now = performance.now();
-                const actualMs = window.__frameLog?.times?.length >= 2 
-                    ? (window.__frameLog.times[window.__frameLog.times.length - 1] - window.__frameLog.times[0]) / window.__frameLog.times.length
-                    : 0;
-                const actualFPS = actualMs > 0 ? 1000 / actualMs : 0;
-                
-                console.log(`📊 FPS MISMATCH DIAGNOSTIC:`);
-                console.log(`   ✅ RENDERED frames (from frame log): ${actualFPS.toFixed(1)} FPS`);
-                console.log(`   ❌ window.__stats.fps (title bar uses): ${fpsVal} FPS`);
-                console.log(`   📋 fpsTimes array length: ${fpsTimes.length}`);
-                console.log(`   📋 fpsTimes oldest: ${fpsTimes[0]}, newest: ${fpsTimes[fpsTimes.length-1]}`);
-                console.log(`   📋 Time range: ${(fpsTimes[fpsTimes.length-1] - fpsTimes[0]).toFixed(2)}ms`);
-                console.log(`   🎯 Expected FPS from cap: ${cap || 'uncapped'}`);
-                window.__statsLogCount = 0;
-            }
+            const targetFps = cap > 0 ? cap : displayHz;
+            const budgetMs = 1000 / targetFps;
+            const budgetPct = Math.min((cpuMs / budgetMs) * 100, 999);
+            window.__stats = {
+                fps: fpsVal,
+                frametime: frametimeMs,
+                lastCpuMs: cpuMs,
+                targetFps: cap > 0 ? cap : 0,
+                displayHz: displayHz,
+                budgetPct: budgetPct
+            };
 
             requestAnimationFrame(update);
         }
@@ -2270,7 +3205,7 @@
                             </div>
                         </div>
                         ${hasMask ? `
-                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
+                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
                             <button class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">✏️ Edit Mask</button>
                             <button class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">🗑️ Clear</button>
                             <span style="font-size:11px; opacity:0.7;">${layer.mask.shapes.length} shape${layer.mask.shapes.length !== 1 ? 's' : ''}</span>
@@ -2281,10 +3216,41 @@
                         </div>
                         `}
                         <div class="layer-threshold">
-                            <span>Feather:</span>
+                            <span>${hasMask ? 'Feather:' : 'Mask:'}</span>
                             <div class="layer-slider-host"></div>
                             <span class="layer-slider-value">${layer.threshold}%</span>
                         </div>
+                        ${!layer.isCollision ? `
+                        <div style="margin-bottom:6px;">
+                            <button class="mask-control-btn" onclick="collisionFromMask(${layer.index})" title="Generate collision layer from current mask or threshold" style="width:100%;background:rgba(255,160,60,0.13);border-color:rgba(255,160,60,0.35);text-align:center;">🧱 Generate Collision Layer</button>
+                        </div>
+                        ` : ''}
+                        ${layer.isCollision ? `
+                        <div class="collision-controls" data-collision-layer="${layer.index}">
+                            <div class="collision-row">
+                                <label class="collision-label">Mode</label>
+                                <select class="collision-mode-select" data-ci="${layer.index}">
+                                    <option value="block" ${layer.collisionMode === 'block' ? 'selected' : ''}>Block</option>
+                                    <option value="slow" ${layer.collisionMode === 'slow' ? 'selected' : ''}>Slow</option>
+                                    <option value="deflect" ${layer.collisionMode === 'deflect' ? 'selected' : ''}>Deflect</option>
+                                </select>
+                            </div>
+                            <div class="collision-row">
+                                <label class="collision-label">Strength</label>
+                                <div class="collision-slider-host" data-cs="${layer.index}"></div>
+                                <span class="collision-strength-val">${(layer.collisionStrength || 0.7).toFixed(1)}</span>
+                            </div>
+                            <div class="collision-row">
+                                <label class="collision-label">Threshold</label>
+                                <div class="collision-slider-host" data-ct="${layer.index}"></div>
+                                <span class="collision-threshold-val">${layer.mask?.shapes?.[0]?.threshold || 128}</span>
+                            </div>
+                            <div class="collision-row">
+                                <label class="collision-toggle"><input type="checkbox" class="collision-invert-cb" data-cinv="${layer.index}" ${layer.mask?.shapes?.[0]?.invert ? 'checked' : ''}> Invert</label>
+                                <button type="button" class="collision-refresh-btn" data-cref="${layer.index}" title="Re-run depth estimation">🔄</button>
+                            </div>
+                        </div>
+                        ` : ''}
                     `;
                     
                     // Create encapsulated slider in host
@@ -2305,6 +3271,83 @@
                         const enable = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; if (itemEl) delete itemEl.dataset.sliderActive; };
                         ['pointerdown','mousedown','touchstart'].forEach(evt => slider.addEventListener(evt, disable, { passive: true }));
                         ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => slider.addEventListener(evt, enable, { passive: true }));
+                    }
+
+                    // Wire collision controls if present
+                    if (layer.isCollision) {
+                        // Mode select
+                        const modeSelect = element.querySelector('.collision-mode-select');
+                        if (modeSelect) {
+                            modeSelect.addEventListener('change', (e) => {
+                                e.stopPropagation();
+                                layer.collisionMode = e.target.value;
+                                if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
+                            });
+                            modeSelect.addEventListener('mousedown', (e) => e.stopPropagation());
+                        }
+
+                        // Strength slider
+                        const strengthHost = element.querySelector('[data-cs="' + layer.index + '"]');
+                        const strengthVal = element.querySelector('.collision-strength-val');
+                        if (strengthHost) {
+                            const sSlider = buildEncapsulatedRange({ min: 0, max: 100, value: Math.round((layer.collisionStrength || 0.7) * 100), step: 1, className: 'encapsulated-slider slider-orange' });
+                            strengthHost.appendChild(sSlider);
+                            sSlider.addEventListener('input', () => {
+                                const v = parseInt(sSlider.value) / 100;
+                                layer.collisionStrength = v;
+                                if (strengthVal) strengthVal.textContent = v.toFixed(1);
+                                if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
+                            });
+                            const dis = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; };
+                            const en = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; };
+                            ['pointerdown','mousedown','touchstart'].forEach(evt => sSlider.addEventListener(evt, dis, { passive: true }));
+                            ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => sSlider.addEventListener(evt, en, { passive: true }));
+                        }
+
+                        // Threshold slider
+                        const threshHost = element.querySelector('[data-ct="' + layer.index + '"]');
+                        const threshVal = element.querySelector('.collision-threshold-val');
+                        if (threshHost) {
+                            const depthShape = layer.mask?.shapes?.find(s => s.type === 'depth-mask');
+                            const tSlider = buildEncapsulatedRange({ min: 0, max: 255, value: depthShape?.threshold || 128, step: 1, className: 'encapsulated-slider slider-orange' });
+                            threshHost.appendChild(tSlider);
+                            tSlider.addEventListener('input', () => {
+                                const v = parseInt(tSlider.value);
+                                if (threshVal) threshVal.textContent = v;
+                                if (depthShape) depthShape.threshold = v;
+                                if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
+                            });
+                            const dis = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; };
+                            const en = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; };
+                            ['pointerdown','mousedown','touchstart'].forEach(evt => tSlider.addEventListener(evt, dis, { passive: true }));
+                            ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => tSlider.addEventListener(evt, en, { passive: true }));
+                        }
+
+                        // Invert checkbox — stop propagation on all pointer/click events
+                        // to prevent parent drag handlers from eating the interaction
+                        const invertCb = element.querySelector('.collision-invert-cb');
+                        const invertLabel = element.querySelector('.collision-toggle');
+                        if (invertCb) {
+                            const stopProp = (ev) => ev.stopPropagation();
+                            ['click', 'mousedown', 'pointerdown', 'touchstart'].forEach(evt => {
+                                invertCb.addEventListener(evt, stopProp);
+                                if (invertLabel) invertLabel.addEventListener(evt, stopProp);
+                            });
+                            invertCb.addEventListener('change', () => {
+                                const depthShape = layer.mask?.shapes?.find(s => s.type === 'depth-mask');
+                                if (depthShape) depthShape.invert = invertCb.checked;
+                                if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
+                            });
+                        }
+
+                        // Refresh button
+                        const refreshBtn = element.querySelector('.collision-refresh-btn');
+                        if (refreshBtn) {
+                            refreshBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                if (window.collisionLayers) window.collisionLayers.refreshDepth(layer.index);
+                            });
+                        }
                     }
                 }
                 
@@ -2398,8 +3441,6 @@
             const [draggedItem] = layerOrder.splice(draggedOrderIndex, 1);
             layerOrder.splice(targetOrderIndex, 0, draggedItem);
             
-            console.log('Reordered layers:', layerOrder);
-            
             renderLayers();
             target.classList.remove('drag-over');
             return false;
@@ -2432,11 +3473,9 @@
             if (dropPosition === 'top') {
                 // Add to beginning (top = closest to viewer = highest z-index)
                 layerOrder.unshift(draggedItem);
-                console.log('Moved to top:', draggedItem);
             } else if (dropPosition === 'bottom') {
                 // Add to end (bottom = furthest from viewer = lowest z-index)
                 layerOrder.push(draggedItem);
-                console.log('Moved to bottom:', draggedItem);
             }
             
             renderLayers();
@@ -2476,9 +3515,6 @@
                 
                 if (item.type === 'sim') {
                     canvas.style.zIndex = zIndex;
-                    trailCanvas.style.zIndex = zIndex;
-                    trailCanvas.style.pointerEvents = 'none';
-                    console.log(`Sim at visual position ${visualIndex}: z-index ${zIndex}`);
                 } else {
                     const layer = layers.find(l => l.index === item.id);
                     if (layer) {
@@ -2486,7 +3522,15 @@
                         if (layerDiv) {
                             layerDiv.style.zIndex = zIndex;
                             layerDiv.style.display = layer.visible ? 'block' : 'none';
-                            layerDiv.style.transform = `translate(${layer.x}px, ${layer.y}px) scale(${layer.scaleX}, ${layer.scaleY})`;
+                            
+                            // Ensure all transform properties have default values
+                            const x = layer.x || 0;
+                            const y = layer.y || 0;
+                            const scaleX = layer.scaleX || 1;
+                            const scaleY = layer.scaleY || 1;
+                            const rotation = layer.rotation || 0;
+                            
+                            layerDiv.style.transform = `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${scaleX}, ${scaleY})`;
                             
                             // Apply active class
                             if (layer.active) {
@@ -2495,10 +3539,15 @@
                                 layerDiv.classList.remove('active');
                             }
                             
-                            // Apply mask if enabled
-                            applyLayerMask(layer.index);
-                            
-                            console.log(`Layer ${layer.index} at visual position ${visualIndex}: z-index ${zIndex}`);
+                            // Reapply mask / threshold so visual state survives reorder
+                            const hasMask = layer.mask?.shapes?.length > 0;
+                            if (hasMask && layer.mask.enabled) {
+                                applyLayerMask(layer.index);
+                            } else if (layer.threshold > 0) {
+                                applyRudimentaryMask(layer.index);
+                            } else {
+                                applyLayerMask(layer.index);
+                            }
                         }
                     }
                 }
@@ -2508,7 +3557,6 @@
         window.toggleSimLayer = () => {
             const isVisible = canvas.style.display !== 'none';
             canvas.style.display = isVisible ? 'none' : 'block';
-            trailCanvas.style.display = isVisible ? 'none' : 'block';
             renderLayers();
         };
         
@@ -2533,9 +3581,11 @@
             
             // Remove from layers array
             layers = layers.filter(l => l.index !== index);
+            window.layers = layers;
             
             // Remove from layerOrder array
             layerOrder = layerOrder.filter(item => !(item.type === 'layer' && item.id === index));
+            window.layerOrder = layerOrder;
             
             // Re-render and update z-indices
             renderLayers();
@@ -2554,6 +3604,14 @@
         window.editImageLayerMask = (index) => {
             if (typeof window.enterImageLayerMaskMode === 'function') {
                 window.enterImageLayerMaskMode(index);
+            }
+        };
+        
+        window.collisionFromMask = (index) => {
+            if (window.collisionLayers && typeof window.collisionLayers.createFromLayerMask === 'function') {
+                window.collisionLayers.createFromLayerMask(index);
+            } else {
+                console.warn('Collision system not available');
             }
         };
         
@@ -2615,7 +3673,6 @@
         
         function disablePointerEventsExceptActive(activeIndex) {
             canvas.style.pointerEvents = 'none';
-            trailCanvas.style.pointerEvents = 'none';
             
             layers.forEach(l => {
                 const div = document.getElementById(`layer${l.index}`);
@@ -2627,7 +3684,6 @@
         
         function enableAllPointerEvents() {
             canvas.style.pointerEvents = 'auto';
-            trailCanvas.style.pointerEvents = 'none';
             
             layers.forEach(l => {
                 const div = document.getElementById(`layer${l.index}`);
@@ -3054,10 +4110,57 @@
             img.src = layer.originalData || layer.data;
         }
         
+        // Cached depth-mask temp canvas (avoids per-call allocations)
+        let _dmTempCanvas = null, _dmTempCtx = null, _dmImgData = null;
+        let _dmCacheW = 0, _dmCacheH = 0;
+        
         // Helper function to draw mask shapes (supports all shape types)
         function drawMaskShape(ctx, shape) {
             const cx = shape.x + shape.width / 2;
             const cy = shape.y + shape.height / 2;
+
+            // Special handling for depth-based masks: threshold the depth map
+            if (shape.type === 'depth-mask' && shape.depthData && shape.depthWidth && shape.depthHeight) {
+                const w = shape.depthWidth;
+                const h = shape.depthHeight;
+                const threshold = shape.threshold || 128;
+                const invert = shape.invert || false;
+
+                // Reuse cached canvas/ImageData when dimensions match
+                if (_dmCacheW !== w || _dmCacheH !== h || !_dmTempCanvas) {
+                    _dmTempCanvas = document.createElement('canvas');
+                    _dmTempCanvas.width = w;
+                    _dmTempCanvas.height = h;
+                    _dmTempCtx = _dmTempCanvas.getContext('2d', { willReadFrequently: true });
+                    _dmImgData = _dmTempCtx.createImageData(w, h);
+                    _dmCacheW = w;
+                    _dmCacheH = h;
+                }
+                const data = _dmImgData.data;
+                // Zero out buffer — we only write obstacle pixels below
+                data.fill(0);
+
+                for (let y = 0; y < h; y++) {
+                    const srcY = h - 1 - y; // flip vertically
+                    for (let x = 0; x < w; x++) {
+                        const srcI = srcY * w + x;
+                        const dstI = y * w + x;
+                        const dv = shape.depthData[srcI] || 0;
+                        const isObstacle = invert ? (dv < threshold) : (dv >= threshold);
+                        if (isObstacle) {
+                            const idx = dstI * 4;
+                            data[idx] = 255;
+                            data[idx + 1] = 255;
+                            data[idx + 2] = 255;
+                            data[idx + 3] = 255;
+                        }
+                    }
+                }
+
+                _dmTempCtx.putImageData(_dmImgData, 0, 0);
+                ctx.drawImage(_dmTempCanvas, shape.x, shape.y, shape.width, shape.height);
+                return;
+            }
 
             // Special handling for pixel-based SAM masks: draw from the
             // samMask bitmap instead of treating the shape as a solid rect.
@@ -3154,6 +4257,10 @@
             ctx.fill();
         }
         
+        // Expose for collision system to reuse
+        window._drawMaskShape = drawMaskShape;
+        window._featherMaskAlpha = featherMaskAlpha;
+        
         // Helper to draw regular polygon
         function drawMaskPolygon(ctx, cx, cy, sides, radius) {
             const angle = (Math.PI * 2) / sides;
@@ -3245,9 +4352,73 @@
 
             layer.threshold = parseInt(threshold, 10) || 0;
 
-            if (layer.mask && layer.mask.enabled) {
+            const hasMask = layer.mask?.shapes?.length > 0;
+            
+            if (hasMask && layer.mask.enabled) {
+                // Has shape mask - threshold controls feathering
                 applyLayerMask(index);
+            } else if (layer.threshold > 0) {
+                // No shape mask - threshold controls rudimentary alpha mask
+                applyRudimentaryMask(index);
+            } else {
+                // No mask and threshold is 0 - show original image
+                const layerDiv = document.getElementById(`layer${index}`);
+                if (layerDiv && layer.originalData) {
+                    layerDiv.style.backgroundImage = `url(${layer.originalData})`;
+                }
             }
+        };
+        
+        // Apply rudimentary alpha-threshold mask for layers without shape masks
+        window.applyRudimentaryMask = function applyRudimentaryMask(index) {
+            const layer = layers.find(l => l.index === index);
+            if (!layer) return;
+            
+            const layerDiv = document.getElementById(`layer${index}`);
+            if (!layerDiv) return;
+            
+            const threshold = layer.threshold || 0;
+            if (threshold === 0) {
+                if (layer.originalData) {
+                    layerDiv.style.backgroundImage = `url(${layer.originalData})`;
+                }
+                return;
+            }
+            
+            // Create canvas for processing
+            const maskCanvas = document.createElement('canvas');
+            const canvasElement = document.getElementById('canvas');
+            maskCanvas.width = canvasElement ? canvasElement.width : 1920;
+            maskCanvas.height = canvasElement ? canvasElement.height : 1080;
+            const ctx = maskCanvas.getContext('2d');
+            
+            const img = new Image();
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0, maskCanvas.width, maskCanvas.height);
+                
+                // Apply alpha threshold - pixels below threshold become transparent
+                const imageData = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+                const data = imageData.data;
+                const thresholdValue = Math.round((threshold / 100) * 255);
+                
+                for (let i = 0; i < data.length; i += 4) {
+                    // Calculate luminance (perceived brightness)
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                    
+                    // Make dark pixels transparent based on threshold
+                    if (luminance < thresholdValue) {
+                        data[i + 3] = 0; // Set alpha to 0
+                    }
+                }
+                
+                ctx.putImageData(imageData, 0, 0);
+                layerDiv.style.backgroundImage = `url(${maskCanvas.toDataURL()})`;
+            };
+            
+            img.src = layer.originalData || layer.data;
         };
         
         // Hotkeys modal + Undo/Redo implementation
@@ -3299,7 +4470,6 @@
                 brushSize: parseFloat(document.getElementById('brushSize')?.value || '11'),
                 visualRes: parseInt(document.getElementById('visualResolution')?.value || String(config.DYE_RESOLUTION), 10),
                 physicsRes: parseInt(document.getElementById('physicsResolution')?.value || String(config.SIM_RESOLUTION), 10),
-                showTrail: !!document.getElementById('trailToggle')?.checked,
                 showCursor: !!document.getElementById('cursorToggle')?.checked,
                 showCanvasHandles: !!document.getElementById('showCanvasHandles')?.checked,
                 lockCanvasBorders: !!document.getElementById('lockCanvasBorders')?.checked,
@@ -3314,7 +4484,6 @@
                 // Checkboxes and selectors
                 const stepEl = document.getElementById('stepPalette');
                 const rndEl = document.getElementById('randomColor');
-                const trailEl = document.getElementById('trailToggle');
                 const cursorEl = document.getElementById('cursorToggle');
                 const handlesEl = document.getElementById('showCanvasHandles');
                 const lockEl = document.getElementById('lockCanvasBorders');
@@ -3345,7 +4514,6 @@
                 if (visualSel) { visualSel.value = String(s.visualRes); visualSel.dispatchEvent(new Event('change')); }
                 if (physSel) { physSel.value = String(s.physicsRes); physSel.dispatchEvent(new Event('change')); }
                 
-                if (trailEl) { trailEl.checked = !!s.showTrail; trailEl.dispatchEvent(new Event('change')); }
                 if (cursorEl) { cursorEl.checked = !!s.showCursor; cursorEl.dispatchEvent(new Event('change')); }
                 if (handlesEl) {
                     handlesEl.checked = !!s.showCanvasHandles;
@@ -3447,6 +4615,7 @@
             }
             if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
         }
+        window.stepPaletteOnce = stepPaletteOnce;
         function cycleSelect(el, dir) {
             if (!el) return;
             const opts = el.options;
@@ -3539,6 +4708,10 @@
         
         // Initialize layer order with sim at the top
         layerOrder = [{ type: 'sim' }];
+        // Expose layer system for collision module and other integrations
+        window.layers = layers;
+        window.layerOrder = layerOrder;
+        window.renderLayers = renderLayers;
         renderLayers();
         
         // Initialize Recorded Layers UI

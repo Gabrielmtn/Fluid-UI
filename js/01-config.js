@@ -38,7 +38,6 @@
         const FADE_START = 333;
         const FADE_END = 555;
         
-        let showTrail = true;
         let showCursor = true;
         
         let savedDensity = null;
@@ -48,7 +47,6 @@
         const canvas = document.getElementById('canvas');
         const canvasArea = document.getElementById('canvas-area');
         const canvasWrapper = document.getElementById('canvas-wrapper');
-        const trailCanvas = document.getElementById('trailCanvas');
         const customCursor = document.getElementById('customCursor');
         const sizeDisplay = document.getElementById('canvas-size-display');
         const showCanvasHandles = document.getElementById('showCanvasHandles');
@@ -68,6 +66,18 @@
         window.userPalettes = window.userPalettes || {};
         window.customPalettes = window.customPalettes || [];
         window.deletedDefaultPalettes = window.deletedDefaultPalettes || [];
+
+        Object.defineProperty(window, 'savedColors', {
+            get: function() { return savedColors; },
+            set: function(val) { savedColors = Array.isArray(val) ? val : []; }
+        });
+        Object.defineProperty(window, 'currentPaletteIndex', {
+            get: function() { return currentPaletteIndex; },
+            set: function(val) { currentPaletteIndex = typeof val === 'number' ? val : 0; }
+        });
+        Object.defineProperty(window, 'curatedPalettes', {
+            get: function() { return curatedPalettes; }
+        });
 
         function uniqueColors(arr) { return [...new Set(arr.map(c => c.toUpperCase()))]; }
 
@@ -234,6 +244,13 @@
             if (cp) {
                 cp.value = list[0] || '#FFFFFF';
                 const stepEl = document.getElementById('stepPalette');
+                
+                // Auto-enable "Step through palette" when selecting a palette
+                if (stepEl && !stepEl.checked) {
+                    stepEl.checked = true;
+                    stepEl.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                
                 if (!(stepEl && stepEl.checked) && typeof updateColor === 'function') updateColor();
             }
             currentTrailColorCss = hexToRgbaCss(list[1] || list[0] || '#FFFFFF', 0.5);
@@ -292,6 +309,7 @@
             if (!autoload && curatedPalettes.length > 0) {
                 applyPalette(currentPaletteIndex || 0);
             }
+            const updateBtn = document.getElementById('updatePaletteBtn');
             const saveNewBtn = document.getElementById('saveNewPaletteBtn');
             const nameInputRow = document.getElementById('paletteNameInput');
             const nameInput = document.getElementById('newPaletteName');
@@ -300,10 +318,50 @@
             const splitRow = document.querySelector('.palette-row-split');
             const paletteLeft = document.querySelector('.palette-left');
             const paletteRight = document.querySelector('.palette-right');
+
+            if (updateBtn) {
+                updateBtn.addEventListener('click', () => {
+                    const list = Array.isArray(savedColors) ? savedColors.slice() : [];
+                    if (list.length === 0) {
+                        const status = document.getElementById('paletteImportStatus');
+                        if (status) {
+                            status.textContent = 'No colors to update';
+                            status.style.color = '#ff6b6b';
+                            status.classList.add('show');
+                            setTimeout(() => { status.classList.remove('show'); status.style.color = '#3fb950'; status.textContent = ''; }, 2000);
+                        }
+                        return;
+                    }
+                    const normalized = uniqueColors(list.map(hexToFull));
+                    setPaletteColorsForIndex(currentPaletteIndex, normalized);
+                    // Also update the curatedPalettes array directly
+                    if (curatedPalettes[currentPaletteIndex]) {
+                        curatedPalettes[currentPaletteIndex].colors = normalized;
+                    }
+                    // Update customPalettes if this is a custom palette
+                    const paletteName = getPaletteName(currentPaletteIndex);
+                    const customIdx = window.customPalettes.findIndex(cp => cp.name === paletteName);
+                    if (customIdx >= 0) {
+                        window.customPalettes[customIdx].colors = list.slice();
+                    }
+                    refreshPaletteCarousel();
+                    renderPalettePreview(currentPaletteIndex);
+                    const status = document.getElementById('paletteImportStatus');
+                    if (status) {
+                        status.textContent = 'Updated';
+                        status.classList.add('show');
+                        setTimeout(() => { status.classList.remove('show'); status.textContent = ''; }, 1200);
+                    }
+                    // Flash the button for feedback
+                    updateBtn.textContent = '✓ Updated';
+                    setTimeout(() => { updateBtn.textContent = 'Update'; }, 1200);
+                });
+            }
             
+            const btnRow = document.querySelector('.palette-btn-row');
             if (saveNewBtn) {
                 saveNewBtn.addEventListener('click', () => {
-                    saveNewBtn.style.display = 'none';
+                    if (btnRow) btnRow.style.display = 'none';
                     if (nameInputRow) nameInputRow.style.display = 'flex';
                     if (nameInput) { nameInput.value = ''; nameInput.focus(); }
                     if (splitRow) splitRow.classList.add('full-width');
@@ -315,7 +373,7 @@
             if (cancelBtn) {
                 cancelBtn.addEventListener('click', () => {
                     if (nameInputRow) nameInputRow.style.display = 'none';
-                    if (saveNewBtn) saveNewBtn.style.display = 'block';
+                    if (btnRow) btnRow.style.display = 'flex';
                     if (nameInput) nameInput.value = '';
                     if (splitRow) splitRow.classList.remove('full-width');
                     if (paletteLeft) paletteLeft.style.display = 'block';
@@ -348,7 +406,7 @@
                     refreshPaletteCarousel();
                     applyPalette(curatedPalettes.length - 1);
                     if (nameInputRow) nameInputRow.style.display = 'none';
-                    if (saveNewBtn) saveNewBtn.style.display = 'block';
+                    if (btnRow) btnRow.style.display = 'flex';
                     nameInput.value = '';
                     if (splitRow) splitRow.classList.remove('full-width');
                     if (paletteLeft) paletteLeft.style.display = 'block';
@@ -481,6 +539,8 @@
             }
         }
 
+        window.refreshPaletteCarousel = refreshPaletteCarousel;
+        window.applyPalette = applyPalette;
         window.exportCurrentPaletteFluid = exportCurrentPaletteFluid;
         window.exportAllPalettesFluid = exportAllPalettesFluid;
         window.importPalettesFluidFromFile = function(file) {
@@ -544,14 +604,10 @@
             // Set canvas resolution (internal pixels)
             canvas.width = newWidth;
             canvas.height = newHeight;
-            trailCanvas.width = newWidth;
-            trailCanvas.height = newHeight;
             
             // Also set CSS size explicitly to match (fixes scaling issues)
             canvas.style.width = newWidth + 'px';
             canvas.style.height = newHeight + 'px';
-            trailCanvas.style.width = newWidth + 'px';
-            trailCanvas.style.height = newHeight + 'px';
             
             sizeDisplay.textContent = `${newWidth} × ${newHeight}`;
             
@@ -564,12 +620,20 @@
         
         // Initialize canvas wrapper position (centered and constrained)
         function initializeCanvasPosition() {
-            // Load saved canvas size if available
-            if (window.Settings && typeof window.Settings.loadCanvasSize === 'function') {
-                const saved = window.Settings.loadCanvasSize();
-                if (saved && saved.width && saved.height) {
-                    canvasWrapper.style.width = saved.width + 'px';
-                    canvasWrapper.style.height = saved.height + 'px';
+            // If a stream format is active, don't override wrapper dimensions —
+            // only re-center to keep the format's aspect ratio intact
+            const hasStreamFormat = window.focusMode &&
+                typeof window.focusMode.getActiveFormat === 'function' &&
+                window.focusMode.getActiveFormat();
+
+            if (!hasStreamFormat) {
+                // Load saved canvas size if available
+                if (window.Settings && typeof window.Settings.loadCanvasSize === 'function') {
+                    const saved = window.Settings.loadCanvasSize();
+                    if (saved && saved.width && saved.height) {
+                        canvasWrapper.style.width = saved.width + 'px';
+                        canvasWrapper.style.height = saved.height + 'px';
+                    }
                 }
             }
             
@@ -577,17 +641,19 @@
             let wrapperWidth = canvasWrapper.offsetWidth;
             let wrapperHeight = canvasWrapper.offsetHeight;
             
-            // Constrain canvas to fit within window (Electron fix)
-            const maxWidth = areaRect.width - 40; // Leave margin
-            const maxHeight = areaRect.height - 40;
-            
-            if (wrapperWidth > maxWidth) {
-                wrapperWidth = maxWidth;
-                canvasWrapper.style.width = maxWidth + 'px';
-            }
-            if (wrapperHeight > maxHeight) {
-                wrapperHeight = maxHeight;
-                canvasWrapper.style.height = maxHeight + 'px';
+            if (!hasStreamFormat) {
+                // Constrain canvas to fit within window (Electron fix)
+                const maxWidth = areaRect.width - 40; // Leave margin
+                const maxHeight = areaRect.height - 40;
+                
+                if (wrapperWidth > maxWidth) {
+                    wrapperWidth = maxWidth;
+                    canvasWrapper.style.width = maxWidth + 'px';
+                }
+                if (wrapperHeight > maxHeight) {
+                    wrapperHeight = maxHeight;
+                    canvasWrapper.style.height = maxHeight + 'px';
+                }
             }
             
             const centerLeft = Math.max(0, (areaRect.width - wrapperWidth) / 2);

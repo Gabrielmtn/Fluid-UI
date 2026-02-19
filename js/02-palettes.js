@@ -257,8 +257,6 @@
             }
         });
         
-        const trailCtx = trailCanvas.getContext('2d');
-        
         function getCanvasCoordinates(e) {
             const rect = canvas.getBoundingClientRect();
             return {
@@ -267,6 +265,7 @@
             };
         }
         
+        window.colorStorage = null; // will be set below
         const colorStorage = {
             save: function(colors) {
                 try {
@@ -312,6 +311,7 @@
                 }
             }
         };
+        window.colorStorage = colorStorage;
         
         customCursor.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">

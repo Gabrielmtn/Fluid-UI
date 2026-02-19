@@ -1,6 +1,7 @@
 /**
  * Stats For Nerds Panel
- * Real-time statistics and monitoring for the fluid simulation
+ * Reads pre-computed stats from window.__stats (populated by render loop's
+ * zero-GC ring buffer). No global rAF monkey-patching.
  */
 
 (function initStatsPanel() {
@@ -17,50 +18,19 @@
     let updateInterval = null;
     let draggable = null;
     
-    // Performance tracking
-    let lastFPSTime = performance.now();
-    let frameCount = 0;
-    let fps = 0;
-    let lastFrameTime = 0;
-    let updateTime = 0;
-    let frames = [];
-    let lastRafTS = 0;
-    
     // Kaleidoscope mode names
     const kaleidoModes = ['Off', 'Wedge', 'Mirror H', 'Mirror V', 'Mirror Quad', 'Spiral'];
     
-    // Track actual render frames
-    let rafHooked = false;
-    function hookRAF() {
-        if (rafHooked) return;
-        rafHooked = true;
-        
-        const originalRAF = window.requestAnimationFrame;
-        window.requestAnimationFrame = function(callback) {
-            return originalRAF.call(window, function(timestamp) {
-                const start = performance.now();
-                const isNewFrame = (timestamp !== lastRafTS);
-                if (isNewFrame) {
-                    frameCount++;
-                    frames.push(timestamp);
-                    const oneSecondAgo = timestamp - 1000;
-                    frames = frames.filter(t => t > oneSecondAgo);
-                    fps = frames.length;
-                    if (frames.length >= 2) {
-                        lastFrameTime = frames[frames.length - 1] - frames[frames.length - 2];
-                    }
-                    lastRafTS = timestamp;
-                }
-                
-                callback(timestamp);
-                
-                const end = performance.now();
-                updateTime = end - start;
-            });
-        };
+    // ─── Cache DOM refs once (avoid getElementById every 100ms) ────
+    const elCache = {};
+    function getEl(id) {
+        if (!elCache[id]) elCache[id] = document.getElementById(id);
+        return elCache[id];
     }
-    
-    hookRAF();
+    function setText(id, value) {
+        const el = getEl(id);
+        if (el) el.textContent = value;
+    }
     
     // Initialize draggable (wait for Draggable class to load)
     function initDraggable() {
@@ -134,11 +104,9 @@
     
     function startUpdating() {
         if (updateInterval) return;
-        
-        // Wait a bit for fluid sim to initialize
         setTimeout(() => {
-            updateStats(); // Initial update
-            updateInterval = setInterval(updateStats, 100); // Update 10 times per second
+            updateStats();
+            updateInterval = setInterval(updateStats, 100);
         }, 500);
     }
     
@@ -150,33 +118,32 @@
     }
     
     function updateStats() {
-        // Debug: Log what's available (only once)
-        if (!window._statsDebugLogged) {
-            console.log('Stats Debug:', {
-                config: !!window.config,
-                simTexWidth: window.simTexWidth,
-                dyeTexWidth: window.dyeTexWidth,
-                pointer: !!window.pointer,
-                animationMultiplier: window.animationMultiplier,
-                kaleidoMode: window.kaleidoMode,
-                gl: !!window.gl
-            });
-            window._statsDebugLogged = true;
-        }
-        
-        // Performance stats (prefer main-loop provided stats if available)
         const s = window.__stats;
+        
+        // ─── Performance ──────────────────────────────────────────
         if (s && typeof s.fps === 'number') {
-            setText('stat-fps', s.fps + ' fps');
-            setText('stat-frametime', ((s.frametime || 0)).toFixed(2) + ' ms');
-            setText('stat-updatetime', ((s.lastCpuMs != null ? s.lastCpuMs : updateTime)).toFixed(2) + ' ms');
+            const capLabel = s.targetFps > 0 ? s.targetFps : '∞';
+            setText('stat-fps', s.fps + ' / ' + capLabel + ' fps');
+            setText('stat-frametime', (s.frametime || 0).toFixed(2) + ' ms');
+            setText('stat-updatetime', (s.lastCpuMs || 0).toFixed(2) + ' ms');
+            setText('stat-displayhz', (s.displayHz || 60) + ' Hz');
+            
+            // Frame budget: color-code for quick glance
+            const budgetEl = getEl('stat-budget');
+            if (budgetEl) {
+                const pct = s.budgetPct || 0;
+                budgetEl.textContent = pct.toFixed(1) + '%';
+                budgetEl.style.color = pct < 60 ? '#4fe0b0' : pct < 85 ? '#f0d060' : '#ff6070';
+            }
         } else {
-            setText('stat-fps', fps + ' fps');
-            setText('stat-frametime', lastFrameTime.toFixed(2) + ' ms');
-            setText('stat-updatetime', updateTime.toFixed(2) + ' ms');
+            setText('stat-fps', '-- fps');
+            setText('stat-frametime', '-- ms');
+            setText('stat-updatetime', '-- ms');
+            setText('stat-displayhz', '-- Hz');
+            setText('stat-budget', '--%');
         }
         
-        // Simulation stats
+        // ─── Simulation ───────────────────────────────────────────
         const canvas = document.getElementById('canvas');
         const simRes = window.simTexWidth || '--';
         const dyeRes = window.dyeTexWidth || '--';
@@ -197,7 +164,7 @@
             setText('stat-curl', '--');
         }
         
-        // Kaleidoscope stats (coerce to numbers safely)
+        // ─── Kaleidoscope ─────────────────────────────────────────
         const kMode = (typeof window.kaleidoMode === 'number') ? (kaleidoModes[window.kaleidoMode] || 'Off') : 'Off';
         setText('stat-kmode', kMode);
         const kSeg = Number(window.kaleidoSegments);
@@ -207,16 +174,16 @@
         const kZm = Number(window.kZoom);
         setText('stat-kzoom', Number.isFinite(kZm) ? kZm.toFixed(2) : '--');
         
-        // Input stats
+        // ─── Input ────────────────────────────────────────────────
         if (window.pointer) {
             const x = Math.round(window.pointer.x || 0);
             const y = Math.round(window.pointer.y || 0);
             setText('stat-pointerpos', `${x}, ${y}`);
             
-            const dx = (window.pointer.dx || 0).toFixed(2);
-            const dy = (window.pointer.dy || 0).toFixed(2);
-            const vel = Math.sqrt(dx * dx + dy * dy).toFixed(2);
-            setText('stat-pointervel', vel + ' px/frame');
+            const dx = window.pointer.dx || 0;
+            const dy = window.pointer.dy || 0;
+            const vel = Math.sqrt(dx * dx + dy * dy).toFixed(1);
+            setText('stat-pointervel', vel + ' px/f');
         }
         
         if (window.config) {
@@ -224,10 +191,9 @@
             setText('stat-multiplier', window.animationMultiplier || '--');
         }
         
-        // Memory stats
+        // ─── Memory ──────────────────────────────────────────────
         const gl = window.gl;
         if (gl) {
-            // Count textures (approximate)
             const textureCount = estimateTextureCount();
             setText('stat-textures', textureCount);
             setText('stat-webgl', gl.getParameter(gl.VERSION));
@@ -235,9 +201,8 @@
     }
     
     function estimateTextureCount() {
-        // Estimate based on known buffers
         let count = 0;
-        if (window.density) count += 2; // read/write
+        if (window.density) count += 2;
         if (window.velocity) count += 2;
         if (window.pressure) count += 2;
         if (window.divergence) count += 1;
@@ -245,12 +210,4 @@
         return count;
     }
     
-    function setText(id, value) {
-        const element = document.getElementById(id);
-        if (element) {
-            element.textContent = value;
-        }
-    }
-    
-    console.log('Stats panel initialized - FPS tracking active');
 })();

@@ -4,45 +4,67 @@
 (function() {
     'use strict';
     
-    // Performance profiles
-    // NOTE: Physics runs at fixed 60 Hz regardless of targetFPS (see 05-fluid-sim.js)
-    // targetFPS only affects rendering frame rate
+    // Performance profiles - from battery saver to extreme high-end
     const PROFILES = {
         'battery-saver': {
             name: 'Battery Saver',
             icon: '🔋',
-            simResolution: 512,        // Low physics detail
+            simResolution: 128,        // Minimal physics
             dyeResolution: 512,        // Low visual detail
             pressureIterations: 10,    // Minimal accuracy
             curl: 20,
+            sharpness: 0,
             description: 'Low quality, maximum battery life'
         },
         'balanced': {
             name: 'Balanced',
             icon: '⚖️',
-            simResolution: 1024,       // Good physics
+            simResolution: 256,        // Good physics
             dyeResolution: 1024,       // Good visuals
-            pressureIterations: 20,    // Good accuracy
+            pressureIterations: 25,    // Good accuracy
             curl: 30,
-            description: 'Recommended: good quality & performance'
+            sharpness: 0.3,
+            description: 'Recommended for most systems'
         },
         'performance': {
-            name: 'High Quality',
+            name: 'High',
             icon: '⚡',
-            simResolution: 1024,       // Same physics
-            dyeResolution: 2048,       // Higher visual detail
+            simResolution: 512,        // Higher physics
+            dyeResolution: 1024,       // Good visuals
             pressureIterations: 30,    // Higher accuracy
             curl: 40,
-            description: 'High quality visuals, needs good GPU'
+            sharpness: 0.5,
+            description: 'High quality, needs decent GPU'
         },
         'ultra': {
             name: 'Ultra',
             icon: '🚀',
-            simResolution: 1024,       // Keep physics reasonable
+            simResolution: 512,        // High physics
             dyeResolution: 2048,       // High visual detail
             pressureIterations: 40,    // High accuracy
             curl: 50,
-            description: 'Maximum quality (use FPS Limit dropdown for refresh rate)'
+            sharpness: 0.6,
+            description: 'Very high quality, needs good GPU'
+        },
+        'extreme': {
+            name: 'Extreme',
+            icon: '🔥',
+            simResolution: 1024,       // Maximum physics detail
+            dyeResolution: 2048,       // High visual detail
+            pressureIterations: 60,    // Very high accuracy
+            curl: 60,
+            sharpness: 0.8,
+            description: 'Extreme quality, needs powerful GPU'
+        },
+        'cinematic': {
+            name: 'Cinematic',
+            icon: '🎬',
+            simResolution: 1024,       // Maximum physics
+            dyeResolution: 4096,       // 4K visual detail
+            pressureIterations: 80,    // Maximum accuracy
+            curl: 70,
+            sharpness: 1.0,
+            description: '4K cinematic, for high-end GPUs only'
         }
     };
     
@@ -53,7 +75,6 @@
             
             // Detect device type
             const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            console.log(`📱 Device detection: ${isMobile ? 'Mobile' : 'Desktop'}`);
             
             // Auto-adjust features OFF by default on desktop
             this.autoMode = isMobile; // Battery auto-adjust only on mobile
@@ -89,7 +110,6 @@
         
         async initBattery() {
             if (!navigator.getBattery) {
-                console.log('⚠️ Battery API not available');
                 this.updateUI({ level: null, charging: true });
                 return;
             }
@@ -104,9 +124,7 @@
                 this.battery.addEventListener('chargingchange', () => this.updateBatteryStatus());
                 this.battery.addEventListener('levelchange', () => this.updateBatteryStatus());
                 
-                console.log('🔋 Battery monitoring enabled');
             } catch (err) {
-                console.warn('Battery API error:', err);
                 this.updateUI({ level: null, charging: true });
             }
         }
@@ -132,8 +150,6 @@
                 return;
             }
             
-            console.log(`🔋 Battery auto-adjust check: ${level}%, charging: ${charging}, autoMode: ${this.autoMode}`);
-            
             let targetProfile = this.currentProfile;
             
             if (charging) {
@@ -152,7 +168,6 @@
             
             if (targetProfile !== this.currentProfile) {
                 this.setProfile(targetProfile);
-                console.log(`🔄 Battery auto-switched to ${PROFILES[targetProfile].name} (${level}% battery)`);
             }
         }
         
@@ -196,8 +211,6 @@
             // Calculate average FPS
             const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
             
-            console.log(`📊 FPS adaptive check: current=${currentFps}, avg=${avgFps.toFixed(1)}, adaptive=${this.fpsAdaptive}`);
-            
             // Cooldown: Don't adjust more than once every 10 seconds
             const now = Date.now();
             if (now - this.lastFpsAdjustment < 10000) return;
@@ -215,7 +228,6 @@
                     const newProfile = profiles[currentIndex + 1];
                     this.setProfile(newProfile, false);
                     this.lastFpsAdjustment = now;
-                    console.log(`📉 FPS adaptive: Lowered to ${PROFILES[newProfile].name} (${Math.round(avgFps)} FPS)`);
                     
                     // Show notification
                     this.showFpsNotification('lowered', PROFILES[newProfile].name, Math.round(avgFps));
@@ -231,7 +243,6 @@
                     const newProfile = profiles[currentIndex + 1];
                     this.setProfile(newProfile, false);
                     this.lastFpsAdjustment = now;
-                    console.log(`📈 FPS adaptive: Raised to ${PROFILES[newProfile].name} (${Math.round(avgFps)} FPS)`);
                     
                     // Show notification
                     this.showFpsNotification('raised', PROFILES[newProfile].name, Math.round(avgFps));
@@ -287,6 +298,21 @@
                     curlSlider.value = profile.curl;
                     curlSlider.dispatchEvent(new Event('input'));
                 }
+                
+                // Sharpness
+                if (typeof profile.sharpness === 'number') {
+                    config.SHARPNESS = profile.sharpness;
+                    const sharpSlider = document.getElementById('sharpness');
+                    if (sharpSlider) {
+                        sharpSlider.value = profile.sharpness;
+                        sharpSlider.style.setProperty('--val', profile.sharpness);
+                        const sharpSpan = document.getElementById('sharpnessValue');
+                        if (sharpSpan) sharpSpan.textContent = profile.sharpness.toFixed(1);
+                    }
+                }
+                
+                // Trigger framebuffer reinit for resolution changes
+                window.needsFramebufferReinit = true;
             }
             
             // DON'T set FPS cap - let user control it via dropdown
@@ -299,12 +325,11 @@
             if (manual) {
                 this.autoMode = false;
                 this.saveSettings();
-                console.log(`🎮 Manual profile: ${profile.name}`);
             }
         }
         
         createUI() {
-            const controls = document.querySelector('.controls');
+            const controls = document.getElementById('sidebar-right') || document.querySelector('.controls');
             if (!controls) return;
             
             const batterySection = document.createElement('div');
@@ -412,11 +437,8 @@
                     this.saveSettings();
                     
                     if (this.fpsAdaptive) {
-                        console.log('✅ FPS adaptive quality enabled');
                         this.fpsHistory = []; // Reset history
                         this.lastFpsAdjustment = 0;
-                    } else {
-                        console.log('❌ FPS adaptive quality disabled');
                     }
                 });
             }
