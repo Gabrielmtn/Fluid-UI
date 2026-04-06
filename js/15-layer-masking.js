@@ -327,7 +327,7 @@
                         <button class="mask-zoom-btn" onclick="window.maskResetZoom()" title="Reset Zoom" style="margin-left: 8px;">⊙</button>
                     </div>
                 </div>
-                <div id="maskHint" class="mask-hint" style="padding: 8px 20px; background: rgba(88, 166, 255, 0.1); border-top: 1px solid rgba(88, 166, 255, 0.2); border-bottom: 1px solid rgba(88, 166, 255, 0.2); font-size: 13px; color: #8b949e; text-align: center;">
+                <div id="maskHint" class="mask-hint" style="padding: clamp(4px, 0.8vh, 8px) clamp(12px, 2vw, 20px); background: rgba(88, 166, 255, 0.1); border-top: 1px solid rgba(88, 166, 255, 0.2); border-bottom: 1px solid rgba(88, 166, 255, 0.2); font-size: clamp(11px, 1.3vh, 13px); color: #8b949e; text-align: center; flex-shrink: 0;">
                     <strong style="color: #58a6ff;">💡 Tip:</strong> Scroll to zoom • Middle-click to pan • Shift+Drag for fine positioning
                 </div>
                 <div class="mask-canvas-container">

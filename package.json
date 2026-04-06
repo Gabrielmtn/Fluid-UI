@@ -12,12 +12,12 @@
     "electron-build": "electron-builder"
   },
   "dependencies": {
-    "@electron/remote": "^2.1.3",
-    "partykit": "^0.0.111"
+    "@electron/remote": "^2.1.3"
   },
   "devDependencies": {
     "electron": "^39.1.2",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "partykit": "^0.0.111"
   },
   "build": {
     "appId": "com.fluidsim.app",
@@ -28,15 +28,13 @@
     "files": [
       "**/*",
       "!zig/**",
-      "!node_modules/**",
       "!dist/**",
       "!.git/**"
     ],
     "win": {
       "target": [
-        "nsis"
-      ],
-      "icon": "assets/icon.ico"
+        "portable"
+      ]
     }
   }
 }

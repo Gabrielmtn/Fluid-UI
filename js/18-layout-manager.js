@@ -83,6 +83,7 @@
             { id: 'curl', label: 'Curl', type: 'knob', min: 0, max: 60, value: 10, step: 1 },
             { id: 'sharpness', label: 'Viscosity', type: 'knob', min: 0, max: 2, value: 0.8, step: 0.1 },
             { id: 'multiplier', label: 'Multiplier', type: 'knob', min: 1, max: 8, value: 1, step: 1 },
+            { id: 'timeScale', label: 'Time', type: 'knob', min: 0.01, max: 3, value: 1, step: 0.01 },
             { id: 'kaleidoSegments', label: 'K-Segments', type: 'knob', min: 1, max: 24, value: 12, step: 1 },
             { id: 'kAngle', label: 'K-Angle', type: 'knob', min: -180, max: 180, value: 0, step: 1 },
             { id: 'kSpinSpeed', label: 'K-Spin', type: 'knob', min: -180, max: 180, value: 30, step: 1 },
@@ -254,6 +255,18 @@
                         <span class="settings-label">Turbulence</span>
                         <div class="settings-control">
                             <input type="checkbox" id="settings-turbulence">
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <span class="settings-label">☀️ Sunrays</span>
+                        <div class="settings-control">
+                            <input type="checkbox" id="settings-sunrays">
+                        </div>
+                    </div>
+                    <div class="settings-row settings-sunrays-params" style="display:none; flex-direction:column; gap:4px; padding-left:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span class="settings-label" style="font-size:10px;">Weight</span>
+                            <input type="range" id="settings-sunraysWeight" min="0.1" max="3" value="1.0" step="0.1" style="width:80px;">
                         </div>
                     </div>
                     <div class="settings-row">
@@ -641,6 +654,7 @@
             'settings-light': 'enableLighting',
             'settings-lightShift': 'enableLightShift',
             'settings-turbulence': 'turbulenceMode',
+            'settings-sunrays': 'sunraysToggle',
             'settings-randomColor': 'randomColor',
             'settings-stepPalette': 'stepPalette',
             'settings-transparentMode': 'transparentMode',
@@ -688,6 +702,21 @@
             }
         });
         
+        // Sunrays toggle: show/hide param sliders + sync sliders
+        const sSunrays = document.getElementById('settings-sunrays');
+        const sunraysParams = document.querySelector('.settings-sunrays-params');
+        if (sSunrays && sunraysParams) {
+            sSunrays.addEventListener('change', () => {
+                sunraysParams.style.display = sSunrays.checked ? 'flex' : 'none';
+            });
+        }
+        const sSunW = document.getElementById('settings-sunraysWeight');
+        const oSunW = document.getElementById('sunraysWeight');
+        if (sSunW && oSunW) {
+            sSunW.addEventListener('input', () => { oSunW.value = sSunW.value; oSunW.dispatchEvent(new Event('input', {bubbles:true})); });
+            oSunW.addEventListener('input', () => { sSunW.value = oSunW.value; });
+        }
+
         // Action buttons
         document.getElementById('settings-pause')?.addEventListener('click', () => {
             if (typeof togglePause === 'function') togglePause();
@@ -809,7 +838,11 @@
                     e.stopPropagation();
                     const snapshot = captureSnapshot();
                     if (snapshot) {
-                        window.Settings.savePreset(name, snapshot);
+                        if (typeof window.saveUserPreset === 'function') {
+                            window.saveUserPreset(name, snapshot);
+                        } else {
+                            window.Settings.savePreset(name, snapshot);
+                        }
                         if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
                         showLayoutPresetStatus('Updated: ' + name, '#64b5f6');
                     }
@@ -873,7 +906,11 @@
                 showLayoutPresetStatus('Could not capture settings', '#ff6b6b');
                 return;
             }
-            window.Settings.savePreset(name, snapshot);
+            if (typeof window.saveUserPreset === 'function') {
+                window.saveUserPreset(name, snapshot);
+            } else {
+                window.Settings.savePreset(name, snapshot);
+            }
             if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
             showLayoutPresetStatus('Saved: ' + name, '#3fb950');
             if (layoutNameRow) layoutNameRow.style.display = 'none';
@@ -889,16 +926,21 @@
             });
         }
 
-        // Initial render + re-render when panel opens
+        // Initial render + re-render when panel opens (debounced)
         renderLayoutUserPresets();
         const settingsPanel = document.getElementById('settingsPanel');
         if (settingsPanel) {
+            var pendingRender = 0;
             const observer = new MutationObserver(() => {
-                if (settingsPanel.classList.contains('visible') || settingsPanel.style.display !== 'none') {
+                var isOpen = settingsPanel.classList.contains('open') || settingsPanel.classList.contains('visible');
+                if (!isOpen) return; // skip renders when panel is closing
+                if (pendingRender) cancelAnimationFrame(pendingRender);
+                pendingRender = requestAnimationFrame(() => {
+                    pendingRender = 0;
                     renderLayoutUserPresets();
-                }
+                });
             });
-            observer.observe(settingsPanel, { attributes: true, attributeFilter: ['class', 'style'] });
+            observer.observe(settingsPanel, { attributes: true, attributeFilter: ['class'] });
         }
     }
     

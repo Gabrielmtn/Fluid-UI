@@ -24,6 +24,11 @@
         const strip = buildMixerStrip(controls);
         const sidebar = buildSidebar(controls);
 
+        // Add entrance animation classes
+        strip.classList.add('ui-enter');
+        sidebar.classList.add('ui-enter');
+        canvasArea.classList.add('ui-enter');
+
         // Create main-area wrapper
         const mainArea = document.createElement('div');
         mainArea.id = 'main-area';
@@ -82,8 +87,166 @@
                 brushDisplay.textContent = parseFloat(brushSlider.value).toFixed(1);
             }
             brushSlider.addEventListener('input', syncBrush);
-            setInterval(syncBrush, 300);
+            brushSlider.addEventListener('change', syncBrush);
+            // Slow fallback for programmatic value changes (2s instead of 300ms)
+            setInterval(syncBrush, 2000);
+            syncBrush();
         }
+
+        // ── Responsive typography: detect HiDPI / 4K and set --ui-scale ──
+        initResponsiveScale();
+
+        // ── Sidebar resize handle ──
+        initSidebarResize(sidebar);
+
+        // ── Splash → entrance animation sequence ──
+        orchestrateEntrance(strip, sidebar, canvasArea);
+
+        // ── COS Oscillator UI: inject after sliders are in their final positions ──
+        if (window.cosOscillator && typeof window.cosOscillator.buildUI === 'function') {
+            window.cosOscillator.buildUI();
+        }
+    }
+
+    function initResponsiveScale() {
+        // Elements to apply zoom scaling to
+        var _zoomTargetIds = ['sidebar-right', 'mixer-strip', 'colorBar',
+            'settingsToggleBtn', 'settingsPanel', 'hotkeyOverlay', 'statsPanel'];
+        var _zoomTargetClasses = ['stats-panel', 'rec-drawer', 'delete-modal',
+            'hotkey-reminder', 'mask-editor-overlay', 'fps-notification'];
+
+        function applyZoom(scale) {
+            var z = scale === 1 ? '' : String(scale);
+            _zoomTargetIds.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.style.zoom = z;
+            });
+            _zoomTargetClasses.forEach(function(cls) {
+                var els = document.querySelectorAll('.' + cls);
+                for (var i = 0; i < els.length; i++) els[i].style.zoom = z;
+            });
+        }
+
+        function computeScale() {
+            var dpr = window.devicePixelRatio || 1;
+            var cssW = window.innerWidth;
+            var scale = 1;
+            // Continuous scale: UI was designed for ~1440px viewport.
+            // Wider viewports get proportionally larger UI elements.
+            // Formula: linear ramp from 1.0 at 1600px to 1.8 at 3840px
+            if (cssW > 1600) {
+                scale = Math.round(Math.min(1.8, 1 + (cssW - 1600) * 0.00036) * 100) / 100;
+            }
+            // Also scale up for high-DPI screens even with moderate viewport
+            // (physical 4K with high OS scaling — viewport looks ok-ish but text is still small)
+            if (scale === 1 && dpr >= 2 && cssW >= 1200) {
+                scale = 1.15;
+            }
+            document.documentElement.style.setProperty('--ui-scale', scale);
+            applyZoom(scale);
+            console.log('[UI Scale] dpr=' + dpr + ' cssW=' + cssW + ' → scale=' + scale);
+        }
+        computeScale();
+        window.addEventListener('resize', computeScale);
+        // Detect DPI changes (e.g. dragging to a different monitor)
+        // Use recursive matchMedia that re-binds after each change
+        function watchDpr() {
+            var mq = window.matchMedia('(resolution: ' + window.devicePixelRatio + 'dppx)');
+            mq.addEventListener('change', function onDprChange() {
+                mq.removeEventListener('change', onDprChange);
+                computeScale();
+                watchDpr(); // re-bind with new DPR
+            });
+        }
+        watchDpr();
+        // Expose so late-created panels can be re-scaled
+        window._uiScaleReapply = function() { applyZoom(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1); };
+    }
+
+    function initSidebarResize(sidebar) {
+        var handle = document.createElement('div');
+        handle.className = 'sidebar-resize-handle';
+        sidebar.appendChild(handle);
+
+        var startX = 0, startW = 0, dragging = false;
+        handle.addEventListener('pointerdown', function(e) {
+            e.preventDefault();
+            dragging = true;
+            startX = e.clientX;
+            startW = sidebar.offsetWidth;
+            handle.classList.add('active');
+            handle.setPointerCapture(e.pointerId);
+        });
+        handle.addEventListener('pointermove', function(e) {
+            if (!dragging) return;
+            var zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+            var delta = startX - e.clientX; // dragging left = wider
+            // offsetWidth and delta are in screen pixels (zoomed), convert to base width
+            var newW = Math.max(220, Math.min(420, (startW + delta) / zoom));
+            document.documentElement.style.setProperty('--sidebar-width', Math.round(newW) + 'px');
+        });
+        handle.addEventListener('pointerup', function(e) {
+            dragging = false;
+            handle.classList.remove('active');
+        });
+        handle.addEventListener('pointercancel', function() {
+            dragging = false;
+            handle.classList.remove('active');
+        });
+    }
+
+    function orchestrateEntrance(strip, sidebar, canvasArea) {
+        var splash = document.getElementById('splash-screen');
+        var titlebar = document.getElementById('custom-titlebar');
+
+        // If no splash screen, just show UI immediately
+        if (!splash) {
+            if (titlebar) titlebar.classList.remove('ui-enter');
+            strip.classList.remove('ui-enter');
+            sidebar.classList.remove('ui-enter');
+            canvasArea.classList.remove('ui-enter');
+            return;
+        }
+
+        // Phase 1: Let splash play for 1.4s, then fade it out
+        setTimeout(function() {
+            splash.classList.add('fade-out');
+
+            // Phase 2: After splash starts fading, stagger UI in
+            setTimeout(function() {
+                if (titlebar) titlebar.classList.add('ui-ready');
+            }, 150);
+
+            setTimeout(function() {
+                strip.classList.add('ui-ready');
+            }, 250);
+
+            setTimeout(function() {
+                canvasArea.classList.add('ui-ready');
+            }, 350);
+
+            setTimeout(function() {
+                sidebar.classList.add('ui-ready');
+            }, 400);
+
+            // Phase 3: Clean up after animations complete
+            setTimeout(function() {
+                if (splash.parentNode) splash.parentNode.removeChild(splash);
+                [titlebar, strip, sidebar, canvasArea].forEach(function(el) {
+                    if (el) {
+                        el.classList.remove('ui-enter', 'ui-ready');
+                        el.classList.add('ui-settled');
+                    }
+                });
+                // Remove will-change after settling
+                setTimeout(function() {
+                    [titlebar, strip, sidebar, canvasArea].forEach(function(el) {
+                        if (el) el.classList.remove('ui-settled');
+                    });
+                }, 100);
+            }, 1000);
+
+        }, 1400);
     }
 
     // ─── MIXER STRIP ─────────────────────────────────────────────
@@ -96,7 +259,11 @@
         strip.appendChild(faderChannel('Curl', 'blue', 'curl', 'curlValue'));
         strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
-        strip.appendChild(faderChannel('Multiply', 'yellow', 'multiplier', 'multiplierValue'));
+        var multiplyChannel = faderChannel('Multiply', 'yellow', 'multiplier', 'multiplierValue');
+        var armDropdown = buildArmColorsDropdown();
+        multiplyChannel.appendChild(armDropdown.toggle);
+        strip.appendChild(multiplyChannel);
+        strip.appendChild(faderChannel('Time', 'pink', 'timeScale', 'timeScaleValue'));
         strip.appendChild(faderChannel('Density', 'cyan', 'densityDissipation', 'densityValue'));
         strip.appendChild(faderChannel('Velocity', 'cyan', 'velocityDissipation', 'velocityValue'));
 
@@ -348,16 +515,9 @@
             }
             var snapshot = typeof window.capturePresetSnapshot === 'function' ? window.capturePresetSnapshot() : null;
             if (!snapshot) { cancelSave(); return; }
-            var ok = window.Settings.savePreset(name, snapshot);
-            if (ok === false && snapshot.layers) {
-                // Quota exceeded — retry without layer images
-                var lite = JSON.parse(JSON.stringify(snapshot));
-                if (lite.layers) lite.layers.forEach(function(l) { delete l.data; delete l.originalData; });
-                lite._layersStripped = true;
-                ok = window.Settings.savePreset(name, lite);
-                if (ok === false) { delete lite.layers; delete lite.layerOrder; ok = window.Settings.savePreset(name, lite); }
-                console.warn('Preset "' + name + '": saved without layer images (storage quota)');
-            }
+            var ok = typeof window.saveUserPreset === 'function'
+                ? window.saveUserPreset(name, snapshot)
+                : window.Settings.savePreset(name, snapshot);
             cancelSave();
             if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
         }
@@ -406,6 +566,7 @@
         moveEl('mobileMenuClose', sidebar);
 
         sidebar.appendChild(buildFocusSection());
+        sidebar.appendChild(buildMutationSection());
         sidebar.appendChild(buildAudioReactiveSection());
         sidebar.appendChild(buildBrandingSection());
         sidebar.appendChild(buildLayersSection(controls));
@@ -417,6 +578,7 @@
         sidebar.appendChild(buildColorsSection(controls));
         sidebar.appendChild(buildDisplaySection(controls));
         sidebar.appendChild(buildRecordingSection());
+        sidebar.appendChild(buildExportSection());
         sidebar.appendChild(buildMultiArtistSection());
         sidebar.appendChild(buildSettingsSection(controls));
 
@@ -424,6 +586,394 @@
     }
 
     // --- Section builders ---
+
+    function buildMutationSection() {
+        const { sec, body } = makeSection('🧬 Mutate', 'purple', false);
+        sec.id = 'mutation-section';
+
+        // ── Controls row ──
+        const controlsRow = document.createElement('div');
+        controlsRow.className = 'mutation-controls';
+
+        // Scope
+        const scopeWrap = document.createElement('div');
+        scopeWrap.className = 'mutation-field';
+        scopeWrap.innerHTML = '<label>Scope</label>';
+        const scopeSel = document.createElement('select');
+        scopeSel.id = 'mutationScope';
+        scopeSel.innerHTML = '<option value="basic">Basic</option><option value="all">All</option>';
+        scopeWrap.appendChild(scopeSel);
+        controlsRow.appendChild(scopeWrap);
+
+        // Strength
+        const strWrap = document.createElement('div');
+        strWrap.className = 'mutation-field mutation-field-wide';
+        strWrap.innerHTML = '<label>Strength <span id="mutationStrengthVal" class="value-display">0.30</span></label>';
+        const strSlider = document.createElement('input');
+        strSlider.type = 'range'; strSlider.id = 'mutationStrength';
+        strSlider.min = '0.05'; strSlider.max = '1'; strSlider.step = '0.05'; strSlider.value = '0.3';
+        strSlider.addEventListener('input', function () {
+            var disp = document.getElementById('mutationStrengthVal');
+            if (disp) disp.textContent = parseFloat(this.value).toFixed(2);
+        });
+        strWrap.appendChild(strSlider);
+        controlsRow.appendChild(strWrap);
+
+        // Count
+        const cntWrap = document.createElement('div');
+        cntWrap.className = 'mutation-field';
+        cntWrap.innerHTML = '<label>Variants</label>';
+        const cntSel = document.createElement('select');
+        cntSel.id = 'mutationCount';
+        cntSel.innerHTML = '<option value="4">4</option><option value="6" selected>6</option><option value="9">9</option><option value="12">12</option>';
+        cntWrap.appendChild(cntSel);
+        controlsRow.appendChild(cntWrap);
+
+        body.appendChild(controlsRow);
+
+        // ── Action buttons ──
+        const actionsRow = document.createElement('div');
+        actionsRow.className = 'mutation-actions';
+
+        const mutBtn = document.createElement('button');
+        mutBtn.id = 'mutationGenerate';
+        mutBtn.className = 'mutation-btn mutation-btn-primary';
+        mutBtn.textContent = 'Mutate';
+
+        const undoBtn = document.createElement('button');
+        undoBtn.id = 'mutationUndo';
+        undoBtn.className = 'mutation-btn';
+        undoBtn.textContent = '← Undo';
+        undoBtn.disabled = true;
+
+        const redoBtn = document.createElement('button');
+        redoBtn.id = 'mutationRedo';
+        redoBtn.className = 'mutation-btn';
+        redoBtn.textContent = 'Redo →';
+        redoBtn.disabled = true;
+
+        const resetBtn = document.createElement('button');
+        resetBtn.id = 'mutationReset';
+        resetBtn.className = 'mutation-btn';
+        resetBtn.textContent = 'Reset';
+
+        actionsRow.appendChild(mutBtn);
+        actionsRow.appendChild(undoBtn);
+        actionsRow.appendChild(redoBtn);
+        actionsRow.appendChild(resetBtn);
+        body.appendChild(actionsRow);
+
+        // ── Lock toggles ──
+        const lockRow = document.createElement('div');
+        lockRow.className = 'mutation-locks';
+        lockRow.innerHTML = '<label class="mutation-locks-label">Lock:</label>';
+        var lockGroups = [
+            { key: 'colors', label: 'Colors' },
+            { key: 'kaleido', label: 'Kaleido' },
+            { key: 'simulation', label: 'Sim' },
+            { key: 'effects', label: 'Effects' },
+            { key: 'animations', label: 'Anim' },
+            { key: 'audio', label: 'Audio' }
+        ];
+        lockGroups.forEach(function (g) {
+            var lbl = document.createElement('label');
+            lbl.className = 'mutation-lock-chip';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.dataset.lockGroup = g.key;
+            cb.className = 'mutation-lock-cb';
+            lbl.appendChild(cb);
+            lbl.appendChild(document.createTextNode(' ' + g.label));
+            lockRow.appendChild(lbl);
+        });
+        body.appendChild(lockRow);
+
+        // ── Variant grid ──
+        const grid = document.createElement('div');
+        grid.id = 'mutationGrid';
+        grid.className = 'mutation-grid';
+        body.appendChild(grid);
+
+        // ── Diff panel (shows changes for hovered/selected variant) ──
+        const diffPanel = document.createElement('div');
+        diffPanel.id = 'mutationDiff';
+        diffPanel.className = 'mutation-diff';
+        diffPanel.style.display = 'none';
+        body.appendChild(diffPanel);
+
+        // ── Chain breadcrumb ──
+        const chainWrap = document.createElement('div');
+        chainWrap.id = 'mutationChain';
+        chainWrap.className = 'mutation-chain';
+        body.appendChild(chainWrap);
+
+        // ── Wire up logic ──
+        setTimeout(function () { wireMutationUI(); }, 200);
+
+        return sec;
+    }
+
+    function wireMutationUI() {
+        var engine = window.mutationEngine;
+        if (!engine) { console.warn('[Mutation] Engine not loaded'); return; }
+
+        var _variants = [];
+        var _baseSnapshot = null;
+
+        // Lock group → parameter ID mapping
+        var LOCK_GROUPS = {
+            colors: ['color.background', 'color.brush', 'randomColor', 'stepPalette', 'palette'],
+            kaleido: ['kaleidoToggle', 'kAnimateRot', 'kaleidoSegments', 'kAngle', 'kSpinSpeed',
+                      'kTwist', 'kZoom', 'kBlend', 'kaleidoMode',
+                      'kaleido.mode', 'kaleido.segments', 'kaleido.angle', 'kaleido.twist', 'kaleido.zoom', 'kaleido.blend'],
+            simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
+                         'pressureIteration', 'curl', 'sharpness', 'multiplier', 'timeScale',
+                         'velocityInfluence', 'turbulenceMode', 'brushSize', 'brushRefreshRate'],
+            effects: ['enableLighting', 'enableLightShift', 'microDetailToggle', 'sunraysToggle',
+                      'lightIntensity', 'lightAmbient', 'lightSpeed', 'clarity', 'vibrance',
+                      'sunraysWeight', 'shadingIntensity', 'displayShadingToggle',
+                      'lightShiftSpeed', 'lightShiftThreshold', 'lightShiftIntensity', 'lightShiftSaturation',
+                      'lightPos', 'lightShiftPath'],
+            animations: ['ascendToggle', 'ascendRandomness', 'shootingStarToggle',
+                         'ssFrequency', 'ssAngle', 'ssLength', 'ssSize', 'ssVariance', 'ssGravity', 'ssOrigin'],
+            audio: ['audioReactToggle', 'arMapAutoSplat', 'arMapSize', 'arMapKaleido', 'arMapColor',
+                    'audioSensitivity', 'audioBeatThreshold']
+        };
+
+        function getLockedParams() {
+            var locks = {};
+            document.querySelectorAll('.mutation-lock-cb:checked').forEach(function (cb) {
+                var group = cb.dataset.lockGroup;
+                if (LOCK_GROUPS[group]) {
+                    LOCK_GROUPS[group].forEach(function (id) { locks[id] = true; });
+                }
+            });
+            return locks;
+        }
+
+        function getOptions() {
+            var scope = document.getElementById('mutationScope');
+            var strength = document.getElementById('mutationStrength');
+            return {
+                scope: scope ? scope.value : 'basic',
+                strength: strength ? parseFloat(strength.value) : 0.3,
+                locks: getLockedParams()
+            };
+        }
+
+        function getCount() {
+            var el = document.getElementById('mutationCount');
+            return el ? parseInt(el.value, 10) : 6;
+        }
+
+        // Generate variants
+        function doMutate() {
+            if (!window.capturePresetSnapshot) return;
+            _baseSnapshot = window.capturePresetSnapshot();
+            if (!_baseSnapshot) return;
+
+            // Push base to chain if chain is empty
+            if (engine.chain.length === 0) {
+                engine.chain.push(_baseSnapshot, 'Origin');
+            }
+
+            var opts = getOptions();
+            var count = getCount();
+            _variants = engine.generateVariations(_baseSnapshot, count, opts);
+            renderGrid();
+        }
+
+        // Render the variant grid
+        function renderGrid() {
+            var grid = document.getElementById('mutationGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            if (_variants.length === 0) {
+                grid.innerHTML = '<div class="mutation-empty">Press Mutate to generate variants</div>';
+                return;
+            }
+
+            _variants.forEach(function (variant, idx) {
+                var card = document.createElement('div');
+                card.className = 'mutation-card';
+                card.dataset.index = idx;
+
+                // Color swatch preview
+                var swatch = document.createElement('div');
+                swatch.className = 'mutation-swatch';
+                var bg = (variant.colors && variant.colors.background) || '#000';
+                var br = (variant.colors && variant.colors.brush) || '#fff';
+                swatch.style.background = 'linear-gradient(135deg, ' + bg + ' 50%, ' + br + ' 50%)';
+                card.appendChild(swatch);
+
+                // Summary label
+                var label = document.createElement('div');
+                label.className = 'mutation-card-label';
+                var diff = engine.diffSummary(_baseSnapshot, variant);
+                label.textContent = diff.length + ' change' + (diff.length !== 1 ? 's' : '');
+                card.appendChild(label);
+
+                // Key changes preview
+                var preview = document.createElement('div');
+                preview.className = 'mutation-card-preview';
+                var topChanges = diff.slice(0, 3).map(function (d) {
+                    if (d.type === 'color') return d.param.split('.')[1];
+                    if (d.type === 'checkbox') return d.param;
+                    return d.param + ' ' + (d.pct > 0 ? d.pct + '%' : '');
+                });
+                preview.textContent = topChanges.join(', ');
+                card.appendChild(preview);
+
+                // Click to apply
+                card.addEventListener('click', function () {
+                    applyVariant(idx);
+                });
+
+                grid.appendChild(card);
+            });
+        }
+
+        // Apply a specific variant
+        function applyVariant(idx) {
+            var variant = _variants[idx];
+            if (!variant || !window.applyPresetSnapshot) return;
+
+            window.applyPresetSnapshot(variant);
+
+            // Push to chain
+            engine.chain.push(variant, 'Mutation ' + engine.chain.length);
+
+            // Highlight selected card
+            document.querySelectorAll('.mutation-card').forEach(function (c) {
+                c.classList.toggle('mutation-card-active', parseInt(c.dataset.index, 10) === idx);
+            });
+
+            // Show diff
+            showDiff(variant);
+
+            // Update chain display
+            renderChain();
+            updateNavButtons();
+
+            // Use this variant as new base for next mutation
+            _baseSnapshot = variant;
+        }
+
+        // Show diff panel
+        function showDiff(variant) {
+            var panel = document.getElementById('mutationDiff');
+            if (!panel || !_baseSnapshot) return;
+            var diff = engine.diffSummary(_baseSnapshot, variant);
+            if (diff.length === 0) {
+                panel.style.display = 'none';
+                return;
+            }
+            panel.style.display = 'block';
+            var html = '<div class="mutation-diff-title">' + diff.length + ' parameter' + (diff.length !== 1 ? 's' : '') + ' changed:</div>';
+            diff.forEach(function (d) {
+                var from = d.type === 'color' ? '<span class="mutation-color-dot" style="background:' + d.from + '"></span>' :
+                           d.type === 'checkbox' ? (d.from ? 'ON' : 'OFF') :
+                           (typeof d.from === 'number' ? d.from.toFixed(3) : d.from);
+                var to = d.type === 'color' ? '<span class="mutation-color-dot" style="background:' + d.to + '"></span>' :
+                         d.type === 'checkbox' ? (d.to ? 'ON' : 'OFF') :
+                         (typeof d.to === 'number' ? d.to.toFixed(3) : d.to);
+                html += '<div class="mutation-diff-row"><span class="mutation-diff-param">' + d.param + '</span> ' + from + ' → ' + to + '</div>';
+            });
+            panel.innerHTML = html;
+        }
+
+        // Render chain breadcrumbs
+        function renderChain() {
+            var wrap = document.getElementById('mutationChain');
+            if (!wrap) return;
+            var entries = engine.chain.getAll();
+            if (entries.length < 2) { wrap.innerHTML = ''; return; }
+
+            wrap.innerHTML = '';
+            entries.forEach(function (entry, i) {
+                var crumb = document.createElement('span');
+                crumb.className = 'mutation-crumb' + (entry.active ? ' mutation-crumb-active' : '');
+                crumb.textContent = entry.label;
+                crumb.title = new Date(entry.timestamp).toLocaleTimeString();
+                crumb.addEventListener('click', function () {
+                    var jumped = engine.chain.jump(i);
+                    if (jumped && window.applyPresetSnapshot) {
+                        window.applyPresetSnapshot(jumped.snapshot);
+                        _baseSnapshot = jumped.snapshot;
+                        _variants = [];
+                        renderGrid();
+                        renderChain();
+                        updateNavButtons();
+                    }
+                });
+                wrap.appendChild(crumb);
+                if (i < entries.length - 1) {
+                    var arrow = document.createElement('span');
+                    arrow.className = 'mutation-crumb-arrow';
+                    arrow.textContent = '→';
+                    wrap.appendChild(arrow);
+                }
+            });
+        }
+
+        function updateNavButtons() {
+            var undo = document.getElementById('mutationUndo');
+            var redo = document.getElementById('mutationRedo');
+            if (undo) undo.disabled = engine.chain.index <= 0;
+            if (redo) redo.disabled = engine.chain.index >= engine.chain.length - 1;
+        }
+
+        // ── Button wiring ──
+        var genBtn = document.getElementById('mutationGenerate');
+        if (genBtn) genBtn.addEventListener('click', doMutate);
+
+        var undoBtn = document.getElementById('mutationUndo');
+        if (undoBtn) undoBtn.addEventListener('click', function () {
+            var entry = engine.chain.back();
+            if (entry && window.applyPresetSnapshot) {
+                window.applyPresetSnapshot(entry.snapshot);
+                _baseSnapshot = entry.snapshot;
+                _variants = [];
+                renderGrid();
+                renderChain();
+                updateNavButtons();
+            }
+        });
+
+        var redoBtn = document.getElementById('mutationRedo');
+        if (redoBtn) redoBtn.addEventListener('click', function () {
+            var entry = engine.chain.forward();
+            if (entry && window.applyPresetSnapshot) {
+                window.applyPresetSnapshot(entry.snapshot);
+                _baseSnapshot = entry.snapshot;
+                _variants = [];
+                renderGrid();
+                renderChain();
+                updateNavButtons();
+            }
+        });
+
+        var resetBtn = document.getElementById('mutationReset');
+        if (resetBtn) resetBtn.addEventListener('click', function () {
+            var first = engine.chain.length > 0 ? engine.chain.jump(0) : null;
+            if (first && window.applyPresetSnapshot) {
+                window.applyPresetSnapshot(first.snapshot);
+                _baseSnapshot = first.snapshot;
+            }
+            engine.chain.clear();
+            _variants = [];
+            renderGrid();
+            renderChain();
+            updateNavButtons();
+            var diff = document.getElementById('mutationDiff');
+            if (diff) diff.style.display = 'none';
+        });
+
+        // Initial state
+        renderGrid();
+        console.log('[Mutation] UI wired');
+    }
 
     function buildLayersSection(controls) {
         const { sec, body, header } = makeSection('📑 Layers', 'cyan', false);
@@ -577,6 +1127,10 @@
     function buildEffectsSection(controls) {
         const { sec, body } = makeSection('💡 Effects', 'yellow', true);
 
+        // Surface shading (Pavel-style pseudo-normal lighting)
+        moveCheckboxGroup('displayShadingToggle', body);
+        moveEl('shadingIntensityGroup', body);
+
         moveCheckboxGroup('enableLighting', body);
         const lightControls = document.getElementById('lightSourceControls');
         if (lightControls) body.appendChild(lightControls);
@@ -589,6 +1143,16 @@
         moveCheckboxGroup('microDetailToggle', body);
         const microDetailPanel = document.getElementById('microDetailPanel');
         if (microDetailPanel) body.appendChild(microDetailPanel);
+
+        // Sunrays toggle + panel
+        moveCheckboxGroup('sunraysToggle', body);
+        const sunraysPanel = document.getElementById('sunraysPanel');
+        if (sunraysPanel) body.appendChild(sunraysPanel);
+
+        // Spin (Balatro idea) toggle + panel
+        moveCheckboxGroup('spinToggle', body);
+        const spinPanel = document.getElementById('spinPanel');
+        if (spinPanel) body.appendChild(spinPanel);
 
         return sec;
     }
@@ -640,6 +1204,7 @@
         moveCheckboxGroup('cursorToggle', body);
         moveCheckboxGroup('showCanvasHandles', body);
         moveCheckboxGroup('lockCanvasBorders', body);
+        moveCheckboxGroup('statsToggle', body);
 
         return sec;
     }
@@ -1396,6 +1961,242 @@
         return sec;
     }
 
+    function buildExportSection() {
+        const { sec, body } = makeSection('📤 Export', 'green', false);
+
+        // Export status display
+        var statusDiv = document.createElement('div');
+        statusDiv.id = 'exportStatus';
+        statusDiv.style.cssText = 'display:none;font-size:11px;padding:6px;background:rgba(0,0,0,0.3);border-radius:4px;margin-bottom:8px;text-align:center;color:#58a6ff;';
+        body.appendChild(statusDiv);
+
+        // Progress bar
+        var progressWrap = document.createElement('div');
+        progressWrap.id = 'exportProgress';
+        progressWrap.style.cssText = 'display:none;height:4px;background:rgba(0,0,0,0.3);border-radius:2px;overflow:hidden;margin-bottom:12px;';
+        var progressBar = document.createElement('div');
+        progressBar.id = 'exportProgressBar';
+        progressBar.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,#3fb950,#58a6ff);transition:width 0.2s;';
+        progressWrap.appendChild(progressBar);
+        body.appendChild(progressWrap);
+
+        // Quick export buttons
+        var quickLabel = document.createElement('label');
+        quickLabel.className = 'brush-section-label';
+        quickLabel.textContent = 'Quick Export';
+        body.appendChild(quickLabel);
+
+        var quickGrid = document.createElement('div');
+        quickGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;';
+
+        var videoBtn = document.createElement('button');
+        videoBtn.textContent = '🎬 Video';
+        videoBtn.style.cssText = 'padding:8px;background:rgba(88,166,255,0.15);border:1px solid rgba(88,166,255,0.3);color:#58a6ff;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        videoBtn.addEventListener('click', function() {
+            if (window.fluidExport) window.fluidExport.video();
+        });
+        quickGrid.appendChild(videoBtn);
+
+        var gifBtn = document.createElement('button');
+        gifBtn.textContent = '🎨 GIF';
+        gifBtn.style.cssText = 'padding:8px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.3);color:#3fb950;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        gifBtn.addEventListener('click', function() {
+            if (window.fluidExport) window.fluidExport.gif();
+        });
+        quickGrid.appendChild(gifBtn);
+
+        var stillBtn = document.createElement('button');
+        stillBtn.textContent = '📸 Still';
+        stillBtn.style.cssText = 'padding:8px;background:rgba(210,153,34,0.15);border:1px solid rgba(210,153,34,0.3);color:#d29922;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        stillBtn.addEventListener('click', function() {
+            if (window.fluidExport) window.fluidExport.still();
+        });
+        quickGrid.appendChild(stillBtn);
+
+        var seqBtn = document.createElement('button');
+        seqBtn.textContent = '🎞️ Sequence';
+        seqBtn.style.cssText = 'padding:8px;background:rgba(248,81,73,0.15);border:1px solid rgba(248,81,73,0.3);color:#f85149;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        seqBtn.addEventListener('click', function() {
+            if (window.fluidExport) window.fluidExport.sequence();
+        });
+        quickGrid.appendChild(seqBtn);
+
+        body.appendChild(quickGrid);
+
+        // Stop button (hidden until export starts)
+        var stopBtn = document.createElement('button');
+        stopBtn.id = 'exportStopBtn';
+        stopBtn.textContent = '⏹ Cancel Export';
+        stopBtn.style.cssText = 'display:none;width:100%;padding:8px;background:rgba(248,81,73,0.2);border:1px solid rgba(248,81,73,0.4);color:#f85149;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;margin-bottom:12px;';
+        stopBtn.addEventListener('click', function() {
+            if (window.fluidExport) window.fluidExport.stop();
+        });
+        body.appendChild(stopBtn);
+
+        // Video settings
+        var videoLabel = document.createElement('label');
+        videoLabel.className = 'brush-section-label';
+        videoLabel.textContent = 'Video Settings';
+        body.appendChild(videoLabel);
+
+        var durationGroup = document.createElement('div');
+        durationGroup.className = 'control-group';
+        var durationLbl = document.createElement('label');
+        durationLbl.textContent = 'Duration (seconds)';
+        durationLbl.style.cssText = 'font-size:10px;margin-bottom:4px;display:block;';
+        var durationInput = document.createElement('input');
+        durationInput.type = 'number';
+        durationInput.id = 'exportVideoDuration';
+        durationInput.min = '1';
+        durationInput.max = '300';
+        durationInput.value = '15';
+        durationInput.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:4px;';
+        durationGroup.appendChild(durationLbl);
+        durationGroup.appendChild(durationInput);
+        body.appendChild(durationGroup);
+
+        var fpsGroup = document.createElement('div');
+        fpsGroup.className = 'control-group';
+        var fpsLbl = document.createElement('label');
+        fpsLbl.textContent = 'Frame Rate';
+        fpsLbl.style.cssText = 'font-size:10px;margin-bottom:4px;display:block;';
+        var fpsSelect = document.createElement('select');
+        fpsSelect.id = 'exportVideoFPS';
+        fpsSelect.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:4px;';
+        [['30','30 fps'],['60','60 fps'],['120','120 fps']].forEach(function(opt) {
+            var o = document.createElement('option');
+            o.value = opt[0];
+            o.textContent = opt[1];
+            if (opt[0] === '60') o.selected = true;
+            fpsSelect.appendChild(o);
+        });
+        fpsGroup.appendChild(fpsLbl);
+        fpsGroup.appendChild(fpsSelect);
+        body.appendChild(fpsGroup);
+
+        // GIF settings
+        var gifLabel = document.createElement('label');
+        gifLabel.className = 'brush-section-label';
+        gifLabel.textContent = 'GIF Settings';
+        gifLabel.style.marginTop = '12px';
+        body.appendChild(gifLabel);
+
+        var gifDurationGroup = document.createElement('div');
+        gifDurationGroup.className = 'control-group';
+        var gifDurationLbl = document.createElement('label');
+        gifDurationLbl.textContent = 'Duration (seconds)';
+        gifDurationLbl.style.cssText = 'font-size:10px;margin-bottom:4px;display:block;';
+        var gifDurationInput = document.createElement('input');
+        gifDurationInput.type = 'number';
+        gifDurationInput.id = 'exportGifDuration';
+        gifDurationInput.min = '1';
+        gifDurationInput.max = '10';
+        gifDurationInput.value = '3';
+        gifDurationInput.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:4px;';
+        gifDurationGroup.appendChild(gifDurationLbl);
+        gifDurationGroup.appendChild(gifDurationInput);
+        body.appendChild(gifDurationGroup);
+
+        var gifFpsGroup = document.createElement('div');
+        gifFpsGroup.className = 'control-group';
+        var gifFpsLbl = document.createElement('label');
+        gifFpsLbl.textContent = 'Frame Rate';
+        gifFpsLbl.style.cssText = 'font-size:10px;margin-bottom:4px;display:block;';
+        var gifFpsSelect = document.createElement('select');
+        gifFpsSelect.id = 'exportGifFPS';
+        gifFpsSelect.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:4px;';
+        [['10','10 fps'],['15','15 fps'],['24','24 fps'],['30','30 fps']].forEach(function(opt) {
+            var o = document.createElement('option');
+            o.value = opt[0];
+            o.textContent = opt[1];
+            if (opt[0] === '15') o.selected = true;
+            gifFpsSelect.appendChild(o);
+        });
+        gifFpsGroup.appendChild(gifFpsLbl);
+        gifFpsGroup.appendChild(gifFpsSelect);
+        body.appendChild(gifFpsGroup);
+
+        // Output folder (Electron only)
+        if (typeof require !== 'undefined') {
+            var folderLabel = document.createElement('label');
+            folderLabel.className = 'brush-section-label';
+            folderLabel.textContent = 'Output Folder';
+            folderLabel.style.marginTop = '12px';
+            body.appendChild(folderLabel);
+
+            var folderRow = document.createElement('div');
+            folderRow.style.cssText = 'display:flex;gap:6px;align-items:center;';
+
+            var folderInput = document.createElement('input');
+            folderInput.type = 'text';
+            folderInput.id = 'exportFolderPath';
+            folderInput.readOnly = true;
+            folderInput.placeholder = 'No folder set…';
+            folderInput.style.cssText = 'flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:6px 8px;color:#c9d1d9;font-size:11px;cursor:pointer;';
+            folderInput.addEventListener('click', function() {
+                if (window.fluidExport) window.fluidExport.pickFolder();
+            });
+            folderRow.appendChild(folderInput);
+
+            var folderOpenBtn = document.createElement('button');
+            folderOpenBtn.textContent = '📂';
+            folderOpenBtn.title = 'Open folder';
+            folderOpenBtn.style.cssText = 'background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 8px;color:#c9d1d9;cursor:pointer;font-size:14px;';
+            folderOpenBtn.addEventListener('click', function() {
+                if (window.fluidExport) window.fluidExport.openFolder();
+            });
+            folderRow.appendChild(folderOpenBtn);
+
+            body.appendChild(folderRow);
+
+            // Load saved folder path
+            setTimeout(function() {
+                if (window.fluidExport) {
+                    var c = window.fluidExport.getConfig();
+                    if (c.outputFolder) folderInput.value = c.outputFolder;
+                }
+            }, 500);
+        }
+
+        // Load saved settings into UI inputs
+        setTimeout(function() {
+            if (window.fluidExport) {
+                var c = window.fluidExport.getConfig();
+                durationInput.value = Math.round(c.videoDuration / 1000);
+                fpsSelect.value = String(c.videoFPS);
+                gifDurationInput.value = Math.round(c.gifDuration / 1000);
+                gifFpsSelect.value = String(c.gifFPS);
+            }
+        }, 500);
+
+        // Wire settings changes
+        durationInput.addEventListener('change', function() {
+            if (window.fluidExport) {
+                window.fluidExport.setConfig('videoDuration', parseInt(durationInput.value) * 1000);
+            }
+        });
+
+        fpsSelect.addEventListener('change', function() {
+            if (window.fluidExport) {
+                window.fluidExport.setConfig('videoFPS', parseInt(fpsSelect.value));
+            }
+        });
+
+        gifDurationInput.addEventListener('change', function() {
+            if (window.fluidExport) {
+                window.fluidExport.setConfig('gifDuration', parseInt(gifDurationInput.value) * 1000);
+            }
+        });
+
+        gifFpsSelect.addEventListener('change', function() {
+            if (window.fluidExport) {
+                window.fluidExport.setConfig('gifFPS', parseInt(gifFpsSelect.value));
+            }
+        });
+
+        return sec;
+    }
+
     function buildMultiArtistSection() {
         const { sec, body } = makeSection('🌐 Multi Artist', 'blue', true);
 
@@ -1439,6 +2240,42 @@
 
         body.appendChild(presetSection);
 
+        // ── ComfyUI Bridge ──
+        var comfySection = document.createElement('div');
+        comfySection.style.cssText = 'margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08);';
+
+        var comfyLabel = document.createElement('label');
+        comfyLabel.style.cssText = 'display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:rgba(255,255,255,0.5); margin-bottom:6px;';
+        comfyLabel.textContent = 'ComfyUI Bridge (Ctrl+Enter)';
+        comfySection.appendChild(comfyLabel);
+
+        var comfyRow = document.createElement('div');
+        comfyRow.style.cssText = 'display:flex; gap:6px; align-items:center;';
+
+        var comfyInput = document.createElement('input');
+        comfyInput.type = 'text';
+        comfyInput.id = 'comfyuiFolderPath';
+        comfyInput.readOnly = true;
+        comfyInput.placeholder = 'No folder set…';
+        comfyInput.style.cssText = 'flex:1; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px 8px; color:#c9d1d9; font-size:11px; cursor:pointer;';
+        comfyInput.value = (window.comfyuiBridge && window.comfyuiBridge.getConfig().outputFolder) || '';
+        comfyInput.addEventListener('click', function() {
+            if (window.comfyuiBridge) window.comfyuiBridge.pickFolder();
+        });
+        comfyRow.appendChild(comfyInput);
+
+        var comfyOpenBtn = document.createElement('button');
+        comfyOpenBtn.textContent = '📂';
+        comfyOpenBtn.title = 'Open folder';
+        comfyOpenBtn.style.cssText = 'background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 8px; color:#c9d1d9; cursor:pointer; font-size:14px;';
+        comfyOpenBtn.addEventListener('click', function() {
+            if (window.comfyuiBridge) window.comfyuiBridge.openFolder();
+        });
+        comfyRow.appendChild(comfyOpenBtn);
+
+        comfySection.appendChild(comfyRow);
+        body.appendChild(comfySection);
+
         // Render function
         function renderSidebarPresets() {
             if (!presetList || !window.Settings) return;
@@ -1475,13 +2312,10 @@
                     e.stopPropagation();
                     var snapshot = typeof window.capturePresetSnapshot === 'function' ? window.capturePresetSnapshot() : null;
                     if (snapshot) {
-                        var ok = window.Settings.savePreset(name, snapshot);
-                        if (ok === false && snapshot.layers) {
-                            var lite = JSON.parse(JSON.stringify(snapshot));
-                            if (lite.layers) lite.layers.forEach(function(l) { delete l.data; delete l.originalData; });
-                            lite._layersStripped = true;
-                            ok = window.Settings.savePreset(name, lite);
-                            if (ok === false) { delete lite.layers; delete lite.layerOrder; window.Settings.savePreset(name, lite); }
+                        if (typeof window.saveUserPreset === 'function') {
+                            window.saveUserPreset(name, snapshot);
+                        } else {
+                            window.Settings.savePreset(name, snapshot);
                         }
                         if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
                         overwriteBtn.textContent = '\u2713';
@@ -1510,6 +2344,192 @@
         window.renderSidebarPresets = renderSidebarPresets;
 
         return sec;
+    }
+
+    // ─── ARM COLORS DROPDOWN ────────────────────────────────────
+
+    function buildArmColorsDropdown() {
+        var toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'arm-colors-toggle';
+        toggle.textContent = '\u2726';
+        toggle.title = 'Per-arm color settings';
+
+        var panel = document.createElement('div');
+        panel.className = 'arm-colors-panel';
+        panel.style.display = 'none';
+        panel.style.position = 'fixed';
+        document.body.appendChild(panel);
+
+        function positionPanel() {
+            var rect = toggle.getBoundingClientRect();
+            var panelW = 220;
+            var left = rect.left + rect.width / 2 - panelW / 2;
+            // Clamp to viewport
+            left = Math.max(4, Math.min(left, window.innerWidth - panelW - 4));
+            panel.style.left = left + 'px';
+            panel.style.top = (rect.bottom + 4) + 'px';
+            panel.style.width = panelW + 'px';
+        }
+
+        var header = document.createElement('div');
+        header.className = 'arm-colors-header';
+        header.textContent = 'Arm Colors';
+        panel.appendChild(header);
+
+        var rowsWrap = document.createElement('div');
+        rowsWrap.className = 'arm-colors-rows';
+        panel.appendChild(rowsWrap);
+
+        function ensureArmConfig(count) {
+            var arr = window.multiArmColors;
+            if (!arr) { arr = []; window.multiArmColors = arr; }
+            while (arr.length < count) {
+                arr.push({ mode: 'main', color: '#ffffff', stepIndex: 0 });
+            }
+        }
+
+        function rebuildRows() {
+            rowsWrap.innerHTML = '';
+            var slider = document.getElementById('multiplier');
+            var count = slider ? parseInt(slider.value, 10) || 1 : 1;
+            if (count < 2) {
+                var hint = document.createElement('div');
+                hint.className = 'arm-colors-hint';
+                hint.textContent = 'Set multiplier to 2+ to configure arm colors';
+                rowsWrap.appendChild(hint);
+                return;
+            }
+            ensureArmConfig(count);
+            var arr = window.multiArmColors;
+
+            for (var i = 0; i < count; i++) {
+                (function(idx) {
+                    var cfg = arr[idx];
+                    var row = document.createElement('div');
+                    row.className = 'arm-row';
+
+                    var label = document.createElement('span');
+                    label.className = 'arm-label';
+                    label.textContent = String(idx + 1);
+                    row.appendChild(label);
+
+                    var picker = document.createElement('input');
+                    picker.type = 'color';
+                    picker.className = 'arm-picker';
+                    picker.value = cfg.color || '#ffffff';
+                    picker.disabled = cfg.mode !== 'fixed';
+                    if (cfg.mode !== 'fixed') picker.style.opacity = '0.35';
+
+                    var modes = [
+                        { key: 'main',    text: '\u25CF', title: 'Follow pointer color' },
+                        { key: 'fixed',   text: '\u25C6', title: 'Fixed color' },
+                        { key: 'rainbow', text: '\uD83C\uDF08', title: 'Rainbow — new color every splat' },
+                        { key: 'random',  text: 'R',      title: 'Random — new color each stroke' },
+                        { key: 'step',    text: 'S',      title: 'Step through palette each stroke' }
+                    ];
+
+                    var modeWrap = document.createElement('div');
+                    modeWrap.className = 'arm-mode-wrap';
+                    var btns = [];
+
+                    modes.forEach(function(m) {
+                        var btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'arm-mode-btn' + (cfg.mode === m.key ? ' active' : '');
+                        btn.textContent = m.text;
+                        btn.title = m.title;
+                        btn.dataset.mode = m.key;
+                        btn.addEventListener('click', function() {
+                            cfg.mode = m.key;
+                            cfg.cachedColor = null;
+                            if (m.key === 'fixed' && cfg.color === '#ffffff') {
+                                // Auto-pick a hue based on arm index
+                                var hue = Math.round((idx / (count || 1)) * 360) % 360;
+                                cfg.color = hslToHex(hue, 80, 55);
+                                picker.value = cfg.color;
+                            }
+                            btns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === m.key); });
+                            picker.disabled = m.key !== 'fixed';
+                            picker.style.opacity = m.key === 'fixed' ? '1' : '0.35';
+                        });
+                        btns.push(btn);
+                        modeWrap.appendChild(btn);
+                    });
+
+                    picker.addEventListener('input', function() {
+                        cfg.color = picker.value;
+                        if (cfg.mode !== 'fixed') {
+                            cfg.mode = 'fixed';
+                            btns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === 'fixed'); });
+                            picker.disabled = false;
+                            picker.style.opacity = '1';
+                        }
+                    });
+
+                    row.appendChild(picker);
+                    row.appendChild(modeWrap);
+                    rowsWrap.appendChild(row);
+                })(i);
+            }
+        }
+
+        toggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var open = panel.style.display !== 'none';
+            if (open) {
+                panel.style.display = 'none';
+                toggle.classList.remove('active');
+            } else {
+                panel.style.display = 'block';
+                toggle.classList.add('active');
+                positionPanel();
+                rebuildRows();
+            }
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', function(e) {
+            if (panel.style.display !== 'none' && !panel.contains(e.target) && e.target !== toggle) {
+                panel.style.display = 'none';
+                toggle.classList.remove('active');
+            }
+        });
+        panel.addEventListener('click', function(e) { e.stopPropagation(); });
+
+        // Reposition or close on resize
+        window.addEventListener('resize', function() {
+            if (panel.style.display !== 'none') positionPanel();
+        });
+
+        // Rebuild when multiplier changes
+        var mSlider = document.getElementById('multiplier');
+        if (mSlider) {
+            mSlider.addEventListener('input', function() {
+                if (panel.style.display !== 'none') rebuildRows();
+            });
+        }
+
+        // Expose rebuild for external use
+        window.rebuildArmColorRows = rebuildRows;
+
+        return { toggle: toggle };
+    }
+
+    function hslToHex(h, s, l) {
+        s /= 100; l /= 100;
+        var c = (1 - Math.abs(2 * l - 1)) * s;
+        var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        var m = l - c / 2;
+        var r, g, b;
+        if (h < 60) { r=c; g=x; b=0; }
+        else if (h < 120) { r=x; g=c; b=0; }
+        else if (h < 180) { r=0; g=c; b=x; }
+        else if (h < 240) { r=0; g=x; b=c; }
+        else if (h < 300) { r=x; g=0; b=c; }
+        else { r=c; g=0; b=x; }
+        var toHex = function(v) { var h = Math.round((v + m) * 255).toString(16); return h.length < 2 ? '0' + h : h; };
+        return '#' + toHex(r) + toHex(g) + toHex(b);
     }
 
     // ─── HELPERS ─────────────────────────────────────────────────

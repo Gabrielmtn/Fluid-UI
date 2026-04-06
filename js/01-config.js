@@ -666,6 +666,22 @@
         initializeCanvasPosition();
         updateCanvasSize();
         
+        // Force a micro-resize cycle to lock in canvas/framebuffer sync.
+        // This prevents a rendering glitch when the mouse leaves the canvas
+        // before any manual resize has occurred.
+        requestAnimationFrame(() => {
+            const w = canvasWrapper.clientWidth;
+            const h = canvasWrapper.clientHeight;
+            canvasWrapper.style.width = (w + 1) + 'px';
+            canvasWrapper.style.height = (h + 1) + 'px';
+            updateCanvasSize();
+            requestAnimationFrame(() => {
+                canvasWrapper.style.width = w + 'px';
+                canvasWrapper.style.height = h + 'px';
+                updateCanvasSize();
+            });
+        });
+        
         // Re-center on window resize (Electron)
         window.addEventListener('resize', () => {
             setTimeout(initializeCanvasPosition, 100);

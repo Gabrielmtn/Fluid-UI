@@ -10,40 +10,32 @@
     width: 36px;
     height: 36px;
     cursor: pointer;
-    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 0;
 }
 
-.mask-zoom-btn:hover {
-    background: linear-gradient(180deg, #3a4350, #2f3642);
-    border-color: rgba(88, 166, 255, 0.4);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(88, 166, 255, 0.2);
-}
 
 .mask-zoom-btn:active {
-    transform: translateY(0);
     box-shadow: none;
 }
 
 .mask-editor-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(8px);
+    background: rgba(11, 14, 20, 0.96);
     z-index: 10003;
     display: none;
     align-items: center;
     justify-content: center;
     animation: maskFadeIn 0.3s ease;
+    overflow: hidden;
 }
 
 @keyframes maskFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { }
+    to { }
 }
 
 .mask-editor-panel {
@@ -51,9 +43,10 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-    width: 90vw;
+    width: 94%;
     max-width: 1200px;
-    height: 85vh;
+    height: 96%;
+    max-height: 96%;
     display: flex;
     flex-direction: column;
     color: #e6edf3;
@@ -64,14 +57,15 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
+    padding: clamp(8px, 1.5vh, 16px) clamp(12px, 2vw, 20px);
     background: linear-gradient(180deg, rgba(26, 31, 42, 0.95), rgba(15, 20, 27, 0.95));
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
 }
 
 .mask-editor-header h3 {
     margin: 0;
-    font-size: 20px;
+    font-size: clamp(14px, 2vh, 20px);
     font-weight: 600;
     color: #58a6ff;
 }
@@ -88,22 +82,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
 }
 
-.mask-close-btn:hover {
-    background: linear-gradient(#3a3f4a, #2f3440);
-    transform: scale(1.05);
-}
 
 .mask-editor-controls {
     display: flex;
-    gap: 20px;
+    gap: clamp(6px, 1vh, 14px);
     align-items: center;
-    padding: 16px 20px;
+    padding: clamp(6px, 1vh, 12px) clamp(12px, 2vw, 20px);
     background: rgba(13, 17, 23, 0.6);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     flex-wrap: wrap;
+    flex: 0 1 auto;
+    overflow-y: auto;
 }
 
 .mask-mode-toggle {
@@ -122,7 +113,6 @@
     padding: 8px 16px;
     border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s ease;
     font-size: 14px;
     font-weight: 500;
 }
@@ -145,10 +135,6 @@
     color: #8b949e;
 }
 
-.mask-mode-toggle label:not(:has(input:checked)):hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #c9d1d9;
-}
 
 .mask-shape-tools {
     display: flex;
@@ -167,19 +153,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
 }
 
-.mask-tool-btn:hover {
-    background: linear-gradient(#3a3f4a, #2f3440);
-    border-color: #58a6ff;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(88, 166, 255, 0.2);
-}
-
-.mask-tool-btn:active {
-    transform: translateY(0);
-}
 
 .mask-actions {
     display: flex;
@@ -196,14 +171,8 @@
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
 
-.mask-action-btn:hover:not(:disabled) {
-    background: linear-gradient(#3a3f4a, #2f3440);
-    border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-1px);
-}
 
 .mask-action-btn:disabled {
     opacity: 0.5;
@@ -212,11 +181,12 @@
 }
 
 .mask-canvas-container {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: clamp(6px, 1vh, 16px);
     background: rgba(0, 0, 0, 0.3);
     position: relative;
     overflow: hidden;
@@ -235,19 +205,19 @@
     display: flex;
     justify-content: flex-end;
     gap: 12px;
-    padding: 16px 20px;
+    padding: clamp(8px, 1.5vh, 16px) clamp(12px, 2vw, 20px);
     background: linear-gradient(180deg, rgba(15, 20, 27, 0.95), rgba(13, 17, 23, 0.95));
     border-top: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
 }
 
 .mask-cancel-btn,
 .mask-apply-btn {
-    padding: 12px 24px;
+    padding: clamp(8px, 1.2vh, 12px) clamp(16px, 2vw, 24px);
     border-radius: 10px;
-    font-size: 15px;
+    font-size: clamp(13px, 1.5vh, 15px);
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
     border: 1px solid;
 }
 
@@ -257,11 +227,6 @@
     color: #8b949e;
 }
 
-.mask-cancel-btn:hover {
-    background: linear-gradient(#3a3f4a, #2f3440);
-    color: #c9d1d9;
-    border-color: rgba(255, 255, 255, 0.2);
-}
 
 .mask-apply-btn {
     background: linear-gradient(135deg, #4caf50, #2e7d32);
@@ -270,15 +235,6 @@
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
-.mask-apply-btn:hover {
-    background: linear-gradient(135deg, #5cb85f, #3e8e41);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
-}
-
-.mask-apply-btn:active {
-    transform: translateY(0);
-}
 
 /* Layer item mask button */
 .layer-mask-btn {
@@ -289,7 +245,6 @@
     border-radius: 6px;
     font-size: 16px;
     cursor: pointer;
-    transition: all 0.2s ease;
     opacity: 0.6;
 }
 
@@ -298,11 +253,6 @@
     color: #e6edf3;
 }
 
-.layer-mask-btn:hover {
-    background: linear-gradient(#2f3743, #1f2530);
-    border-color: #58a6ff;
-    opacity: 1;
-}
 
 .layer-mask-btn.active {
     background: linear-gradient(135deg, #58a6ff, #1a7cff);
@@ -318,14 +268,8 @@
 }
 
 @keyframes maskControlsSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { }
+    to { }
 }
 
 @keyframes spin {
@@ -346,19 +290,9 @@
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
     white-space: nowrap;
 }
 
-.mask-control-btn:hover {
-    background: linear-gradient(#3a3f4a, #2f3440);
-    border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-1px);
-}
-
-.mask-control-btn:active {
-    transform: translateY(0);
-}
 
 .mask-create-btn {
     background: linear-gradient(135deg, #7b61ff, #4a33d1);
@@ -366,21 +300,12 @@
     color: #fff;
 }
 
-.mask-create-btn:hover {
-    background: linear-gradient(135deg, #8b71ff, #5a43e1);
-    box-shadow: 0 2px 8px rgba(123, 97, 255, 0.3);
-}
 
 .mask-clear-btn {
     color: #ff7b72;
     border-color: rgba(255, 123, 114, 0.3);
 }
 
-.mask-clear-btn:hover {
-    background: linear-gradient(#3a2f2f, #2f2424);
-    border-color: rgba(255, 123, 114, 0.5);
-    color: #ff9b8a;
-}
 
 /* Smart Select Button */
 .mask-mode-btn {
@@ -392,20 +317,10 @@
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     gap: 6px;
     flex: 1;
 }
 
-.mask-mode-btn:hover {
-    background: linear-gradient(180deg, #3a4350, #2f3642);
-    border-color: rgba(88, 166, 255, 0.4);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(88, 166, 255, 0.2);
-}
 
-.mask-mode-btn:active {
-    transform: translateY(0);
-}

@@ -61,9 +61,11 @@ class AnimationsGroup extends UIComponent {
                     <label class="anim-switch"><input type="checkbox" id="${this.id}-ascendToggle" ${this.state.ascendActive ? 'checked' : ''}><span class="anim-switch-track"></span></label>
                 </div>
                 <div class="anim-settings ${this.state.ascendActive ? 'open' : ''}" id="${this.id}-ascendSettings">
-                    <div class="control-group checkbox-group" style="margin-top:4px;">
-                        <input type="checkbox" id="${this.id}-ascendRandomness" ${this.state.ascendRandomness ? 'checked' : ''}>
-                        <label for="${this.id}-ascendRandomness" style="margin:0;text-transform:none;opacity:1;font-size:11px;">Randomness</label>
+                    <div class="anim-settings-inner">
+                        <div class="control-group checkbox-group" style="margin-top:4px;">
+                            <input type="checkbox" id="${this.id}-ascendRandomness" ${this.state.ascendRandomness ? 'checked' : ''}>
+                            <label for="${this.id}-ascendRandomness" style="margin:0;text-transform:none;opacity:1;font-size:11px;">Randomness</label>
+                        </div>
                     </div>
                 </div>
                 
@@ -72,6 +74,7 @@ class AnimationsGroup extends UIComponent {
                     <label class="anim-switch"><input type="checkbox" id="${this.id}-shootingStarToggle" ${this.state.shootingStarActive ? 'checked' : ''}><span class="anim-switch-track"></span></label>
                 </div>
                 <div class="anim-settings ${this.state.shootingStarActive ? 'open' : ''}" id="${this.id}-shootingStarSettings">
+                    <div class="anim-settings-inner"></div>
                 </div>
             </div>
         `;

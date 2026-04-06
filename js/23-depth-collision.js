@@ -749,8 +749,14 @@ class DepthEstimator {
 
     function _doUpdateObstacle() {
         _obsDirty = false;
-        if (!collisionEnabled) return;
         if (!window.layers) return;
+
+        // Auto-enable collision if any collision layers exist (e.g. after preset restore)
+        if (!collisionEnabled) {
+            var hasCollision = window.layers.some(function (l) { return l.isCollision; });
+            if (!hasCollision) return;
+            collisionEnabled = true;
+        }
 
         var canvasEl = document.getElementById('canvas');
         if (!canvasEl) return;
@@ -805,9 +811,30 @@ class DepthEstimator {
 
                 _shapeCtx.putImageData(_shapeImgData, 0, 0);
 
+                // Apply layer transform (x, y, scaleX, scaleY, rotation)
+                // mapped from canvas-pixel space to sim-texture space
+                var canvasW = canvasEl.width || 1;
+                var canvasH = canvasEl.height || 1;
+                var mapX = simW / canvasW;
+                var mapY = simH / canvasH;
+                var lx = (layer.x || 0) * mapX;
+                var ly = (layer.y || 0) * mapY;
+                var lScaleX = layer.scaleX || 1;
+                var lScaleY = layer.scaleY || 1;
+                var lRot = (layer.rotation || 0) * Math.PI / 180;
+                var cx = simW * 0.5;
+                var cy = simH * 0.5;
+
+                obstacleCtx.save();
                 obstacleCtx.globalCompositeOperation = 'lighter';
+                // Mirror CSS transform: translate then rotate then scale around center
+                obstacleCtx.translate(cx, cy);
+                obstacleCtx.translate(lx, ly);
+                obstacleCtx.rotate(lRot);
+                obstacleCtx.scale(lScaleX, lScaleY);
+                obstacleCtx.translate(-cx, -cy);
                 obstacleCtx.drawImage(_shapeCanvas, 0, 0, simW, simH);
-                obstacleCtx.globalCompositeOperation = 'source-over';
+                obstacleCtx.restore();
             });
         });
 

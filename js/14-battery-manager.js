@@ -12,8 +12,10 @@
             simResolution: 128,        // Minimal physics
             dyeResolution: 512,        // Low visual detail
             pressureIterations: 10,    // Minimal accuracy
-            curl: 20,
+            curl: 4,
             sharpness: 0,
+            targetFPS: 30,
+            fpsCap: 30,                // Hard cap to save power
             description: 'Low quality, maximum battery life'
         },
         'balanced': {
@@ -22,8 +24,10 @@
             simResolution: 256,        // Good physics
             dyeResolution: 1024,       // Good visuals
             pressureIterations: 25,    // Good accuracy
-            curl: 30,
+            curl: 6,
             sharpness: 0.3,
+            targetFPS: 60,
+            fpsCap: 60,
             description: 'Recommended for most systems'
         },
         'performance': {
@@ -32,8 +36,10 @@
             simResolution: 512,        // Higher physics
             dyeResolution: 1024,       // Good visuals
             pressureIterations: 30,    // Higher accuracy
-            curl: 40,
+            curl: 10,
             sharpness: 0.5,
+            targetFPS: 60,
+            fpsCap: 60,
             description: 'High quality, needs decent GPU'
         },
         'ultra': {
@@ -42,28 +48,34 @@
             simResolution: 512,        // High physics
             dyeResolution: 2048,       // High visual detail
             pressureIterations: 40,    // High accuracy
-            curl: 50,
+            curl: 12,
             sharpness: 0.6,
+            targetFPS: 120,
+            fpsCap: 120,
             description: 'Very high quality, needs good GPU'
         },
         'extreme': {
             name: 'Extreme',
             icon: '🔥',
-            simResolution: 1024,       // Maximum physics detail
+            simResolution: 512,        // High physics (512→1024 is 4x GPU cost, minimal visual gain)
             dyeResolution: 2048,       // High visual detail
-            pressureIterations: 60,    // Very high accuracy
-            curl: 60,
+            pressureIterations: 40,    // High accuracy
+            curl: 16,
             sharpness: 0.8,
-            description: 'Extreme quality, needs powerful GPU'
+            targetFPS: 'native',       // Resolved to monitor Hz at runtime
+            fpsCap: 'native',          // Uncap to match monitor
+            description: 'Extreme quality, targets native monitor Hz'
         },
         'cinematic': {
             name: 'Cinematic',
             icon: '🎬',
-            simResolution: 1024,       // Maximum physics
+            simResolution: 512,        // High physics (keeps frame budget for 4K dye)
             dyeResolution: 4096,       // 4K visual detail
-            pressureIterations: 80,    // Maximum accuracy
-            curl: 70,
+            pressureIterations: 50,    // Very high accuracy
+            curl: 20,
             sharpness: 1.0,
+            targetFPS: 'native',       // Resolved to monitor Hz at runtime
+            fpsCap: 'native',          // Uncap to match monitor
             description: '4K cinematic, for high-end GPUs only'
         }
     };
@@ -92,20 +104,16 @@
             this.startFpsMonitoring();
         }
         
-        detectMonitorHz() {
-            // Try to get from screen API (Chrome/Electron)
-            if (window.screen && window.screen.refreshRate && window.screen.refreshRate > 0) {
-                return window.screen.refreshRate;
-            }
-            
-            // Fallback: assume 60 Hz (most common)
-            return 60;
+        getMonitorHz() {
+            // Use the globally detected display Hz (set by 05-fluid-sim.js via Electron API)
+            return window.__displayHz || 60;
         }
         
-        updateUltraProfile() {
-            // Set Ultra to match monitor Hz instead of uncapped
-            PROFILES.ultra.targetFPS = this.monitorHz;
-            PROFILES.ultra.description = `Match monitor (${this.monitorHz} Hz)`;
+        // Resolve 'native' targetFPS/fpsCap to actual monitor Hz
+        resolveProfileFps(profile) {
+            const hz = this.getMonitorHz();
+            const target = profile.targetFPS === 'native' ? hz : profile.targetFPS;
+            return target || 60;
         }
         
         async initBattery() {
@@ -216,10 +224,10 @@
             if (now - this.lastFpsAdjustment < 10000) return;
             
             const currentProfile = PROFILES[this.currentProfile];
-            const targetFps = currentProfile.targetFPS;
+            const targetFps = this.resolveProfileFps(currentProfile);
             
             // If FPS is significantly below target (< 70%), downgrade
-            if (avgFps < targetFps * 0.7) {
+            if (targetFps > 0 && avgFps < targetFps * 0.7) {
                 const profiles = ['ultra', 'performance', 'balanced', 'battery-saver'];
                 const currentIndex = profiles.indexOf(this.currentProfile);
                 
@@ -275,15 +283,18 @@
             
             // Apply profile settings to config
             if (window.config) {
+                // Guard: prevent slider event listeners from deactivating this profile
+                window._profileApplying = true;
+                
+                // Check if resolution is changing BEFORE applying (reinit destroys sim state)
+                const resChanged = config.SIM_RESOLUTION !== profile.simResolution ||
+                                   config.DYE_RESOLUTION !== profile.dyeResolution;
+                
                 // Simulation resolution
-                if (config.SIM_RESOLUTION !== profile.simResolution) {
-                    config.SIM_RESOLUTION = profile.simResolution;
-                }
+                config.SIM_RESOLUTION = profile.simResolution;
                 
                 // Dye resolution
-                if (config.DYE_RESOLUTION !== profile.dyeResolution) {
-                    config.DYE_RESOLUTION = profile.dyeResolution;
-                }
+                config.DYE_RESOLUTION = profile.dyeResolution;
                 
                 // Pressure iterations
                 const pressureSlider = document.getElementById('pressure-iterations');
@@ -311,12 +322,39 @@
                     }
                 }
                 
-                // Trigger framebuffer reinit for resolution changes
-                window.needsFramebufferReinit = true;
+                // Only reinit framebuffers if resolution actually changed
+                if (resChanged) {
+                    window.needsFramebufferReinit = true;
+                }
+                
+                // Clear guard — future slider changes are user-initiated
+                window._profileApplying = false;
             }
             
-            // DON'T set FPS cap - let user control it via dropdown
-            // FPS cap is independent of quality profile
+            // Set FPS cap if profile specifies one
+            if (profile.fpsCap !== undefined) {
+                const hz = this.getMonitorHz();
+                const capVal = profile.fpsCap === 'native' ? 0 : profile.fpsCap;
+                window.fpsCap = capVal;
+                // Sync the FPS cap dropdown
+                const fpsCapSel = document.getElementById('fpsCap');
+                if (fpsCapSel) {
+                    if (profile.fpsCap === 'native') {
+                        fpsCapSel.value = 'native';
+                    } else {
+                        fpsCapSel.value = String(capVal);
+                        // If exact value not in dropdown, set to closest
+                        if (fpsCapSel.value !== String(capVal)) {
+                            fpsCapSel.value = 'native';
+                            window.fpsCap = 0;
+                        }
+                    }
+                }
+                console.log('[Profile] ' + profileName + ' → FPS cap: ' + (capVal === 0 ? 'native (' + hz + 'Hz)' : capVal));
+            }
+            
+            // Sync resolution dropdowns to match new profile values
+            this.syncResolutionDropdowns();
             
             // Update UI
             this.updateProfileUI(profileName);
@@ -460,8 +498,8 @@
             const statusText = document.getElementById('battery-status-text');
             
             if (level === null) {
-                percentText.textContent = 'N/A';
-                statusText.textContent = 'Desktop Mode';
+                if (percentText) percentText.textContent = 'N/A';
+                if (statusText) statusText.textContent = 'Desktop Mode';
                 if (levelBar) levelBar.style.width = '100%';
                 return;
             }
@@ -509,19 +547,68 @@
                 desc.textContent = profile.description;
             }
             
-            // Update stats (FPS cap is controlled separately via dropdown)
-            const currentFpsCap = window.fpsCap || 60;
+            // Update stats — show profile's target FPS (resolving 'native' to monitor Hz)
+            const resolvedTarget = this.resolveProfileFps(profile);
             const targetFpsEl = document.getElementById('target-fps');
             const simResEl = document.getElementById('sim-res');
             const simResHEl = document.getElementById('sim-res-h');
             const dyeResEl = document.getElementById('dye-res');
             const dyeResHEl = document.getElementById('dye-res-h');
 
-            if (targetFpsEl) targetFpsEl.textContent = currentFpsCap;
+            if (targetFpsEl) targetFpsEl.textContent = profile.targetFPS === 'native' ? resolvedTarget + ' (native)' : resolvedTarget;
             if (simResEl)   simResEl.textContent   = profile.simResolution;
             if (simResHEl)  simResHEl.textContent  = Math.round(profile.simResolution * 0.75);
             if (dyeResEl)   dyeResEl.textContent   = profile.dyeResolution;
             if (dyeResHEl)  dyeResHEl.textContent  = Math.round(profile.dyeResolution * 0.75);
+        }
+        
+        // Deactivate the active profile (called when user makes custom changes)
+        clearActiveProfile() {
+            this.currentProfile = null;
+            
+            // Remove active state from all profile buttons
+            document.querySelectorAll('.profile-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Update description to indicate custom
+            const desc = document.getElementById('profile-description');
+            if (desc) {
+                desc.textContent = 'Custom settings';
+            }
+            
+            // Update target FPS display to show current cap
+            const targetFpsEl = document.getElementById('target-fps');
+            if (targetFpsEl) {
+                const cap = window.fpsCap;
+                targetFpsEl.textContent = cap > 0 ? cap : (window.__displayHz || 60) + ' (native)';
+            }
+        }
+        
+        // Sync the resolution dropdowns in the UI to match config values
+        syncResolutionDropdowns() {
+            const visualResSel = document.getElementById('visualResolution');
+            if (visualResSel) {
+                const val = String(window.config.DYE_RESOLUTION);
+                const hasOption = Array.from(visualResSel.options).some(opt => opt.value === val);
+                visualResSel.value = hasOption ? val : 'custom';
+                const customInput = document.getElementById('visualResolutionCustom');
+                if (customInput) {
+                    customInput.style.display = hasOption ? 'none' : 'block';
+                    if (!hasOption) customInput.value = val;
+                }
+            }
+            const physicsResSel = document.getElementById('physicsResolution');
+            if (physicsResSel) {
+                const val = String(window.config.SIM_RESOLUTION);
+                const hasOption = Array.from(physicsResSel.options).some(opt => opt.value === val);
+                physicsResSel.value = hasOption ? val : 'custom';
+                const customInput = document.getElementById('physicsResolutionCustom');
+                if (customInput) {
+                    customInput.style.display = hasOption ? 'none' : 'block';
+                    if (!hasOption) customInput.value = val;
+                }
+            }
         }
         
         saveSettings() {
@@ -561,8 +648,10 @@
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             window.batteryManager = new BatteryManager();
+            window.clearActiveProfile = () => window.batteryManager?.clearActiveProfile();
         });
     } else {
         window.batteryManager = new BatteryManager();
+        window.clearActiveProfile = () => window.batteryManager?.clearActiveProfile();
     }
 })();

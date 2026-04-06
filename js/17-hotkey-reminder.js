@@ -1,9 +1,9 @@
 /**
- * Hotkey Reminder Bar
- * Fixed-position panel that slides in from the right edge of the mixer
- * strip when modifier keys are held. Same height as the strip, overlays
- * color / actions / presets but not the fader channels.
- * All animation is GPU-composited (transform + opacity).
+ * Hotkey Reminder Panel
+ * Fixed-position column panel that appears at the top-right when
+ * modifier keys are held. Chips wrap into a compact vertical layout.
+ * Uses instant display toggling (no CSS transitions) to avoid
+ * compositor layer disruption of the WebGL canvas in Electron.
  */
 (function () {
     'use strict';
@@ -26,6 +26,11 @@
         bar.innerHTML =
             '<div class="hotkey-reminder-inner">' +
                 '<div class="hk-group hk-default">' +
+                    '<span class="hk-chip"><kbd>Space</kbd> Play/Pause</span>' +
+                    '<span class="hk-chip"><kbd>F9</kbd> Record</span>' +
+                    '<span class="hk-chip"><kbd>↑</kbd><kbd>↓</kbd> Layers</span>' +
+                    '<span class="hk-chip"><kbd>Del</kbd> Clear Layer</span>' +
+                    '<span class="hk-chip hk-sep"></span>' +
                     '<span class="hk-chip"><kbd>[</kbd><kbd>]</kbd> Brush</span>' +
                     '<span class="hk-chip"><kbd>1</kbd>–<kbd>8</kbd> Mult</span>' +
                     '<span class="hk-chip"><kbd>T</kbd> Trail</span>' +
@@ -39,6 +44,9 @@
                 '</div>' +
                 '<div class="hk-group hk-shift">' +
                     '<span class="hk-mod">Shift</span>' +
+                    '<span class="hk-chip"><kbd>Space</kbd> Play/Pause All</span>' +
+                    '<span class="hk-chip"><kbd>F9</kbd> Record Now</span>' +
+                    '<span class="hk-chip hk-sep"></span>' +
                     '<span class="hk-chip"><kbd>[</kbd><kbd>]</kbd> Coarse Brush</span>' +
                     '<span class="hk-chip"><kbd>S</kbd> Save Color</span>' +
                     '<span class="hk-chip"><kbd>X</kbd> Clear Colors</span>' +
@@ -52,6 +60,7 @@
                 '</div>' +
                 '<div class="hk-group hk-ctrl-shift">' +
                     '<span class="hk-mod">Ctrl+Shift</span>' +
+                    '<span class="hk-chip"><kbd>N</kbd> New Layer</span>' +
                     '<span class="hk-chip"><kbd>Scroll</kbd> Motion Isolation</span>' +
                     '<span class="hk-chip"><kbd>Z</kbd> Redo</span>' +
                 '</div>' +

@@ -36,7 +36,7 @@
     height: 100%;
     background: linear-gradient(90deg, #4ade80, #22c55e);
     border-radius: 2px;
-    transition: width 0.3s ease, background 0.3s ease;
+    transition: width 0.3s ease;
     min-width: 2px;
 }
 
@@ -76,14 +76,7 @@
     border-radius: 8px;
     color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
-    transition: all 0.2s ease;
     font-size: 11px;
-}
-
-.profile-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-1px);
 }
 
 .profile-btn.active {
@@ -146,15 +139,11 @@ body.dark-theme .profile-btn {
     border-color: rgba(255, 255, 255, 0.08);
 }
 
-body.dark-theme .profile-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.15);
-}
 
 /* Animation for battery level changes */
 @keyframes batteryPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+    0%, 100% { color: #4ade80; }
+    50% { color: #86efac; }
 }
 
 .battery-level.charging {
@@ -179,15 +168,11 @@ body.dark-theme .profile-btn:hover {
     font-weight: 500;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     z-index: 10000;
-    opacity: 0;
-    transform: translateX(400px);
-    transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
+    display: none;
 }
 
 .fps-notification.show {
-    opacity: 1;
-    transform: translateX(0);
+    display: block;
 }
 
 /* Setting hints */

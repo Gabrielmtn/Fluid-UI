@@ -11,11 +11,27 @@
     function setVal(id, value, evt='input') { const el = $(id); if (!el) return; el.value = value; el.dispatchEvent(new Event(evt, {bubbles:true})); el.style.setProperty('--val', value); }
     function setCheck(id, checked) { const el = $(id); if (!el) return; el.checked = !!checked; el.dispatchEvent(new Event('change', {bubbles:true})); }
 
+    // Base64 encode/decode for Uint8Array (collision depthData serialization)
+    function _uint8ToBase64(uint8) {
+        var chunks = [];
+        var CHUNK = 8192; // avoid call stack overflow with .apply
+        for (var i = 0; i < uint8.length; i += CHUNK) {
+            chunks.push(String.fromCharCode.apply(null, uint8.subarray(i, Math.min(i + CHUNK, uint8.length))));
+        }
+        return btoa(chunks.join(''));
+    }
+    function _base64ToUint8(b64) {
+        var bin = atob(b64);
+        var arr = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return arr;
+    }
+
     // All slider IDs to save/load
     var SLIDER_IDS = [
         // Simulation
         'densityDissipation','velocityDissipation','pressureDissipation','pressureIteration',
-        'velocityInfluence','curl','sharpness','brushSize','multiplier','canvasOpacity','captureDimming',
+        'velocityInfluence','curl','sharpness','brushSize','multiplier','timeScale','canvasOpacity','captureDimming',
         // Kaleidoscope
         'kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments',
         // Light Source
@@ -24,12 +40,18 @@
         'lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation',
         // Micro Detail
         'clarity','vibrance',
+        // Sunrays
+        'sunraysWeight',
+        // Spin (Balatro idea)
+        'spinSpeed','spinRotation','spinContrast','spinLighting','spinAmount','spinPixelFilter','spinEase','spinMix',
         // Shooting Star
         'ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity',
         // Audio Reactive
         'audioSensitivity','audioBeatThreshold',
         // Brush
-        'brushRefreshRate'
+        'brushRefreshRate',
+        // Display Shading
+        'shadingIntensity'
     ];
 
     // All checkbox IDs to save/load
@@ -43,6 +65,7 @@
         'kaleidoToggle','kAnimateRot',
         // Effects
         'enableLighting','enableLightShift','microDetailToggle',
+        'sunraysToggle','spinToggle',
         // Simulation
         'turbulenceMode',
         // Animations
@@ -54,7 +77,9 @@
         // Focus
         'focusModeToggle','streamFormatLock',
         // Settings
-        'autoloadSettings'
+        'autoloadSettings',
+        // Display Shading
+        'displayShadingToggle'
     ];
 
     // All select IDs to save/load
@@ -319,6 +344,14 @@
             if (typeof kr.segments === 'number') setVal('kaleidoSegments', kr.segments, 'input');
         }
 
+        // ── 9. COS Oscillator state ──
+        try {
+            var cosSnap = sm.get('cosOscillator', null);
+            if (cosSnap && window.cosOscillator && typeof window.cosOscillator.loadState === 'function') {
+                window.cosOscillator.loadState(cosSnap);
+            }
+        } catch(_){}
+
         console.log('Settings loaded:', sliderCount, 'sliders restored');
     }
 
@@ -559,22 +592,24 @@
                         collisionMode: layer.collisionMode || 'block',
                         collisionStrength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
                     };
-                    // Mask data (skip large typed arrays — depth can be regenerated)
+                    // Mask data — encode collision depthData as base64 for exact restoration
                     if (layer.mask) {
                         ld.mask = {
                             enabled: !!layer.mask.enabled,
                             mode: layer.mask.mode || 'show',
                             shapes: (layer.mask.shapes || []).map(function(s) {
                                 var sc = {};
-                                // Copy only JSON-safe metadata; skip depthData/samMask typed arrays
                                 Object.keys(s).forEach(function(k) {
                                     var v = s[k];
-                                    if (k === 'depthData' || k === 'samMask') return; // skip large binary
+                                    if (k === 'samMask') return; // skip SAM masks (visual only)
+                                    if (k === 'depthData' && v instanceof Uint8Array) {
+                                        // Encode collision depth data as base64 for exact restore
+                                        sc._depthDataB64 = _uint8ToBase64(v);
+                                        return;
+                                    }
                                     if (v instanceof Uint8Array || v instanceof Float32Array) return;
                                     sc[k] = v;
                                 });
-                                // Flag shapes that had binary data stripped
-                                if (s.depthData) sc._hadDepthData = true;
                                 if (s.samMask) sc._hadSamMask = true;
                                 return sc;
                             })
@@ -614,6 +649,35 @@
             }
         } catch(_){}
 
+        // ── Spin (Balatro) colour state ──
+        var spinColours = null;
+        try {
+            var c1el = document.getElementById('spinColour1');
+            var c2el = document.getElementById('spinColour2');
+            var c3el = document.getElementById('spinColour3');
+            spinColours = {
+                colour1: c1el ? c1el.value : '#de443b',
+                colour2: c2el ? c2el.value : '#006bb4',
+                colour3: c3el ? c3el.value : '#162325'
+            };
+        } catch(_){}
+
+        // ── Recorded layers (timeline interactions) ──
+        var recordedLayers = null;
+        try {
+            if (typeof window.recGetLayersSnapshot === 'function') {
+                recordedLayers = window.recGetLayersSnapshot();
+            }
+        } catch(_){}
+
+        // ── COS Oscillator state ──
+        var cosState = null;
+        try {
+            if (window.cosOscillator && typeof window.cosOscillator.getState === 'function') {
+                cosState = window.cosOscillator.getState();
+            }
+        } catch(_){}
+
         return {
             version: 2,
             timestamp: Date.now(),
@@ -635,7 +699,10 @@
             sidebarSections: sidebarSections,
             layers: layersData,
             layerOrder: layerOrderData,
-            branding: brandingData
+            branding: brandingData,
+            recordedLayers: recordedLayers,
+            cosOscillator: cosState,
+            spinColours: spinColours
         };
     }
 
@@ -842,6 +909,29 @@
             }
         } catch(_){}
 
+        // ── Spin (Balatro idea) colour state ──
+        try {
+            if (snapshot.spinColours && window.spinEffect) {
+                var sc = snapshot.spinColours;
+                var fn = function(id, hexVal, prop) {
+                    var el = document.getElementById(id);
+                    if (el && hexVal) {
+                        el.value = hexVal;
+                        var h = hexVal.replace('#','');
+                        window.spinEffect[prop] = [
+                            parseInt(h.slice(0,2),16)/255,
+                            parseInt(h.slice(2,4),16)/255,
+                            parseInt(h.slice(4,6),16)/255,
+                            1.0
+                        ];
+                    }
+                };
+                fn('spinColour1', sc.colour1, 'colour1');
+                fn('spinColour2', sc.colour2, 'colour2');
+                fn('spinColour3', sc.colour3, 'colour3');
+            }
+        } catch(_){}
+
         // ── Layers ──
         try {
             if (snapshot.layers && Array.isArray(snapshot.layers) && snapshot.layers.length > 0) {
@@ -922,7 +1012,7 @@
                         collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7
                     };
 
-                    // Restore mask metadata (binary data like depthData/samMask was stripped during capture)
+                    // Restore mask metadata and decode collision depthData from base64
                     if (ld.mask) {
                         var needsDepthRefresh = false;
                         layer.mask = {
@@ -930,13 +1020,26 @@
                             mode: ld.mask.mode || 'show',
                             shapes: (ld.mask.shapes || []).map(function(s) {
                                 var sc = Object.assign({}, s);
-                                // Clean up internal flags
-                                if (sc._hadDepthData) { needsDepthRefresh = true; delete sc._hadDepthData; }
+                                // Decode base64 depthData back to Uint8Array (new format)
+                                if (sc._depthDataB64) {
+                                    try {
+                                        sc.depthData = _base64ToUint8(sc._depthDataB64);
+                                        delete sc._depthDataB64;
+                                    } catch(e) {
+                                        console.warn('Preset: failed to decode depthData base64', e);
+                                        if (ld.isCollision) needsDepthRefresh = true;
+                                    }
+                                }
+                                // Legacy presets: depthData was stripped entirely
+                                else if (sc._hadDepthData) {
+                                    needsDepthRefresh = true;
+                                    delete sc._hadDepthData;
+                                }
                                 if (sc._hadSamMask) delete sc._hadSamMask;
                                 return sc;
                             })
                         };
-                        // Track collision layers that need depth regeneration
+                        // Track collision layers that need depth regeneration (legacy presets only)
                         if (needsDepthRefresh && ld.isCollision) {
                             collisionIndicesToRefresh.push(ld.index);
                         }
@@ -958,16 +1061,18 @@
 
                 if (typeof window.renderLayers === 'function') window.renderLayers();
 
-                // Step 4: Regenerate depth data for collision layers (async — runs depth estimation)
+                // Step 4: Upload collision obstacle data immediately for layers with restored depthData
+                if (window.collisionLayers && window.collisionLayers.updateObstacleFromLayers) {
+                    window.collisionLayers.updateObstacleFromLayers();
+                }
+                // Step 5: Legacy presets — regenerate depth for layers that had depthData stripped
                 if (collisionIndicesToRefresh.length > 0 && window.collisionLayers && window.collisionLayers.refreshDepth) {
                     setTimeout(function() {
                         collisionIndicesToRefresh.forEach(function(idx) {
-                            console.log('Preset: regenerating depth for collision layer ' + idx);
+                            console.log('Preset: regenerating depth for collision layer ' + idx + ' (legacy preset — no base64 data)');
                             window.collisionLayers.refreshDepth(idx);
                         });
                     }, 500);
-                } else if (window.collisionLayers && window.collisionLayers.updateObstacleFromLayers) {
-                    window.collisionLayers.updateObstacleFromLayers();
                 }
             }
         } catch(e) { console.warn('Preset: layer restore failed', e); }
@@ -986,11 +1091,26 @@
             }
         } catch(_){}
 
+        // ── Recorded layers (timeline interactions) ──
+        try {
+            if (snapshot.recordedLayers && Array.isArray(snapshot.recordedLayers) && typeof window.recRestoreLayersSnapshot === 'function') {
+                window.recRestoreLayersSnapshot(snapshot.recordedLayers);
+            }
+        } catch(_){}
+
+        // ── COS Oscillator state ──
+        try {
+            if (snapshot.cosOscillator && window.cosOscillator && typeof window.cosOscillator.loadState === 'function') {
+                window.cosOscillator.loadState(snapshot.cosOscillator);
+            }
+        } catch(_){}
+
         console.log('Preset applied: v' + (snapshot.version || 1) + ', ' +
             Object.keys(snapshot.sliders || {}).length + ' sliders, ' +
             Object.keys(snapshot.checkboxes || {}).length + ' checkboxes, ' +
             Object.keys(snapshot.selects || {}).length + ' selects' +
-            (snapshot.layers ? ', ' + snapshot.layers.length + ' layers' : ''));
+            (snapshot.layers ? ', ' + snapshot.layers.length + ' layers' : '') +
+            (snapshot.recordedLayers ? ', ' + snapshot.recordedLayers.length + ' recorded layers' : ''));
     }
 
     function getUserPresets() {
@@ -1002,22 +1122,45 @@
         if (!window.Settings || !name || !snapshot) return false;
         // Try full save (may fail if layers make it too large for localStorage)
         var ok = window.Settings.savePreset(name, snapshot);
-        if (ok === false && snapshot.layers) {
-            // Retry without layer image data (keep metadata)
+        if (ok === false) {
             var lite = JSON.parse(JSON.stringify(snapshot));
-            if (lite.layers) {
-                lite.layers.forEach(function(l) { delete l.data; delete l.originalData; });
-                lite._layersStripped = true;
-            }
-            console.warn('Preset "' + name + '": full save failed (quota), retrying without layer images');
-            ok = window.Settings.savePreset(name, lite);
-            if (ok === false) {
-                // Last resort: save without layers at all
-                delete lite.layers;
-                delete lite.layerOrder;
+            // First fallback: strip recorded layer interaction data (can be very large)
+            if (lite.recordedLayers) {
+                lite.recordedLayers.forEach(function(rl) {
+                    if (rl.timeline) rl.timeline.interactions = [];
+                });
+                lite._recordedLayersStripped = true;
+                console.warn('Preset "' + name + '": full save failed (quota), retrying without recorded interactions');
                 ok = window.Settings.savePreset(name, lite);
             }
-            window._lastPresetSaveWarning = 'Layers too large for storage — saved settings only';
+            // Second fallback: strip collision depthData base64 (can be regenerated via depth estimation)
+            if (ok === false && lite.layers) {
+                lite.layers.forEach(function(l) {
+                    if (l.mask && l.mask.shapes) {
+                        l.mask.shapes.forEach(function(s) {
+                            if (s._depthDataB64) { s._hadDepthData = true; delete s._depthDataB64; }
+                        });
+                    }
+                });
+                lite._depthDataStripped = true;
+                console.warn('Preset "' + name + '": retrying without collision depth data');
+                ok = window.Settings.savePreset(name, lite);
+            }
+            // Third fallback: strip canvas layer image data
+            if (ok === false && lite.layers) {
+                lite.layers.forEach(function(l) { delete l.data; delete l.originalData; });
+                lite._layersStripped = true;
+                console.warn('Preset "' + name + '": retrying without layer images');
+                ok = window.Settings.savePreset(name, lite);
+            }
+            // Last resort: save without layers at all
+            if (ok === false) {
+                delete lite.layers;
+                delete lite.layerOrder;
+                delete lite.recordedLayers;
+                ok = window.Settings.savePreset(name, lite);
+            }
+            window._lastPresetSaveWarning = 'Some data too large for storage — saved settings only';
             return ok !== false;
         }
         window._lastPresetSaveWarning = null;
@@ -1182,13 +1325,19 @@
         window.renderUserPresets = renderUserPresets;
         window.applyPresetSnapshot = applyPresetSnapshot;
         window.capturePresetSnapshot = capturePresetSnapshot;
+        window.saveUserPreset = saveUserPreset;
 
-        // Global helper: refresh ALL preset list UIs across the app
+        // Global helper: refresh ALL preset list UIs across the app (debounced to single frame)
+        var _presetRefreshPending = 0;
         window.refreshAllPresetLists = function() {
-            if (typeof window.renderUserPresets === 'function') window.renderUserPresets();
-            if (typeof window.renderMixerUserPresets === 'function') window.renderMixerUserPresets();
-            if (typeof window.renderSidebarPresets === 'function') window.renderSidebarPresets();
-            if (typeof window.renderLayoutUserPresets === 'function') window.renderLayoutUserPresets();
+            if (_presetRefreshPending) return; // already scheduled
+            _presetRefreshPending = requestAnimationFrame(function() {
+                _presetRefreshPending = 0;
+                if (typeof window.renderUserPresets === 'function') window.renderUserPresets();
+                if (typeof window.renderMixerUserPresets === 'function') window.renderMixerUserPresets();
+                if (typeof window.renderSidebarPresets === 'function') window.renderSidebarPresets();
+                if (typeof window.renderLayoutUserPresets === 'function') window.renderLayoutUserPresets();
+            });
         };
     }
 

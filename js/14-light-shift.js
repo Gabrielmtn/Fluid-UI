@@ -19,6 +19,7 @@
     let canvasSize = 180;
     let animationFrame = null;
     let currentPathIndex = 0;
+    let _baseGradientCache = null; // Cached pixel-by-pixel HSL gradient
 
     function init() {
         loadSettings();
@@ -107,7 +108,7 @@
             clearBtn.addEventListener('click', () => {
                 window.lightShift.colorPath = [];
                 window.lightShift.playheadPosition = 0;
-                drawColorWheel();
+                drawColorPicker();
                 saveSettings();
             });
         }
@@ -121,7 +122,8 @@
         
         // Set canvas size (square)
         const container = canvas.parentElement;
-        canvasSize = Math.min(container.clientWidth, 200);
+        const cw = container.clientWidth;
+        canvasSize = cw > 0 ? Math.min(cw, 200) : 180;
         canvas.width = canvasSize;
         canvas.height = canvasSize;
 
@@ -145,25 +147,51 @@
         canvas.addEventListener('touchend', stopDrawing);
     }
 
+    function ensureBaseGradientCache() {
+        if (_baseGradientCache && _baseGradientCache.width === canvasSize && _baseGradientCache.height === canvasSize) return;
+        _baseGradientCache = document.createElement('canvas');
+        _baseGradientCache.width = canvasSize;
+        _baseGradientCache.height = canvasSize;
+        const offCtx = _baseGradientCache.getContext('2d');
+        const imageData = offCtx.createImageData(canvasSize, canvasSize);
+        const data = imageData.data;
+        for (let y = 0; y < canvasSize; y++) {
+            const saturation = 100 - (y / canvasSize) * 100;
+            for (let x = 0; x < canvasSize; x++) {
+                const hue = (x / canvasSize) * 360;
+                const rgb = hslToRgb(hue, saturation, 50);
+                const idx = (y * canvasSize + x) * 4;
+                data[idx] = rgb[0];
+                data[idx + 1] = rgb[1];
+                data[idx + 2] = rgb[2];
+                data[idx + 3] = 255;
+            }
+        }
+        offCtx.putImageData(imageData, 0, 0);
+    }
+
+    function hslToRgb(h, s, l) {
+        s /= 100; l /= 100;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        const m = l - c / 2;
+        let r = 0, g = 0, b = 0;
+        if (h < 60) { r = c; g = x; }
+        else if (h < 120) { r = x; g = c; }
+        else if (h < 180) { g = c; b = x; }
+        else if (h < 240) { g = x; b = c; }
+        else if (h < 300) { r = x; b = c; }
+        else { r = c; b = x; }
+        return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+    }
+
     function drawColorPicker() {
         if (!ctx) return;
 
-        // Clear canvas
+        // Clear canvas and blit cached gradient (created once, not per-frame)
+        ensureBaseGradientCache();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Draw color gradient square (Hue horizontal, Saturation vertical)
-        // Create gradient for each row
-        for (let y = 0; y < canvasSize; y++) {
-            const saturation = 100 - (y / canvasSize) * 100; // Top = saturated, Bottom = desaturated
-            
-            for (let x = 0; x < canvasSize; x++) {
-                const hue = (x / canvasSize) * 360; // Left to right = 0 to 360 degrees
-                const lightness = 50; // Fixed lightness
-                
-                ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-                ctx.fillRect(x, y, 1, 1);
-            }
-        }
+        ctx.drawImage(_baseGradientCache, 0, 0);
 
         // Draw user's path if exists
         if (window.lightShift.colorPath.length > 0) {
@@ -334,8 +362,11 @@
 
     function addPointFromEvent(e) {
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.pageX) - rect.left;
-        const y = (e.clientY || e.pageY) - rect.top;
+        // Scale viewport pixels to canvas pixels (accounts for CSS zoom on parent)
+        const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+        const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
+        const x = ((e.clientX || e.pageX) - rect.left) * scaleX;
+        const y = ((e.clientY || e.pageY) - rect.top) * scaleY;
 
         // Clamp to canvas bounds
         const clampedX = Math.max(0, Math.min(canvasSize, x));
@@ -360,6 +391,9 @@
         }
     }
 
+    let _lightShiftLastDraw = 0;
+    const _lightShiftDrawInterval = 33; // ~30fps for playhead animation (visual only)
+
     function startAnimation() {
         function animate() {
             animationFrame = requestAnimationFrame(animate);
@@ -375,6 +409,11 @@
             if (currentPathIndex >= window.lightShift.colorPath.length) {
                 currentPathIndex = 0;
             }
+
+            // Throttle canvas redraws — playhead visual doesn't need 60fps
+            const now = performance.now();
+            if (now - _lightShiftLastDraw < _lightShiftDrawInterval) return;
+            _lightShiftLastDraw = now;
 
             // Redraw to show playhead movement
             if (canvas) {
@@ -472,6 +511,17 @@
 
     // Expose function for shader to get current color
     window.lightShift.getCurrentColor = getCurrentShiftColor;
+
+    // Expose getPath / setPath for preset save/load and mutation engine
+    window.lightShift.getPath = function () {
+        return JSON.parse(JSON.stringify(window.lightShift.colorPath));
+    };
+    window.lightShift.setPath = function (path) {
+        window.lightShift.colorPath = JSON.parse(JSON.stringify(path || []));
+        currentPathIndex = 0;
+        if (canvas) drawColorPicker();
+        saveSettings();
+    };
 
     function saveSettings() {
         if (typeof window.settingsManager !== 'undefined') {

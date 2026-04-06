@@ -21,8 +21,8 @@ body {
         "colorbar colorbar colorbar"
         "canvas canvas layers"
         "mixer mixer mixer";
-    grid-template-rows: 32px var(--top-bar-height) 1fr var(--bottom-panel-height);
-    grid-template-columns: 1fr auto var(--right-panel-width);
+    grid-template-rows: calc(32px * var(--ui-scale, 1)) calc(var(--top-bar-height) * var(--ui-scale, 1)) 1fr calc(var(--bottom-panel-height) * var(--ui-scale, 1));
+    grid-template-columns: 1fr auto calc(var(--sidebar-width, 280px) * var(--ui-scale, 1));
     height: 100vh;
     overflow: hidden;
 }
@@ -65,15 +65,9 @@ body {
     border: 2px solid rgba(0, 0, 0, 0.5);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.1);
     cursor: pointer;
-    transition: all 0.2s ease;
     position: relative;
 }
 
-.color-swatch-large:hover {
-    border-color: var(--mixer-primary);
-    box-shadow: 0 0 8px rgba(246, 176, 24, 0.6);
-    transform: scale(1.05);
-}
 
 .color-swatch-large.primary {
     width: 50px;
@@ -122,13 +116,8 @@ body {
     color: #ccc;
     border-radius: 4px;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
 
-.color-actions-bar button:hover {
-    background: linear-gradient(180deg, var(--mixer-secondary), var(--mixer-primary));
-    color: #000;
-}
 
 /* ========================================
    BOTTOM MIXER PANEL
@@ -202,9 +191,6 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
-.mixer-fader::-webkit-slider-thumb:hover {
-    background: linear-gradient(180deg, var(--mixer-secondary), var(--mixer-primary));
-}
 
 .mixer-value-display {
     font-size: 9px;
@@ -244,8 +230,7 @@ body {
 
 #layersPanel {
     grid-area: layers;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(10px);
+    background: rgba(11, 14, 20, 0.96);
     border-left: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
     display: flex;
@@ -292,10 +277,6 @@ body {
     cursor: pointer;
 }
 
-.layers-actions button:hover {
-    background: linear-gradient(180deg, var(--mixer-secondary), var(--mixer-primary));
-    color: #000;
-}
 
 .layers-content {
     flex: 1;
@@ -313,13 +294,8 @@ body {
     gap: 8px;
     align-items: center;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
 
-.layer-item-compact:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: var(--mixer-primary);
-}
 
 .layer-item-compact.active {
     background: rgba(246, 176, 24, 0.2);
@@ -363,12 +339,8 @@ body {
     justify-content: center;
     cursor: pointer;
     color: var(--mixer-text-secondary);
-    transition: color 0.2s ease;
 }
 
-.layer-visibility-toggle:hover {
-    color: var(--mixer-primary);
-}
 
 /* ========================================
    SETTINGS DROPDOWN PANEL
@@ -438,9 +410,6 @@ body {
     justify-content: center;
 }
 
-.settings-close:hover {
-    color: var(--mixer-primary);
-}
 
 .settings-content {
     flex: 1;
@@ -488,7 +457,7 @@ body {
 #settingsToggleBtn {
     position: fixed;
     top: calc(32px + 15px);
-    right: calc(var(--right-panel-width) + 15px);
+    right: calc(var(--sidebar-width, 280px) * var(--ui-scale, 1) + 15px);
     width: 36px;
     height: 36px;
     background: var(--mixer-button-gradient);
@@ -502,14 +471,8 @@ body {
     justify-content: center;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     z-index: 250;
-    transition: all 0.2s ease;
 }
 
-#settingsToggleBtn:hover {
-    background: linear-gradient(180deg, var(--mixer-secondary), var(--mixer-primary));
-    color: #000;
-    transform: scale(1.05);
-}
 
 #settingsToggleBtn.active {
     background: linear-gradient(180deg, var(--mixer-primary), #d89a10);
@@ -542,11 +505,6 @@ body {
     border: 1px solid rgba(0, 0, 0, 0.5);
 }
 
-#mixerPanel::-webkit-scrollbar-thumb:hover,
-#layersPanel .layers-content::-webkit-scrollbar-thumb:hover,
-#settingsPanel .settings-content::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, var(--mixer-secondary), var(--mixer-primary));
-}
 
 /* ========================================
    RESPONSIVE ADJUSTMENTS
@@ -555,6 +513,7 @@ body {
 @media (max-width: 1024px) {
     :root {
         --right-panel-width: 240px;
+        --sidebar-width: 240px;
         --mixer-channel-width: 70px;
     }
     
@@ -580,7 +539,6 @@ body {
         top: calc(32px + var(--top-bar-height));
         bottom: var(--bottom-panel-height);
         width: 280px;
-        transition: right 0.3s ease;
     }
     
     #layersPanel.open {

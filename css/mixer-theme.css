@@ -128,7 +128,6 @@
         var(--mixer-primary) var(--progress-percent),
         black var(--progress-percent)
     );
-    transition: all 0.3s linear;
     cursor: pointer;
 }
 
@@ -258,13 +257,9 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease-out;
     flex-shrink: 0;
 }
 
-.buttonContainer button:hover {
-    background: var(--mixer-secondary);
-}
 
 .buttonContainer button.active {
     background: var(--mixer-primary);
@@ -334,7 +329,6 @@
     height: 36px;
     background: var(--mixer-button-gradient);
     border-radius: 50px;
-    transition: all 0.2s ease-out;
 }
 
 .toggle:checked + label:before {
@@ -377,9 +371,6 @@
     margin-bottom: 12px;
 }
 
-.controls.mixer-style .control-group:hover {
-    background: rgba(255, 255, 255, 0.02);
-}
 
 /* Override existing slider styles for mixer theme */
 .mixer-style input[type=range] {
@@ -400,19 +391,10 @@
     font-weight: 600;
     letter-spacing: 0.5px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-    transition: all 0.2s ease-out;
 }
 
-.mixer-style button:hover {
-    background: linear-gradient(180deg, var(--mixer-secondary), var(--mixer-primary));
-    color: #000;
-    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.5);
-    transform: translateY(-1px);
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 1px rgba(255, 255, 255, 0.2);
-}
 
 .mixer-style button:active {
-    transform: translateY(0);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -476,13 +458,8 @@
     border: 2px solid var(--mixer-inset-top);
     border-radius: 50%;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(0, 0, 0, 0.2);
-    transition: all 0.2s ease;
 }
 
-.mixer-style input[type="color"]:hover {
-    box-shadow: 0 2px 10px rgba(246, 176, 24, 0.3), inset 0 1px 3px rgba(0, 0, 0, 0.2);
-    border-color: var(--mixer-primary);
-}
 
 /* ========================================
    COMPACT MIXER SECTIONS
@@ -522,14 +499,8 @@
 .mixer-style .color-swatch {
     border: 2px solid rgba(0, 0, 0, 0.5);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.2);
-    transition: all 0.2s ease;
 }
 
-.mixer-style .color-swatch:hover {
-    border-color: var(--mixer-primary);
-    box-shadow: 0 0 8px rgba(246, 176, 24, 0.6), inset 0 1px rgba(255, 255, 255, 0.3);
-    transform: scale(1.15);
-}
 
 .mixer-style .palette-tag {
     background: var(--mixer-button-gradient);
@@ -538,10 +509,6 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.1);
 }
 
-.mixer-style .palette-tag:hover {
-    background: linear-gradient(180deg, rgba(60, 60, 60, 1), rgba(40, 40, 40, 1));
-    border-color: var(--mixer-primary);
-}
 
 .mixer-style .palette-tag.active {
     background: linear-gradient(180deg, var(--mixer-primary), #d89a10);
@@ -555,10 +522,6 @@
     box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
 }
 
-.mixer-style .palette-chip:hover {
-    border-color: var(--mixer-primary);
-    box-shadow: 0 0 6px rgba(246, 176, 24, 0.5);
-}
 
 /* ========================================
    MIXER-THEMED SCROLLBAR
@@ -581,9 +544,6 @@
     box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
 }
 
-.controls.mixer-style::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, var(--mixer-secondary), var(--mixer-primary));
-}
 
 .controls.mixer-style::-webkit-scrollbar-thumb:active {
     background: linear-gradient(180deg, var(--mixer-primary), #d89a10);
@@ -628,22 +588,9 @@
         rgba(255, 255, 255, 0.1),
         transparent
     );
-    transition: left 0.5s;
 }
 
-.controllerBox:hover h3.title::after {
-    left: 100%;
-}
-
-/* Smooth value transitions */
-.dotDisplay {
-    transition: color 0.3s ease, transform 0.1s ease;
-}
-
-.dotDisplay:hover {
-    transform: scale(1.05);
-    color: var(--mixer-secondary);
-}
+/* Smooth value transitions — no transitions allowed (Electron compositor) */
 
 /* Button press effect */
 .buttonContainer button {
@@ -661,7 +608,6 @@
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.3);
     transform: translate(-50%, -50%);
-    transition: width 0.3s, height 0.3s;
 }
 
 .buttonContainer button:active::before {

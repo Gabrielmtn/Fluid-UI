@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-fluid-ui-bridge"
+description = "Load images sent from Fluid UI into ComfyUI workflows"
+version = "1.0.0"
+readme = "README.md"
+license = { file = "LICENSE" }
+
+[project.urls]
+Repository = "https://github.com/Gabrielmtn/Fluid-UI"
+
+[tool.comfy]
+PublisherId = "gabrielmtn"
+DisplayName = "Fluid UI Bridge"
+Icon = ""
+requires-comfyui = ">=0.3.0"

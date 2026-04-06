@@ -18,7 +18,4 @@
     box-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
 }
 
-/* Gradient overlay transition */
-.light-gradient-overlay {
-    transition: background 0.2s ease;
-}
+/* Gradient overlay (no transition — composited updates only) */

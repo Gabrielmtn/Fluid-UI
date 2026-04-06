@@ -6,6 +6,27 @@
                 recRenderUI();
             });
         }
+
+        // Throttled timeline UI refresh — limits expensive canvas redraws to ~10fps
+        let _recRefreshQueued = false;
+        let _recRefreshLastTime = 0;
+        const _recRefreshInterval = 100; // ms between timeline redraws
+        function recThrottledRefreshUI() {
+            if (_recRefreshQueued) return;
+            const now = performance.now();
+            const elapsed = now - _recRefreshLastTime;
+            if (elapsed >= _recRefreshInterval) {
+                _recRefreshLastTime = now;
+                recRefreshTimelinesUI();
+            } else {
+                _recRefreshQueued = true;
+                setTimeout(() => {
+                    _recRefreshQueued = false;
+                    _recRefreshLastTime = performance.now();
+                    recRefreshTimelinesUI();
+                }, _recRefreshInterval - elapsed);
+            }
+        }
         
         function recParseTime(str) {
             if (str === undefined || str === null) return 10000;
@@ -201,13 +222,12 @@
             const a = recGetActiveLayer();
             if (!a || !a.timeline.isRecording) return;
             const timestamp = Date.now() - a.timeline.recordingStartTime;
-            if (timestamp > recMaxDurationMs) {
+            const layerMaxMs = (typeof a.loopMaxMs === 'number' && a.loopMaxMs > 0) ? a.loopMaxMs : recMaxDurationMs;
+            if (timestamp > layerMaxMs) {
                 a.timeline.isRecording = false;
-                const btn = document.getElementById('recRecordBtn');
-                if (btn) btn.textContent = '⏺ Record';
                 a.timeline.duration = 0;
                 a.timeline.interactions.forEach(i => { a.timeline.duration = Math.max(a.timeline.duration, i.timestamp); });
-                recScheduleRender();
+                recRenderUI();
                 return;
             }
             const mult = (typeof window.animationMultiplier === 'number') ? window.animationMultiplier : 1;
@@ -227,8 +247,8 @@
                     }
                 }
             }
-            // Update timelines (main + minis) without rebuilding the whole list
-            recRefreshTimelinesUI();
+            // Update timelines (main + minis) — throttled to avoid blocking input
+            recThrottledRefreshUI();
         }
         
         function recTogglePlayback() {
@@ -312,7 +332,19 @@
                 const prevTime = currentTime - scaledDelta;
                 const cappedPrev = Math.min(prevTime, eff);
                 const cappedCurr = Math.min(currentTime, eff);
-                const events = layer.timeline.interactions.filter(i => i.timestamp > cappedPrev && i.timestamp <= cappedCurr);
+                // Binary search for start index instead of O(n) filter
+                const interactions = layer.timeline.interactions;
+                let lo = 0, hi = interactions.length;
+                while (lo < hi) {
+                    const mid = (lo + hi) >>> 1;
+                    if (interactions[mid].timestamp <= cappedPrev) lo = mid + 1;
+                    else hi = mid;
+                }
+                const events = [];
+                for (let idx = lo; idx < interactions.length; idx++) {
+                    if (interactions[idx].timestamp > cappedCurr) break;
+                    events.push(interactions[idx]);
+                }
                 events.forEach(i => {
                     // Check if this interaction passes through the layer's mask
                     if (typeof window.checkMaskPoint === 'function' && !window.checkMaskPoint(layer.id, i.x, i.y)) {
@@ -343,7 +375,7 @@
                 }
             });
             recLastPlaybackTime = now;
-            recRefreshTimelinesUI();
+            recThrottledRefreshUI();
         }
         
         function recRenderUI() {
@@ -433,6 +465,12 @@
                 recDrawerElState.classList.toggle('rec-playing', !!(a && a.timeline.isPlaying));
                 recDrawerElState.classList.toggle('rec-countdown', !!recCountdownActive);
             }
+            // Propagate state to body for global CSS feedback (canvas glow, etc.)
+            var isRec = !!(a && a.timeline.isRecording);
+            var isPlay = !!(a && a.timeline.isPlaying) || !!recIsPlayingAll;
+            document.body.classList.toggle('rec-recording', isRec);
+            document.body.classList.toggle('rec-playing', !isRec && isPlay);
+            document.body.classList.toggle('rec-countdown', !!recCountdownActive);
             const miniStatus = document.getElementById('recMiniLayerStatus');
             if (miniStatus) {
                 const total = recLayers.length || 0;

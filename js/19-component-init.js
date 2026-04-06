@@ -632,6 +632,32 @@
         effectsGroup.mount(container);
         
         // Sync with original controls
+        const shadingToggle = document.getElementById('displayShadingToggle');
+        const shadingSlider = document.getElementById('shadingIntensity');
+        const shadingValue = document.getElementById('shadingIntensityValue');
+        const shadingGroup = document.getElementById('shadingIntensityGroup');
+
+        if (shadingToggle) {
+            effectsGroup.on('surfaceShadingChange', (enabled) => {
+                shadingToggle.checked = enabled;
+                shadingToggle.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            shadingToggle.addEventListener('change', () => {
+                effectsGroup.setSurfaceShading(shadingToggle.checked);
+            });
+        }
+        if (shadingSlider) {
+            effectsGroup.on('shadingIntensityChange', (val) => {
+                shadingSlider.value = val;
+                if (shadingValue) shadingValue.textContent = val.toFixed(1);
+                if (shadingGroup) shadingGroup.style.display = shadingToggle && shadingToggle.checked ? 'block' : 'none';
+                shadingSlider.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+            shadingSlider.addEventListener('input', () => {
+                effectsGroup.setShadingIntensity(parseFloat(shadingSlider.value));
+            });
+        }
+
         const lightSource = document.getElementById('enableLighting');
         const lightShift = document.getElementById('enableLightShift');
         

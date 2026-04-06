@@ -18,7 +18,8 @@ app.commandLine.appendSwitch('enable-webgl2-compute-context');
 app.commandLine.appendSwitch('max-gum-fps', '1000'); // Remove media FPS cap
 app.commandLine.appendSwitch('disable-renderer-backgrounding'); // Keep rendering at full speed
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows'); // No throttling when covered
-app.commandLine.appendSwitch('use-angle', 'gl'); // Force OpenGL instead of D3D
+// NOTE: Do NOT use --use-angle=gl on Windows — OpenGL backend locks vsync to 60Hz.
+// Default D3D11 backend handles high-refresh monitors correctly.
 app.commandLine.appendSwitch('disable-software-rasterizer'); // Force hardware rendering
 
 // ⚡ Memory and Performance Flags
@@ -36,8 +37,10 @@ console.log('   - Frame rate limit: DISABLED');
 console.log('   - GPU workarounds: DISABLED');
 console.log('   - Renderer throttling: DISABLED');
 
+let mainWindow = null;
+
 function createWindow() {
-    const mainWindow = new BrowserWindow({
+    mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
         resizable: true,
@@ -62,10 +65,8 @@ function createWindow() {
     // Enable remote module for this window
     require('@electron/remote/main').enable(mainWindow.webContents);
     
-    // FORCE: Try to disable VSync at window level
-    mainWindow.webContents.on('dom-ready', () => {
-        mainWindow.webContents.setFrameRate(144); // Try to set frame rate directly
-    });
+    // NOTE: setFrameRate() only works with offscreen rendering (offscreen: true).
+    // High refresh rate is handled by --disable-gpu-vsync + --disable-frame-rate-limit flags.
     
     // NOTE: Cache and localStorage are preserved across restarts.
     // Use Ctrl+Shift+D in the app to force-clear everything for debugging.
@@ -107,6 +108,11 @@ function createWindow() {
 
     // Remove menu bar for cleaner look (optional)
     mainWindow.setMenuBarVisibility(false);
+
+    // Clean up reference when window is closed
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+    });
 }
 
 app.whenReady().then(() => {
@@ -123,4 +129,28 @@ app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
     }
+});
+
+// Force-destroy all windows before quitting
+app.on('before-quit', () => {
+    const allWindows = BrowserWindow.getAllWindows();
+    allWindows.forEach((win) => {
+        if (!win.isDestroyed()) {
+            win.removeAllListeners('close');
+            win.destroy();
+        }
+    });
+});
+
+// Final cleanup on process exit
+app.on('will-quit', () => {
+    mainWindow = null;
+});
+
+// Handle terminal kill signals (Ctrl+C, taskkill, etc.)
+process.on('SIGINT', () => {
+    app.quit();
+});
+process.on('SIGTERM', () => {
+    app.quit();
 });

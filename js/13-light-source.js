@@ -22,6 +22,8 @@
     let targetY = 0.5;
     let velocityX = 0;
     let velocityY = 0;
+    let _lsLastDotDraw = 0;
+    const _lsDotDrawInterval = 33; // ~30fps for DOM dot position updates
 
     function init() {
         loadSettings();
@@ -221,6 +223,10 @@
                 animateRandomMode(speed);
             }
             
+            // Throttle DOM updates for dot position — visual only, doesn't affect shader
+            const now = performance.now();
+            if (now - _lsLastDotDraw < _lsDotDrawInterval) return;
+            _lsLastDotDraw = now;
             updateDotPosition();
         }
         animate();
