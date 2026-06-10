@@ -300,11 +300,17 @@
 
             activePreset = name;
 
-            
 
-            // Instant application - zero overhead
 
-            Object.assign(config, preset);
+            // Instant application — clamped through the param registry
+
+            const safePreset = (window.ParamRegistry && window.ParamRegistry.clampConfigObject)
+
+                ? window.ParamRegistry.clampConfigObject(preset)
+
+                : preset;
+
+            Object.assign(config, safePreset);
 
             
 

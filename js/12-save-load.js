@@ -728,41 +728,67 @@
 
     function applyPresetSnapshot(snapshot) {
         if (!snapshot) return;
+        var reg = window.ParamRegistry;
 
-        // ── Sliders ──
-        if (snapshot.sliders) {
-            Object.keys(snapshot.sliders).forEach(function(id) {
-                setVal(id, snapshot.sliders[id]);
-            });
-        }
+        // ── Sliders ── (clamped through the param registry; unknown ids warn + skip)
+        try {
+            if (snapshot.sliders) {
+                Object.keys(snapshot.sliders).forEach(function(id) {
+                    var raw = snapshot.sliders[id];
+                    if (reg) {
+                        var clamped = reg.clampSlider(id, raw);
+                        if (clamped === null) { console.warn('[Preset] skipping unknown/invalid slider', id, raw); return; }
+                        if (clamped !== Number(raw)) console.warn('[Preset] clamped slider', id, raw, '→', clamped);
+                        setVal(id, clamped);
+                    } else {
+                        setVal(id, raw);
+                    }
+                });
+            }
+        } catch(e) { console.warn('[Preset] slider restore failed:', e); }
 
         // ── Checkboxes ──
-        if (snapshot.checkboxes) {
-            Object.keys(snapshot.checkboxes).forEach(function(id) {
-                setCheck(id, snapshot.checkboxes[id]);
-            });
-        }
+        try {
+            if (snapshot.checkboxes) {
+                Object.keys(snapshot.checkboxes).forEach(function(id) {
+                    if (reg && reg.coerceCheckbox(id, snapshot.checkboxes[id]) === null) {
+                        console.warn('[Preset] skipping unknown checkbox', id); return;
+                    }
+                    setCheck(id, !!snapshot.checkboxes[id]);
+                });
+            }
+        } catch(e) { console.warn('[Preset] checkbox restore failed:', e); }
 
         // ── Selects ──
-        if (snapshot.selects) {
-            Object.keys(snapshot.selects).forEach(function(id) {
-                var el = $(id);
-                if (!el) return;
-                if (el.tagName === 'SELECT') {
-                    var hasOpt = Array.from(el.options).some(function(opt) { return opt.value === String(snapshot.selects[id]); });
-                    if (hasOpt) setVal(id, snapshot.selects[id], 'change');
-                } else {
-                    setVal(id, snapshot.selects[id], 'change');
-                }
-            });
-        }
+        try {
+            if (snapshot.selects) {
+                Object.keys(snapshot.selects).forEach(function(id) {
+                    var el = $(id);
+                    if (!el) return;
+                    var v = snapshot.selects[id];
+                    if (reg) {
+                        var coerced = reg.coerceSelect(id, v);
+                        if (coerced === null) { console.warn('[Preset] skipping unknown/invalid select', id, v); return; }
+                        v = coerced;
+                    }
+                    if (el.tagName === 'SELECT') {
+                        var hasOpt = Array.from(el.options).some(function(opt) { return opt.value === String(v); });
+                        if (hasOpt) setVal(id, v, 'change');
+                    } else {
+                        setVal(id, v, 'change');
+                    }
+                });
+            }
+        } catch(e) { console.warn('[Preset] select restore failed:', e); }
 
         // ── Colors ──
-        if (snapshot.colors) {
-            if (snapshot.colors.background) setVal('backgroundColorPicker', snapshot.colors.background, 'input');
-            if (snapshot.colors.brush) setVal('colorPicker', snapshot.colors.brush, 'input');
-            if (snapshot.colors.brandingText) setVal('brandingTextColor', snapshot.colors.brandingText, 'input');
-        }
+        try {
+            if (snapshot.colors) {
+                if (snapshot.colors.background) setVal('backgroundColorPicker', snapshot.colors.background, 'input');
+                if (snapshot.colors.brush) setVal('colorPicker', snapshot.colors.brush, 'input');
+                if (snapshot.colors.brandingText) setVal('brandingTextColor', snapshot.colors.brandingText, 'input');
+            }
+        } catch(e) { console.warn('[Preset] color restore failed:', e); }
 
         // ── Per-arm brush colors (multiply brush) ──
         try {
@@ -782,28 +808,32 @@
         } catch(_){}
 
         // ── Kaleidoscope runtime ──
-        if (snapshot.kaleido) {
-            var kr = snapshot.kaleido;
-            if (typeof kr.mode === 'number') setVal('kaleidoMode', kr.mode, 'change');
-            if (typeof kr.segments === 'number') setVal('kaleidoSegments', kr.segments, 'input');
-            // Runtime globals for immediate effect
-            if (typeof kr.angle === 'number') window.kAngle = kr.angle;
-            if (typeof kr.twist === 'number') window.kTwist = kr.twist;
-            if (typeof kr.zoom === 'number') window.kZoom = kr.zoom;
-            if (typeof kr.blend === 'number') window.kBlend = kr.blend;
-            if (typeof kr.animate === 'boolean') window.kAnimateRot = kr.animate;
-        }
+        try {
+            if (snapshot.kaleido) {
+                var kr = snapshot.kaleido;
+                if (typeof kr.mode === 'number') setVal('kaleidoMode', kr.mode, 'change');
+                if (typeof kr.segments === 'number') setVal('kaleidoSegments', kr.segments, 'input');
+                // Runtime globals for immediate effect
+                if (typeof kr.angle === 'number') window.kAngle = kr.angle;
+                if (typeof kr.twist === 'number') window.kTwist = kr.twist;
+                if (typeof kr.zoom === 'number') window.kZoom = kr.zoom;
+                if (typeof kr.blend === 'number') window.kBlend = kr.blend;
+                if (typeof kr.animate === 'boolean') window.kAnimateRot = kr.animate;
+            }
+        } catch(e) { console.warn('[Preset] kaleidoscope restore failed:', e); }
 
         // ── Palette ──
-        if (typeof snapshot.paletteIndex === 'number' && typeof window.applyPalette === 'function') {
-            if (snapshot.paletteName && typeof window.getPaletteIndexByName === 'function') {
-                var idx = window.getPaletteIndexByName(snapshot.paletteName);
-                if (idx >= 0) { window.applyPalette(idx); }
-                else { window.applyPalette(snapshot.paletteIndex); }
-            } else {
-                window.applyPalette(snapshot.paletteIndex);
+        try {
+            if (typeof snapshot.paletteIndex === 'number' && typeof window.applyPalette === 'function') {
+                if (snapshot.paletteName && typeof window.getPaletteIndexByName === 'function') {
+                    var idx = window.getPaletteIndexByName(snapshot.paletteName);
+                    if (idx >= 0) { window.applyPalette(idx); }
+                    else { window.applyPalette(snapshot.paletteIndex); }
+                } else {
+                    window.applyPalette(snapshot.paletteIndex);
+                }
             }
-        }
+        } catch(e) { console.warn('[Preset] palette restore failed:', e); }
 
         // ── Saved colors ──
         try {

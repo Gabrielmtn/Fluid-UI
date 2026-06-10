@@ -2415,17 +2415,21 @@
         }
         // Expose globally for other scripts
         window.generateVibrantColor = generateVibrantColor;
-        const sliderConfig = {
-            densityDissipation: { key: 'DENSITY_DISSIPATION', decimals: 4 },
-            velocityDissipation: { key: 'VELOCITY_DISSIPATION', decimals: 4 },
-            pressureDissipation: { key: 'PRESSURE_DISSIPATION', decimals: 3 },
-            pressureIteration: { key: 'PRESSURE_ITERATIONS', decimals: 0 },
-            velocityInfluence: { key: 'VELOCITY_INFLUENCE', decimals: 3 },
-            curl: { key: 'CURL', decimals: 0 },
-            sharpness: { key: 'SHARPNESS', decimals: 1 },
-            clarity: { key: 'CLARITY', decimals: 2 },
-            vibrance: { key: 'VIBRANCE', decimals: 2 }
-        };
+        // Derived from the param registry (single source of truth); the
+        // object literal fallback matches the registry's simSlider entries.
+        const sliderConfig = (window.ParamRegistry && window.ParamRegistry.toSliderConfig)
+            ? window.ParamRegistry.toSliderConfig()
+            : {
+                densityDissipation: { key: 'DENSITY_DISSIPATION', decimals: 4 },
+                velocityDissipation: { key: 'VELOCITY_DISSIPATION', decimals: 4 },
+                pressureDissipation: { key: 'PRESSURE_DISSIPATION', decimals: 3 },
+                pressureIteration: { key: 'PRESSURE_ITERATIONS', decimals: 0 },
+                velocityInfluence: { key: 'VELOCITY_INFLUENCE', decimals: 3 },
+                curl: { key: 'CURL', decimals: 0 },
+                sharpness: { key: 'SHARPNESS', decimals: 1 },
+                clarity: { key: 'CLARITY', decimals: 2 },
+                vibrance: { key: 'VIBRANCE', decimals: 2 }
+            };
         const brushSizeSlider = document.getElementById('brushSize');
         brushSizeSlider.addEventListener('input', (e) => {
             config.SPLAT_RADIUS = e.target.value / 1000;

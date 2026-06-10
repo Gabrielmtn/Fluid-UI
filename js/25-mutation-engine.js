@@ -16,91 +16,15 @@
     // scope: 'basic' = high visual impact, 'extended' = everything else
     //         Selecting "All" uses both; "Basic" uses only 'basic'.
 
-    var SLIDER_SCHEMA = [
-        // Simulation — basic
-        { id: 'densityDissipation',  min: 0.85,  max: 1.005,  step: 0.0001, scope: 'basic' },
-        { id: 'velocityDissipation', min: 0.9,   max: 1.0009, step: 0.0001, scope: 'basic' },
-        { id: 'pressureDissipation', min: 0.9,   max: 1.0333, step: 0.001,  scope: 'basic' },
-        { id: 'pressureIteration',   min: 1,     max: 50,     step: 1,      scope: 'basic' },
-        { id: 'curl',                min: 0,     max: 60,     step: 1,      scope: 'basic' },
-        { id: 'sharpness',           min: 0,     max: 2,      step: 0.1,    scope: 'basic' },
-        { id: 'multiplier',          min: 1,     max: 8,      step: 1,      scope: 'basic' },
-        { id: 'timeScale',           min: 0.01,  max: 3,      step: 0.01,   scope: 'extended' },
-        { id: 'velocityInfluence',   min: 1,     max: 5,      step: 0.001,  scope: 'extended' },
-
-        // Kaleidoscope — basic
-        { id: 'kaleidoSegments',     min: 1,     max: 24,     step: 1,      scope: 'basic' },
-        { id: 'kAngle',             min: -180,  max: 180,    step: 1,      scope: 'basic' },
-        { id: 'kSpinSpeed',         min: -180,  max: 180,    step: 1,      scope: 'basic' },
-        { id: 'kTwist',             min: 0,     max: 10,     step: 0.1,    scope: 'basic' },
-        { id: 'kZoom',              min: 0.5,   max: 2,      step: 0.01,   scope: 'basic' },
-        { id: 'kBlend',             min: 0,     max: 1,      step: 0.01,   scope: 'basic' },
-
-        // Display
-        { id: 'canvasOpacity',       min: 0,     max: 100,    step: 1,      scope: 'extended' },
-        { id: 'captureDimming',      min: 0,     max: 100,    step: 1,      scope: 'extended' },
-        { id: 'brushSize',           min: 0.1,   max: 30,     step: 0.1,    scope: 'extended' },
-
-        // Lighting
-        { id: 'lightIntensity',      min: 0,     max: 1,      step: 0.01,   scope: 'extended' },
-        { id: 'lightAmbient',        min: 0,     max: 1,      step: 0.01,   scope: 'extended' },
-        { id: 'lightSpeed',          min: 0.1,   max: 2,      step: 0.1,    scope: 'extended' },
-
-        // Light Shift
-        { id: 'lightShiftSpeed',       min: 0.05, max: 0.5, step: 0.05, scope: 'extended' },
-        { id: 'lightShiftThreshold',   min: 0.5, max: 1,   step: 0.01, scope: 'extended' },
-        { id: 'lightShiftIntensity',   min: 0,   max: 1,   step: 0.01, scope: 'extended' },
-        { id: 'lightShiftSaturation',  min: 0,   max: 1,   step: 0.01, scope: 'extended' },
-
-        // Micro Detail
-        { id: 'clarity',             min: 0,     max: 1,      step: 0.05,   scope: 'extended' },
-        { id: 'vibrance',            min: 0,     max: 1,      step: 0.05,   scope: 'extended' },
-
-        // Sunrays
-        { id: 'sunraysWeight',       min: 0.1,   max: 3,      step: 0.1,    scope: 'extended' },
-
-        // Shooting Star
-        { id: 'ssFrequency',         min: 0.2,   max: 8,      step: 0.1,    scope: 'extended' },
-        { id: 'ssAngle',             min: 0,     max: 360,    step: 1,      scope: 'extended' },
-        { id: 'ssLength',            min: 0.1,   max: 3.0,    step: 0.05,   scope: 'extended' },
-        { id: 'ssSize',              min: 0.1,   max: 2.0,    step: 0.05,   scope: 'extended' },
-        { id: 'ssVariance',          min: 0,     max: 60,     step: 1,      scope: 'extended' },
-        { id: 'ssGravity',           min: 0,     max: 1.0,    step: 0.01,   scope: 'extended' },
-
-        // Display Shading
-        { id: 'shadingIntensity',     min: 0,     max: 2,      step: 0.1,    scope: 'extended' },
-
-        // Audio Reactive
-        { id: 'audioSensitivity',     min: 0.1,   max: 3.0,    step: 0.1,    scope: 'extended' },
-        { id: 'audioBeatThreshold',   min: 0.1,   max: 1.0,    step: 0.05,   scope: 'extended' },
-
-        // Brush
-        { id: 'brushRefreshRate',     min: 0,     max: 100,    step: 1,      scope: 'extended' }
-    ];
-
-    var CHECKBOX_SCHEMA = [
-        { id: 'kaleidoToggle',       scope: 'basic' },
-        { id: 'kAnimateRot',         scope: 'basic' },
-        { id: 'randomColor',         scope: 'basic' },
-        { id: 'stepPalette',         scope: 'basic' },
-        { id: 'turbulenceMode',      scope: 'basic' },
-        { id: 'preserveFluidOpacity', scope: 'extended' },
-        { id: 'enableLighting',      scope: 'extended' },
-        { id: 'enableLightShift',    scope: 'extended' },
-        { id: 'microDetailToggle',   scope: 'extended' },
-        { id: 'sunraysToggle',       scope: 'extended' },
-        { id: 'ascendToggle',        scope: 'extended' },
-        { id: 'ascendRandomness',    scope: 'extended' },
-        { id: 'shootingStarToggle',  scope: 'extended' },
-        { id: 'displayShadingToggle', scope: 'extended' }
-    ];
-
-    var SELECT_SCHEMA = [
-        { id: 'kaleidoMode', options: ['0','1','2','3','4','5'], scope: 'basic' },
-        { id: 'lightMode',   options: null, scope: 'extended' },  // null = read from DOM
-        { id: 'lightShiftMode', options: null, scope: 'extended' }
-    ];
-
+    // Schemas are derived from the param registry (js/01a-param-registry.js),
+    // the single source of truth for parameter bounds and mutation scopes.
+    var _schemas = (window.ParamRegistry && window.ParamRegistry.toMutationSchemas)
+        ? window.ParamRegistry.toMutationSchemas()
+        : (console.warn('[Mutation] ParamRegistry missing — mutation disabled'),
+           { sliders: [], checkboxes: [], selects: [] });
+    var SLIDER_SCHEMA = _schemas.sliders;
+    var CHECKBOX_SCHEMA = _schemas.checkboxes;
+    var SELECT_SCHEMA = _schemas.selects;
     // Build lookup maps
     var _sliderMap = {};
     SLIDER_SCHEMA.forEach(function (s) { _sliderMap[s.id] = s; });
