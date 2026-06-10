@@ -89,6 +89,9 @@
                             <div class="stat-row"><span class="stat-label">CPU Time:</span> <span id="stat-updatetime">--</span></div>
                             <div class="stat-row"><span class="stat-label">Frame Budget:</span> <span id="stat-budget">--</span></div>
                             <div class="stat-row"><span class="stat-label">Display:</span> <span id="stat-displayhz">--</span></div>
+                            <div class="stat-row"><label class="stat-label" for="governorToggle">Adaptive Quality:</label> <input type="checkbox" id="governorToggle"></div>
+                            <div class="stat-row"><label class="stat-label" for="governorAllowRes">&nbsp;&nbsp;Resolution Tiers:</label> <input type="checkbox" id="governorAllowRes"></div>
+                            <div class="stat-row"><span class="stat-label">Adaptive State:</span> <span id="stat-governor">--</span></div>
                         </div>
                         <div class="stats-section">
                             <div class="stats-title">Simulation</div>
@@ -894,6 +897,7 @@
     <script src="js/11-settings-interface.js"></script>
     <script src="js/10-draggable.js"></script>
     <script src="js/08-stats-panel.js"></script>
+    <script src="js/08a-quality-governor.js"></script>
     <script src="js/12-save-load.js"></script>
     <script src="js/13-light-source.js"></script>
     <script src="js/14-light-shift.js"></script>

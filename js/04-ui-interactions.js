@@ -312,6 +312,8 @@
 
             Object.assign(config, safePreset);
 
+            if (window.QualityGovernor) window.QualityGovernor.reset();
+
             
 
             // Single DOM update

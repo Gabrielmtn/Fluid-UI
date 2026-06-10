@@ -729,6 +729,7 @@
     function applyPresetSnapshot(snapshot) {
         if (!snapshot) return;
         var reg = window.ParamRegistry;
+        if (window.QualityGovernor) window.QualityGovernor.reset();
 
         // ── Sliders ── (clamped through the param registry; unknown ids warn + skip)
         try {

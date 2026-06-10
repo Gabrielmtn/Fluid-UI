@@ -1029,8 +1029,12 @@
             const displayW = canvas.width;
             const displayH = canvas.height;
             const aspect = displayW / Math.max(1, displayH);
-            const dyeBase = config.DYE_RESOLUTION || 1024;
-            const simBase = config.SIM_RESOLUTION || 128;
+            // [GOVERNOR HOOK] stash old density so artwork survives re-init
+            const _prevDensity = (typeof density !== 'undefined' && density && density.read) ? density : null;
+            // [GOVERNOR HOOK] scale internal resolution (config untouched)
+            const _gov = window.QualityGovernor;
+            const dyeBase = Math.max(64, Math.round((config.DYE_RESOLUTION || 1024) * (_gov ? _gov.dyeScale() : 1)));
+            const simBase = Math.max(32, Math.round((config.SIM_RESOLUTION || 128) * (_gov ? _gov.simScale() : 1)));
             // Check WebGL texture size limits
             const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
             // Compute absolute internal sizes: long side = base, short side scaled by aspect
@@ -1098,6 +1102,24 @@
                     gl.clearColor(0, 0, 0, 0);
                     gl.clear(gl.COLOR_BUFFER_BIT);
                 }
+            }
+            // [GOVERNOR HOOK] dye-preserving re-init: copy the old density into
+            // the fresh FBO (clearProg with value=1.0 is a passthrough), then
+            // free the old GPU memory. Fixes "resolution change wipes artwork".
+            if (_prevDensity) {
+                gl.disable(gl.BLEND);
+                gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                clearProg.bind();
+                gl.uniform1i(clearProg.uniforms.uTexture, 0);
+                gl.uniform1f(clearProg.uniforms.value, 1.0);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, _prevDensity.read.texture);
+                blit(density.write.fbo);
+                density.swap();
+                [_prevDensity.read, _prevDensity.write].forEach((f) => {
+                    if (f) { gl.deleteTexture(f.texture); gl.deleteFramebuffer(f.fbo); }
+                });
+                gl.enable(gl.BLEND);
             }
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
@@ -3225,7 +3247,11 @@
                 gl.uniform1i(pressureProg.uniforms.uDivergence, 0);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, divergence.texture);
-                for (let i = 0; i < config.PRESSURE_ITERATIONS; i++) {
+                // [GOVERNOR HOOK] effective iteration count (config untouched)
+                const _pIters = window.QualityGovernor
+                    ? window.QualityGovernor.effIters(config.PRESSURE_ITERATIONS)
+                    : config.PRESSURE_ITERATIONS;
+                for (let i = 0; i < _pIters; i++) {
                     gl.uniform1i(pressureProg.uniforms.uPressure, 1);
                     gl.activeTexture(gl.TEXTURE1);
                     gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
@@ -3291,8 +3317,10 @@
                 // Re-enable blend for post-processing and display passes
                 gl.enable(gl.BLEND);
             }
+            // [GOVERNOR HOOK] post-FX gate (sharpen, micro-detail, sunrays)
+            const _fxOn = window.QualityGovernor ? window.QualityGovernor.fxOn() : true;
             // Apply sharpness pass if enabled (config.SHARPNESS > 0)
-            const sharpnessEnabled = config.SHARPNESS > 0;
+            const sharpnessEnabled = _fxOn && config.SHARPNESS > 0;
             let displayTexture = density.read.texture;
             if (sharpnessEnabled) {
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
@@ -3311,7 +3339,7 @@
             // Apply micro detail pass if clarity or vibrance is active
             const mdClarity = config.CLARITY || 0;
             const mdVibrance = config.VIBRANCE || 0;
-            const microDetailEnabled = mdClarity > 0 || mdVibrance > 0;
+            const microDetailEnabled = _fxOn && (mdClarity > 0 || mdVibrance > 0);
             if (microDetailEnabled) {
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 microDetailProg.bind();
@@ -3382,7 +3410,8 @@
                 }
             }
             // ── Sunrays post-processing ──
-            if (config.SUNRAYS) {
+            const _sunraysOn = _fxOn && !!config.SUNRAYS; // [GOVERNOR HOOK]
+            if (_sunraysOn) {
                 applySunrays(displayTexture, sunrays, sunraysTemp);
                 blur(sunrays, sunraysTemp, 1);
             }
@@ -3416,7 +3445,7 @@
             gl.uniform1f(displayProg.uniforms.displayShading, window.displayShading || 0.0);
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
             gl.uniform1i(displayProg.uniforms.uSunrays, 1);
-            gl.uniform1f(displayProg.uniforms.sunraysEnabled, config.SUNRAYS ? 1.0 : 0.0);
+            gl.uniform1f(displayProg.uniforms.sunraysEnabled, _sunraysOn ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.preserveOpacity, window.preserveFluidOpacity ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.backgroundTransparency, window.backgroundTransparency || 0.0);
             gl.uniform1f(displayProg.uniforms.kaleidoEnabled, window.kaleidoEnabled ? 1.0 : 0.0);
@@ -3435,7 +3464,7 @@
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, displayTexture);
             gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, config.SUNRAYS ? sunrays.texture : null);
+            gl.bindTexture(gl.TEXTURE_2D, _sunraysOn ? sunrays.texture : null);
             blit(null);
             }
             // ─── Stats update (ring buffer, zero-GC) ──────────────────
@@ -3454,6 +3483,8 @@
                 displayHz: displayHz,
                 budgetPct: budgetPct
             };
+            // [GOVERNOR HOOK] feed the adaptive quality governor
+            if (window.QualityGovernor) window.QualityGovernor.onFrame(nowMs, cpuMs);
             requestAnimationFrame(update);
         }
         function renderLayers() {
