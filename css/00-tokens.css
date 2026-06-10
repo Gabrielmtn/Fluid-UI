@@ -1,0 +1,70 @@
+/* ================================================================
+   00-TOKENS — design tokens (single source of truth)
+   Linked FIRST, before all other stylesheets.
+
+   Adoption is opportunistic: replace literals with tokens only where
+   the value matches exactly; never re-derive values.
+
+   Note: --ui-scale and the responsive font/space scales live in
+   init-responsive.css (they are computed against --ui-scale which JS
+   sets at runtime).
+   ================================================================ */
+:root {
+    /* ── Accent (warm yellow used across active states) ── */
+    --accent: rgba(255, 220, 80, 1);
+    --accent-60: rgba(255, 220, 80, 0.6);
+    --accent-40: rgba(255, 220, 80, 0.4);
+    --accent-25: rgba(255, 220, 80, 0.25);
+    --accent-12: rgba(255, 220, 80, 0.12);
+
+    /* ── Cool accent (info / focus / sliders) ── */
+    --accent-cool: #4fc3f7;
+    --accent-cool-soft: rgba(100, 200, 255, 0.35);
+
+    /* ── Status ── */
+    --ok: #3fb950;
+    --warn: #ffa500;
+    --danger: #ff6b6b;
+
+    /* ── Surfaces ── */
+    --bg-app: #0a0d12;
+    --bg-panel: rgba(11, 14, 20, 0.96);
+    --bg-panel-2: #0f141b;
+    --bg-raised: rgba(255, 255, 255, 0.06);
+    --bg-raised-hover: rgba(255, 255, 255, 0.1);
+    --bg-inset: rgba(0, 0, 0, 0.2);
+
+    /* ── Borders ── */
+    --border-subtle: rgba(255, 255, 255, 0.04);
+    --border-default: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.12);
+
+    /* ── Text ── */
+    --text-primary: rgba(255, 255, 255, 0.95);
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --text-dim: rgba(255, 255, 255, 0.4);
+
+    /* ── Spacing scale ── */
+    --sp-1: 4px;
+    --sp-2: 6px;
+    --sp-3: 8px;
+    --sp-4: 12px;
+    --sp-5: 16px;
+
+    /* ── Radii ── */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+
+    /* ── Font stack ── */
+    --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+    --font-mono: 'Courier New', monospace;
+
+    /* ── Z-index scale ── */
+    --z-canvas: 0;
+    --z-ui: 100;
+    --z-overlay: 1000;
+    --z-modal: 2000;
+    --z-toast: 3000;
+    --z-splash: 99999;
+}

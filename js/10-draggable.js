@@ -21,8 +21,19 @@ class Draggable {
         this.startY = 0;
         this.offsetX = 0;
         this.offsetY = 0;
-        
+
         this.init();
+    }
+
+    /**
+     * Effective CSS zoom of the element (panels are scaled via
+     * `zoom: var(--ui-scale)`). style.left/top on a zoomed element are
+     * interpreted in the zoomed coordinate space, so screen-px coordinates
+     * must be divided by this before being applied.
+     */
+    getZoom() {
+        const z = parseFloat(getComputedStyle(this.element).zoom);
+        return (isFinite(z) && z > 0) ? z : 1;
     }
     
     init() {
@@ -113,19 +124,20 @@ class Draggable {
             y = Math.round(y / this.options.grid[1]) * this.options.grid[1];
         }
         
-        // Constrain to viewport
+        // Constrain to viewport (all values here are screen px)
         if (this.options.constrainToViewport) {
             const rect = this.element.getBoundingClientRect();
             const maxX = window.innerWidth - rect.width;
             const maxY = window.innerHeight - rect.height;
-            
+
             x = Math.max(0, Math.min(x, maxX));
             y = Math.max(0, Math.min(y, maxY));
         }
-        
-        // Apply position
-        this.element.style.left = x + 'px';
-        this.element.style.top = y + 'px';
+
+        // Apply position (convert screen px → zoomed coordinate space)
+        const zoom = this.getZoom();
+        this.element.style.left = (x / zoom) + 'px';
+        this.element.style.top = (y / zoom) + 'px';
         this.element.style.right = 'auto';
         this.element.style.bottom = 'auto';
         
@@ -183,12 +195,15 @@ class Draggable {
         const position = window.settingsManager.get(this.options.savePosition);
         
         if (position && typeof position.x === 'number' && typeof position.y === 'number') {
-            // Ensure position is still within viewport
+            // Saved positions are screen px (from getBoundingClientRect).
+            // Ensure position is still within viewport, then convert to the
+            // element's zoomed coordinate space.
             const x = Math.max(0, Math.min(position.x, window.innerWidth - 100));
             const y = Math.max(0, Math.min(position.y, window.innerHeight - 100));
-            
-            this.element.style.left = x + 'px';
-            this.element.style.top = y + 'px';
+            const zoom = this.getZoom();
+
+            this.element.style.left = (x / zoom) + 'px';
+            this.element.style.top = (y / zoom) + 'px';
             this.element.style.right = 'auto';
             this.element.style.bottom = 'auto';
         }

@@ -120,24 +120,10 @@
     }
 
     function initResponsiveScale() {
-        // Elements to apply zoom scaling to
-        var _zoomTargetIds = ['sidebar-right', 'mixer-strip', 'colorBar',
-            'settingsToggleBtn', 'settingsPanel', 'hotkeyOverlay', 'statsPanel'];
-        var _zoomTargetClasses = ['stats-panel', 'rec-drawer', 'delete-modal',
-            'hotkey-reminder', 'mask-editor-overlay', 'fps-notification',
-            'arm-colors-panel'];
-
-        function applyZoom(scale) {
-            var z = scale === 1 ? '' : String(scale);
-            _zoomTargetIds.forEach(function(id) {
-                var el = document.getElementById(id);
-                if (el) el.style.zoom = z;
-            });
-            _zoomTargetClasses.forEach(function(cls) {
-                var els = document.querySelectorAll('.' + cls);
-                for (var i = 0; i < els.length; i++) els[i].style.zoom = z;
-            });
-        }
+        // Single scaling mechanism: JS only computes --ui-scale; all zooming
+        // is done in CSS via `zoom: var(--ui-scale)` rules (init-responsive.css).
+        // Elements added later pick the zoom up automatically from their class.
+        var _scale = 1;
 
         function computeScale() {
             var dpr = window.devicePixelRatio || 1;
@@ -154,8 +140,8 @@
             if (scale === 1 && dpr >= 2 && cssW >= 1200) {
                 scale = 1.15;
             }
+            _scale = scale;
             document.documentElement.style.setProperty('--ui-scale', scale);
-            applyZoom(scale);
             console.log('[UI Scale] dpr=' + dpr + ' cssW=' + cssW + ' → scale=' + scale);
         }
         computeScale();
@@ -171,8 +157,14 @@
             });
         }
         watchDpr();
-        // Expose so late-created panels can be re-scaled
-        window._uiScaleReapply = function() { applyZoom(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1); };
+        // Coordinate helper for fixed-position math on zoomed elements:
+        // style px = screen px / scale.
+        window.UIScale = {
+            get: function() { return _scale; },
+            fromVisual: function(px) { return px / _scale; }
+        };
+        // Back-compat no-op (zooming is CSS-driven now)
+        window._uiScaleReapply = function() {};
     }
 
     function initSidebarResize(sidebar) {
@@ -191,7 +183,7 @@
         });
         handle.addEventListener('pointermove', function(e) {
             if (!dragging) return;
-            var zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+            var zoom = window.UIScale ? window.UIScale.get() : 1;
             var delta = startX - e.clientX; // dragging left = wider
             // offsetWidth and delta are in screen pixels (zoomed), convert to base width
             var newW = Math.max(220, Math.min(420, (startW + delta) / zoom));
@@ -2450,12 +2442,11 @@
         panel.style.display = 'none';
         panel.style.position = 'fixed';
         document.body.appendChild(panel);
-        if (window._uiScaleReapply) window._uiScaleReapply();
 
         function positionPanel() {
             // Panel is zoomed via --ui-scale; fixed left/top are interpreted in the
             // zoomed coordinate space, so compute in screen px then divide by zoom.
-            var z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+            var z = window.UIScale ? window.UIScale.get() : 1;
             var rect = toggle.getBoundingClientRect();
             var panelW = 220;
             var left = rect.left + rect.width / 2 - (panelW * z) / 2;
