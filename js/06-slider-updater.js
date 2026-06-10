@@ -55,11 +55,10 @@
           }
         }
       });
+      // Only watch for new elements, not attribute changes (causes perf issues)
       mo.observe(document.documentElement, {
         childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['min', 'max']
+        subtree: true
       });
     } catch (_) {}
   }

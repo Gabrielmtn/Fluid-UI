@@ -40,6 +40,11 @@ console.log('   - Renderer throttling: DISABLED');
 let mainWindow = null;
 
 function createWindow() {
+    // ⚠️ PERFORMANCE NOTE: transparent: true causes GPU compositor overhead.
+    // At high resolutions (4K dye), this can cause "GPU state invalid" errors.
+    // Set to false for maximum performance, true for desktop transparency.
+    const USE_TRANSPARENT_WINDOW = false; // Set to true if you need transparency
+    
     mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
@@ -55,9 +60,9 @@ function createWindow() {
             allowRunningInsecureContent: false,
             // cache: true by default — preserves localStorage/settings across restarts
         },
-        transparent: true, // Allow desktop to show through
+        transparent: USE_TRANSPARENT_WINDOW,
         frame: false, // Use custom title bar (frameless window)
-        backgroundColor: '#00000000', // Fully transparent background
+        backgroundColor: USE_TRANSPARENT_WINDOW ? '#00000000' : '#0d1117',
         icon: path.join(__dirname, 'assets/icon.png'),
         show: false, // Show after ready for smoother startup
     });

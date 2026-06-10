@@ -178,12 +178,18 @@ body > .controls {
     min-width: 52px;
     outline: none;
 }
+.ch-text-toggle:hover {
+    opacity: 0.8;
+}
 .ch-text-toggle.active {
     color: #4fc3f7;
     text-shadow: 0 0 6px rgba(79, 195, 247, 0.5),
                  0 0 14px rgba(79, 195, 247, 0.2);
     background: rgba(79, 195, 247, 0.08);
     border-color: rgba(79, 195, 247, 0.2);
+}
+.ch-text-toggle.active:hover {
+    opacity: 0.85;
 }
 
 /* ── Mixer divider ── */
@@ -204,13 +210,18 @@ body > .controls {
     flex-shrink: 0;
 }
 #mixer-strip .mixer-actions button {
+    all: unset;
+    box-sizing: border-box;
     padding: 5px 8px;
     font-size: 13px;
     border-radius: 4px;
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.06);
-    color: white;
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: white !important;
     cursor: pointer;
+}
+.mixer-actions button:hover {
+    opacity: 0.8;
 }
 
 /* Preset buttons in mixer strip */
@@ -224,15 +235,22 @@ body > .controls {
     max-width: 360px;
     flex-shrink: 0;
 }
+.mixer-presets button,
 #mixer-strip .mixer-presets button {
-    padding: 3px 6px;
-    font-size: 9px;
-    border-radius: 3px;
-    background: rgba(255,255,255,0.06);
-    color: rgba(255,255,255,0.6);
-    border: 1px solid rgba(255,255,255,0.04);
-    cursor: pointer;
-    line-height: 1.1;
+    all: unset !important;
+    box-sizing: border-box !important;
+    padding: 4px 8px !important;
+    font-size: 9px !important;
+    border-radius: 3px !important;
+    background: rgba(255,255,255,0.08) !important;
+    color: rgba(255,255,255,0.7) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    cursor: pointer !important;
+    line-height: 1.2 !important;
+    font-weight: 500 !important;
+}
+.mixer-presets button:hover {
+    opacity: 0.8;
 }
 /* Separator between built-in and user presets */
 .preset-sep {
@@ -247,18 +265,24 @@ body > .controls {
     display: contents;
 }
 #mixer-strip .mixer-user-preset-btn {
-    padding: 3px 6px;
+    all: unset;
+    box-sizing: border-box;
+    padding: 4px 8px;
     font-size: 9px;
     border-radius: 3px;
-    background: rgba(100,200,255,0.08);
-    color: rgba(100,200,255,0.7);
-    border: 1px solid rgba(100,200,255,0.12);
+    background: rgba(100,200,255,0.12) !important;
+    color: rgba(100,200,255,0.8) !important;
+    border: 1px solid rgba(100,200,255,0.2) !important;
     cursor: pointer;
-    line-height: 1.1;
+    line-height: 1.2;
     max-width: 80px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: 500;
+}
+#mixer-strip .mixer-user-preset-btn:hover {
+    opacity: 0.8;
 }
 #mixer-strip .mixer-user-preset-btn.active {
     background: rgba(100,200,255,0.3);
@@ -268,16 +292,21 @@ body > .controls {
 }
 /* Save button */
 #mixer-strip .mixer-preset-save {
-    padding: 3px 7px;
+    all: unset;
+    box-sizing: border-box;
+    padding: 4px 8px;
     font-size: 11px;
     font-weight: 700;
     border-radius: 3px;
-    background: rgba(63,185,80,0.12);
-    color: rgba(63,185,80,0.8);
-    border: 1px solid rgba(63,185,80,0.2);
+    background: rgba(63,185,80,0.15) !important;
+    color: rgba(63,185,80,0.9) !important;
+    border: 1px solid rgba(63,185,80,0.25) !important;
     cursor: pointer;
     line-height: 1;
     flex-shrink: 0;
+}
+#mixer-strip .mixer-preset-save:hover {
+    opacity: 0.8;
 }
 /* Inline name input */
 .mixer-preset-name-input {
@@ -293,6 +322,84 @@ body > .controls {
 }
 .mixer-preset-name-input:focus {
     border-color: rgba(100,200,255,0.6);
+}
+
+/* ── Arm Colors Dropdown Toggle ── */
+.arm-colors-toggle {
+    all: unset;
+    box-sizing: border-box;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-size: 12px;
+    background: rgba(255, 220, 80, 0.15) !important;
+    border: 1px solid rgba(255, 220, 80, 0.3) !important;
+    border-radius: 4px;
+    color: rgba(255, 220, 80, 0.9) !important;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+}
+.arm-colors-toggle:hover {
+    background: rgba(255, 220, 80, 0.25) !important;
+}
+
+/* Arm Colors Panel */
+.arm-colors-panel {
+    background: rgba(15, 20, 27, 0.98);
+    border: 1px solid rgba(255, 220, 80, 0.25);
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+.arm-colors-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 220, 80, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.arm-colors-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.arm-colors-hint {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+    padding: 8px;
+}
+.arm-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+}
+.arm-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 220, 80, 0.8);
+    min-width: 16px;
+}
+.arm-picker {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    padding: 0;
+    background: transparent;
+}
+.arm-mode-wrap {
+    display: flex;
+    gap: 3px;
 }
 
 /* ── MAIN AREA ── */
@@ -317,7 +424,8 @@ body > .controls {
 /* ── RIGHT SIDEBAR ── */
 #sidebar-right {
     flex: 0 0 280px;
-    background: rgba(11, 14, 20, 0.96);
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(10px);
     overflow-y: auto;
     overflow-x: hidden;
     border-left: 1px solid rgba(255, 255, 255, 0.06);
@@ -329,7 +437,6 @@ body > .controls {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     scroll-behavior: smooth;
-    contain: layout style;
 }
 
 #sidebar-right::-webkit-scrollbar { width: 5px; }
@@ -339,11 +446,10 @@ body > .controls {
 /* ── SIDEBAR SECTIONS ── */
 .sidebar-section {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    /* Grid-based collapse — NO transition: CSS grid transitions force
-       compositor layer promotion which disturbs the transparent WebGL
-       canvas backbuffer in Electron, causing the opacity decay bug. */
+    /* Grid-based collapse: scales to any content height */
     display: grid;
     grid-template-rows: auto 1fr;
+    transition: grid-template-rows 0.3s ease;
 }
 .sidebar-section.collapsed {
     grid-template-rows: auto 0fr;
@@ -378,6 +484,7 @@ body > .controls {
 .section-chevron {
     font-size: 10px;
     color: rgba(255, 255, 255, 0.25);
+    transition: transform 0.2s ease;
 }
 
 .sidebar-section.collapsed .section-chevron {
@@ -388,11 +495,14 @@ body > .controls {
     padding: 6px 12px 10px;
     overflow: hidden;
     min-height: 0; /* Required for grid 0fr collapse */
+    opacity: 1;
+    transition: padding 0.2s ease, opacity 0.2s ease;
 }
 
 .sidebar-section.collapsed .section-body {
-    padding: 0;
-    visibility: hidden;
+    padding: 0 12px;
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* Section accent colors */
@@ -520,6 +630,7 @@ body > .controls {
     height: 16px;
     border-radius: 50%;
     background: rgba(255,255,255,0.5);
+    transition: transform 0.2s;
 }
 .anim-switch input:checked + .anim-switch-track {
     background: rgba(100,220,160,0.5);
@@ -530,16 +641,21 @@ body > .controls {
 }
 /* Collapsible settings panel beneath toggle — grid-based, scales to any height */
 .anim-settings {
-    display: none;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.25s ease, opacity 0.2s ease;
+    opacity: 0;
     border-radius: 0 0 6px 6px;
 }
 .anim-settings.open {
-    display: block;
+    grid-template-rows: 1fr;
+    opacity: 1;
 }
 .anim-settings-inner {
     overflow: hidden;
     min-height: 0;
     padding: 0 10px;
+    transition: padding 0.2s ease;
 }
 .anim-settings.open .anim-settings-inner {
     padding: 6px 10px 10px;
@@ -640,6 +756,9 @@ body > .controls {
     cursor: pointer;
     line-height: 1;
 }
+.section-header-actions button:hover {
+    opacity: 0.8;
+}
 
 /* ── Checkbox groups in sidebar ── */
 #sidebar-right .checkbox-group {
@@ -705,12 +824,13 @@ body.mobile-mode #sidebar-right {
     width: 280px;
     height: 100vh;
     height: 100dvh;
-    display: none;
+    transform: translateX(100%);
     z-index: 10000;
     box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease;
 }
 body.mobile-mode #sidebar-right.visible {
-    display: flex;
+    transform: translateX(0);
 }
 body.mobile-mode #canvas-wrapper {
     max-width: 100vw !important;
@@ -761,6 +881,9 @@ body.mobile-mode #canvas-wrapper {
     color: white;
     border-radius: 5px;
     cursor: pointer;
+}
+#sidebar-right .anim-grid button:hover {
+    opacity: 0.8;
 }
 #sidebar-right .anim-grid button div:first-child {
     font-size: 1em;
@@ -876,6 +999,9 @@ body.mobile-mode #canvas-wrapper {
     cursor: pointer;
     margin-bottom: 8px;
 }
+.mp-btn-create:hover {
+    transform: translateY(-1px);
+}
 .mp-join-row {
     display: flex;
     gap: 6px;
@@ -912,6 +1038,9 @@ body.mobile-mode #canvas-wrapper {
     border-radius: 5px;
     cursor: pointer;
 }
+.mp-join-row button:hover {
+    opacity: 0.8;
+}
 .mp-error {
     color: #ff6b6b;
     font-size: 11px;
@@ -943,8 +1072,8 @@ body.mobile-mode #canvas-wrapper {
     animation: mp-pulse 1s infinite;
 }
 @keyframes mp-pulse {
-    0%, 100% { box-shadow: 0 0 6px rgba(255, 193, 7, 0.4); }
-    50% { box-shadow: 0 0 12px rgba(255, 193, 7, 0.8); }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
 }
 .mp-room-display {
     background: rgba(255, 255, 255, 0.04);
@@ -983,6 +1112,9 @@ body.mobile-mode #canvas-wrapper {
     border-radius: 5px;
     cursor: pointer;
 }
+.mp-btn-share:hover {
+    opacity: 0.8;
+}
 .mp-btn-disconnect {
     flex: 1;
     padding: 6px;
@@ -992,6 +1124,9 @@ body.mobile-mode #canvas-wrapper {
     color: #ff8a8a;
     border-radius: 5px;
     cursor: pointer;
+}
+.mp-btn-disconnect:hover {
+    opacity: 0.8;
 }
 .mp-users {
     font-size: 11px;
@@ -1060,6 +1195,9 @@ body.mobile-mode #canvas-wrapper {
     background: rgba(255, 255, 255, 0.02);
     user-select: none;
     outline: none;
+}
+.brush-mode-btn:hover {
+    opacity: 0.8;
 }
 .brush-mode-btn.active {
     color: #ffaa50;
@@ -1180,8 +1318,8 @@ body.focus-mode #canvas {
 #focus-mode-badge.visible { display: block; }
 
 @keyframes live-pulse {
-    0%, 100% { color: #4fc3f7; }
-    50% { color: #1a7cff; }
+    0%, 100% { opacity: 0.85; }
+    50% { opacity: 0.55; }
 }
 
 /* ================================================================
@@ -1204,6 +1342,9 @@ body.focus-mode #canvas {
     line-height: 1.2;
     text-align: center;
     font-weight: 600;
+}
+.stream-format-grid button:hover {
+    opacity: 0.8;
 }
 .stream-format-grid button.active {
     background: rgba(80, 210, 255, 0.2);
@@ -1245,6 +1386,9 @@ body.focus-mode #canvas {
     border-radius: 4px;
     text-align: left;
     white-space: nowrap;
+}
+.collision-source-menu button:hover {
+    opacity: 0.8;
 }
 
 .collision-controls {
@@ -1318,349 +1462,559 @@ body.focus-mode #canvas {
     cursor: pointer;
     margin-left: auto;
 }
+.collision-refresh-btn:hover {
+    opacity: 0.8;
+}
 .slider-orange {
     accent-color: #ff8850;
 }
 
-/* ── Arm Colors Dropdown ── */
-.arm-colors-toggle {
-    all: unset;
-    box-sizing: border-box;
-    display: block;
-    width: 100%;
-    height: 15px;
-    text-align: center;
-    font-size: 10px;
-    line-height: 15px;
-    color: rgba(255, 220, 80, 0.4);
-    cursor: pointer;
-    border-radius: 3px;
-    border: 1px solid rgba(255, 220, 80, 0.1);
-    background: rgba(255, 220, 80, 0.03);
-    user-select: none;
-    margin-top: 2px;
-}
-.arm-colors-toggle.active {
-    color: rgba(255, 220, 80, 0.9);
-    background: rgba(255, 220, 80, 0.1);
-    border-color: rgba(255, 220, 80, 0.3);
-}
-
-.arm-colors-panel {
-    z-index: 9999;
-    max-height: 320px;
-    overflow-y: auto;
-    background: #12161e;
-    border: 1px solid rgba(255, 220, 80, 0.2);
-    border-radius: 6px;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
-    padding: 0;
-}
-.arm-colors-panel::-webkit-scrollbar { width: 4px; }
-.arm-colors-panel::-webkit-scrollbar-thumb { background: rgba(255,220,80,0.15); border-radius: 2px; }
-
-.arm-colors-header {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: rgba(255, 220, 80, 0.6);
-    padding: 7px 10px 5px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.arm-colors-hint {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.3);
-    text-align: center;
-    padding: 12px 10px;
-}
-
-.arm-colors-rows {
-    padding: 4px 6px 6px;
-}
-
-.arm-row {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 4px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.02);
-    margin-bottom: 3px;
-}
-.arm-row:last-child { margin-bottom: 0; }
-
-.arm-label {
-    font-size: 10px;
-    font-weight: 700;
-    color: rgba(255, 220, 80, 0.7);
-    min-width: 16px;
-    text-align: center;
-    flex-shrink: 0;
-}
-
-.arm-picker {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 1.5px solid rgba(255, 255, 255, 0.15);
-    padding: 0;
-    cursor: pointer;
-    background: transparent;
-    flex-shrink: 0;
-}
-.arm-picker:disabled {
-    cursor: default;
-}
-
-.arm-mode-wrap {
-    display: flex;
-    gap: 2px;
-    flex: 1;
-    justify-content: flex-end;
-}
-
-.arm-mode-btn {
-    all: unset;
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    min-width: 0;
-    height: 20px;
-    font-size: 9px;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.02);
-    cursor: pointer;
-    user-select: none;
-    text-align: center;
-}
-.arm-mode-btn.active {
-    color: #ffdc50;
-    background: rgba(255, 220, 80, 0.12);
-    border-color: rgba(255, 220, 80, 0.3);
-}
-
 /* ================================================================
-   MUTATION UI
+   MUTATION ENGINE STYLES
    ================================================================ */
 
-/* Controls row */
-.mutation-controls {
-    display: flex;
-    gap: 8px;
-    align-items: flex-end;
-    margin-bottom: 8px;
-}
-.mutation-field {
+#mutation-section .section-body {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    min-width: 60px;
+    gap: 10px;
+}
+
+.mutation-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mutation-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 .mutation-field label {
     font-size: 10px;
-    color: rgba(255,255,255,0.5);
-    display: flex;
-    justify-content: space-between;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    min-width: 70px;
+    flex-shrink: 0;
 }
 .mutation-field-wide {
-    flex: 1;
+    flex-direction: column;
+    align-items: stretch;
 }
-.mutation-field select,
+.mutation-field-wide label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+.mutation-field select {
+    flex: 1;
+    height: 28px;
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(180, 100, 255, 0.2);
+    color: white;
+    border-radius: 5px;
+    padding: 0 8px;
+}
 .mutation-field input[type="range"] {
     width: 100%;
 }
 
-/* Action buttons */
 .mutation-actions {
     display: flex;
-    gap: 4px;
-    margin-bottom: 8px;
     flex-wrap: wrap;
-}
-.mutation-btn {
-    all: unset;
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 5px 10px;
-    font-size: 11px;
-    font-weight: 600;
-    color: rgba(255,255,255,0.7);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 4px;
-    background: rgba(255,255,255,0.04);
-    cursor: pointer;
-    user-select: none;
-}
-.mutation-btn:disabled {
-    color: rgba(255,255,255,0.2);
-    cursor: default;
-}
-.mutation-btn-primary {
-    color: #c084fc;
-    border-color: rgba(192,132,252,0.3);
-    background: rgba(192,132,252,0.1);
-    flex: 1;
-    font-size: 12px;
+    gap: 4px;
 }
 
-/* Lock chips */
+.mutation-btn {
+    flex: 1 1 auto;
+    padding: 6px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(180, 100, 255, 0.1);
+    border: 1px solid rgba(180, 100, 255, 0.25);
+    border-radius: 5px;
+    color: rgba(220, 180, 255, 0.9);
+    cursor: pointer;
+}
+.mutation-btn:hover:not(:disabled) {
+    background: rgba(180, 100, 255, 0.2);
+    border-color: rgba(180, 100, 255, 0.4);
+}
+.mutation-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.mutation-btn-primary {
+    background: linear-gradient(180deg, rgba(180, 100, 255, 0.25), rgba(180, 100, 255, 0.15));
+    border-color: rgba(180, 100, 255, 0.4);
+    color: rgba(230, 200, 255, 1);
+}
+.mutation-btn-primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(180, 100, 255, 0.35), rgba(180, 100, 255, 0.2));
+}
+
 .mutation-locks {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
+    padding: 8px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .mutation-locks-label {
     font-size: 10px;
-    color: rgba(255,255,255,0.4);
-    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 .mutation-lock-chip {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     font-size: 10px;
-    color: rgba(255,255,255,0.5);
-    padding: 2px 6px;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
-    user-select: none;
+    padding: 3px 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
 }
-.mutation-lock-chip:has(.mutation-lock-cb:checked) {
-    color: #fbbf24;
-    border-color: rgba(251,191,36,0.3);
-    background: rgba(251,191,36,0.08);
+.mutation-lock-chip:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 .mutation-lock-cb {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     margin: 0;
 }
 
-/* Variant grid */
 .mutation-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin-bottom: 8px;
-    min-height: 30px;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    min-height: 60px;
 }
 .mutation-empty {
     grid-column: 1 / -1;
     text-align: center;
+    color: rgba(255, 255, 255, 0.4);
     font-size: 11px;
-    color: rgba(255,255,255,0.25);
-    padding: 12px 0;
+    padding: 20px;
 }
 
-/* Variant card */
 .mutation-card {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(180, 100, 255, 0.08);
+    border: 1px solid rgba(180, 100, 255, 0.15);
     border-radius: 6px;
-    background: rgba(255,255,255,0.02);
-    overflow: hidden;
+    padding: 8px;
     cursor: pointer;
-    user-select: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+.mutation-card:hover {
+    background: rgba(180, 100, 255, 0.15);
+    border-color: rgba(180, 100, 255, 0.3);
 }
 .mutation-card-active {
-    border-color: rgba(192,132,252,0.5);
-    box-shadow: 0 0 6px rgba(192,132,252,0.2);
+    border-color: rgba(180, 100, 255, 0.6);
+    box-shadow: 0 0 8px rgba(180, 100, 255, 0.3);
 }
+
 .mutation-swatch {
-    height: 28px;
     width: 100%;
-    border-radius: 5px 5px 0 0;
+    height: 32px;
+    border-radius: 4px;
+    margin-bottom: 6px;
 }
 .mutation-card-label {
     font-size: 10px;
-    font-weight: 600;
-    color: rgba(255,255,255,0.7);
-    padding: 3px 5px 0;
-}
-.mutation-card-preview {
-    font-size: 8px;
-    color: rgba(255,255,255,0.35);
-    padding: 0 5px 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Diff panel */
-.mutation-diff {
-    border: 1px solid rgba(192,132,252,0.15);
-    border-radius: 4px;
-    background: rgba(192,132,252,0.04);
-    padding: 6px 8px;
-    margin-bottom: 8px;
-    max-height: 120px;
-    overflow-y: auto;
-}
-.mutation-diff-title {
-    font-size: 10px;
-    font-weight: 600;
-    color: #c084fc;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
     margin-bottom: 4px;
 }
-.mutation-diff-row {
+.mutation-card-preview {
     font-size: 9px;
-    color: rgba(255,255,255,0.5);
-    padding: 1px 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.4;
+}
+
+.mutation-diff {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(180, 100, 255, 0.15);
+    border-radius: 6px;
+    padding: 10px;
+    margin-top: 8px;
+    font-size: 10px;
+}
+.mutation-diff-title {
+    color: rgba(200, 150, 255, 0.9);
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.mutation-diff-row {
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 3px;
 }
 .mutation-diff-param {
-    font-weight: 600;
-    color: rgba(255,255,255,0.65);
-    min-width: 80px;
+    color: rgba(180, 100, 255, 0.9);
 }
 .mutation-color-dot {
     display: inline-block;
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.15);
     vertical-align: middle;
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-/* Chain breadcrumb trail */
 .mutation-chain {
     display: flex;
-    align-items: center;
-    gap: 4px;
     flex-wrap: wrap;
-    min-height: 0;
+    gap: 4px;
+    margin-top: 8px;
 }
 .mutation-crumb {
     font-size: 9px;
-    color: rgba(255,255,255,0.35);
-    padding: 2px 6px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.06);
+    padding: 3px 6px;
+    background: rgba(180, 100, 255, 0.1);
+    border: 1px solid rgba(180, 100, 255, 0.2);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
+}
+.mutation-crumb:hover {
+    background: rgba(180, 100, 255, 0.2);
 }
 .mutation-crumb-active {
-    color: #c084fc;
-    border-color: rgba(192,132,252,0.3);
-    background: rgba(192,132,252,0.08);
+    background: rgba(180, 100, 255, 0.25);
+    border-color: rgba(180, 100, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
 }
-.mutation-crumb-arrow {
-    font-size: 8px;
-    color: rgba(255,255,255,0.15);
+
+/* ================================================================
+   PATH LAYERS STYLES
+   ================================================================ */
+
+#pathLayersList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.path-layer-item {
+    background: rgba(100, 200, 255, 0.06);
+    border: 1px solid rgba(100, 200, 255, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    transition: grid-template-rows 0.25s ease;
+}
+.path-layer-item.collapsed {
+    grid-template-rows: auto 0fr;
+}
+.path-layer-item.active-layer {
+    border-color: rgba(100, 200, 255, 0.4);
+    box-shadow: 0 0 8px rgba(100, 200, 255, 0.15);
+}
+
+.path-layer-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(100, 200, 255, 0.08);
+    cursor: grab;
+}
+.path-layer-header:active {
+    cursor: grabbing;
+}
+
+.path-layer-thumb {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.path-layer-header .layer-title {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #e6edf3;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+.path-layer-header .layer-title:focus {
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
+.path-layer-header .layer-controls {
+    display: flex;
+    gap: 4px;
+}
+.path-layer-header .layer-btn {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.path-layer-header .layer-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+.path-layer-header .layer-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.path-layer-body {
+    overflow: hidden;
+    min-height: 0;
+    padding: 4px 12px 12px;
+}
+.path-layer-item.collapsed .path-layer-body {
+    padding: 0;
+    visibility: hidden;
+}
+
+.path-layer-info {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.path-layer-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.path-control-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.path-control-row label {
+    font-size: 9px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+    min-width: 44px;
+    letter-spacing: 0.3px;
+}
+/* Path layer sliders - base styles (overrides injected via JS) */
+.path-control-row input[type="range"] {
+    flex: 1;
+}
+.path-control-row select {
+    flex: 1;
+    height: 24px;
+    font-size: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    color: #e6edf3;
+    padding: 2px 6px;
+}
+.path-speed-val, .path-brush-val, .path-flow-val {
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    color: #4fc3f7;
+    min-width: 28px;
+    text-align: right;
+}
+
+/* Color picker in path layer */
+.path-color-picker {
+    width: 32px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+}
+.path-color-picker::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+.path-color-picker::-webkit-color-swatch {
+    border-radius: 2px;
+    border: none;
+}
+.path-use-brush-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: auto;
+}
+.path-use-brush-btn:hover {
+    background: rgba(100, 200, 255, 0.15);
+    border-color: rgba(100, 200, 255, 0.3);
+}
+
+/* Shape preset buttons */
+.path-shapes-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+    padding: 6px 0;
+}
+.path-shape-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.path-shape-btn:hover {
+    background: rgba(100, 200, 255, 0.15);
+    border-color: rgba(100, 200, 255, 0.3);
+    transform: scale(1.05);
+}
+.path-shape-btn:active {
+    transform: scale(0.95);
+}
+
+/* Draw path button */
+.path-draw-btn {
+    width: 100%;
+    padding: 8px 12px;
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    background: linear-gradient(180deg, rgba(100, 200, 255, 0.18), rgba(100, 200, 255, 0.08));
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 6px;
+    color: rgba(100, 200, 255, 0.95);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.path-draw-btn:hover {
+    background: linear-gradient(180deg, rgba(100, 200, 255, 0.25), rgba(100, 200, 255, 0.12));
+    border-color: rgba(100, 200, 255, 0.5);
+}
+
+/* Path preview canvas */
+.path-preview-canvas {
+    width: 100%;
+    height: 60px;
+    border-radius: 6px;
+    margin-top: 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Path Draw Overlay ── */
+#pathDrawOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+#pathDrawOverlay .draw-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(15, 20, 27, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 13px;
+}
+
+#pathDrawOverlay .draw-toolbar button {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+}
+
+#pathDrawDone {
+    background: rgba(80, 200, 120, 0.9);
+    color: white;
+}
+
+#pathDrawCancel {
+    background: rgba(255, 100, 100, 0.9);
+    color: white;
+}
+
+#pathDrawCanvas {
+    flex: 1;
+    cursor: crosshair;
+}
+
+.draw-canvas-area {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+}
+.draw-canvas-area canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ================================================================
+   COLLAPSIBLE LAYER CONTAINERS (refactored)
+   ================================================================ */
+
+/* Generic collapsible layer item pattern */
+.layer-item-collapsible {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: grid-template-rows 0.25s ease;
+}
+.layer-item-collapsible.collapsed {
+    grid-template-rows: auto 0fr;
+}
+.layer-item-collapsible .layer-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    cursor: grab;
+}
+.layer-item-collapsible .layer-body {
+    overflow: hidden;
+    min-height: 0;
+}
+.layer-item-collapsible.collapsed .layer-body {
+    visibility: hidden;
 }

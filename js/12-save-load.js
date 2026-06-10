@@ -678,6 +678,14 @@
             }
         } catch(_){}
 
+        // ── Path layers state ──
+        var pathLayersData = null;
+        try {
+            if (window.pathLayers && typeof window.pathLayers.getSnapshot === 'function') {
+                pathLayersData = window.pathLayers.getSnapshot();
+            }
+        } catch(_){}
+
         return {
             version: 2,
             timestamp: Date.now(),
@@ -702,7 +710,8 @@
             branding: brandingData,
             recordedLayers: recordedLayers,
             cosOscillator: cosState,
-            spinColours: spinColours
+            spinColours: spinColours,
+            pathLayers: pathLayersData
         };
     }
 
@@ -1102,6 +1111,13 @@
         try {
             if (snapshot.cosOscillator && window.cosOscillator && typeof window.cosOscillator.loadState === 'function') {
                 window.cosOscillator.loadState(snapshot.cosOscillator);
+            }
+        } catch(_){}
+
+        // ── Path layers state ──
+        try {
+            if (snapshot.pathLayers && window.pathLayers && typeof window.pathLayers.restoreSnapshot === 'function') {
+                window.pathLayers.restoreSnapshot(snapshot.pathLayers);
             }
         } catch(_){}
 

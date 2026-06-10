@@ -41,6 +41,8 @@
                     '<span class="hk-chip"><kbd>A</kbd> Step</span>' +
                     '<span class="hk-chip"><kbd>N</kbd> Next Color</span>' +
                     '<span class="hk-chip"><kbd>S</kbd> Focus</span>' +
+                    '<span class="hk-chip"><kbd>E</kbd> Export</span>' +
+                    '<span class="hk-chip"><kbd>M</kbd> Mutate</span>' +
                 '</div>' +
                 '<div class="hk-group hk-shift">' +
                     '<span class="hk-mod">Shift</span>' +

@@ -64,29 +64,35 @@
 
         function trackMouseMovement(e) {
 
-            // Snapshot pointer velocity when right-click is held while dragging.
+            if (!pointer.down || isReplayActive) return;
 
-            // Used by the right-mouseup handler in 05-fluid-sim.js to fire a
+            
 
-            // clean velocity burst (the "fast brush" easter egg) without fuzz.
+            const position = {
 
-            if (pointer.down && isRightMouseDown) {
+                x: pointer.x,
 
-                window._pausedPointerState = {
+                y: pointer.y,
 
-                    x: pointer.x,
+                dx: pointer.dx,
 
-                    y: pointer.y,
+                dy: pointer.dy,
 
-                    dx: pointer.dx,
+                timestamp: Date.now(),
 
-                    dy: pointer.dy,
+                color: [...pointer.color],
 
-                    color: pointer.color.slice()
+                velocity: { dx: pointer.dx, dy: pointer.dy }
 
-                };
+            };
 
-            }
+            
+
+            mousePositions.push(position);
+
+            const cutoff = position.timestamp - FADE_END;
+
+            mousePositions = mousePositions.filter(pos => pos.timestamp >= cutoff);
 
         }
 
@@ -94,13 +100,51 @@
 
         function replayMovements() {
 
-            // Legacy RAF loop removed — caused fuzz/static on big paints by
+            if (!isRightMouseDown || !isReplayActive) {
 
-            // hammering hundreds of splat() calls per frame from mousePositions.
+                customCursor.style.display = 'none';
 
-            // The "fast brush" easter egg is now handled cleanly in the
+                return;
 
-            // right-mouseup handler in 05-fluid-sim.js via _pausedPointerState.
+            }
+
+            
+
+            customCursor.style.opacity = showCursor ? '1' : '0';
+
+            const now = Date.now();
+
+            const replayProgress = (now % 500) / 500;
+
+            
+
+            mousePositions.forEach((pos, index) => {
+
+                const progress = index / (mousePositions.length - 1);
+
+                if (progress <= replayProgress) {
+
+                    splat(pos.x, pos.y, pos.velocity.dx, pos.velocity.dy, pos.color);
+
+                    
+
+                    if (Math.abs(progress - replayProgress) < 0.1) {
+
+                        customCursor.style.display = 'block';
+
+                        customCursor.style.left = (pos.x - 13) + 'px';
+
+                        customCursor.style.top = (pos.y - 13) + 'px';
+
+                    }
+
+                }
+
+            });
+
+            
+
+            requestAnimationFrame(replayMovements);
 
         }
 
@@ -158,7 +202,7 @@
 
             PRESSURE_ITERATIONS: 32,  // 32 gives clean incompressible flow without being expensive
 
-            CURL: 6,                  // Gentle vortices for clean fluid on first load (0.5-scaled like Pavel)
+            CURL: 25,                 // Strong vortices for visually interesting fluid on first load
 
             SPLAT_RADIUS: 0.011,
 
@@ -172,11 +216,7 @@
 
             SIM_RESOLUTION: 384,      // 384 gives noticeably better physics detail than 256
 
-            VELOCITY_INFLUENCE: 2.5,  // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
-
-            SUNRAYS: false,
-            SUNRAYS_RESOLUTION: 196,
-            SUNRAYS_WEIGHT: 1.0
+            VELOCITY_INFLUENCE: 2.5   // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
 
         };
 
@@ -230,21 +270,21 @@
 
         const presets = {
 
-            silky: { DENSITY_DISSIPATION: 0.9995, VELOCITY_DISSIPATION: 1.0001, PRESSURE_DISSIPATION: 0.8, PRESSURE_ITERATIONS: 20, CURL: 10, SPLAT_RADIUS: 0.011 },
+            silky: { DENSITY_DISSIPATION: 0.9995, VELOCITY_DISSIPATION: 1.0001, PRESSURE_DISSIPATION: 0.8, PRESSURE_ITERATIONS: 20, CURL: 30, SPLAT_RADIUS: 0.011 },
 
-            thick: { DENSITY_DISSIPATION: 0.999, VELOCITY_DISSIPATION: 0.99, PRESSURE_DISSIPATION: 0.95, PRESSURE_ITERATIONS: 35, CURL: 2, SPLAT_RADIUS: 0.015 },
+            thick: { DENSITY_DISSIPATION: 0.999, VELOCITY_DISSIPATION: 0.99, PRESSURE_DISSIPATION: 0.95, PRESSURE_ITERATIONS: 35, CURL: 1, SPLAT_RADIUS: 0.015 },  // Was 120
 
-            wispy: { DENSITY_DISSIPATION: 0.9972, VELOCITY_DISSIPATION: 0.9996, PRESSURE_DISSIPATION: 0.92, PRESSURE_ITERATIONS: 25, CURL: 20, SPLAT_RADIUS: 0.01 },
+            wispy: { DENSITY_DISSIPATION: 0.9972, VELOCITY_DISSIPATION: 0.9996, PRESSURE_DISSIPATION: 0.92, PRESSURE_ITERATIONS: 25, CURL: 60, SPLAT_RADIUS: 0.01 },  // Was 40
 
-            chaotic: { DENSITY_DISSIPATION: 0.996, VELOCITY_DISSIPATION: 0.9938, PRESSURE_DISSIPATION: 0.934, PRESSURE_ITERATIONS: 25, CURL: 24, SPLAT_RADIUS: 0.0151 },
+            chaotic: { DENSITY_DISSIPATION: 0.996, VELOCITY_DISSIPATION: 0.9938, PRESSURE_DISSIPATION: 0.934, PRESSURE_ITERATIONS: 25, CURL: 12, SPLAT_RADIUS: 0.0151 },
 
-            ethereal: { DENSITY_DISSIPATION: 0.9998, VELOCITY_DISSIPATION: 1.0005, PRESSURE_DISSIPATION: 0.75, PRESSURE_ITERATIONS: 15, CURL: 14, SPLAT_RADIUS: 0.008 },
+            ethereal: { DENSITY_DISSIPATION: 0.9998, VELOCITY_DISSIPATION: 1.0005, PRESSURE_DISSIPATION: 0.75, PRESSURE_ITERATIONS: 15, CURL: 45, SPLAT_RADIUS: 0.008 },
 
-            turbulent: { DENSITY_DISSIPATION: 0.994, VELOCITY_DISSIPATION: 0.997, PRESSURE_DISSIPATION: 0.88, PRESSURE_ITERATIONS: 30, CURL: 18, SPLAT_RADIUS: 0.013 },
+            turbulent: { DENSITY_DISSIPATION: 0.994, VELOCITY_DISSIPATION: 0.997, PRESSURE_DISSIPATION: 0.88, PRESSURE_ITERATIONS: 30, CURL: 55, SPLAT_RADIUS: 0.013 },  // Was 60
 
-            marble: { DENSITY_DISSIPATION: 0.9992, VELOCITY_DISSIPATION: 0.9985, PRESSURE_DISSIPATION: 0.98, PRESSURE_ITERATIONS: 35, CURL: 16, SPLAT_RADIUS: 0.018 },
+            marble: { DENSITY_DISSIPATION: 0.9992, VELOCITY_DISSIPATION: 0.9985, PRESSURE_DISSIPATION: 0.98, PRESSURE_ITERATIONS: 35, CURL: 8, SPLAT_RADIUS: 0.018 },  // Was 100
 
-            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.82, PRESSURE_ITERATIONS: 25, CURL: 16, SPLAT_RADIUS: 0.006 }
+            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.82, PRESSURE_ITERATIONS: 25, CURL: 52, SPLAT_RADIUS: 0.006 }  // Was 35
 
         };
 
@@ -374,12 +414,6 @@
 
             if (!isUnfreezing) {
 
-                // Cancel any in-progress unfreeze ramp
-                if (window._unfreezeRafId) {
-                    cancelAnimationFrame(window._unfreezeRafId);
-                    window._unfreezeRafId = null;
-                }
-
                 // Freeze: save current values and set to freeze state
 
                 savedDensity = config.DENSITY_DISSIPATION;
@@ -392,27 +426,11 @@
 
             } else {
 
-                // Unfreeze: gradually ramp dissipation back over ~2s
-                // Prevents snap-to-black when velocity field is still zero
-                const targetDensity = savedDensity;
-                const targetVelocity = savedVelocity;
-                const startDensity = config.DENSITY_DISSIPATION;   // 1.0
-                const startVelocity = config.VELOCITY_DISSIPATION; // 0.9
-                const duration = 2000; // ms
-                const startTime = performance.now();
+                // Unfreeze: restore saved values
 
-                function rampUnfreeze() {
-                    const t = Math.min((performance.now() - startTime) / duration, 1.0);
-                    const ease = t * t * (3.0 - 2.0 * t); // smoothstep
-                    config.DENSITY_DISSIPATION = startDensity + (targetDensity - startDensity) * ease;
-                    config.VELOCITY_DISSIPATION = startVelocity + (targetVelocity - startVelocity) * ease;
-                    if (t < 1.0) {
-                        window._unfreezeRafId = requestAnimationFrame(rampUnfreeze);
-                    } else {
-                        window._unfreezeRafId = null;
-                    }
-                }
-                window._unfreezeRafId = requestAnimationFrame(rampUnfreeze);
+                config.DENSITY_DISSIPATION = savedDensity;
+
+                config.VELOCITY_DISSIPATION = savedVelocity;
 
             }
 
@@ -792,7 +810,7 @@
 
             // Use the great settings from the screenshot
 
-            config.CURL = 80;
+            config.CURL = 40;
 
             config.VELOCITY_DISSIPATION = 0.9888;
 
@@ -956,7 +974,7 @@
 
             // Reduce curl for cleaner spirals
 
-            config.CURL = 20;
+            config.CURL = 10;
 
             
 
@@ -2618,7 +2636,7 @@
 
                 // 1. LEFT SHOULDER - Converges from left toward center bottom
 
-                await animateSettings(0.010, 0.998, 0.95, 16, 200);
+                await animateSettings(0.010, 0.998, 0.95, 8, 200);
 
                 const leftShoulderColor = [0.1, 0.3, 0.9]; // Bright blue
 
@@ -2642,7 +2660,7 @@
 
                 // 2. RIGHT SHOULDER - Converges from right toward center bottom
 
-                await animateSettings(0.010, 0.998, 0.95, 16, 200);
+                await animateSettings(0.010, 0.998, 0.95, 8, 200);
 
                 const rightShoulderColor = [0.9, 0.5, 0.1]; // Bright orange
 
@@ -2666,7 +2684,7 @@
 
                 // 3. HEAD - Converges from top toward center bottom
 
-                await animateSettings(0.008, 0.998, 0.95, 10, 200);
+                await animateSettings(0.008, 0.998, 0.95, 5, 200);
 
                 const headColor = [0.9, 0.2, 0.3]; // Bright red/pink
 
@@ -2690,7 +2708,7 @@
 
                 // 4. LEFT EYE - Small stroke converging from upper left
 
-                await animateSettings(0.004, 0.998, 0.95, 6, 150);
+                await animateSettings(0.004, 0.998, 0.95, 3, 150);
 
                 const leftEyeColor = [0.1, 0.9, 0.3]; // Bright green
 
@@ -2714,7 +2732,7 @@
 
                 // 5. RIGHT EYE - Small stroke converging from upper right
 
-                await animateSettings(0.004, 0.998, 0.95, 6, 150);
+                await animateSettings(0.004, 0.998, 0.95, 3, 150);
 
                 const rightEyeColor = [0.8, 0.1, 0.8]; // Bright purple
 
@@ -2738,7 +2756,7 @@
 
                 // 6. LEFT CORNER SWOOP - Pull fluid up from bottom left to 3/4 height
 
-                await animateSettings(0.006, 0.999, 0.88, 4, 200);
+                await animateSettings(0.006, 0.999, 0.88, 2, 200);
 
                 const leftSwoopColor = [0.2, 0.8, 0.9]; // Bright cyan
 
@@ -2762,7 +2780,7 @@
 
                 // 7. RIGHT CORNER SWOOP - Pull fluid up from bottom right to 3/4 height
 
-                await animateSettings(0.006, 0.999, 0.88, 4, 200);
+                await animateSettings(0.006, 0.999, 0.88, 2, 200);
 
                 const rightSwoopColor = [0.9, 0.8, 0.2]; // Bright yellow
 
@@ -2788,7 +2806,7 @@
 
                 // Very low curl, very high velocity sustain, slow and deliberate
 
-                await animateSettings(0.005, 0.998, 0.995, 2, 250);
+                await animateSettings(0.005, 0.998, 0.995, 1, 250);
 
                 
 

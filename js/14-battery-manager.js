@@ -5,6 +5,8 @@
     'use strict';
     
     // Performance profiles - from battery saver to extreme high-end
+    // EXTREME = best real-time experience (optimized for interaction)
+    // CINEMATIC = maxed settings for frame capture (not for real-time use)
     const PROFILES = {
         'battery-saver': {
             name: 'Battery Saver',
@@ -23,7 +25,7 @@
             icon: '⚖️',
             simResolution: 256,        // Good physics
             dyeResolution: 1024,       // Good visuals
-            pressureIterations: 25,    // Good accuracy
+            pressureIterations: 20,    // Good accuracy
             curl: 6,
             sharpness: 0.3,
             targetFPS: 60,
@@ -33,9 +35,9 @@
         'performance': {
             name: 'High',
             icon: '⚡',
-            simResolution: 512,        // Higher physics
+            simResolution: 384,        // Good physics
             dyeResolution: 1024,       // Good visuals
-            pressureIterations: 30,    // Higher accuracy
+            pressureIterations: 25,    // Good accuracy
             curl: 10,
             sharpness: 0.5,
             targetFPS: 60,
@@ -46,37 +48,83 @@
             name: 'Ultra',
             icon: '🚀',
             simResolution: 512,        // High physics
-            dyeResolution: 2048,       // High visual detail
-            pressureIterations: 40,    // High accuracy
+            dyeResolution: 1536,       // High visual detail (1.5K)
+            pressureIterations: 30,    // High accuracy
             curl: 12,
             sharpness: 0.6,
-            targetFPS: 120,
-            fpsCap: 120,
-            description: 'Very high quality, needs good GPU'
+            targetFPS: 'native',       // Uncapped for high-refresh monitors
+            fpsCap: 'native',
+            description: 'High quality, uncapped FPS'
         },
         'extreme': {
             name: 'Extreme',
             icon: '🔥',
-            simResolution: 512,        // High physics (512→1024 is 4x GPU cost, minimal visual gain)
-            dyeResolution: 2048,       // High visual detail
-            pressureIterations: 40,    // High accuracy
+            simResolution: 512,        // High physics (sweet spot)
+            dyeResolution: 2048,       // 2K visual detail
+            pressureIterations: 35,    // High accuracy (reduced from 40)
             curl: 16,
             sharpness: 0.8,
-            targetFPS: 'native',       // Resolved to monitor Hz at runtime
-            fpsCap: 'native',          // Uncap to match monitor
-            description: 'Extreme quality, targets native monitor Hz'
+            targetFPS: 'native',       // Uncapped - best real-time experience
+            fpsCap: 'native',
+            description: 'Best real-time quality, needs powerful GPU'
+        },
+        'gpu-share': {
+            name: 'GPU Share',
+            icon: '🤝',
+            simResolution: 256,        // Mid-tier physics (balanced quality)
+            dyeResolution: 1024,       // Keep visuals decent (same as balanced)
+            pressureIterations: 18,    // Slightly reduced solver cost (vs balanced's 20)
+            curl: 8,                   // Keep some vorticity
+            sharpness: 0.4,            // Maintain visual clarity
+            targetFPS: 60,             // Full frame rate by default
+            fpsCap: 60,                // Run at 60fps until external load detected
+            description: 'Optimized for running alongside GPU apps - enable Adaptive Quality',
+            
+            // Enhanced adaptive behavior for this profile (USER MUST ENABLE)
+            adaptiveConfig: {
+                enabled: false,         // User must enable "Adaptive quality" checkbox
+                checkInterval: 1500,    // Check every 1.5s for stability
+                minSamples: 3,          // Wait for 3 samples to confirm pressure
+                cooldown: 8000,         // 8s between adjustments to prevent jitter
+                fpsThreshold: 0.70,     // Downgrade if <70% of target (more tolerant)
+                upgradeThreshold: 0.92, // Upgrade if >92% sustained
+                
+                // Tiered response levels
+                tiers: [
+                    {
+                        name: 'normal',
+                        fpsCap: 60,
+                        pressureIterations: 18,
+                        minDuration: 0  // Start here
+                    },
+                    {
+                        name: 'constrained',
+                        fpsCap: 40,
+                        pressureIterations: 15,
+                        minDuration: 3000  // Must be struggling for 3s
+                    },
+                    {
+                        name: 'yielding',
+                        fpsCap: 30,
+                        pressureIterations: 12,
+                        simResolution: 192,  // Only now drop sim res
+                        minDuration: 6000  // Must be struggling for 6s
+                    }
+                ]
+            }
         },
         'cinematic': {
             name: 'Cinematic',
             icon: '🎬',
-            simResolution: 512,        // High physics (keeps frame budget for 4K dye)
+            simResolution: 512,        // High physics
             dyeResolution: 4096,       // 4K visual detail
-            pressureIterations: 50,    // Very high accuracy
+            pressureIterations: 50,    // Maximum accuracy
             curl: 20,
             sharpness: 1.0,
-            targetFPS: 'native',       // Resolved to monitor Hz at runtime
-            fpsCap: 'native',          // Uncap to match monitor
-            description: '4K cinematic, for high-end GPUs only'
+            targetFPS: 30,             // Capped - for frame capture, not real-time
+            fpsCap: 30,                // 30fps is fine for video capture
+            description: '4K capture mode - NOT for real-time use',
+            isCaptureModeOnly: true    // Flag for UI warnings
         }
     };
     
@@ -97,6 +145,18 @@
             this.fpsHistory = [];
             this.fpsCheckInterval = null;
             this.lastFpsAdjustment = 0;
+            
+            // Tiered adaptive system state
+            this.currentAdaptiveTier = 0;
+            this.pressureStartTime = null;
+            this.lastAdaptiveChange = 0;
+            this.baseProfileSettings = null; // Store original profile settings
+            
+            // Interaction burst mode state
+            this.inBurstMode = false;
+            this.baseFpsCap = null;
+            this.burstTimeout = null;
+            this.lastInteractionTime = 0;
             
             this.initBattery();
             this.createUI();
@@ -184,12 +244,15 @@
                 clearInterval(this.fpsCheckInterval);
             }
             
-            // Check FPS every 2 seconds
+            const profile = PROFILES[this.currentProfile];
+            const interval = profile?.adaptiveConfig?.checkInterval || 2000;
+            
+            // Check FPS at profile-specific interval (default 2s)
             this.fpsCheckInterval = setInterval(() => {
-                if (!this.fpsAdaptive) return;
+                if (!this.shouldRunAdaptive()) return;
                 
-                this.checkFpsAndAdjust();
-            }, 2000);
+                this.checkPerformanceAndAdapt();
+            }, interval);
         }
         
         checkFpsAndAdjust() {
@@ -275,11 +338,224 @@
             }, 3000);
         }
         
+        showAdaptiveNotification(tierName) {
+            const tierIcons = {
+                'normal': '⚖️',
+                'constrained': '⚡',
+                'yielding': '🤝'
+            };
+            
+            const notification = document.createElement('div');
+            notification.className = 'fps-notification';
+            notification.textContent = `${tierIcons[tierName] || '⚙️'} GPU Share: ${tierName}`;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 10);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+            
+            // Update tier indicator if present
+            this.updateTierIndicator(tierName, tierIcons[tierName] || '⚙️');
+        }
+        
+        updateTierIndicator(tierName, icon) {
+            const tierIndicator = document.getElementById('adaptive-tier');
+            if (!tierIndicator) return;
+            
+            const tierIconEl = document.getElementById('tier-icon');
+            const tierNameEl = document.getElementById('tier-name');
+            
+            if (tierIconEl) tierIconEl.textContent = icon;
+            if (tierNameEl) tierNameEl.textContent = tierName.charAt(0).toUpperCase() + tierName.slice(1);
+            
+            // Show indicator
+            tierIndicator.style.display = 'flex';
+        }
+        
+        applyAdaptiveTier(tierIndex) {
+            const profile = PROFILES[this.currentProfile];
+            if (!profile.adaptiveConfig) return;
+            
+            const tier = profile.adaptiveConfig.tiers[tierIndex];
+            if (!tier) return;
+            
+            // Apply tier settings WITHOUT changing the profile
+            // This preserves visual settings while throttling compute
+            
+            if (tier.fpsCap !== undefined) {
+                window.fpsCap = tier.fpsCap;
+                this.syncFpsCapUI(tier.fpsCap);
+            }
+            
+            if (tier.pressureIterations !== undefined) {
+                config.PRESSURE_ITERATIONS = tier.pressureIterations;
+                this.syncPressureIterationsUI(tier.pressureIterations);
+            }
+            
+            if (tier.simResolution !== undefined) {
+                // Only change if different (framebuffer reinit is expensive)
+                if (config.SIM_RESOLUTION !== tier.simResolution) {
+                    config.SIM_RESOLUTION = tier.simResolution;
+                    window.needsFramebufferReinit = true;
+                }
+            }
+            
+            // Visual feedback
+            this.showAdaptiveNotification(tier.name);
+        }
+        
+        syncFpsCapUI(capValue) {
+            const fpsCapSel = document.getElementById('fpsCap');
+            if (fpsCapSel) {
+                fpsCapSel.value = String(capValue);
+            }
+        }
+        
+        syncPressureIterationsUI(value) {
+            const pressureSlider = document.getElementById('pressure-iterations');
+            if (pressureSlider) {
+                pressureSlider.value = value;
+                pressureSlider.dispatchEvent(new Event('input', { bubbles: false }));
+            }
+        }
+        
+        getCurrentFPS() {
+            // Get FPS from electron-performance.js or calculate it
+            if (window.electronPerf && window.electronPerf.getFPS) {
+                return window.electronPerf.getFPS();
+            } else if (window.lastFPS !== undefined) {
+                return window.lastFPS;
+            }
+            return 60; // Default fallback
+        }
+        
+        shouldRunAdaptive() {
+            // Always respect user's checkbox setting
+            // The adaptiveConfig just defines HOW to adapt, not WHETHER to adapt
+            return this.fpsAdaptive;
+        }
+        
+        checkPerformanceAndAdapt() {
+            const profile = PROFILES[this.currentProfile];
+            const adaptiveConfig = profile.adaptiveConfig;
+            
+            // If profile doesn't have adaptiveConfig, use old profile-switching
+            if (!adaptiveConfig) {
+                this.checkFpsAndAdjust();
+                return;
+            }
+            
+            // Get current performance metrics
+            const currentFps = this.getCurrentFPS();
+            const targetFps = this.resolveProfileFps(profile);
+            
+            // Track history
+            this.fpsHistory.push(currentFps);
+            if (this.fpsHistory.length > 10) this.fpsHistory.shift();
+            
+            // Need minimum samples
+            if (this.fpsHistory.length < adaptiveConfig.minSamples) return;
+            
+            // Calculate average
+            const avgFps = this.fpsHistory.reduce((a, b) => a + b) / this.fpsHistory.length;
+            const fpsRatio = avgFps / targetFps;
+            
+            // Determine current tier
+            const currentTier = this.currentAdaptiveTier || 0;
+            const maxTier = adaptiveConfig.tiers.length - 1;
+            
+            // Check if we need to downgrade
+            if (fpsRatio < adaptiveConfig.fpsThreshold) {
+                const now = Date.now();
+                
+                // Has pressure been sustained long enough for next tier?
+                if (!this.pressureStartTime) {
+                    this.pressureStartTime = now;
+                }
+                
+                const pressureDuration = now - this.pressureStartTime;
+                const nextTier = Math.min(currentTier + 1, maxTier);
+                const nextTierConfig = adaptiveConfig.tiers[nextTier];
+                
+                if (pressureDuration >= nextTierConfig.minDuration && currentTier < maxTier) {
+                    // Downgrade to next tier
+                    this.currentAdaptiveTier = nextTier;
+                    this.applyAdaptiveTier(nextTier);
+                    this.lastAdaptiveChange = now;
+                    this.pressureStartTime = now; // Reset for next tier
+                }
+            }
+            // Check if we can upgrade
+            else if (fpsRatio > adaptiveConfig.upgradeThreshold && currentTier > 0) {
+                const now = Date.now();
+                
+                // Cooldown check
+                if (now - this.lastAdaptiveChange < adaptiveConfig.cooldown) return;
+                
+                // Upgrade to previous tier
+                this.currentAdaptiveTier = currentTier - 1;
+                this.applyAdaptiveTier(this.currentAdaptiveTier);
+                this.lastAdaptiveChange = now;
+                this.pressureStartTime = null; // Clear pressure timer
+            }
+        }
+        
+        handlePointerInput() {
+            // Mark interaction time
+            this.lastInteractionTime = Date.now();
+            
+            // If in GPU Share mode with adaptive, enter burst mode
+            const profile = PROFILES[this.currentProfile];
+            if (profile?.adaptiveConfig?.enabled) {
+                this.enterInteractionBurst();
+            }
+        }
+        
+        enterInteractionBurst() {
+            if (this.inBurstMode) {
+                clearTimeout(this.burstTimeout);
+            } else {
+                this.inBurstMode = true;
+                this.baseFpsCap = window.fpsCap;
+                window.fpsCap = this.baseFpsCap + 10; // Bump by 10 FPS
+            }
+            
+            // Exit burst mode after 300ms of no interaction
+            this.burstTimeout = setTimeout(() => {
+                window.fpsCap = this.baseFpsCap;
+                this.inBurstMode = false;
+            }, 300);
+        }
+        
         setProfile(profileName, manual = false) {
             if (!PROFILES[profileName]) return;
             
-            this.currentProfile = profileName;
             const profile = PROFILES[profileName];
+            
+            // Warn user if selecting capture-only mode
+            if (profile.isCaptureModeOnly && manual) {
+                console.warn('[Profile] ⚠️ Cinematic mode is for frame capture only - expect input lag during real-time use');
+            }
+            
+            this.currentProfile = profileName;
+            
+            // Reset adaptive tier state when switching profiles
+            this.currentAdaptiveTier = 0;
+            this.pressureStartTime = null;
+            this.lastAdaptiveChange = 0;
+            this.fpsHistory = [];
+            
+            // Hide tier indicator when switching profiles
+            const tierIndicator = document.getElementById('adaptive-tier');
+            if (tierIndicator) {
+                tierIndicator.style.display = 'none';
+            }
+            
+            // Restart FPS monitoring with new profile's interval
+            this.startFpsMonitoring();
             
             // Apply profile settings to config
             if (window.config) {
@@ -392,21 +668,17 @@
                     </div>
                     
                     <!-- Auto Mode Toggles -->
-                    <div class="control-group">
-                        <label>
-                            <input type="checkbox" id="battery-auto-mode">
-                            Auto-adjust for battery
-                        </label>
-                        <div class="setting-hint">Adjusts quality based on battery level (mobile only)</div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="battery-auto-mode">
+                        <label for="battery-auto-mode">Auto-adjust for battery</label>
                     </div>
+                    <div class="setting-hint" style="margin-top:-4px;margin-bottom:8px;">Adjusts quality based on battery level</div>
                     
-                    <div class="control-group">
-                        <label>
-                            <input type="checkbox" id="fps-adaptive-mode">
-                            Adaptive quality (FPS-based)
-                        </label>
-                        <div class="setting-hint">Adjusts quality if FPS drops (recommended for mobile)</div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="fps-adaptive-mode">
+                        <label for="fps-adaptive-mode">Adaptive quality (FPS-based)</label>
                     </div>
+                    <div class="setting-hint" style="margin-top:-4px;">Adjusts quality if FPS drops</div>
                     
                     <!-- Performance Profile Selector -->
                     <div class="control-group">
@@ -438,6 +710,12 @@
                             Sim: <span id="sim-res">1024</span>x<span id="sim-res-h">768</span><br>
                             Dye: <span id="dye-res">1024</span>x<span id="dye-res-h">768</span>
                         </div>
+                    </div>
+                    
+                    <!-- Adaptive Tier Indicator -->
+                    <div class="adaptive-tier-indicator" id="adaptive-tier" style="display: none;">
+                        <span id="tier-icon">⚖️</span>
+                        <span id="tier-name">Normal</span>
                     </div>
                 </div>
             `;
@@ -639,7 +917,13 @@
                     fpsToggle.checked = this.fpsAdaptive;
                 }
                 
-                this.setProfile(this.currentProfile, false);
+                // PERF: Defer profile application to avoid blocking initial render
+                // This allows the UI to be responsive before heavy resolution changes
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        this.setProfile(this.currentProfile, false);
+                    });
+                });
             }
         }
     }
@@ -647,11 +931,18 @@
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            window.batteryManager = new BatteryManager();
-            window.clearActiveProfile = () => window.batteryManager?.clearActiveProfile();
+            // Defer initialization to allow render loop to start first
+            requestAnimationFrame(() => {
+                window.batteryManager = new BatteryManager();
+                window.clearActiveProfile = () => window.batteryManager?.clearActiveProfile();
+                window.batteryHandleInput = () => window.batteryManager?.handlePointerInput();
+            });
         });
     } else {
-        window.batteryManager = new BatteryManager();
-        window.clearActiveProfile = () => window.batteryManager?.clearActiveProfile();
+        requestAnimationFrame(() => {
+            window.batteryManager = new BatteryManager();
+            window.clearActiveProfile = () => window.batteryManager?.clearActiveProfile();
+            window.batteryHandleInput = () => window.batteryManager?.handlePointerInput();
+        });
     }
 })();

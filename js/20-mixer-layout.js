@@ -13,7 +13,18 @@
     'use strict';
 
     document.addEventListener('DOMContentLoaded', function() {
-        requestAnimationFrame(initMixerLayout);
+        // PERF: Defer heavy DOM restructuring until after splash animation starts
+        // This prevents jitter during the title fadein
+        var splash = document.getElementById('splash-screen');
+        if (splash) {
+            // Wait for splash animations to complete their initial render
+            // then do heavy DOM work during the "hold" phase before fadeout
+            setTimeout(function() {
+                requestAnimationFrame(initMixerLayout);
+            }, 800); // Splash title animation is 0.8s, start after it settles
+        } else {
+            requestAnimationFrame(initMixerLayout);
+        }
     });
 
     function initMixerLayout() {
@@ -208,45 +219,41 @@
             return;
         }
 
-        // Phase 1: Let splash play for 1.4s, then fade it out
-        setTimeout(function() {
-            splash.classList.add('fade-out');
-
-            // Phase 2: After splash starts fading, stagger UI in
+        function doTransition() {
+            // Brief pause to show "ready" flourish, then fade out
             setTimeout(function() {
-                if (titlebar) titlebar.classList.add('ui-ready');
-            }, 150);
+                splash.classList.add('fade-out');
 
-            setTimeout(function() {
-                strip.classList.add('ui-ready');
-            }, 250);
+                // Stagger UI entrance
+                setTimeout(function() { if (titlebar) titlebar.classList.add('ui-ready'); }, 100);
+                setTimeout(function() { strip.classList.add('ui-ready'); }, 180);
+                setTimeout(function() { canvasArea.classList.add('ui-ready'); }, 260);
+                setTimeout(function() { sidebar.classList.add('ui-ready'); }, 320);
 
-            setTimeout(function() {
-                canvasArea.classList.add('ui-ready');
-            }, 350);
-
-            setTimeout(function() {
-                sidebar.classList.add('ui-ready');
-            }, 400);
-
-            // Phase 3: Clean up after animations complete
-            setTimeout(function() {
-                if (splash.parentNode) splash.parentNode.removeChild(splash);
-                [titlebar, strip, sidebar, canvasArea].forEach(function(el) {
-                    if (el) {
-                        el.classList.remove('ui-enter', 'ui-ready');
-                        el.classList.add('ui-settled');
-                    }
-                });
-                // Remove will-change after settling
+                // Clean up after animations
                 setTimeout(function() {
+                    if (splash.parentNode) splash.parentNode.removeChild(splash);
                     [titlebar, strip, sidebar, canvasArea].forEach(function(el) {
-                        if (el) el.classList.remove('ui-settled');
+                        if (el) {
+                            el.classList.remove('ui-enter', 'ui-ready');
+                            el.classList.add('ui-settled');
+                        }
                     });
-                }, 100);
-            }, 1000);
+                    setTimeout(function() {
+                        [titlebar, strip, sidebar, canvasArea].forEach(function(el) {
+                            if (el) el.classList.remove('ui-settled');
+                        });
+                    }, 100);
+                }, 800);
+            }, 250); // Brief pause after ready state
+        }
 
-        }, 1400);
+        // Wait for scripts to load, then transition
+        if (window.__scriptsReady) {
+            doTransition();
+        } else {
+            window.__onScriptsReady = doTransition;
+        }
     }
 
     // ─── MIXER STRIP ─────────────────────────────────────────────
@@ -285,6 +292,19 @@
         return strip;
     }
 
+    // Tooltips for mixer channels
+    var CHANNEL_TOOLTIPS = {
+        'Brush': 'Brush size for painting fluid',
+        'Curl': 'Vorticity strength - creates swirling motion',
+        'Viscosity': 'Sharpness/detail enhancement',
+        'Isolation': 'Motion isolation - how much color follows velocity',
+        'Multiply': 'Kaleidoscope multiplier (1-8x)',
+        'Time': 'Simulation time scale',
+        'Density': 'How fast color fades',
+        'Velocity': 'How fast motion fades',
+        'Color': 'Current brush color'
+    };
+
     function faderChannel(label, accent, sliderId, existingValueId, newValueId) {
         const ch = document.createElement('div');
         ch.className = 'mixer-channel';
@@ -293,6 +313,7 @@
         const lbl = document.createElement('div');
         lbl.className = 'ch-label';
         lbl.textContent = label;
+        if (CHANNEL_TOOLTIPS[label]) lbl.title = CHANNEL_TOOLTIPS[label];
         ch.appendChild(lbl);
 
         const slider = document.getElementById(sliderId);
@@ -412,14 +433,16 @@
         const wrap = document.createElement('div');
         wrap.className = 'mixer-actions';
 
+        var actionBtnStyle = 'all:unset;box-sizing:border-box;padding:5px 8px;font-size:13px;border-radius:4px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;cursor:pointer;';
+
         const pauseBtn = document.getElementById('pauseBtn');
-        if (pauseBtn) { pauseBtn.style.cssText = ''; wrap.appendChild(pauseBtn); }
+        if (pauseBtn) { pauseBtn.style.cssText = actionBtnStyle; wrap.appendChild(pauseBtn); }
 
         const clearBtn = controls.querySelector('button[onclick*="clearCanvas"]');
-        if (clearBtn) { clearBtn.style.cssText = ''; wrap.appendChild(clearBtn); }
+        if (clearBtn) { clearBtn.style.cssText = actionBtnStyle; wrap.appendChild(clearBtn); }
 
         const freezeBtn = document.getElementById('freezeBtn');
-        if (freezeBtn) { freezeBtn.style.cssText = ''; wrap.appendChild(freezeBtn); }
+        if (freezeBtn) { freezeBtn.style.cssText = actionBtnStyle; wrap.appendChild(freezeBtn); }
 
         return wrap;
     }
@@ -428,11 +451,15 @@
         const wrap = document.createElement('div');
         wrap.className = 'mixer-presets';
 
-        // Move built-in preset buttons
+        // Move built-in preset buttons and apply inline styles
         const presetsDiv = controls.querySelector('.presets');
         if (presetsDiv) {
             while (presetsDiv.firstChild) {
-                wrap.appendChild(presetsDiv.firstChild);
+                var child = presetsDiv.firstChild;
+                if (child.tagName === 'BUTTON') {
+                    child.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 8px;font-size:9px;border-radius:3px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.1);cursor:pointer;line-height:1.2;font-weight:500;';
+                }
+                wrap.appendChild(child);
             }
         }
 
@@ -452,6 +479,7 @@
         saveBtn.className = 'mixer-preset-save';
         saveBtn.textContent = '+';
         saveBtn.title = 'Save current settings as preset';
+        saveBtn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 8px;font-size:11px;font-weight:700;border-radius:3px;background:rgba(63,185,80,0.15);color:rgba(63,185,80,0.9);border:1px solid rgba(63,185,80,0.25);cursor:pointer;line-height:1;';
         wrap.appendChild(saveBtn);
 
         // Inline name input (hidden by default)
@@ -535,6 +563,7 @@
                 btn.className = 'mixer-user-preset-btn';
                 btn.textContent = name;
                 btn.title = 'Load "' + name + '"';
+                btn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 8px;font-size:9px;border-radius:3px;background:rgba(100,200,255,0.12);color:rgba(100,200,255,0.8);border:1px solid rgba(100,200,255,0.2);cursor:pointer;line-height:1.2;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;';
                 btn.addEventListener('click', function() {
                     var snapshot = presets[name];
                     if (snapshot && typeof window.applyPresetSnapshot === 'function') {
@@ -708,14 +737,24 @@
         body.appendChild(chainWrap);
 
         // ── Wire up logic ──
-        setTimeout(function () { wireMutationUI(); }, 200);
+        // Pass button references directly to avoid getElementById issues
+        setTimeout(function () { 
+            wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn); 
+        }, 200);
 
         return sec;
     }
 
-    function wireMutationUI() {
+    function wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn) {
         var engine = window.mutationEngine;
         if (!engine) { console.warn('[Mutation] Engine not loaded'); return; }
+        
+        // Wait for snapshot functions to be available (exposed by save-load.js)
+        if (!window.capturePresetSnapshot || !window.applyPresetSnapshot) {
+            setTimeout(function() { wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn); }, 100);
+            return;
+        }
+        console.log('[Mutation] UI wired successfully');
 
         var _variants = [];
         var _baseSnapshot = null;
@@ -924,11 +963,11 @@
             if (redo) redo.disabled = engine.chain.index >= engine.chain.length - 1;
         }
 
-        // ── Button wiring ──
-        var genBtn = document.getElementById('mutationGenerate');
-        if (genBtn) genBtn.addEventListener('click', doMutate);
+        // ── Button wiring (using passed references) ──
+        if (mutBtn) {
+            mutBtn.addEventListener('click', doMutate);
+        }
 
-        var undoBtn = document.getElementById('mutationUndo');
         if (undoBtn) undoBtn.addEventListener('click', function () {
             var entry = engine.chain.back();
             if (entry && window.applyPresetSnapshot) {
@@ -941,7 +980,6 @@
             }
         });
 
-        var redoBtn = document.getElementById('mutationRedo');
         if (redoBtn) redoBtn.addEventListener('click', function () {
             var entry = engine.chain.forward();
             if (entry && window.applyPresetSnapshot) {
@@ -954,7 +992,6 @@
             }
         });
 
-        var resetBtn = document.getElementById('mutationReset');
         if (resetBtn) resetBtn.addEventListener('click', function () {
             var first = engine.chain.length > 0 ? engine.chain.jump(0) : null;
             if (first && window.applyPresetSnapshot) {
@@ -986,6 +1023,21 @@
         if (captureBtn) { captureBtn.style.cssText = 'font-size:11px;padding:3px 8px;'; captureBtn.textContent = 'Capture Layer'; actions.appendChild(captureBtn); }
         const uploadBtn = document.getElementById('uploadBtn');
         if (uploadBtn) { uploadBtn.style.cssText = ''; uploadBtn.textContent = '📁'; actions.appendChild(uploadBtn); }
+
+        // Path layer button
+        var pathBtn = document.createElement('button');
+        pathBtn.type = 'button';
+        pathBtn.textContent = '✏️';
+        pathBtn.title = 'Add Path Layer';
+        pathBtn.style.cssText = 'font-size:11px;padding:3px 6px;cursor:pointer;';
+        pathBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (window.pathLayers) {
+                window.pathLayers.create();
+                window.pathLayers.render();
+            }
+        });
+        actions.appendChild(pathBtn);
 
         // Collision layer button with source picker
         var collisionBtn = document.createElement('button');
@@ -1049,6 +1101,12 @@
 
         moveEl('layersPanel', body);
 
+        // Path Layers subsection
+        var pathLayersSubsection = document.createElement('div');
+        pathLayersSubsection.className = 'layers-subsection';
+        pathLayersSubsection.innerHTML = '<div class="layers-subsection-title">✏️ Path Layers</div><div id="pathLayersList"></div>';
+        body.appendChild(pathLayersSubsection);
+
         // Layer-related checkboxes
         moveCheckboxGroup('hoverCaptureToggle', body);
         moveCheckboxGroup('detachCaptureToggle', body);
@@ -1058,8 +1116,8 @@
         if (preview) {
             preview.style.display = 'none';
             var previewCb = document.createElement('div');
-            previewCb.className = 'control-group';
-            previewCb.innerHTML = '<label class="checkbox-label"><input type="checkbox" id="showPreviewLayersCb"> Show Preview Layers</label>';
+            previewCb.className = 'checkbox-group';
+            previewCb.innerHTML = '<input type="checkbox" id="showPreviewLayersCb"><label for="showPreviewLayersCb">Show Preview Layers</label>';
             body.appendChild(previewCb);
             body.appendChild(preview);
             var cb = previewCb.querySelector('input');
@@ -1067,6 +1125,13 @@
                 preview.style.display = cb.checked ? '' : 'none';
             });
         }
+
+        // Initialize path layers UI after DOM is ready
+        setTimeout(function() {
+            if (window.pathLayers) {
+                window.pathLayers.render();
+            }
+        }, 100);
 
         return sec;
     }
@@ -1665,8 +1730,16 @@
             }
         });
 
-        // Initial list render after a frame
-        requestAnimationFrame(refreshList);
+        // Initial list render - wait for brandingOverlays API
+        function initBrandingList() {
+            if (!window.brandingOverlays) {
+                setTimeout(initBrandingList, 100);
+                return;
+            }
+            refreshList();
+            console.log('[Branding] UI wired successfully');
+        }
+        setTimeout(initBrandingList, 200);
 
         return sec;
     }
@@ -2255,23 +2328,39 @@
         var comfyInput = document.createElement('input');
         comfyInput.type = 'text';
         comfyInput.id = 'comfyuiFolderPath';
-        comfyInput.readOnly = true;
-        comfyInput.placeholder = 'No folder set…';
-        comfyInput.style.cssText = 'flex:1; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px 8px; color:#c9d1d9; font-size:11px; cursor:pointer;';
+        comfyInput.placeholder = 'Paste path or click 📂';
+        comfyInput.style.cssText = 'flex:1; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px 8px; color:#c9d1d9; font-size:11px;';
         comfyInput.value = (window.comfyuiBridge && window.comfyuiBridge.getConfig().outputFolder) || '';
-        comfyInput.addEventListener('click', function() {
-            if (window.comfyuiBridge) window.comfyuiBridge.pickFolder();
+        comfyInput.addEventListener('change', function() {
+            if (window.comfyuiBridge && comfyInput.value.trim()) {
+                window.comfyuiBridge.setConfig('outputFolder', comfyInput.value.trim());
+            }
+        });
+        comfyInput.addEventListener('paste', function() {
+            setTimeout(function() {
+                if (window.comfyuiBridge && comfyInput.value.trim()) {
+                    window.comfyuiBridge.setConfig('outputFolder', comfyInput.value.trim());
+                }
+            }, 0);
         });
         comfyRow.appendChild(comfyInput);
 
-        var comfyOpenBtn = document.createElement('button');
-        comfyOpenBtn.textContent = '📂';
-        comfyOpenBtn.title = 'Open folder';
-        comfyOpenBtn.style.cssText = 'background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 8px; color:#c9d1d9; cursor:pointer; font-size:14px;';
-        comfyOpenBtn.addEventListener('click', function() {
-            if (window.comfyuiBridge) window.comfyuiBridge.openFolder();
+        var comfyFolderBtn = document.createElement('button');
+        comfyFolderBtn.textContent = '📂';
+        comfyFolderBtn.title = 'Pick or open folder';
+        comfyFolderBtn.style.cssText = 'background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 8px; color:#c9d1d9; cursor:pointer; font-size:14px;';
+        comfyFolderBtn.addEventListener('click', function() {
+            if (!window.comfyuiBridge) return;
+            var cfg = window.comfyuiBridge.getConfig();
+            if (cfg.outputFolder) {
+                // If folder is set, open it
+                window.comfyuiBridge.openFolder();
+            } else {
+                // If no folder, pick one
+                window.comfyuiBridge.pickFolder();
+            }
         });
-        comfyRow.appendChild(comfyOpenBtn);
+        comfyRow.appendChild(comfyFolderBtn);
 
         comfySection.appendChild(comfyRow);
         body.appendChild(comfySection);
@@ -2440,6 +2529,8 @@
                         btn.textContent = m.text;
                         btn.title = m.title;
                         btn.dataset.mode = m.key;
+                        var isActive = cfg.mode === m.key;
+                        btn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 6px;font-size:10px;border-radius:3px;background:' + (isActive ? 'rgba(255,220,80,0.25)' : 'rgba(255,255,255,0.08)') + ';color:' + (isActive ? 'rgba(255,220,80,1)' : 'rgba(255,255,255,0.6)') + ';border:1px solid ' + (isActive ? 'rgba(255,220,80,0.4)' : 'rgba(255,255,255,0.1)') + ';cursor:pointer;';
                         btn.addEventListener('click', function() {
                             cfg.mode = m.key;
                             cfg.cachedColor = null;
@@ -2449,7 +2540,13 @@
                                 cfg.color = hslToHex(hue, 80, 55);
                                 picker.value = cfg.color;
                             }
-                            btns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === m.key); });
+                            btns.forEach(function(b) {
+                                var active = b.dataset.mode === m.key;
+                                b.classList.toggle('active', active);
+                                b.style.background = active ? 'rgba(255,220,80,0.25)' : 'rgba(255,255,255,0.08)';
+                                b.style.color = active ? 'rgba(255,220,80,1)' : 'rgba(255,255,255,0.6)';
+                                b.style.borderColor = active ? 'rgba(255,220,80,0.4)' : 'rgba(255,255,255,0.1)';
+                            });
                             picker.disabled = m.key !== 'fixed';
                             picker.style.opacity = m.key === 'fixed' ? '1' : '0.35';
                         });
@@ -2461,7 +2558,13 @@
                         cfg.color = picker.value;
                         if (cfg.mode !== 'fixed') {
                             cfg.mode = 'fixed';
-                            btns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === 'fixed'); });
+                            btns.forEach(function(b) {
+                                var active = b.dataset.mode === 'fixed';
+                                b.classList.toggle('active', active);
+                                b.style.background = active ? 'rgba(255,220,80,0.25)' : 'rgba(255,255,255,0.08)';
+                                b.style.color = active ? 'rgba(255,220,80,1)' : 'rgba(255,255,255,0.6)';
+                                b.style.borderColor = active ? 'rgba(255,220,80,0.4)' : 'rgba(255,255,255,0.1)';
+                            });
                             picker.disabled = false;
                             picker.style.opacity = '1';
                         }

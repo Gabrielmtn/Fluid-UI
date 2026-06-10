@@ -87,14 +87,17 @@
 
 .mask-editor-controls {
     display: flex;
-    gap: clamp(6px, 1vh, 14px);
-    align-items: center;
+    flex-direction: column;
+    gap: clamp(6px, 1vh, 10px);
     padding: clamp(6px, 1vh, 12px) clamp(12px, 2vw, 20px);
     background: rgba(13, 17, 23, 0.6);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    flex-wrap: wrap;
-    flex: 0 1 auto;
-    overflow-y: auto;
+    flex: 0 0 auto;
+    overflow: visible;
+}
+
+.mask-editor-controls > * {
+    flex-shrink: 0;
 }
 
 .mask-mode-toggle {

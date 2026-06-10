@@ -29,10 +29,12 @@
     align-items: center;
     justify-content: center;
     background: #0a0d12;
-    /* GPU-composited: only opacity + transform change */
+    /* GPU-composited: isolate from main thread layout work */
     will-change: opacity;
+    transform: translateZ(0);
+    contain: strict;
     opacity: 1;
-    transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.6s cubic-bezier(0.4, 0, 0.6, 1); /* Smooth ease-in-out */
     pointer-events: auto;
 }
 
@@ -41,56 +43,89 @@
     pointer-events: none;
 }
 
+/* Ready state - triggers final flourish before fadeout */
+#splash-screen.ready .splash-title {
+    text-shadow: 0 0 80px rgba(100, 180, 255, 0.5),
+                 0 0 160px rgba(100, 180, 255, 0.2);
+}
+#splash-screen.ready .splash-subtitle {
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.48em;
+}
+#splash-screen.ready .splash-progress {
+    opacity: 0;
+    transform: scaleX(1.1) translateZ(0);
+}
+
 .splash-title {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
     font-size: clamp(36px, 5vw, 64px);
     font-weight: 200;
     letter-spacing: 0.25em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.92);
+    color: rgba(255, 255, 255, 0.95);
     text-shadow: 0 0 60px rgba(100, 180, 255, 0.25),
                  0 0 120px rgba(100, 180, 255, 0.08);
-    /* GPU-composited entrance */
-    will-change: transform, opacity;
+    will-change: transform, opacity, text-shadow;
+    transform: translateY(10px) translateZ(0);
+    backface-visibility: hidden;
     opacity: 0;
-    transform: translateY(12px) scale(0.97);
-    animation: splashTitleIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+    animation: splashTitleIn 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) 0.1s forwards; /* ease-in-out */
+    transition: text-shadow 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
     user-select: none;
 }
 
 .splash-subtitle {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
     font-size: clamp(11px, 1.5vw, 14px);
-    font-weight: 400;
+    font-weight: 500;
     letter-spacing: 0.4em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.25);
-    margin-top: 16px;
-    will-change: opacity;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 20px;
+    will-change: opacity, transform, letter-spacing, color;
+    transform: translateY(8px) translateZ(0);
+    backface-visibility: hidden;
     opacity: 0;
-    animation: splashSubIn 0.6s ease 0.55s forwards;
+    animation: splashSubIn 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) 0.4s forwards; /* ease-in-out */
+    transition: color 0.4s cubic-bezier(0.25, 0.1, 0.25, 1), letter-spacing 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
     user-select: none;
 }
 
-.splash-bar {
-    width: 60px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(100, 180, 255, 0.5), transparent);
-    margin-top: 24px;
+/* Progress bar - shows actual loading state */
+.splash-progress {
+    width: 120px;
+    height: 2px;
+    margin-top: 32px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 1px;
+    overflow: hidden;
     will-change: opacity, transform;
     opacity: 0;
-    transform: scaleX(0);
-    animation: splashBarIn 0.5s ease 0.4s forwards;
+    transform: translateZ(0);
+    animation: splashProgressIn 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) 0.6s forwards;
+    transition: opacity 0.4s cubic-bezier(0.25, 0.1, 0.25, 1), transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.splash-progress-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(100, 180, 255, 0.6), rgba(140, 200, 255, 0.8));
+    border-radius: 1px;
+    transition: width 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); /* Smooth ease-in-out */
 }
 
 @keyframes splashTitleIn {
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    0% { opacity: 0; transform: translateY(10px) translateZ(0); }
+    100% { opacity: 1; transform: translateY(0) translateZ(0); }
 }
 @keyframes splashSubIn {
-    to { opacity: 1; }
+    0% { opacity: 0; transform: translateY(8px) translateZ(0); }
+    100% { opacity: 1; transform: translateY(0) translateZ(0); }
 }
-@keyframes splashBarIn {
-    to { opacity: 1; transform: scaleX(1); }
+@keyframes splashProgressIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
 }
 
 /* ── UI ENTRANCE ANIMATIONS ── */
@@ -123,27 +158,27 @@
 #custom-titlebar.ui-enter.ui-ready {
     transform: translateY(0);
     opacity: 1;
-    transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-                opacity 0.35s ease;
+    transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1),
+                opacity 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 #mixer-strip.ui-enter.ui-ready {
     transform: translateY(0);
     opacity: 1;
-    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-                opacity 0.4s ease;
+    transition: transform 0.55s cubic-bezier(0.25, 0.1, 0.25, 1),
+                opacity 0.45s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 #sidebar-right.ui-enter.ui-ready {
     transform: translateX(0);
     opacity: 1;
-    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-                opacity 0.4s ease;
+    transition: transform 0.55s cubic-bezier(0.25, 0.1, 0.25, 1),
+                opacity 0.45s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 #canvas-area.ui-enter.ui-ready {
     opacity: 1;
-    transition: opacity 0.5s ease;
+    transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Clean up will-change after animation completes */
@@ -323,6 +358,37 @@
     font-size: calc(10px * var(--ui-scale));
     gap: 6px;
     opacity: 0.85;
+    margin-bottom: 14px; /* Extra breathing room below */
+}
+#sidebar-right .layer-threshold .layer-slider-host {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+#sidebar-right .layer-threshold span:first-child,
+#sidebar-right .layer-threshold .layer-slider-value {
+    margin-top: 10px; /* Nudge label and value down to align with slider knob center */
+}
+/* Remove ALL dark borders from sidebar sliders */
+#sidebar-right input[type="range"] {
+    box-shadow: none !important;
+    border: none !important;
+}
+#sidebar-right input[type="range"]::-webkit-slider-container {
+    box-shadow: none !important;
+    border: none !important;
+}
+#sidebar-right input[type="range"]::-webkit-slider-runnable-track {
+    box-shadow: none !important;
+    border: none !important;
+}
+#sidebar-right input[type="range"]::-moz-range-track {
+    box-shadow: none !important;
+    border: none !important;
+}
+#sidebar-right input[type="range"]::-moz-range-progress {
+    box-shadow: none !important;
+    border: none !important;
 }
 #sidebar-right .layer-threshold span:first-child {
     font-size: calc(9px * var(--ui-scale));
@@ -352,7 +418,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
+    padding: 6px 0; /* Space for slider thumb overflow */
 }
 #sidebar-right .collision-row:last-child {
     margin-bottom: 0;

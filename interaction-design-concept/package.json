@@ -1,0 +1,17 @@
+{
+  "name": "fluid-centering",
+  "version": "1.0.0",
+  "description": "Community centering exercise - multiplayer fluid interaction demo",
+  "main": "index.html",
+  "scripts": {
+    "dev": "partykit dev",
+    "deploy": "partykit deploy"
+  },
+  "dependencies": {
+    "partykit": "^0.0.108"
+  },
+  "devDependencies": {},
+  "keywords": ["fluid", "multiplayer", "partykit", "interaction-design"],
+  "author": "",
+  "license": "MIT"
+}

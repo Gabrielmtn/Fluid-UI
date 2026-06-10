@@ -1,1794 +1,946 @@
 <!DOCTYPE html>
-
 <html lang="en" class="js">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-
     <title>Fluid UI</title>
-
     <link rel="stylesheet" href="css/styles.css">
-
     <link rel="stylesheet" href="css/slider-styles.css">
-
     <link rel="stylesheet" href="css/battery-styles.css">
-
     <link rel="stylesheet" href="css/mask-editor.css">
-
     <link rel="stylesheet" href="css/light-source.css">
-
     <link rel="stylesheet" href="css/mixer-layout.css">
-
     <link rel="stylesheet" href="css/init-responsive.css">
-
 </head>
-
 <body>
-
     <!-- Splash Screen -->
-
     <div id="splash-screen">
-
         <div class="splash-title">Fluid UI</div>
-
-        <div class="splash-bar"></div>
-
         <div class="splash-subtitle">Creative Simulation Engine</div>
-
+        <div class="splash-progress">
+            <div class="splash-progress-bar" id="splash-progress-bar"></div>
+        </div>
     </div>
-
-
-
     <!-- Custom Title Bar for Frameless Window -->
-
     <div id="custom-titlebar" class="ui-enter">
-
         <div class="titlebar-drag-region">
-
             <span class="titlebar-title">Fluid UI</span>
-
         </div>
-
         <div class="window-controls">
-
             <button id="min-button" class="titlebar-button" title="Minimize">
-
                 <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
-
             </button>
-
             <button id="max-button" class="titlebar-button" title="Maximize">
-
                 <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0" y="0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/></svg>
-
             </button>
-
             <button id="close-button" class="titlebar-button close" title="Close">
-
                 <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1"/></svg>
-
             </button>
-
         </div>
-
     </div>
-
-
-
     <!-- Invisible window resize handles (for frameless, transparent window) -->
-
     <div class="window-resize-edge edge-top"    data-resize="n"></div>
-
     <div class="window-resize-edge edge-right"  data-resize="e"></div>
-
     <div class="window-resize-edge edge-bottom" data-resize="s"></div>
-
     <div class="window-resize-edge edge-left"   data-resize="w"></div>
-
-
-
     <div class="window-resize-corner corner-nw" data-resize="nw"></div>
-
     <div class="window-resize-corner corner-ne" data-resize="ne"></div>
-
     <div class="window-resize-corner corner-se" data-resize="se"></div>
-
     <div class="window-resize-corner corner-sw" data-resize="sw"></div>
-
-    
-
     <button id="mobileMenuToggle" aria-label="Toggle Menu"></button>
-
     <div id="canvas-area">
-
                 <div id="canvas-wrapper">
-
                     <div id="canvas-size-display">800 × 600</div>
-
-                    
-
                     <!-- Resize handles -->
-
                     <div class="resize-handle corner resize-nw"></div>
-
                     <div class="resize-handle edge resize-n"></div>
-
                     <div class="resize-handle corner resize-ne"></div>
-
                     <div class="resize-handle edge resize-e"></div>
-
                     <div class="resize-handle corner resize-se"></div>
-
                     <div class="resize-handle edge resize-s"></div>
-
                     <div class="resize-handle corner resize-sw"></div>
-
                     <div class="resize-handle edge resize-w"></div>
-
-                    
-
                     <div id="layers-container">
-
                         <div class="background-layer" id="layer0"></div>
-
                         <div class="background-layer" id="layer1"></div>
-
                         <div class="background-layer" id="layer2"></div>
-
                         <div class="background-layer" id="layer3"></div>
-
                         <div class="background-layer" id="layer4"></div>
-
                         <div class="background-layer" id="layer5"></div>
-
                         <div class="background-layer" id="layer6"></div>
-
                         <div class="background-layer" id="layer7"></div>
-
                         <div class="background-layer" id="layer8"></div>
-
                         <div class="background-layer" id="layer9"></div>
-
                     </div>
-
                     <canvas id="canvas"></canvas>
-
                     <div id="customCursor"></div>
-
                 </div>
-
-                
-
                 <!-- Stats For Nerds Panel -->
-
                 <div id="statsPanel" class="stats-panel" style="display: none;">
-
                     <div class="stats-header">
-
                         <span class="stats-drag-handle">Stats For Nerds 🤓</span>
-
                     </div>
-
                     <button id="statsCloseBtn" class="stats-close-btn" title="Close panel">✕</button>
-
                     <div class="stats-content">
-
                         <div class="stats-section">
-
                             <div class="stats-title">Performance</div>
-
                             <div class="stat-row"><span class="stat-label">FPS:</span> <span id="stat-fps">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Frame Time:</span> <span id="stat-frametime">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">CPU Time:</span> <span id="stat-updatetime">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Frame Budget:</span> <span id="stat-budget">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Display:</span> <span id="stat-displayhz">--</span></div>
-
                         </div>
-
-                        
-
                         <div class="stats-section">
-
                             <div class="stats-title">Simulation</div>
-
                             <div class="stat-row"><span class="stat-label">Sim Resolution:</span> <span id="stat-simres">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Dye Resolution:</span> <span id="stat-dyeres">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Canvas Size:</span> <span id="stat-canvassize">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Velocity Dissipation:</span> <span id="stat-veldiss">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Density Dissipation:</span> <span id="stat-dendiss">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Pressure Iterations:</span> <span id="stat-pressure">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Curl:</span> <span id="stat-curl">--</span></div>
-
                         </div>
-
-                        
-
                         <div class="stats-section">
-
                             <div class="stats-title">Kaleidoscope</div>
-
                             <div class="stat-row"><span class="stat-label">Mode:</span> <span id="stat-kmode">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Segments:</span> <span id="stat-ksegments">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Angle:</span> <span id="stat-kangle">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Zoom:</span> <span id="stat-kzoom">--</span></div>
-
                         </div>
-
-                        
-
                         <div class="stats-section">
-
                             <div class="stats-title">Input</div>
-
                             <div class="stat-row"><span class="stat-label">Pointer Position:</span> <span id="stat-pointerpos">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Pointer Velocity:</span> <span id="stat-pointervel">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Splat Radius:</span> <span id="stat-splatradius">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">Multiplier:</span> <span id="stat-multiplier">--</span></div>
-
                         </div>
-
-                        
-
                         <div class="stats-section">
-
                             <div class="stats-title">Memory</div>
-
                             <div class="stat-row"><span class="stat-label">Textures:</span> <span id="stat-textures">--</span></div>
-
                             <div class="stat-row"><span class="stat-label">WebGL Context:</span> <span id="stat-webgl">--</span></div>
-
                         </div>
-
                     </div>
-
                 </div>
-
     </div>
-
-    
-
     <div class="controls">
-
         <button id="mobileMenuClose" class="mobile-menu-close" aria-label="Close Menu">✕</button>
-
         <div class="control-group">
-
             <label for="brushSize">Brush Size</label>
-
             <input type="range" id="brushSize" min="0.1" max="30" value="11" step="0.1">
-
         </div>
-
-        
-
         <div class="control-group">
-
             <label for="colorPicker">Fluid Color</label>
-
             <input type="color" id="colorPicker" value="#ff0000">
-
             <div class="color-actions">
-
                 <button onclick="saveColor()">Save Color</button>
-
                 <button onclick="clearColors()">Clear All</button>
-
             </div>
-
             <div class="saved-colors" id="savedColors"></div>
-
             <div class="control-group checkbox-group" style="margin-top: 8px;">
-
                 <input type="checkbox" id="randomColor" checked>
-
                 <label for="randomColor" style="margin: 0">Random Colors</label>
-
             </div>
-
             <div style="margin-top: 10px;">
-
                 <label>Palette <span id="paletteImportStatus" class="import-status"></span></label>
-
                 <div class="palette-carousel" id="paletteCarousel"></div>
-
                 <div class="palette-row-split">
-
                     <div class="palette-left">
-
                         <div class="palette-preview" id="palettePreview"></div>
-
                         <div class="palette-step" id="paletteStepIndicator"></div>
-
                     </div>
-
                     <div class="palette-right">
-
                         <div class="palette-create" id="paletteCreateRow">
-
                             <div class="palette-btn-row">
-
                                 <button id="updatePaletteBtn">Update</button>
-
                                 <button id="saveNewPaletteBtn">+ Save as New</button>
-
                             </div>
-
                             <div class="palette-name-input" id="paletteNameInput" style="display:none;">
-
                                 <input type="text" id="newPaletteName" placeholder="Enter Palette Name" />
-
                                 <div class="palette-name-input-buttons">
-
                                     <button id="confirmSaveBtn">Save</button>
-
                                     <button id="cancelSaveBtn">Cancel</button>
-
                                 </div>
-
                             </div>
-
                         </div>
-
                     </div>
-
                 </div>
-
                 <div class="palette-actions">
-
                     <button onclick="exportCurrentPaletteFluid()">Export Current</button>
-
                     <button onclick="exportAllPalettesFluid()">Export All</button>
-
                     <button onclick="document.getElementById('paletteFluidFile').click()">Import</button>
-
                     <input type="file" id="paletteFluidFile" accept=".fluid,text/plain" style="display:none" onchange="importPalettesFluidFromFile(this.files[0]); this.value='';" />
-
                 </div>
-
             </div>
-
         </div>
-
-        
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="stepPalette">
-
             <label for="stepPalette" style="margin: 0">Step through palette</label>
-
         </div>
-
-        
-
         <div class="control-group">
-
             <label for="visualResolution">Visual Quality</label>
-
             <select id="visualResolution">
-
                 <option value="4096">Cinematic (4K)</option>
-
                 <option value="2048">Ultra (2K)</option>
-
                 <option value="1024" selected>High (1K) - Recommended</option>
-
                 <option value="512">Medium (512)</option>
-
                 <option value="256">Low (256)</option>
-
             </select>
-
         </div>
-
         <div class="control-group">
-
             <label for="physicsResolution">Physics Detail</label>
-
             <select id="physicsResolution">
-
                 <option value="1024">Extreme (1K)</option>
-
                 <option value="512">Ultra (512)</option>
-
                 <option value="384" selected>High (384) - Recommended</option>
-
                 <option value="256">Standard (256)</option>
-
                 <option value="128">Medium (128)</option>
-
                 <option value="64">Low (64)</option>
-
             </select>
-
         </div>
-
         <div class="control-group">
-
             <label for="fpsCap">FPS Limit</label>
-
             <select id="fpsCap">
-
                 <option value="30">30 fps — Battery Saver</option>
-
                 <option value="60" selected>60 fps — Standard</option>
-
                 <option value="120">120 fps</option>
-
                 <option value="144">144 fps</option>
-
                 <option value="165">165 fps</option>
-
                 <option value="240">240 fps</option>
-
                 <option value="native">Native (Match Display)</option>
-
                 <option value="0">Uncapped</option>
-
             </select>
-
         </div>
-
         <div class="control-group">
-
             <label for="densityDissipation">Density Sustain <span id="densityValue" class="value-display">0.9930</span></label>
-
             <input type="range" id="densityDissipation" min="0.85" max="1.005" value="0.993" step="0.0001">
-
         </div>
-
         <div class="control-group">
-
             <label for="velocityDissipation">Velocity Sustain <span id="velocityValue" class="value-display">0.9990</span></label>
-
             <input type="range" id="velocityDissipation" min="0.9" max="1.0009" value="0.999" step="0.0001">
-
         </div>
-
         <div class="control-group">
-
             <label for="pressureDissipation">Pressure Dissipation <span id="pressureValue" class="value-display">0.944</span></label>
-
             <input type="range" id="pressureDissipation" min="0.9" max="1.0333" value="0.944" step="0.001">
-
         </div>
-
         <div class="control-group">
-
             <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">32</span></label>
-
             <input type="range" id="pressureIteration" min="1" max="50" value="32" step="1">
-
         </div>
-
         <div class="control-group">
-
             <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">2.500</span></label>
-
             <input type="range" id="velocityInfluence" min="1" max="5" value="2.5" step="0.001">
-
         </div>
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="turbulenceMode">
-
             <label for="turbulenceMode" style="margin: 0">☁️ Billowing Clouds (Turbulence)</label>
-
         </div>
-
         <div class="control-group">
-
             <label for="curl">Curl <span id="curlValue" class="value-display">25</span></label>
-
             <input type="range" id="curl" min="0" max="60" value="25" step="1">
-
         </div>
-
         <div class="control-group">
-
             <label for="sharpness">Viscosity <span id="sharpnessValue" class="value-display">0.8</span></label>
-
             <input type="range" id="sharpness" min="0" max="2" value="0.8" step="0.1">
-
         </div>
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="microDetailToggle">
-
             <label for="microDetailToggle" style="margin: 0">Micro Detail</label>
-
         </div>
-
         <div id="microDetailPanel" class="collapsible" style="display:none;">
-
             <div class="control-group">
-
                 <label for="clarity">Clarity <span id="clarityValue" class="value-display">0.0</span></label>
-
                 <input type="range" id="clarity" min="0" max="1" value="0" step="0.05">
-
             </div>
-
             <div class="control-group">
-
                 <label for="vibrance">Vibrance <span id="vibranceValue" class="value-display">0.0</span></label>
-
                 <input type="range" id="vibrance" min="0" max="1" value="0" step="0.05">
-
             </div>
-
         </div>
-
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="displayShadingToggle">
+            <label for="displayShadingToggle" style="margin: 0">Surface Shading</label>
+        </div>
+        <div id="shadingIntensityGroup" class="collapsible" style="display:none;">
+            <div class="control-group">
+                <label for="shadingIntensity">Intensity <span id="shadingIntensityValue" class="value-display">0.8</span></label>
+                <input type="range" id="shadingIntensity" min="0" max="2" value="0.8" step="0.1">
+            </div>
+        </div>
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="sunraysToggle">
+            <label for="sunraysToggle" style="margin: 0">Sunrays</label>
+        </div>
+        <div id="sunraysPanel" class="collapsible" style="display:none;">
+            <div class="control-group">
+                <label for="sunraysWeight">Weight <span id="sunraysWeightValue" class="value-display">0.5</span></label>
+                <input type="range" id="sunraysWeight" min="0" max="1" value="0.5" step="0.05">
+            </div>
+        </div>
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="spinToggle">
+            <label for="spinToggle" style="margin: 0">Spin (Balatro)</label>
+        </div>
+        <div id="spinPanel" class="collapsible" style="display:none;">
+            <div class="control-group">
+                <label for="spinSpeed">Speed <span id="spinSpeedValue" class="value-display">7.0</span></label>
+                <input type="range" id="spinSpeed" min="0" max="20" value="7" step="0.5">
+            </div>
+            <div class="control-group">
+                <label for="spinAmount">Amount <span id="spinAmountValue" class="value-display">0.25</span></label>
+                <input type="range" id="spinAmount" min="0" max="1" value="0.25" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="spinMix">Mix <span id="spinMixValue" class="value-display">1.00</span></label>
+                <input type="range" id="spinMix" min="0" max="1" value="1" step="0.01">
+            </div>
+        </div>
         <div class="control-group">
-
             <label for="multiplier">✨ Multiplier <span id="multiplierValue" class="value-display">1x</span></label>
-
             <input type="range" id="multiplier" min="1" max="8" value="1" step="1">
-
         </div>
-
         <div class="control-group">
-
             <label for="timeScale">⏱️ Time <span id="timeScaleValue" class="value-display">1.00x</span></label>
-
             <input type="range" id="timeScale" min="0.01" max="3" value="1" step="0.01">
-
         </div>
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="kaleidoToggle">
-
             <label for="kaleidoToggle" style="margin: 0">Kaleido</label>
-
         </div>
-
         <div id="kaleidoPanel" class="collapsible">
-
             <div class="control-group">
-
                 <label for="kaleidoSegments">Segments <span id="kaleidoValue" class="value-display">12</span></label>
-
                 <input type="range" id="kaleidoSegments" min="1" max="24" value="12" step="1" class="slider-star">
-
             </div>
-
             <div class="control-group">
-
                 <label for="kaleidoMode">Kaleidoscope Mode</label>
-
                 <select id="kaleidoMode">
-
                     <option value="1" selected>Wedge</option>
-
                     <option value="2">Mirror H</option>
-
                     <option value="3">Mirror V</option>
-
                     <option value="4">Mirror Quad</option>
-
                     <option value="5">Spiral</option>
-
                     <option value="0">Off</option>
-
                 </select>
-
             </div>
-
             <div class="control-group">
-
                 <label for="kAngle">Angle <span id="kAngleValue" class="value-display">0°</span></label>
-
                 <input type="range" id="kAngle" min="-180" max="180" value="0" step="1" class="slider-star">
-
             </div>
-
             <div class="control-group checkbox-group">
-
                 <input type="checkbox" id="kAnimateRot">
-
                 <label for="kAnimateRot" style="margin: 0">Animate Rotation</label>
-
             </div>
-
             <div class="control-group">
-
                 <label>
-
                     Spin Speed
-
                     <span class="value-display" id="kSpinSpeedValue">30°/s</span>
-
                 </label>
-
                 <input type="range" id="kSpinSpeed" min="-180" max="180" value="30" step="1" class="slider-star">
-
             </div>
-
             <div class="control-group">
-
                 <label for="kTwist">Twist <span id="kTwistValue" class="value-display">0.0</span></label>
-
                 <input type="range" id="kTwist" min="0" max="10" value="0" step="0.1" class="slider-star">
-
             </div>
-
             <div class="control-group">
-
                 <label for="kZoom">Zoom <span id="kZoomValue" class="value-display">1.00</span></label>
-
                 <input type="range" id="kZoom" min="0.5" max="2" value="1" step="0.01" class="slider-star">
-
             </div>
-
             <div class="control-group">
-
                 <label for="kBlend">Blend <span id="kBlendValue" class="value-display">1.00</span></label>
-
                 <input type="range" id="kBlend" min="0" max="1" value="1" step="0.01">
-
             </div>
-
         </div>
-
         <div class="control-group" style="margin-top: 10px;">
-
             <label for="backgroundColorPicker">Background Color</label>
-
             <input type="color" id="backgroundColorPicker" value="#000000">
-
             <div class="control-group checkbox-group" style="margin-top: 8px;">
-
                 <input type="checkbox" id="transparentMode">
-
                 <label for="transparentMode" style="margin: 0">Transparent Background</label>
-
             </div>
-
         </div>
-
         <div class="control-group" style="margin-top: 10px;">
-
             <label for="canvasOpacity">Canvas Opacity (Sim Visibility) <span id="opacityValue" class="value-display">100%</span></label>
-
             <input type="range" id="canvasOpacity" min="0" max="100" value="100" step="1">
-
         </div>
-
         <div class="control-group checkbox-group" style="margin-top: 5px; margin-left: 10px;">
-
             <input type="checkbox" id="preserveFluidOpacity" checked>
-
             <label for="preserveFluidOpacity" style="margin: 0">Empty Alpha Locked</label>
-
         </div>
-
         <div class="control-group" style="margin-top: 10px;">
-
             <label for="captureDimming">Background Transparency <span id="dimmingValue" class="value-display">80%</span></label>
-
             <input type="range" id="captureDimming" min="0" max="100" value="80" step="1">
-
         </div>
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="cursorToggle" checked>
-
             <label for="cursorToggle" style="margin: 0">Show Cursor</label>
-
         </div>
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="showCanvasHandles" checked>
-
             <label for="showCanvasHandles" style="margin: 0">Show Canvas Border & Handles</label>
-
         </div>
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="statsToggle">
-
             <label for="statsToggle" style="margin: 0">Stats For Nerds</label>
-
         </div>
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="enableLighting">
-
             <label for="enableLighting" style="margin: 0">💡 Light Source (Depth Effect)</label>
-
         </div>
-
-        
-
         <!-- Light Source Controls (compact, inline) -->
-
         <div id="lightSourceControls" class="light-source-controls" style="display: none; margin-left: 20px; margin-top: 8px; padding: 12px; background: rgba(100, 150, 255, 0.05); border-left: 2px solid rgba(100, 150, 255, 0.3); border-radius: 4px;">
-
             <div class="control-group" style="margin-bottom: 8px;">
-
                 <label style="font-size: 12px; margin-bottom: 4px;">Mode</label>
-
                 <select id="lightMode" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid rgba(100,150,255,0.3); color: white; border-radius: 4px;">
-
                     <option value="manual">Manual</option>
-
                     <option value="random">Random</option>
-
                 </select>
-
             </div>
-
-            
-
             <div class="light-grid-container" id="lightGridContainer" style="width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, rgba(20, 30, 50, 0.5), rgba(30, 20, 50, 0.5)); border: 1px solid rgba(100, 150, 255, 0.3); border-radius: 4px; position: relative; margin-bottom: 8px; cursor: crosshair;">
-
                 <div class="light-grid" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
-
                     <div class="grid-line vertical" style="position: absolute; width: 1px; height: 100%; background: rgba(100, 150, 255, 0.15); left: 50%;"></div>
-
                     <div class="grid-line horizontal" style="position: absolute; height: 1px; width: 100%; background: rgba(100, 150, 255, 0.15); top: 50%;"></div>
-
                 </div>
-
                 <div class="light-dot" id="lightDot" style="position: absolute; width: 16px; height: 16px; background: radial-gradient(circle, rgba(255, 255, 200, 1) 0%, rgba(255, 220, 100, 0.9) 40%, rgba(255, 200, 50, 0.6) 70%, transparent 100%); border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 0 8px rgba(255, 255, 200, 0.8); z-index: 10; left: 50%; top: 50%;"></div>
-
                 <div class="light-gradient-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
-
             </div>
-
-            
-
             <div class="control-group" id="lightSpeedControl" style="display: none;">
-
                 <label>
-
                     Speed
-
                     <span class="value-display" id="lightSpeedValue">0.50</span>
-
                 </label>
-
                 <input type="range" id="lightSpeed" class="slider-blue" min="0.1" max="2" step="0.1" value="0.5">
-
             </div>
-
-            
-
             <div class="control-group">
-
                 <label>
-
                     Intensity
-
                     <span class="value-display" id="lightIntensityValue">0.50</span>
-
                 </label>
-
                 <input type="range" id="lightIntensity" class="slider-blue" min="0" max="1" step="0.01" value="0.5">
-
             </div>
-
-            
-
             <div class="control-group">
-
                 <label>
-
                     Ambient
-
                     <span class="value-display" id="lightAmbientValue">0.30</span>
-
                 </label>
-
                 <input type="range" id="lightAmbient" class="slider-blue" min="0" max="1" step="0.01" value="0.3">
-
             </div>
-
         </div>
-
-        
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="enableLightShift">
-
             <label for="enableLightShift" style="margin: 0">🌈 Light Shift (Color Overexposure)</label>
-
         </div>
-
-        
-
         <!-- Light Shift Controls -->
-
         <div id="lightShiftControls" style="display: none; margin-left: 20px; margin-top: 8px; padding: 12px; background: rgba(255, 150, 100, 0.05); border-left: 2px solid rgba(255, 150, 100, 0.3); border-radius: 4px;">
-
             <div style="text-align: center; margin-bottom: 8px;">
-
                 <label style="font-size: 11px; color: rgba(255, 255, 255, 0.7);">Draw a path through colors</label>
-
             </div>
-
-            
-
             <div style="display: flex; justify-content: center; margin-bottom: 12px;">
-
                 <canvas id="lightShiftWheel" style="border: 1px solid rgba(255, 150, 100, 0.3); border-radius: 4px; cursor: crosshair;"></canvas>
-
             </div>
-
-            
-
             <div class="control-group" style="margin-bottom: 8px;">
-
                 <label style="font-size: 12px; margin-bottom: 4px;">Blend Mode</label>
-
                 <select id="lightShiftMode" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,150,100,0.3); color: white; border-radius: 4px;">
-
                     <option value="replace">Replace</option>
-
                     <option value="tint">Tint</option>
-
                     <option value="overlay">Overlay</option>
-
                     <option value="multiply">Multiply</option>
-
                     <option value="screen">Screen</option>
-
                     <option value="add">Additive</option>
-
                 </select>
-
             </div>
-
-            
-
             <div class="control-group">
-
                 <label>
-
                     Speed
-
                     <span class="value-display" id="lightShiftSpeedValue">0.50</span>
-
                 </label>
-
                 <input type="range" id="lightShiftSpeed" class="slider-orange" min="0.1" max="2" step="0.1" value="0.5">
-
             </div>
-
-            
-
             <div class="control-group">
-
                 <label>
-
                     Threshold
-
                     <span class="value-display" id="lightShiftThresholdValue">0.85</span>
-
                 </label>
-
                 <input type="range" id="lightShiftThreshold" class="slider-orange" min="0.5" max="1" step="0.01" value="0.85">
-
             </div>
-
-            
-
             <div class="control-group">
-
                 <label>
-
                     Intensity
-
                     <span class="value-display" id="lightShiftIntensityValue">0.50</span>
-
                 </label>
-
                 <input type="range" id="lightShiftIntensity" class="slider-orange" min="0" max="1" step="0.01" value="0.5">
-
             </div>
-
-            
-
             <div class="control-group">
-
                 <label>
-
                     Saturation
-
                     <span class="value-display" id="lightShiftSaturationValue">1.00</span>
-
                 </label>
-
                 <input type="range" id="lightShiftSaturation" class="slider-orange" min="0" max="1" step="0.01" value="1.0">
-
             </div>
-
-            
-
             <button id="clearLightShiftPath" style="width: 100%; padding: 6px; background: rgba(255, 100, 100, 0.2); border: 1px solid rgba(255, 100, 100, 0.4); color: white; border-radius: 4px; cursor: pointer; font-size: 11px;">Clear Path</button>
-
         </div>
-
-        
-
         <div class="control-group checkbox-group">
-
             <input type="checkbox" id="lockCanvasBorders">
-
             <label for="lockCanvasBorders" style="margin: 0">Lock Canvas Borders</label>
-
         </div>
-
         <div class="control-group" style="margin-top: 15px;">
-
             <label>Settings</label>
-
             <div style="display: flex; gap: 8px;">
-
                 <button id="saveSettingsBtn" style="flex: 1;">💾 Save</button>
-
                 <button id="loadSettingsBtn" style="flex: 1;">📂 Load</button>
-
                 <button id="clearSettingsBtn" style="flex: 1;">🧹 Clear</button>
-
             </div>
-
             <div class="control-group checkbox-group" style="margin-top: 8px;">
-
                 <input type="checkbox" id="autoloadSettings">
-
                 <label for="autoloadSettings" style="margin: 0">Load saved on start</label>
-
             </div>
-
         </div>
-
         <div class="control-group" id="presetsGroup">
-
             <label>Presets</label>
-
             <div class="presets">
-
                 <button onclick="applyPreset('silky')">Silky</button>
-
                 <button onclick="applyPreset('thick')">Thick</button>
-
                 <button onclick="applyPreset('wispy')">Wispy</button>
-
                 <button onclick="applyPreset('chaotic')">Chaotic</button>
-
                 <button onclick="applyPreset('ethereal')">Ethereal</button>
-
                 <button onclick="applyPreset('turbulent')">Turbulent</button>
-
                 <button onclick="applyPreset('marble')">Marble</button>
-
                 <button onclick="applyPreset('electric')">Electric</button>
-
             </div>
-
             <div id="userPresetsList" class="user-presets-list" style="margin-top: 6px;"></div>
-
             <div id="userPresetSaveRow" style="margin-top: 6px;">
-
                 <button id="saveAsPresetBtn" style="width: 100%; font-size: 10px; padding: 6px;">+ Save Current as Preset</button>
-
             </div>
-
             <div id="userPresetNameRow" style="display: none; gap: 6px; margin-top: 6px;">
-
                 <input type="text" id="userPresetNameInput" placeholder="Preset name..." maxlength="32" spellcheck="false" autocomplete="off" style="flex: 1; padding: 6px 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; font-size: 11px;">
-
                 <button id="userPresetConfirmBtn" style="padding: 6px 10px;">Save</button>
-
                 <button id="userPresetCancelBtn" style="padding: 6px 10px; background: rgba(255,100,100,0.2); border: 1px solid rgba(255,100,100,0.3);">Cancel</button>
-
             </div>
-
             <div id="userPresetStatus" style="display: none; font-size: 10px; margin-top: 4px; color: #3fb950; text-align: center;"></div>
-
         </div>
-
         <input type="checkbox" id="multiplayerToggle" style="display:none">
-
         <div id="multiArtistPanel">
-
             <!-- Disconnected state -->
-
             <div id="mpDisconnected">
-
                 <button id="createRoomBtn" class="mp-btn-create">🎨 Create Room</button>
-
                 <div class="mp-join-row">
-
                     <input type="text" id="joinRoomInput" placeholder="Enter room code..." maxlength="6" spellcheck="false" autocomplete="off">
-
                     <button id="joinRoomBtn">Join</button>
-
                 </div>
-
                 <div id="mpError" class="mp-error" style="display:none"></div>
-
             </div>
-
             <!-- Connected state -->
-
             <div id="mpConnected" style="display:none">
-
                 <div class="mp-status-row">
-
                     <div id="connectionDot" class="mp-dot mp-dot-connected"></div>
-
                     <span id="multiplayerStatus">Connected</span>
-
                 </div>
-
                 <div class="mp-room-display">
-
                     <div class="mp-room-label">Room Code</div>
-
                     <div class="mp-room-code" id="roomName">------</div>
-
                 </div>
-
                 <div class="mp-action-row">
-
                     <button id="copyRoomBtn" class="mp-btn-share">📋 Copy Link</button>
-
                     <button id="disconnectBtn" class="mp-btn-disconnect">Disconnect</button>
-
                 </div>
-
                 <div id="connectedUsers" class="mp-users">1 user</div>
-
             </div>
-
         </div>
-
-        
-
         <button onclick="togglePause()" id="pauseBtn" style="width: 100%; margin-top: 10px">Pause</button>
-
         <button onclick="clearCanvas()" style="width: 100%; margin-top: 10px">Clear</button>
-
         <button onclick="toggleFreeze()" id="freezeBtn" style="width: 100%; margin-top: 10px">❄️ Freeze</button>
-
         <button id="smashBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 100, 100, 0.2); padding: 8px; line-height: 1.3;">
-
             <div style="font-size: 1.1em; margin-bottom: 2px;">💥 Smash</div>
-
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Collide | Right: Expand</div>
-
         </button>
-
         <button id="jellyfishBtn" style="width: 100%; margin-top: 10px; background: rgba(100, 150, 255, 0.2); padding: 8px; line-height: 1.3;">
-
             <div style="font-size: 1.1em; margin-bottom: 2px;">🪼 Jellyfish</div>
-
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Single | Right: Swarm</div>
-
         </button>
-
         <button onclick="playPortraitAnimation()" style="width: 100%; margin-top: 10px; background: rgba(200, 150, 255, 0.2);">🎨 Portrait</button>
-
-        
-
         <button id="vortexBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 200, 100, 0.2); padding: 8px; line-height: 1.3;">
-
             <div style="font-size: 1.1em; margin-bottom: 2px;">🌀 Vortex</div>
-
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Clockwise | Right: Counter</div>
-
         </button>
-
-        
-
         <button id="portalBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 100, 255, 0.2); padding: 8px; line-height: 1.3;">
-
             <div style="font-size: 1.1em; margin-bottom: 2px;">🌌 Portal</div>
-
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Swoop | Right: Expand</div>
-
         </button>
-
-
-
         <!-- Toggle animations -->
-
         <div id="ascendToggleWrap">
-
             <div class="anim-toggle-row" style="background:rgba(150,255,200,0.1);">
-
                 <span class="anim-toggle-label">⬆️ Ascend</span>
-
                 <label class="anim-switch"><input type="checkbox" id="ascendToggle"><span class="anim-switch-track"></span></label>
-
             </div>
-
             <div class="anim-settings" id="ascendSettings">
-
                 <div class="anim-settings-inner">
-
                     <div class="control-group checkbox-group" style="margin-top:4px;">
-
                         <input type="checkbox" id="ascendRandomness">
-
                         <label for="ascendRandomness" style="margin:0;text-transform:none;opacity:1;font-size:11px;">Randomness</label>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
-
-
-
         <div id="shootingStarWrap">
-
             <div class="anim-toggle-row" style="background:rgba(255,220,100,0.1);">
-
                 <span class="anim-toggle-label">🌠 Shooting Star</span>
-
                 <label class="anim-switch"><input type="checkbox" id="shootingStarToggle"><span class="anim-switch-track"></span></label>
-
             </div>
-
             <div class="anim-settings" id="shootingStarSettings">
-
                 <div class="anim-settings-inner">
-
                     <div class="control-group">
-
                         <label for="ssFrequency">Frequency <span class="value-display" id="ssFreqVal">2.0/s</span></label>
-
                         <input type="range" id="ssFrequency" min="0.2" max="8" step="0.1" value="2">
-
                     </div>
-
                     <div class="control-group">
-
                         <label for="ssAngle">Angle <span class="value-display" id="ssAngleVal">120°</span></label>
-
                         <input type="range" id="ssAngle" min="0" max="360" step="1" value="120">
-
                     </div>
-
                     <div class="control-group">
-
                         <label for="ssLength">Length <span class="value-display" id="ssLengthVal">0.4s</span></label>
-
                         <input type="range" id="ssLength" min="0.1" max="3.0" step="0.05" value="0.4">
-
                     </div>
-
                     <div class="control-group">
-
                         <label for="ssSize">Size <span class="value-display" id="ssSizeVal">0.5x</span></label>
-
                         <input type="range" id="ssSize" min="0.1" max="2.0" step="0.05" value="0.5">
-
                     </div>
-
                     <label style="font-size:10px;text-transform:uppercase;letter-spacing:0.3px;opacity:0.7;margin:6px 0 3px;display:block;">Origin</label>
-
                     <div class="ss-origin-picker" id="ssOriginPicker">
-
                         <div class="ss-origin-frame" id="ssOriginFrame">
-
                             <div class="ss-origin-dot" id="ssOriginDot"></div>
-
                         </div>
-
                         <div class="ss-origin-coords" id="ssOriginCoords">-30%, 0%</div>
-
                     </div>
-
                     <div class="control-group">
-
                         <label for="ssVariance">Variance <span class="value-display" id="ssVarianceVal">15%</span></label>
-
                         <input type="range" id="ssVariance" min="0" max="60" step="1" value="15">
-
                     </div>
-
                     <div class="control-group">
-
                         <label for="ssGravity">Gravity <span class="value-display" id="ssGravityVal">0.10</span></label>
-
                         <input type="range" id="ssGravity" min="0" max="1.0" step="0.01" value="0.10">
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
-
-        
-
         <button id="captureBtn" style="width: 100%; margin-top: 10px; background: rgba(100, 255, 100, 0.2);">Capture Layer</button>
-
-        
-
         <div class="control-group checkbox-group" style="margin-top: 10px;">
-
             <input type="checkbox" id="hoverCaptureToggle">
-
             <label for="hoverCaptureToggle" style="margin: 0">Enable Capture on Hover</label>
-
         </div>
-
         <div class="control-group checkbox-group" style="margin-top: 6px;">
-
             <input type="checkbox" id="detachCaptureToggle">
-
             <label for="detachCaptureToggle" style="margin: 0">Detach Capture Area</label>
-
         </div>
-
-        
-
         <input type="file" id="imageUpload" accept="image/png,image/jpeg,image/jpg" style="display: none;">
-
         <button id="uploadBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 200, 100, 0.2);">📁 Upload Image Layer</button>
-
-        
-
         <div class="preview-toggle" id="previewToggle" 
-
              onmouseenter="showPreview()" 
-
              onmouseleave="hidePreview()">
-
             <div style="font-weight: bold; margin-bottom: 5px;">👁️ PREVIEW LAYERS</div>
-
             <div style="font-size: 11px;">Hover to view stacked PNGs</div>
-
         </div>
-
-        
-
         <div class="control-group" id="recModeGroup" style="margin-top: 10px;">
-
             <label for="recMode">Recording Mode</label>
-
             <select id="recMode">
-
                 <option value="off" selected>Off</option>
-
                 <option value="min">Minimized</option>
-
                 <option value="full">Full</option>
-
             </select>
-
         </div>
-
         <div id="recMini" class="rec-mini" style="display: none;">
-
             <div class="rec-mini-grid">
-
                 <div class="rec-square" id="recMiniSquareControls">
-
                     <div class="rec-square-content">
-
                         <div class="row top3">
-
                             <button id="recMiniRecordBtn" class="action-record">⏺ Record</button>
-
                             <button id="recMiniMultiBtn" class="action-multi">⏺ Multi</button>
-
                             <input type="text" id="recMiniMaxDuration" class="time-input action-max" value="00:10:000" placeholder="mm:ss:ms">
-
                         </div>
-
                         <div class="row bottom2">
-
                             <button id="recMiniPauseBtn" class="action-pause">⏸ Pause</button>
-
                             <button id="recMiniStopBtn" class="action-stop">⏹ Stop</button>
-
                         </div>
-
                         <div class="row bottom1">
-
                             <button id="recMiniPlayAllBtn" class="full action-full">▶▶ Play All</button>
-
                         </div>
-
                     </div>
-
                 </div>
-
                 <div class="rec-square" id="recMiniSquareLayers">
-
                     <div class="rec-square-content">
-
                         <div class="row layer-top">
-
                             <button id="recMiniPrevLayerBtn" class="action-prev">◀</button>
-
                             <div id="recMiniLayerStatus" class="rec-layer-status">0/0</div>
-
                             <button id="recMiniNextLayerBtn" class="action-next">▶</button>
-
                         </div>
-
                         <div class="row layer-bottom">
-
                             <button id="recMiniAddLayerBtn" class="full action-add">➕ New Layer</button>
-
                         </div>
-
                     </div>
-
                 </div>
-
             </div>
-
             <div class="rec-mini-actions">
-
                 <button id="recOpenFullBtn" class="full action-full" title="Open full recorder">⬆️ Full Recorder</button>
-
             </div>
-
         </div>
-
-
-
         <div class="control-group" style="margin-top: 20px">
-
             <label>Layers</label>
-
             <div class="layers-panel" id="layersPanel"></div>
-
         </div>
-
     </div>
-
-    
-
     <!-- Recorded Layers Drawer (full-width) -->
-
     <div id="recDrawer" class="rec-drawer">
-
         <div id="recResizeHandle" class="rec-resize-handle"><div class="rec-grabber"></div></div>
-
         <div class="rec-header">
-
             <div class="rec-left">
-
                 <strong>Recorded Layers</strong>
-
                 <span id="recStatus" style="font-size:12px; opacity:0.7; margin-left:8px;">Ready</span>
-
             </div>
-
             <div class="rec-right">
-
                 <label for="recPlaybackSpeed" style="font-size:12px; opacity:0.8;">Speed</label>
-
                 <select id="recPlaybackSpeed">
-
                     <option value="0.25">0.25x</option>
-
                     <option value="0.5">0.5x</option>
-
                     <option value="1" selected>1x</option>
-
                     <option value="2">2x</option>
-
                     <option value="4">4x</option>
-
                 </select>
-
                 <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;">Max</label>
-
                 <input type="text" id="recMaxDuration" class="time-input" value="00:10:000" placeholder="mm:ss:ms" style="width:110px;">
-
                 <button id="recCloseBtn" class="rec-close">✕</button>
-
             </div>
-
         </div>
-
         <div class="rec-header" style="gap:6px;">
-
             <div class="rec-left" style="gap:6px;">
-
                 <button id="recRecordBtn">⏺ Record</button>
-
                 <button id="recMultiRecordBtn">⏺ Multi Artist Record</button>
-
                 <button id="recPlayBtn">▶ Play Layer</button>
-
                 <button id="recPlayAllBtn">▶▶ Play All</button>
-
                 <button id="recStopBtn">⏹ Stop</button>
-
                 <button id="recAddLayerBtn">➕ Add Layer</button>
-
                 <button id="recDuplicateLayerBtn">📋 Duplicate</button>
-
                 <button id="recDeleteLayerBtn">🗑 Delete</button>
-
                 <button id="recClearBtn">🧹 Clear Active</button>
-
                 <button id="recExportBtn">💾 Export</button>
-
                 <button id="recImportBtn">📁 Import</button>
-
                 <input type="file" id="recImportFile" accept=".json" style="display:none;" />
-
             </div>
-
         </div>
-
         <div class="rec-header" style="gap:6px;">
-
             <div class="rec-left" style="gap:6px; align-items:center;">
-
                 <label for="recPresetSelect" style="font-size:12px; opacity:0.8;">Preset</label>
-
                 <select id="recPresetSelect" style="min-width:200px;"></select>
-
                 <button id="recSavePresetBtn">Save as New</button>
-
                 <div id="recPresetNameRow" style="display:none; gap:6px; align-items:center;">
-
                     <input type="text" id="recNewPresetName" placeholder="Enter Preset Name" style="width:200px;">
-
                     <button id="recPresetConfirmBtn">Save</button>
-
                     <button id="recPresetCancelBtn">Cancel</button>
-
                 </div>
-
             </div>
-
         </div>
-
         <div class="rec-timeline-wrap">
-
             <canvas id="recTimelineCanvas" class="rec-timeline"></canvas>
-
             <div id="recPlayhead" class="rec-playhead" style="left:0;"></div>
-
             <div id="recRecordhead" class="rec-recordhead" style="left:0;"></div>
-
         </div>
-
         <div class="rec-body">
-
             <div id="recLayersList" class="layers-panel"></div>
-
         </div>
-
     </div>
-
-
-
     <div id="hotkeyOverlay">
-
         <div class="hotkey-modal">
-
             <div class="hotkey-header">
-
                 <h2>Hotkeys</h2>
-
                 <button class="close-btn" id="hotkeyClose">×</button>
-
             </div>
-
             <div class="hotkey-body">
-
                 <div>
-
                     <h3>Recording & Transport</h3>
-
                     <ul>
-
                         <li>Space — Play / Pause Layer</li>
-
                         <li>Shift+Space — Play All / Pause All</li>
-
                         <li>F9 — Record (3-2-1 countdown)</li>
-
                         <li>Shift+F9 — Record Immediately</li>
-
                         <li>Esc — Stop All (recording + playback)</li>
-
                         <li>↑ / ↓ — Cycle Layers</li>
-
                         <li>Delete — Clear Active Layer</li>
-
                         <li>Ctrl+Shift+N — New Layer</li>
-
                     </ul>
-
                 </div>
-
                 <div>
-
                     <h3>Undo/Redo</h3>
-
                     <ul>
-
                         <li>Ctrl+Z — Undo</li>
-
                         <li>Ctrl+Y / Ctrl+Shift+Z — Redo</li>
-
                     </ul>
-
                 </div>
-
                 <div>
-
                     <h3>Canvas/Display</h3>
-
                     <ul>
-
                         <li>T — Toggle Trail</li>
-
                         <li>C — Toggle Cursor</li>
-
                         <li>H — Toggle Border & Handles</li>
-
                         <li>L — Lock/Unlock Borders</li>
-
+                        <li>S — Focus Mode</li>
                     </ul>
-
                 </div>
-
                 <div>
-
+                    <h3>Export & Mutation</h3>
+                    <ul>
+                        <li>E — Quick Export (Video)</li>
+                        <li>M — Mutate Settings</li>
+                    </ul>
+                </div>
+                <div>
                     <h3>Brush</h3>
-
                     <ul>
-
                         <li>[ / ] — Brush Size − / +</li>
-
                         <li>Shift+[ / Shift+] — Coarse − / +</li>
-
                     </ul>
-
                 </div>
-
                 <div>
-
                     <h3>Colors & Palettes</h3>
-
                     <ul>
-
                         <li>R — Toggle Random Colors</li>
-
                         <li>A — Toggle Step Through Palette</li>
-
                         <li>N — Next Color</li>
-
                         <li>Shift+S — Save Color</li>
-
                         <li>Shift+X — Clear Colors</li>
-
                         <li>Ctrl+← / Ctrl+→ — Prev/Next Palette</li>
-
                     </ul>
-
                 </div>
-
                 <div>
-
                     <h3>Resolution</h3>
-
                     <ul>
-
                         <li>Alt+↑ / Alt+↓ — Visual Quality + / −</li>
-
                         <li>Alt+Shift+↑ / Alt+Shift+↓ — Physics + / −</li>
-
                     </ul>
-
                 </div>
-
                 <div>
-
                     <h3>Physics</h3>
-
                     <ul>
-
                         <li>Ctrl+Shift+Scroll — Motion Isolation (Velocity Influence) − / +</li>
-
                     </ul>
-
                 </div>
-
                 <div>
-
                     <h3>Multiplier</h3>
-
                     <ul>
-
                         <li>1..8 — Set Multiplier to 1x..8x</li>
-
                         <li>Numpad 1..8 — Set Multiplier to 1x..8x</li>
-
                     </ul>
-
                 </div>
-
                 <div>
-
                     <h3>Help</h3>
-
                     <ul>
-
                         <li>F1 or ? — Toggle Hotkeys</li>
-
                         <li>Esc — Close / Stop All</li>
-
                     </ul>
-
                 </div>
-
             </div>
-
         </div>
-
     </div>
-
-
-
-
-
-    
-
     <script src="js/00-window-controls.js"></script>
-
     <script src="js/01-config.js"></script>
-
     <script src="js/02-palettes.js"></script>
-
     <script src="js/03-recording.js"></script>
-
-    <script src="js/04-ui-interactions.js"></script>
-
-    <script src="js/05-fluid-sim.js"></script>
-
-    <script src="js/06-slider-updater.js"></script>
-
-    <script src="js/06-multiplayer.js"></script>
-
+    <!-- PERF: Adaptive loading with progress feedback -->
+    <script>
+    (function() {
+        var scripts = [
+            'js/04-ui-interactions.js',
+            'js/05-fluid-sim.js',
+            'js/06-slider-updater.js',
+            'js/06-multiplayer.js'
+        ];
+        var splash = document.getElementById('splash-screen');
+        var progressBar = document.getElementById('splash-progress-bar');
+        var loaded = 0;
+        var total = scripts.length;
+        function updateProgress(pct) {
+            if (progressBar) progressBar.style.width = pct + '%';
+        }
+        function loadNext() {
+            if (loaded >= total) {
+                // All scripts loaded - trigger ready state
+                updateProgress(100);
+                if (splash) {
+                    setTimeout(function() {
+                        splash.classList.add('ready');
+                    }, 50);
+                }
+                // Signal to orchestrateEntrance that we're ready
+                window.__scriptsReady = true;
+                if (window.__onScriptsReady) window.__onScriptsReady();
+                return;
+            }
+            var s = document.createElement('script');
+            s.src = scripts[loaded];
+            s.onload = function() {
+                loaded++;
+                updateProgress((loaded / total) * 100);
+                loadNext();
+            };
+            s.onerror = function() {
+                loaded++;
+                loadNext(); // Continue even on error
+            };
+            document.body.appendChild(s);
+        }
+        // Start loading after initial animations begin (quick start)
+        updateProgress(5); // Show immediate feedback
+        setTimeout(loadNext, 400);
+    })();
+    </script>
     <script src="js/09-settings-manager.js"></script>
-
     <script src="js/11-settings-interface.js"></script>
-
     <script src="js/10-draggable.js"></script>
-
     <script src="js/08-stats-panel.js"></script>
-
     <script src="js/12-save-load.js"></script>
-
     <script src="js/13-light-source.js"></script>
-
     <script src="js/14-light-shift.js"></script>
-
     <script src="js/17-hotkey-reminder.js"></script>
-
     <script src="js/13-drag-scroll.js"></script>
-
     <script src="js/13-mobile-mode.js"></script>
-
     <!-- Component System -->
-
     <script src="js/components/base/UIComponent.js"></script>
-
     <script src="js/components/base/ComponentRegistry.js"></script>
-
     <script src="js/components/controls/SliderControl.js"></script>
-
     <script src="js/components/controls/CheckboxControl.js"></script>
-
     <script src="js/components/controls/SelectControl.js"></script>
-
     <script src="js/components/controls/ButtonControl.js"></script>
-
     <script src="js/components/groups/ColorGroup.js"></script>
-
     <script src="js/components/groups/QualityGroup.js"></script>
-
     <script src="js/components/groups/SimulationGroup.js"></script>
-
     <script src="js/components/groups/KaleidoscopeGroup.js"></script>
-
     <script src="js/components/groups/CanvasDisplayGroup.js"></script>
-
     <script src="js/components/groups/ActionsGroup.js"></script>
-
     <script src="js/components/groups/AnimationsGroup.js"></script>
-
     <script src="js/components/groups/EffectsGroup.js"></script>
-
     <script src="js/components/groups/LayersGroup.js"></script>
-
     <script src="js/components/groups/SettingsManagementGroup.js"></script>
-
     <script src="js/19-component-init.js"></script>
-
     <script src="js/14-battery-manager.js"></script>
-
     <script src="js/15-layer-masking.js"></script>
-
     <!-- SAM Integration (Transformers.js bundles its own ONNX Runtime) -->
-
     <script type="module" src="js/16-sam-integration.js"></script>
-
     <!-- Depth Collision (shares Transformers.js with SAM) -->
-
     <script type="module" src="js/23-depth-collision.js"></script>
-
     <script src="js/electron-performance.js"></script>
-
     <script src="js/21-focus-mode.js"></script>
-
     <script src="js/22-audio-reactive.js"></script>
-
     <script src="js/23-branding-overlays.js"></script>
-
+    <script src="js/25-mutation-engine.js"></script>
+    <script src="js/comfyui-bridge.js"></script>
+    <script src="js/24-path-layers.js"></script>
     <script src="js/20-mixer-layout.js"></script>
-
     <!-- Delete Palette Confirmation Modal -->
-
     <div id="deletePaletteModal" class="delete-modal">
-
         <div class="delete-modal-content">
-
             <div class="delete-modal-title">Delete Palette?</div>
-
             <div class="delete-modal-message" id="deleteModalMessage">Are you sure you want to delete this palette?</div>
-
             <div class="delete-modal-actions">
-
                 <button class="delete-modal-cancel" onclick="hideDeleteModal()">Cancel</button>
-
                 <button class="delete-modal-confirm" onclick="confirmDeletePalette()">Delete</button>
-
             </div>
-
         </div>
-
     </div>
-
 </body>
-
 </html>
-

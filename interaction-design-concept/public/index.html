@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Centering Together</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Participant count overlay -->
+    <div id="participants">
+        <span id="count">0</span> present
+    </div>
+    
+    <!-- Connection status -->
+    <div id="status">Connecting...</div>
+    
+    <!-- Breathing guide (optional visual cue) -->
+    <div id="breathe">
+        <div class="breathe-circle"></div>
+        <span class="breathe-text">breathe</span>
+    </div>
+    
+    <!-- Main canvas -->
+    <canvas id="canvas"></canvas>
+    
+    <!-- Remote cursors container -->
+    <div id="cursors"></div>
+    
+    <!-- Welcome overlay -->
+    <div id="welcome" class="overlay">
+        <div class="overlay-content">
+            <h1>Centering Together</h1>
+            <p>A shared moment of presence</p>
+            <p class="instruction">Touch or move to create ripples.<br>See others' energy in real-time.</p>
+            <button id="startBtn">Enter the Space</button>
+        </div>
+    </div>
+
+    <script src="fluid.js"></script>
+    <script src="multiplayer.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
