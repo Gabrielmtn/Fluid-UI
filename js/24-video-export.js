@@ -1,3 +1,4 @@
+// NOT LOADED by index.html in this copy
 // Multi-Format Export System
 // Supports: Video (WebM), GIF (inline encoder), PNG/JPG stills, PNG sequences
 // Zero external dependencies — GIF encoder is fully inline

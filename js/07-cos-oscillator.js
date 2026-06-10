@@ -1,3 +1,4 @@
+// NOT LOADED by index.html in this copy
 /**
  * COS (Cosine Oscillator) — smooth parameter oscillation system.
  *

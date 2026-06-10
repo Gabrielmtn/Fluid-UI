@@ -1,3 +1,4 @@
+// NOT LOADED by index.html in this copy
 /**
  * Layout Manager
  * Handles the new professional layout with bottom mixer, top color bar, right layers, and settings dropdown
