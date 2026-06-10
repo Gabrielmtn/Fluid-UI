@@ -71,8 +71,14 @@
             const displayW = canvas.width;
             const displayH = canvas.height;
             const aspect = displayW / Math.max(1, displayH);
-            // [GOVERNOR HOOK] stash old density so artwork survives re-init
+            // [GOVERNOR HOOK] stash old sim state so it survives re-init.
+            // Density carries the artwork; velocity/pressure carry the motion —
+            // without them every re-init (resize, governor/battery resolution
+            // change) froze the fluid mid-flow and the dye just faded out.
             const _prevDensity = (typeof density !== 'undefined' && density && density.read) ? density : null;
+            const _prevVelocity = (typeof velocity !== 'undefined' && velocity && velocity.read) ? velocity : null;
+            const _prevPressure = (typeof pressure !== 'undefined' && pressure && pressure.read) ? pressure : null;
+            const _prevSimW = simTexWidth || 0; // old grid width, for velocity rescale
             // [GOVERNOR HOOK] scale internal resolution (config untouched)
             const _gov = window.QualityGovernor;
             const dyeBase = Math.max(64, Math.round((config.DYE_RESOLUTION || 1024) * (_gov ? _gov.dyeScale() : 1)));
@@ -145,22 +151,31 @@
                     gl.clear(gl.COLOR_BUFFER_BIT);
                 }
             }
-            // [GOVERNOR HOOK] dye-preserving re-init: copy the old density into
-            // the fresh FBO (clearProg with value=1.0 is a passthrough), then
-            // free the old GPU memory. Fixes "resolution change wipes artwork".
-            if (_prevDensity) {
-                gl.disable(gl.BLEND);
-                gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
-                clearProg.bind();
-                gl.uniform1i(clearProg.uniforms.uTexture, 0);
-                gl.uniform1f(clearProg.uniforms.value, 1.0);
+            // [GOVERNOR HOOK] state-preserving re-init: copy old density,
+            // velocity and pressure into the fresh FBOs (clearProg is a
+            // passthrough scaled by `value`), then free the old GPU memory.
+            // Velocity is stored in grid cells/sec (advection multiplies by
+            // texelSize), so it is rescaled by newGrid/oldGrid to keep the
+            // same physical speed across a resolution change.
+            function _copyPreserved(prev, dest, w, h, scale) {
+                gl.uniform1f(clearProg.uniforms.value, scale);
+                gl.viewport(0, 0, w, h);
                 gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, _prevDensity.read.texture);
-                blit(density.write.fbo);
-                density.swap();
-                [_prevDensity.read, _prevDensity.write].forEach((f) => {
+                gl.bindTexture(gl.TEXTURE_2D, prev.read.texture);
+                blit(dest.write.fbo);
+                dest.swap();
+                [prev.read, prev.write].forEach((f) => {
                     if (f) { gl.deleteTexture(f.texture); gl.deleteFramebuffer(f.fbo); }
                 });
+            }
+            if (_prevDensity || _prevVelocity || _prevPressure) {
+                gl.disable(gl.BLEND);
+                clearProg.bind();
+                gl.uniform1i(clearProg.uniforms.uTexture, 0);
+                const _velScale = _prevSimW > 0 ? simTexWidth / _prevSimW : 1.0;
+                if (_prevDensity) _copyPreserved(_prevDensity, density, dyeTexWidth, dyeTexHeight, 1.0);
+                if (_prevVelocity) _copyPreserved(_prevVelocity, velocity, simTexWidth, simTexHeight, _velScale);
+                if (_prevPressure) _copyPreserved(_prevPressure, pressure, simTexWidth, simTexHeight, 1.0);
                 gl.enable(gl.BLEND);
             }
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
