@@ -73,8 +73,8 @@
                             </div>
                             <div class="layer-controls">
                                 <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${layer.collapsed ? 'Expand' : 'Collapse'}">${layer.collapsed ? '▼' : '▲'}</button>
-                                <button class="layer-btn" onclick="toggleActiveLayer(${layer.index})" title="${layer.active ? 'Deactivate positioning' : 'Activate positioning'}">
-                                    ${layer.active ? '🎯' : '⭕'}
+                                <button class="layer-btn" onclick="window.LayerTransform ? LayerTransform.open(${layer.index}) : toggleActiveLayer(${layer.index})" title="Move / resize / rotate layer">
+                                    ⤢
                                 </button>
                                 <button class="layer-btn" onclick="toggleLayer(${layer.index})">
                                     ${layer.visible ? '👁️' : '👁️‍🗨️'}
