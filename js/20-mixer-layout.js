@@ -1097,12 +1097,35 @@
         // Path Layers subsection
         var pathLayersSubsection = document.createElement('div');
         pathLayersSubsection.className = 'layers-subsection';
-        pathLayersSubsection.innerHTML = '<div class="layers-subsection-title">✏️ Path Layers</div><div id="pathLayersList"></div>';
+        var pathHeader = document.createElement('div');
+        pathHeader.className = 'layers-subsection-header';
+        pathHeader.innerHTML = '<span class="layers-subsection-title">✏️ Path Layers</span>';
+        var newPathBtn = document.createElement('button');
+        newPathBtn.type = 'button';
+        newPathBtn.className = 'subsection-add-btn';
+        newPathBtn.textContent = '+ New Path';
+        newPathBtn.title = 'Create a new path layer';
+        newPathBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (window.pathLayers) {
+                window.pathLayers.create();
+                window.pathLayers.render();
+            }
+        });
+        pathHeader.appendChild(newPathBtn);
+        pathLayersSubsection.appendChild(pathHeader);
+        var pathList = document.createElement('div');
+        pathList.id = 'pathLayersList';
+        pathLayersSubsection.appendChild(pathList);
         body.appendChild(pathLayersSubsection);
 
-        // Layer-related checkboxes
-        moveCheckboxGroup('hoverCaptureToggle', body);
-        moveCheckboxGroup('detachCaptureToggle', body);
+        // Layer-related options, grouped instead of loose checkboxes
+        var optsGroup = document.createElement('div');
+        optsGroup.className = 'layers-options-group';
+        optsGroup.innerHTML = '<div class="layers-options-title">Capture & Preview</div>';
+        body.appendChild(optsGroup);
+        moveCheckboxGroup('hoverCaptureToggle', optsGroup);
+        moveCheckboxGroup('detachCaptureToggle', optsGroup);
         moveEl('imageUpload', body);
 
         const preview = document.getElementById('previewToggle');
@@ -1111,7 +1134,7 @@
             var previewCb = document.createElement('div');
             previewCb.className = 'checkbox-group';
             previewCb.innerHTML = '<input type="checkbox" id="showPreviewLayersCb"><label for="showPreviewLayersCb">Show Preview Layers</label>';
-            body.appendChild(previewCb);
+            optsGroup.appendChild(previewCb);
             body.appendChild(preview);
             var cb = previewCb.querySelector('input');
             cb.addEventListener('change', function () {

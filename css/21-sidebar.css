@@ -852,3 +852,78 @@ body.rec-open #sidebar-right {
     z-index: 99;
 }
 
+
+
+/* ── Layers subsections (Path Layers etc.) ── */
+.layers-subsection {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-default);
+}
+.layers-subsection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.layers-subsection-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-secondary);
+}
+.subsection-add-btn {
+    padding: 4px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(100, 200, 255, 0.1);
+    border: 1px solid rgba(100, 200, 255, 0.25);
+    border-radius: 999px;
+    color: var(--accent-cool);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.subsection-add-btn:hover {
+    background: rgba(100, 200, 255, 0.2);
+    border-color: rgba(100, 200, 255, 0.45);
+}
+
+/* ── Grouped layer options (capture / preview checkboxes) ── */
+.layers-options-group {
+    margin-top: 14px;
+    padding: 8px 10px 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+}
+.layers-options-title {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+}
+.layers-options-group .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 6px 2px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.layers-options-group .checkbox-group:last-child {
+    border-bottom: none;
+}
+.layers-options-group .checkbox-group label {
+    margin: 0;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.layers-options-group .checkbox-group input[type="checkbox"] {
+    cursor: pointer;
+}

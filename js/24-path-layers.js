@@ -585,7 +585,21 @@
         if (!container) return;
         
         container.innerHTML = '';
-        
+
+        if (pathLayers.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'path-empty-state';
+            empty.innerHTML = `
+                <div class="path-empty-icon">✏️</div>
+                <div class="path-empty-text">No path layers yet</div>
+                <div class="path-empty-hint">Paths trace shapes into the fluid automatically</div>
+                <button type="button" class="path-empty-create" data-action="create">+ Create Path Layer</button>
+            `;
+            container.appendChild(empty);
+            bindPathLayerEvents();
+            return;
+        }
+
         pathLayers.forEach(layer => {
             const el = document.createElement('div');
             el.className = 'path-layer-item' + (layer.id === pathActiveId ? ' active-layer' : '') + (layer.collapsed ? ' collapsed' : '');
@@ -645,7 +659,10 @@
                             <button class="path-shape-btn" data-shape="spiral" title="Spiral">🌀</button>
                             <button class="path-shape-btn" data-shape="wave" title="Wave">〰️</button>
                         </div>
-                        <button class="path-draw-btn" data-action="draw">✏️ Draw Path</button>
+                        <div class="path-action-row">
+                            <button class="path-draw-btn" data-action="draw">✏️ Draw</button>
+                            <button class="path-transform-btn" data-action="transform" ${!hasPath ? 'disabled' : ''} title="Move or resize this path on the canvas">⤢ Move / Resize</button>
+                        </div>
                     </div>
                     <canvas class="path-preview-canvas" width="200" height="60"></canvas>
                 </div>
@@ -730,7 +747,13 @@
                 addShapeToLayer(shape);
                 return;
             }
-            
+
+            if (action === 'create') {
+                createPathLayer();
+                renderPathLayersUI();
+                return;
+            }
+
             if (!id) return;
             
             e.stopPropagation();
@@ -749,14 +772,20 @@
                 case 'collapse':
                     togglePathLayerCollapse(id);
                     break;
-                case 'delete':
-                    if (confirm('Delete this path layer?')) {
-                        deletePathLayer(id);
-                    }
+                case 'delete': {
+                    const layerToDelete = pathLayers.find(l => l.id === id);
+                    confirmDeletePath(layerToDelete ? layerToDelete.name : 'this path').then((ok) => {
+                        if (ok) deletePathLayer(id);
+                    });
                     break;
+                }
                 case 'draw':
                     setActivePathLayer(id);
                     enterDrawMode();
+                    break;
+                case 'transform':
+                    setActivePathLayer(id);
+                    enterTransformMode();
                     break;
                 case 'use-brush':
                     const layerForBrush = pathLayers.find(l => l.id === id);
@@ -825,6 +854,49 @@
         });
         
         container._pathBound = true;
+    }
+
+    // ── Delete confirmation modal (app-styled, reuses .delete-modal theme) ──
+    let _deleteResolve = null;
+
+    function ensureDeleteModal() {
+        let modal = document.getElementById('pathDeleteModal');
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.id = 'pathDeleteModal';
+        modal.className = 'delete-modal';
+        modal.innerHTML = `
+            <div class="delete-modal-content">
+                <div class="delete-modal-title">Delete Path Layer</div>
+                <div class="delete-modal-message" id="pathDeleteModalMessage"></div>
+                <div class="delete-modal-actions">
+                    <button type="button" class="delete-modal-cancel" id="pathDeleteCancel">Cancel</button>
+                    <button type="button" class="delete-modal-confirm" id="pathDeleteConfirm">Delete</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const close = (result) => {
+            modal.classList.remove('show');
+            if (_deleteResolve) { _deleteResolve(result); _deleteResolve = null; }
+        };
+        modal.querySelector('#pathDeleteCancel').addEventListener('click', () => close(false));
+        modal.querySelector('#pathDeleteConfirm').addEventListener('click', () => close(true));
+        // Backdrop click cancels
+        modal.addEventListener('click', (e) => { if (e.target === modal) close(false); });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('show')) close(false);
+        });
+        return modal;
+    }
+
+    function confirmDeletePath(name) {
+        const modal = ensureDeleteModal();
+        const msg = modal.querySelector('#pathDeleteModalMessage');
+        if (msg) msg.textContent = `Are you sure you want to delete "${name}"? This cannot be undone.`;
+        modal.classList.add('show');
+        return new Promise((resolve) => { _deleteResolve = resolve; });
     }
 
     // Drawing mode overlay
@@ -952,6 +1024,209 @@
         renderPathLayersUI();
     }
 
+    // ── Transform mode: move / resize a path directly on the canvas ──
+    let transformOverlay = null;
+
+    function enterTransformMode() {
+        if (transformOverlay) return;
+        const layer = getActivePathLayer();
+        if (!layer || layer.points.length < 2) return;
+
+        // Snapshot for cancel
+        const originalPoints = layer.points.map(p => ({ x: p.x, y: p.y }));
+
+        transformOverlay = document.createElement('div');
+        transformOverlay.id = 'pathTransformOverlay';
+        transformOverlay.innerHTML = `
+            <div class="draw-toolbar">
+                <span>Drag inside the box to move · drag a corner to resize</span>
+                <button id="pathTransformDone" type="button">✓ Done</button>
+                <button id="pathTransformCancel" type="button">✕ Cancel</button>
+            </div>
+            <div class="draw-canvas-area">
+                <canvas id="pathTransformCanvas"></canvas>
+            </div>
+        `;
+        document.body.appendChild(transformOverlay);
+
+        const tCanvas = document.getElementById('pathTransformCanvas');
+        const area = transformOverlay.querySelector('.draw-canvas-area');
+        const sizeCanvas = () => {
+            const rect = area.getBoundingClientRect();
+            tCanvas.width = rect.width;
+            tCanvas.height = rect.height;
+        };
+        sizeCanvas();
+        const tCtx = tCanvas.getContext('2d');
+
+        const HANDLE = 14; // hit size in px
+        let drag = null;   // { mode: 'move'|'scale', startX, startY, basePoints, anchor }
+
+        function bbox() {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            layer.points.forEach(p => {
+                minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+            });
+            return { minX, minY, maxX, maxY };
+        }
+
+        function corners(b) {
+            const w = tCanvas.width, h = tCanvas.height;
+            return [
+                { id: 'nw', x: b.minX * w, y: b.minY * h, ax: b.maxX, ay: b.maxY, cursor: 'nwse-resize' },
+                { id: 'ne', x: b.maxX * w, y: b.minY * h, ax: b.minX, ay: b.maxY, cursor: 'nesw-resize' },
+                { id: 'sw', x: b.minX * w, y: b.maxY * h, ax: b.maxX, ay: b.minY, cursor: 'nesw-resize' },
+                { id: 'se', x: b.maxX * w, y: b.maxY * h, ax: b.minX, ay: b.minY, cursor: 'nwse-resize' }
+            ];
+        }
+
+        function hitTest(px, py) {
+            const b = bbox();
+            for (const c of corners(b)) {
+                if (Math.abs(px - c.x) <= HANDLE && Math.abs(py - c.y) <= HANDLE) {
+                    return { mode: 'scale', corner: c };
+                }
+            }
+            const w = tCanvas.width, h = tCanvas.height;
+            if (px >= b.minX * w - 6 && px <= b.maxX * w + 6 &&
+                py >= b.minY * h - 6 && py <= b.maxY * h + 6) {
+                return { mode: 'move' };
+            }
+            return null;
+        }
+
+        function draw() {
+            const w = tCanvas.width, h = tCanvas.height;
+            tCtx.clearRect(0, 0, w, h);
+
+            // Path
+            tCtx.strokeStyle = rgbToHex(layer.color);
+            tCtx.lineWidth = 3;
+            tCtx.lineCap = 'round';
+            tCtx.lineJoin = 'round';
+            tCtx.beginPath();
+            layer.points.forEach((p, i) => {
+                if (i === 0) tCtx.moveTo(p.x * w, p.y * h);
+                else tCtx.lineTo(p.x * w, p.y * h);
+            });
+            tCtx.stroke();
+
+            // Bounding box
+            const b = bbox();
+            tCtx.strokeStyle = 'rgba(100, 200, 255, 0.85)';
+            tCtx.lineWidth = 1;
+            tCtx.setLineDash([6, 4]);
+            tCtx.strokeRect(b.minX * w, b.minY * h, (b.maxX - b.minX) * w, (b.maxY - b.minY) * h);
+            tCtx.setLineDash([]);
+
+            // Corner handles
+            corners(b).forEach(c => {
+                tCtx.fillStyle = 'rgba(100, 200, 255, 0.95)';
+                tCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                tCtx.lineWidth = 1.5;
+                tCtx.beginPath();
+                tCtx.rect(c.x - 5, c.y - 5, 10, 10);
+                tCtx.fill();
+                tCtx.stroke();
+            });
+        }
+
+        function getPos(e) {
+            const rect = tCanvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        function onPointerDown(e) {
+            const pos = getPos(e);
+            const hit = hitTest(pos.x, pos.y);
+            if (!hit) return;
+            e.preventDefault();
+            drag = {
+                mode: hit.mode,
+                corner: hit.corner || null,
+                startX: pos.x,
+                startY: pos.y,
+                basePoints: layer.points.map(p => ({ x: p.x, y: p.y }))
+            };
+            tCanvas.setPointerCapture(e.pointerId);
+        }
+
+        function onPointerMove(e) {
+            const pos = getPos(e);
+            if (!drag) {
+                const hit = hitTest(pos.x, pos.y);
+                tCanvas.style.cursor = hit ? (hit.mode === 'move' ? 'move' : hit.corner.cursor) : 'default';
+                return;
+            }
+            e.preventDefault();
+            const w = tCanvas.width, h = tCanvas.height;
+            if (drag.mode === 'move') {
+                const dx = (pos.x - drag.startX) / w;
+                const dy = (pos.y - drag.startY) / h;
+                layer.points = drag.basePoints.map(p => ({ x: p.x + dx, y: p.y + dy }));
+            } else {
+                // Scale from the corner opposite the grabbed handle
+                const ax = drag.corner.ax, ay = drag.corner.ay; // anchor (normalized)
+                const startDx = drag.startX / w - ax, startDy = drag.startY / h - ay;
+                const curDx = pos.x / w - ax, curDy = pos.y / h - ay;
+                const sx = Math.abs(startDx) > 1e-4 ? Math.max(0.05, curDx / startDx) : 1;
+                const sy = Math.abs(startDy) > 1e-4 ? Math.max(0.05, curDy / startDy) : 1;
+                layer.points = drag.basePoints.map(p => ({
+                    x: ax + (p.x - ax) * sx,
+                    y: ay + (p.y - ay) * sy
+                }));
+            }
+            draw();
+        }
+
+        function onPointerUp(e) {
+            if (!drag) return;
+            drag = null;
+            try { tCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+
+        tCanvas.addEventListener('pointerdown', onPointerDown);
+        tCanvas.addEventListener('pointermove', onPointerMove);
+        tCanvas.addEventListener('pointerup', onPointerUp);
+        tCanvas.addEventListener('pointercancel', onPointerUp);
+
+        const onResize = () => { sizeCanvas(); draw(); };
+        window.addEventListener('resize', onResize);
+
+        const onKey = (e) => {
+            if (e.key === 'Escape') { cancel(); }
+            else if (e.key === 'Enter') { done(); }
+        };
+        document.addEventListener('keydown', onKey);
+
+        function cleanup() {
+            window.removeEventListener('resize', onResize);
+            document.removeEventListener('keydown', onKey);
+            transformOverlay.remove();
+            transformOverlay = null;
+            renderPathLayersUI();
+        }
+        function done() { cleanup(); }
+        function cancel() {
+            layer.points = originalPoints;
+            cleanup();
+        }
+
+        document.getElementById('pathTransformDone').onclick = (e) => { e.preventDefault(); done(); };
+        document.getElementById('pathTransformCancel').onclick = (e) => { e.preventDefault(); cancel(); };
+
+        draw();
+    }
+
+    function exitTransformMode() {
+        if (transformOverlay) {
+            transformOverlay.remove();
+            transformOverlay = null;
+            renderPathLayersUI();
+        }
+    }
+
     // Expose API
     window.pathLayers = {
         create: createPathLayer,
@@ -965,6 +1240,8 @@
         getLayers: () => pathLayers,
         enterDrawMode: enterDrawMode,
         exitDrawMode: exitDrawMode,
+        enterTransformMode: enterTransformMode,
+        exitTransformMode: exitTransformMode,
         
         // For save/load integration
         getSnapshot: function() {
