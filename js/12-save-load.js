@@ -686,6 +686,16 @@
             }
         } catch(_){}
 
+        // ── Per-arm brush colors (multiply brush) ──
+        var armColorsData = null;
+        try {
+            if (window.multiArmColors && window.multiArmColors.length) {
+                armColorsData = window.multiArmColors.map(function(c) {
+                    return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0 };
+                });
+            }
+        } catch(_){}
+
         return {
             version: 2,
             timestamp: Date.now(),
@@ -711,7 +721,8 @@
             recordedLayers: recordedLayers,
             cosOscillator: cosState,
             spinColours: spinColours,
-            pathLayers: pathLayersData
+            pathLayers: pathLayersData,
+            armColors: armColorsData
         };
     }
 
@@ -752,6 +763,23 @@
             if (snapshot.colors.brush) setVal('colorPicker', snapshot.colors.brush, 'input');
             if (snapshot.colors.brandingText) setVal('brandingTextColor', snapshot.colors.brandingText, 'input');
         }
+
+        // ── Per-arm brush colors (multiply brush) ──
+        try {
+            if (snapshot.armColors && Array.isArray(snapshot.armColors)) {
+                // Mutate in place — the sim holds a reference to this array
+                var armArr = window.multiArmColors;
+                if (!armArr) { armArr = []; window.multiArmColors = armArr; }
+                armArr.length = 0;
+                snapshot.armColors.forEach(function(c) {
+                    armArr.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                });
+                if (window.settingsManager) {
+                    window.settingsManager.set('brush.armColors', snapshot.armColors);
+                }
+                if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
+            }
+        } catch(_){}
 
         // ── Kaleidoscope runtime ──
         if (snapshot.kaleido) {

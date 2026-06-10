@@ -124,7 +124,8 @@
         var _zoomTargetIds = ['sidebar-right', 'mixer-strip', 'colorBar',
             'settingsToggleBtn', 'settingsPanel', 'hotkeyOverlay', 'statsPanel'];
         var _zoomTargetClasses = ['stats-panel', 'rec-drawer', 'delete-modal',
-            'hotkey-reminder', 'mask-editor-overlay', 'fps-notification'];
+            'hotkey-reminder', 'mask-editor-overlay', 'fps-notification',
+            'arm-colors-panel'];
 
         function applyZoom(scale) {
             var z = scale === 1 ? '' : String(scale);
@@ -2449,15 +2450,19 @@
         panel.style.display = 'none';
         panel.style.position = 'fixed';
         document.body.appendChild(panel);
+        if (window._uiScaleReapply) window._uiScaleReapply();
 
         function positionPanel() {
+            // Panel is zoomed via --ui-scale; fixed left/top are interpreted in the
+            // zoomed coordinate space, so compute in screen px then divide by zoom.
+            var z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
             var rect = toggle.getBoundingClientRect();
             var panelW = 220;
-            var left = rect.left + rect.width / 2 - panelW / 2;
-            // Clamp to viewport
-            left = Math.max(4, Math.min(left, window.innerWidth - panelW - 4));
-            panel.style.left = left + 'px';
-            panel.style.top = (rect.bottom + 4) + 'px';
+            var left = rect.left + rect.width / 2 - (panelW * z) / 2;
+            // Clamp to viewport (screen px)
+            left = Math.max(4, Math.min(left, window.innerWidth - panelW * z - 4));
+            panel.style.left = (left / z) + 'px';
+            panel.style.top = ((rect.bottom + 4) / z) + 'px';
             panel.style.width = panelW + 'px';
         }
 
@@ -2477,6 +2482,30 @@
                 arr.push({ mode: 'main', color: '#ffffff', stepIndex: 0 });
             }
         }
+
+        function persistArmColors() {
+            if (!window.settingsManager) return;
+            var arr = window.multiArmColors || [];
+            window.settingsManager.set('brush.armColors', arr.map(function(c) {
+                return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0 };
+            }));
+        }
+
+        // Restore persisted arm colors once the sim script (which declares
+        // `var multiArmColors`) has loaded — mutate the array in place so the
+        // sim's reference stays valid.
+        (function restoreArmColors() {
+            if (!window.__scriptsReady) { setTimeout(restoreArmColors, 250); return; }
+            var saved = window.settingsManager && window.settingsManager.get('brush.armColors', null);
+            if (!saved || !Array.isArray(saved) || !saved.length) return;
+            var arr = window.multiArmColors;
+            if (!arr) { arr = []; window.multiArmColors = arr; }
+            arr.length = 0;
+            saved.forEach(function(c) {
+                arr.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+            });
+            if (panel.style.display !== 'none') rebuildRows();
+        })();
 
         function rebuildRows() {
             rowsWrap.innerHTML = '';
@@ -2549,6 +2578,7 @@
                             });
                             picker.disabled = m.key !== 'fixed';
                             picker.style.opacity = m.key === 'fixed' ? '1' : '0.35';
+                            persistArmColors();
                         });
                         btns.push(btn);
                         modeWrap.appendChild(btn);
@@ -2568,6 +2598,7 @@
                             picker.disabled = false;
                             picker.style.opacity = '1';
                         }
+                        persistArmColors();
                     });
 
                     row.appendChild(picker);
