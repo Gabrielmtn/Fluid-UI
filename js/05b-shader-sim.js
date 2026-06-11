@@ -96,12 +96,20 @@
                         float slowDecay = pow(max(dissipation, 0.994), dt * 60.0);
                         color = mix(effectiveDecay, slowDecay, obsSmooth) * source;
                     }
-                    // Smooth cleanup: snap to zero based on max RGB intensity
-                    // (not alpha) so cleanup only triggers when visually invisible.
+                    // Guaranteed-zero cleanup. Multiplicative decay alone never
+                    // reaches zero (and half-float storage stalls it at a dim
+                    // visible floor), which left a permanent residue wash that
+                    // new paint interacted with badly.
+                    // 1) Linear floor drain, proportional to the preset's decay
+                    //    rate so slow "smoke" presets keep their long tails and
+                    //    freeze mode (dissipation = 1.0) is untouched.
+                    float floorEps = (1.0 - min(dissipation, 1.0)) * 0.02 * dt * 60.0;
+                    color = max(color - floorEps, 0.0);
+                    // 2) Smooth low-end ramp to zero (replaces the old binary
+                    //    "< 0.001 → 0" snap, whose hard cutoff created jagged
+                    //    boundaries between cleared and not-yet-cleared texels).
                     float maxC = max(max(color.r, color.g), color.b);
-                    if (maxC < 0.001) {
-                        color = vec4(0.0);
-                    }
+                    color *= smoothstep(0.0003, 0.0015, maxC);
                 } else {
                     // Velocity pass: keep alpha at 1.0
                     color.a = 1.0;

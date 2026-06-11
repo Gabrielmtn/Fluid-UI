@@ -263,12 +263,15 @@
             uniform vec2 texelSize;
             void main() {
                 vec3 center = texture(uTexture, vUv).rgb;
-                // Early exit if pixel is nearly black (no sharpening needed)
                 float centerIntensity = dot(center, vec3(0.299, 0.587, 0.114));
-                if (centerIntensity < 0.01) {
+                // Early exit only for truly black pixels. The old hard cutoff
+                // at 0.01 drew a visible seam where faint dye met sharpened
+                // dye; sharpening now fades in smoothly across that range.
+                if (centerIntensity < 0.001) {
                     fragColor = vec4(center, 1.0);
                     return;
                 }
+                float lowFade = smoothstep(0.003, 0.03, centerIntensity);
                 // Sample neighbors for detail extraction (unsharp mask technique)
                 vec3 blur = vec3(0.0);
                 blur += texture(uTexture, vUv + vec2(texelSize.x, 0.0)).rgb;
@@ -278,10 +281,12 @@
                 blur *= 0.25;
                 // Extract high-frequency detail
                 vec3 detail = center - blur;
-                // Velocity-adaptive sharpening (sharpen more where fluid moves)
+                // Velocity-adaptive sharpening (sharpen more where fluid moves),
+                // faded out smoothly at low intensities so faint dye is never
+                // contrast-amplified into jagged noise.
                 vec2 vel = texture(uVelocity, vUv).xy;
                 float velocityMag = length(vel);
-                float adaptiveStrength = sharpness * (0.8 + min(velocityMag * 3.0, 1.2));
+                float adaptiveStrength = sharpness * (0.8 + min(velocityMag * 3.0, 1.2)) * lowFade;
                 // Apply sharpening with clamping to prevent overshooting
                 vec3 sharpened = center + detail * adaptiveStrength;
                 // Clamp to valid range [0, max(center * 2.0, 1.0)]
