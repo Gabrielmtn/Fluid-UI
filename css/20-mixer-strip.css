@@ -45,9 +45,12 @@ body > .controls {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    padding: 9px 10px 8px;
+    /* Center a tight label/fader/value cluster regardless of strip height —
+       space-between scattered the three across the full height whenever a
+       taller sibling (e.g. wrapped presets) stretched the strip */
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 10px;
     min-width: 92px;
     flex: 1 0 auto;
     max-width: 150px;
@@ -80,8 +83,7 @@ body > .controls {
     width: 100%;
     display: flex;
     align-items: center;
-    flex: 1;
-    padding: 4px 0;
+    flex: 0 0 auto;
 }
 
 .ch-fader input[type="range"] {
@@ -260,12 +262,25 @@ body > .controls {
     gap: 4px;
     padding: 8px 10px;
     align-items: center;
-    align-content: center;
+    align-content: flex-start;
     /* Flex into whatever space the channels leave over so wide screens
-       don't end up with a dead gap before the preset chips */
+       don't end up with a dead gap before the preset chips — but NEVER
+       set the strip's height: on narrow windows the chips wrap into many
+       rows, so cap the block and scroll internally instead of letting it
+       balloon the whole strip. */
     flex: 1 1 280px;
     min-width: 240px;
     max-width: none;
+    align-self: center;
+    max-height: 104px;
+    overflow-y: auto;
+}
+.mixer-presets::-webkit-scrollbar {
+    width: 4px;
+}
+.mixer-presets::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
 }
 .mixer-presets button,
 #mixer-strip .mixer-presets button {
