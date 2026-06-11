@@ -13,6 +13,14 @@
             gl.uniform2f(splatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
             gl.uniform1f(splatProg.uniforms.radius, config.SPLAT_RADIUS);
             gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
+            // Block injection inside collision masks (prevents burned-in dye)
+            const _splatObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
+            gl.uniform1i(splatProg.uniforms.hasObstacle, _splatObsActive ? 1 : 0);
+            if (_splatObsActive) {
+                gl.uniform1i(splatProg.uniforms.uObstacle, 1);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            }
             // Write velocity at physics resolution (with isolation applied)
             gl.viewport(0, 0, simTexWidth, simTexHeight);
             gl.uniform1i(splatProg.uniforms.isVelocity, 1); // Velocity pass

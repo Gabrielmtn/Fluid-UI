@@ -11,14 +11,23 @@
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTarget;
+            uniform sampler2D uObstacle;
             uniform vec2 point;
             uniform vec3 color;
             uniform float radius, aspectRatio, velocityInfluence;
             uniform int isVelocity; // 1 for velocity, 0 for density
+            uniform int hasObstacle;
             void main() {
                 vec2 p = vUv - point;
                 p.x *= aspectRatio;
                 vec3 base = texture(uTarget, vUv).xyz;
+                // Don't inject paint or velocity inside collision masks: the
+                // damped velocity field pins whatever lands there, so injected
+                // dye lingers as a burned-in imprint of the mask shape.
+                float obsBlock = 1.0;
+                if (hasObstacle == 1) {
+                    obsBlock = 1.0 - smoothstep(0.15, 0.7, texture(uObstacle, vUv).r);
+                }
                 if (isVelocity == 1) {
                     // Motion Isolation: prevent new velocity from affecting areas with existing velocity
                     // Higher velocityInfluence = more isolation (less impact on existing areas)
@@ -44,11 +53,11 @@
                     float velShield = smoothstep(0.0, 0.5, existingVelMag);
                     float impactReduction = 1.0 - (velShield * isolationStrength * 0.85);
                     impactReduction = max(0.15, impactReduction); // Minimum 15% impact always allowed
-                    fragColor = vec4(base + splat * impactReduction, 1.0);
+                    fragColor = vec4(base + splat * impactReduction * obsBlock, 1.0);
                 } else {
                     // ─── Additive mixing (original) ───────────────────────
                     vec3 splat = exp(-dot(p, p) / radius) * color;
-                    fragColor = vec4(base + splat, 1.0);
+                    fragColor = vec4(base + splat * obsBlock, 1.0);
                 }
             }
         `;
@@ -87,14 +96,15 @@
                         effectiveDecay *= max(1.0 - boostRate, 0.95);
                     }
                     color = effectiveDecay * source;
-                    // Obstacle-aware fade: slow ALL channel decay inside obstacle
-                    // regions so density dissolves gradually (~5s) instead of
-                    // snapping to black.
-                    if (hasObstacle == 1) {
+                    // Obstacle-aware drain: dye inside collision masks cannot
+                    // advect out (velocity is damped to zero there), so dissolve
+                    // it FASTER, not slower — the old slow-decay override pinned
+                    // a burned-in imprint of the mask shape. Skipped in freeze
+                    // mode (dissipation ~1.0 = preserve artwork).
+                    if (hasObstacle == 1 && dissipation < 0.999) {
                         float obs = texture(uObstacle, vUv).r;
                         float obsSmooth = smoothstep(0.0, 0.6, obs);
-                        float slowDecay = pow(max(dissipation, 0.994), dt * 60.0);
-                        color = mix(effectiveDecay, slowDecay, obsSmooth) * source;
+                        color *= 1.0 - obsSmooth * 0.04 * dt * 60.0;
                     }
                     // Guaranteed-zero cleanup. Multiplicative decay alone never
                     // reaches zero (and half-float storage stalls it at a dim
