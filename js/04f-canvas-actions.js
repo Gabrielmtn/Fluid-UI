@@ -62,9 +62,11 @@
 
             const btn = document.getElementById('pauseBtn');
 
-            btn.textContent = isPaused ? 'Resume' : 'Pause';
+            btn.textContent = isPaused ? '▶' : '⏸';
 
-            btn.style.background = isPaused ? 'rgba(100, 200, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)';
+            btn.title = isPaused ? 'Resume simulation' : 'Pause simulation';
+
+            btn.classList.toggle('active', isPaused);
 
         };
 

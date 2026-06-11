@@ -140,11 +140,11 @@
 
             const freezeBtn = document.getElementById('freezeBtn');
 
-            const isUnfreezing = freezeBtn.textContent.includes('Unfreeze');
+            // State lives in the .active class (button shows a constant 🛑 icon)
 
-            
+            const isUnfreezing = freezeBtn.classList.contains('active');
 
-            freezeBtn.textContent = isUnfreezing ? '❄️ Freeze' : '🔥 Unfreeze';
+            freezeBtn.title = isUnfreezing ? 'Freeze fluid motion' : 'Unfreeze fluid motion';
 
             if (isUnfreezing) {
 

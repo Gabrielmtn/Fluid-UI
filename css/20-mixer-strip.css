@@ -46,9 +46,11 @@ body > .controls {
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    padding: 7px 6px 5px;
-    min-width: 72px;
-    flex: 0 0 auto;
+    gap: 4px;
+    padding: 9px 10px 8px;
+    min-width: 92px;
+    flex: 1 0 auto;
+    max-width: 150px;
     background: rgba(255, 255, 255, 0.015);
     border-right: 1px solid rgba(255, 255, 255, 0.03);
     position: relative;
@@ -64,14 +66,14 @@ body > .controls {
 .mixer-channel[data-accent="pink"]   { border-top: 2px solid rgba(255, 130, 170, 0.45); }
 
 .ch-label {
-    font-size: 8.5px;
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.7px;
-    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.55);
     white-space: nowrap;
     text-align: center;
     font-weight: 700;
-    line-height: 1;
+    line-height: 1.2;
 }
 
 .ch-fader {
@@ -79,7 +81,7 @@ body > .controls {
     display: flex;
     align-items: center;
     flex: 1;
-    padding: 2px 0;
+    padding: 4px 0;
 }
 
 .ch-fader input[type="range"] {
@@ -97,12 +99,12 @@ body > .controls {
 
 .ch-value {
     font-family: 'Courier New', monospace;
-    font-size: 10px;
+    font-size: 13px;
     color: #4fc3f7;
     text-align: center;
-    line-height: 1;
-    min-height: 12px;
-    letter-spacing: 0.2px;
+    line-height: 1.2;
+    min-height: 16px;
+    letter-spacing: 0.3px;
     font-weight: 700;
 }
 
@@ -127,7 +129,7 @@ body > .controls {
 }
 
 .ch-toggle {
-    font-size: 8px;
+    font-size: 10px;
     display: flex;
     align-items: center;
     gap: 3px;
@@ -148,13 +150,13 @@ body > .controls {
     display: flex;
     gap: 3px;
     width: 100%;
-    height: 17px;
+    height: 20px;
     flex-shrink: 0;
 }
 .ch-toggle-row .ch-text-toggle {
     flex: 1;
     min-width: 0;
-    height: 17px;
+    height: 20px;
 }
 
 /* Text-only toggle button (lights up when active) */
@@ -164,8 +166,8 @@ body > .controls {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 17px;
-    font-size: 9px;
+    height: 20px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.8px;
@@ -205,46 +207,72 @@ body > .controls {
     flex-shrink: 0;
 }
 
-/* ── Mixer action buttons ── */
+/* ── Transport column (play/pause · clear · freeze) ── */
 .mixer-actions {
     display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 8px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 5px;
+    padding: 8px 10px;
     flex-shrink: 0;
 }
-#mixer-strip .mixer-actions button {
+#mixer-strip .mixer-actions button,
+.mixer-actions .transport-btn {
     all: unset;
     box-sizing: border-box;
-    padding: 5px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    height: 26px;
+    padding: 0 10px;
     font-size: 13px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.08) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    color: white !important;
+    font-weight: 600;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
     cursor: pointer;
+    line-height: 1;
+    transition: background 0.15s, border-color 0.15s;
 }
-.mixer-actions button:hover {
-    opacity: 0.8;
+#mixer-strip .mixer-actions button:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+/* Paused state: play icon lit */
+#mixer-strip .mixer-actions #pauseBtn.active {
+    background: rgba(79, 195, 247, 0.18);
+    border-color: rgba(79, 195, 247, 0.45);
+    color: #4fc3f7;
+}
+/* Frozen state: stop sign lit */
+#mixer-strip .mixer-actions #freezeBtn.active {
+    background: rgba(255, 100, 100, 0.18);
+    border-color: rgba(255, 100, 100, 0.45);
 }
 
 /* Preset buttons in mixer strip */
 .mixer-presets {
     display: flex;
     flex-wrap: wrap;
-    gap: 3px;
-    padding: 6px 8px;
+    gap: 4px;
+    padding: 8px 10px;
     align-items: center;
     align-content: center;
-    max-width: 360px;
-    flex-shrink: 0;
+    /* Flex into whatever space the channels leave over so wide screens
+       don't end up with a dead gap before the preset chips */
+    flex: 1 1 280px;
+    min-width: 240px;
+    max-width: none;
 }
 .mixer-presets button,
 #mixer-strip .mixer-presets button {
     all: unset !important;
     box-sizing: border-box !important;
-    padding: 4px 8px !important;
-    font-size: 9px !important;
+    padding: 5px 10px !important;
+    font-size: 10.5px !important;
     border-radius: 3px !important;
     background: rgba(255,255,255,0.08) !important;
     color: rgba(255,255,255,0.7) !important;

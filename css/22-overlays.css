@@ -63,14 +63,14 @@ body.focus-mode #canvas {
     user-select: none;
     text-transform: uppercase;
     box-shadow: 0 2px 8px rgba(255, 40, 40, 0.4);
-    animation: live-pulse 2s ease-in-out infinite;
+    opacity: 0.85;
+    /* NOTE: deliberately NO animation here. The old infinite opacity pulse
+       forced the Electron transparent-window compositor to recomposite the
+       WebGL canvas every frame for as long as focus mode was active —
+       the same hazard documented in styles.css (canvas-size-display) and
+       battery-styles. Keep this badge fully static. */
 }
 #focus-mode-badge.visible { display: block; }
-
-@keyframes live-pulse {
-    0%, 100% { opacity: 0.85; }
-    50% { opacity: 0.55; }
-}
 
 /* ================================================================
    STREAM FORMAT PRESETS

@@ -426,16 +426,31 @@
         const wrap = document.createElement('div');
         wrap.className = 'mixer-actions';
 
-        var actionBtnStyle = 'all:unset;box-sizing:border-box;padding:5px 8px;font-size:13px;border-radius:4px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;cursor:pointer;';
-
+        // Transport column: icon play/pause, Clear, stop-sign freeze.
+        // Styling comes from .mixer-actions CSS; state via .active class.
         const pauseBtn = document.getElementById('pauseBtn');
-        if (pauseBtn) { pauseBtn.style.cssText = actionBtnStyle; wrap.appendChild(pauseBtn); }
+        if (pauseBtn) {
+            pauseBtn.style.cssText = '';
+            pauseBtn.textContent = '⏸';
+            pauseBtn.title = 'Pause / resume simulation';
+            wrap.appendChild(pauseBtn);
+        }
 
         const clearBtn = controls.querySelector('button[onclick*="clearCanvas"]');
-        if (clearBtn) { clearBtn.style.cssText = actionBtnStyle; wrap.appendChild(clearBtn); }
+        if (clearBtn) {
+            clearBtn.style.cssText = '';
+            clearBtn.textContent = 'Clear';
+            clearBtn.title = 'Clear the canvas';
+            wrap.appendChild(clearBtn);
+        }
 
         const freezeBtn = document.getElementById('freezeBtn');
-        if (freezeBtn) { freezeBtn.style.cssText = actionBtnStyle; wrap.appendChild(freezeBtn); }
+        if (freezeBtn) {
+            freezeBtn.style.cssText = '';
+            freezeBtn.textContent = '🛑';
+            freezeBtn.title = 'Freeze / unfreeze fluid motion';
+            wrap.appendChild(freezeBtn);
+        }
 
         return wrap;
     }
