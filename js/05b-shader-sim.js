@@ -24,9 +24,12 @@
                 // Don't inject paint or velocity inside collision masks: the
                 // damped velocity field pins whatever lands there, so injected
                 // dye lingers as a burned-in imprint of the mask shape.
+                // Saturates at 0.5 because real collision maps are written at
+                // collisionStrength (default 0.7) with antialiased detail —
+                // partial-strength texels must still block firmly.
                 float obsBlock = 1.0;
                 if (hasObstacle == 1) {
-                    obsBlock = 1.0 - smoothstep(0.15, 0.7, texture(uObstacle, vUv).r);
+                    obsBlock = 1.0 - smoothstep(0.1, 0.5, texture(uObstacle, vUv).r);
                 }
                 if (isVelocity == 1) {
                     // Motion Isolation: prevent new velocity from affecting areas with existing velocity
@@ -90,7 +93,11 @@
                     // caused patchy disappearance with vorticity confinement.
                     // Skip entirely when frozen (dissipation ~1.0 = preserve mode)
                     float effectiveDecay = decay;
-                    if (dissipation < 0.999) {
+                    // Also applied on slow presets whenever a collision mask is
+                    // active: obstacles pin pockets of dye in place (velocity is
+                    // damped around them), and motionless pinned dye is an
+                    // artifact there, not aesthetic.
+                    if (dissipation < 0.999 || hasObstacle == 1) {
                         float stillness = exp(-speed * 30.0);
                         float boostRate = stillness * 0.005 * dt * 60.0;
                         effectiveDecay *= max(1.0 - boostRate, 0.95);
@@ -99,12 +106,31 @@
                     // Obstacle-aware drain: dye inside collision masks cannot
                     // advect out (velocity is damped to zero there), so dissolve
                     // it FASTER, not slower — the old slow-decay override pinned
-                    // a burned-in imprint of the mask shape. Skipped in freeze
-                    // mode (dissipation ~1.0 = preserve artwork).
-                    if (hasObstacle == 1 && dissipation < 0.999) {
+                    // a burned-in imprint of the mask shape. Real collision maps
+                    // are written at collisionStrength (default 0.7) with
+                    // antialiased detail, so the curve must saturate well below
+                    // 1.0 and the drain must apply on slow presets too (gate at
+                    // 0.9999 excludes only true freeze, which preserves artwork).
+                    if (hasObstacle == 1 && dissipation < 0.9999) {
+                        // Dilate by one sim texel: depth-thresholded masks leave
+                        // sub-texel gaps (image detail) and a thin rim where dye
+                        // is pinned without obs being high at the exact texel.
                         float obs = texture(uObstacle, vUv).r;
-                        float obsSmooth = smoothstep(0.0, 0.6, obs);
-                        color *= 1.0 - obsSmooth * 0.04 * dt * 60.0;
+                        obs = max(obs, texture(uObstacle, vUv + vec2(texelSize.x, 0.0)).r);
+                        obs = max(obs, texture(uObstacle, vUv - vec2(texelSize.x, 0.0)).r);
+                        obs = max(obs, texture(uObstacle, vUv + vec2(0.0, texelSize.y)).r);
+                        obs = max(obs, texture(uObstacle, vUv - vec2(0.0, texelSize.y)).r);
+                        // Wider half-strength apron (±3 texels): with density
+                        // decay near 1.0 (e.g. 0.9969) dye that the flow presses
+                        // against the collider piles up at stagnation zones a few
+                        // texels out and otherwise never clears — the burn halo.
+                        float apron = texture(uObstacle, vUv + vec2(3.0 * texelSize.x, 0.0)).r;
+                        apron = max(apron, texture(uObstacle, vUv - vec2(3.0 * texelSize.x, 0.0)).r);
+                        apron = max(apron, texture(uObstacle, vUv + vec2(0.0, 3.0 * texelSize.y)).r);
+                        apron = max(apron, texture(uObstacle, vUv - vec2(0.0, 3.0 * texelSize.y)).r);
+                        obs = max(obs, apron * 0.55);
+                        float obsSmooth = smoothstep(0.0, 0.45, obs);
+                        color *= 1.0 - obsSmooth * 0.06 * dt * 60.0;
                     }
                     // Guaranteed-zero cleanup. Multiplicative decay alone never
                     // reaches zero (and half-float storage stalls it at a dim
