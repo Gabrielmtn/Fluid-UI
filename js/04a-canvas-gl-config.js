@@ -224,7 +224,13 @@
 
             SIM_RESOLUTION: 384,      // 384 gives noticeably better physics detail than 256
 
-            VELOCITY_INFLUENCE: 2.5   // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
+            VELOCITY_INFLUENCE: 2.5,  // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
+
+            SUNRAYS: false,           // Sunrays post-FX enabled (toggled in Effects)
+
+            SUNRAYS_WEIGHT: 0.5       // MUST be seeded: undefined here uploads NaN to the
+                                      // sunrays shader and blacks out the whole canvas the
+                                      // moment Sunrays is toggled on (slider only writes it on input)
 
         };
 

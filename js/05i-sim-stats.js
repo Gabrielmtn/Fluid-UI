@@ -168,7 +168,10 @@
             // Apply radial blur
             sunraysProg.bind();
             gl.uniform1i(sunraysProg.uniforms.uTexture, 0);
-            gl.uniform1f(sunraysProg.uniforms.weight, config.SUNRAYS_WEIGHT);
+            // Guard against an undefined/NaN weight (e.g. a preset that enables
+            // SUNRAYS without a weight): NaN here propagates through the sunrays
+            // texture and displayFrag's `color *= sr`, blacking out the canvas.
+            gl.uniform1f(sunraysProg.uniforms.weight, config.SUNRAYS_WEIGHT != null ? config.SUNRAYS_WEIGHT : 0.5);
             gl.viewport(0, 0, dest.width, dest.height);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, temp.texture);
