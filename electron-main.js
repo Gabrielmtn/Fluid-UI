@@ -76,8 +76,11 @@ function createWindow() {
     // NOTE: Cache and localStorage are preserved across restarts.
     // Use Ctrl+Shift+D in the app to force-clear everything for debugging.
     
-    // Show window when ready (prevents flash)
+    // Show window when ready (prevents flash). Start maximized so the canvas
+    // gets the full work area on launch — measured by initializeCanvasPosition
+    // in the renderer once the (now-maximized) layout settles.
     mainWindow.once('ready-to-show', () => {
+        mainWindow.maximize();
         mainWindow.show();
     });
 

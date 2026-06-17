@@ -58,21 +58,32 @@
             }
         }
         // Resolution dropdowns (absolute resolution, independent of display canvas size)
+        // Set a resolution <select> to a value, INJECTING it as an option if it isn't
+        // one of the presets. Battery profiles / the FPS-adaptive tier use non-standard
+        // resolutions (dye 1536, sim 192); the markup has no 'custom' option or input,
+        // so the old code set value='custom' and left the dropdown BLANK ("not
+        // initializing properly"). Injecting keeps the dropdown showing the real value.
+        window.setResolutionDropdown = function (sel, value) {
+            if (!sel) return;
+            var v = String(value);
+            var has = false;
+            for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === v) { has = true; break; } }
+            if (!has) {
+                var prev = sel.querySelector('option[data-injected]');
+                if (prev) prev.remove();
+                var opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v + ' (custom)';
+                opt.setAttribute('data-injected', '1');
+                sel.appendChild(opt);
+            }
+            sel.value = v;
+        };
+
         const visualResSel = document.getElementById('visualResolution');
         const visualResCustom = document.getElementById('visualResolutionCustom');
         if (visualResSel) {
-            // Check if current value exists in options, otherwise use custom
-            const currentVal = String(config.DYE_RESOLUTION);
-            const hasOption = Array.from(visualResSel.options).some(opt => opt.value === currentVal);
-            if (hasOption) {
-                visualResSel.value = currentVal;
-            } else {
-                visualResSel.value = 'custom';
-                if (visualResCustom) {
-                    visualResCustom.style.display = 'block';
-                    visualResCustom.value = config.DYE_RESOLUTION;
-                }
-            }
+            window.setResolutionDropdown(visualResSel, config.DYE_RESOLUTION);
             visualResSel.addEventListener('change', (e) => {
                 if (typeof window.clearActiveProfile === 'function') window.clearActiveProfile();
                 if (e.target.value === 'custom') {
@@ -107,18 +118,7 @@
         const physicsResSel = document.getElementById('physicsResolution');
         const physicsResCustom = document.getElementById('physicsResolutionCustom');
         if (physicsResSel) {
-            // Check if current value exists in options, otherwise use custom
-            const currentVal = String(config.SIM_RESOLUTION);
-            const hasOption = Array.from(physicsResSel.options).some(opt => opt.value === currentVal);
-            if (hasOption) {
-                physicsResSel.value = currentVal;
-            } else {
-                physicsResSel.value = 'custom';
-                if (physicsResCustom) {
-                    physicsResCustom.style.display = 'block';
-                    physicsResCustom.value = config.SIM_RESOLUTION;
-                }
-            }
+            window.setResolutionDropdown(physicsResSel, config.SIM_RESOLUTION);
             physicsResSel.addEventListener('change', (e) => {
                 if (typeof window.clearActiveProfile === 'function') window.clearActiveProfile();
                 if (e.target.value === 'custom') {

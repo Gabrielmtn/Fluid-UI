@@ -271,7 +271,7 @@
                 try {
                     savedColors = colors;
                     localStorage.setItem('fluidSimColors', JSON.stringify(colors));
-                    renderSavedColors();
+                    if (typeof renderSavedColors === 'function') renderSavedColors();
                     if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
                 } catch (e) {
                     console.error('Error saving colors:', e);
@@ -303,7 +303,7 @@
                     const stored = localStorage.getItem('fluidSimColors');
                     if (stored) {
                         savedColors = JSON.parse(stored);
-                        renderSavedColors();
+                        if (typeof renderSavedColors === 'function') renderSavedColors();
                         if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
                     }
                 } catch (e) {

@@ -49,8 +49,8 @@ body > .controls {
        space-between scattered the three across the full height whenever a
        taller sibling (e.g. wrapped presets) stretched the strip */
     justify-content: center;
-    gap: 7px;
-    padding: 8px 10px;
+    gap: 4px;
+    padding: 2px 10px;
     min-width: 92px;
     flex: 1 0 auto;
     max-width: 150px;
@@ -77,6 +77,26 @@ body > .controls {
     text-align: center;
     font-weight: 700;
     line-height: 1.2;
+}
+
+/* Header row above each fader: label top-left, value top-right */
+.ch-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 6px;
+    min-width: 0;
+}
+.ch-header .ch-label {
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.ch-header .ch-value {
+    text-align: right;
+    flex-shrink: 0;
 }
 
 .ch-fader {
@@ -110,17 +130,50 @@ body > .controls {
     font-weight: 700;
 }
 
+/* Multiplier value doubles as the per-arm-colors button (gold, clickable) */
+.ch-value.arm-colors-trigger {
+    cursor: pointer;
+    padding: 1px 8px;
+    min-height: 0;
+    border-radius: 4px;
+    color: rgba(255, 220, 80, 0.95);
+    background: rgba(255, 220, 80, 0.15);
+    border: 1px solid rgba(255, 220, 80, 0.35);
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+}
+.ch-value.arm-colors-trigger:hover {
+    background: rgba(255, 220, 80, 0.28);
+    border-color: rgba(255, 220, 80, 0.6);
+}
+.ch-value.arm-colors-trigger.active {
+    background: rgba(255, 220, 80, 0.34);
+    border-color: rgba(255, 220, 80, 0.75);
+}
+
 /* ── Color channel ── */
 .mixer-channel.ch-wide {
-    min-width: 72px;
-    max-width: 90px;
+    min-width: 86px;
+    max-width: 112px;
     gap: 3px;
+}
+/* Label sits inline with the swatch on one row (saves a stacked row) */
+.ch-color-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+}
+.ch-color-head .ch-label {
+    line-height: 1;
 }
 
 #mixer-strip .ch-color-input,
 #mixer-strip input[type="color"] {
-    width: 32px;
-    height: 32px;
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     border: 2px solid rgba(255, 255, 255, 0.15);
     cursor: pointer;
@@ -152,13 +205,13 @@ body > .controls {
     display: flex;
     gap: 3px;
     width: 100%;
-    height: 20px;
+    height: 16px;
     flex-shrink: 0;
 }
 .ch-toggle-row .ch-text-toggle {
     flex: 1;
     min-width: 0;
-    height: 20px;
+    height: 16px;
 }
 
 /* Text-only toggle button (lights up when active) */
@@ -168,7 +221,7 @@ body > .controls {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 20px;
+    height: 16px;
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
@@ -215,8 +268,8 @@ body > .controls {
     flex-direction: column;
     align-items: stretch;
     justify-content: center;
-    gap: 5px;
-    padding: 8px 10px;
+    gap: 3px;
+    padding: 2px 10px;
     flex-shrink: 0;
 }
 #mixer-strip .mixer-actions button,
@@ -227,7 +280,7 @@ body > .controls {
     align-items: center;
     justify-content: center;
     min-width: 64px;
-    height: 26px;
+    height: 20px;
     padding: 0 10px;
     font-size: 13px;
     font-weight: 600;
@@ -254,13 +307,26 @@ body > .controls {
     background: rgba(255, 100, 100, 0.18);
     border-color: rgba(255, 100, 100, 0.45);
 }
+/* Pause + freeze share one compact row (smaller than the full-width Clear).
+   ID-bearing selector so it outranks `#mixer-strip .mixer-actions button`. */
+.mixer-actions .transport-row {
+    display: flex;
+    gap: 5px;
+}
+#mixer-strip .mixer-actions .transport-row button {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 20px;
+    padding: 0;
+    font-size: 12px;
+}
 
 /* Preset buttons in mixer strip */
 .mixer-presets {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    padding: 8px 10px;
+    gap: 3px;
+    padding: 2px 10px;
     align-items: center;
     align-content: flex-start;
     /* Flex into whatever space the channels leave over so wide screens
@@ -272,7 +338,7 @@ body > .controls {
     min-width: 240px;
     max-width: none;
     align-self: center;
-    max-height: 104px;
+    max-height: 64px;
     overflow-y: auto;
 }
 .mixer-presets::-webkit-scrollbar {
@@ -286,8 +352,8 @@ body > .controls {
 #mixer-strip .mixer-presets button {
     all: unset !important;
     box-sizing: border-box !important;
-    padding: 5px 10px !important;
-    font-size: 10.5px !important;
+    padding: 3px 8px !important;
+    font-size: 10px !important;
     border-radius: 3px !important;
     background: rgba(255,255,255,0.08) !important;
     color: rgba(255,255,255,0.7) !important;

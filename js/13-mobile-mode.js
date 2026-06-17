@@ -47,21 +47,37 @@
         if (mobileMenuToggle) {
             mobileMenuToggle.classList.remove('show');
         }
-        
+
+        restoreMixerStrip();
         console.log('Mobile mode disabled');
+    }
+
+    // The mixer strip (quick faders + style presets + action buttons) is
+    // display:none in the top bar on mobile, so those controls are otherwise
+    // unreachable. Relocate it into the top of the slide-out menu so mobile users
+    // get everything. Reparenting preserves the wired handlers; CSS reflows it to
+    // fit (flex-wrap). Done lazily on first menu-open (the layout exists by then).
+    var mixerStripHome = null;
+    function relocateMixerStripToMenu() {
+        var strip = document.getElementById('mixer-strip');
+        var menu = document.getElementById('sidebar-right');
+        if (!strip || !menu || strip.parentElement === menu) return;
+        mixerStripHome = { parent: strip.parentElement, next: strip.nextElementSibling };
+        menu.insertBefore(strip, menu.firstChild);
+    }
+    function restoreMixerStrip() {
+        var strip = document.getElementById('mixer-strip');
+        if (!strip || !mixerStripHome || !mixerStripHome.parent) return;
+        mixerStripHome.parent.insertBefore(strip, mixerStripHome.next);
+        mixerStripHome = null;
     }
 
     // Toggle menu visibility
     function toggleMenu() {
+        controls = getControls(); // re-fetch: the mixer layout builds #sidebar-right later
         if (!controls) return;
-        
-        const isVisible = controls.classList.contains('visible');
-        
-        if (isVisible) {
-            controls.classList.remove('visible');
-        } else {
-            controls.classList.add('visible');
-        }
+        if (isMobileMode) relocateMixerStripToMenu(); // bring faders + presets into the menu
+        controls.classList.toggle('visible');
     }
 
     // Show menu button temporarily when tapping top-right
@@ -97,22 +113,33 @@
             enableMobileMode();
         }
 
-        // Menu toggle button click
-        if (mobileMenuToggle) {
-            mobileMenuToggle.addEventListener('click', (e) => {
+        // A single tap fires a pointer/touch event AND a synthetic click ~ms apart;
+        // firing the toggle on both flips it twice (open→closed) so touch "does
+        // nothing". Route every activation through one handler that swallows the
+        // duplicate from the same tap. pointerup covers mouse + touch; click is the
+        // keyboard/fallback path. (Each button gets its own debounce closure.)
+        function tapHandler(action) {
+            var last = 0;
+            return function (e) {
                 e.stopPropagation();
-                toggleMenu();
-            });
+                var now = Date.now();
+                if (now - last < 500) return; // duplicate event from the same tap
+                last = now;
+                action();
+            };
         }
-
-        // Menu close button click
+        if (mobileMenuToggle) {
+            var onToggle = tapHandler(toggleMenu);
+            mobileMenuToggle.addEventListener('pointerup', onToggle);
+            mobileMenuToggle.addEventListener('click', onToggle);
+        }
         if (mobileMenuClose) {
-            mobileMenuClose.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (controls) {
-                    controls.classList.remove('visible');
-                }
+            var onClose = tapHandler(function () {
+                controls = getControls();
+                if (controls) controls.classList.remove('visible');
             });
+            mobileMenuClose.addEventListener('pointerup', onClose);
+            mobileMenuClose.addEventListener('click', onClose);
         }
 
         // Tap detection for showing menu button
@@ -131,6 +158,22 @@
                 controls.classList.remove('visible');
             }
         });
+
+        // The canvas swallows synthetic clicks (it preventDefaults touch for
+        // painting), so the click-outside handler above never fires for a canvas tap.
+        // Catch the touch in the CAPTURE phase: if the menu is open and you tap
+        // outside it, dismiss it and consume the tap so it doesn't also paint.
+        document.addEventListener('touchstart', (e) => {
+            if (!isMobileMode) return;
+            var c = getControls();
+            if (!c || !c.classList.contains('visible')) return;
+            var t = e.target;
+            if (c.contains(t)) return;                                    // inside the menu
+            if (mobileMenuToggle && mobileMenuToggle.contains(t)) return; // the toggle
+            c.classList.remove('visible');
+            e.stopPropagation();   // don't also paint this dismiss tap
+            e.preventDefault();
+        }, { capture: true, passive: false });
 
         // Handle window resize
         window.addEventListener('resize', () => {

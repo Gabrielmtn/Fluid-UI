@@ -15,7 +15,12 @@ input[type=range] {
     --max: 100;
     --val: 50;
     --rng: calc(var(--max) - var(--min));
-    --pos: calc((var(--val) - var(--min)) / var(--rng) * 100%);
+    /* Divide by a parenthesized group, NOT by var(--rng) (which expands to a nested
+       calc()). iOS Safari/WebKit rejects "/ calc(...)" as a divisor -> the background-size
+       below becomes invalid -> defaults to 'auto' -> the fill gradient covers the whole
+       track (slider renders FULL). A parenthesized-group divisor works on every browser.
+       Most visible on non-zero-min sliders like Isolation (velocityInfluence, 1-5). */
+    --pos: calc((var(--val) - var(--min)) / (var(--max) - var(--min)) * 100%);
     
     /* Dimensions */
     --input-w: 100%;

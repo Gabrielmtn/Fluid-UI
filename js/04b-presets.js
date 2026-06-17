@@ -158,6 +158,12 @@
 
             
 
+            // Explicit flag for the advection shader: freeze preserves artwork
+            // (skips obstacle drain + stillness boost), unlike a user-set
+            // density of 1.0 which should still drain near collision masks.
+
+            window.__fluidFrozen = !isUnfreezing;
+
             if (!isUnfreezing) {
 
                 // Freeze: save current values and set to freeze state

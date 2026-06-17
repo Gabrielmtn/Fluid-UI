@@ -3,6 +3,12 @@
 (function () {
     'use strict';
 
+    // Electron-only feature (writes canvas frames to a watched folder). In a
+    // plain browser there is no `require`, so no-op instead of throwing — matches
+    // the guard pattern in 00-window-controls.js. Consumers in 20-mixer-layout.js
+    // already null-check window.comfyuiBridge.
+    if (typeof require === 'undefined') return;
+
     const fs = require('fs');
     const path = require('path');
     const { shell } = require('electron');

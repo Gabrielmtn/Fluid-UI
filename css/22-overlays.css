@@ -15,6 +15,8 @@ body.focus-mode #mobileMenuToggle { display: none !important; }
 body.focus-mode #main-area {
     width: 100vw !important;
     height: 100vh !important;
+    height: 100dvh !important;
+    height: var(--app-height, 100dvh) !important;
     padding: 0 !important;
     margin: 0 !important;
 }
@@ -22,6 +24,8 @@ body.focus-mode #canvas-area {
     flex: 1;
     width: 100vw !important;
     height: 100vh !important;
+    height: 100dvh !important;
+    height: var(--app-height, 100dvh) !important;
     padding: 0 !important;
     margin: 0 !important;
     overflow: hidden !important;
@@ -32,8 +36,10 @@ body.focus-mode #canvas-wrapper {
     top: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
+    height: 100dvh !important;
     max-width: 100vw !important;
     max-height: 100vh !important;
+    max-height: 100dvh !important;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
@@ -950,4 +956,73 @@ body.layer-transform-active #canvas-wrapper .resize-handle {
 }
 body.layer-transform-active #canvas-size-display {
     opacity: 0 !important;
+}
+
+/* ── Branding overlay arrange mode ── */
+#branding-arrange-canvas {
+    /* sized/positioned inline; swallows pointer events so painting is paused */
+}
+#branding-arrange-bar {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10020; /* above #branding-arrange-canvas (10010) so Done stays clickable */
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(15, 20, 27, 0.96);
+    border: 1px solid rgba(255, 130, 170, 0.35);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    color: white;
+    font-size: 13px;
+    pointer-events: auto;
+}
+#branding-arrange-bar .ba-title {
+    font-weight: 700;
+    color: rgba(255, 130, 170, 0.95);
+    white-space: nowrap;
+}
+#branding-arrange-bar .ba-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+#brandingArrangeDone {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    background: rgba(80, 200, 120, 0.9);
+    color: white;
+}
+#brandingArrangeDone:hover { background: rgba(80, 200, 120, 1); }
+
+/* While arranging, dim the sim border chrome so the pink overlay handles read
+   clearly, and — critically — make every other interactive layer in the
+   canvas-area non-blocking so the arrange canvas is the sole click target.
+   (#canvas-wrapper has no stacking context, so these would otherwise capture
+   clicks above/around the overlays.) */
+body.branding-arrange-active #canvas-wrapper .resize-handle {
+    opacity: 0.12;
+    pointer-events: none !important;
+}
+body.branding-arrange-active .layer-resize-handle,
+body.branding-arrange-active .background-layer,
+body.branding-arrange-active .background-layer.active,
+body.branding-arrange-active .background-layer.active.dragging {
+    pointer-events: none !important;
+}
+body.branding-arrange-active #canvas-size-display {
+    opacity: 0 !important;
+}
+/* The arrange toggle button reflects active state */
+.branding-arrange-btn.active {
+    background: rgba(255, 130, 170, 0.35) !important;
+    border-color: rgba(255, 130, 170, 0.6) !important;
+    color: #fff !important;
 }

@@ -187,6 +187,7 @@
             <select id="visualResolution">
                 <option value="4096">Cinematic (4K)</option>
                 <option value="2048">Ultra (2K)</option>
+                <option value="1536">Very High (1.5K)</option>
                 <option value="1024" selected>High (1K) - Recommended</option>
                 <option value="512">Medium (512)</option>
                 <option value="256">Low (256)</option>
@@ -199,6 +200,7 @@
                 <option value="512">Ultra (512)</option>
                 <option value="384" selected>High (384) - Recommended</option>
                 <option value="256">Standard (256)</option>
+                <option value="192">Balanced (192)</option>
                 <option value="128">Medium (128)</option>
                 <option value="64">Low (64)</option>
             </select>
@@ -280,24 +282,6 @@
             <div class="control-group">
                 <label for="sunraysWeight">Weight <span id="sunraysWeightValue" class="value-display">0.5</span></label>
                 <input type="range" id="sunraysWeight" min="0" max="1" value="0.5" step="0.05">
-            </div>
-        </div>
-        <div class="control-group checkbox-group">
-            <input type="checkbox" id="spinToggle">
-            <label for="spinToggle" style="margin: 0">Spin (Balatro)</label>
-        </div>
-        <div id="spinPanel" class="collapsible" style="display:none;">
-            <div class="control-group">
-                <label for="spinSpeed">Speed <span id="spinSpeedValue" class="value-display">7.0</span></label>
-                <input type="range" id="spinSpeed" min="0" max="20" value="7" step="0.5">
-            </div>
-            <div class="control-group">
-                <label for="spinAmount">Amount <span id="spinAmountValue" class="value-display">0.25</span></label>
-                <input type="range" id="spinAmount" min="0" max="1" value="0.25" step="0.01">
-            </div>
-            <div class="control-group">
-                <label for="spinMix">Mix <span id="spinMixValue" class="value-display">1.00</span></label>
-                <input type="range" id="spinMix" min="0" max="1" value="1" step="0.01">
             </div>
         </div>
         <div class="control-group">
@@ -527,12 +511,16 @@
         <div id="multiArtistPanel">
             <!-- Disconnected state -->
             <div id="mpDisconnected">
+                <div class="mp-hint">Draw together live — create a room and share the #, or jump in with a random stranger.</div>
                 <button id="createRoomBtn" class="mp-btn-create">🎨 Create Room</button>
                 <div class="mp-join-row">
-                    <input type="text" id="joinRoomInput" placeholder="Enter room code..." maxlength="6" spellcheck="false" autocomplete="off">
+                    <input type="text" id="joinRoomInput" placeholder="Enter room #" maxlength="48" spellcheck="false" autocomplete="off">
                     <button id="joinRoomBtn">Join</button>
                 </div>
+                <div class="mp-or">— or —</div>
+                <button id="strangerBtn" class="mp-btn-stranger">🎲 Paint with a stranger</button>
                 <div id="mpError" class="mp-error" style="display:none"></div>
+                <button id="reconnectBtn" class="mp-btn-create" style="display:none; margin-top:8px;">🔄 Reconnect</button>
             </div>
             <!-- Connected state -->
             <div id="mpConnected" style="display:none">
@@ -540,14 +528,17 @@
                     <div id="connectionDot" class="mp-dot mp-dot-connected"></div>
                     <span id="multiplayerStatus">Connected</span>
                 </div>
-                <div class="mp-room-display">
+                <div id="lockBadge" class="mp-lock-badge" style="display:none">🔒 Locked — invite-only</div>
+                <div class="mp-room-display" id="roomDisplay">
                     <div class="mp-room-label">Room Code</div>
                     <div class="mp-room-code" id="roomName">------</div>
                 </div>
+                <div class="mp-share-hint" id="shareHint">Send this # to a friend to draw together.</div>
                 <div class="mp-action-row">
-                    <button id="copyRoomBtn" class="mp-btn-share">📋 Copy Link</button>
+                    <button id="copyRoomBtn" class="mp-btn-share">📋 Copy #</button>
                     <button id="disconnectBtn" class="mp-btn-disconnect">Disconnect</button>
                 </div>
+                <button id="lockRoomBtn" class="mp-btn-lock" style="display:none">🔒 Lock room</button>
                 <div id="connectedUsers" class="mp-users">1 user</div>
             </div>
         </div>

@@ -11,6 +11,12 @@
         var multiArmColors = [];
         window.multiArmColors = multiArmColors;
         function resolveArmColor(armIndex, fallbackColor) {
+            // Per-arm colors only apply with 2+ arms ("multi brush"). At multiplier 1
+            // the single splat must follow the pointer / solo #colorPicker, even if
+            // arm 0 was left on a non-'main' mode from a prior multi session — the
+            // arm-colors panel can't edit arm 0 below 2 arms, so it never resets it,
+            // which otherwise hijacks the solo picker. (Mirrors multiSplat's loop bound.)
+            if (animationMultiplier < 2) return fallbackColor;
             var cfg = multiArmColors[armIndex];
             if (!cfg || cfg.mode === 'main') return fallbackColor;
             if (cfg.mode === 'fixed') {

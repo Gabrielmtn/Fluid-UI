@@ -618,52 +618,74 @@
         // Expose for other modules (e.g. save/load) to force a resize after restoring state
         window.updateCanvasSize = updateCanvasSize;
         
-        // Initialize canvas wrapper position (centered and constrained)
-        function initializeCanvasPosition() {
-            // If a stream format is active, don't override wrapper dimensions —
-            // only re-center to keep the format's aspect ratio intact
+        // Whether the user has a pinned canvas size (saved only when they drag
+        // a resize handle — see js/02-palettes.js pointerup). When false we keep
+        // the canvas filled to the available area on every layout change.
+        function hasPinnedCanvasSize() {
+            if (!(window.Settings && typeof window.Settings.loadCanvasSize === 'function')) return false;
+            const s = window.Settings.loadCanvasSize();
+            return !!(s && s.width && s.height);
+        }
+
+        // Place the canvas-wrapper so it is ALWAYS fully inside the available
+        // canvas area, at any window size. opts.initial = launch (restore saved
+        // size or fill the area); opts.fill = force-fill the area; otherwise
+        // keep the current size and just re-clamp + re-center.
+        const CANVAS_MARGIN = 24;   // breathing room; also clears the -12px resize handles
+        const CANVAS_MIN = 200;
+        function initializeCanvasPosition(opts) {
+            opts = opts || {};
+            const areaRect = canvasArea.getBoundingClientRect();
+
+            // Area not laid out yet (pre-paint / mid-transition): retry next frame
+            // so we never measure a zero-size area and shrink the canvas to nothing.
+            if (areaRect.width < CANVAS_MIN || areaRect.height < CANVAS_MIN) {
+                requestAnimationFrame(() => initializeCanvasPosition(opts));
+                return;
+            }
+
+            const maxW = Math.max(CANVAS_MIN, areaRect.width  - CANVAS_MARGIN * 2);
+            const maxH = Math.max(CANVAS_MIN, areaRect.height - CANVAS_MARGIN * 2);
+
+            // Stream format owns the wrapper dimensions — only re-center it.
             const hasStreamFormat = window.focusMode &&
                 typeof window.focusMode.getActiveFormat === 'function' &&
                 window.focusMode.getActiveFormat();
 
+            let w = canvasWrapper.offsetWidth;
+            let h = canvasWrapper.offsetHeight;
+
             if (!hasStreamFormat) {
-                // Load saved canvas size if available
-                if (window.Settings && typeof window.Settings.loadCanvasSize === 'function') {
-                    const saved = window.Settings.loadCanvasSize();
-                    if (saved && saved.width && saved.height) {
-                        canvasWrapper.style.width = saved.width + 'px';
-                        canvasWrapper.style.height = saved.height + 'px';
+                if (opts.initial) {
+                    // Launch: restore a pinned size if present, else fill the area.
+                    let saved = null;
+                    if (window.Settings && typeof window.Settings.loadCanvasSize === 'function') {
+                        saved = window.Settings.loadCanvasSize();
                     }
+                    if (saved && saved.width && saved.height) {
+                        w = saved.width; h = saved.height;
+                    } else {
+                        w = maxW; h = maxH;
+                    }
+                } else if (opts.fill) {
+                    w = maxW; h = maxH;
                 }
+                // Always clamp the size so it can never exceed the area.
+                w = Math.min(Math.max(w, CANVAS_MIN), maxW);
+                h = Math.min(Math.max(h, CANVAS_MIN), maxH);
+                canvasWrapper.style.width  = w + 'px';
+                canvasWrapper.style.height = h + 'px';
             }
-            
-            const areaRect = canvasArea.getBoundingClientRect();
-            let wrapperWidth = canvasWrapper.offsetWidth;
-            let wrapperHeight = canvasWrapper.offsetHeight;
-            
-            if (!hasStreamFormat) {
-                // Constrain canvas to fit within window (Electron fix)
-                const maxWidth = areaRect.width - 40; // Leave margin
-                const maxHeight = areaRect.height - 40;
-                
-                if (wrapperWidth > maxWidth) {
-                    wrapperWidth = maxWidth;
-                    canvasWrapper.style.width = maxWidth + 'px';
-                }
-                if (wrapperHeight > maxHeight) {
-                    wrapperHeight = maxHeight;
-                    canvasWrapper.style.height = maxHeight + 'px';
-                }
-            }
-            
-            const centerLeft = Math.max(0, (areaRect.width - wrapperWidth) / 2);
-            const centerTop = Math.max(20, (areaRect.height - wrapperHeight) / 2);
-            
-            canvasWrapper.style.left = centerLeft + 'px';
-            canvasWrapper.style.top = centerTop + 'px';
+
+            // Center, then clamp the position so the box stays fully inside the
+            // area with at least CANVAS_MARGIN on every edge.
+            const left = Math.max(CANVAS_MARGIN, Math.min((areaRect.width  - w) / 2, areaRect.width  - w - CANVAS_MARGIN));
+            const top  = Math.max(CANVAS_MARGIN, Math.min((areaRect.height - h) / 2, areaRect.height - h - CANVAS_MARGIN));
+            canvasWrapper.style.left = Math.round(left) + 'px';
+            canvasWrapper.style.top  = Math.round(top)  + 'px';
         }
-        
-        initializeCanvasPosition();
+
+        initializeCanvasPosition({ initial: true });
         updateCanvasSize();
         
         // Force a micro-resize cycle to lock in canvas/framebuffer sync.
@@ -682,11 +704,48 @@
             });
         });
         
-        // Re-center on window resize (Electron)
-        window.addEventListener('resize', () => {
-            setTimeout(initializeCanvasPosition, 100);
-        });
-        
+        // Re-place whenever the AVAILABLE AREA changes size — not just on window
+        // resize. The sidebar is inserted asynchronously after this script runs,
+        // and the launch maximize / entrance animation settle later too, so the
+        // area shrinks/grows after the first placement. A ResizeObserver on
+        // canvas-area catches every such change (sidebar insert/drag, window
+        // resize, maximize, fullscreen) and re-fits the canvas so it is always
+        // fully inside. (Observing the area, not the wrapper, so no feedback.)
+        function replaceCanvasForArea() {
+            initializeCanvasPosition({ fill: !hasPinnedCanvasSize() });
+        }
+        if (typeof ResizeObserver !== 'undefined') {
+            let _roTimer = null;
+            const areaObserver = new ResizeObserver(() => {
+                clearTimeout(_roTimer);
+                _roTimer = setTimeout(replaceCanvasForArea, 80); // coalesce rapid changes
+            });
+            areaObserver.observe(canvasArea);
+        } else {
+            window.addEventListener('resize', () => { setTimeout(replaceCanvasForArea, 100); });
+        }
+
+        // ── Mobile viewport sizing (iOS Chrome / Safari) ──
+        // 100vh/100dvh and getBoundingClientRect don't reliably exclude the browser's
+        // top URL bar + bottom toolbar on iOS, so the canvas ran under the bottom bar.
+        // The Visual Viewport API reports the exact area BETWEEN the bars; drive an
+        // --app-height CSS var from it (consumed by the mobile/focus #canvas-area
+        // height) and re-fit the canvas whenever the chrome shows/hides.
+        var _appHeightTimer = null;
+        function setAppHeight() {
+            var vv = window.visualViewport;
+            var h = (vv && vv.height) || window.innerHeight;
+            document.documentElement.style.setProperty('--app-height', Math.round(h) + 'px');
+            clearTimeout(_appHeightTimer);
+            _appHeightTimer = setTimeout(replaceCanvasForArea, 120); // settle, then re-fit
+        }
+        setAppHeight();
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', setAppHeight);
+        }
+        window.addEventListener('resize', setAppHeight);
+        window.addEventListener('orientationchange', function () { setTimeout(setAppHeight, 250); });
+
         // Corner locking functionality
         const lockedCorners = {
             nw: false,

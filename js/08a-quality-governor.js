@@ -50,6 +50,11 @@
     var upDwell = 5;         // evals required at-target before stepping up
     var lastStepUpMs = 0;    // for flap detection
 
+    // Fast paint-relief state (sub-second; only steps the no-pop iteration tiers)
+    var fastFrameCount = 0;
+    var fastLastMs = 0;
+    var fastFreezeUntil = 0;
+
     function settings() { return window.settingsManager || null; }
 
     function targetFps() {
@@ -122,14 +127,47 @@
             highStreak++;
             lowStreak = 0;
             if (highStreak >= upDwell && level > 0) {
+                // Resolution-tier recovery reinitializes framebuffers, which
+                // resamples the dye and visibly pops mid-artwork. Hold those
+                // transitions until painting has been idle long enough that
+                // the canvas has mostly faded — the reinit is then invisible.
+                var up = nextUp(level);
+                var recentPaint = window.__lastPaintMs && (nowMs - window.__lastPaintMs) < 10000;
+                if (recentPaint && scalesDiffer(level, up)) return;
                 lastStepUpMs = nowMs;
-                setLevel(nextUp(level), nowMs, 'recovered (fps ' + fps.toFixed(1) + ', cpu ' + cpuEma.toFixed(1) + 'ms)');
+                setLevel(up, nowMs, 'recovered (fps ' + fps.toFixed(1) + ', cpu ' + cpuEma.toFixed(1) + 'ms)');
             }
         } else {
             lowStreak = 0;
             highStreak = 0;
         }
         updateStatusLine();
+    }
+
+    // Highest quality level that does NOT change resolution — stepping through these
+    // reinits nothing, so it's visually seamless (used by the fast paint path).
+    var MAX_NONRES_LEVEL = (function () {
+        var m = 0;
+        for (var i = 0; i < LEVELS.length; i++) if (!LEVELS[i].res) m = i;
+        return m;
+    })();
+
+    // Fast relief while ACTIVELY painting. The 1 Hz evaluator can't react within a
+    // single stroke, so on a ~300 ms window we drop the iteration-cap tiers when fps
+    // tanks mid-paint. Those tiers don't reinit framebuffers (no visible pop);
+    // resolution tiers are left to the slow path, which only touches them once
+    // painting has gone idle (so its reinit pop stays invisible).
+    function maybeFastRelief(nowMs) {
+        var elapsed = nowMs - fastLastMs;
+        if (elapsed < 300) return;
+        var fps = fastFrameCount * 1000 / elapsed;
+        fastFrameCount = 0;
+        fastLastMs = nowMs;
+        var painting = window.__lastPaintMs && (nowMs - window.__lastPaintMs) < 250;
+        if (!painting || level >= MAX_NONRES_LEVEL || nowMs < fastFreezeUntil) return;
+        if (fps >= 0.85 * targetFps()) return;
+        fastFreezeUntil = nowMs + 700; // brief settle before another step
+        setLevel(level + 1, nowMs, 'paint relief — fps ' + fps.toFixed(1));
     }
 
     function updateStatusLine() {
@@ -149,8 +187,10 @@
         onFrame: function (nowMs, cpuMs) {
             if (!enabled) return;
             frameCount++;
+            fastFrameCount++;
             cpuEma = cpuEma === 0 ? cpuMs : cpuEma * 0.95 + cpuMs * 0.05;
-            if (lastEvalMs === 0) { lastEvalMs = nowMs; return; }
+            if (lastEvalMs === 0) { lastEvalMs = nowMs; fastLastMs = nowMs; return; }
+            maybeFastRelief(nowMs);
             if (nowMs - lastEvalMs >= 1000) evaluate(nowMs);
         },
         effIters: function (n) {
@@ -169,6 +209,7 @@
             lowStreak = 0;
             highStreak = 0;
             freezeUntilMs = 0;
+            fastFreezeUntil = 0;
             updateStatusLine();
         },
         setEnabled: function (b) {

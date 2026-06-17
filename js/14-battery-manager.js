@@ -865,28 +865,28 @@
         
         // Sync the resolution dropdowns in the UI to match config values
         syncResolutionDropdowns() {
+            // window.config is provided by the async-loaded 04a; the deferred
+            // setProfile can fire before it exists. Re-syncs once config is ready.
+            if (!window.config) return;
+            // Profiles / the FPS-adaptive tier use non-preset resolutions (dye 1536,
+            // sim 192); 05h's setResolutionDropdown injects them as options so the
+            // dropdown shows the real value instead of going blank. Inline fallback
+            // in case this runs before 05h has defined the helper.
+            const set = window.setResolutionDropdown || function (sel, value) {
+                if (!sel) return;
+                const v = String(value);
+                const has = Array.prototype.some.call(sel.options, function (o) { return o.value === v; });
+                if (!has) {
+                    const o = document.createElement('option');
+                    o.value = v; o.textContent = v + ' (custom)'; o.setAttribute('data-injected', '1');
+                    sel.appendChild(o);
+                }
+                sel.value = v;
+            };
             const visualResSel = document.getElementById('visualResolution');
-            if (visualResSel) {
-                const val = String(window.config.DYE_RESOLUTION);
-                const hasOption = Array.from(visualResSel.options).some(opt => opt.value === val);
-                visualResSel.value = hasOption ? val : 'custom';
-                const customInput = document.getElementById('visualResolutionCustom');
-                if (customInput) {
-                    customInput.style.display = hasOption ? 'none' : 'block';
-                    if (!hasOption) customInput.value = val;
-                }
-            }
+            if (visualResSel) set(visualResSel, window.config.DYE_RESOLUTION);
             const physicsResSel = document.getElementById('physicsResolution');
-            if (physicsResSel) {
-                const val = String(window.config.SIM_RESOLUTION);
-                const hasOption = Array.from(physicsResSel.options).some(opt => opt.value === val);
-                physicsResSel.value = hasOption ? val : 'custom';
-                const customInput = document.getElementById('physicsResolutionCustom');
-                if (customInput) {
-                    customInput.style.display = hasOption ? 'none' : 'block';
-                    if (!hasOption) customInput.value = val;
-                }
-            }
+            if (physicsResSel) set(physicsResSel, window.config.SIM_RESOLUTION);
         }
         
         saveSettings() {
@@ -917,13 +917,18 @@
                     fpsToggle.checked = this.fpsAdaptive;
                 }
                 
-                // PERF: Defer profile application to avoid blocking initial render
-                // This allows the UI to be responsive before heavy resolution changes
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
+                // PERF: defer profile application so it doesn't block initial render,
+                // AND wait for window.config (provided by the async-loaded 04a) — else
+                // the profile's resolution silently no-ops (and used to crash).
+                let _profileTries = 0;
+                const applyProfileWhenReady = () => {
+                    if (window.config) {
                         this.setProfile(this.currentProfile, false);
-                    });
-                });
+                    } else if (_profileTries++ < 600) {
+                        requestAnimationFrame(applyProfileWhenReady);
+                    }
+                };
+                requestAnimationFrame(() => requestAnimationFrame(applyProfileWhenReady));
             }
         }
     }

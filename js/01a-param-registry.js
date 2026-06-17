@@ -23,7 +23,7 @@
     'use strict';
 
     // Dynamically-created controls (no static markup; hydrated from DOM at runtime):
-    // ["spinRotation","spinContrast","spinLighting","spinPixelFilter","spinEase","audioSensitivity","audioBeatThreshold","brushRefreshRate","audioReactToggle","arMapAutoSplat","arMapSize","arMapKaleido","arMapColor","focusModeToggle","streamFormatLock","audioReactSource","audioAutoSplatMode","splatInMode","splatOutMode"]
+    // ["audioSensitivity","audioBeatThreshold","brushRefreshRate","audioReactToggle","arMapAutoSplat","arMapSize","arMapKaleido","arMapColor","focusModeToggle","streamFormatLock","audioReactSource","audioAutoSplatMode","splatInMode","splatOutMode"]
     var SLIDERS = {
         densityDissipation: {configKey: "DENSITY_DISSIPATION", ui: {min: 0.85, max: 1.005, step: 0.0001}, hard: {min: 0.85, max: 1.005}, def: 0.993, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.85, max: 1.005, step: 0.0001, scope: "basic"}},
         velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.9, max: 1.0009}, def: 0.999, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
@@ -53,14 +53,6 @@
         clarity: {configKey: "CLARITY", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
         vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
         sunraysWeight: {configKey: null, ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 3}, def: 0.5, decimals: 2, category: "sunrays", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 3, step: 0.1, scope: "extended"}},
-        spinSpeed: {configKey: null, ui: {min: 0, max: 20, step: 0.5}, hard: {min: 0, max: 20}, def: 7, decimals: 1, category: "spin", perfTier: 0, simSlider: false, mut: null},
-        spinRotation: {configKey: null, ui: null, hard: null, def: null, decimals: 2, category: "spin", perfTier: 0, simSlider: false, mut: null},
-        spinContrast: {configKey: null, ui: null, hard: null, def: null, decimals: 2, category: "spin", perfTier: 0, simSlider: false, mut: null},
-        spinLighting: {configKey: null, ui: null, hard: null, def: null, decimals: 2, category: "spin", perfTier: 0, simSlider: false, mut: null},
-        spinAmount: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.25, decimals: 2, category: "spin", perfTier: 0, simSlider: false, mut: null},
-        spinPixelFilter: {configKey: null, ui: null, hard: null, def: null, decimals: 2, category: "spin", perfTier: 0, simSlider: false, mut: null},
-        spinEase: {configKey: null, ui: null, hard: null, def: null, decimals: 2, category: "spin", perfTier: 0, simSlider: false, mut: null},
-        spinMix: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 1, decimals: 2, category: "spin", perfTier: 0, simSlider: false, mut: null},
         ssFrequency: {configKey: null, ui: {min: 0.2, max: 8, step: 0.1}, hard: {min: 0.2, max: 8}, def: 2, decimals: 1, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.2, max: 8, step: 0.1, scope: "extended"}},
         ssAngle: {configKey: null, ui: {min: 0, max: 360, step: 1}, hard: {min: 0, max: 360}, def: 120, decimals: 0, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0, max: 360, step: 1, scope: "extended"}},
         ssLength: {configKey: null, ui: {min: 0.1, max: 3, step: 0.05}, hard: {min: 0.1, max: 3}, def: 0.4, decimals: 2, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.05, scope: "extended"}},
@@ -87,7 +79,6 @@
         enableLightShift: {def: false, mutScope: "extended"},
         microDetailToggle: {def: false, mutScope: "extended"},
         sunraysToggle: {def: false, mutScope: "extended"},
-        spinToggle: {def: false, mutScope: null},
         turbulenceMode: {def: false, mutScope: "basic"},
         ascendToggle: {def: false, mutScope: "extended"},
         ascendRandomness: {def: false, mutScope: "extended"},

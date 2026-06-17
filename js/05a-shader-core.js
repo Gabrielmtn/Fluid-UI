@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05a-shader-core.js — part 1/14 of former 05-fluid-sim.js (lines 1–653)
 // LOAD ORDER: after 04-ui-interactions.js (async loader), before 05b-shader-sim.js
-// PROVIDES: compileShader, Program, PRECISION, baseVert/blur/display/sharpen/microDetail/lighting/spin/lightShift frag sources
+// PROVIDES: compileShader, Program, PRECISION, baseVert/blur/display/sharpen/microDetail/lighting/lightShift frag sources
 // REQUIRES: gl (04)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -38,7 +38,16 @@
                 gl.useProgram(this.program);
             }
         }
-        const PRECISION = (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "mediump" : "highp");
+        // WebGL2 / GLSL ES 3.00 GUARANTEES highp float in fragment shaders (the
+        // "fragment highp is optional" caveat is WebGL1/ESSL100 only). mediump = real
+        // fp16 (~10-bit mantissa) on mobile, which made the dissipation feedback loop's
+        // decay math (05b advection: pow(dissipation, decayDt*60) + floor/smoothstep
+        // cleanup) compound rounding error each frame -> grainy fadeout. highp matches
+        // what desktop already runs (zero desktop change); only the final fp16 *store*
+        // quantizes, which is uniform, not grainy. (Costs ~2x fragment time on scalar
+        // mobile GPUs; the QualityGovernor absorbs it. If mobile perf regresses, split
+        // into highp for the 05b sim/feedback shaders + mediump for cheap display passes.)
+        const PRECISION = "highp";
         const baseVert = `#version 300 es
             precision ${PRECISION} float;
             layout (location = 0) in vec2 aPos;
@@ -483,68 +492,6 @@
             }
         `;
         // Standalone Light Shift shader (works without lighting
-        // ─── Balatro idea - Spinny shader ────────────────────────────────────────
-        // Original by localthunk (https://www.playbalatro.com), adapted for WebGL2.
-        // Renders as a background layer; fluid is composited on top.
-        const spinFrag = `#version 300 es
-            precision ${PRECISION} float;
-            in vec2 vUv;
-            out vec4 fragColor;
-            uniform vec2  uResolution;    // canvas size in pixels
-            uniform float uTime;
-            uniform float uSpinRotation;  // e.g. -2.0
-            uniform float uSpinSpeed;     // e.g.  7.0
-            uniform float uContrast;      // e.g.  3.5
-            uniform float uLighting;      // e.g.  0.4
-            uniform float uSpinAmount;    // e.g.  0.25
-            uniform float uPixelFilter;   // e.g. 745.0
-            uniform float uSpinEase;      // e.g.  1.0
-            uniform vec4  uColour1;       // foreground colour A
-            uniform vec4  uColour2;       // foreground colour B
-            uniform vec4  uColour3;       // dark fill colour
-            uniform float uOpacity;       // overall spin layer opacity
-            #define PI 3.14159265359
-            vec4 spinEffect(vec2 screenSize, vec2 screen_coords) {
-                float pixel_size = length(screenSize.xy) / uPixelFilter;
-                vec2 uv = (floor(screen_coords.xy * (1.0 / pixel_size)) * pixel_size
-                           - 0.5 * screenSize.xy) / length(screenSize.xy);
-                float uv_len = length(uv);
-                float speed = uSpinRotation * uSpinEase * 0.2;
-                speed += 302.2;
-                float new_pixel_angle = atan(uv.y, uv.x) + speed
-                    - uSpinEase * 20.0 * (1.0 * uSpinAmount * uv_len
-                    + (1.0 - 1.0 * uSpinAmount));
-                vec2 mid = (screenSize.xy / length(screenSize.xy)) / 2.0;
-                uv = vec2(uv_len * cos(new_pixel_angle) + mid.x,
-                          uv_len * sin(new_pixel_angle) + mid.y) - mid;
-                uv *= 30.0;
-                float spd = uTime * uSpinSpeed;
-                vec2 uv2 = vec2(uv.x + uv.y);
-                for (int i = 0; i < 5; i++) {
-                    uv2 += sin(max(uv.x, uv.y)) + uv;
-                    uv  += 0.5 * vec2(cos(5.1123314 + 0.353 * uv2.y + spd * 0.131121),
-                                      sin(uv2.x - 0.113 * spd));
-                    uv  -= 1.0 * cos(uv.x + uv.y) - 1.0 * sin(uv.x * 0.711 - uv.y);
-                }
-                float contrast_mod = 0.25 * uContrast + 0.5 * uSpinAmount + 1.2;
-                float paint_res = min(2.0, max(0.0, length(uv) * 0.035 * contrast_mod));
-                float c1p = max(0.0, 1.0 - contrast_mod * abs(1.0 - paint_res));
-                float c2p = max(0.0, 1.0 - contrast_mod * abs(paint_res));
-                float c3p = 1.0 - min(1.0, c1p + c2p);
-                float light = (uLighting - 0.2) * max(c1p * 5.0 - 4.0, 0.0)
-                            + uLighting * max(c2p * 5.0 - 4.0, 0.0);
-                return (0.3 / uContrast) * uColour1
-                    + (1.0 - 0.3 / uContrast)
-                      * (uColour1 * c1p + uColour2 * c2p
-                         + vec4(c3p * uColour3.rgb, c3p * uColour1.a))
-                    + light;
-            }
-            void main() {
-                vec2 screen_coords = vUv * uResolution;
-                vec4 spin = spinEffect(uResolution, screen_coords);
-                fragColor = vec4(spin.rgb, spin.a * uOpacity);
-            }
-        `;
         // Applies color to overexposed/bright areas above threshold
         const lightShiftFrag = `#version 300 es
             precision ${PRECISION} float;

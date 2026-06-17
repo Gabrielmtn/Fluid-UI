@@ -72,15 +72,23 @@
             uniform sampler2D uObstacle;
             uniform vec2 texelSize;
             uniform float dt, dissipation;
+            uniform float decayDt; // accumulated decay timestep; 0.0 = skip decay this frame
+            uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform int isDensity;
             uniform int hasObstacle;
             void main() {
                 vec2 coord = clamp(vUv - dt * texture(uVelocity, vUv).xy * texelSize, 0.0, 1.0);
-                // Time-independent dissipation: pow(d, dt*60) so decay rate is
+                // Time-independent dissipation: pow(d, t*60) so decay rate is
                 // constant regardless of framerate. 60.0 = reference FPS these
-                // values were tuned for. At 60fps dt=1/60 → pow(d,1) = d (unchanged).
-                // At 144fps dt=1/144 → pow(d,0.417) = weaker per-frame decay = same per-second.
-                float decay = pow(dissipation, dt * 60.0);
+                // values were tuned for. Uses decayDt, not dt: when dt is tiny
+                // (uncapped Electron framerates, low timeScale) a per-frame
+                // multiply shrinks below half-float texture precision and
+                // rounds back to the same value — dye then never fades. The
+                // CPU side accumulates time across frames and hands it over
+                // (as decayDt) only when the step is large enough to survive
+                // fp16 rounding; in between decayDt is 0 and pow() returns
+                // exactly 1.0 (a true no-op).
+                float decay = pow(dissipation, decayDt * 60.0);
                 vec4 source = texture(uSource, coord);
                 vec4 color = decay * source;
                 if (isDensity == 1) {
@@ -96,10 +104,13 @@
                     // Also applied on slow presets whenever a collision mask is
                     // active: obstacles pin pockets of dye in place (velocity is
                     // damped around them), and motionless pinned dye is an
-                    // artifact there, not aesthetic.
-                    if (dissipation < 0.999 || hasObstacle == 1) {
+                    // artifact there, not aesthetic. Never in freeze mode —
+                    // frozen artwork must not erode.
+                    // Batched on decayDt like the base decay (a per-frame
+                    // 0.5%·dt boost also rounds to nothing in fp16 at tiny dt).
+                    if ((dissipation < 0.999 || hasObstacle == 1) && frozen < 0.5) {
                         float stillness = exp(-speed * 30.0);
-                        float boostRate = stillness * 0.005 * dt * 60.0;
+                        float boostRate = stillness * 0.005 * decayDt * 60.0;
                         effectiveDecay *= max(1.0 - boostRate, 0.95);
                     }
                     color = effectiveDecay * source;
@@ -111,7 +122,11 @@
                     // antialiased detail, so the curve must saturate well below
                     // 1.0 and the drain must apply on slow presets too (gate at
                     // 0.9999 excludes only true freeze, which preserves artwork).
-                    if (hasObstacle == 1 && dissipation < 0.9999) {
+                    // Gated by the explicit freeze flag rather than dissipation:
+                    // the density slider magnetically snaps to exactly 1.0, and
+                    // dye pinned against colliders must still drain there — only
+                    // true freeze mode preserves it.
+                    if (hasObstacle == 1 && frozen < 0.5) {
                         // Dilate by one sim texel: depth-thresholded masks leave
                         // sub-texel gaps (image detail) and a thin rim where dye
                         // is pinned without obs being high at the exact texel.
@@ -135,17 +150,21 @@
                     // Guaranteed-zero cleanup. Multiplicative decay alone never
                     // reaches zero (and half-float storage stalls it at a dim
                     // visible floor), which left a permanent residue wash that
-                    // new paint interacted with badly.
-                    // 1) Linear floor drain, proportional to the preset's decay
-                    //    rate so slow "smoke" presets keep their long tails and
-                    //    freeze mode (dissipation = 1.0) is untouched.
-                    float floorEps = (1.0 - min(dissipation, 1.0)) * 0.02 * dt * 60.0;
-                    color = max(color - floorEps, 0.0);
-                    // 2) Smooth low-end ramp to zero (replaces the old binary
-                    //    "< 0.001 → 0" snap, whose hard cutoff created jagged
-                    //    boundaries between cleared and not-yet-cleared texels).
-                    float maxC = max(max(color.r, color.g), color.b);
-                    color *= smoothstep(0.0003, 0.0015, maxC);
+                    // new paint interacted with badly. Both steps run on the
+                    // batched decayDt so they too survive fp16 rounding at tiny
+                    // per-frame timesteps (and stay no-ops on skip frames).
+                    if (decayDt > 0.0) {
+                        // 1) Linear floor drain, proportional to the preset's decay
+                        //    rate so slow "smoke" presets keep their long tails and
+                        //    freeze mode (dissipation = 1.0) is untouched.
+                        float floorEps = (1.0 - min(dissipation, 1.0)) * 0.02 * decayDt * 60.0;
+                        color = max(color - floorEps, 0.0);
+                        // 2) Smooth low-end ramp to zero (replaces the old binary
+                        //    "< 0.001 → 0" snap, whose hard cutoff created jagged
+                        //    boundaries between cleared and not-yet-cleared texels).
+                        float maxC = max(max(color.r, color.g), color.b);
+                        color *= smoothstep(0.0003, 0.0015, maxC);
+                    }
                 } else {
                     // Velocity pass: keep alpha at 1.0
                     color.a = 1.0;

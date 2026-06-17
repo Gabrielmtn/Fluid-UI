@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05e-effect-controls.js — part 5/14 of former 05-fluid-sim.js (lines 1741–1965)
 // LOAD ORDER: after 05d-input-replay.js, before 05f-kaleido-controls.js
-// PROVIDES: turbulence/microDetail/sunrays/spin control wiring, background color, canvas opacity, display shading, capture dimming, multiplier, timeScale, setMultiplierHotkey
+// PROVIDES: turbulence/microDetail/sunrays control wiring, background color, canvas opacity, display shading, capture dimming, multiplier, timeScale, setMultiplierHotkey
 // REQUIRES: config (04)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -63,56 +63,6 @@
                 if (sp) sp.textContent = parseFloat(e.target.value).toFixed(1);
             });
         }
-        // ── Spin (Balatro idea) effect controls ──
-        window.spinEffect = window.spinEffect || {
-            enabled: false,
-            spinSpeed: 7.0, spinRotation: -2.0, contrast: 3.5,
-            lighting: 0.4, spinAmount: 0.25, pixelFilter: 745.0,
-            spinEase: 1.0, opacity: 1.0,
-            colour1: [0.871, 0.267, 0.231, 1.0],
-            colour2: [0.0,   0.420, 0.706, 1.0],
-            colour3: [0.086, 0.137, 0.145, 1.0]
-        };
-        function hexToRgb01(hex) {
-            const h = hex.replace('#', '');
-            return [
-                parseInt(h.slice(0,2), 16) / 255,
-                parseInt(h.slice(2,4), 16) / 255,
-                parseInt(h.slice(4,6), 16) / 255,
-                1.0
-            ];
-        }
-        const spinToggleEl = document.getElementById('spinToggle');
-        const spinPanelEl  = document.getElementById('spinPanel');
-        if (spinToggleEl) {
-            spinToggleEl.addEventListener('change', (e) => {
-                window.spinEffect.enabled = e.target.checked;
-                if (spinPanelEl) spinPanelEl.style.display = e.target.checked ? '' : 'none';
-                try { window.settingsManager && window.settingsManager.set('spinEffect.enabled', e.target.checked); } catch(_){}
-            });
-        }
-        const spinSpeedEl = document.getElementById('spinSpeed');
-        if (spinSpeedEl) { spinSpeedEl.addEventListener('input', (e) => { const v = parseFloat(e.target.value); window.spinEffect.spinSpeed = v; const d = document.getElementById('spinSpeedValue'); if(d) d.textContent = v.toFixed(1); }); }
-        const spinRotationEl = document.getElementById('spinRotation');
-        if (spinRotationEl) { spinRotationEl.addEventListener('input', (e) => { const v = parseFloat(e.target.value); window.spinEffect.spinRotation = v; const d = document.getElementById('spinRotationValue'); if(d) d.textContent = v.toFixed(1); }); }
-        const spinContrastEl = document.getElementById('spinContrast');
-        if (spinContrastEl) { spinContrastEl.addEventListener('input', (e) => { const v = parseFloat(e.target.value); window.spinEffect.contrast = v; const d = document.getElementById('spinContrastValue'); if(d) d.textContent = v.toFixed(1); }); }
-        const spinLightingEl = document.getElementById('spinLighting');
-        if (spinLightingEl) { spinLightingEl.addEventListener('input', (e) => { const v = parseFloat(e.target.value); window.spinEffect.lighting = v; const d = document.getElementById('spinLightingValue'); if(d) d.textContent = v.toFixed(2); }); }
-        const spinAmountEl = document.getElementById('spinAmount');
-        if (spinAmountEl) { spinAmountEl.addEventListener('input', (e) => { const v = parseFloat(e.target.value); window.spinEffect.spinAmount = v; const d = document.getElementById('spinAmountValue'); if(d) d.textContent = v.toFixed(2); }); }
-        const spinPixelFilterEl = document.getElementById('spinPixelFilter');
-        if (spinPixelFilterEl) { spinPixelFilterEl.addEventListener('input', (e) => { const v = parseFloat(e.target.value); window.spinEffect.pixelFilter = v; const d = document.getElementById('spinPixelFilterValue'); if(d) d.textContent = Math.round(v).toString(); }); }
-        const spinEaseEl = document.getElementById('spinEase');
-        if (spinEaseEl) { spinEaseEl.addEventListener('input', (e) => { const v = parseFloat(e.target.value); window.spinEffect.spinEase = v; const d = document.getElementById('spinEaseValue'); if(d) d.textContent = v.toFixed(1); }); }
-        const spinMixEl = document.getElementById('spinMix');
-        if (spinMixEl) { spinMixEl.addEventListener('input', (e) => { const v = parseFloat(e.target.value); window.spinEffect.opacity = v; const d = document.getElementById('spinMixValue'); if(d) d.textContent = v.toFixed(2); }); }
-        const spinColour1El = document.getElementById('spinColour1');
-        if (spinColour1El) { spinColour1El.addEventListener('input', (e) => { window.spinEffect.colour1 = hexToRgb01(e.target.value); }); }
-        const spinColour2El = document.getElementById('spinColour2');
-        if (spinColour2El) { spinColour2El.addEventListener('input', (e) => { window.spinEffect.colour2 = hexToRgb01(e.target.value); }); }
-        const spinColour3El = document.getElementById('spinColour3');
-        if (spinColour3El) { spinColour3El.addEventListener('input', (e) => { window.spinEffect.colour3 = hexToRgb01(e.target.value); }); }
         // DEBUG: Pointer leave tracking removed for performance
         // Background color picker
         const backgroundColorPicker = document.getElementById('backgroundColorPicker');

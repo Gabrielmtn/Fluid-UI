@@ -1,7 +1,24 @@
 // Window Controls for Frameless Electron Window
 (function() {
     'use strict';
-    
+
+    // Tag <body> with the platform so CSS can drop Electron-only window chrome
+    // when running in a browser. The min/max/close controls, the drag-region
+    // titlebar, and the frameless-window resize handles are all meaningless on
+    // the web. Detect via the Electron renderer's node integration (require /
+    // process.versions.electron) — the SAME signal used just below and across
+    // the app. userAgent is unreliable here: an Electron-based webview serving
+    // the web build (e.g. a preview shell) has "Electron" in its UA but no
+    // require, so it must still be treated as web.
+    (function tagPlatform() {
+        var isElectron = (typeof require !== 'undefined')
+            || (typeof process !== 'undefined' && process.versions && !!process.versions.electron);
+        var cls = isElectron ? 'electron-mode' : 'web-mode';
+        var apply = function () { if (document.body) document.body.classList.add(cls); };
+        if (document.body) apply();
+        else document.addEventListener('DOMContentLoaded', apply);
+    })();
+
     // Only run in Electron
     if (typeof require === 'undefined') return;
     

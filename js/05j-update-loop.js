@@ -6,6 +6,26 @@
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
 // ═══════════════════════════════════════════════════════════════════
+        // Decay batching: half-float dye/velocity textures round a multiply
+        // back to the same value when the per-frame decrement is below ~0.05%
+        // of the stored value (fp16 has a 10-bit mantissa). At tiny timesteps
+        // (uncapped Electron framerates, low timeScale, near-1.0 dissipation)
+        // every decay mechanism falls below that and the fade freezes with
+        // patchy residue. Fix: accumulate decay time on the CPU and apply it
+        // in one batched step (uniform decayDt) only when the resulting
+        // decrement is comfortably above fp16 rounding (≥0.2%); skip frames
+        // pass decayDt=0 which the shader treats as an exact no-op.
+        // Growth (dissipation ≥ 1.0) keeps per-frame semantics — it has no
+        // fade-to-zero path and batching it would change preset feel.
+        let dyeDecayAccum = 0, velDecayAccum = 0;
+        let lastDyeDiss = -1, lastVelDiss = -1;
+        function computeDecayDt(dissipation, accum, dt) {
+            if (dissipation >= 1.0) return { decayDt: dt, accum: 0 };
+            accum = Math.min(accum + dt, 1.0);
+            const cand = Math.pow(dissipation, accum * 60.0);
+            if (1.0 - cand >= 0.002 || accum >= 1.0) return { decayDt: accum, accum: 0 };
+            return { decayDt: 0, accum };
+        }
         function update() {
             const nowMs = performance.now();
             const cpuStart = nowMs;
@@ -62,6 +82,10 @@
             processReplay();
             if (!isPaused) {
                 if (pointer.moved && pointer.down && !isReplayActive) {
+                    window.__lastPaintMs = nowMs; // governor: defer res-tier recovery while strokes are recent
+                    // Accumulate cursor travel (fraction of canvas width) so the
+                    // splat-in ramp is distance-based / speed-independent.
+                    splatStrokeDist += Math.hypot(pointer.dx, pointer.dy) / 10 / Math.max(1, canvas.width);
                     const inMult = getSplatInMult();
                     const savedR = config.SPLAT_RADIUS;
                     config.SPLAT_RADIUS = savedR * inMult;
@@ -70,17 +94,26 @@
                     pushStrokeEvent(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
                     pointer.moved = false;
                 }
-                // Splat-out: continue splatting with decaying radius after release
+                // Splat-out: a trailing tail along the release velocity, tapering
+                // in size over splatOutDist of travel. Ends when the size taper
+                // completes OR the velocity has effectively died (so it can never
+                // stall splatting at a fixed point).
                 if (splatOutActive) {
                     const outMult = getSplatOutMult();
-                    if (outMult <= 0.001) {
+                    const outVel2 = splatOutDx * splatOutDx + splatOutDy * splatOutDy;
+                    if (outMult <= 0.001 || outVel2 < 0.0004) {
                         splatOutActive = false;
                         if (pendingArmAdvance) {
                             advanceArmColors();
                             pendingArmAdvance = false;
                         }
                     } else {
-                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * 0.9, splatOutDy * 0.9, splatOutColor, config.SPLAT_RADIUS * outMult);
+                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * 0.9, splatOutDy * 0.9, splatOutColor, config.SPLAT_RADIUS * splatReleaseInMult * outMult);
+                        // Advance the tail along the decaying velocity + accumulate
+                        // its travel for the distance-based taper.
+                        splatOutX += splatOutDx / 10;
+                        splatOutY += splatOutDy / 10;
+                        splatTailDist += Math.sqrt(outVel2) / 10 / Math.max(1, canvas.width);
                         splatOutDx *= 0.9;
                         splatOutDy *= 0.9;
                     }
@@ -181,6 +214,15 @@
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
                 gl.uniform1i(advectionProg.uniforms.uSource, 0);
                 gl.uniform1f(advectionProg.uniforms.dissipation, config.VELOCITY_DISSIPATION);
+                // Batched decay (see header): a slider change resets the debt
+                // so an accumulated exponent is never applied to a new rate.
+                if (config.VELOCITY_DISSIPATION !== lastVelDiss) {
+                    lastVelDiss = config.VELOCITY_DISSIPATION;
+                    velDecayAccum = 0;
+                }
+                const _velDecay = computeDecayDt(config.VELOCITY_DISSIPATION, velDecayAccum, dt);
+                velDecayAccum = _velDecay.accum;
+                gl.uniform1f(advectionProg.uniforms.decayDt, _velDecay.decayDt);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(velocity.write.fbo);
@@ -195,6 +237,17 @@
                 gl.uniform1i(advectionProg.uniforms.uSource, 1);
                 gl.uniform1i(advectionProg.uniforms.uObstacle, 2);
                 gl.uniform1f(advectionProg.uniforms.dissipation, config.DENSITY_DISSIPATION);
+                if (config.DENSITY_DISSIPATION !== lastDyeDiss) {
+                    lastDyeDiss = config.DENSITY_DISSIPATION;
+                    dyeDecayAccum = 0;
+                }
+                const _dyeDecay = computeDecayDt(config.DENSITY_DISSIPATION, dyeDecayAccum, dt);
+                dyeDecayAccum = _dyeDecay.accum;
+                gl.uniform1f(advectionProg.uniforms.decayDt, _dyeDecay.decayDt);
+                // Explicit freeze flag: the shader must distinguish freeze mode
+                // (preserve artwork — no drains) from a user-set density of 1.0
+                // (obstacle drain should still clear dye pinned against masks)
+                gl.uniform1f(advectionProg.uniforms.frozen, window.__fluidFrozen ? 1.0 : 0.0);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
                 if (obsActive) {
@@ -203,9 +256,19 @@
                 }
                 blit(density.write.fbo);
                 density.swap();
-                // Re-enable blend for post-processing and display passes
-                gl.enable(gl.BLEND);
             }
+            // Post-FX passes (sharpen, micro-detail, lighting, light shift,
+            // sunrays) are full-quad rewrites into persistent FBOs — they must
+            // OVERWRITE, never alpha-blend. With blending on, any pass whose
+            // shader emits the source's faded alpha (lighting/light shift
+            // early-exit and pass-through write color.a, and dye alpha decays
+            // to 0 with the dye) keeps the FBO's previous contents wherever
+            // alpha is low: the last bright frame stays burned in as a ghost
+            // that never fades. Hidden most of the time because sharpen and
+            // micro-detail hardcode alpha=1.0 — but exposed whenever those
+            // passes are off (sharpness 0, or the governor's fx gate) while
+            // light shift or lighting is on.
+            gl.disable(gl.BLEND);
             // [GOVERNOR HOOK] post-FX gate (sharpen, micro-detail, sunrays)
             const _fxOn = window.QualityGovernor ? window.QualityGovernor.fxOn() : true;
             // Apply sharpness pass if enabled (config.SHARPNESS > 0)
@@ -305,29 +368,6 @@
                 blur(sunrays, sunraysTemp, 1);
             }
             gl.disable(gl.BLEND);
-            // ── Spin (Balatro) — exclusive display mode, skips fluid displayProg ──
-            if (window.spinEffect && window.spinEffect.enabled) {
-                const se = window.spinEffect;
-                gl.viewport(0, 0, canvas.width, canvas.height);
-                spinProg.bind();
-                gl.uniform2f(spinProg.uniforms.uResolution, canvas.width, canvas.height);
-                gl.uniform1f(spinProg.uniforms.uTime,         performance.now() * 0.001);
-                gl.uniform1f(spinProg.uniforms.uSpinRotation, se.spinRotation !== undefined ? se.spinRotation : -2.0);
-                gl.uniform1f(spinProg.uniforms.uSpinSpeed,    se.spinSpeed    !== undefined ? se.spinSpeed    :  7.0);
-                gl.uniform1f(spinProg.uniforms.uContrast,     se.contrast     !== undefined ? se.contrast     :  3.5);
-                gl.uniform1f(spinProg.uniforms.uLighting,     se.lighting     !== undefined ? se.lighting     :  0.4);
-                gl.uniform1f(spinProg.uniforms.uSpinAmount,   se.spinAmount   !== undefined ? se.spinAmount   :  0.25);
-                gl.uniform1f(spinProg.uniforms.uPixelFilter,  se.pixelFilter  !== undefined ? se.pixelFilter  :  745.0);
-                gl.uniform1f(spinProg.uniforms.uSpinEase,     se.spinEase     !== undefined ? se.spinEase     :  1.0);
-                gl.uniform1f(spinProg.uniforms.uOpacity,      se.opacity      !== undefined ? se.opacity      :  1.0);
-                const c1 = se.colour1 || [0.871, 0.267, 0.231, 1.0];
-                const c2 = se.colour2 || [0.0,   0.42,  0.706, 1.0];
-                const c3 = se.colour3 || [0.086, 0.137, 0.145, 1.0];
-                gl.uniform4f(spinProg.uniforms.uColour1, c1[0], c1[1], c1[2], 1.0);
-                gl.uniform4f(spinProg.uniforms.uColour2, c2[0], c2[1], c2[2], 1.0);
-                gl.uniform4f(spinProg.uniforms.uColour3, c3[0], c3[1], c3[2], 1.0);
-                blit(null);
-            } else {
             gl.viewport(0, 0, canvas.width, canvas.height);
             displayProg.bind();
             gl.uniform2f(displayProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
@@ -355,7 +395,6 @@
             gl.activeTexture(gl.TEXTURE1);
             gl.bindTexture(gl.TEXTURE_2D, _sunraysOn ? sunrays.texture : null);
             blit(null);
-            }
             // ─── Stats update (ring buffer, zero-GC) ──────────────────
             pushFrameTimestamp(nowMs);
             const fpsVal = countRecentFrames(nowMs);

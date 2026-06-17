@@ -42,8 +42,6 @@
         'clarity','vibrance',
         // Sunrays
         'sunraysWeight',
-        // Spin (Balatro idea)
-        'spinSpeed','spinRotation','spinContrast','spinLighting','spinAmount','spinPixelFilter','spinEase','spinMix',
         // Shooting Star
         'ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity',
         // Audio Reactive
@@ -65,7 +63,7 @@
         'kaleidoToggle','kAnimateRot',
         // Effects
         'enableLighting','enableLightShift','microDetailToggle',
-        'sunraysToggle','spinToggle',
+        'sunraysToggle',
         // Simulation
         'turbulenceMode',
         // Animations
@@ -518,7 +516,9 @@
             replayTimePeriod: window.replayTimePeriod || 5,
             refreshRate: window.brushRefreshRate || 0,
             splatInMode: window.splatInMode || 'instant',
-            splatOutMode: window.splatOutMode || 'instant'
+            splatOutMode: window.splatOutMode || 'instant',
+            splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
+            splatOutDist: typeof window.splatOutDist === 'number' ? window.splatOutDist : 0.15
         };
 
         // ── Shooting star origin ──
@@ -649,18 +649,6 @@
             }
         } catch(_){}
 
-        // ── Spin (Balatro) colour state ──
-        var spinColours = null;
-        try {
-            var c1el = document.getElementById('spinColour1');
-            var c2el = document.getElementById('spinColour2');
-            var c3el = document.getElementById('spinColour3');
-            spinColours = {
-                colour1: c1el ? c1el.value : '#de443b',
-                colour2: c2el ? c2el.value : '#006bb4',
-                colour3: c3el ? c3el.value : '#162325'
-            };
-        } catch(_){}
 
         // ── Recorded layers (timeline interactions) ──
         var recordedLayers = null;
@@ -720,7 +708,6 @@
             branding: brandingData,
             recordedLayers: recordedLayers,
             cosOscillator: cosState,
-            spinColours: spinColours,
             pathLayers: pathLayersData,
             armColors: armColorsData
         };
@@ -926,6 +913,16 @@
                     var soEl = document.getElementById('splatOutMode');
                     if (soEl) soEl.value = bs.splatOutMode;
                 }
+                if (typeof bs.splatInDist === 'number') {
+                    window.splatInDist = bs.splatInDist;
+                    var siD = document.getElementById('splatInDist');
+                    if (siD) { siD.value = bs.splatInDist; siD.dispatchEvent(new Event('input', { bubbles: true })); }
+                }
+                if (typeof bs.splatOutDist === 'number') {
+                    window.splatOutDist = bs.splatOutDist;
+                    var soD = document.getElementById('splatOutDist');
+                    if (soD) { soD.value = bs.splatOutDist; soD.dispatchEvent(new Event('input', { bubbles: true })); }
+                }
             }
         } catch(_){}
 
@@ -977,28 +974,6 @@
             }
         } catch(_){}
 
-        // ── Spin (Balatro idea) colour state ──
-        try {
-            if (snapshot.spinColours && window.spinEffect) {
-                var sc = snapshot.spinColours;
-                var fn = function(id, hexVal, prop) {
-                    var el = document.getElementById(id);
-                    if (el && hexVal) {
-                        el.value = hexVal;
-                        var h = hexVal.replace('#','');
-                        window.spinEffect[prop] = [
-                            parseInt(h.slice(0,2),16)/255,
-                            parseInt(h.slice(2,4),16)/255,
-                            parseInt(h.slice(4,6),16)/255,
-                            1.0
-                        ];
-                    }
-                };
-                fn('spinColour1', sc.colour1, 'colour1');
-                fn('spinColour2', sc.colour2, 'colour2');
-                fn('spinColour3', sc.colour3, 'colour3');
-            }
-        } catch(_){}
 
         // ── Layers ──
         try {

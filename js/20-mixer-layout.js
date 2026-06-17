@@ -260,8 +260,11 @@
         strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
         var multiplyChannel = faderChannel('Multiply', 'yellow', 'multiplier', 'multiplierValue');
-        var armDropdown = buildArmColorsDropdown();
-        multiplyChannel.appendChild(armDropdown.toggle);
+        // The multiplier value ("1x") IS the arm-colors trigger — click it to
+        // open the per-arm brush color controls (no separate icon button).
+        // Query from the (detached) channel: faderChannel already re-parented
+        // the value element, so document.getElementById would miss it here.
+        buildArmColorsDropdown(multiplyChannel.querySelector('#multiplierValue'));
         strip.appendChild(multiplyChannel);
         strip.appendChild(faderChannel('Time', 'pink', 'timeScale', 'timeScaleValue'));
         strip.appendChild(faderChannel('Density', 'cyan', 'densityDissipation', 'densityValue'));
@@ -303,33 +306,37 @@
         ch.className = 'mixer-channel';
         if (accent) ch.dataset.accent = accent;
 
+        const slider = document.getElementById(sliderId);
+
+        // Header row: label top-left, value top-right (above the slider).
+        const head = document.createElement('div');
+        head.className = 'ch-header';
+
         const lbl = document.createElement('div');
         lbl.className = 'ch-label';
         lbl.textContent = label;
         if (CHANNEL_TOOLTIPS[label]) lbl.title = CHANNEL_TOOLTIPS[label];
-        ch.appendChild(lbl);
+        head.appendChild(lbl);
 
-        const slider = document.getElementById(sliderId);
+        let val = null;
+        if (existingValueId) {
+            val = document.getElementById(existingValueId);
+            if (val) val.classList.add('ch-value');
+        } else {
+            val = document.createElement('div');
+            val.className = 'ch-value';
+            if (newValueId) val.id = newValueId;
+            if (slider) val.textContent = fmtSlider(slider);
+        }
+        if (val) head.appendChild(val);
+
+        ch.appendChild(head);
+
         if (slider) {
             const fader = document.createElement('div');
             fader.className = 'ch-fader';
             fader.appendChild(slider);
             ch.appendChild(fader);
-        }
-
-        if (existingValueId) {
-            const val = document.getElementById(existingValueId);
-            if (val) {
-                val.classList.add('ch-value');
-                ch.appendChild(val);
-            }
-        } else {
-            // Create new value display
-            const val = document.createElement('div');
-            val.className = 'ch-value';
-            if (newValueId) val.id = newValueId;
-            if (slider) val.textContent = fmtSlider(slider);
-            ch.appendChild(val);
         }
 
         return ch;
@@ -340,17 +347,25 @@
         ch.className = 'mixer-channel ch-wide';
         ch.dataset.accent = 'pink';
 
+        // Label + swatch share one row (the "head"); the Rnd/Step toggles sit below.
+        // Keeps the colour channel near fader height instead of stacking
+        // label → swatch → toggles vertically.
+        const head = document.createElement('div');
+        head.className = 'ch-color-head';
+
         const lbl = document.createElement('div');
         lbl.className = 'ch-label';
         lbl.textContent = 'Color';
-        ch.appendChild(lbl);
+        head.appendChild(lbl);
 
         const picker = document.getElementById('colorPicker');
         if (picker) {
             picker.className = 'ch-color-input';
             picker.style.cssText = '';
-            ch.appendChild(picker);
+            head.appendChild(picker);
         }
+
+        ch.appendChild(head);
 
         // --- Toggle row (Random + Step) ---
         var toggleRow = document.createElement('div');
@@ -426,22 +441,18 @@
         const wrap = document.createElement('div');
         wrap.className = 'mixer-actions';
 
-        // Transport column: icon play/pause, Clear, stop-sign freeze.
-        // Styling comes from .mixer-actions CSS; state via .active class.
+        // Transport: pause + freeze are compact icon buttons sharing one row;
+        // Clear spans the full width below. Two rows instead of three keeps the
+        // block close to the fader height. Styling/state via .mixer-actions CSS.
+        const transportRow = document.createElement('div');
+        transportRow.className = 'transport-row';
+
         const pauseBtn = document.getElementById('pauseBtn');
         if (pauseBtn) {
             pauseBtn.style.cssText = '';
             pauseBtn.textContent = '⏸';
             pauseBtn.title = 'Pause / resume simulation';
-            wrap.appendChild(pauseBtn);
-        }
-
-        const clearBtn = controls.querySelector('button[onclick*="clearCanvas"]');
-        if (clearBtn) {
-            clearBtn.style.cssText = '';
-            clearBtn.textContent = 'Clear';
-            clearBtn.title = 'Clear the canvas';
-            wrap.appendChild(clearBtn);
+            transportRow.appendChild(pauseBtn);
         }
 
         const freezeBtn = document.getElementById('freezeBtn');
@@ -449,7 +460,17 @@
             freezeBtn.style.cssText = '';
             freezeBtn.textContent = '🛑';
             freezeBtn.title = 'Freeze / unfreeze fluid motion';
-            wrap.appendChild(freezeBtn);
+            transportRow.appendChild(freezeBtn);
+        }
+
+        wrap.appendChild(transportRow);
+
+        const clearBtn = controls.querySelector('button[onclick*="clearCanvas"]');
+        if (clearBtn) {
+            clearBtn.style.cssText = '';
+            clearBtn.textContent = 'Clear';
+            clearBtn.title = 'Clear the canvas';
+            wrap.appendChild(clearBtn);
         }
 
         return wrap;
@@ -625,7 +646,7 @@
     // --- Section builders ---
 
     function buildMutationSection() {
-        const { sec, body } = makeSection('🧬 Mutate', 'purple', false);
+        const { sec, body } = makeSection('🧬 Mutate Shader', 'purple', false);
         sec.id = 'mutation-section';
 
         // ── Controls row ──
@@ -1245,11 +1266,6 @@
         const sunraysPanel = document.getElementById('sunraysPanel');
         if (sunraysPanel) body.appendChild(sunraysPanel);
 
-        // Spin (Balatro idea) toggle + panel
-        moveCheckboxGroup('spinToggle', body);
-        const spinPanel = document.getElementById('spinPanel');
-        if (spinPanel) body.appendChild(spinPanel);
-
         return sec;
     }
 
@@ -1399,6 +1415,28 @@
         });
         body.appendChild(splatInSelect);
 
+        // Ramp-distance slider (how far the brush travels before reaching full
+        // size). Built by a small helper shared by in/out.
+        function makeRampRow(id, getDist) {
+            var row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:6px;margin:-2px 0 8px;';
+            var lab = document.createElement('span');
+            lab.textContent = 'Ramp';
+            lab.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.45);min-width:30px;';
+            var slider = document.createElement('input');
+            slider.type = 'range'; slider.id = id;
+            slider.min = '0'; slider.max = '0.5'; slider.step = '0.01';
+            slider.value = String(getDist());
+            slider.style.cssText = 'flex:1;min-width:0;';
+            var val = document.createElement('span');
+            val.style.cssText = 'font-size:10px;font-family:monospace;color:#4fc3f7;min-width:32px;text-align:right;';
+            val.textContent = Math.round(parseFloat(slider.value) * 100) + '%';
+            row.appendChild(lab); row.appendChild(slider); row.appendChild(val);
+            return { row: row, slider: slider, val: val };
+        }
+        var inRamp = makeRampRow('splatInDist', function () { return window.splatInDist != null ? window.splatInDist : 0.15; });
+        body.appendChild(inRamp.row);
+
         // --- Splat Out ---
         var splatOutLabel = document.createElement('label');
         splatOutLabel.className = 'brush-section-label';
@@ -1415,14 +1453,37 @@
         });
         body.appendChild(splatOutSelect);
 
+        var outRamp = makeRampRow('splatOutDist', function () { return window.splatOutDist != null ? window.splatOutDist : 0.15; });
+        body.appendChild(outRamp.row);
+
         // --- Wire splat in/out ---
+        // Ramp slider only matters for linear/easing; dim it when mode is instant.
+        function syncRamp(ramp, sel) {
+            var on = sel.value !== 'instant';
+            ramp.row.style.opacity = on ? '1' : '0.4';
+            ramp.slider.disabled = !on;
+        }
         splatInSelect.addEventListener('change', function() {
             window.splatInMode = splatInSelect.value;
+            syncRamp(inRamp, splatInSelect);
             try { if (window.settingsManager) window.settingsManager.set('brush.splatInMode', splatInSelect.value); } catch(_) {}
         });
         splatOutSelect.addEventListener('change', function() {
             window.splatOutMode = splatOutSelect.value;
+            syncRamp(outRamp, splatOutSelect);
             try { if (window.settingsManager) window.settingsManager.set('brush.splatOutMode', splatOutSelect.value); } catch(_) {}
+        });
+        inRamp.slider.addEventListener('input', function() {
+            var v = parseFloat(inRamp.slider.value);
+            window.splatInDist = v;
+            inRamp.val.textContent = Math.round(v * 100) + '%';
+            try { if (window.settingsManager) window.settingsManager.set('brush.splatInDist', v); } catch(_) {}
+        });
+        outRamp.slider.addEventListener('input', function() {
+            var v = parseFloat(outRamp.slider.value);
+            window.splatOutDist = v;
+            outRamp.val.textContent = Math.round(v * 100) + '%';
+            try { if (window.settingsManager) window.settingsManager.set('brush.splatOutDist', v); } catch(_) {}
         });
 
         // --- Wire mode toggle ---
@@ -1489,8 +1550,23 @@
                     splatOutSelect.value = savedSplatOut;
                     window.splatOutMode = savedSplatOut;
                 }
+                var savedInDist = window.settingsManager.get('brush.splatInDist');
+                if (typeof savedInDist === 'number') {
+                    window.splatInDist = savedInDist;
+                    inRamp.slider.value = savedInDist;
+                    inRamp.val.textContent = Math.round(savedInDist * 100) + '%';
+                }
+                var savedOutDist = window.settingsManager.get('brush.splatOutDist');
+                if (typeof savedOutDist === 'number') {
+                    window.splatOutDist = savedOutDist;
+                    outRamp.slider.value = savedOutDist;
+                    outRamp.val.textContent = Math.round(savedOutDist * 100) + '%';
+                }
             }
         } catch (_) {}
+        // Reflect the in/out mode in the ramp sliders' enabled state
+        syncRamp(inRamp, splatInSelect);
+        syncRamp(outRamp, splatOutSelect);
 
         // Defaults
         if (!window.replayMode) window.replayMode = 'stroke';
@@ -1502,7 +1578,7 @@
         return sec;
     }
 
-    function buildBrandingSection() {
+    function buildBrandingSection_OLD_UNUSED() {
         const { sec, body } = makeSection('\ud83c\udfa8 Branding', 'pink', true);
 
         // --- Add Text Overlay ---
@@ -1771,6 +1847,230 @@
             console.log('[Branding] UI wired successfully');
         }
         setTimeout(initBrandingList, 200);
+
+        return sec;
+    }
+
+    // \u2500\u2500 Branding panel (redesigned): create overlays + arrange (select/drag/
+    //    resize/rotate) via window.brandingOverlays. Replaces the old preset-only
+    //    panel (buildBrandingSection_OLD_UNUSED below, kept temporarily). \u2500\u2500
+    function buildBrandingSection() {
+        const { sec, body } = makeSection('\ud83c\udfa8 Branding', 'pink', true);
+
+        function api() { return window.brandingOverlays; }
+
+        // \u2500\u2500 Arrange toggle (the headline feature) \u2500\u2500
+        var arrangeBtn = document.createElement('button');
+        arrangeBtn.type = 'button';
+        arrangeBtn.className = 'branding-arrange-btn';
+        arrangeBtn.style.cssText = 'width:100%;margin-bottom:4px;padding:7px;font-size:11px;font-weight:600;border-radius:4px;background:rgba(255,130,170,0.18);border:1px solid rgba(255,130,170,0.3);color:white;cursor:pointer;';
+        body.appendChild(arrangeBtn);
+
+        var arrangeHint = document.createElement('div');
+        arrangeHint.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.35);margin:0 0 10px;text-align:center;line-height:1.35;';
+        arrangeHint.textContent = 'Drag overlays on the canvas to move; corners resize, top handle rotates. Painting pauses while arranging.';
+        body.appendChild(arrangeHint);
+
+        function syncArrangeBtn() {
+            var on = !!(api() && api().isArranging());
+            arrangeBtn.textContent = on ? '\u2713 Done Arranging' : '\u270b Arrange Overlays';
+            arrangeBtn.classList.toggle('active', on);
+        }
+        arrangeBtn.addEventListener('click', function () {
+            var a = api(); if (!a) return;
+            if (a.isArranging()) a.closeArrange(); else a.openArrange();
+            syncArrangeBtn();
+        });
+
+        // \u2500\u2500 Add: Text \u2500\u2500
+        var textLabel = document.createElement('label');
+        textLabel.className = 'brush-section-label';
+        textLabel.textContent = 'Text Overlay';
+        body.appendChild(textLabel);
+
+        var textRow = document.createElement('div');
+        textRow.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
+        var textInput = document.createElement('input');
+        textInput.type = 'text';
+        textInput.id = 'brandingTextInput';
+        textInput.placeholder = '@yourhandle';
+        textInput.style.cssText = 'flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;padding:4px 6px;border-radius:3px;font-size:11px;';
+        var colorPick = document.createElement('input');
+        colorPick.type = 'color';
+        colorPick.value = '#ffffff';
+        colorPick.id = 'brandingTextColor';
+        colorPick.title = 'Text colour';
+        colorPick.style.cssText = 'width:26px;height:24px;border:none;padding:0;cursor:pointer;background:transparent;flex:none;';
+        var sizeInput = document.createElement('input');
+        sizeInput.type = 'number';
+        sizeInput.id = 'brandingTextSize';
+        sizeInput.value = '24'; sizeInput.min = '8'; sizeInput.max = '200';
+        sizeInput.title = 'Font size';
+        sizeInput.style.cssText = 'width:38px;height:24px;font-size:10px;text-align:center;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:3px;flex:none;';
+        var textAddBtn = document.createElement('button');
+        textAddBtn.type = 'button';
+        textAddBtn.textContent = '+ Add';
+        textAddBtn.style.cssText = 'padding:4px 8px;font-size:10px;border-radius:3px;background:rgba(255,130,170,0.2);border:1px solid rgba(255,130,170,0.3);color:white;cursor:pointer;flex:none;';
+        textRow.appendChild(textInput);
+        textRow.appendChild(colorPick);
+        textRow.appendChild(sizeInput);
+        textRow.appendChild(textAddBtn);
+        body.appendChild(textRow);
+
+        var quickRow = document.createElement('div');
+        quickRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;';
+        ['\ud83d\udd34 LIVE', 'Follow me!', 'Link in bio', '\u2764\ufe0f + \ud83d\udc4d'].forEach(function (text) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = text;
+            b.style.cssText = 'padding:2px 6px;font-size:9px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);cursor:pointer;';
+            b.addEventListener('click', function () { textInput.value = text; textInput.focus(); });
+            quickRow.appendChild(b);
+        });
+        body.appendChild(quickRow);
+
+        // \u2500\u2500 Add: Logo / Image \u2500\u2500
+        var imgLabel = document.createElement('label');
+        imgLabel.className = 'brush-section-label';
+        imgLabel.textContent = 'Logo / Image';
+        body.appendChild(imgLabel);
+        var imgUploadBtn = document.createElement('button');
+        imgUploadBtn.type = 'button';
+        imgUploadBtn.textContent = '\ud83d\udcce Upload Logo';
+        imgUploadBtn.style.cssText = 'width:100%;margin-bottom:10px;padding:5px 8px;font-size:10px;border-radius:3px;background:rgba(255,200,100,0.15);border:1px solid rgba(255,200,100,0.2);color:white;cursor:pointer;';
+        var imgFileInput = document.createElement('input');
+        imgFileInput.type = 'file';
+        imgFileInput.accept = 'image/png,image/svg+xml,image/jpeg,image/webp';
+        imgFileInput.style.display = 'none';
+        body.appendChild(imgUploadBtn);
+        body.appendChild(imgFileInput);
+
+        // \u2500\u2500 Add: QR \u2500\u2500
+        var qrLabel = document.createElement('label');
+        qrLabel.className = 'brush-section-label';
+        qrLabel.textContent = 'QR Code';
+        body.appendChild(qrLabel);
+        var qrRow = document.createElement('div');
+        qrRow.style.cssText = 'display:flex;gap:4px;margin-bottom:10px;';
+        var qrInput = document.createElement('input');
+        qrInput.type = 'text';
+        qrInput.placeholder = 'https://tiktok.com/@handle';
+        qrInput.style.cssText = 'flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;padding:4px 6px;border-radius:3px;font-size:10px;';
+        var qrAddBtn = document.createElement('button');
+        qrAddBtn.type = 'button';
+        qrAddBtn.textContent = '+ QR';
+        qrAddBtn.style.cssText = 'padding:4px 8px;font-size:10px;border-radius:3px;background:rgba(180,130,255,0.2);border:1px solid rgba(180,130,255,0.3);color:white;cursor:pointer;flex:none;';
+        qrRow.appendChild(qrInput);
+        qrRow.appendChild(qrAddBtn);
+        body.appendChild(qrRow);
+
+        // \u2500\u2500 Active Overlays list \u2500\u2500
+        var listLabel = document.createElement('label');
+        listLabel.className = 'brush-section-label';
+        listLabel.textContent = 'Active Overlays';
+        body.appendChild(listLabel);
+        var overlayList = document.createElement('div');
+        overlayList.id = 'brandingOverlayList';
+        overlayList.style.cssText = 'max-height:170px;overflow-y:auto;margin-bottom:6px;';
+        body.appendChild(overlayList);
+
+        var clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.textContent = '\ud83d\uddd1 Clear All';
+        clearBtn.style.cssText = 'width:100%;padding:4px;font-size:10px;border-radius:3px;background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.2);color:rgba(255,255,255,0.6);cursor:pointer;';
+        body.appendChild(clearBtn);
+
+        function mkRowBtn(txt, title, fn) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = txt;
+            b.title = title;
+            b.style.cssText = 'padding:1px 5px;font-size:12px;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.7);line-height:1;flex:none;';
+            b.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
+            return b;
+        }
+
+        function refreshList() {
+            var a = api();
+            overlayList.innerHTML = '';
+            if (!a) return;
+            var all = a.getAll();
+            if (!all.length) {
+                overlayList.innerHTML = '<div style="font-size:9px;color:rgba(255,255,255,0.3);text-align:center;padding:8px;">No overlays yet \u2014 add one above</div>';
+                return;
+            }
+            var selId = a.getSelectedId();
+            all.forEach(function (ov) {
+                var isSel = ov.id === selId;
+                var row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px;border-radius:3px;cursor:pointer;border:1px solid ' + (isSel ? 'rgba(255,130,170,0.5)' : 'transparent') + ';background:' + (isSel ? 'rgba(255,130,170,0.12)' : 'transparent') + ';';
+
+                var icon = ov.type === 'text' ? '\u2709' : ov.type === 'image' ? '\ud83d\uddbc' : '\ud83d\udcf1';
+                var desc = ov.type === 'text' ? ov.content : ov.type === 'image' ? 'Logo' : ov.url;
+                var label = document.createElement('span');
+                label.style.cssText = 'flex:1;min-width:0;font-size:10px;color:rgba(255,255,255,' + (ov.visible ? '0.75' : '0.35') + ');overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                label.textContent = icon + ' ' + desc;
+
+                row.addEventListener('click', function () {
+                    a.openArrange(ov.id);
+                    syncArrangeBtn();
+                    refreshList();
+                });
+
+                var moveBtn = mkRowBtn('\u2725', 'Arrange / move', function () { a.openArrange(ov.id); syncArrangeBtn(); refreshList(); });
+                var toggleBtn = mkRowBtn(ov.visible ? '\ud83d\udc41' : '\ud83d\ude48', 'Toggle visibility', function () { a.toggle(ov.id); refreshList(); });
+                var rmBtn = mkRowBtn('\u00d7', 'Remove', function () { a.remove(ov.id); refreshList(); });
+                rmBtn.style.color = 'rgba(255,90,90,0.85)';
+                rmBtn.style.fontWeight = 'bold';
+                rmBtn.style.fontSize = '14px';
+
+                row.appendChild(label);
+                row.appendChild(moveBtn);
+                row.appendChild(toggleBtn);
+                row.appendChild(rmBtn);
+                overlayList.appendChild(row);
+            });
+        }
+
+        // \u2500\u2500 Wire creation \u2500\u2500
+        function addText() {
+            var t = textInput.value.trim();
+            if (!t) { textInput.focus(); return; }
+            var a = api(); if (!a) return;
+            a.addText({ content: t, color: colorPick.value, fontSize: parseInt(sizeInput.value, 10) || 24 });
+            textInput.value = '';
+            refreshList();
+        }
+        textAddBtn.addEventListener('click', addText);
+        textInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') addText(); e.stopPropagation(); });
+
+        imgUploadBtn.addEventListener('click', function () { imgFileInput.click(); });
+        imgFileInput.addEventListener('change', function (e) {
+            var file = e.target.files && e.target.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (ev) { var a = api(); if (a) { a.addImage({ src: ev.target.result }); refreshList(); } };
+            reader.readAsDataURL(file);
+            imgFileInput.value = '';
+        });
+
+        qrAddBtn.addEventListener('click', function () {
+            var url = qrInput.value.trim();
+            if (!url) { qrInput.focus(); return; }
+            var a = api(); if (a) { a.addQR({ url: url }); qrInput.value = ''; refreshList(); }
+        });
+        qrInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') qrAddBtn.click(); e.stopPropagation(); });
+
+        clearBtn.addEventListener('click', function () { var a = api(); if (a) { a.clearAll(); refreshList(); } });
+
+        // \u2500\u2500 Init + subscribe to overlay changes (drag updates the list highlight) \u2500\u2500
+        function ready() {
+            if (!api()) { setTimeout(ready, 100); return; }
+            api().onChange(function () { syncArrangeBtn(); refreshList(); });
+            syncArrangeBtn();
+            refreshList();
+        }
+        setTimeout(ready, 200);
 
         return sec;
     }
@@ -2302,7 +2602,8 @@
     }
 
     function buildMultiArtistSection() {
-        const { sec, body } = makeSection('🌐 Multi Artist', 'blue', true);
+        // Expanded by default so multiplayer is discoverable (it was buried collapsed).
+        const { sec, body } = makeSection('🌐 Multi Artist', 'blue', false);
 
         // Move the new multi artist panel
         var panel = document.getElementById('multiArtistPanel');
@@ -2311,6 +2612,18 @@
         // Move hidden toggle for legacy compat
         var toggle = document.getElementById('multiplayerToggle');
         if (toggle) body.appendChild(toggle);
+
+        // When the section is expanded by the user, focus the join field so a
+        // joiner can paste a room # immediately (only while disconnected).
+        var header = sec.querySelector('.section-header');
+        if (header) header.addEventListener('click', function () {
+            if (sec.classList.contains('collapsed')) return; // just collapsed
+            var dc = document.getElementById('mpDisconnected');
+            var ji = document.getElementById('joinRoomInput');
+            if (ji && dc && dc.style.display !== 'none') {
+                setTimeout(function () { ji.focus(); ji.select(); }, 50);
+            }
+        });
 
         return sec;
     }
@@ -2394,7 +2707,11 @@
         comfyRow.appendChild(comfyFolderBtn);
 
         comfySection.appendChild(comfyRow);
-        body.appendChild(comfySection);
+        // ComfyUI writes canvas frames to a local watched folder (Electron/filesystem
+        // only) — it cannot work in a browser, so only show the control in the desktop
+        // app. window.comfyuiBridge exists ONLY in Electron (comfyui-bridge.js guards on
+        // `require`), so this hides it on web AND mobile.
+        if (window.comfyuiBridge) body.appendChild(comfySection);
 
         // Render function
         function renderSidebarPresets() {
@@ -2468,12 +2785,21 @@
 
     // ─── ARM COLORS DROPDOWN ────────────────────────────────────
 
-    function buildArmColorsDropdown() {
-        var toggle = document.createElement('button');
-        toggle.type = 'button';
-        toggle.className = 'arm-colors-toggle';
-        toggle.textContent = '\u2726';
-        toggle.title = 'Per-arm color settings';
+    function buildArmColorsDropdown(triggerEl) {
+        // Use an existing element (e.g. the multiplier value) as the toggle, or
+        // fall back to a standalone gold icon button.
+        var toggle;
+        if (triggerEl) {
+            toggle = triggerEl;
+            toggle.classList.add('arm-colors-trigger');
+            toggle.title = 'Per-arm brush colors \u2014 click to configure';
+        } else {
+            toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'arm-colors-toggle';
+            toggle.textContent = '\u2726';
+            toggle.title = 'Per-arm color settings';
+        }
 
         var panel = document.createElement('div');
         panel.className = 'arm-colors-panel';

@@ -25,28 +25,39 @@
         let splatOutX = 0, splatOutY = 0, splatOutDx = 0, splatOutDy = 0;
         let splatOutColor = [1, 0, 0];
         let pendingArmAdvance = false;
-        const SPLAT_IN_DURATION = 250;  // ms
-        const SPLAT_OUT_DURATION = 350; // ms
+        // Distance-based envelope: the brush grows from SPLAT_START_FLOOR to full
+        // size over splatInDist of cursor travel (speed-independent), and on
+        // release trails off, tapering over splatOutDist. Distances are fractions
+        // of the canvas width; accumulated in the update loop (05j).
+        let splatStrokeDist = 0;   // travel since press (drives splat-in)
+        let splatTailDist = 0;     // travel of the post-release tail (drives splat-out)
+        let splatReleaseInMult = 1.0; // brush size fraction at release (so splat-out
+                                      // tapers from the current size, not a jump to full)
+        const SPLAT_START_FLOOR = 0.12; // initial brush fraction at the very start
         window.splatInMode = window.splatInMode || 'instant';
         window.splatOutMode = window.splatOutMode || 'instant';
+        // Ramp distances (fraction of canvas width). 0 ⇒ behaves like instant.
+        if (typeof window.splatInDist !== 'number') window.splatInDist = 0.15;
+        if (typeof window.splatOutDist !== 'number') window.splatOutDist = 0.15;
         function smoothstep(t) {
             return t * t * (3.0 - 2.0 * t);
         }
         function getSplatInMult() {
             if (window.splatInMode === 'instant') return 1.0;
-            const elapsed = Date.now() - splatDownTime;
-            const t = Math.min(elapsed / SPLAT_IN_DURATION, 1.0);
-            if (window.splatInMode === 'linear') return t;
-            return smoothstep(t); // easing
+            const D = window.splatInDist || 0;
+            if (D <= 0.0001) return 1.0;
+            const t = Math.min(splatStrokeDist / D, 1.0);
+            const shape = (window.splatInMode === 'linear') ? t : smoothstep(t);
+            return SPLAT_START_FLOOR + (1.0 - SPLAT_START_FLOOR) * shape;
         }
         function getSplatOutMult() {
             if (window.splatOutMode === 'instant') return 0.0;
-            const elapsed = Date.now() - splatUpTime;
-            const t = Math.min(elapsed / SPLAT_OUT_DURATION, 1.0);
+            const D = window.splatOutDist || 0;
+            if (D <= 0.0001) return 0.0;
+            const t = Math.min(splatTailDist / D, 1.0);
             if (t >= 1.0) return 0.0;
             const remaining = 1.0 - t;
-            if (window.splatOutMode === 'linear') return remaining;
-            return smoothstep(remaining); // easing
+            return (window.splatOutMode === 'linear') ? remaining : smoothstep(remaining);
         }
         function splatWithRadius(x, y, dx, dy, color, radius) {
             const saved = config.SPLAT_RADIUS;
@@ -319,6 +330,7 @@
             pointer.dx = 0;
             pointer.dy = 0;
             splatDownTime = Date.now();
+            splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
             // Begin stroke recording and include initial splat
@@ -428,6 +440,8 @@
                 if (wasDown && window.splatOutMode !== 'instant') {
                     splatUpTime = Date.now();
                     splatOutActive = true;
+                    splatTailDist = 0;
+                    splatReleaseInMult = getSplatInMult(); // size at release → no jump
                     splatOutX = pointer.x;
                     splatOutY = pointer.y;
                     splatOutDx = pointer.dx;
@@ -452,6 +466,27 @@
         canvas.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });
+        // ── Pointer-state safety net ──
+        // The window-level mouseup is normally enough to clear pointer.down, but
+        // a few events skip it and would otherwise strand the stroke (so the next
+        // click reads as a continuation — the "mouseup/mousedown out of sync"
+        // bug): a native drag (dragstart fires dragend, not mouseup), releasing
+        // the button outside the window, or the window losing focus mid-press.
+        // Force-end any in-progress stroke on all of those so it can never stick.
+        function abortPointerStroke() {
+            isRightMouseDown = false;
+            isReplayActive = false;
+            window._activeReplayEvents = null;
+            window._pausedPointerState = null;
+            if (pointer.down) {
+                pointer.down = false;
+                pointer.moved = false;
+                archiveCurrentStroke();
+            }
+        }
+        window.addEventListener('blur', abortPointerStroke);
+        window.addEventListener('dragstart', abortPointerStroke);
+        window.addEventListener('pointercancel', abortPointerStroke);
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (isPaused) return;
@@ -464,6 +499,7 @@
             pointer.dx = 0;
             pointer.dy = 0;
             splatDownTime = Date.now();
+            splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
             if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
@@ -526,6 +562,8 @@
                 if (window.splatOutMode !== 'instant') {
                     splatUpTime = Date.now();
                     splatOutActive = true;
+                    splatTailDist = 0;
+                    splatReleaseInMult = getSplatInMult(); // size at release → no jump
                     splatOutX = pointer.x;
                     splatOutY = pointer.y;
                     splatOutDx = pointer.dx;

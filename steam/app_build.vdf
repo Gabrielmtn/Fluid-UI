@@ -1,0 +1,13 @@
+"appbuild"
+{
+	"appid"	"YOUR_STEAM_APP_ID"
+	"desc"	"Fluid Simulation Windows build"
+	"buildoutput"	"..\dist\steam-build-output"
+	"contentroot"	"..\dist\win-unpacked"
+	"setlive"	""
+	"preview"	"0"
+	"depots"
+	{
+		"YOUR_STEAM_DEPOT_ID"	"depot_build.vdf"
+	}
+}

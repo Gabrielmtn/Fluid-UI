@@ -28,6 +28,24 @@
         body.transparent-mode #custom-titlebar {
             background: rgba(11, 14, 20, 0.97);
         }
+
+        /* Minimize/maximize/close are desktop-window controls — meaningless on
+           mobile/web, so hide the whole titlebar there and give the canvas the space. */
+        body.mobile-mode #custom-titlebar {
+            display: none !important;
+        }
+
+        /* Browser build: there's no OS window to control, so drop the titlebar AND
+           the frameless-window resize handles (invisible, but they'd still capture
+           pointer events along the canvas edges), and reclaim the titlebar's 32px. */
+        body.web-mode #custom-titlebar,
+        body.web-mode .window-resize-edge,
+        body.web-mode .window-resize-corner {
+            display: none !important;
+        }
+        body.web-mode {
+            padding-top: 0;
+        }
         
         .titlebar-drag-region {
             flex: 1;
@@ -156,6 +174,21 @@
             height: 100vh;
             height: 100dvh;
             overscroll-behavior: none;
+            /* App-wide: prevent accidental text selection. Highlighting UI text
+               and then dragging fires a native dragstart/dragend INSTEAD of
+               mouseup, which strands the sim's pointer.down=true and desyncs
+               every later click. This is an app, not a document — only real
+               text inputs (re-enabled below) should be selectable. */
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* Re-enable selection only where the user genuinely types/reads text */
+        input[type="text"], input[type="number"], input[type="search"],
+        input[type="url"], input[type="email"], input[type="password"],
+        input:not([type]), textarea, [contenteditable="true"] {
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         body.transparent-mode {
@@ -1221,11 +1254,17 @@ body.mobile-mode {
 body.mobile-mode #canvas-area {
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
+    /* JS sets --app-height from window.visualViewport (the exact area BETWEEN iOS's
+       top URL bar and bottom toolbar) — more reliable than dvh on iOS Chrome, which
+       still let the canvas run under the bottom bar. Falls back to dvh/vh. */
+    height: var(--app-height, 100dvh);
 }
 
 body.mobile-mode #canvas-wrapper {
     width: 100vw !important;
     height: 100vh !important;
+    height: 100dvh !important;
     left: 0 !important;
     top: 0 !important;
 }

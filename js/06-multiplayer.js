@@ -9,9 +9,28 @@ let remoteCursors = new Map();
 let isProcessingRemoteEvent = false;
 let remoteLastPositions = new Map();
 let currentRoom = null;
+let lastRoom = null; // remembered after a connection gives up, for the Reconnect button
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT = 5;
+let matchmakingSocket = null;
+let myRole = 'guest';     // 'host' | 'guest' in a managed room
+let roomLocked = false;   // current room's server-confirmed lock state
+
+// Stable per-device id (opaque, localStorage). Used to re-admit a dropped
+// member into a locked room and to throttle matchmaking. NOT a security token.
+const DEVICE_UID = (function() {
+    try {
+        const k = 'fluidDeviceId';
+        let v = localStorage.getItem(k);
+        if (!v) { v = Math.random().toString(36).slice(2, 10).toUpperCase(); localStorage.setItem(k, v); }
+        return v;
+    } catch (_) { return 'anon-' + Math.random().toString(36).slice(2, 8).toUpperCase(); }
+})();
+
+// Matchmade "stranger" rooms use a pub- prefix the lobby mints; private/code
+// rooms are bare 6-char codes.
+function isStrangerRoom() { return !!currentRoom && currentRoom.indexOf('pub-') === 0; }
 
 // Configuration
 // Always use the deployed PartyKit server. Override with window.PARTYKIT_HOST
@@ -38,31 +57,105 @@ function getRoomFromHash() {
     return null;
 }
 
-// Create a new room
+// Pull a 6-char room # out of a typed code OR a pasted link/hash.
+function extractRoomCode(input) {
+    if (!input) return '';
+    var s = String(input).trim();
+    if (s.indexOf('#') !== -1) s = s.substring(s.lastIndexOf('#') + 1);
+    else if (s.indexOf('/') !== -1) s = s.substring(s.lastIndexOf('/') + 1);
+    return s.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
+
+// Create a new room, connect, and copy the # so the host can paste it to a friend.
 function createRoom() {
     const code = generateRoomCode();
     connectToRoom(code);
+    copyRoomCode(true);
 }
 
-// Join an existing room by code
+// Join an existing room by # (accepts a typed code or a pasted link/hash)
 function joinRoom(code) {
-    if (!code || typeof code !== 'string') return showMpError('Enter a room code');
-    code = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (code.length < 3) return showMpError('Code too short');
-    connectToRoom(code);
+    var room = extractRoomCode(code);
+    if (!room) return showMpError('Enter a room #');
+    if (room.length < 6) return showMpError('Room # is 6 characters');
+    connectToRoom(room);
+}
+
+// "Paint with a stranger": ask the lobby to pair us 1:1 with another seeker,
+// then connect to whatever room it hands back (a pub- room).
+function paintWithStranger() {
+    // Leave any current room/socket before matchmaking so we never leak one.
+    if (partySocket || currentRoom) disconnectMultiplayer();
+    hideMpError();
+    closeMatchmaking();
+    showMatchmaking();
+    try {
+        const isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
+        const protocol = isLocal ? 'ws:' : 'wss:';
+        const url = `${protocol}//${PARTYKIT_HOST}/parties/lobby/main?uid=${encodeURIComponent(DEVICE_UID)}`;
+        matchmakingSocket = new WebSocket(url);
+        var settled = false;
+        var timeout = setTimeout(function() {
+            if (settled) return;
+            settled = true; closeMatchmaking();
+            showMpError("Couldn't find a match. Try again."); showDisconnectedUI();
+        }, 9000);
+        matchmakingSocket.addEventListener('open', function() {
+            if (matchmakingSocket) matchmakingSocket.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID }));
+        });
+        matchmakingSocket.addEventListener('message', function(ev) {
+            var data; try { data = JSON.parse(ev.data); } catch (_) { return; }
+            if (data.type === 'matched') {
+                settled = true; clearTimeout(timeout); closeMatchmaking();
+                connectToRoom(data.roomId);
+            } else if (data.type === 'matchmake-error') {
+                settled = true; clearTimeout(timeout); closeMatchmaking();
+                showMpError(data.message || 'Try again in a moment.'); showDisconnectedUI();
+            }
+        });
+        matchmakingSocket.addEventListener('error', function() {
+            if (settled) return;
+            settled = true; clearTimeout(timeout); closeMatchmaking();
+            showMpError("Couldn't reach matchmaking. Check your connection."); showDisconnectedUI();
+        });
+    } catch (e) {
+        closeMatchmaking();
+        showMpError("Couldn't start matchmaking."); showDisconnectedUI();
+    }
+}
+
+function closeMatchmaking() {
+    if (matchmakingSocket) {
+        try { matchmakingSocket.close(); } catch (_) {}
+        matchmakingSocket = null;
+    }
+}
+
+// Host-only: toggle the room lock. The server confirms via a 'lock-state' broadcast.
+function toggleLock() {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    partySocket.send(JSON.stringify({ type: 'lock', locked: !roomLocked }));
 }
 
 // Core connect logic
 function connectToRoom(roomCode) {
-    if (partySocket && partySocket.readyState === WebSocket.OPEN) {
+    // Tear down any existing socket (OPEN *or* still CONNECTING) so we never leak one.
+    if (partySocket) {
         disconnectMultiplayer();
     }
     hideMpError();
     currentRoom = roomCode;
     reconnectAttempts = 0;
+    myRole = 'guest';
+    roomLocked = false;
 
-    // Update URL hash
-    history.replaceState(null, '', '#' + roomCode);
+    // Stranger rooms are ephemeral — keep them out of the shareable URL hash;
+    // private/code rooms stay in the hash so a #CODE deep-link auto-joins.
+    if (roomCode.indexOf('pub-') === 0) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    } else {
+        history.replaceState(null, '', '#' + roomCode);
+    }
 
     doConnect();
 }
@@ -72,7 +165,7 @@ function doConnect() {
     try {
         const isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
         const protocol = isLocal ? 'ws:' : 'wss:';
-        const url = `${protocol}//${PARTYKIT_HOST}/parties/fluid/${currentRoom}`;
+        const url = `${protocol}//${PARTYKIT_HOST}/parties/fluid/${currentRoom}?uid=${encodeURIComponent(DEVICE_UID)}`;
         console.log('Connecting to PartyKit:', url);
         showConnecting();
         partySocket = new WebSocket(url);
@@ -86,9 +179,7 @@ function doConnect() {
                 console.warn('Connection timed out');
                 partySocket.close();
                 if (reconnectAttempts >= MAX_RECONNECT) {
-                    showMpError('Server unreachable. Deploy with: npx partykit deploy');
-                    currentRoom = null;
-                    showDisconnectedUI();
+                    giveUpConnection("Couldn't reach the room. Check your connection and try again.");
                 }
             }
         }, 8000);
@@ -112,7 +203,10 @@ function initMultiplayer() {
 function disconnectMultiplayer() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
+    closeMatchmaking();
     currentRoom = null;
+    myRole = 'guest';
+    roomLocked = false;
     if (partySocket) {
         partySocket.close();
         partySocket = null;
@@ -146,14 +240,24 @@ function onMultiplayerMessage(event) {
             case 'connected':
                 clientId = data.clientId;
                 connectedClients = data.totalClients;
-                updateMultiplayerStatus('Connected');
-                updateUsersDisplay();
+                if (data.role) myRole = data.role;
+                if (typeof data.locked === 'boolean') roomLocked = data.locked;
+                updateConnectedView();
                 break;
 
             case 'client-count':
                 connectedClients = data.count;
-                updateMultiplayerStatus('Connected');
-                updateUsersDisplay();
+                updateConnectedView();
+                break;
+
+            case 'lock-state':
+                roomLocked = !!data.locked;
+                updateConnectedView();
+                break;
+
+            case 'host-changed':
+                myRole = (data.hostId === DEVICE_UID) ? 'host' : 'guest';
+                updateConnectedView();
                 break;
 
             case 'splat':
@@ -192,9 +296,14 @@ function onMultiplayerMessage(event) {
                 break;
 
             case 'preset':
-                // Another client applied a preset
+                // Another client applied a preset. applyPreset() itself calls
+                // broadcastPreset(), so without this guard the preset ping-pongs
+                // between clients forever (the "settings jumping around" bug). Mark
+                // it as a remote event so broadcastPreset() skips the re-send.
                 if (data.clientId !== clientId && typeof applyPreset === 'function') {
-                    applyPreset(data.data.preset);
+                    isProcessingRemoteEvent = true;
+                    try { applyPreset(data.data.preset); }
+                    finally { isProcessingRemoteEvent = false; }
                 }
                 break;
         }
@@ -207,17 +316,37 @@ function onMultiplayerClose(event) {
     console.log('Disconnected from multiplayer');
     isMultiplayerEnabled = false;
     clearRemoteCursors();
+    // Server refused the join (locked room / full room) — don't retry in a loop.
+    if (event && (event.code === 4001 || event.code === 4002)) {
+        currentRoom = null; lastRoom = null;
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+        showMpError(event.code === 4001
+            ? 'This room is locked — ask the host for an invite.'
+            : 'That room is full.');
+        showDisconnectedUI();
+        return;
+    }
     // Auto-reconnect if we still have a room
     if (currentRoom && reconnectAttempts < MAX_RECONNECT) {
         reconnectAttempts++;
-        var delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 8000);
+        // Full jitter so clients don't reconnect in lockstep after a server blip.
+        var base = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 8000);
+        var delay = base / 2 + Math.random() * base / 2;
         updateMultiplayerStatus('Reconnecting (' + reconnectAttempts + ')...');
         reconnectTimer = setTimeout(doConnect, delay);
     } else if (currentRoom) {
-        showMpError('Connection lost. Try again.');
-        currentRoom = null;
-        showDisconnectedUI();
+        giveUpConnection('Lost connection to the room.');
     }
+}
+
+// Stop trying, remember the room, and offer a one-tap Reconnect.
+function giveUpConnection(msg) {
+    lastRoom = currentRoom;
+    currentRoom = null;
+    showMpError(msg);
+    showDisconnectedUI();
+    var rc = document.getElementById('reconnectBtn');
+    if (rc && lastRoom) rc.style.display = '';
 }
 
 function onMultiplayerError(error) {
@@ -283,7 +412,7 @@ function broadcastClear() {
 
 // Send preset change
 function broadcastPreset(presetName) {
-    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
         return;
     }
 
@@ -375,6 +504,20 @@ function handleRemotePointerUp(data) {
     remoteLastPositions.delete(data.clientId);
 }
 
+// Stable per-user identity derived from the clientId (no coordination needed)
+function hashId(id) {
+    var h = 0, s = String(id);
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+}
+function colorForClient(id) {
+    return 'hsl(' + (hashId(id) % 360) + ', 80%, 62%)';
+}
+function shortName(id) {
+    var s = String(id).replace(/[^a-zA-Z0-9]/g, '');
+    return 'Artist-' + (s.slice(-2).toUpperCase() || '??');
+}
+
 // Update remote cursor display
 function updateRemoteCursors() {
     // Remove old cursors (older than 5 seconds)
@@ -388,23 +531,24 @@ function updateRemoteCursors() {
     // Clear existing remote cursors
     clearRemoteCursors();
 
-    // Create cursor elements for each remote client
+    // Create cursor elements for each remote client (distinct per-user color + label)
     for (const [id, cursor] of remoteCursors.entries()) {
+        const col = colorForClient(id);
         let cursorEl = document.getElementById(`remote-cursor-${id}`);
         if (!cursorEl) {
             cursorEl = document.createElement('div');
             cursorEl.id = `remote-cursor-${id}`;
             cursorEl.className = 'remote-cursor';
-            cursorEl.style.position = 'absolute';
-            cursorEl.style.width = '12px';
-            cursorEl.style.height = '12px';
-            cursorEl.style.borderRadius = '50%';
-            cursorEl.style.border = '2px solid rgba(255, 255, 255, 0.8)';
-            cursorEl.style.backgroundColor = 'rgba(100, 200, 255, 0.5)';
-            cursorEl.style.pointerEvents = 'none';
-            cursorEl.style.zIndex = '1000';
-            cursorEl.style.transform = 'translate(-50%, -50%)';
-            cursorEl.style.transition = 'left 0.05s, top 0.05s';
+            cursorEl.style.cssText = 'position:absolute;width:12px;height:12px;border-radius:50%;' +
+                'border:2px solid rgba(255,255,255,0.85);pointer-events:none;z-index:1000;' +
+                'transform:translate(-50%,-50%);transition:left 0.05s, top 0.05s;';
+            cursorEl.style.backgroundColor = col;
+            cursorEl.style.boxShadow = '0 0 8px ' + col;
+            const label = document.createElement('span');
+            label.className = 'remote-cursor-label';
+            label.textContent = shortName(id);
+            label.style.color = col;
+            cursorEl.appendChild(label);
             canvasWrapper.appendChild(cursorEl);
         }
 
@@ -429,30 +573,69 @@ function updateMultiplayerStatus(status) {
 }
 
 // ─── UI helpers ───
+function setShown(id, shown) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = shown ? '' : 'none';
+}
+
+// Shown while the lobby is pairing us with a stranger (before we have a room).
+function showMatchmaking() {
+    setShown('mpDisconnected', false);
+    setShown('mpConnected', true);
+    var dot = document.getElementById('connectionDot');
+    if (dot) dot.className = 'mp-dot mp-dot-connecting';
+    updateMultiplayerStatus('🎲 Finding a stranger…');
+    ['roomDisplay', 'shareHint', 'copyRoomBtn', 'lockRoomBtn', 'lockBadge'].forEach(function(id) { setShown(id, false); });
+}
+
 function showConnecting() {
-    var dc = document.getElementById('mpDisconnected');
-    var cn = document.getElementById('mpConnected');
-    if (dc) dc.style.display = 'none';
-    if (cn) {
-        cn.style.display = '';
-        updateMultiplayerStatus('Connecting...');
-        var dot = document.getElementById('connectionDot');
-        if (dot) { dot.className = 'mp-dot mp-dot-connecting'; }
-    }
+    setShown('mpDisconnected', false);
+    setShown('mpConnected', true);
+    var dot = document.getElementById('connectionDot');
+    if (dot) dot.className = 'mp-dot mp-dot-connecting';
+    updateMultiplayerStatus(isStrangerRoom() ? '🎲 Finding a stranger…' : 'Connecting…');
+    setShown('roomDisplay', !isStrangerRoom());
     var roomEl = document.getElementById('roomName');
-    if (roomEl) roomEl.textContent = currentRoom || '------';
+    if (roomEl && !isStrangerRoom()) roomEl.textContent = currentRoom || '------';
 }
 
 function showConnectedUI() {
-    var dc = document.getElementById('mpDisconnected');
-    var cn = document.getElementById('mpConnected');
-    if (dc) dc.style.display = 'none';
-    if (cn) cn.style.display = '';
+    setShown('mpDisconnected', false);
+    setShown('mpConnected', true);
     var dot = document.getElementById('connectionDot');
-    if (dot) { dot.className = 'mp-dot mp-dot-connected'; }
+    if (dot) dot.className = 'mp-dot mp-dot-connected';
+    updateConnectedView();
+}
+
+// Single source of truth for the connected panel: adapts to room kind (stranger
+// vs private), participant count, host role, and lock state.
+function updateConnectedView() {
+    var stranger = isStrangerRoom();
+    var isHost = myRole === 'host';
+
+    if (stranger) {
+        updateMultiplayerStatus(connectedClients < 2 ? '🎲 Waiting for a stranger…' : '🎨 Painting with a stranger');
+    } else {
+        updateMultiplayerStatus(roomLocked ? '🔒 Room locked' : 'Connected');
+    }
+
+    // Room code / share / copy: private rooms only (you can't invite to a 1:1 pairing).
+    setShown('roomDisplay', !stranger);
+    setShown('shareHint', !stranger);
+    setShown('copyRoomBtn', !stranger);
     var roomEl = document.getElementById('roomName');
-    if (roomEl) roomEl.textContent = currentRoom || '------';
-    updateMultiplayerStatus('Connected');
+    if (roomEl && !stranger) roomEl.textContent = currentRoom || '------';
+
+    // Lock toggle: only the host of a private room sees it.
+    var lockBtn = document.getElementById('lockRoomBtn');
+    if (lockBtn) {
+        var canLock = !stranger && isHost;
+        lockBtn.style.display = canLock ? '' : 'none';
+        lockBtn.textContent = roomLocked ? '🔓 Unlock room' : '🔒 Lock room';
+    }
+    // Locked badge: non-host members see why no one else can join.
+    setShown('lockBadge', !stranger && roomLocked && !isHost);
+
     updateUsersDisplay();
 }
 
@@ -463,6 +646,9 @@ function showDisconnectedUI() {
     if (cn) cn.style.display = 'none';
     var toggle = document.getElementById('multiplayerToggle');
     if (toggle) toggle.checked = false;
+    // Reconnect button only appears after a give-up (giveUpConnection re-shows it)
+    var rc = document.getElementById('reconnectBtn');
+    if (rc) rc.style.display = 'none';
 }
 
 function updateUsersDisplay() {
@@ -479,26 +665,28 @@ function hideMpError() {
     if (el) el.style.display = 'none';
 }
 
-// Copy room URL to clipboard
-function copyRoomUrl() {
+// Copy just the room # to the clipboard (the only thing a friend needs).
+function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+}
+function copyRoomCode(fromCreate) {
     if (!currentRoom) return;
-    var url = window.location.origin + window.location.pathname + '#' + currentRoom;
-    navigator.clipboard.writeText(url).then(function() {
+    var code = currentRoom;
+    var flash = function () {
         var btn = document.getElementById('copyRoomBtn');
-        if (btn) {
-            btn.textContent = '✓ Copied!';
-            setTimeout(function() { btn.textContent = '📋 Copy Link'; }, 2000);
-        }
-    }).catch(function(err) {
-        // Fallback: select + copy
-        var ta = document.createElement('textarea');
-        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); } catch(_) {}
-        document.body.removeChild(ta);
-        var btn = document.getElementById('copyRoomBtn');
-        if (btn) { btn.textContent = '✓ Copied!'; setTimeout(function() { btn.textContent = '📋 Copy Link'; }, 2000); }
-    });
+        if (!btn) return;
+        btn.textContent = fromCreate ? '✓ Copied — send it!' : '✓ Copied!';
+        setTimeout(function () { btn.textContent = '📋 Copy #'; }, 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(flash).catch(function () { fallbackCopy(code); flash(); });
+    } else {
+        fallbackCopy(code); flash();
+    }
 }
 
 // Initialize multiplayer UI + auto-join from hash
@@ -510,13 +698,37 @@ function initMultiplayerUI() {
     var joinBtn = document.getElementById('joinRoomBtn');
     var joinInput = document.getElementById('joinRoomInput');
     if (joinBtn) joinBtn.addEventListener('click', function() { joinRoom(joinInput ? joinInput.value : ''); });
-    if (joinInput) joinInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') joinRoom(joinInput.value); });
+    if (joinInput) {
+        // Type or paste a # (or a link/hash) → clean it and auto-join the moment
+        // it's a full 6-char code. No separate Join click needed.
+        joinInput.addEventListener('input', function() {
+            var room = extractRoomCode(joinInput.value);
+            if (joinInput.value !== room) joinInput.value = room;
+            if (room.length === 6 && room !== currentRoom) joinRoom(room);
+        });
+        joinInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') joinRoom(joinInput.value); });
+        joinInput.addEventListener('focus', function() { joinInput.select(); });
+    }
 
     var copyBtn = document.getElementById('copyRoomBtn');
-    if (copyBtn) copyBtn.addEventListener('click', copyRoomUrl);
+    if (copyBtn) copyBtn.addEventListener('click', function() { copyRoomCode(false); });
+
+    var reconnectBtn = document.getElementById('reconnectBtn');
+    if (reconnectBtn) reconnectBtn.addEventListener('click', function() {
+        if (!lastRoom) return;
+        reconnectBtn.style.display = 'none';
+        hideMpError();
+        connectToRoom(lastRoom);
+    });
 
     var discBtn = document.getElementById('disconnectBtn');
     if (discBtn) discBtn.addEventListener('click', disconnectMultiplayer);
+
+    var strangerBtn = document.getElementById('strangerBtn');
+    if (strangerBtn) strangerBtn.addEventListener('click', paintWithStranger);
+
+    var lockBtn = document.getElementById('lockRoomBtn');
+    if (lockBtn) lockBtn.addEventListener('click', toggleLock);
 
     // Auto-join if URL has room hash
     var hashRoom = getRoomFromHash();
@@ -535,7 +747,9 @@ window.broadcastPreset = broadcastPreset;
 window.broadcastReplayStroke = broadcastReplayStroke;
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
-window.copyRoomUrl = copyRoomUrl;
+window.paintWithStranger = paintWithStranger;
+window.toggleLock = toggleLock;
+window.copyRoomCode = copyRoomCode;
 window.disconnectMultiplayer = disconnectMultiplayer;
 
 console.log('Multiplayer module loaded. PartyKit host:', PARTYKIT_HOST);

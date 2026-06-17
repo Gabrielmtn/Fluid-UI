@@ -11,7 +11,6 @@
         const microDetailProg = new Program(baseVert, microDetailFrag);
         const lightingProg = new Program(baseVert, lightingFrag);
         const lightShiftProg = new Program(baseVert, lightShiftFrag);
-        const spinProg = new Program(baseVert, spinFrag);
         const splatProg = new Program(baseVert, splatFrag);
         const advectionProg = new Program(baseVert, advectionFrag);
         const divergenceProg = new Program(baseVert, divergenceFrag);
@@ -101,7 +100,17 @@
             const rgba = { internalFormat: gl.RGBA16F, format: gl.RGBA };
             const rg = { internalFormat: gl.RG16F, format: gl.RG };
             const r = { internalFormat: gl.R16F, format: gl.RED };
-            const _linearOk = (typeof window !== 'undefined' && window.linearExt) || gl.getExtension('OES_texture_float_linear');
+            // Linear filtering of HALF_FLOAT (RGBA16F/RG16F/R16F) textures is CORE in
+            // WebGL2 — no extension needed. The old probe gated on OES_texture_float_linear
+            // (the 32-BIT float extension), which is commonly ABSENT on mobile GPUs, so
+            // mobile silently fell back to NEAREST → blocky/shimmering "static" in the
+            // advection feedback loop. Default to LINEAR on WebGL2; keep the extension
+            // checks as a fallback for any non-WebGL2 context.
+            const _isWebGL2 = (typeof WebGL2RenderingContext !== 'undefined') && (gl instanceof WebGL2RenderingContext);
+            const _linearOk = _isWebGL2
+                || gl.getExtension('OES_texture_half_float_linear')
+                || (typeof window !== 'undefined' && window.linearExt)
+                || gl.getExtension('OES_texture_float_linear');
             const filter = _linearOk ? gl.LINEAR : gl.NEAREST;
             // Visual dye buffers at dye resolution
             density = createDoubleFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);

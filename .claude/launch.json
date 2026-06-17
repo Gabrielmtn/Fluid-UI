@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["http-server", "-p", "8080", "-c-1"],
       "port": 8080
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "public", "-p", "8092", "-c-1"],
+      "port": 8092
     }
   ]
 }

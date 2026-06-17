@@ -21,8 +21,10 @@ const Multiplayer = (function() {
         return 'fluid-ui-multiplayer.gabrielmtn.partykit.dev';
     })();
     
-    // Fixed room name for the centering exercise (separate from main Fluid-UI rooms)
-    const ROOM_NAME = 'CENTERING';
+    // Fixed room name for the centering exercise. The "sys-" prefix marks it a
+    // system/passthrough room on the shared relay (no capacity cap or lock),
+    // keeping it isolated from the main app's matchmade/private rooms.
+    const ROOM_NAME = 'sys-centering';
     
     function connect() {
         if (socket && socket.readyState === WebSocket.OPEN) return;
@@ -73,14 +75,16 @@ const Multiplayer = (function() {
     function handleMessage(data) {
         switch (data.type) {
             case 'welcome':
+            case 'connected': // shared Fluid-UI relay sends 'connected' (clientId + totalClients)
                 clientId = data.clientId;
                 myColor = data.color || [0.5, 0.5, 1.0];
-                participantCount = data.participants || 1;
+                participantCount = data.participants || data.totalClients || 1;
                 console.log('[Multiplayer] Welcome! ID:', clientId, 'Color:', myColor);
                 if (onParticipantsCallback) onParticipantsCallback(participantCount);
                 break;
-                
+
             case 'participants':
+            case 'client-count': // shared relay sends 'client-count' with .count
                 participantCount = data.count || 0;
                 if (onParticipantsCallback) onParticipantsCallback(participantCount);
                 break;

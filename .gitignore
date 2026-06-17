@@ -7,6 +7,12 @@ yarn-error.log*
 # PartyKit
 .partykit/
 
+# Generated web bundle (built by scripts/build-web.js, served by partykit deploy)
+public/
+
+# Desktop build output (electron-builder: unpacked app, portable exe, Steam logs)
+dist/
+
 # Backup files
 *.backup
 

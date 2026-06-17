@@ -3,9 +3,12 @@
   "main": "party/index.ts",
   "compatibilityDate": "2025-10-25",
   "parties": {
-    "fluid": "party/index.ts"
+    "fluid": "party/index.ts",
+    "lobby": "party/lobby.ts"
   },
   "serve": {
-    "path": "."
+    "path": "public",
+    "browserTTL": 0,
+    "edgeTTL": 0
   }
 }
