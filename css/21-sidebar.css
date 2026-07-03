@@ -1,0 +1,1098 @@
+/* ================================================================
+   RIGHT SIDEBAR - main area, sections, controls, layers, brush, mobile overrides
+   (part of former mixer-layout.css, lines 405-1254; cascade order preserved)
+   ================================================================ */
+/* ── MAIN AREA ── */
+#main-area {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+#canvas-wrapper {
+    max-width: calc(100vw - 290px) !important;
+    max-height: calc(100vh - 150px) !important;
+}
+
+#canvas-area {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ── RIGHT SIDEBAR ── */
+#sidebar-right {
+    flex: 0 0 280px;
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(10px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    color-scheme: dark;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+}
+
+#sidebar-right::-webkit-scrollbar { width: 5px; }
+#sidebar-right::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+#sidebar-right::-webkit-scrollbar-thumb { background: rgba(80,80,96,0.6); border-radius: 3px; }
+
+/* ── SIDEBAR SECTIONS ── */
+.sidebar-section {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    /* Grid-based collapse: scales to any content height */
+    display: grid;
+    grid-template-rows: auto 1fr;
+    transition: grid-template-rows 0.3s ease;
+}
+.sidebar-section.collapsed {
+    grid-template-rows: auto 0fr;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.section-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.4);
+    margin-left: 6px;
+}
+
+.section-chevron {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.25);
+    transition: transform 0.2s ease;
+}
+
+.sidebar-section.collapsed .section-chevron {
+    transform: rotate(-90deg);
+}
+
+.section-body {
+    padding: 6px 12px 10px;
+    overflow: hidden;
+    min-height: 0; /* Required for grid 0fr collapse */
+    opacity: 1;
+    transition: padding 0.2s ease, opacity 0.2s ease;
+}
+
+.sidebar-section.collapsed .section-body {
+    padding: 0 12px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Section accent colors */
+.sidebar-section[data-color="blue"]   .section-title { color: rgba(88, 166, 255, 0.75); }
+.sidebar-section[data-color="orange"] .section-title { color: rgba(255, 170, 80, 0.75); }
+.sidebar-section[data-color="green"]  .section-title { color: rgba(80, 220, 140, 0.75); }
+.sidebar-section[data-color="purple"] .section-title { color: rgba(180, 130, 255, 0.75); }
+.sidebar-section[data-color="yellow"] .section-title { color: rgba(255, 220, 80, 0.75); }
+.sidebar-section[data-color="cyan"]   .section-title { color: rgba(80, 210, 255, 0.75); }
+.sidebar-section[data-color="pink"]   .section-title { color: rgba(255, 130, 170, 0.75); }
+
+/* ── Compact controls within sidebar ── */
+#sidebar-right .control-group {
+    margin-bottom: 10px;
+}
+#sidebar-right .control-group:last-child {
+    margin-bottom: 0;
+}
+#sidebar-right .control-group label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 10px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    letter-spacing: 0.4px;
+}
+#sidebar-right .control-group label .value-display {
+    font-size: 13px;
+    text-transform: none;
+    opacity: 1;
+    font-weight: 600;
+}
+#sidebar-right select {
+    width: 100%;
+    height: 28px;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #0f141b, #0b0f14);
+    color: #e6edf3;
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 4px 6px;
+    font-size: 11px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+#sidebar-right select option {
+    background: #0b0f14;
+    color: #e6edf3;
+}
+#sidebar-right select:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(88,166,255,0.25);
+}
+
+#sidebar-right input[type="color"] {
+    width: 36px;
+    height: 36px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 0;
+    background: transparent;
+}
+
+/* ── Animation button grid ── */
+.anim-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+}
+.anim-grid button {
+    padding: 7px 4px;
+    font-size: 11px;
+    line-height: 1.25;
+    text-align: center;
+    border-radius: 5px;
+}
+
+/* ── Animation toggle rows ── */
+.anim-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    border-radius: 6px;
+    margin-top: 5px;
+    cursor: pointer;
+    user-select: none;
+}
+.anim-toggle-row .anim-toggle-label {
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+/* iOS-style toggle switch */
+.anim-switch {
+    position: relative;
+    width: 38px;
+    height: 20px;
+    flex-shrink: 0;
+}
+.anim-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+.anim-switch .anim-switch-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.12);
+    cursor: pointer;
+}
+.anim-switch .anim-switch-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.5);
+    transition: transform 0.2s;
+}
+.anim-switch input:checked + .anim-switch-track {
+    background: rgba(100,220,160,0.5);
+}
+.anim-switch input:checked + .anim-switch-track::after {
+    transform: translateX(18px);
+    background: #fff;
+}
+/* Collapsible settings panel beneath toggle — grid-based, scales to any height */
+.anim-settings {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.25s ease, opacity 0.2s ease;
+    opacity: 0;
+    border-radius: 0 0 6px 6px;
+}
+.anim-settings.open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+}
+.anim-settings-inner {
+    overflow: hidden;
+    min-height: 0;
+    padding: 0 10px;
+    transition: padding 0.2s ease;
+}
+.anim-settings.open .anim-settings-inner {
+    padding: 6px 10px 10px;
+}
+.anim-settings .control-group {
+    margin-top: 5px;
+}
+.anim-settings label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    opacity: 0.7;
+    margin-bottom: 2px;
+    display: flex;
+    justify-content: space-between;
+}
+.anim-settings label .value-display {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 1;
+}
+
+/* ── Shooting Star origin picker ── */
+.ss-origin-picker {
+    margin: 0 0 6px;
+    text-align: center;
+}
+.ss-origin-frame {
+    position: relative;
+    width: 55%;
+    aspect-ratio: var(--ss-frame-ratio, 16 / 9);
+    background: rgba(255,255,255,0.03);
+    border: 1.5px solid rgba(255,255,255,0.25);
+    border-radius: 4px;
+    cursor: crosshair;
+    overflow: visible;
+    margin: 30px auto;
+    transition: aspect-ratio 0.3s ease;
+}
+.ss-origin-dot {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255,220,100,0.9);
+    box-shadow: 0 0 6px rgba(255,220,100,0.7), 0 0 12px rgba(255,220,100,0.3);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+}
+.ss-origin-coords {
+    font-size: 10px;
+    opacity: 0.55;
+    font-family: 'Courier New', monospace;
+    margin-top: -14px;
+    margin-bottom: 2px;
+}
+
+/* ── Preset grid ── */
+#sidebar-right .presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 4px;
+    margin-top: 6px;
+}
+#sidebar-right .presets button {
+    padding: 5px 2px;
+    font-size: 9px;
+}
+
+/* ── Layers section - always at top, no collapse ── */
+.sidebar-section.section-layers {
+    grid-template-rows: auto 1fr !important; /* Never collapse */
+}
+.sidebar-section.section-layers .section-header {
+    cursor: default;
+}
+.sidebar-section.section-layers .section-chevron {
+    display: none;
+}
+.sidebar-section.section-layers .section-body {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    padding: 6px 12px 10px !important;
+}
+
+.section-header-actions {
+    display: flex;
+    gap: 4px;
+}
+.section-header-actions button {
+    padding: 2px 6px;
+    font-size: 11px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+    line-height: 1;
+}
+.section-header-actions button:hover {
+    opacity: 0.8;
+}
+
+/* ── Checkbox groups in sidebar ── */
+#sidebar-right .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+#sidebar-right .checkbox-group label {
+    margin-bottom: 0;
+    font-size: 11px;
+    opacity: 0.8;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+}
+#sidebar-right .checkbox-group input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+}
+
+/* Settings buttons row */
+.settings-btn-row {
+    display: flex;
+    gap: 6px;
+}
+.settings-btn-row button {
+    flex: 1;
+    font-size: 11px;
+    padding: 6px 4px;
+}
+
+/* ── Mobile overrides ── */
+@media (max-width: 800px) {
+    #mixer-strip {
+        min-height: 80px;
+    }
+    .mixer-channel {
+        min-width: 60px;
+        padding: 5px 4px 4px;
+    }
+    .ch-label { font-size: 7px; }
+    .ch-value { font-size: 9px; }
+    #sidebar-right {
+        flex: 0 0 240px;
+    }
+    #canvas-wrapper {
+        max-width: calc(100vw - 250px) !important;
+    }
+}
+
+/* Mobile mode (JS-toggled) */
+body.mobile-mode #mixer-strip {
+    display: none;
+}
+body.mobile-mode #main-area {
+    flex-direction: column;
+}
+body.mobile-mode #sidebar-right {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: min(92vw, 380px);
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    transform: translateX(100%);
+    z-index: 10000;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease;
+}
+body.mobile-mode #sidebar-right.visible {
+    transform: translateX(0);
+}
+body.mobile-mode #canvas-wrapper {
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;   /* exclude mobile URL bar */
+}
+
+/* The mixer strip is relocated into the slide-out menu on mobile (JS, 13-mobile-mode).
+   This selector out-specifies "body.mobile-mode #mixer-strip { display:none }" above,
+   and reflows the horizontal strip into a wrapping grid that fits the menu. */
+body.mobile-mode #sidebar-right > #mixer-strip {
+    display: flex !important;
+    flex-wrap: wrap;
+    overflow: visible;
+    width: 100%;
+    padding: 6px;
+    gap: 6px;
+    box-shadow: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-channel {
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 calc(50% - 6px);   /* ~2 faders per row */
+    border-right: none;
+}
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-presets {
+    flex: 1 1 100%;              /* presets + action buttons span full width */
+}
+
+/* ── Sidebar content polish ── */
+
+/* Light source controls - fit in 256px width */
+#sidebar-right .light-source-controls {
+    margin-left: 0 !important;
+    padding: 8px !important;
+    border-radius: 4px;
+}
+#sidebar-right .light-source-controls .light-grid-container {
+    max-width: 200px !important;
+    margin: 0 auto 8px !important;
+}
+
+/* Light shift controls */
+#sidebar-right #lightShiftControls {
+    margin-left: 0 !important;
+    padding: 8px !important;
+}
+#sidebar-right #lightShiftControls canvas {
+    max-width: 180px;
+}
+
+/* Recording mini - compact for sidebar */
+#sidebar-right .rec-mini {
+    margin: 0;
+    width: 100%;
+}
+#sidebar-right .rec-mini-grid {
+    grid-template-columns: 1fr;
+}
+#sidebar-right .rec-mini .rec-square {
+    min-height: auto;
+}
+
+/* Animation grid buttons */
+#sidebar-right .anim-grid button {
+    padding: 7px 4px;
+    font-size: 11px;
+    line-height: 1.2;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+#sidebar-right .anim-grid button:hover {
+    opacity: 0.8;
+}
+#sidebar-right .anim-grid button div:first-child {
+    font-size: 1em;
+    margin-bottom: 1px;
+}
+#sidebar-right .anim-grid button div:last-child {
+    font-size: 0.65em;
+    opacity: 0.6;
+}
+
+/* Palette section in sidebar */
+#sidebar-right .palette-carousel {
+    max-height: 160px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 4px 0;
+    gap: 4px;
+}
+#sidebar-right .palette-tag {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    min-width: 0;
+}
+#sidebar-right .palette-tag-delete {
+    font-size: 13px;
+}
+#sidebar-right .palette-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+}
+#sidebar-right .palette-actions button {
+    flex: 1;
+    font-size: 9px;
+    padding: 5px 2px;
+}
+#sidebar-right .palette-row-split {
+    gap: 6px;
+    flex-direction: column;
+}
+#sidebar-right .palette-left,
+#sidebar-right .palette-right {
+    width: 100%;
+}
+#sidebar-right .palette-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+#sidebar-right .palette-btn-row {
+    display: flex;
+    gap: 4px;
+    width: 100%;
+}
+#sidebar-right .palette-btn-row button {
+    flex: 1;
+    font-size: 11px;
+    padding: 5px 6px;
+}
+#sidebar-right .palette-create button {
+    font-size: 11px;
+    width: 100%;
+}
+#sidebar-right .palette-name-input {
+    width: 100%;
+}
+#sidebar-right .palette-name-input input {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 11px;
+}
+
+/* Preview toggle in sidebar */
+#sidebar-right .preview-toggle {
+    margin-top: 8px;
+    padding: 8px;
+    text-align: center;
+    font-size: 11px;
+}
+
+/* Color actions in sidebar */
+#sidebar-right .color-actions {
+    margin-top: 0;
+}
+#sidebar-right .color-actions button {
+    font-size: 10px;
+    padding: 5px;
+}
+
+/* Saved colors in sidebar */
+#sidebar-right .saved-colors {
+    min-height: 30px;
+    padding: 6px;
+    margin-top: 6px;
+}
+
+/* ── Multi Artist room UI ── */
+#multiArtistPanel {
+    font-size: 12px;
+}
+.mp-btn-create {
+    width: 100%;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    background: linear-gradient(135deg, rgba(100, 150, 255, 0.25), rgba(150, 100, 255, 0.2));
+    border: 1px solid rgba(100, 150, 255, 0.35);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+.mp-btn-create:hover {
+    transform: translateY(-1px);
+}
+.mp-join-row {
+    display: flex;
+    gap: 6px;
+}
+.mp-join-row input {
+    flex: 1;
+    padding: 7px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 5px;
+    color: white;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+.mp-join-row input::placeholder {
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: inherit;
+    opacity: 0.4;
+}
+.mp-join-row input:focus {
+    outline: none;
+    border-color: rgba(100, 150, 255, 0.5);
+}
+.mp-join-row button {
+    flex: 1;
+    padding: 8px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.mp-join-row button:hover {
+    opacity: 0.8;
+}
+.mp-error {
+    color: #ff6b6b;
+    font-size: 11px;
+    margin-top: 6px;
+    padding: 4px 8px;
+    background: rgba(255, 80, 80, 0.1);
+    border-radius: 4px;
+}
+.mp-status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+.mp-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.mp-dot-connected {
+    background: #4caf50;
+    box-shadow: 0 0 6px rgba(76, 175, 80, 0.5);
+}
+.mp-dot-connecting {
+    background: #ffc107;
+    box-shadow: 0 0 6px rgba(255, 193, 7, 0.4);
+    animation: mp-pulse 1s infinite;
+}
+@keyframes mp-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+.mp-room-display {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    text-align: center;
+}
+.mp-room-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.45;
+    margin-bottom: 4px;
+}
+.mp-room-code {
+    font-family: 'Courier New', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #4fc3f7;
+}
+.mp-action-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.mp-btn-share {
+    flex: 1;
+    padding: 6px;
+    font-size: 11px;
+    background: rgba(100, 150, 255, 0.15);
+    border: 1px solid rgba(100, 150, 255, 0.25);
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.mp-btn-share:hover {
+    opacity: 0.8;
+}
+.mp-btn-disconnect {
+    flex: 1;
+    padding: 6px;
+    font-size: 11px;
+    background: rgba(255, 80, 80, 0.12);
+    border: 1px solid rgba(255, 80, 80, 0.25);
+    color: #ff8a8a;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.mp-btn-disconnect:hover {
+    opacity: 0.8;
+}
+.mp-users {
+    font-size: 11px;
+    opacity: 0.55;
+    text-align: center;
+}
+.mp-hint {
+    font-size: 11px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.45);
+    margin-bottom: 8px;
+}
+.mp-share-hint {
+    font-size: 10px;
+    color: rgba(100, 200, 255, 0.7);
+    text-align: center;
+    margin-bottom: 8px;
+}
+/* "— or —" divider between the code flow and stranger matchmaking */
+.mp-or {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 1px;
+    opacity: 0.35;
+    margin: 8px 0;
+}
+/* "Paint with a stranger" — public 1:1 matchmaking */
+.mp-btn-stranger {
+    width: 100%;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    background: linear-gradient(135deg, rgba(255, 160, 80, 0.22), rgba(255, 90, 160, 0.18));
+    border: 1px solid rgba(255, 150, 90, 0.35);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.mp-btn-stranger:hover {
+    transform: translateY(-1px);
+}
+/* Host-only lock toggle in the connected panel */
+.mp-btn-lock {
+    width: 100%;
+    padding: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(255, 200, 80, 0.14);
+    border: 1px solid rgba(255, 200, 80, 0.3);
+    color: #ffd98a;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+.mp-btn-lock:hover {
+    opacity: 0.85;
+}
+/* Badge shown to non-host members of a locked room */
+.mp-lock-badge {
+    font-size: 10px;
+    text-align: center;
+    color: #ffd98a;
+    background: rgba(255, 200, 80, 0.1);
+    border: 1px solid rgba(255, 200, 80, 0.2);
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin-bottom: 8px;
+}
+/* Name label on a remote user's cursor (positioned beside the colored dot) */
+.remote-cursor-label {
+    position: absolute;
+    left: 13px;
+    top: -3px;
+    white-space: nowrap;
+    font-family: 'Courier New', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.55);
+    padding: 1px 5px;
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+/* Settings buttons row */
+#sidebar-right .control-group > div[style*="display: flex"] {
+    gap: 4px !important;
+}
+#sidebar-right .control-group > div[style*="display: flex"] button {
+    font-size: 10px;
+    padding: 6px 2px;
+}
+
+/* Layers panel in sidebar */
+#sidebar-right .layers-panel {
+    max-height: 300px;
+    margin-top: 4px;
+}
+#sidebar-right .layer-item {
+    padding: 6px 8px;
+    margin-bottom: 5px;
+    gap: 5px;
+}
+
+/* Compact checkboxes in sidebar */
+#sidebar-right .control-group.checkbox-group {
+    margin-bottom: 6px;
+}
+
+/* ── Brush section ── */
+.brush-section-label {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.brush-mode-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.brush-mode-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    height: 26px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    user-select: none;
+    outline: none;
+}
+.brush-mode-btn:hover {
+    opacity: 0.8;
+}
+.brush-mode-btn.active {
+    color: #ffaa50;
+    text-shadow: 0 0 6px rgba(255, 170, 80, 0.4);
+    background: rgba(255, 170, 80, 0.08);
+    border-color: rgba(255, 170, 80, 0.2);
+}
+
+.brush-time-group {
+    margin-bottom: 10px;
+}
+
+.brush-time-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.brush-time-input-wrap input[type="number"] {
+    width: 60px;
+    padding: 4px 6px;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    color: #ffaa50;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    outline: none;
+    text-align: center;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+.brush-time-input-wrap input[type="number"]::-webkit-inner-spin-button,
+.brush-time-input-wrap input[type="number"]::-webkit-outer-spin-button {
+    opacity: 0.4;
+}
+.brush-time-input-wrap input[type="number"]:focus {
+    border-color: rgba(255, 170, 80, 0.3);
+}
+
+.brush-time-suffix {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* ── Recording drawer z-index adjustment ── */
+body.rec-open #sidebar-right {
+    z-index: 99;
+}
+
+
+
+/* ── Layers subsections (Path Layers etc.) ── */
+.layers-subsection {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-default);
+}
+.layers-subsection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.layers-subsection-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-secondary);
+}
+.subsection-add-btn {
+    padding: 4px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(100, 200, 255, 0.1);
+    border: 1px solid rgba(100, 200, 255, 0.25);
+    border-radius: 999px;
+    color: var(--accent-cool);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.subsection-add-btn:hover {
+    background: rgba(100, 200, 255, 0.2);
+    border-color: rgba(100, 200, 255, 0.45);
+}
+
+/* ── Grouped layer options (capture / preview checkboxes) ── */
+.layers-options-group {
+    margin-top: 14px;
+    padding: 8px 10px 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+}
+.layers-options-title {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+}
+.layers-options-group .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 6px 2px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.layers-options-group .checkbox-group:last-child {
+    border-bottom: none;
+}
+.layers-options-group .checkbox-group label {
+    margin: 0;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.layers-options-group .checkbox-group input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* ── Audio React: auto-splat pattern picker (visual emission patterns) ── */
+.ar-pattern-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+}
+.ar-pattern-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 2px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.ar-pattern-btn:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: rgba(255, 255, 255, 0.85);
+}
+.ar-pattern-btn.active {
+    background: rgba(180, 130, 255, 0.18);
+    border-color: rgba(180, 130, 255, 0.5);
+    color: #fff;
+}
+.ar-pat-glyph { font-size: 15px; line-height: 1; }
+.ar-pat-label { font-size: 8px; letter-spacing: 0.3px; text-transform: uppercase; opacity: 0.85; }
+
+/* Audio minimized widget (sidebar) — mirrors the recorder's rec-mini */
+.audio-mini {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 10px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
+}
+.audio-mini-row { display: flex; align-items: center; gap: 8px; }
+.audio-mini-enable {
+    display: flex; align-items: center; gap: 6px;
+    margin: 0; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.audio-mini-enable input { margin: 0; cursor: pointer; }
+.audio-mini-src { flex: 1; min-width: 0; }
+.audio-mini-timeline {
+    width: 100%; height: 54px; display: block;
+    border-radius: 6px; background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.audio-mini-full {
+    width: 100%; padding: 9px; border-radius: 10px;
+    font-weight: 700; font-size: 13px; cursor: pointer;
+    background: linear-gradient(#2b3543, #1b2230); color: #e6edf3;
+    border: 1px solid rgba(120, 170, 255, 0.35);
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.10), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.audio-mini-full:hover { border-color: rgba(120, 170, 255, 0.6); color: #fff; }

@@ -1,0 +1,474 @@
+/* ================================================================
+   INIT & RESPONSIVE — Splash screen, entrance animations,
+   responsive typography, and panel resize foundation
+   ================================================================ */
+
+/* ── CSS Custom Properties for responsive scaling ── */
+:root {
+    --ui-scale: 1;
+    --sidebar-width: 280px;
+    --strip-h: 68px;
+    --font-xs: calc(9px * var(--ui-scale));
+    --font-sm: calc(11px * var(--ui-scale));
+    --font-md: calc(13px * var(--ui-scale));
+    --font-lg: calc(16px * var(--ui-scale));
+    --font-xl: calc(20px * var(--ui-scale));
+    --space-xs: calc(4px * var(--ui-scale));
+    --space-sm: calc(6px * var(--ui-scale));
+    --space-md: calc(10px * var(--ui-scale));
+    --space-lg: calc(14px * var(--ui-scale));
+}
+
+/* ── SPLASH SCREEN ── */
+#splash-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #0a0d12;
+    /* GPU-composited: isolate from main thread layout work */
+    will-change: opacity;
+    transform: translateZ(0);
+    contain: strict;
+    opacity: 1;
+    transition: opacity 0.6s cubic-bezier(0.4, 0, 0.6, 1); /* Smooth ease-in-out */
+    pointer-events: auto;
+}
+
+#splash-screen.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Ready state - triggers final flourish before fadeout */
+#splash-screen.ready .splash-title {
+    text-shadow: 0 0 80px rgba(100, 180, 255, 0.5),
+                 0 0 160px rgba(100, 180, 255, 0.2);
+}
+#splash-screen.ready .splash-subtitle {
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.48em;
+}
+#splash-screen.ready .splash-progress {
+    opacity: 0;
+    transform: scaleX(1.1) translateZ(0);
+}
+
+.splash-title {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 200;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.95);
+    text-shadow: 0 0 60px rgba(100, 180, 255, 0.25),
+                 0 0 120px rgba(100, 180, 255, 0.08);
+    will-change: transform, opacity, text-shadow;
+    transform: translateY(10px) translateZ(0);
+    backface-visibility: hidden;
+    opacity: 0;
+    animation: splashTitleIn 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) 0.1s forwards; /* ease-in-out */
+    transition: text-shadow 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+    user-select: none;
+}
+
+.splash-subtitle {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+    font-size: clamp(11px, 1.5vw, 14px);
+    font-weight: 500;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 20px;
+    will-change: opacity, transform, letter-spacing, color;
+    transform: translateY(8px) translateZ(0);
+    backface-visibility: hidden;
+    opacity: 0;
+    animation: splashSubIn 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) 0.4s forwards; /* ease-in-out */
+    transition: color 0.4s cubic-bezier(0.25, 0.1, 0.25, 1), letter-spacing 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+    user-select: none;
+}
+
+/* Progress bar - shows actual loading state */
+.splash-progress {
+    width: 120px;
+    height: 2px;
+    margin-top: 32px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 1px;
+    overflow: hidden;
+    will-change: opacity, transform;
+    opacity: 0;
+    transform: translateZ(0);
+    animation: splashProgressIn 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) 0.6s forwards;
+    transition: opacity 0.4s cubic-bezier(0.25, 0.1, 0.25, 1), transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.splash-progress-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(100, 180, 255, 0.6), rgba(140, 200, 255, 0.8));
+    border-radius: 1px;
+    transition: width 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); /* Smooth ease-in-out */
+}
+
+@keyframes splashTitleIn {
+    0% { opacity: 0; transform: translateY(10px) translateZ(0); }
+    100% { opacity: 1; transform: translateY(0) translateZ(0); }
+}
+@keyframes splashSubIn {
+    0% { opacity: 0; transform: translateY(8px) translateZ(0); }
+    100% { opacity: 1; transform: translateY(0) translateZ(0); }
+}
+@keyframes splashProgressIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+/* ── UI ENTRANCE ANIMATIONS ── */
+
+/* Initial hidden states — applied by JS before first paint */
+#mixer-strip.ui-enter {
+    will-change: transform, opacity;
+    transform: translateY(-100%);
+    opacity: 0;
+}
+
+#sidebar-right.ui-enter {
+    will-change: transform, opacity;
+    transform: translateX(100%);
+    opacity: 0;
+}
+
+#canvas-area.ui-enter {
+    will-change: opacity;
+    opacity: 0;
+}
+
+#custom-titlebar.ui-enter {
+    will-change: transform, opacity;
+    transform: translateY(-100%);
+    opacity: 0;
+}
+
+/* Animate-in classes — triggered by JS in sequence */
+#custom-titlebar.ui-enter.ui-ready {
+    transform: translateY(0);
+    opacity: 1;
+    transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1),
+                opacity 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+#mixer-strip.ui-enter.ui-ready {
+    transform: translateY(0);
+    opacity: 1;
+    transition: transform 0.55s cubic-bezier(0.25, 0.1, 0.25, 1),
+                opacity 0.45s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+#sidebar-right.ui-enter.ui-ready {
+    transform: translateX(0);
+    opacity: 1;
+    transition: transform 0.55s cubic-bezier(0.25, 0.1, 0.25, 1),
+                opacity 0.45s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+#canvas-area.ui-enter.ui-ready {
+    opacity: 1;
+    transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Clean up will-change after animation completes */
+#mixer-strip.ui-settled,
+#sidebar-right.ui-settled,
+#canvas-area.ui-settled,
+#custom-titlebar.ui-settled {
+    will-change: auto;
+}
+
+/* ── RESPONSIVE UI SCALING ── */
+/* CSS zoom scales ALL content (fonts, padding, borders, icons) proportionally.
+   --ui-scale is set by JS in initResponsiveScale() based on screen DPI/resolution. */
+
+#sidebar-right {
+    zoom: var(--ui-scale);
+}
+#mixer-strip {
+    zoom: var(--ui-scale);
+}
+#colorBar {
+    zoom: var(--ui-scale);
+}
+/* Floating panels / overlays */
+.stats-panel {
+    zoom: var(--ui-scale);
+}
+.rec-drawer {
+    zoom: var(--ui-scale);
+}
+#hotkeyOverlay {
+    zoom: var(--ui-scale);
+}
+.delete-modal {
+    zoom: var(--ui-scale);
+}
+.hotkey-reminder {
+    zoom: var(--ui-scale);
+}
+#settingsToggleBtn {
+    zoom: var(--ui-scale);
+}
+#settingsPanel {
+    zoom: var(--ui-scale);
+}
+.mask-editor-overlay {
+    zoom: var(--ui-scale);
+}
+.fps-notification {
+    zoom: var(--ui-scale);
+}
+.arm-colors-panel {
+    zoom: var(--ui-scale);
+}
+
+/* Canvas wrapper accounts for zoomed sidebar width */
+#canvas-wrapper {
+    max-width: calc(100vw - var(--sidebar-width) * var(--ui-scale) - 10px) !important;
+}
+
+/* ── PANEL RESIZE FOUNDATION ── */
+#sidebar-right {
+    position: relative;
+    min-width: 220px;
+    max-width: 420px;
+}
+
+/* Resize grip on left edge of sidebar */
+.sidebar-resize-handle {
+    position: absolute;
+    top: 0;
+    left: -3px;
+    width: 6px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 200;
+    background: transparent;
+}
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.active {
+    opacity: 0.7;
+}
+
+/* ── LAYER PANEL OVERHAUL ── */
+
+/* Override the cramped layer layout */
+#sidebar-right .layer-item {
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    gap: 6px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+#sidebar-right .layer-item.active-layer {
+    background: rgba(100, 200, 255, 0.1);
+    border: 1px solid rgba(100, 200, 255, 0.35);
+}
+
+/* Header: wrap into two rows — thumbnail+title on top, buttons below */
+#sidebar-right .layer-item-header {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    grid-template-rows: auto auto;
+    gap: 6px 8px;
+    align-items: center;
+}
+
+/* Thumbnail */
+#sidebar-right .layer-thumbnail {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    grid-row: 1;
+    grid-column: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Title info area - gets full remaining width */
+#sidebar-right .layer-info {
+    grid-row: 1;
+    grid-column: 2;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+/* Title input - clean, not competing for space */
+#sidebar-right .layer-title {
+    width: 100%;
+    font-size: var(--font-sm);
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+#sidebar-right .layer-title:focus {
+    border-color: rgba(100, 200, 255, 0.4);
+    background: rgba(0, 0, 0, 0.35);
+    outline: none;
+}
+
+/* Controls row - spans full width below thumbnail+title */
+#sidebar-right .layer-controls {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+/* Compact layer buttons with clearer styling */
+#sidebar-right .layer-btn {
+    padding: 3px 7px;
+    font-size: calc(10px * var(--ui-scale));
+    min-width: auto;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    line-height: 1.2;
+}
+
+/* Mask control buttons */
+#sidebar-right .layer-mask-controls {
+    padding: 0;
+}
+#sidebar-right .mask-control-btn {
+    font-size: calc(10px * var(--ui-scale));
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* Threshold / Feather slider row */
+#sidebar-right .layer-threshold {
+    font-size: calc(10px * var(--ui-scale));
+    gap: 6px;
+    opacity: 0.85;
+    margin-bottom: 14px; /* Extra breathing room below */
+}
+#sidebar-right .layer-threshold .layer-slider-host {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+#sidebar-right .layer-threshold span:first-child,
+#sidebar-right .layer-threshold .layer-slider-value {
+    margin-top: 10px; /* Nudge label and value down to align with slider knob center */
+}
+/* Remove ALL dark borders from sidebar sliders */
+#sidebar-right input[type="range"] {
+    box-shadow: none !important;
+    border: none !important;
+}
+#sidebar-right input[type="range"]::-webkit-slider-container {
+    box-shadow: none !important;
+    border: none !important;
+}
+#sidebar-right input[type="range"]::-webkit-slider-runnable-track {
+    box-shadow: none !important;
+    border: none !important;
+}
+#sidebar-right input[type="range"]::-moz-range-track {
+    box-shadow: none !important;
+    border: none !important;
+}
+#sidebar-right input[type="range"]::-moz-range-progress {
+    box-shadow: none !important;
+    border: none !important;
+}
+#sidebar-right .layer-threshold span:first-child {
+    font-size: calc(9px * var(--ui-scale));
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    opacity: 0.6;
+    min-width: 42px;
+    flex-shrink: 0;
+}
+#sidebar-right .layer-slider-value {
+    font-family: 'Courier New', monospace;
+    font-size: calc(10px * var(--ui-scale));
+    min-width: 32px;
+    text-align: right;
+    color: #4fc3f7;
+    font-weight: 600;
+}
+
+/* Collision controls - cleaner layout */
+#sidebar-right .collision-controls {
+    padding: 6px 8px;
+    background: rgba(255, 160, 60, 0.04);
+    border: 1px solid rgba(255, 160, 60, 0.1);
+    border-radius: 6px;
+}
+#sidebar-right .collision-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding: 6px 0; /* Space for slider thumb overflow */
+}
+#sidebar-right .collision-row:last-child {
+    margin-bottom: 0;
+}
+#sidebar-right .collision-label {
+    font-size: calc(9px * var(--ui-scale));
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    opacity: 0.55;
+    min-width: 52px;
+    flex-shrink: 0;
+}
+#sidebar-right .collision-mode-select {
+    flex: 1;
+    height: 24px;
+    font-size: calc(10px * var(--ui-scale));
+    padding: 2px 4px;
+}
+#sidebar-right .collision-strength-val,
+#sidebar-right .collision-threshold-val {
+    font-family: 'Courier New', monospace;
+    font-size: calc(10px * var(--ui-scale));
+    min-width: 28px;
+    text-align: right;
+    color: rgba(255, 170, 80, 0.85);
+    font-weight: 600;
+}
+
+/* Drop zone polish */
+#sidebar-right .drop-zone {
+    height: 32px;
+    border-radius: 6px;
+    font-size: calc(9px * var(--ui-scale));
+    margin-bottom: 6px;
+    border-width: 1px;
+    border-style: dashed;
+}
+
+/* Layers panel scrollable area */
+#sidebar-right .layers-panel {
+    max-height: 340px;
+    margin-top: 4px;
+    padding-right: 2px;
+}
+
+/* Layers panel scrollbar */
+#sidebar-right .layers-panel::-webkit-scrollbar { width: 4px; }
+#sidebar-right .layers-panel::-webkit-scrollbar-track { background: transparent; }
+#sidebar-right .layers-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }

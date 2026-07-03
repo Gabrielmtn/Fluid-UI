@@ -1,0 +1,11 @@
+{
+  "name": "fluid-centering",
+  "main": "party/server.js",
+  "compatibilityDate": "2025-10-25",
+  "parties": {
+    "room": "party/server.js"
+  },
+  "serve": {
+    "path": "public"
+  }
+}

@@ -1,0 +1,517 @@
+/* ================================================================
+   MIXER STRIP - body layout, top strip, channels, action buttons, arm-colors dropdown
+   (part of former mixer-layout.css, lines 1-404; cascade order preserved)
+   ================================================================ */
+/* ================================================================
+   MIXER LAYOUT - Audio mixer-inspired UI
+   ================================================================ */
+
+/* ── BODY LAYOUT: column instead of row ── */
+body {
+    flex-direction: column !important;
+}
+
+/* Hide old sidebar - content moved to mixer strip + sidebar-right */
+body > .controls {
+    display: none !important;
+}
+
+/* ── MIXER STRIP (top bar) ── */
+#mixer-strip {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: stretch;
+    background: linear-gradient(180deg, #13171f, #0b0e14);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    padding: 0 4px;
+    z-index: 150;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 1px;
+    color: white;
+}
+
+#mixer-strip::-webkit-scrollbar {
+    height: 3px;
+}
+#mixer-strip::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+}
+
+/* ── Channel strip ── */
+.mixer-channel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Center a tight label/fader/value cluster regardless of strip height —
+       space-between scattered the three across the full height whenever a
+       taller sibling (e.g. wrapped presets) stretched the strip */
+    justify-content: center;
+    gap: 4px;
+    padding: 2px 10px;
+    min-width: 92px;
+    flex: 1 0 auto;
+    max-width: 150px;
+    background: rgba(255, 255, 255, 0.015);
+    border-right: 1px solid rgba(255, 255, 255, 0.03);
+    position: relative;
+}
+
+/* Accent top border per channel type */
+.mixer-channel[data-accent="blue"]   { border-top: 2px solid rgba(88, 166, 255, 0.45); }
+.mixer-channel[data-accent="orange"] { border-top: 2px solid rgba(255, 170, 80, 0.45); }
+.mixer-channel[data-accent="green"]  { border-top: 2px solid rgba(80, 220, 140, 0.45); }
+.mixer-channel[data-accent="purple"] { border-top: 2px solid rgba(180, 130, 255, 0.45); }
+.mixer-channel[data-accent="yellow"] { border-top: 2px solid rgba(255, 220, 80, 0.45); }
+.mixer-channel[data-accent="cyan"]   { border-top: 2px solid rgba(80, 210, 255, 0.45); }
+.mixer-channel[data-accent="pink"]   { border-top: 2px solid rgba(255, 130, 170, 0.45); }
+
+.ch-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+    text-align: center;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+/* Header row above each fader: label top-left, value top-right */
+.ch-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 6px;
+    min-width: 0;
+}
+.ch-header .ch-label {
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.ch-header .ch-value {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.ch-fader {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.ch-fader input[type="range"] {
+    width: 100%;
+    --track-h: 0.45em;
+    --input-p: 0.35em;
+    --thumb-h: 1.1em;
+    --thumb-w: 0.6em;
+    --thumb-r: 3px;
+    --track-fill-alpha: 0.85;
+    background: linear-gradient(#1a1a1a, #222 20%, #333, #282828);
+    box-shadow: 0 1px 1px rgba(255, 255, 255, 0.06),
+                inset 0 1px 0 1px #0a0a0a;
+}
+
+.ch-value {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #4fc3f7;
+    text-align: center;
+    line-height: 1.2;
+    min-height: 16px;
+    letter-spacing: 0.3px;
+    font-weight: 700;
+}
+
+/* Multiplier value doubles as the per-arm-colors button (gold, clickable) */
+.ch-value.arm-colors-trigger {
+    cursor: pointer;
+    padding: 1px 8px;
+    min-height: 0;
+    border-radius: 4px;
+    color: rgba(255, 220, 80, 0.95);
+    background: rgba(255, 220, 80, 0.15);
+    border: 1px solid rgba(255, 220, 80, 0.35);
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+}
+.ch-value.arm-colors-trigger:hover {
+    background: rgba(255, 220, 80, 0.28);
+    border-color: rgba(255, 220, 80, 0.6);
+}
+.ch-value.arm-colors-trigger.active {
+    background: rgba(255, 220, 80, 0.34);
+    border-color: rgba(255, 220, 80, 0.75);
+}
+
+/* ── Color channel ── */
+.mixer-channel.ch-wide {
+    min-width: 86px;
+    max-width: 112px;
+    gap: 3px;
+}
+/* Label sits inline with the swatch on one row (saves a stacked row) */
+.ch-color-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+}
+.ch-color-head .ch-label {
+    line-height: 1;
+}
+
+#mixer-strip .ch-color-input,
+#mixer-strip input[type="color"] {
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    padding: 0;
+    background: transparent;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5),
+                inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.ch-toggle {
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    color: rgba(255,255,255,0.45);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+.ch-toggle input[type="checkbox"] {
+    width: 11px;
+    height: 11px;
+    margin: 0;
+}
+
+/* Toggle row (side-by-side text toggles) */
+.ch-toggle-row {
+    display: flex;
+    gap: 3px;
+    width: 100%;
+    height: 16px;
+    flex-shrink: 0;
+}
+.ch-toggle-row .ch-text-toggle {
+    flex: 1;
+    min-width: 0;
+    height: 16px;
+}
+
+/* Text-only toggle button (lights up when active) */
+.ch-text-toggle {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 16px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    padding: 0 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    white-space: nowrap;
+    text-align: center;
+    line-height: 1;
+    user-select: none;
+    min-width: 52px;
+    outline: none;
+}
+.ch-text-toggle:hover {
+    opacity: 0.8;
+}
+.ch-text-toggle.active {
+    color: #4fc3f7;
+    text-shadow: 0 0 6px rgba(79, 195, 247, 0.5),
+                 0 0 14px rgba(79, 195, 247, 0.2);
+    background: rgba(79, 195, 247, 0.08);
+    border-color: rgba(79, 195, 247, 0.2);
+}
+.ch-text-toggle.active:hover {
+    opacity: 0.85;
+}
+
+/* ── Mixer divider ── */
+.mixer-divider {
+    width: 1px;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.08), transparent);
+    margin: 6px 3px;
+    align-self: stretch;
+    flex-shrink: 0;
+}
+
+/* ── Transport column (play/pause · clear · freeze) ── */
+.mixer-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 3px;
+    padding: 2px 10px;
+    flex-shrink: 0;
+}
+#mixer-strip .mixer-actions button,
+.mixer-actions .transport-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    height: 20px;
+    padding: 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.15s, border-color 0.15s;
+}
+#mixer-strip .mixer-actions button:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+/* Paused state: play icon lit */
+#mixer-strip .mixer-actions #pauseBtn.active {
+    background: rgba(79, 195, 247, 0.18);
+    border-color: rgba(79, 195, 247, 0.45);
+    color: #4fc3f7;
+}
+/* Frozen state: stop sign lit */
+#mixer-strip .mixer-actions #freezeBtn.active {
+    background: rgba(255, 100, 100, 0.18);
+    border-color: rgba(255, 100, 100, 0.45);
+}
+/* Pause + freeze share one compact row (smaller than the full-width Clear).
+   ID-bearing selector so it outranks `#mixer-strip .mixer-actions button`. */
+.mixer-actions .transport-row {
+    display: flex;
+    gap: 5px;
+}
+#mixer-strip .mixer-actions .transport-row button {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 20px;
+    padding: 0;
+    font-size: 12px;
+}
+
+/* Preset buttons in mixer strip */
+.mixer-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 2px 10px;
+    align-items: center;
+    align-content: flex-start;
+    /* Flex into whatever space the channels leave over so wide screens
+       don't end up with a dead gap before the preset chips — but NEVER
+       set the strip's height: on narrow windows the chips wrap into many
+       rows, so cap the block and scroll internally instead of letting it
+       balloon the whole strip. */
+    flex: 1 1 280px;
+    min-width: 240px;
+    max-width: none;
+    align-self: center;
+    max-height: 64px;
+    overflow-y: auto;
+}
+.mixer-presets::-webkit-scrollbar {
+    width: 4px;
+}
+.mixer-presets::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+}
+.mixer-presets button,
+#mixer-strip .mixer-presets button {
+    all: unset !important;
+    box-sizing: border-box !important;
+    padding: 3px 8px !important;
+    font-size: 10px !important;
+    border-radius: 3px !important;
+    background: rgba(255,255,255,0.08) !important;
+    color: rgba(255,255,255,0.7) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    cursor: pointer !important;
+    line-height: 1.2 !important;
+    font-weight: 500 !important;
+}
+.mixer-presets button:hover {
+    opacity: 0.8;
+}
+/* Separator between built-in and user presets */
+.preset-sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(255,255,255,0.15);
+    margin: 0 3px;
+    flex-shrink: 0;
+}
+/* User preset buttons in mixer strip */
+.mixer-user-presets {
+    display: contents;
+}
+#mixer-strip .mixer-user-preset-btn {
+    all: unset;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    font-size: 9px;
+    border-radius: 3px;
+    background: rgba(100,200,255,0.12) !important;
+    color: rgba(100,200,255,0.8) !important;
+    border: 1px solid rgba(100,200,255,0.2) !important;
+    cursor: pointer;
+    line-height: 1.2;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+#mixer-strip .mixer-user-preset-btn:hover {
+    opacity: 0.8;
+}
+#mixer-strip .mixer-user-preset-btn.active {
+    background: rgba(100,200,255,0.3);
+    border-color: rgba(100,200,255,0.5);
+    color: white;
+    font-weight: 600;
+}
+/* Save button */
+#mixer-strip .mixer-preset-save {
+    all: unset;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 3px;
+    background: rgba(63,185,80,0.15) !important;
+    color: rgba(63,185,80,0.9) !important;
+    border: 1px solid rgba(63,185,80,0.25) !important;
+    cursor: pointer;
+    line-height: 1;
+    flex-shrink: 0;
+}
+#mixer-strip .mixer-preset-save:hover {
+    opacity: 0.8;
+}
+/* Inline name input */
+.mixer-preset-name-input {
+    width: 80px;
+    padding: 2px 5px;
+    font-size: 9px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(100,200,255,0.3);
+    border-radius: 3px;
+    color: white;
+    outline: none;
+    flex-shrink: 0;
+}
+.mixer-preset-name-input:focus {
+    border-color: rgba(100,200,255,0.6);
+}
+
+/* ── Arm Colors Dropdown Toggle ── */
+.arm-colors-toggle {
+    all: unset;
+    box-sizing: border-box;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-size: 12px;
+    background: rgba(255, 220, 80, 0.15) !important;
+    border: 1px solid rgba(255, 220, 80, 0.3) !important;
+    border-radius: 4px;
+    color: rgba(255, 220, 80, 0.9) !important;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+}
+.arm-colors-toggle:hover {
+    background: rgba(255, 220, 80, 0.25) !important;
+}
+
+/* Arm Colors Panel */
+.arm-colors-panel {
+    background: rgba(15, 20, 27, 0.98);
+    border: 1px solid rgba(255, 220, 80, 0.25);
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+.arm-colors-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 220, 80, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.arm-colors-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.arm-colors-hint {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+    padding: 8px;
+}
+.arm-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+}
+.arm-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 220, 80, 0.8);
+    min-width: 16px;
+}
+.arm-picker {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    padding: 0;
+    background: transparent;
+}
+.arm-mode-wrap {
+    display: flex;
+    gap: 3px;
+}
+

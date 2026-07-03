@@ -1,0 +1,1038 @@
+/* ================================================================
+   OVERLAYS & FEATURES - focus mode, stream formats, collision, mutation, path layers
+   (part of former mixer-layout.css, lines 1255-2021; cascade order preserved)
+   ================================================================ */
+/* ================================================================
+   FOCUS MODE
+   ================================================================ */
+body.focus-mode #mixer-strip,
+body.focus-mode #sidebar-right,
+body.focus-mode .title-bar,
+body.focus-mode #statsPanel,
+body.focus-mode #hotkeyReminder,
+body.focus-mode #mobileMenuToggle { display: none !important; }
+
+body.focus-mode #main-area {
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    height: var(--app-height, 100dvh) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+body.focus-mode #canvas-area {
+    flex: 1;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    height: var(--app-height, 100dvh) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+}
+body.focus-mode #canvas-wrapper {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+}
+body.focus-mode #canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Focus badge */
+#focus-mode-badge {
+    display: none;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 99999;
+    background: rgba(255, 40, 40, 0.85);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+    text-transform: uppercase;
+    box-shadow: 0 2px 8px rgba(255, 40, 40, 0.4);
+    opacity: 0.85;
+    /* NOTE: deliberately NO animation here. The old infinite opacity pulse
+       forced the Electron transparent-window compositor to recomposite the
+       WebGL canvas every frame for as long as focus mode was active —
+       the same hazard documented in styles.css (canvas-size-display) and
+       battery-styles. Keep this badge fully static. */
+}
+#focus-mode-badge.visible { display: block; }
+
+/* ================================================================
+   STREAM FORMAT PRESETS
+   ================================================================ */
+.stream-format-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+.stream-format-grid button {
+    padding: 5px 4px;
+    font-size: 9.5px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+    line-height: 1.2;
+    text-align: center;
+    font-weight: 600;
+}
+.stream-format-grid button:hover {
+    opacity: 0.8;
+}
+.stream-format-grid button.active {
+    background: rgba(80, 210, 255, 0.2);
+    border-color: rgba(80, 210, 255, 0.4);
+    color: #4fc3f7;
+}
+.stream-format-info {
+    font-size: 9px;
+    color: rgba(255,255,255,0.35);
+    text-align: center;
+    margin-top: 2px;
+    letter-spacing: 0.3px;
+}
+
+/* ── Collision Layer Controls ── */
+.collision-source-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    flex-direction: column;
+    background: #1a1f2a;
+    border: 1px solid rgba(255, 120, 80, 0.3);
+    border-radius: 6px;
+    padding: 4px;
+    gap: 2px;
+    z-index: 200;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    min-width: 120px;
+}
+.collision-source-menu button {
+    display: block;
+    width: 100%;
+    padding: 5px 8px;
+    font-size: 11px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    border-radius: 4px;
+    text-align: left;
+    white-space: nowrap;
+}
+.collision-source-menu button:hover {
+    opacity: 0.8;
+}
+
+.collision-controls {
+    margin-top: 6px;
+    padding: 6px;
+    background: rgba(255, 120, 80, 0.06);
+    border: 1px solid rgba(255, 120, 80, 0.15);
+    border-radius: 5px;
+}
+.collision-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+.collision-row:last-child {
+    margin-bottom: 0;
+}
+.collision-label {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    min-width: 52px;
+    flex-shrink: 0;
+}
+.collision-mode-select {
+    flex: 1;
+    height: 22px;
+    font-size: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 3px;
+    padding: 0 4px;
+}
+.collision-slider-host {
+    flex: 1;
+}
+.collision-slider-host input[type="range"] {
+    width: 100%;
+}
+.collision-strength-val,
+.collision-threshold-val {
+    font-size: 10px;
+    color: rgba(255, 180, 120, 0.9);
+    min-width: 24px;
+    text-align: right;
+    font-family: monospace;
+}
+.collision-toggle {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+.collision-toggle input[type="checkbox"] {
+    width: 12px;
+    height: 12px;
+    margin: 0;
+}
+.collision-refresh-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: auto;
+}
+.collision-refresh-btn:hover {
+    opacity: 0.8;
+}
+.slider-orange {
+    accent-color: #ff8850;
+}
+
+/* ================================================================
+   MUTATION ENGINE STYLES
+   ================================================================ */
+
+#mutation-section .section-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mutation-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mutation-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.mutation-field label {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    min-width: 70px;
+    flex-shrink: 0;
+}
+.mutation-field-wide {
+    flex-direction: column;
+    align-items: stretch;
+}
+.mutation-field-wide label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+.mutation-field select {
+    flex: 1;
+    height: 28px;
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(180, 100, 255, 0.2);
+    color: white;
+    border-radius: 5px;
+    padding: 0 8px;
+}
+.mutation-field input[type="range"] {
+    width: 100%;
+}
+
+.mutation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.mutation-btn {
+    flex: 1 1 auto;
+    padding: 6px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(180, 100, 255, 0.1);
+    border: 1px solid rgba(180, 100, 255, 0.25);
+    border-radius: 5px;
+    color: rgba(220, 180, 255, 0.9);
+    cursor: pointer;
+}
+.mutation-btn:hover:not(:disabled) {
+    background: rgba(180, 100, 255, 0.2);
+    border-color: rgba(180, 100, 255, 0.4);
+}
+.mutation-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.mutation-btn-primary {
+    background: linear-gradient(180deg, rgba(180, 100, 255, 0.25), rgba(180, 100, 255, 0.15));
+    border-color: rgba(180, 100, 255, 0.4);
+    color: rgba(230, 200, 255, 1);
+}
+.mutation-btn-primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(180, 100, 255, 0.35), rgba(180, 100, 255, 0.2));
+}
+
+.mutation-locks {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.mutation-locks-label {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.mutation-lock-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    padding: 3px 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+.mutation-lock-chip:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.mutation-lock-cb {
+    width: 12px;
+    height: 12px;
+    margin: 0;
+}
+
+.mutation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    min-height: 60px;
+}
+.mutation-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+    padding: 20px;
+}
+
+.mutation-card {
+    background: rgba(180, 100, 255, 0.08);
+    border: 1px solid rgba(180, 100, 255, 0.15);
+    border-radius: 6px;
+    padding: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.mutation-card:hover {
+    background: rgba(180, 100, 255, 0.15);
+    border-color: rgba(180, 100, 255, 0.3);
+}
+.mutation-card-active {
+    border-color: rgba(180, 100, 255, 0.6);
+    box-shadow: 0 0 8px rgba(180, 100, 255, 0.3);
+}
+
+.mutation-swatch {
+    width: 100%;
+    height: 32px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+}
+.mutation-card-label {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    margin-bottom: 4px;
+}
+.mutation-card-preview {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.4;
+}
+
+.mutation-diff {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(180, 100, 255, 0.15);
+    border-radius: 6px;
+    padding: 10px;
+    margin-top: 8px;
+    font-size: 10px;
+}
+.mutation-diff-title {
+    color: rgba(200, 150, 255, 0.9);
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.mutation-diff-row {
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 3px;
+}
+.mutation-diff-param {
+    color: rgba(180, 100, 255, 0.9);
+}
+.mutation-color-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    vertical-align: middle;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.mutation-chain {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+}
+.mutation-crumb {
+    font-size: 9px;
+    padding: 3px 6px;
+    background: rgba(180, 100, 255, 0.1);
+    border: 1px solid rgba(180, 100, 255, 0.2);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+}
+.mutation-crumb:hover {
+    background: rgba(180, 100, 255, 0.2);
+}
+.mutation-crumb-active {
+    background: rgba(180, 100, 255, 0.25);
+    border-color: rgba(180, 100, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* ================================================================
+   PATH LAYERS STYLES
+   ================================================================ */
+
+#pathLayersList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.path-layer-item {
+    background: rgba(100, 200, 255, 0.06);
+    border: 1px solid rgba(100, 200, 255, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    transition: grid-template-rows 0.25s ease;
+}
+.path-layer-item.collapsed {
+    grid-template-rows: auto 0fr;
+}
+.path-layer-item.active-layer {
+    border-color: rgba(100, 200, 255, 0.4);
+    box-shadow: 0 0 8px rgba(100, 200, 255, 0.15);
+}
+
+.path-layer-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(100, 200, 255, 0.08);
+    cursor: grab;
+}
+.path-layer-header:active {
+    cursor: grabbing;
+}
+
+.path-layer-thumb {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.path-layer-header .layer-title {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #e6edf3;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+.path-layer-header .layer-title:focus {
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
+.path-layer-header .layer-controls {
+    display: flex;
+    gap: 4px;
+}
+.path-layer-header .layer-btn {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.path-layer-header .layer-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+.path-layer-header .layer-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.path-layer-body {
+    overflow: hidden;
+    min-height: 0;
+    padding: 4px 12px 12px;
+}
+.path-layer-item.collapsed .path-layer-body {
+    padding: 0;
+    visibility: hidden;
+}
+
+.path-layer-info {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.path-layer-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.path-control-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.path-control-row label {
+    font-size: 9px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+    min-width: 44px;
+    letter-spacing: 0.3px;
+}
+/* Path layer sliders - base styles (overrides injected via JS) */
+.path-control-row input[type="range"] {
+    flex: 1;
+}
+.path-control-row select {
+    flex: 1;
+    height: 24px;
+    font-size: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    color: #e6edf3;
+    padding: 2px 6px;
+}
+.path-speed-val, .path-brush-val, .path-flow-val {
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    color: #4fc3f7;
+    min-width: 28px;
+    text-align: right;
+}
+
+/* Color picker in path layer */
+.path-color-picker {
+    width: 32px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+}
+.path-color-picker::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+.path-color-picker::-webkit-color-swatch {
+    border-radius: 2px;
+    border: none;
+}
+.path-use-brush-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: auto;
+}
+.path-use-brush-btn:hover {
+    background: rgba(100, 200, 255, 0.15);
+    border-color: rgba(100, 200, 255, 0.3);
+}
+
+/* Shape preset buttons */
+.path-shapes-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+    padding: 6px 0;
+}
+.path-shape-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.path-shape-btn:hover {
+    background: rgba(100, 200, 255, 0.15);
+    border-color: rgba(100, 200, 255, 0.3);
+    transform: scale(1.05);
+}
+.path-shape-btn:active {
+    transform: scale(0.95);
+}
+
+/* Draw path button */
+.path-draw-btn {
+    width: 100%;
+    padding: 8px 12px;
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    background: linear-gradient(180deg, rgba(100, 200, 255, 0.18), rgba(100, 200, 255, 0.08));
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 6px;
+    color: rgba(100, 200, 255, 0.95);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.path-draw-btn:hover {
+    background: linear-gradient(180deg, rgba(100, 200, 255, 0.25), rgba(100, 200, 255, 0.12));
+    border-color: rgba(100, 200, 255, 0.5);
+}
+
+/* Path preview canvas */
+.path-preview-canvas {
+    width: 100%;
+    height: 60px;
+    border-radius: 6px;
+    margin-top: 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Path Draw Overlay ── */
+#pathDrawOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+#pathDrawOverlay .draw-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(15, 20, 27, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 13px;
+}
+
+#pathDrawOverlay .draw-toolbar button {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+}
+
+#pathDrawDone {
+    background: rgba(80, 200, 120, 0.9);
+    color: white;
+}
+
+#pathDrawCancel {
+    background: rgba(255, 100, 100, 0.9);
+    color: white;
+}
+
+#pathDrawCanvas {
+    flex: 1;
+    cursor: crosshair;
+}
+
+.draw-canvas-area {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+}
+.draw-canvas-area canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ================================================================
+   COLLAPSIBLE LAYER CONTAINERS (refactored)
+   ================================================================ */
+
+/* Generic collapsible layer item pattern */
+.layer-item-collapsible {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: grid-template-rows 0.25s ease;
+}
+.layer-item-collapsible.collapsed {
+    grid-template-rows: auto 0fr;
+}
+.layer-item-collapsible .layer-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    cursor: grab;
+}
+.layer-item-collapsible .layer-body {
+    overflow: hidden;
+    min-height: 0;
+}
+.layer-item-collapsible.collapsed .layer-body {
+    visibility: hidden;
+}
+
+
+
+/* ── Path layer action row (Draw + Move/Resize) ── */
+.path-action-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+.path-action-row .path-draw-btn {
+    margin-top: 0;
+    flex: 1;
+}
+.path-transform-btn {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.path-transform-btn:hover:not(:disabled) {
+    background: rgba(100, 200, 255, 0.12);
+    border-color: rgba(100, 200, 255, 0.4);
+    color: var(--accent-cool);
+}
+.path-transform-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* ── Path layers empty state ── */
+.path-empty-state {
+    text-align: center;
+    padding: 18px 12px;
+    border: 1px dashed rgba(100, 200, 255, 0.25);
+    border-radius: 8px;
+    background: rgba(100, 200, 255, 0.03);
+}
+.path-empty-icon {
+    font-size: 20px;
+    opacity: 0.6;
+    margin-bottom: 6px;
+}
+.path-empty-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+.path-empty-hint {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+.path-empty-create {
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    background: linear-gradient(180deg, rgba(100, 200, 255, 0.18), rgba(100, 200, 255, 0.08));
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 6px;
+    color: var(--accent-cool);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.path-empty-create:hover {
+    background: linear-gradient(180deg, rgba(100, 200, 255, 0.25), rgba(100, 200, 255, 0.12));
+    border-color: rgba(100, 200, 255, 0.5);
+}
+
+/* ── Path Transform Overlay (move / resize) — mirrors the draw overlay ── */
+#pathTransformOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+#pathTransformOverlay .draw-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(15, 20, 27, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 13px;
+}
+#pathTransformOverlay .draw-toolbar button {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+}
+#pathTransformDone {
+    background: rgba(80, 200, 120, 0.9);
+    color: white;
+}
+#pathTransformCancel {
+    background: rgba(255, 100, 100, 0.9);
+    color: white;
+}
+#pathTransformCanvas {
+    flex: 1;
+    touch-action: none;
+}
+
+
+/* ── Layer Transform Overlay (move / resize / rotate image layers) ──
+   Amber chrome to distinguish from the cyan sim border. Transparent
+   backdrop so the artwork stays fully visible while transforming. */
+#layerTransformOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+}
+#layerTransformOverlay .draw-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(15, 20, 27, 0.95);
+    border-bottom: 1px solid rgba(255, 190, 70, 0.25);
+    color: white;
+    font-size: 13px;
+}
+#layerTransformOverlay .layer-transform-title {
+    font-weight: 600;
+    color: rgba(255, 190, 70, 0.95);
+}
+#layerTransformOverlay .layer-transform-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+#layerTransformOverlay .draw-toolbar button {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+}
+#layerTransformDone {
+    background: rgba(80, 200, 120, 0.9);
+    color: white;
+}
+#layerTransformCancel {
+    background: rgba(255, 100, 100, 0.9);
+    color: white;
+}
+#layerTransformCanvas {
+    flex: 1;
+    touch-action: none;
+}
+
+/* Layer being transformed is forced visible above everything (incl. the
+   opaque sim canvas) so hidden collision masks can be positioned by eye.
+   !important beats the inline display/opacity/z-index set per layer;
+   renderLayers() restores normal state when the overlay closes. */
+body.layer-transform-active .background-layer.transform-ghost {
+    display: block !important;
+    opacity: 0.65 !important;
+    z-index: 3000 !important;
+}
+
+/* While transforming a layer, dim the sim border / wrapper chrome so the
+   amber layer handles are unambiguous */
+body.layer-transform-active #canvas-wrapper .resize-handle {
+    opacity: 0.12;
+    pointer-events: none;
+}
+body.layer-transform-active #canvas-size-display {
+    opacity: 0 !important;
+}
+
+/* ── Branding overlay arrange mode ── */
+#branding-arrange-canvas {
+    /* sized/positioned inline; swallows pointer events so painting is paused */
+}
+#branding-arrange-bar {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10020; /* above #branding-arrange-canvas (10010) so Done stays clickable */
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(15, 20, 27, 0.96);
+    border: 1px solid rgba(255, 130, 170, 0.35);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    color: white;
+    font-size: 13px;
+    pointer-events: auto;
+}
+#branding-arrange-bar .ba-title {
+    font-weight: 700;
+    color: rgba(255, 130, 170, 0.95);
+    white-space: nowrap;
+}
+#branding-arrange-bar .ba-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+#brandingArrangeDone {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    background: rgba(80, 200, 120, 0.9);
+    color: white;
+}
+#brandingArrangeDone:hover { background: rgba(80, 200, 120, 1); }
+
+/* While arranging, dim the sim border chrome so the pink overlay handles read
+   clearly, and — critically — make every other interactive layer in the
+   canvas-area non-blocking so the arrange canvas is the sole click target.
+   (#canvas-wrapper has no stacking context, so these would otherwise capture
+   clicks above/around the overlays.) */
+body.branding-arrange-active #canvas-wrapper .resize-handle {
+    opacity: 0.12;
+    pointer-events: none !important;
+}
+body.branding-arrange-active .layer-resize-handle,
+body.branding-arrange-active .background-layer,
+body.branding-arrange-active .background-layer.active,
+body.branding-arrange-active .background-layer.active.dragging {
+    pointer-events: none !important;
+}
+body.branding-arrange-active #canvas-size-display {
+    opacity: 0 !important;
+}
+/* The arrange toggle button reflects active state */
+.branding-arrange-btn.active {
+    background: rgba(255, 130, 170, 0.35) !important;
+    border-color: rgba(255, 130, 170, 0.6) !important;
+    color: #fff !important;
+}

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fluid-ui-static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "C:\\Users\\Gabri\\AppData\\Local\\Temp\\claude\\fluid-ui-preview-root", "-c-1"],
+      "autoPort": true
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "public", "-p", "8092", "-c-1"],
+      "port": 8092
+    }
+  ]
+}

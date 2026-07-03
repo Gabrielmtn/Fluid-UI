@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>SAM Transformers.js Test Harness</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #050816;
+            color: #e5e7eb;
+            margin: 0;
+            padding: 24px;
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 20px;
+        }
+        #log {
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+            background: #020617;
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid #1f2937;
+            max-height: 70vh;
+            overflow: auto;
+            font-size: 12px;
+        }
+        .hint {
+            margin-bottom: 12px;
+            color: #9ca3af;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <h1>SAM / Transformers.js Standalone Test</h1>
+    <div class="hint">
+        Open DevTools (F12) and check the console as well as the log below.
+        This runs the official <code>Xenova/slimsam-77-uniform</code> example directly in the browser.
+    </div>
+    <pre id="log">[boot] Loading test harness...
+</pre>
+
+    <script type="module" src="./sam-test.js"></script>
+</body>
+</html>

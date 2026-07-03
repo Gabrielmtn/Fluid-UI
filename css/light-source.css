@@ -1,0 +1,21 @@
+/* Light Source Inline Controls - Minimal CSS (most styling is inline in HTML) */
+
+/* Smooth transitions for light dot */
+.light-dot {
+    transition: left 0.1s ease, top 0.1s ease;
+}
+
+.light-dot::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    background: rgba(255, 255, 255, 1);
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
+}
+
+/* Gradient overlay (no transition — composited updates only) */

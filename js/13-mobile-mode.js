@@ -1,0 +1,205 @@
+/**
+ * Mobile Mode Handler
+ * Detects mobile devices and provides fullscreen mode with hidden menu
+ */
+
+(function() {
+    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+    const mobileMenuClose = document.getElementById('mobileMenuClose');
+    function getControls() { return document.getElementById('sidebar-right') || document.querySelector('.controls'); }
+    let controls = getControls(); // initial ref, updated after layout
+    let tapTimeout = null;
+    let isMobileMode = false;
+
+    // Detect if device is mobile/tablet
+    function isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+            || (window.innerWidth <= 768);
+    }
+
+    // Enable mobile mode
+    function enableMobileMode() {
+        isMobileMode = true;
+        document.body.classList.add('mobile-mode');
+        
+        // Hide menu by default
+        if (controls) {
+            controls.classList.remove('visible');
+        }
+        
+        // Show the menu toggle button immediately on mobile
+        if (mobileMenuToggle) {
+            mobileMenuToggle.classList.add('show');
+        }
+        
+        console.log('Mobile mode enabled');
+    }
+
+    // Disable mobile mode
+    function disableMobileMode() {
+        isMobileMode = false;
+        document.body.classList.remove('mobile-mode');
+        
+        if (controls) {
+            controls.classList.remove('visible');
+        }
+        
+        if (mobileMenuToggle) {
+            mobileMenuToggle.classList.remove('show');
+        }
+
+        restoreMixerStrip();
+        console.log('Mobile mode disabled');
+    }
+
+    // The mixer strip (quick faders + style presets + action buttons) is
+    // display:none in the top bar on mobile, so those controls are otherwise
+    // unreachable. Relocate it into the top of the slide-out menu so mobile users
+    // get everything. Reparenting preserves the wired handlers; CSS reflows it to
+    // fit (flex-wrap). Done lazily on first menu-open (the layout exists by then).
+    var mixerStripHome = null;
+    function relocateMixerStripToMenu() {
+        var strip = document.getElementById('mixer-strip');
+        var menu = document.getElementById('sidebar-right');
+        if (!strip || !menu || strip.parentElement === menu) return;
+        mixerStripHome = { parent: strip.parentElement, next: strip.nextElementSibling };
+        menu.insertBefore(strip, menu.firstChild);
+    }
+    function restoreMixerStrip() {
+        var strip = document.getElementById('mixer-strip');
+        if (!strip || !mixerStripHome || !mixerStripHome.parent) return;
+        mixerStripHome.parent.insertBefore(strip, mixerStripHome.next);
+        mixerStripHome = null;
+    }
+
+    // Toggle menu visibility
+    function toggleMenu() {
+        controls = getControls(); // re-fetch: the mixer layout builds #sidebar-right later
+        if (!controls) return;
+        if (isMobileMode) relocateMixerStripToMenu(); // bring faders + presets into the menu
+        controls.classList.toggle('visible');
+    }
+
+    // Show menu button temporarily when tapping top-right
+    function handleTap(e) {
+        if (!isMobileMode || !mobileMenuToggle) return;
+        
+        const x = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        const y = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        
+        // Check if tap is in top-right corner (60x60 area)
+        const isTopRight = x > window.innerWidth - 60 && y < 60;
+        
+        if (isTopRight) {
+            mobileMenuToggle.classList.add('show');
+            
+            // Hide button after 3 seconds if menu isn't open
+            if (tapTimeout) clearTimeout(tapTimeout);
+            tapTimeout = setTimeout(() => {
+                if (!controls.classList.contains('visible')) {
+                    mobileMenuToggle.classList.remove('show');
+                }
+            }, 3000);
+        }
+    }
+
+    // Initialize
+    function init() {
+        // Re-bind controls to pick up #sidebar-right if mixer layout has created it
+        setTimeout(function() { controls = getControls(); }, 100);
+
+        // Check if mobile on load
+        if (isMobileDevice()) {
+            enableMobileMode();
+        }
+
+        // A single tap fires a pointer/touch event AND a synthetic click ~ms apart;
+        // firing the toggle on both flips it twice (open→closed) so touch "does
+        // nothing". Route every activation through one handler that swallows the
+        // duplicate from the same tap. pointerup covers mouse + touch; click is the
+        // keyboard/fallback path. (Each button gets its own debounce closure.)
+        function tapHandler(action) {
+            var last = 0;
+            return function (e) {
+                e.stopPropagation();
+                var now = Date.now();
+                if (now - last < 500) return; // duplicate event from the same tap
+                last = now;
+                action();
+            };
+        }
+        if (mobileMenuToggle) {
+            var onToggle = tapHandler(toggleMenu);
+            mobileMenuToggle.addEventListener('pointerup', onToggle);
+            mobileMenuToggle.addEventListener('click', onToggle);
+        }
+        if (mobileMenuClose) {
+            var onClose = tapHandler(function () {
+                controls = getControls();
+                if (controls) controls.classList.remove('visible');
+            });
+            mobileMenuClose.addEventListener('pointerup', onClose);
+            mobileMenuClose.addEventListener('click', onClose);
+        }
+
+        // Tap detection for showing menu button
+        document.addEventListener('touchstart', handleTap);
+        document.addEventListener('click', handleTap);
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!isMobileMode || !controls) return;
+            
+            const isMenuVisible = controls.classList.contains('visible');
+            const clickedInsideMenu = controls.contains(e.target);
+            const clickedToggle = mobileMenuToggle && mobileMenuToggle.contains(e.target);
+            
+            if (isMenuVisible && !clickedInsideMenu && !clickedToggle) {
+                controls.classList.remove('visible');
+            }
+        });
+
+        // The canvas swallows synthetic clicks (it preventDefaults touch for
+        // painting), so the click-outside handler above never fires for a canvas tap.
+        // Catch the touch in the CAPTURE phase: if the menu is open and you tap
+        // outside it, dismiss it and consume the tap so it doesn't also paint.
+        document.addEventListener('touchstart', (e) => {
+            if (!isMobileMode) return;
+            var c = getControls();
+            if (!c || !c.classList.contains('visible')) return;
+            var t = e.target;
+            if (c.contains(t)) return;                                    // inside the menu
+            if (mobileMenuToggle && mobileMenuToggle.contains(t)) return; // the toggle
+            c.classList.remove('visible');
+            e.stopPropagation();   // don't also paint this dismiss tap
+            e.preventDefault();
+        }, { capture: true, passive: false });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const shouldBeMobile = isMobileDevice();
+            
+            if (shouldBeMobile && !isMobileMode) {
+                enableMobileMode();
+            } else if (!shouldBeMobile && isMobileMode) {
+                disableMobileMode();
+            }
+        });
+
+        // Expose toggle function for manual control
+        window.toggleMobileMode = () => {
+            if (isMobileMode) {
+                disableMobileMode();
+            } else {
+                enableMobileMode();
+            }
+        };
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
