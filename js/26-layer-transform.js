@@ -243,6 +243,18 @@
         layerIndex = index;
         original = { x: layer.x, y: layer.y, scaleX: layer.scaleX, scaleY: layer.scaleY, rotation: layer.rotation || 0 };
 
+        // Make sure the layer content is actually visible while transforming —
+        // collision layers are often hidden, which used to leave the user
+        // dragging a blind wireframe. The .transform-ghost class forces
+        // display/opacity/z-index via CSS; renderLayers() on close restores.
+        const layerDiv = document.getElementById('layer' + index);
+        if (layerDiv) {
+            if (layer.isCollision && typeof window.applyLayerMask === 'function') {
+                window.applyLayerMask(index); // ensure preview reflects current threshold/invert
+            }
+            layerDiv.classList.add('transform-ghost');
+        }
+
         overlay = document.createElement('div');
         overlay.id = 'layerTransformOverlay';
         overlay.innerHTML = `
@@ -295,6 +307,8 @@
         if (!overlay) return;
         cleanupFns.forEach(fn => fn());
         cleanupFns = [];
+        const ghostDiv = layerIndex !== null ? document.getElementById('layer' + layerIndex) : null;
+        if (ghostDiv) ghostDiv.classList.remove('transform-ghost');
         overlay.remove();
         overlay = null;
         tCanvas = null;

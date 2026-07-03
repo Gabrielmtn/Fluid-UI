@@ -4,8 +4,8 @@
     {
       "name": "fluid-ui-static",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["http-server", "-p", "8080", "-c-1"],
-      "port": 8080
+      "runtimeArgs": ["http-server", "C:\\Users\\Gabri\\AppData\\Local\\Temp\\claude\\fluid-ui-preview-root", "-c-1"],
+      "autoPort": true
     },
     {
       "name": "web",

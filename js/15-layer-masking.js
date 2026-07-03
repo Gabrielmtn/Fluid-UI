@@ -746,31 +746,36 @@
         
         // Draw background based on layer type
         if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
-            // For image layers, draw the actual layer image
+            // For image layers, draw the ORIGINAL layer image — not the div's
+            // current background, which is the already-masked (and for
+            // collision layers orange-tinted) preview and would double up
+            // with the mask overlay drawn on top.
             const layerIndex = parseInt(maskState.activeMaskLayerId.replace('image-', ''));
+            const layer = (window.layers || []).find(l => l.index === layerIndex);
             const layerDiv = document.getElementById(`layer${layerIndex}`);
-            
-            if (layerDiv) {
-                // Get the background image from the layer div
+
+            let imgSrc = layer ? (layer.originalData || layer.data) : null;
+            if (!imgSrc && layerDiv) {
                 const bgImage = window.getComputedStyle(layerDiv).backgroundImage;
-                if (bgImage && bgImage !== 'none') {
-                    const img = new Image();
-                    img.onload = () => {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        
-                        drawWithTransform(() => {
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            // Add semi-transparent overlay to make shapes more visible
-                            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                            ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        });
-                        
-                        // Redraw shapes after image loads
-                        drawMaskShapesWithTransform(ctx);
-                    };
-                    img.src = bgImage.slice(5, -2); // Remove 'url("' and '")'
-                    return; // Exit early, will redraw when image loads
-                }
+                if (bgImage && bgImage !== 'none') imgSrc = bgImage.slice(5, -2); // strip 'url("' and '")'
+            }
+            if (imgSrc) {
+                const img = new Image();
+                img.onload = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    drawWithTransform(() => {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        // Add semi-transparent overlay to make shapes more visible
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    });
+
+                    // Redraw shapes after image loads
+                    drawMaskShapesWithTransform(ctx);
+                };
+                img.src = imgSrc;
+                return; // Exit early, will redraw when image loads
             }
         } else {
             // For recording layers, draw the fluid simulation canvas
@@ -965,23 +970,18 @@
                 if (match) { r = parseInt(match[1]); g = parseInt(match[2]); b = parseInt(match[3]); a = match[4] ? parseFloat(match[4]) : 1.0; }
             }
 
-            var dw = shape.depthWidth;
-            var dh = shape.depthHeight;
-            for (let y = 0; y < dh; y++) {
-                const srcY = dh - 1 - y; // flip vertically
-                for (let x = 0; x < dw; x++) {
-                    const srcI = srcY * dw + x;
-                    const dstI = y * dw + x;
-                    const dv = shape.depthData[srcI] || 0;
-                    const isObstacle = invert ? (dv < threshold) : (dv >= threshold);
-                    const idx = dstI * 4;
-                    if (isObstacle) {
-                        data[idx] = r; data[idx + 1] = g; data[idx + 2] = b;
-                        data[idx + 3] = Math.floor(a * 255);
-                    } else {
-                        data[idx] = dv; data[idx + 1] = dv; data[idx + 2] = dv;
-                        data[idx + 3] = 40;
-                    }
+            // No flip: depth data is stored top-down, same as this canvas
+            // (matches drawMaskShape in 05m and the obstacle compositor)
+            for (let i = 0, n = shape.depthWidth * shape.depthHeight; i < n; i++) {
+                const dv = shape.depthData[i] || 0;
+                const isObstacle = invert ? (dv < threshold) : (dv >= threshold);
+                const idx = i * 4;
+                if (isObstacle) {
+                    data[idx] = r; data[idx + 1] = g; data[idx + 2] = b;
+                    data[idx + 3] = Math.floor(a * 255);
+                } else {
+                    data[idx] = dv; data[idx + 1] = dv; data[idx + 2] = dv;
+                    data[idx + 3] = 40;
                 }
             }
 
@@ -1596,6 +1596,11 @@
         // Apply mask to layer immediately
         if (save && layer && typeof window.applyLayerMask === 'function') {
             window.applyLayerMask(layerIndex);
+        }
+
+        // Collision layers: re-composite the physics obstacle from the edited mask
+        if (save && layer && layer.isCollision && window.collisionLayers) {
+            window.collisionLayers.updateObstacleFromLayers();
         }
 
         // Refresh UI

@@ -61,15 +61,23 @@
             }
             const targetWidth = canvasWrapper.clientWidth;
             const targetHeight = canvasWrapper.clientHeight;
-            if (canvas.width !== targetWidth || canvas.height !== targetHeight || window.needsFramebufferReinit) {
-                // console.log('[RESIZE]', 'canvas:', canvas.width, 'x', canvas.height, '→ target:', targetWidth, 'x', targetHeight);
-                canvas.width = targetWidth;
-                canvas.height = targetHeight;
-                // Lock CSS to explicit pixels (matches updateCanvasSize behavior).
-                // Without this, the CSS '100%' sizing can cause compositor differences
-                // in Electron's transparent window mode.
-                canvas.style.width = targetWidth + 'px';
-                canvas.style.height = targetHeight + 'px';
+            const canvasSizeChanged = canvas.width !== targetWidth || canvas.height !== targetHeight;
+            if (canvasSizeChanged || window.needsFramebufferReinit) {
+                // Assigning canvas.width/height — even to the SAME value — clears
+                // the drawing buffer to transparent, flashing any layer div under
+                // the canvas until the next display blit. Governor tier changes
+                // arrive here via needsFramebufferReinit with an unchanged canvas
+                // size (they only rescale internal FBOs), so only touch the
+                // canvas dims when they actually differ.
+                if (canvasSizeChanged) {
+                    canvas.width = targetWidth;
+                    canvas.height = targetHeight;
+                    // Lock CSS to explicit pixels (matches updateCanvasSize behavior).
+                    // Without this, the CSS '100%' sizing can cause compositor differences
+                    // in Electron's transparent window mode.
+                    canvas.style.width = targetWidth + 'px';
+                    canvas.style.height = targetHeight + 'px';
+                }
                 initFramebuffers();
                 exposeSimStats(); // Update stats after resize
                 window.needsFramebufferReinit = false;

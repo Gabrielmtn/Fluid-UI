@@ -347,7 +347,19 @@ class DepthEstimator {
 
         var depth = { width: tw, height: th, data: collisionData };
         var thumbUrl = layer.originalData || layer.data;
-        addCollisionLayer(depth, thumbUrl, (layer.title || 'Layer') + ' Collision');
+        addCollisionLayer(depth, thumbUrl, (layer.title || 'Layer') + ' Collision', _transformOf(layer));
+    }
+
+    // Copy a source layer's transform so the generated collision layer
+    // lands exactly where the source layer is displayed on screen.
+    function _transformOf(layer) {
+        return {
+            x: layer.x || 0,
+            y: layer.y || 0,
+            scaleX: layer.scaleX || 1,
+            scaleY: layer.scaleY || 1,
+            rotation: layer.rotation || 0
+        };
     }
 
     // ── Mode 2: Luminance-threshold alpha from original image ─────
@@ -386,7 +398,7 @@ class DepthEstimator {
             }
 
             var depth = { width: tw, height: th, data: collisionData };
-            addCollisionLayer(depth, imgSrc, (layer.title || 'Layer') + ' Collision');
+            addCollisionLayer(depth, imgSrc, (layer.title || 'Layer') + ' Collision', _transformOf(layer));
         };
         img.src = imgSrc;
     }
@@ -421,7 +433,7 @@ class DepthEstimator {
             }
 
             var depth = { width: tw, height: th, data: collisionData };
-            addCollisionLayer(depth, imgSrc, (layer.title || 'Layer') + ' Collision');
+            addCollisionLayer(depth, imgSrc, (layer.title || 'Layer') + ' Collision', _transformOf(layer));
         };
         img.src = imgSrc;
     }
@@ -587,8 +599,11 @@ class DepthEstimator {
         addCollisionLayer(depth, thumbUrl, 'Snapshot');
     }
 
-    // Add a collision layer to the layer system
-    function addCollisionLayer(depth, thumbnailUrl, name) {
+    // Add a collision layer to the layer system.
+    // opts: { x, y, scaleX, scaleY, rotation, visible } — transform is copied
+    // from the source layer so the collision lines up with it on screen.
+    function addCollisionLayer(depth, thumbnailUrl, name, opts) {
+        opts = opts || {};
         // Use the existing layer capture mechanism
         if (typeof window.layers === 'undefined' || typeof window.renderLayers !== 'function') {
             console.warn('⚠️ Layer system not available');
@@ -621,15 +636,30 @@ class DepthEstimator {
         var canvasWrapper = document.getElementById('canvas-wrapper');
         if (!canvasWrapper) canvasWrapper = canvasEl ? canvasEl.parentElement : document.body;
 
-        var layerDiv = document.createElement('div');
-        layerDiv.id = 'layer' + newIndex;
-        layerDiv.className = 'canvas-layer';
+        // REUSE the pre-existing static layerN div (index.html #layers-container).
+        // Creating a second element with the same id makes it unreachable —
+        // getElementById always returns the static one, so toggle/tint/delete
+        // hit that while the duplicate stays on screen as an unhideable
+        // "white outline". Only create a div if the slot has no static one.
+        var layerDiv = document.getElementById('layer' + newIndex);
+        if (!layerDiv) {
+            layerDiv = document.createElement('div');
+            layerDiv.id = 'layer' + newIndex;
+            // Must be .background-layer — the class regular layers use for
+            // absolute fill-the-wrapper positioning ('canvas-layer' has no CSS,
+            // which left collision divs 0px tall and permanently invisible)
+            layerDiv.className = 'background-layer';
+            var layersHost = document.getElementById('layers-container') || canvasWrapper;
+            layersHost.appendChild(layerDiv);
+        }
         layerDiv.style.backgroundImage = 'url(' + depthDataUrl + ')';
-        layerDiv.style.backgroundSize = 'cover';
+        // Stretch to the div (which fills the wrapper) — same mapping the
+        // obstacle compositor uses, so preview and collision stay aligned.
+        layerDiv.style.backgroundSize = '100% 100%';
         layerDiv.style.backgroundPosition = 'center';
-        layerDiv.style.display = 'none'; // collision layers are invisible by default
-        layerDiv.style.opacity = '0.3';
-        canvasWrapper.appendChild(layerDiv);
+        var startVisible = opts.visible !== false; // visible by default so the mask can be seen/aligned
+        layerDiv.style.display = startVisible ? 'block' : 'none';
+        layerDiv.style.opacity = '0.55';
 
         // Add to layers array
         var layer = {
@@ -637,12 +667,12 @@ class DepthEstimator {
             data: depthDataUrl,
             originalData: thumbnailUrl || depthDataUrl,
             title: '🧱 ' + (name || 'Collision'),
-            visible: false,
+            visible: startVisible,
             active: false,
             threshold: 0,
-            x: 0, y: 0,
-            scaleX: 1, scaleY: 1,
-            rotation: 0,
+            x: opts.x || 0, y: opts.y || 0,
+            scaleX: opts.scaleX || 1, scaleY: opts.scaleY || 1,
+            rotation: opts.rotation || 0,
             isCollision: true,
             collisionMode: 'block',   // block | slow | deflect
             collisionStrength: 0.7,
@@ -666,9 +696,10 @@ class DepthEstimator {
 
         window.layers.push(layer);
 
-        // Add to layer order
+        // Add to layer order at the TOP so the mask preview isn't hidden
+        // behind the (opaque) sim canvas
         if (typeof window.layerOrder !== 'undefined') {
-            window.layerOrder.push({ type: 'layer', id: newIndex });
+            window.layerOrder.unshift({ type: 'layer', id: newIndex });
         }
 
         // Render and update
@@ -795,30 +826,34 @@ class DepthEstimator {
                 var invert = !!shape.invert;
                 var alphaVal = Math.round((layer.collisionStrength !== undefined ? layer.collisionStrength : 0.7) * 255);
 
-                for (var y = 0; y < th; y++) {
-                    var srcRow = (th - 1 - y) * tw; // flip vertically
-                    var dstRow = y * tw;
-                    for (var x = 0; x < tw; x++) {
-                        var dv = shape.depthData[srcRow + x] || 0;
-                        var isObs = invert ? (dv < threshold) : (dv >= threshold);
-                        var idx = (dstRow + x) << 2; // *4 via shift
-                        d[idx] = 255;
-                        d[idx + 1] = 255;
-                        d[idx + 2] = 255;
-                        d[idx + 3] = isObs ? alphaVal : 0;
-                    }
+                // Composite in screen space (top-down). GL orientation is
+                // handled by a single vertical flip in updateObstacleTexture,
+                // so transforms here behave exactly like the CSS transform
+                // on the layer div.
+                for (var i = 0, n = tw * th; i < n; i++) {
+                    var dv = shape.depthData[i] || 0;
+                    var isObs = invert ? (dv < threshold) : (dv >= threshold);
+                    var idx = i << 2; // *4 via shift
+                    d[idx] = 255;
+                    d[idx + 1] = 255;
+                    d[idx + 2] = 255;
+                    d[idx + 3] = isObs ? alphaVal : 0;
                 }
 
                 _shapeCtx.putImageData(_shapeImgData, 0, 0);
 
-                // Apply layer transform (x, y, scaleX, scaleY, rotation)
-                // mapped from canvas-pixel space to sim-texture space
-                var canvasW = canvasEl.width || 1;
-                var canvasH = canvasEl.height || 1;
-                var mapX = simW / canvasW;
-                var mapY = simH / canvasH;
-                var lx = (layer.x || 0) * mapX;
-                var ly = (layer.y || 0) * mapY;
+                // Mirror the CSS pipeline: the layer div fills the wrapper
+                // (transform-origin center, translate → rotate → scale),
+                // layer.x/y are CSS px, shape rects are canvas-buffer px.
+                var wrap = document.getElementById('canvas-wrapper');
+                var cssW = (wrap && wrap.clientWidth) || canvasEl.clientWidth || canvasEl.width || 1;
+                var cssH = (wrap && wrap.clientHeight) || canvasEl.clientHeight || canvasEl.height || 1;
+                var bufW = canvasEl.width || 1;
+                var bufH = canvasEl.height || 1;
+                var lx = (layer.x || 0) * (simW / cssW);
+                var ly = (layer.y || 0) * (simH / cssH);
+                var sx = simW / bufW;
+                var sy = simH / bufH;
                 var lScaleX = layer.scaleX || 1;
                 var lScaleY = layer.scaleY || 1;
                 var lRot = (layer.rotation || 0) * Math.PI / 180;
@@ -827,13 +862,18 @@ class DepthEstimator {
 
                 obstacleCtx.save();
                 obstacleCtx.globalCompositeOperation = 'lighter';
-                // Mirror CSS transform: translate then rotate then scale around center
-                obstacleCtx.translate(cx, cy);
-                obstacleCtx.translate(lx, ly);
+                obstacleCtx.translate(cx + lx, cy + ly);
                 obstacleCtx.rotate(lRot);
                 obstacleCtx.scale(lScaleX, lScaleY);
                 obstacleCtx.translate(-cx, -cy);
-                obstacleCtx.drawImage(_shapeCanvas, 0, 0, simW, simH);
+                // Honor the shape rect (same rect the visible preview draws at)
+                obstacleCtx.drawImage(
+                    _shapeCanvas,
+                    (shape.x || 0) * sx,
+                    (shape.y || 0) * sy,
+                    (shape.width || bufW) * sx,
+                    (shape.height || bufH) * sy
+                );
                 obstacleCtx.restore();
             });
         });

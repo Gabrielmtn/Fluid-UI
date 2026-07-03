@@ -68,7 +68,10 @@
         cursorToggle: {def: true, mutScope: null},
         showCanvasHandles: {def: true, mutScope: null},
         lockCanvasBorders: {def: false, mutScope: null},
-        preserveFluidOpacity: {def: true, mutScope: "extended"},
+        // Display plumbing, not an aesthetic param: never mutate. A mutation
+        // flipping this off makes splats erase the canvas alpha ("layer
+        // fades out on click"), which reads as a bug, not a style variant.
+        preserveFluidOpacity: {def: true, mutScope: null},
         statsToggle: {def: false, mutScope: null},
         transparentMode: {def: false, mutScope: null},
         randomColor: {def: true, mutScope: "basic"},

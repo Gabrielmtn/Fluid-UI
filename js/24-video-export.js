@@ -1,4 +1,3 @@
-// NOT LOADED by index.html in this copy
 // Multi-Format Export System
 // Supports: Video (WebM), GIF (inline encoder), PNG/JPG stills, PNG sequences
 // Zero external dependencies — GIF encoder is fully inline
@@ -172,8 +171,8 @@
                     ctx.globalAlpha = 1;
                 });
 
-                if (cfg.compositeOverlays && window.brandingOverlays && window.brandingOverlays.render) {
-                    window.brandingOverlays.render(ctx, w, h);
+                if (cfg.compositeOverlays && window.brandingOverlays && window.brandingOverlays.compositeOntoCanvas) {
+                    window.brandingOverlays.compositeOntoCanvas(ctx, { width: w, height: h });
                 }
                 resolve(comp);
             }).catch(reject);

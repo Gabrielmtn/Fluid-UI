@@ -219,8 +219,14 @@
                 var imgData = _obsTempCtx.getImageData(0, 0, w, h);
                 var d = imgData.data;
                 var f = _obsFloatBuf;
-                for (var i = 0, n = w * h; i < n; i++) {
-                    f[i] = d[i * 4 + 3] * (1 / 255);
+                // The obstacle canvas is composited in screen space (top-down);
+                // GL textures put row 0 at the bottom, so flip once here.
+                for (var y = 0; y < h; y++) {
+                    var src = y * w;
+                    var dst = (h - 1 - y) * w;
+                    for (var x = 0; x < w; x++) {
+                        f[dst + x] = d[(src + x) * 4 + 3] * (1 / 255);
+                    }
                 }
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
                 gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RED, gl.FLOAT, f);

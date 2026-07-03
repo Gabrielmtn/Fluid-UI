@@ -55,8 +55,10 @@
     // All checkbox IDs to save/load
     var CHECKBOX_IDS = [
         // Display
+        // (preserveFluidOpacity is deliberately NOT persisted — "Empty Alpha
+        // Locked" must default to checked on every launch; session-only toggle)
         'cursorToggle','showCanvasHandles','lockCanvasBorders',
-        'preserveFluidOpacity','statsToggle','transparentMode',
+        'statsToggle','transparentMode',
         // Colors
         'randomColor','stepPalette',
         // Kaleidoscope
@@ -739,6 +741,9 @@
         try {
             if (snapshot.checkboxes) {
                 Object.keys(snapshot.checkboxes).forEach(function(id) {
+                    // "Empty Alpha Locked" is session-only: it must stay at its
+                    // checked default, so old presets that captured it are ignored
+                    if (id === 'preserveFluidOpacity') return;
                     if (reg && reg.coerceCheckbox(id, snapshot.checkboxes[id]) === null) {
                         console.warn('[Preset] skipping unknown checkbox', id); return;
                     }
@@ -989,6 +994,11 @@
                 if (canvasWrapper) {
                     var dynamicDivs = canvasWrapper.querySelectorAll('.canvas-layer');
                     dynamicDivs.forEach(function(d) { d.remove(); });
+                    // Also remove stray duplicate layerN divs parented directly to
+                    // the wrapper (old collision-layer code created these alongside
+                    // the static ones in #layers-container; getElementById never
+                    // reaches them, so they'd otherwise ghost on screen forever)
+                    canvasWrapper.querySelectorAll(':scope > .background-layer').forEach(function(d) { d.remove(); });
                 }
                 // Reset pre-existing background-layer divs
                 for (var ri = 0; ri < 10; ri++) {
@@ -1017,16 +1027,23 @@
 
                     var layerDiv;
                     if (ld.isCollision) {
-                        // Collision layers need a dynamically-created div (like 23-depth-collision.js)
-                        layerDiv = document.createElement('div');
-                        layerDiv.id = 'layer' + ld.index;
-                        layerDiv.className = 'canvas-layer';
+                        // Collision layers REUSE the static layerN div like regular
+                        // layers — a duplicate id is unreachable via getElementById,
+                        // leaving an unhideable/undeletable ghost preview on screen.
+                        layerDiv = document.getElementById('layer' + ld.index);
+                        if (!layerDiv) {
+                            layerDiv = document.createElement('div');
+                            layerDiv.id = 'layer' + ld.index;
+                            layerDiv.className = 'background-layer'; // same class as regular layers (canvas-layer has no CSS)
+                            var layersHost = document.getElementById('layers-container') || canvasWrapper;
+                            if (layersHost) layersHost.appendChild(layerDiv);
+                        }
                         layerDiv.style.backgroundImage = 'url(' + ld.data + ')';
-                        layerDiv.style.backgroundSize = 'cover';
+                        // Stretch — matches the obstacle compositor's mapping (see 23-depth-collision.js)
+                        layerDiv.style.backgroundSize = '100% 100%';
                         layerDiv.style.backgroundPosition = 'center';
                         layerDiv.style.display = ld.visible ? 'block' : 'none';
-                        layerDiv.style.opacity = '0.3';
-                        if (canvasWrapper) canvasWrapper.appendChild(layerDiv);
+                        layerDiv.style.opacity = '0.55';
                     } else {
                         // Regular image layers use pre-existing layerN divs
                         layerDiv = document.getElementById('layer' + ld.index);

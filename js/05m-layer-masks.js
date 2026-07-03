@@ -80,6 +80,13 @@
                     const radius = Math.max(1, Math.round((feather / 100) * 20));
                     featherMaskAlpha(ctx, maskCanvas.width, maskCanvas.height, radius);
                 }
+                if (layer.isCollision) {
+                    // Tint the preview orange so it reads as an obstacle, not artwork
+                    ctx.globalCompositeOperation = 'source-atop';
+                    ctx.fillStyle = 'rgba(255, 140, 60, 0.55)';
+                    ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+                    ctx.globalCompositeOperation = 'source-over';
+                }
                 layerDiv.style.backgroundImage = `url(${maskCanvas.toDataURL()})`;
             };
             img.src = layer.originalData || layer.data;
@@ -110,20 +117,17 @@
                 const data = _dmImgData.data;
                 // Zero out buffer — we only write obstacle pixels below
                 data.fill(0);
-                for (let y = 0; y < h; y++) {
-                    const srcY = h - 1 - y; // flip vertically
-                    for (let x = 0; x < w; x++) {
-                        const srcI = srcY * w + x;
-                        const dstI = y * w + x;
-                        const dv = shape.depthData[srcI] || 0;
-                        const isObstacle = invert ? (dv < threshold) : (dv >= threshold);
-                        if (isObstacle) {
-                            const idx = dstI * 4;
-                            data[idx] = 255;
-                            data[idx + 1] = 255;
-                            data[idx + 2] = 255;
-                            data[idx + 3] = 255;
-                        }
+                // No flip: depth data is stored top-down, same as this canvas.
+                // (GL orientation is handled once at obstacle-texture upload.)
+                for (let i = 0, n = w * h; i < n; i++) {
+                    const dv = shape.depthData[i] || 0;
+                    const isObstacle = invert ? (dv < threshold) : (dv >= threshold);
+                    if (isObstacle) {
+                        const idx = i * 4;
+                        data[idx] = 255;
+                        data[idx + 1] = 255;
+                        data[idx + 2] = 255;
+                        data[idx + 3] = 255;
                     }
                 }
                 _dmTempCtx.putImageData(_dmImgData, 0, 0);

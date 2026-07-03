@@ -1302,7 +1302,8 @@
                 if (off) {
                     recEnabled = false;
                     if (recMiniEl) recMiniEl.style.display = 'none';
-                    if (recDrawerEl) recDrawerEl.classList.remove('open');
+                    if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record') window.studioDrawer.close();
+                    else if (recDrawerEl) recDrawerEl.classList.remove('open');
                     // Stop any playback/recording
                     recStopPlayback();
                     const a = recGetActiveLayer();
@@ -1316,13 +1317,15 @@
 
                 if (min) {
                     if (recMiniEl) recMiniEl.style.display = '';
-                    if (recDrawerEl) recDrawerEl.classList.remove('open');
+                    if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record') window.studioDrawer.close();
+                    else if (recDrawerEl) recDrawerEl.classList.remove('open');
                     // Reflect current max into mini field
                     if (recMiniMaxInput) recMiniMaxInput.value = recFormatTime(recMaxDurationMs || 10000);
                     recRenderUI(); // update button texts for mini
                 } else if (full) {
                     if (recMiniEl) recMiniEl.style.display = 'none';
-                    if (recDrawerEl) recDrawerEl.classList.add('open');
+                    if (window.studioDrawer) window.studioDrawer.open('record');
+                    else if (recDrawerEl) recDrawerEl.classList.add('open');
                     // Reflect current max into full field
                     const dur = document.getElementById('recMaxDuration');
                     if (dur) dur.value = recFormatTime(recMaxDurationMs || 10000);

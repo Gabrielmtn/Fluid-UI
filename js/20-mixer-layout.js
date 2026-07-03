@@ -625,7 +625,7 @@
 
         sidebar.appendChild(buildFocusSection());
         sidebar.appendChild(buildMutationSection());
-        sidebar.appendChild(buildAudioReactiveSection());
+        sidebar.appendChild(buildAudioSection());
         sidebar.appendChild(buildBrandingSection());
         sidebar.appendChild(buildLayersSection(controls));
         sidebar.appendChild(buildAnimationsSection(controls));
@@ -2075,38 +2075,47 @@
         return sec;
     }
 
-    function buildAudioReactiveSection() {
-        const { sec, body } = makeSection('\ud83c\udfb5 Audio React', 'purple', true);
+    // \u2500\u2500\u2500 AUDIO \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // Sidebar holds a compact "Audio" mini + an Off/Min/Full mode select. The
+    // full React controls + the Composer segment timeline live in the shared
+    // bottom drawer (Audio tab). Mirrors the Record feature's mini/drawer split.
 
-        // Enable toggle
-        var enableGroup = document.createElement('div');
-        enableGroup.className = 'control-group checkbox-group';
-        var enableCb = document.createElement('input');
-        enableCb.type = 'checkbox';
-        enableCb.id = 'audioReactToggle';
-        var enableLbl = document.createElement('label');
-        enableLbl.setAttribute('for', 'audioReactToggle');
-        enableLbl.style.margin = '0';
-        enableLbl.textContent = 'Enable Audio Reactivity';
-        enableGroup.appendChild(enableCb);
-        enableGroup.appendChild(enableLbl);
-        body.appendChild(enableGroup);
+    var audioDrawerBuilt = false;
+    var audioMiniRaf = null;
 
-        // Source selector
-        var srcGroup = document.createElement('div');
-        srcGroup.className = 'control-group';
-        srcGroup.style.marginTop = '6px';
-        var srcLbl = document.createElement('label');
-        srcLbl.textContent = 'Audio Source';
-        srcLbl.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.4px;opacity:0.7;margin-bottom:4px;display:block';
-        var srcSel = document.createElement('select');
-        srcSel.id = 'audioReactSource';
-        srcSel.innerHTML = '<option value="mic">Microphone</option><option value="system">System Audio</option><option value="file">Audio File</option>';
-        srcGroup.appendChild(srcLbl);
-        srcGroup.appendChild(srcSel);
-        body.appendChild(srcGroup);
+    function buildAudioSection() {
+        const { sec, body } = makeSection('\ud83c\udfb5 Audio', 'purple', false);
 
-        // Hidden file input
+        // Mode select (Off / Minimized / Full) \u2014 mirrors recMode
+        var modeGroup = document.createElement('div');
+        modeGroup.className = 'control-group';
+        var modeLbl = document.createElement('label');
+        modeLbl.setAttribute('for', 'audioMode');
+        modeLbl.textContent = 'Audio Mode';
+        var modeSel = document.createElement('select');
+        modeSel.id = 'audioMode';
+        modeSel.innerHTML = '<option value="off" selected>Off</option><option value="min">Minimized</option><option value="full">Full</option>';
+        modeGroup.appendChild(modeLbl);
+        modeGroup.appendChild(modeSel);
+        body.appendChild(modeGroup);
+
+        // Minimized widget: enable + source + small segments timeline + Full button
+        var mini = document.createElement('div');
+        mini.id = 'audioMini';
+        mini.className = 'audio-mini';
+        mini.style.display = 'none';
+        mini.innerHTML =
+            '<div class="audio-mini-row">' +
+                '<label class="audio-mini-enable"><input type="checkbox" id="audioReactToggle"><span>Enable</span></label>' +
+                '<select id="audioReactSource" class="audio-mini-src">' +
+                    '<option value="mic">Mic</option><option value="system">System</option><option value="file">File</option>' +
+                '</select>' +
+            '</div>' +
+            '<canvas id="audioMiniTimeline" class="audio-mini-timeline" title="Composer segments"></canvas>' +
+            '<button id="audioOpenFullBtn" class="audio-mini-full" title="Open full audio panel">\u2b06\ufe0f Full Audio</button>';
+        body.appendChild(mini);
+
+        // Hidden file input used by the enable/source paths
         var fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.accept = 'audio/*';
@@ -2114,12 +2123,145 @@
         fileInput.id = 'audioReactFile';
         body.appendChild(fileInput);
 
+        var enableCb = mini.querySelector('#audioReactToggle');
+        var srcSel = mini.querySelector('#audioReactSource');
+        function enableFromSource() {
+            if (!window.audioReactive) return;
+            var src = srcSel.value;
+            if (src === 'file') fileInput.click();
+            else window.audioReactive.enable(src);
+        }
+        enableCb.addEventListener('change', function () {
+            if (!window.audioReactive) return;
+            if (enableCb.checked) enableFromSource();
+            else window.audioReactive.disable();
+        });
+        srcSel.addEventListener('change', function () {
+            if (enableCb.checked && window.audioReactive) { window.audioReactive.disable(); enableFromSource(); }
+        });
+        fileInput.addEventListener('change', function (e) {
+            var f = e.target.files && e.target.files[0];
+            if (f && window.audioReactive) window.audioReactive.enable('file', f);
+            else enableCb.checked = false;
+            fileInput.value = '';
+        });
+
+        mini.querySelector('#audioOpenFullBtn').addEventListener('click', function () {
+            modeSel.value = 'full';
+            modeSel.dispatchEvent(new Event('change'));
+        });
+
+        function applyAudioMode(mode) {
+            if (mode === 'off') {
+                mini.style.display = 'none';
+                if (window.audioReactive) window.audioReactive.disable();
+                if (enableCb) enableCb.checked = false;
+                if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
+                stopAudioMiniLoop();
+            } else if (mode === 'min') {
+                mini.style.display = '';
+                if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
+                startAudioMiniLoop();
+            } else if (mode === 'full') {
+                mini.style.display = 'none';
+                ensureAudioDrawer();
+                if (window.studioDrawer) window.studioDrawer.open('audio');
+                stopAudioMiniLoop();
+            }
+        }
+        modeSel.addEventListener('change', function (e) { applyAudioMode(e.target.value); });
+
+        // Build the drawer controls + composer up front (into the hidden panel) so
+        // their element IDs always exist for save/load, mutation locks, and the
+        // engine's viz registration — matching how the controls were always built
+        // before. The Audio tab just reveals the already-built panel.
+        ensureAudioDrawer();
+        applyAudioMode(modeSel.value);
+
+        return sec;
+    }
+
+    function ensureAudioDrawer() {
+        if (audioDrawerBuilt) return;
+        var panel = document.getElementById('audioDrawerPanel');
+        if (!panel) return;
+        buildAudioDrawerControls(panel);
+        audioDrawerBuilt = true;
+    }
+
+    // \u2500\u2500 Mini segments timeline (overlapping active areas) \u2500\u2500
+    function startAudioMiniLoop() {
+        if (audioMiniRaf) return;
+        var draw = function () { drawAudioMiniTimeline(); audioMiniRaf = requestAnimationFrame(draw); };
+        audioMiniRaf = requestAnimationFrame(draw);
+    }
+    function stopAudioMiniLoop() {
+        if (audioMiniRaf) { cancelAnimationFrame(audioMiniRaf); audioMiniRaf = null; }
+    }
+    function miniRoundRect(ctx, x, y, w, h, r) {
+        r = Math.min(r, h / 2, w / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+        ctx.fill();
+    }
+    function drawAudioMiniTimeline() {
+        var cv = document.getElementById('audioMiniTimeline');
+        if (!cv) return;
+        var rect = cv.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) return;
+        var dpr = window.devicePixelRatio || 1;
+        var w = Math.max(1, Math.round(rect.width * dpr));
+        var h = Math.max(1, Math.round(rect.height * dpr));
+        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+        var ctx = cv.getContext('2d');
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(0, 0, w, h);
+        var comp = window.audioComposer;
+        if (!comp || !comp.getState) return;
+        var st = comp.getState();
+        var dur = (comp.getDurationMs ? comp.getDurationMs() : st.durationMs) || 1;
+        var tracks = st.tracks || [];
+        var palette = comp.palette || ['#b48cff', '#4dd2ff', '#4dff7a', '#ffb24d', '#ff6fae'];
+        var n = Math.max(1, tracks.length);
+        var pad = 2 * dpr;
+        var laneH = (h - pad * (n + 1)) / n;
+        for (var i = 0; i < tracks.length; i++) {
+            var y = pad + i * (laneH + pad);
+            var color = palette[i % palette.length];
+            var segs = tracks[i].segments || [];
+            ctx.globalAlpha = 0.85;
+            for (var j = 0; j < segs.length; j++) {
+                var s = segs[j];
+                var x = (s.startMs / dur) * w;
+                var bw = Math.max(2 * dpr, (s.durMs / dur) * w);
+                ctx.fillStyle = color;
+                miniRoundRect(ctx, x, y, bw, laneH, 2 * dpr);
+            }
+        }
+        ctx.globalAlpha = 1;
+        var ph = comp.getPlayheadMs ? comp.getPlayheadMs() : 0;
+        var px = (ph / dur) * w;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = Math.max(1, dpr);
+        ctx.beginPath(); ctx.moveTo(px + 0.5, 0); ctx.lineTo(px + 0.5, h); ctx.stroke();
+    }
+
+    function buildAudioDrawerControls(container) {
+        container.innerHTML = '';
+        var body = container;
+
         // Visualizer canvas
         var vizWrap = document.createElement('div');
-        vizWrap.style.cssText = 'margin:8px 0;border-radius:4px;overflow:hidden;background:rgba(0,0,0,0.3);';
+        vizWrap.style.cssText = 'margin:8px 0;border-radius:6px;overflow:hidden;background:#000;';
         var vizCanvas = document.createElement('canvas');
         vizCanvas.id = 'audioReactViz';
-        vizCanvas.style.cssText = 'width:100%;height:48px;display:block;';
+        vizCanvas.style.cssText = 'width:100%;height:160px;display:block;background:#000;';
         vizWrap.appendChild(vizCanvas);
         body.appendChild(vizWrap);
 
@@ -2193,58 +2335,43 @@
             });
         });
 
-        // Auto-splat mode
+        // Auto-splat pattern — visual emission-pattern picker (drives the bass
+        // auto-splat generator). Tiles map to window.audioReactive generators.
         var splatModeGroup = document.createElement('div');
         splatModeGroup.className = 'control-group';
         splatModeGroup.style.marginTop = '8px';
         var splatModeLbl = document.createElement('label');
-        splatModeLbl.textContent = 'Auto-Splat Position';
+        splatModeLbl.textContent = 'Auto-Splat Pattern';
         splatModeLbl.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.4px;opacity:0.7;margin-bottom:4px;display:block';
-        var splatModeSel = document.createElement('select');
-        splatModeSel.id = 'audioAutoSplatMode';
-        splatModeSel.innerHTML = '<option value="center">Center</option><option value="random">Random</option><option value="circular">Circular</option>';
         splatModeGroup.appendChild(splatModeLbl);
-        splatModeGroup.appendChild(splatModeSel);
+
+        var patGrid = document.createElement('div');
+        patGrid.className = 'ar-pattern-grid';
+        var patterns = [
+            ['center', '◉', 'Center'], ['random', '✦', 'Scatter'], ['circular', '◯', 'Orbit'],
+            ['grid', '▦', 'Grid'], ['spiral', '🌀', 'Spiral'], ['radialBurst', '✺', 'Burst'],
+            ['freqMap', '∿', 'Freq']
+        ];
+        var patBtns = {};
+        patterns.forEach(function (p) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ar-pattern-btn' + (p[0] === 'center' ? ' active' : '');
+            b.dataset.gen = p[0];
+            b.title = p[2] + ' — bass auto-splat pattern';
+            b.innerHTML = '<span class="ar-pat-glyph">' + p[1] + '</span><span class="ar-pat-label">' + p[2] + '</span>';
+            b.addEventListener('click', function () {
+                Object.keys(patBtns).forEach(function (k) { patBtns[k].classList.remove('active'); });
+                b.classList.add('active');
+                if (window.audioReactive) window.audioReactive.setAutoSplatMode(p[0]);
+            });
+            patBtns[p[0]] = b;
+            patGrid.appendChild(b);
+        });
+        splatModeGroup.appendChild(patGrid);
         body.appendChild(splatModeGroup);
 
         // ─── Wire events ───
-        enableCb.addEventListener('change', function () {
-            if (!window.audioReactive) return;
-            if (enableCb.checked) {
-                var src = srcSel.value;
-                if (src === 'file') {
-                    fileInput.click();
-                } else {
-                    window.audioReactive.enable(src);
-                }
-            } else {
-                window.audioReactive.disable();
-            }
-        });
-
-        fileInput.addEventListener('change', function (e) {
-            var f = e.target.files && e.target.files[0];
-            if (f && window.audioReactive) {
-                window.audioReactive.enable('file', f);
-            } else {
-                enableCb.checked = false;
-            }
-            fileInput.value = '';
-        });
-
-        srcSel.addEventListener('change', function () {
-            // If already enabled, restart with new source
-            if (enableCb.checked && window.audioReactive) {
-                window.audioReactive.disable();
-                var src = srcSel.value;
-                if (src === 'file') {
-                    fileInput.click();
-                } else {
-                    window.audioReactive.enable(src);
-                }
-            }
-        });
-
         sensSlider.addEventListener('input', function () {
             var v = parseFloat(sensSlider.value);
             document.getElementById('audioSensValue').textContent = v.toFixed(1);
@@ -2257,16 +2384,51 @@
             if (window.audioReactive) window.audioReactive.setBeatThreshold(v);
         });
 
-        splatModeSel.addEventListener('change', function () {
-            if (window.audioReactive) window.audioReactive.setAutoSplatMode(splatModeSel.value);
-        });
-
         // Register visualizer canvas after a frame (needs dimensions)
         requestAnimationFrame(function () {
             if (window.audioReactive) window.audioReactive.registerViz(vizCanvas);
         });
 
-        return sec;
+        // Mirror the engine config onto these controls whenever the composer
+        // applies a segment, so the panel visibly changes as the playhead crosses
+        // segments. (--val is set directly because programmatic .value doesn't
+        // fire the input event the slider fill listens for.)
+        function syncAudioUIFromEngine() {
+            if (!window.audioReactive || !window.audioReactive.getConfig) return;
+            var c = window.audioReactive.getConfig();
+            if (typeof c.sensitivity === 'number') {
+                sensSlider.value = c.sensitivity;
+                sensSlider.style.setProperty('--val', String(c.sensitivity));
+                var sv = document.getElementById('audioSensValue'); if (sv) sv.textContent = c.sensitivity.toFixed(1);
+            }
+            if (typeof c.beatThreshold === 'number') {
+                beatSlider.value = c.beatThreshold;
+                beatSlider.style.setProperty('--val', String(c.beatThreshold));
+                var bv = document.getElementById('audioBeatValue'); if (bv) bv.textContent = c.beatThreshold.toFixed(2);
+            }
+            if (c.mappings) {
+                var setCb = function (id, val) { var cb = document.getElementById(id); if (cb && typeof val === 'boolean') cb.checked = val; };
+                setCb('arMapAutoSplat', c.mappings.bassAutoSplat);
+                setCb('arMapSize', c.mappings.overallToSize);
+                setCb('arMapKaleido', c.mappings.midToKaleido);
+                setCb('arMapColor', c.mappings.trebleToColor);
+            }
+            if (typeof c.autoSplatMode === 'string') {
+                Object.keys(patBtns).forEach(function (k) { patBtns[k].classList.toggle('active', k === c.autoSplatMode); });
+            }
+        }
+        if (window.audioReactive && window.audioReactive.onConfigChange) {
+            window.audioReactive.onConfigChange(syncAudioUIFromEngine);
+        }
+
+        // Composer segment timeline lives below the React controls in the drawer
+        var compWrap = document.createElement('div');
+        compWrap.className = 'audio-drawer-composer';
+        body.appendChild(compWrap);
+        (function mountComposer() {
+            if (window.audioComposer && window.audioComposer.mount) window.audioComposer.mount(compWrap);
+            else setTimeout(mountComposer, 150);
+        })();
     }
 
     function buildFocusSection() {

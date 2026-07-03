@@ -948,6 +948,16 @@ body.focus-mode #canvas {
     touch-action: none;
 }
 
+/* Layer being transformed is forced visible above everything (incl. the
+   opaque sim canvas) so hidden collision masks can be positioned by eye.
+   !important beats the inline display/opacity/z-index set per layer;
+   renderLayers() restores normal state when the overlay closes. */
+body.layer-transform-active .background-layer.transform-ghost {
+    display: block !important;
+    opacity: 0.65 !important;
+    z-index: 3000 !important;
+}
+
 /* While transforming a layer, dim the sim border / wrapper chrome so the
    amber layer handles are unambiguous */
 body.layer-transform-active #canvas-wrapper .resize-handle {

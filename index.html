@@ -684,8 +684,16 @@
         </div>
     </div>
     <!-- Recorded Layers Drawer (full-width) -->
-    <div id="recDrawer" class="rec-drawer">
+    <div id="recDrawer" class="rec-drawer studio-drawer" data-active-tab="record">
         <div id="recResizeHandle" class="rec-resize-handle"><div class="rec-grabber"></div></div>
+        <div class="studio-tabbar">
+            <div class="studio-tabs">
+                <button type="button" class="studio-tab active" data-tab="record">🎬 Record</button>
+                <button type="button" class="studio-tab" data-tab="audio">🎵 Audio</button>
+            </div>
+            <button id="studioCloseBtn" class="rec-close" title="Close">✕</button>
+        </div>
+        <div class="studio-tab-panel active" data-tab="record">
         <div class="rec-header">
             <div class="rec-left">
                 <strong>Recorded Layers</strong>
@@ -702,7 +710,6 @@
                 </select>
                 <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;">Max</label>
                 <input type="text" id="recMaxDuration" class="time-input" value="00:10:000" placeholder="mm:ss:ms" style="width:110px;">
-                <button id="recCloseBtn" class="rec-close">✕</button>
             </div>
         </div>
         <div class="rec-header" style="gap:6px;">
@@ -741,6 +748,8 @@
         <div class="rec-body">
             <div id="recLayersList" class="layers-panel"></div>
         </div>
+        </div><!-- /studio-tab-panel record -->
+        <div class="studio-tab-panel" data-tab="audio" id="audioDrawerPanel"></div>
     </div>
     <div id="hotkeyOverlay">
         <div class="hotkey-modal">
@@ -839,6 +848,7 @@
     <script src="js/01a-param-registry.js"></script>
     <script src="js/02-palettes.js"></script>
     <script src="js/03-recording.js"></script>
+    <script src="js/28-studio-drawer.js"></script>
     <!-- PERF: Adaptive loading with progress feedback -->
     <script>
     (function() {
@@ -927,10 +937,12 @@
     <script src="js/21-focus-mode.js"></script>
     <script src="js/22-audio-reactive.js"></script>
     <script src="js/23-branding-overlays.js"></script>
+    <script src="js/24-video-export.js"></script>
     <script src="js/25-mutation-engine.js"></script>
     <script src="js/comfyui-bridge.js"></script>
     <script src="js/24-path-layers.js"></script>
     <script src="js/26-layer-transform.js"></script>
+    <script src="js/27-audio-composer.js"></script>
     <script src="js/20-mixer-layout.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">

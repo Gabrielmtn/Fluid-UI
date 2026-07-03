@@ -18,29 +18,28 @@
         const microDetailToggle = document.getElementById('microDetailToggle');
         const microDetailPanel = document.getElementById('microDetailPanel');
         if (microDetailToggle) {
+            // Last non-zero values from toggle-off, restored on toggle-on so
+            // cycling the toggle doesn't discard what the user dialed in
+            let mdRemembered = null;
+            const applyMicroDetail = (vals) => {
+                Object.entries(vals).forEach(([id, val]) => {
+                    config[id.toUpperCase()] = val;
+                    const sl = document.getElementById(id);
+                    if (sl) { sl.value = val; sl.style.setProperty('--val', val); }
+                    const sp = document.getElementById(id + 'Value');
+                    if (sp) sp.textContent = val.toFixed(2);
+                });
+            };
             microDetailToggle.addEventListener('change', (e) => {
                 const on = e.target.checked;
                 if (microDetailPanel) microDetailPanel.style.display = on ? '' : 'none';
                 if (!on) {
-                    // Reset to zero when disabled
-                    config.CLARITY = 0;
-                    config.VIBRANCE = 0;
-                    ['clarity', 'vibrance'].forEach(id => {
-                        const sl = document.getElementById(id);
-                        if (sl) { sl.value = 0; sl.style.setProperty('--val', 0); }
-                        const sp = document.getElementById(id + 'Value');
-                        if (sp) sp.textContent = '0.00';
-                    });
+                    if (config.CLARITY > 0 || config.VIBRANCE > 0) {
+                        mdRemembered = { clarity: config.CLARITY, vibrance: config.VIBRANCE };
+                    }
+                    applyMicroDetail({ clarity: 0, vibrance: 0 });
                 } else {
-                    // Set sensible defaults on enable
-                    const defaults = { clarity: 0.35, vibrance: 0.25 };
-                    Object.entries(defaults).forEach(([id, val]) => {
-                        config[id.toUpperCase()] = val;
-                        const sl = document.getElementById(id);
-                        if (sl) { sl.value = val; sl.style.setProperty('--val', val); }
-                        const sp = document.getElementById(id + 'Value');
-                        if (sp) sp.textContent = val.toFixed(2);
-                    });
+                    applyMicroDetail(mdRemembered || { clarity: 0.35, vibrance: 0.25 });
                 }
             });
         }

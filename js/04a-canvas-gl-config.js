@@ -168,9 +168,21 @@
 
             antialias: false,
 
-            preserveDrawingBuffer: false,  // Disabled for performance (enable if canvas export needed)
+            preserveDrawingBuffer: true,   // Required so drawImage()/toBlob() can read the
+                                           // canvas for image/video/GIF/sequence export. Without
+                                           // it the buffer is cleared after each frame and every
+                                           // export captures black. Minor perf cost (no swap-based
+                                           // present); exports are a core feature so it's enabled.
 
-            desynchronized: true,          // Lower latency rendering
+            desynchronized: false,         // MUST stay false. With alpha:true + layer divs
+                                           // stacked under the canvas, desynchronized presents
+                                           // bypass DOM compositing (direct-composition overlay
+                                           // on Chrome/Windows) — frames tear or present cleared,
+                                           // momentarily exposing the layers beneath (rhythmic
+                                           // "layer flash"). preserveDrawingBuffer:true makes the
+                                           // copy-present path even more tear-prone. Electron
+                                           // ignores desync (no overlay), which is why the bug
+                                           // only showed in the web/preview builds.
 
             powerPreference: 'high-performance'
 

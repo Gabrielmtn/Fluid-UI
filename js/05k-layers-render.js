@@ -194,6 +194,10 @@
                                 if (depthShape) depthShape.threshold = v;
                                 if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
                             });
+                            // Refresh the visible mask preview on release (full-res redraw is too heavy per input tick)
+                            tSlider.addEventListener('change', () => {
+                                if (layer.visible && typeof window.applyLayerMask === 'function') window.applyLayerMask(layer.index);
+                            });
                             const dis = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; };
                             const en = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; };
                             ['pointerdown','mousedown','touchstart'].forEach(evt => tSlider.addEventListener(evt, dis, { passive: true }));
@@ -213,6 +217,7 @@
                                 const depthShape = layer.mask?.shapes?.find(s => s.type === 'depth-mask');
                                 if (depthShape) depthShape.invert = invertCb.checked;
                                 if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
+                                if (layer.visible && typeof window.applyLayerMask === 'function') window.applyLayerMask(layer.index);
                             });
                         }
                         // Refresh button
