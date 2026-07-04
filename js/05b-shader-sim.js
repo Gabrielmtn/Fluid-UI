@@ -71,13 +71,28 @@
             uniform sampler2D uVelocity, uSource;
             uniform sampler2D uObstacle;
             uniform vec2 texelSize;
+            uniform vec2 srcTexelSize; // texel size of uSource (dye and sim grids differ)
             uniform float dt, dissipation;
             uniform float decayDt; // accumulated decay timestep; 0.0 = skip decay this frame
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform int isDensity;
             uniform int hasObstacle;
             void main() {
-                vec2 coord = clamp(vUv - dt * texture(uVelocity, vUv).xy * texelSize, 0.0, 1.0);
+                vec2 disp = dt * texture(uVelocity, vUv).xy * texelSize;
+                // Settle ease-out. Repeated re-filtering + fp16 re-rounding of
+                // near-still fluid is what carves the terraced "cooled" banding,
+                // so settled fluid must stop being resampled — but a binary
+                // stillness snap freezes striation bands one-by-one as velocity
+                // dies ("dominoes"). Instead: below ~0.002 source texels/frame
+                // (imperceptible, <0.12 texel/s) displacement scales to exactly
+                // zero — an exact self-fetch, bit-stable at rest — and the
+                // approach is eased smoothly from 0.05 texels/frame down, so
+                // fluid glides to rest instead of crawling for many seconds
+                // through the worst re-filtering regime and snapping still
+                // along a moving frontier.
+                float mTexels = length(disp / srcTexelSize);
+                disp *= smoothstep(0.002, 0.05, mTexels);
+                vec2 coord = clamp(vUv - disp, 0.0, 1.0);
                 // Time-independent dissipation: pow(d, t*60) so decay rate is
                 // constant regardless of framerate. 60.0 = reference FPS these
                 // values were tuned for. Uses decayDt, not dt: when dt is tiny
@@ -89,6 +104,12 @@
                 // fp16 rounding; in between decayDt is 0 and pow() returns
                 // exactly 1.0 (a true no-op).
                 float decay = pow(dissipation, decayDt * 60.0);
+                // Bilinear on purpose: an interpolating cubic (Catmull-Rom)
+                // was tried here and etched permanent pixel-scale crackle —
+                // its >1 mid-frequency gain slowly amplifies noise in this
+                // forever-feedback loop, even min/max-clamped. Bilinear only
+                // attenuates, which keeps the field clean; the settle ease-out
+                // above is what prevents its terracing artifact at rest.
                 vec4 source = texture(uSource, coord);
                 vec4 color = decay * source;
                 if (isDensity == 1) {

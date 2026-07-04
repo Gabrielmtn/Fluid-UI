@@ -216,6 +216,7 @@
                 advectionProg.bind();
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
                 gl.uniform2f(advectionProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(advectionProg.uniforms.dt, dt);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 0);
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, 0);
@@ -239,6 +240,7 @@
                 const obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 gl.uniform2f(advectionProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
@@ -376,12 +378,31 @@
                 blur(sunrays, sunraysTemp, 1);
             }
             gl.disable(gl.BLEND);
+            // Shading form field: downsample the frame into the quarter-res
+            // shadeForm FBO and blur it — the display shading normals come
+            // from this smoothed height field, not the raw dye, so pigment
+            // texel noise can't render as relief texture.
+            const _shadingOn = (window.displayShading || 0.0) > 0.0 && shadeForm;
+            if (_shadingOn) {
+                blurProg.bind();
+                gl.uniform1i(blurProg.uniforms.uTexture, 0);
+                gl.uniform2f(blurProg.uniforms.texelSize, shadeForm.texelSizeX, 0.0);
+                gl.viewport(0, 0, shadeForm.width, shadeForm.height);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, displayTexture);
+                blit(shadeForm.fbo);
+                blur(shadeForm, shadeFormTemp, 1);
+            }
             gl.viewport(0, 0, canvas.width, canvas.height);
             displayProg.bind();
             gl.uniform2f(displayProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
             gl.uniform1f(displayProg.uniforms.displayShading, window.displayShading || 0.0);
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
             gl.uniform1i(displayProg.uniforms.uSunrays, 1);
+            gl.uniform1i(displayProg.uniforms.uShadeForm, 2);
+            if (_shadingOn) {
+                gl.uniform2f(displayProg.uniforms.shadeTexelSize, shadeForm.texelSizeX, shadeForm.texelSizeY);
+            }
             gl.uniform1f(displayProg.uniforms.sunraysEnabled, _sunraysOn ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.preserveOpacity, window.preserveFluidOpacity ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.backgroundTransparency, window.backgroundTransparency || 0.0);
@@ -402,6 +423,8 @@
             gl.bindTexture(gl.TEXTURE_2D, displayTexture);
             gl.activeTexture(gl.TEXTURE1);
             gl.bindTexture(gl.TEXTURE_2D, _sunraysOn ? sunrays.texture : null);
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, _shadingOn ? shadeForm.texture : null);
             blit(null);
             // ─── Stats update (ring buffer, zero-GC) ──────────────────
             pushFrameTimestamp(nowMs);

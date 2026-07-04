@@ -93,6 +93,8 @@
             out vec4 fragColor;
             uniform sampler2D uTexture;
             uniform sampler2D uSunrays;
+            uniform sampler2D uShadeForm; // quarter-res blurred frame: the shading height field
+            uniform vec2 shadeTexelSize;
             uniform float sunraysEnabled;
             uniform float preserveOpacity;
             uniform float backgroundTransparency;
@@ -207,15 +209,32 @@
                 // Enhanced display shading: normal-mapped lighting for 3D fabric/clay depth
                 if (displayShading > 0.0) {
                     vec3 lumaW = vec3(0.299, 0.587, 0.114);
-                    // Luminance at 4 neighbors (raw HDR for strong gradients)
-                    float lL = dot(texture(uTexture, vL).rgb, lumaW);
-                    float lR = dot(texture(uTexture, vR).rgb, lumaW);
-                    float lT = dot(texture(uTexture, vT).rgb, lumaW);
-                    float lB = dot(texture(uTexture, vB).rgb, lumaW);
-                    // Gradient → surface normal (strength scales with slider)
-                    float dx = lR - lL;
-                    float dy = lT - lB;
-                    float nStr = displayShading * 6.0;
+                    float centerLuma = dot(color.rgb, lumaW);
+                    // Fade the whole effect out at low luminance: in fading dye
+                    // the gradients are dominated by fp16 quantization steps and
+                    // the sim's cleanup floor, and full-strength normals/contrast
+                    // paint hard lines along those steps.
+                    float shadeFade = smoothstep(0.005, 0.06, centerLuma);
+                    // Gradient from the blurred quarter-res form field (raw
+                    // HDR for strong gradients) — the paint-engine approach:
+                    // relief is lit from a smoothed height map, so pigment
+                    // texel noise (fp16 grain, stir micro-laminae) physically
+                    // cannot read as texture; only actual swirl forms shade.
+                    // Sobel at 1 form texel ≈ 4 dye texels; 0.0625 keeps the
+                    // same response as the original 1-texel differences on
+                    // smooth ramps.
+                    vec2 t2 = shadeTexelSize;
+                    float lL  = dot(texture(uShadeForm, vUv + vec2(-t2.x,  0.0 )).rgb, lumaW);
+                    float lR  = dot(texture(uShadeForm, vUv + vec2( t2.x,  0.0 )).rgb, lumaW);
+                    float lT  = dot(texture(uShadeForm, vUv + vec2( 0.0 ,  t2.y)).rgb, lumaW);
+                    float lB  = dot(texture(uShadeForm, vUv + vec2( 0.0 , -t2.y)).rgb, lumaW);
+                    float lTL = dot(texture(uShadeForm, vUv + vec2(-t2.x,  t2.y)).rgb, lumaW);
+                    float lTR = dot(texture(uShadeForm, vUv + vec2( t2.x,  t2.y)).rgb, lumaW);
+                    float lBL = dot(texture(uShadeForm, vUv + vec2(-t2.x, -t2.y)).rgb, lumaW);
+                    float lBR = dot(texture(uShadeForm, vUv + vec2( t2.x, -t2.y)).rgb, lumaW);
+                    float dx = ((lTR + 2.0 * lR + lBR) - (lTL + 2.0 * lL + lBL)) * 0.0625;
+                    float dy = ((lTL + 2.0 * lT + lTR) - (lBL + 2.0 * lB + lBR)) * 0.0625;
+                    float nStr = displayShading * 6.0 * shadeFade;
                     vec3 N = normalize(vec3(dx * nStr, dy * nStr, 0.25));
                     // Key light (upper-left, warm white)
                     vec3 keyDir = normalize(vec3(-0.5, 0.7, 0.9));
@@ -230,20 +249,28 @@
                     vec3 H = normalize(keyDir + V);
                     float spec = pow(max(dot(N, H), 0.0), 48.0);
                     // Ambient occlusion from curvature (Laplacian)
-                    float centerLuma = dot(color.rgb, lumaW);
                     float avgN = (lL + lR + lT + lB) * 0.25;
                     avgN = avgN / (1.0 + avgN); // tone-map for comparison
                     float ao = smoothstep(-0.08, 0.04, centerLuma - avgN);
-                    ao = mix(1.0, ao, displayShading * 0.6);
-                    // Combine lighting
+                    ao = mix(1.0, ao, displayShading * 0.6 * shadeFade);
+                    // Combine lighting, normalized against a flat surface:
+                    // without this, raising the intensity tilts normals away
+                    // from the fixed lights and the WHOLE image darkens — the
+                    // slider read as a brightness knob, not a relief knob.
+                    // Dividing by the flat-normal lighting keeps flat areas at
+                    // constant brightness at every intensity; only actual
+                    // slopes get brighter/darker relative to it.
                     vec3 lighting = vec3(0.35) + keyDiff * warmKey * 0.55 + fillDiff * coolFill * 0.2;
-                    color.rgb = color.rgb * lighting * ao + spec * warmKey * 0.2 * centerLuma;
-                    // S-curve contrast
+                    vec3 lightFlat = vec3(0.35) + keyDir.z * warmKey * 0.55 + fillDir.z * coolFill * 0.2;
+                    color.rgb = color.rgb * (lighting / lightFlat) * ao + spec * warmKey * 0.2 * centerLuma;
+                    // S-curve contrast, faded at low luminance — near black it
+                    // crushes faint dye toward zero and hardens the fade edge
                     color.rgb = min(color.rgb, vec3(1.0));
-                    color.rgb = color.rgb * color.rgb * (3.0 - 2.0 * color.rgb);
-                    // Saturation boost
+                    vec3 sCurved = color.rgb * color.rgb * (3.0 - 2.0 * color.rgb);
+                    color.rgb = mix(color.rgb, sCurved, shadeFade);
+                    // Saturation boost (fades to neutral at low luminance)
                     float gray = dot(color.rgb, lumaW);
-                    color.rgb = mix(vec3(gray), color.rgb, 1.15 + displayShading * 0.35);
+                    color.rgb = mix(vec3(gray), color.rgb, 1.0 + (0.15 + displayShading * 0.35) * shadeFade);
                     color.rgb = max(color.rgb, vec3(0.0));
                 }
                 // Sunrays: multiplicative light/shadow on tone-mapped base
@@ -251,6 +278,13 @@
                     float sr = texture(uSunrays, vUv).r;
                     color.rgb *= sr;
                 }
+                // ±0.5 LSB hash dither before the 8-bit store: smooth slow
+                // gradients otherwise quantize into visible contour bands that
+                // crawl as the field decays (the S-curve and saturation boost
+                // in the shading pass steepen them further). Static pattern —
+                // temporal dither would shimmer.
+                float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+                color.rgb = max(color.rgb + dn * (1.0 / 255.0), 0.0);
                 float intensity = max(max(color.r, color.g), color.b);
                 if (preserveOpacity > 0.5) {
                     // Preserve fluid opacity - make alpha proportional to color intensity
@@ -288,8 +322,11 @@
                 blur += texture(uTexture, vUv + vec2(0.0, texelSize.y)).rgb;
                 blur += texture(uTexture, vUv - vec2(0.0, texelSize.y)).rgb;
                 blur *= 0.25;
-                // Extract high-frequency detail
+                // Extract high-frequency detail, bounded to the local
+                // intensity so faint dye is never more than ~doubled
+                // (quantization steps would otherwise amplify into speckle)
                 vec3 detail = center - blur;
+                detail = clamp(detail, vec3(-centerIntensity), vec3(centerIntensity));
                 // Velocity-adaptive sharpening (sharpen more where fluid moves),
                 // faded out smoothly at low intensities so faint dye is never
                 // contrast-amplified into jagged noise.
@@ -321,10 +358,14 @@
                 vec3 center = texture(uTexture, vUv).rgb;
                 vec3 lumaW = vec3(0.299, 0.587, 0.114);
                 float centerLuma = dot(center, lumaW);
-                if (centerLuma < 0.005) {
+                // Early exit only for truly black pixels; the effect fades in
+                // smoothly above that (same fix as the sharpen pass — a hard
+                // cutoff draws a jagged seam through fading dye).
+                if (centerLuma < 0.001) {
                     fragColor = vec4(center, 1.0);
                     return;
                 }
+                float lowFade = smoothstep(0.003, 0.03, centerLuma);
                 vec3 result = center;
                 // ── Clarity — Wide-kernel unsharp mask ──
                 // Same proven additive approach as the sharpening pass
@@ -349,9 +390,13 @@
                     blur /= 10.0;
                     // Extract detail and apply (same as sharpening pass)
                     vec3 detail = center - blur;
-                    // Velocity-adaptive strength
+                    // Bound the swing to the local luminance so faint dye is
+                    // never more than ~doubled — unbounded, fp16 quantization
+                    // steps in fading dye amplify into hard speckle and lines.
+                    detail = clamp(detail, vec3(-centerLuma), vec3(centerLuma));
+                    // Velocity-adaptive strength, faded out at low luminance
                     float velMag = length(texture(uVelocity, vUv).xy);
-                    float adaptiveStrength = clarity * (1.0 + min(velMag * 3.0, 1.5));
+                    float adaptiveStrength = clarity * (1.0 + min(velMag * 3.0, 1.5)) * lowFade;
                     // Additive unsharp mask with clamping
                     result = center + detail * adaptiveStrength * 1.5;
                     vec3 maxVal = max(center * 2.0, vec3(1.0));
@@ -363,7 +408,7 @@
                     float maxC = max(result.r, max(result.g, result.b));
                     float minC = min(result.r, min(result.g, result.b));
                     float sat = maxC > 0.001 ? (maxC - minC) / maxC : 0.0;
-                    float boost = vibrance * (1.0 - sat * sat) * 1.2;
+                    float boost = vibrance * (1.0 - sat * sat) * 1.2 * lowFade;
                     result = mix(vec3(gray), result, 1.0 + boost);
                     result = max(result, vec3(0.0));
                 }

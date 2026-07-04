@@ -63,6 +63,7 @@
         }
         let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, lightShifted, obstacle;
         let sunrays, sunraysTemp;
+        let shadeForm, shadeFormTemp;
         function initFramebuffers() {
             // Use canvas attribute dimensions (not gl.drawingBufferWidth) for aspect ratio.
             // In Electron with transparent windows or DPR scaling, the drawing buffer
@@ -142,6 +143,26 @@
             }
             sunrays = createFBO(sunW, sunH, rgba.internalFormat, rgba.format, texType, filter);
             sunraysTemp = createFBO(sunW, sunH, rgba.internalFormat, rgba.format, texType, filter);
+            // Shading form field: low-res blurred copy of the frame that
+            // the display shading derives its normals from. Paint-engine rule
+            // (Krita/ArtRage impasto): light a smoothed height field, never
+            // the raw pigment — pixel-scale dye noise must not read as relief.
+            // FIXED resolution (like sunrays), NOT tied to dye resolution:
+            // relief smoothing must stay constant in screen space — a
+            // dye-relative form field re-admitted pixel-scale striations the
+            // moment the user raised the quality tier. 256 long-side matches
+            // the approved look at the High (1K) tier exactly.
+            const sfRes = 256;
+            let sfW, sfH;
+            if (displayW >= displayH) {
+                sfW = Math.min(sfRes, maxTextureSize);
+                sfH = Math.max(1, Math.round(sfRes / sunAspect));
+            } else {
+                sfH = Math.min(sfRes, maxTextureSize);
+                sfW = Math.max(1, Math.round(sfRes * sunAspect));
+            }
+            shadeForm = createFBO(sfW, sfH, rgba.internalFormat, rgba.format, texType, filter);
+            shadeFormTemp = createFBO(sfW, sfH, rgba.internalFormat, rgba.format, texType, filter);
             // Explicitly clear all FBOs to zero.
             // Electron's disable-gpu-driver-bug-workarounds can skip default zeroing,
             // leaving garbage in textures that corrupts simulation until first resize.
@@ -151,7 +172,7 @@
                 divergence, curl,
                 pressure.read, pressure.write,
                 sharpened, detailed, lit, lightShifted, obstacle,
-                sunrays, sunraysTemp
+                sunrays, sunraysTemp, shadeForm, shadeFormTemp
             ];
             for (let i = 0; i < allFBOs.length; i++) {
                 if (allFBOs[i] && allFBOs[i].fbo) {
