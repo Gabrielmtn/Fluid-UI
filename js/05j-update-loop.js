@@ -133,15 +133,10 @@
                 gl.disable(gl.BLEND);
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
                 // ── Standard Chorin projection order: forces → project → advect ──
-                // 1. Curl / Turbulence computation
-                const useTurbulence = window.useTurbulenceMode || false;
-                const curlProgram = useTurbulence ? turbulenceProg : curlProg;
-                curlProgram.bind();
-                gl.uniform2f(curlProgram.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
-                gl.uniform1i(curlProgram.uniforms.uVelocity, 0);
-                if (useTurbulence) {
-                    gl.uniform1f(curlProgram.uniforms.time, performance.now() * 0.001);
-                }
+                // 1. Curl computation
+                curlProg.bind();
+                gl.uniform2f(curlProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform1i(curlProg.uniforms.uVelocity, 0);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(curl.fbo);
@@ -247,6 +242,7 @@
                 gl.uniform1i(advectionProg.uniforms.uSource, 1);
                 gl.uniform1i(advectionProg.uniforms.uObstacle, 2);
                 gl.uniform1f(advectionProg.uniforms.dissipation, config.DENSITY_DISSIPATION);
+                gl.uniform1f(advectionProg.uniforms.bloomCeiling, config.BLOOM_CEILING || 0.0);
                 if (config.DENSITY_DISSIPATION !== lastDyeDiss) {
                     lastDyeDiss = config.DENSITY_DISSIPATION;
                     dyeDecayAccum = 0;
@@ -397,6 +393,8 @@
             displayProg.bind();
             gl.uniform2f(displayProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
             gl.uniform1f(displayProg.uniforms.displayShading, window.displayShading || 0.0);
+            gl.uniform1f(displayProg.uniforms.shadeInvert, window.displayShadingInvert || 0.0);
+            gl.uniform1f(displayProg.uniforms.gateVibrance, (config.BLOOM_CEILING > 0) ? 1.0 : 0.0);
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
             gl.uniform1i(displayProg.uniforms.uSunrays, 1);
             gl.uniform1i(displayProg.uniforms.uShadeForm, 2);

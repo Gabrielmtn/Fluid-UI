@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <!-- Dark UA chrome: native select popups, scrollbars, form controls.
+         Without this Chromium frames dropdown option lists in light-theme white. -->
+    <meta name="color-scheme" content="dark">
     <title>Fluid UI</title>
     <link rel="stylesheet" href="css/00-tokens.css">
     <link rel="stylesheet" href="css/styles.css">
@@ -146,6 +149,10 @@
                 <input type="checkbox" id="randomColor" checked>
                 <label for="randomColor" style="margin: 0">Random Colors</label>
             </div>
+            <div class="control-group checkbox-group" style="margin-top: 8px;">
+                <input type="checkbox" id="colorGate">
+                <label for="colorGate" style="margin: 0" title="Lock max to original color — repeated strokes can't overflow into white">Gate</label>
+            </div>
             <div style="margin-top: 10px;">
                 <label>Palette <span id="paletteImportStatus" class="import-status"></span></label>
                 <div class="palette-carousel" id="paletteCarousel"></div>
@@ -238,12 +245,15 @@
             <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">2.500</span></label>
             <input type="range" id="velocityInfluence" min="1" max="5" value="2.5" step="0.001">
         </div>
-        <div class="control-group checkbox-group">
-            <input type="checkbox" id="turbulenceMode">
-            <label for="turbulenceMode" style="margin: 0">☁️ Billowing Clouds (Turbulence)</label>
-        </div>
         <div class="control-group">
-            <label for="curl">Curl <span id="curlValue" class="value-display">25</span></label>
+            <label>
+                <select id="materialMode" class="material-mode-select" title="Material — swaps what this slider controls">
+                    <option value="fluid" selected>Fluid</option>
+                    <option value="acrylic">Acrylic-thin</option>
+                    <option value="clay">Acrylic</option>
+                </select>
+                <span id="curlValue" class="value-display">25</span>
+            </label>
             <input type="range" id="curl" min="0" max="60" value="25" step="1">
         </div>
         <div class="control-group">
@@ -875,7 +885,8 @@
             'js/05m-layer-masks.js',
             'js/05n-hotkeys-init.js',
             'js/06-slider-updater.js',
-            'js/06-multiplayer.js'
+            'js/06-multiplayer.js',
+            'js/29-material-modes.js'
         ];
         var splash = document.getElementById('splash-screen');
         var progressBar = document.getElementById('splash-progress-bar');

@@ -6,14 +6,6 @@
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
 // ═══════════════════════════════════════════════════════════════════
-        // Turbulence mode toggle
-        window.useTurbulenceMode = false;
-        const turbulenceToggle = document.getElementById('turbulenceMode');
-        if (turbulenceToggle) {
-            turbulenceToggle.addEventListener('change', (e) => {
-                window.useTurbulenceMode = e.target.checked;
-            });
-        }
         // Micro Detail toggle
         const microDetailToggle = document.getElementById('microDetailToggle');
         const microDetailPanel = document.getElementById('microDetailPanel');

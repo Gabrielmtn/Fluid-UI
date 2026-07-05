@@ -441,34 +441,37 @@ function handleRemoteSplat(data) {
         isProcessingRemoteEvent = true;
         try {
             const lastPos = remoteLastPositions.get(data.clientId);
-            
+            // Gap-fill between network messages at ~12px spacing (matching how
+            // densely local mousemove events deposit dabs), splitting the
+            // message's velocity across all dabs so total injected momentum
+            // equals what the sender's stroke put in. The old loop splatted
+            // every 2px (up to 30 dabs) EACH with full velocity — one message
+            // injected ~30x the sender's energy and blew the velocity field
+            // into fp16 static around remote strokes.
+            let steps = 0;
+            let distX = 0, distY = 0;
             if (lastPos && lastPos.x !== undefined && lastPos.y !== undefined) {
-                const distX = canvasX - lastPos.x;
-                const distY = canvasY - lastPos.y;
+                distX = canvasX - lastPos.x;
+                distY = canvasY - lastPos.y;
                 const distance = Math.sqrt(distX * distX + distY * distY);
-                
-                if (distance > 1) {
-                    const steps = Math.min(Math.floor(distance / 2), 30);
-                    
-                    for (let i = 1; i <= steps; i++) {
-                        const t = i / (steps + 1);
-                        const interpX = lastPos.x + distX * t;
-                        const interpY = lastPos.y + distY * t;
-                        
-                        if (typeof window.applyMultiSplatWith === 'function') {
-                            window.applyMultiSplatWith(interpX, interpY, canvasDx, canvasDy, color || [1,0,0], mult || 1, normalizedRadius);
-                        } else {
-                            splat(interpX, interpY, canvasDx, canvasDy, color || [1,0,0]);
-                        }
-                    }
+                if (distance > 12) {
+                    steps = Math.min(Math.floor(distance / 12), 8);
                 }
             }
-            
-            if (typeof window.applyMultiSplatWith === 'function') {
-                window.applyMultiSplatWith(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0], mult || 1, normalizedRadius);
-            } else {
-                splat(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0]);
+            const stepDx = canvasDx / (steps + 1);
+            const stepDy = canvasDy / (steps + 1);
+            const applyOne = (px, py) => {
+                if (typeof window.applyMultiSplatWith === 'function') {
+                    window.applyMultiSplatWith(px, py, stepDx, stepDy, color || [1,0,0], mult || 1, normalizedRadius);
+                } else {
+                    splat(px, py, stepDx, stepDy, color || [1,0,0]);
+                }
+            };
+            for (let i = 1; i <= steps; i++) {
+                const t = i / (steps + 1);
+                applyOne(lastPos.x + distX * t, lastPos.y + distY * t);
             }
+            applyOne(canvasX, canvasY);
             
             remoteLastPositions.set(data.clientId, { x: canvasX, y: canvasY });
         } finally {
@@ -525,6 +528,9 @@ function updateRemoteCursors() {
     for (const [id, cursor] of remoteCursors.entries()) {
         if (now - cursor.timestamp > 5000) {
             remoteCursors.delete(id);
+            // A peer that vanished mid-drag never sends pointer-up, so their
+            // last-position entry would otherwise outlive them forever.
+            remoteLastPositions.delete(id);
         }
     }
 

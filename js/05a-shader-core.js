@@ -106,6 +106,8 @@
             uniform float kZoom;  // scale
             uniform float kBlend; // 0..1
             uniform float displayShading; // 0=off, >0 = shading intensity
+            uniform float shadeInvert;    // 1 = flip relief normals (clay chiaroscuro: strokes read as carved dents)
+            uniform float gateVibrance;   // 1 = Gate on: re-add the saturation the Reinhard tone-map strips from HDR dye
             uniform vec2 texelSize;
             const float PI = 3.141592653589793;
             // Mode 1: Wedge - Facets create angular reflections
@@ -204,8 +206,21 @@
                     kcol = texture(uTexture, uv2);
                 }
                 vec4 color = mix(base, kcol, clamp(kBlend, 0.0, 1.0));
+                float hdrMax = max(color.r, max(color.g, color.b));
                 // Tone map HDR to displayable range (per-channel Reinhard)
                 color.rgb = color.rgb / (1.0 + color.rgb);
+                // Gate vibrance: per-channel Reinhard flattens channel ratios as
+                // dye climbs into HDR — the washed-out look near the bloom
+                // ceiling. Re-widen saturation in proportion to how deep into
+                // HDR the dye sits (the richness the pre-Gate blowout showed in
+                // transit, but bounded — dye can't pass the ceiling, so neither
+                // can the boost).
+                if (gateVibrance > 0.0) {
+                    float satW = smoothstep(0.8, 2.5, hdrMax) * 0.35 * gateVibrance;
+                    vec3 lw = vec3(0.299, 0.587, 0.114);
+                    float gv = dot(color.rgb, lw);
+                    color.rgb = clamp(mix(vec3(gv), color.rgb, 1.0 + satW), 0.0, 1.0);
+                }
                 // Enhanced display shading: normal-mapped lighting for 3D fabric/clay depth
                 if (displayShading > 0.0) {
                     vec3 lumaW = vec3(0.299, 0.587, 0.114);
@@ -234,7 +249,7 @@
                     float lBR = dot(texture(uShadeForm, vUv + vec2( t2.x, -t2.y)).rgb, lumaW);
                     float dx = ((lTR + 2.0 * lR + lBR) - (lTL + 2.0 * lL + lBL)) * 0.0625;
                     float dy = ((lTL + 2.0 * lT + lTR) - (lBL + 2.0 * lB + lBR)) * 0.0625;
-                    float nStr = displayShading * 6.0 * shadeFade;
+                    float nStr = displayShading * 6.0 * shadeFade * (shadeInvert > 0.5 ? -1.0 : 1.0);
                     vec3 N = normalize(vec3(dx * nStr, dy * nStr, 0.25));
                     // Key light (upper-left, warm white)
                     vec3 keyDir = normalize(vec3(-0.5, 0.7, 0.9));

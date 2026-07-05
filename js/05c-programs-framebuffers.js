@@ -15,7 +15,6 @@
         const advectionProg = new Program(baseVert, advectionFrag);
         const divergenceProg = new Program(baseVert, divergenceFrag);
         const curlProg = new Program(baseVert, curlFrag);
-        const turbulenceProg = new Program(baseVert, turbulenceFrag);
         const vorticityProg = new Program(baseVert, vorticityFrag);
         const pressureProg = new Program(baseVert, pressureFrag);
         const gradientProg = new Program(baseVert, gradientFrag);
@@ -79,6 +78,18 @@
             const _prevVelocity = (typeof velocity !== 'undefined' && velocity && velocity.read) ? velocity : null;
             const _prevPressure = (typeof pressure !== 'undefined' && pressure && pressure.read) ? pressure : null;
             const _prevSimW = simTexWidth || 0; // old grid width, for velocity rescale
+            // GL objects are never garbage-collected while the context lives, so
+            // every non-preserved FBO must be deleted before its variable is
+            // overwritten below — otherwise each resize/governor re-init strands
+            // its textures in VRAM (the preserved density/velocity/pressure pairs
+            // are freed separately inside _copyPreserved).
+            function _deleteFBO(f) {
+                if (!f) return;
+                if (f.texture) gl.deleteTexture(f.texture);
+                if (f.fbo) gl.deleteFramebuffer(f.fbo);
+            }
+            [sharpened, detailed, lit, lightShifted, divergence, curl, obstacle,
+             sunrays, sunraysTemp, shadeForm, shadeFormTemp].forEach(_deleteFBO);
             // [GOVERNOR HOOK] scale internal resolution (config untouched)
             const _gov = window.QualityGovernor;
             const dyeBase = Math.max(64, Math.round((config.DYE_RESOLUTION || 1024) * (_gov ? _gov.dyeScale() : 1)));

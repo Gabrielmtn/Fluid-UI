@@ -66,8 +66,6 @@
         // Effects
         'enableLighting','enableLightShift','microDetailToggle',
         'sunraysToggle',
-        // Simulation
-        'turbulenceMode',
         // Animations
         'ascendToggle','ascendRandomness','shootingStarToggle',
         // Layers

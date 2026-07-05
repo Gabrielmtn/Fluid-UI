@@ -15,8 +15,23 @@
             uniform vec2 point;
             uniform vec3 color;
             uniform float radius, aspectRatio, velocityInfluence;
+            uniform float stampNoise;  // 0 = classic gaussian splat; >0 blends in the clay stamp
+            uniform vec2 stampSeed;    // per-splat offset so consecutive stamps differ
+            uniform int stampShape;    // 0 = blob, 1 = chisel (square press), 2 = streak (elongated smear)
+            uniform int gateColor;     // 1 = clamp dye at the splat's own color (no HDR overflow into white)
             uniform int isVelocity; // 1 for velocity, 0 for density
             uniform int hasObstacle;
+            float sn_hash(vec2 q) {
+                q = fract(q * vec2(123.34, 345.45));
+                q += dot(q, q + 34.345);
+                return fract(q.x * q.y);
+            }
+            float sn_noise(vec2 q) {
+                vec2 i = floor(q), f = fract(q);
+                f = f * f * (3.0 - 2.0 * f);
+                return mix(mix(sn_hash(i),                  sn_hash(i + vec2(1.0, 0.0)), f.x),
+                           mix(sn_hash(i + vec2(0.0, 1.0)), sn_hash(i + vec2(1.0, 1.0)), f.x), f.y);
+            }
             void main() {
                 vec2 p = vUv - point;
                 p.x *= aspectRatio;
@@ -59,8 +74,44 @@
                     fragColor = vec4(base + splat * impactReduction * obsBlock, 1.0);
                 } else {
                     // ─── Additive mixing (original) ───────────────────────
-                    vec3 splat = exp(-dot(p, p) / radius) * color;
-                    fragColor = vec4(base + splat * obsBlock, 1.0);
+                    float r2 = dot(p, p) / radius;
+                    float shape = exp(-r2);
+                    if (stampNoise > 0.0) {
+                        // Clay stamp: hard-edged footprint with a noise-notched rim
+                        // and surface grain instead of the gaussian bloom. Dye only —
+                        // the velocity pass stays gaussian, or motion reads as glitch.
+                        // Noise domain scales with splat size so grain tracks the brush.
+                        vec2 q = p / sqrt(radius);
+                        float n = sn_noise(q * 3.0 + stampSeed);
+                        // Footprint metric per brush shape (r2-compatible units)
+                        float m = r2;                                   // 0: round blob
+                        if (stampShape == 1) {
+                            float box = max(abs(q.x), abs(q.y));        // 1: chisel — square press
+                            m = box * box;
+                        } else if (stampShape == 2) {
+                            vec2 qs = q * vec2(0.55, 2.4);              // 2: streak — wide smear
+                            m = dot(qs, qs);
+                        }
+                        float rim = 1.4 * (0.55 + 0.9 * n);
+                        float stamp = (1.0 - smoothstep(rim * 0.72, rim, m)) * (0.75 + 0.5 * n);
+                        shape = mix(shape, stamp, stampNoise);
+                    }
+                    vec3 result;
+                    if (gateColor == 1) {
+                        // Gate: paint COVERS — dye converges to the stroke's own
+                        // color instead of accumulating. A per-channel clamp was
+                        // tried first (min(base+splat, max(base,color))) and
+                        // failed: painting yellow over blue kept the old blue
+                        // channel, and the union of channels tone-mapped to
+                        // white. Mixing by splat intensity means heavy strokes
+                        // become exactly the picked color over ANY underlying
+                        // dye, while soft gaussian edges still blend.
+                        float w = clamp(shape, 0.0, 1.0) * obsBlock;
+                        result = mix(base, color, w);
+                    } else {
+                        result = base + shape * color * obsBlock;
+                    }
+                    fragColor = vec4(result, 1.0);
                 }
             }
         `;
@@ -75,6 +126,7 @@
             uniform float dt, dissipation;
             uniform float decayDt; // accumulated decay timestep; 0.0 = skip decay this frame
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
+            uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
             uniform int isDensity;
             uniform int hasObstacle;
             void main() {
@@ -135,6 +187,15 @@
                         effectiveDecay *= max(1.0 - boostRate, 0.95);
                     }
                     color = effectiveDecay * source;
+                    // Bloom ceiling (Gate breathing): the up-phase (dissipation
+                    // > 1) grows dye into HDR; without a cap it eventually
+                    // tone-maps out to white. Scale the WHOLE color down when
+                    // the dominant channel hits the ceiling — hue-preserving,
+                    // unlike a per-channel clamp which drifts toward white.
+                    if (bloomCeiling > 0.0) {
+                        float mxCh = max(color.r, max(color.g, color.b));
+                        if (mxCh > bloomCeiling) color.rgb *= bloomCeiling / mxCh;
+                    }
                     // Obstacle-aware drain: dye inside collision masks cannot
                     // advect out (velocity is damped to zero there), so dissolve
                     // it FASTER, not slower — the old slow-decay override pinned
@@ -223,42 +284,6 @@
                 float vorticity = texture(uVelocity, cR).y - texture(uVelocity, cL).y -
                                   texture(uVelocity, cT).x + texture(uVelocity, cB).x;
                 fragColor = vec4(0.5 * vorticity, 0.0, 0.0, 1.0);
-            }
-        `;
-        // Alternative turbulence shader for billowing clouds effect
-        const turbulenceFrag = `#version 300 es
-            precision ${PRECISION} float;
-            in vec2 vUv, vL, vR, vT, vB;
-            out vec4 fragColor;
-            uniform sampler2D uVelocity;
-            uniform float time;
-            // Simple noise function for turbulence
-            float hash(vec2 p) {
-                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-            }
-            float noise(vec2 p) {
-                vec2 i = floor(p);
-                vec2 f = fract(p);
-                f = f * f * (3.0 - 2.0 * f);
-                float a = hash(i);
-                float b = hash(i + vec2(1.0, 0.0));
-                float c = hash(i + vec2(0.0, 1.0));
-                float d = hash(i + vec2(1.0, 1.0));
-                return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-            }
-            void main() {
-                // Get velocity field
-                vec2 vel = texture(uVelocity, vUv).xy;
-                float velMag = length(vel);
-                // Large-scale turbulence based on velocity
-                vec2 noiseCoord = vUv * 2.5 + vel * 0.3 + time * 0.02;
-                float n1 = noise(noiseCoord) * 2.0 - 1.0;
-                float n2 = noise(noiseCoord * 1.7 + vec2(5.2, 1.3)) * 2.0 - 1.0;
-                // Create swirling turbulence
-                float turbulence = n1 * 0.7 + n2 * 0.3;
-                // Scale by velocity magnitude for more dynamic effect
-                turbulence *= (0.5 + velMag * 2.0);
-                fragColor = vec4(turbulence, 0.0, 0.0, 1.0);
             }
         `;
         const vorticityFrag = `#version 300 es

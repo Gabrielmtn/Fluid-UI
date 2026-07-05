@@ -253,12 +253,6 @@
                         </div>
                     </div>
                     <div class="settings-row">
-                        <span class="settings-label">Turbulence</span>
-                        <div class="settings-control">
-                            <input type="checkbox" id="settings-turbulence">
-                        </div>
-                    </div>
-                    <div class="settings-row">
                         <span class="settings-label">☀️ Sunrays</span>
                         <div class="settings-control">
                             <input type="checkbox" id="settings-sunrays">
@@ -654,7 +648,6 @@
             'settings-kAnimateRot': 'kAnimateRot',
             'settings-light': 'enableLighting',
             'settings-lightShift': 'enableLightShift',
-            'settings-turbulence': 'turbulenceMode',
             'settings-sunrays': 'sunraysToggle',
             'settings-randomColor': 'randomColor',
             'settings-stepPalette': 'stepPalette',

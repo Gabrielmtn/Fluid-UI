@@ -11,8 +11,16 @@
             splatProg.bind();
             gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
             gl.uniform2f(splatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
-            gl.uniform1f(splatProg.uniforms.radius, config.SPLAT_RADIUS);
+            // Material modes may scale the dab (clay Depth): applies to both the
+            // dye footprint and the velocity push so they stay congruent.
+            gl.uniform1f(splatProg.uniforms.radius, config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1));
             gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
+            // Clay stamp (material modes): 0 = classic gaussian. Fresh seed per
+            // splat so consecutive stamps get distinct notch patterns.
+            gl.uniform1f(splatProg.uniforms.stampNoise, config.STAMP_NOISE || 0);
+            gl.uniform2f(splatProg.uniforms.stampSeed, Math.random() * 19.7, Math.random() * 23.3);
+            gl.uniform1i(splatProg.uniforms.stampShape, config.STAMP_SHAPE || 0);
+            gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
             // Block injection inside collision masks (prevents burned-in dye)
             const _splatObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
             gl.uniform1i(splatProg.uniforms.hasObstacle, _splatObsActive ? 1 : 0);

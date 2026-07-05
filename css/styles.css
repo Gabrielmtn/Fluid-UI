@@ -7,6 +7,10 @@
         html {
             /* Allow Electron's transparent window to show desktop behind the page */
             background: transparent;
+            /* Dark UA chrome (native select popups, scrollbars): pairs with the
+               color-scheme meta in index.html — some Chromium builds honor the
+               CSS property, some the meta. */
+            color-scheme: dark;
         }
         
         /* Custom Title Bar */

@@ -57,6 +57,31 @@
                 }
             }
         }
+        // Gate = no overflows, ever. Two clamps, no automatic motion:
+        // (1) splat shader locks new dye at the stroke's own color, so
+        //     repeated paint in one spot can't stack into white;
+        // (2) advection shader caps the dominant channel at 3.0 (hue-
+        //     preserving), so a user-set density above 1.0 blooms into the
+        //     vibrant HDR zone and saturates there instead of whiting out.
+        // Density dissipation itself stays entirely under user control.
+        function applyGateState(on) {
+            config.COLOR_GATE = on;
+            config.BLOOM_CEILING = on ? 3.0 : 0;
+        }
+        const colorGateCheckbox = document.getElementById('colorGate');
+        if (colorGateCheckbox) {
+            colorGateCheckbox.addEventListener('change', (e) => {
+                applyGateState(e.target.checked);
+                if (window.Settings && typeof window.Settings.saveCheckbox === 'function') {
+                    window.Settings.saveCheckbox('colorGate', e.target.checked);
+                }
+            });
+            if (window.Settings && typeof window.Settings.loadCheckbox === 'function') {
+                const savedGate = window.Settings.loadCheckbox('colorGate', false);
+                colorGateCheckbox.checked = savedGate;
+                applyGateState(savedGate);
+            }
+        }
         // Resolution dropdowns (absolute resolution, independent of display canvas size)
         // Set a resolution <select> to a value, INJECTING it as an option if it isn't
         // one of the presets. Battery profiles / the FPS-adaptive tier use non-standard
@@ -187,10 +212,11 @@
                     if (velValueSpan) velValueSpan.textContent = newValue.toFixed(3);
                 }
             } else if (e.ctrlKey && e.altKey) {
-                // Ctrl+Alt+Scroll: Adjust Curl
+                // Ctrl+Alt+Scroll: Adjust Curl (raw CURL only — in material mode
+                // the slider is a macro and this shortcut would desync it)
                 const cSlider = document.getElementById('curl');
                 const cSpan = document.getElementById('curlValue');
-                if (cSlider) {
+                if (cSlider && !(window.MaterialModes && window.MaterialModes.active())) {
                     let currentValue = parseFloat(cSlider.value);
                     const minValue = parseFloat(cSlider.min);
                     const maxValue = parseFloat(cSlider.max);
@@ -329,6 +355,20 @@
                         window.clearActiveProfile();
                     }
                 }
+                // Material modes own the curl slider when a material is selected:
+                // the value is a macro amount, not CURL — delegate and skip the
+                // direct config write below. Exception: a profile being applied
+                // writes raw CURL values, so material mode yields to it.
+                if (id === 'curl' && window.MaterialModes && window.MaterialModes.active()) {
+                    if (window._profileApplying) {
+                        window.MaterialModes.yieldToExternal();
+                        // fall through: treat the value as raw CURL again
+                    } else {
+                        window.MaterialModes.onSlider(val);
+                        if (valueSpan) valueSpan.textContent = window.MaterialModes.displayValue();
+                        return;
+                    }
+                }
                 // Magnetic snap to 1.0 for density slider
                 if (id === 'densityDissipation') {
                     const snapTarget = 1.0;
@@ -395,6 +435,8 @@
         // Load saved slider values from Settings
         function loadSavedSliderValues() {
             if (!window.Settings || typeof window.Settings.loadSlider !== 'function') return;
+            // Session/settings restore writes raw sim params — material mode yields
+            if (window.MaterialModes && window.MaterialModes.active()) window.MaterialModes.yieldToExternal();
             // Load main sliders
             Object.entries(sliderConfig).forEach(([id, cfg]) => {
                 const savedValue = window.Settings.loadSlider(id, null);
@@ -493,6 +535,9 @@
         // Expose loadSavedSliderValues globally so save-load.js can call it when needed
         window.loadSavedSliderValues = loadSavedSliderValues;
         function updateSliderValues() {
+            // Preset/profile appliers resync sliders from config (raw CURL etc.)
+            // — material mode yields rather than fight over the curl slider.
+            if (window.MaterialModes && window.MaterialModes.active()) window.MaterialModes.yieldToExternal();
             Object.entries(sliderConfig).forEach(([id, cfg]) => {
                 const val = config[cfg.key];
                 const slider = document.getElementById(id);

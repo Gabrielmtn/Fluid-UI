@@ -111,6 +111,7 @@
                     if (lastStr === currStr) return; // skip duplicate snapshot
                 }
                 undoStack.push(current);
+                if (undoStack.length > 100) undoStack.shift();
                 redoStack.length = 0;
             } catch (e) { /* noop */ }
         }

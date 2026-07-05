@@ -314,7 +314,20 @@
 
         const lbl = document.createElement('div');
         lbl.className = 'ch-label';
-        lbl.textContent = label;
+        // The Curl channel's label IS the material-mode selector (Curl/Fluid/
+        // Ooze/Clay) — adopt it from the sidebar markup instead of static text.
+        const matSel = (sliderId === 'curl') ? document.getElementById('materialMode') : null;
+        if (matSel) {
+            lbl.appendChild(matSel);
+            // Re-fit the select to its label text in the strip's font — deferred
+            // a tick: this label is still detached here, and computed styles on
+            // a detached node measure with the wrong font.
+            setTimeout(function () {
+                if (window.MaterialModes && window.MaterialModes.resizeLabel) window.MaterialModes.resizeLabel();
+            }, 0);
+        } else {
+            lbl.textContent = label;
+        }
         if (CHANNEL_TOOLTIPS[label]) lbl.title = CHANNEL_TOOLTIPS[label];
         head.appendChild(lbl);
 
@@ -430,6 +443,28 @@
             });
             stepEl.addEventListener('change', syncToggles);
             toggleRow.appendChild(stepBtn);
+        }
+
+        // Gate chip (independent of Rnd/Step exclusivity): clamps dye at the
+        // stroke's own color so repeated paint can't overflow into white.
+        var gateEl = document.getElementById('colorGate');
+        if (gateEl) {
+            gateEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+            var gateBtn = document.createElement('button');
+            gateBtn.type = 'button';
+            gateBtn.className = 'ch-text-toggle' + (gateEl.checked ? ' active' : '');
+            gateBtn.textContent = 'Gate';
+            gateBtn.title = 'Lock max to original color — repeated strokes can\'t overflow into white';
+            gateBtn.addEventListener('click', function () {
+                gateEl.checked = !gateEl.checked;
+                gateEl.dispatchEvent(new Event('change', { bubbles: true }));
+                gateBtn.classList.toggle('active', gateEl.checked);
+            });
+            gateEl.addEventListener('change', function () {
+                gateBtn.classList.toggle('active', gateEl.checked);
+            });
+            ch.appendChild(gateEl);
+            toggleRow.appendChild(gateBtn);
         }
 
         ch.appendChild(toggleRow);
@@ -796,7 +831,7 @@
                       'kaleido.mode', 'kaleido.segments', 'kaleido.angle', 'kaleido.twist', 'kaleido.zoom', 'kaleido.blend'],
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
                          'pressureIteration', 'curl', 'sharpness', 'multiplier', 'timeScale',
-                         'velocityInfluence', 'turbulenceMode', 'brushSize', 'brushRefreshRate'],
+                         'velocityInfluence', 'brushSize', 'brushRefreshRate'],
             effects: ['enableLighting', 'enableLightShift', 'microDetailToggle', 'sunraysToggle',
                       'lightIntensity', 'lightAmbient', 'lightSpeed', 'clarity', 'vibrance',
                       'sunraysWeight', 'shadingIntensity', 'displayShadingToggle',
@@ -1236,7 +1271,6 @@
         moveControlGroup('fpsCap', body);
         moveControlGroup('pressureDissipation', body);
         moveControlGroup('pressureIteration', body);
-        moveCheckboxGroup('turbulenceMode', body);
 
         return sec;
     }
@@ -2125,6 +2159,11 @@
 
         var enableCb = mini.querySelector('#audioReactToggle');
         var srcSel = mini.querySelector('#audioReactSource');
+        // The enable row (checkbox + source) is SHARED between the mini widget
+        // and the full drawer: the same DOM nodes are relocated on mode change
+        // so there's exactly one control and zero state-sync problems. Without
+        // this, Full mode had no enable control at all (the mini is hidden).
+        var enableRow = mini.querySelector('.audio-mini-row');
         function enableFromSource() {
             if (!window.audioReactive) return;
             var src = srcSel.value;
@@ -2152,6 +2191,13 @@
         });
 
         function applyAudioMode(mode) {
+            // Park the shared enable row where the active mode can reach it
+            var enableHost = document.getElementById('audioDrawerEnableHost');
+            if (mode === 'full' && enableHost && enableRow) {
+                enableHost.appendChild(enableRow);
+            } else if (enableRow && enableRow.parentElement !== mini) {
+                mini.insertBefore(enableRow, mini.firstChild);
+            }
             if (mode === 'off') {
                 mini.style.display = 'none';
                 if (window.audioReactive) window.audioReactive.disable();
@@ -2255,6 +2301,14 @@
     function buildAudioDrawerControls(container) {
         container.innerHTML = '';
         var body = container;
+
+        // Host for the shared enable row (checkbox + source select). The row's
+        // DOM nodes live in the sidebar mini widget and are moved here whenever
+        // Audio Mode is 'full' — see applyAudioMode.
+        var enableHost = document.createElement('div');
+        enableHost.id = 'audioDrawerEnableHost';
+        enableHost.className = 'audio-drawer-enable';
+        body.appendChild(enableHost);
 
         // Visualizer canvas
         var vizWrap = document.createElement('div');
