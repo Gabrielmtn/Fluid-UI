@@ -78,7 +78,7 @@ For EACH channel: hover-state perf (no reflow/repaint storms), open/close animat
 - [ ] Color channel (swatches, quick palette).
 - [ ] Actions channel (pause/clear/freeze/etc.).
 - [ ] Presets channel.
-- [ ] Strip-wide: `syncBrush` runs on a 2s `setInterval` forever (20-mixer-layout.js:103) — replace polling with an event; audit for other polling loops.
+- [x] Strip-wide: `syncBrush` 2s interval — no-op-write guard added 2026-07-09 (compares before writing; kills the periodic invalidation). Full event-driven replacement folded into Stage 4's Slider component (programmatic set-points get a single change pathway there). Audit for other polling loops still open.
 - [ ] Strip-wide: tooltips, keyboard access, hit-target sizes.
 
 ### Stage 2 — Sidebar, top to bottom
@@ -102,6 +102,7 @@ For EACH section: collapse/expand animation perf, hover states, content audit (s
 - [ ] Export
 - [ ] Multi Artist
 - [ ] Settings
+- [x] Cross-section: compositor isolation — DONE 2026-07-09 from first JankMonitor field data (72 dropped frames on a sidebar hover pass, ZERO long tasks = compositor contention, not JS). #sidebar-right + #mixer-strip promoted to own layers (translateZ(0)) + contain: layout style on both and .sidebar-section. AWAITING Gabriel's re-measure to confirm the drop count falls; dropAt maps now name residual offenders per element.
 - [ ] Cross-section: section open/close is a raw class toggle — audit the CSS transition it triggers (height animation = layout thrash; move to grid-template-rows/max-height on compositor or content-visibility)
 - [ ] Sidebar resize handle (initSidebarResize) — continuous resize triggers canvas reflow? Throttle/snap.
 
