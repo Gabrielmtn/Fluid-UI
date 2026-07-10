@@ -277,6 +277,10 @@
                 gl.uniform1i(advectionProg.uniforms.isDensity, 0);
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, 0);
                 gl.uniform1i(advectionProg.uniforms.macMode, 0);
+                // Swirl NEVER touches the velocity self-advection — the
+                // output IS the velocity texture, so any offset here would
+                // be written back and compound (dye-only by design).
+                gl.uniform1f(advectionProg.uniforms.swirl, 0.0);
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
                 gl.uniform1i(advectionProg.uniforms.uSource, 0);
                 gl.uniform1f(advectionProg.uniforms.dissipation, config.VELOCITY_DISSIPATION);
@@ -308,12 +312,19 @@
                 // zero VRAM. If the post-FX pass order ever changes, revisit.
                 const macActive = !!config.MACCORMACK &&
                     (window.QualityGovernor ? window.QualityGovernor.fxOn() : true);
+                // Swirl clock + strength, identical across all three dye
+                // passes (the MacCormack correction is only valid if every
+                // pass recomputes the same displacement).
+                const _swirl = config.SWIRL || 0.0;
+                const _swirlT = (nowMs % 3600000) / 1000;
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 if (macActive) {
                     macAdvectProg.bind();
                     gl.uniform2f(macAdvectProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform2f(macAdvectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                     gl.uniform1f(macAdvectProg.uniforms.dt, dt);
+                    gl.uniform1f(macAdvectProg.uniforms.swirl, _swirl);
+                    gl.uniform1f(macAdvectProg.uniforms.swirlTime, _swirlT);
                     gl.uniform1i(macAdvectProg.uniforms.uVelocity, 0);
                     gl.uniform1i(macAdvectProg.uniforms.uSource, 1);
                     gl.activeTexture(gl.TEXTURE0);
@@ -325,6 +336,8 @@
                     gl.uniform2f(macCorrectProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform2f(macCorrectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                     gl.uniform1f(macCorrectProg.uniforms.dt, dt);
+                    gl.uniform1f(macCorrectProg.uniforms.swirl, _swirl);
+                    gl.uniform1f(macCorrectProg.uniforms.swirlTime, _swirlT);
                     gl.uniform1i(macCorrectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                     gl.uniform1i(macCorrectProg.uniforms.uVelocity, 0);
                     gl.uniform1i(macCorrectProg.uniforms.uSource, 1);
@@ -340,6 +353,10 @@
                     advectionProg.bind();
                 }
                 gl.uniform1i(advectionProg.uniforms.macMode, macActive ? 1 : 0);
+                // macMode self-fetches (coord = vUv) so swirl is moot there,
+                // but the plain-SL dye path uses it directly.
+                gl.uniform1f(advectionProg.uniforms.swirl, macActive ? 0.0 : _swirl);
+                gl.uniform1f(advectionProg.uniforms.swirlTime, _swirlT);
                 gl.uniform2f(advectionProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);

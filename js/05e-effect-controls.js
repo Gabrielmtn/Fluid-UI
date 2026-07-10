@@ -62,6 +62,15 @@
                 if (sunraysPanel) sunraysPanel.style.display = on ? '' : 'none';
             });
         }
+        // Swirl slider (curl-noise micro-swirl in dye advection)
+        const swirlSlider = document.getElementById('swirl');
+        if (swirlSlider) {
+            swirlSlider.addEventListener('input', (e) => {
+                config.SWIRL = parseFloat(e.target.value);
+                const sp = document.getElementById('swirlValue');
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
+            });
+        }
         // Sunrays slider
         const sunraysWeightSlider = document.getElementById('sunraysWeight');
         if (sunraysWeightSlider) {

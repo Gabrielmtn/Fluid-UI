@@ -177,11 +177,51 @@
         // through the worst re-filtering regime and snapping still
         // along a moving frontier. (At rest this also zeroes the
         // MacCormack correction exactly — see macCorrectFrag.)
+        // Curl-noise micro-swirl (Bridson 2007): the curl of a scrolling
+        // value-noise potential is divergence-free by construction, so it
+        // never fights the pressure solve. Applied ONLY as an offset to the
+        // dye-sampling displacement (uniform-gated; the velocity pass sets
+        // swirl=0) — never written back into the velocity texture, so it's
+        // feedback-safe: still pure bilinear resampling, gain ≤ 1. Adds
+        // painterly sub-grid wisps below sim-grid resolution for one noise
+        // eval. Shared by all three dye advection passes — the MacCormack
+        // correction needs the exact same displacement in every pass.
+        const swirlGLSL = `
+            uniform float swirl;     // micro-swirl strength (0 = off, branch skipped)
+            uniform float swirlTime; // animation clock, seconds
+            float sw_hash(vec2 q) {
+                q = fract(q * vec2(127.1, 311.7));
+                q += dot(q, q + 19.19);
+                return fract(q.x * q.y);
+            }
+            float sw_noise(vec2 q) {
+                vec2 i = floor(q), f = fract(q);
+                f = f * f * (3.0 - 2.0 * f);
+                return mix(mix(sw_hash(i),                  sw_hash(i + vec2(1.0, 0.0)), f.x),
+                           mix(sw_hash(i + vec2(0.0, 1.0)), sw_hash(i + vec2(1.0, 1.0)), f.x), f.y);
+            }
+            vec2 swirlCurl(vec2 uv, float t) {
+                // 2D curl of the noise potential: (dN/dy, -dN/dx)
+                vec2 q = uv * 24.0 + vec2(t * 0.35, -t * 0.27);
+                float e = 0.35;
+                float dy = sw_noise(q + vec2(0.0, e)) - sw_noise(q - vec2(0.0, e));
+                float dx = sw_noise(q + vec2(e, 0.0)) - sw_noise(q - vec2(e, 0.0));
+                return vec2(dy, -dx) * (0.5 / e);
+            }
+        `;
         const rk2Backtrace = `
                 vec2 vHalf = texture(uVelocity, vUv).xy;
                 vec2 midUv = clamp(vUv - 0.5 * dt * vHalf * texelSize, 0.0, 1.0);
                 vec2 disp = dt * texture(uVelocity, midUv).xy * texelSize;
                 float mTexels = length(disp / srcTexelSize);
+                // Swirl magnitude rides on the LOCAL advective displacement
+                // (mTexels factor): moving paint wisps, settled paint gets
+                // exactly nothing — and the settle ease-out below multiplies
+                // the total, so the at-rest bit-stability guarantee holds
+                // with swirl active.
+                if (swirl > 0.0) {
+                    disp += swirlCurl(vUv, swirlTime) * (mTexels * swirl) * srcTexelSize;
+                }
                 disp *= smoothstep(0.002, 0.05, mTexels);
         `;
         const advectionFrag = `#version 300 es
@@ -202,6 +242,7 @@
             uniform int macMode; // 1 = uSource is the already-advected MacCormack
                                  // result (macCorrectFrag output): self-fetch it
                                  // and apply only the decay/drain logic below.
+            ${swirlGLSL}
             void main() {
                 ${rk2Backtrace}
                 vec2 coord = (macMode == 1) ? vUv : clamp(vUv - disp, 0.0, 1.0);
@@ -341,6 +382,7 @@
             uniform vec2 texelSize;    // sim-grid texel (velocity lives there)
             uniform vec2 srcTexelSize; // dye-grid texel
             uniform float dt;
+            ${swirlGLSL}
             void main() {
                 ${rk2Backtrace}
                 fragColor = texture(uSource, clamp(vUv - disp, 0.0, 1.0));
@@ -367,6 +409,7 @@
             uniform vec2 srcTexelSize;   // dye-grid texel
             uniform float dt;
             uniform int hasObstacle;
+            ${swirlGLSL}
             void main() {
                 ${rk2Backtrace}
                 vec4 fwd = texture(uForward, vUv);

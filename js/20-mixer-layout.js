@@ -1280,6 +1280,9 @@
     function buildEffectsSection(controls) {
         const { sec, body } = makeSection('💡 Effects', 'yellow', true);
 
+        // Curl-noise micro-swirl (dye advection wisps)
+        moveControlGroup('swirl', body);
+
         // Surface shading (Pavel-style pseudo-normal lighting)
         moveCheckboxGroup('displayShadingToggle', body);
         moveEl('shadingIntensityGroup', body);

@@ -248,6 +248,10 @@
                                       // Jacobi iterations at ~1/3 the fill cost of the 32 default
                                       // (governor ladder: 2 cycles → 1 → Jacobi floor)
 
+            SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
+                                      // Painterly sub-grid wisps on moving paint; dies with
+                                      // motion so settled artwork stays bit-stable
+
 
 
             SUNRAYS: false,           // Sunrays post-FX enabled (toggled in Effects)
