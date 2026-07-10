@@ -65,8 +65,9 @@ From the implementations survey (2026-07-09). Ordered by payoff-per-effort; none
 Working order: instrumentation → top nav left-to-right → sidebar top-to-bottom → layout/customization rework → component library → integration testing.
 
 ### Stage 0 — Instrumentation (do first; feeds every later stage)
-- [ ] Frame-time + long-task overlay (extend Stats For Nerds): distinguish main-thread stalls from GPU load. UI jank that reads as "sim slow" may be tricking QualityGovernor into stepping quality down — verify; if so, pause governor sampling during UI transitions.
-- [ ] Per-interaction jank capture: log dropped frames on hover enter/leave and every drawer/section open-close, so each Stage 1–2 item gets a before/after number.
+- [x] Frame-time + long-task overlay + per-interaction jank capture — DONE 2026-07-09: js/08b-jank-monitor.js. Attributes dropped frames (adaptive to display Hz) + PerformanceObserver long tasks to the hover/click that caused them (mixer-strip channels, sidebar sections, drawers, stats panel), 600ms attribution windows with hover-storm merging. "UI Jank" section in Stats For Nerds; `JankMonitor.worst(n)` returns the ranked offender list — that list IS the Stage 1–2 work queue. `JankMonitor.report(n)` / `.reset()` for before/after measurement. Verified: synthetic 80ms stall during a section hover → captured, labeled, attributed exactly.
+- [ ] Collect real data (Gabriel, local Electron app): play normally for a session with Stats For Nerds open, then run `JankMonitor.worst(15)` in devtools and paste the result — that ranks the Stage 1/2 audit order by actual damage.
+- [ ] Governor mis-stepdown check: with the monitor running, watch whether Adaptive State steps down during UI-only interactions (no painting). If yes → pause governor sampling during interaction windows (JankMonitor can expose an `isInteracting` flag for 08a to consult).
 
 ### Stage 1 — Top mixer strip, left to right
 Current inventory (built by 20-mixer-layout.js `buildMixerStrip`):
