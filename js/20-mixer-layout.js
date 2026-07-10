@@ -95,7 +95,11 @@
         const brushDisplay = document.getElementById('mixer-brushValue');
         if (brushSlider && brushDisplay) {
             function syncBrush() {
-                brushDisplay.textContent = parseFloat(brushSlider.value).toFixed(1);
+                // Compare before writing: the 2s fallback interval otherwise
+                // invalidates style/layout every tick even when nothing
+                // changed (UI audit Stage 1 — no-op DOM writes aren't free).
+                var v = parseFloat(brushSlider.value).toFixed(1);
+                if (brushDisplay.textContent !== v) brushDisplay.textContent = v;
             }
             brushSlider.addEventListener('input', syncBrush);
             brushSlider.addEventListener('change', syncBrush);

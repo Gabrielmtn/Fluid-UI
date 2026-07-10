@@ -515,3 +515,12 @@ body > .controls {
     gap: 3px;
 }
 
+
+/* ── Compositor isolation (UI audit Stage 1, 2026-07-09) ──────────────
+   Same treatment as #sidebar-right (see 21-sidebar.css): promote the
+   strip to its own compositor layer so channel hover repaints stop
+   contending with the WebGL canvas underneath. */
+#mixer-strip {
+    transform: translateZ(0);
+    contain: layout style;
+}

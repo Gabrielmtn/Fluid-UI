@@ -1177,3 +1177,20 @@ body.rec-open #sidebar-right {
     border: 1px solid rgba(255, 255, 255, 0.12);
     cursor: crosshair; touch-action: none;
 }
+
+/* ── Compositor isolation (UI audit Stage 2, 2026-07-09) ──────────────
+   The sidebar was not layer-promoted, so every native hover repaint
+   (cursor swaps, button hover opacity) invalidated raster tiles shared
+   with the rest of the page while the GPU was already saturated by the
+   sim — measured 72 dropped frames from a sidebar hover pass with ZERO
+   long tasks (JankMonitor), i.e. pure compositor contention.
+   translateZ(0) promotes the sidebar to its own layer on all engines;
+   contain bounds style/layout invalidation to the section that changed.
+   (contain: paint deliberately NOT used — it clips overflowing children.) */
+#sidebar-right {
+    transform: translateZ(0);
+    contain: layout style;
+}
+.sidebar-section {
+    contain: layout style;
+}

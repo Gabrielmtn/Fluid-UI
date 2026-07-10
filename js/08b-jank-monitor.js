@@ -36,6 +36,10 @@
                 if (current) {
                     current.dropped += dropped;
                     if (d > current.worstGap) current.worstGap = d;
+                    // fine attribution: what was under the pointer when the
+                    // frame actually dropped (merged hover windows span many
+                    // targets; this pins the damage to the right one)
+                    current.dropAt[hoverLabel] = (current.dropAt[hoverLabel] || 0) + dropped;
                 }
             }
         }
@@ -72,7 +76,7 @@
         }
         finish();
         current = { label: label, start: t, deadline: t + WINDOW_MS,
-                    dropped: 0, longTasks: 0, worstTask: 0, worstGap: 0 };
+                    dropped: 0, longTasks: 0, worstTask: 0, worstGap: 0, dropAt: {} };
     }
     function finish() {
         if (!current) return;
@@ -111,9 +115,12 @@
         return !!(el.closest && (el.closest('#sidebar-right') || el.closest('#mixer-strip')
             || el.closest('.rec-drawer') || el.closest('#statsPanel')));
     }
+    var hoverLabel = '(none)'; // whatever is under the pointer right now
     document.addEventListener('mouseover', function (e) {
         var t = e.target;
-        if (t && t.nodeType === 1 && inUI(t)) begin('hover ' + labelFor(t));
+        if (!t || t.nodeType !== 1) return;
+        hoverLabel = labelFor(t);
+        if (inUI(t)) begin('hover ' + hoverLabel);
     }, { capture: true, passive: true });
     document.addEventListener('click', function (e) {
         var t = e.target;
@@ -163,7 +170,8 @@
         report: function (n) {
             return interactions.slice(-(n || 10)).map(function (r) {
                 return { label: r.label, dropped: r.dropped, longTasks: r.longTasks,
-                         worstTask: Math.round(r.worstTask), worstGap: Math.round(r.worstGap) };
+                         worstTask: Math.round(r.worstTask), worstGap: Math.round(r.worstGap),
+                         dropAt: r.dropAt };
             });
         },
         // the offenders, ranked — this list IS the Stage 1/2 work queue
@@ -173,7 +181,7 @@
                 .slice(0, n || 10)
                 .map(function (r) {
                     return { label: r.label, dropped: r.dropped, longTasks: r.longTasks,
-                             worstTask: Math.round(r.worstTask) };
+                             worstTask: Math.round(r.worstTask), dropAt: r.dropAt };
                 });
         },
         reset: function () {
