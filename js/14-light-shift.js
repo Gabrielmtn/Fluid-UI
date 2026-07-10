@@ -394,11 +394,18 @@
     let _lightShiftLastDraw = 0;
     const _lightShiftDrawInterval = 33; // ~30fps for playhead animation (visual only)
 
+    // Gated to ~60 Hz: rAF is uncapped in the Electron build, and the playhead
+    // advances PER CALL — ungated, the color path cycled ~16× faster than the
+    // speed slider suggests on high-refresh rigs.
+    let _lsAdvanceLast = 0;
     function startAnimation() {
         function animate() {
             animationFrame = requestAnimationFrame(animate);
 
             if (!window.lightShift.enabled || window.lightShift.colorPath.length === 0) return;
+            const _advNow = performance.now();
+            if (_advNow - _lsAdvanceLast < 15) return;
+            _lsAdvanceLast = _advNow;
 
             // Advance playhead along the path with smoother increments
             // Use smaller steps for smoother interpolation

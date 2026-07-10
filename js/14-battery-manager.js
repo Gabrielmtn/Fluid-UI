@@ -440,6 +440,10 @@
         
         checkPerformanceAndAdapt() {
             const profile = PROFILES[this.currentProfile];
+            // No active profile (desktop boots profile-less): there is no
+            // ladder to walk — live quality adaptation is the QualityGovernor's
+            // job until the user explicitly picks a profile.
+            if (!profile) return;
             const adaptiveConfig = profile.adaptiveConfig;
             
             // If profile doesn't have adaptiveConfig, use old profile-switching
@@ -905,7 +909,14 @@
                 this.autoMode = Settings.loadCheckbox('batteryAutoMode', isMobile);
                 this.fpsAdaptive = Settings.loadCheckbox('fpsAdaptiveMode', isMobile);
                 
-                this.currentProfile = Settings.loadSelect('performanceProfile', 'balanced');
+                // Desktop always boots at the raw config defaults (highest sim
+                // quality — the QualityGovernor scales down live if the GPU can't
+                // keep up). The persisted profile is deliberately NOT applied at
+                // boot on desktop: adaptive downgrades during one session (e.g. a
+                // backgrounded window walking the ladder to battery-saver) would
+                // otherwise leave every future boot degraded. Profiles stay fully
+                // usable as in-session tools. Mobile keeps the 'balanced' boot.
+                this.currentProfile = isMobile ? Settings.loadSelect('performanceProfile', 'balanced') : null;
                 
                 const autoToggle = document.getElementById('battery-auto-mode');
                 if (autoToggle) {
@@ -923,7 +934,11 @@
                 let _profileTries = 0;
                 const applyProfileWhenReady = () => {
                     if (window.config) {
-                        this.setProfile(this.currentProfile, false);
+                        if (this.currentProfile) {
+                            this.setProfile(this.currentProfile, false);
+                        } else {
+                            this.clearActiveProfile();
+                        }
                     } else if (_profileTries++ < 600) {
                         requestAnimationFrame(applyProfileWhenReady);
                     }

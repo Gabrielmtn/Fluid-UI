@@ -29,6 +29,11 @@ app.commandLine.appendSwitch('js-flags', '--expose-gc --max-semi-space-size=128'
 // ⚡ Additional GPU flags
 app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
+// On dual-GPU machines Chromium can land on the integrated GPU (observed:
+// UHD 770 pegged at 100% while the GeForce idles). Ask for the discrete
+// adapter explicitly; the canvas already requests powerPreference
+// 'high-performance', but the process-level hint is what Windows honors.
+app.commandLine.appendSwitch('force_high_performance_gpu');
 app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,CanvasOopRasterization'); // Out-of-process rasterization
 
 console.log('🚀 Electron performance flags applied');

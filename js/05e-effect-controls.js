@@ -35,6 +35,23 @@
                 }
             });
         }
+        // Crisp Advection (MacCormack) toggle — checkbox follows the config
+        // default (04a flips it off on mobile), then drives it on change.
+        const macCormackToggle = document.getElementById('macCormackToggle');
+        if (macCormackToggle) {
+            macCormackToggle.checked = !!config.MACCORMACK;
+            macCormackToggle.addEventListener('change', (e) => {
+                config.MACCORMACK = e.target.checked;
+            });
+        }
+        // Multigrid Pressure toggle — same pattern as Crisp Advection above
+        const multigridToggle = document.getElementById('multigridToggle');
+        if (multigridToggle) {
+            multigridToggle.checked = !!config.MULTIGRID;
+            multigridToggle.addEventListener('change', (e) => {
+                config.MULTIGRID = e.target.checked;
+            });
+        }
         // Sunrays toggle
         const sunraysToggle = document.getElementById('sunraysToggle');
         const sunraysPanel = document.getElementById('sunraysPanel');

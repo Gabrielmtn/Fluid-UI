@@ -211,6 +211,7 @@
                     src.buffer = buffer;
                     src.loop = true;
                     src.connect(analyser);
+                    if (hiRes) { try { src.connect(hiRes.analyser); } catch (_) {} }
                     src.start(0);
                     sourceNode = src;
                     resolve();
@@ -242,12 +243,34 @@
         }
     }
 
+    // ── Hi-res spectrum tap (spectral gate editor) ──────────────
+    // A second analyser on the same source: 4096-point FFT (10.8 Hz bins at
+    // 44.1k — separates a kick fundamental from a bassline) with a 93 ms
+    // window that still catches transients. 16k FFTs were considered and
+    // rejected: a 372 ms window smears snare hits into mush.
+    var hiRes = null; // { analyser, data, lastFill }
+    var _hiResRet = { data: null, sampleRate: 44100, fftSize: 4096 };
+    function ensureHiRes() {
+        if (!audioCtx) return null;
+        if (!hiRes) {
+            var an = audioCtx.createAnalyser();
+            an.fftSize = 4096;
+            an.smoothingTimeConstant = 0.5;
+            an.minDecibels = -90;
+            an.maxDecibels = -10;
+            hiRes = { analyser: an, data: new Uint8Array(an.frequencyBinCount), lastFill: 0 };
+            if (sourceNode) { try { sourceNode.connect(an); } catch (_) {} }
+        }
+        return hiRes;
+    }
+
     function connectStream(s) {
         stream = s;
         ensureContext();
         if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
         sourceNode = audioCtx.createMediaStreamSource(s);
         sourceNode.connect(analyser);
+        if (hiRes) { try { sourceNode.connect(hiRes.analyser); } catch (_) {} }
 
         // Handle stream ending unexpectedly (user revokes permission, etc.)
         s.addEventListener('inactive', function () {
@@ -289,9 +312,18 @@
         return prev + (input - prev) * (1 - Math.exp(-dt / Math.max(1, tau)));
     }
 
+    // rAF is UNCAPPED in the Electron build (~1000+ Hz on high-refresh rigs):
+    // self-throttle to ~60 Hz — the rate every smoothing constant in this file
+    // was designed for. Unthrottled, the analysis ran 16× too fast (band
+    // envelopes effectively raw) and burned ~10% of the main thread.
+    var _tickGateMs = 0;
+    var _lastVizMs = 0;
     function tick() {
         if (!enabled || !analyser) { animFrame = null; return; }
         animFrame = requestAnimationFrame(tick);
+        var _nowGate = performance.now();
+        if (_nowGate - _tickGateMs < 15) return;
+        _tickGateMs = _nowGate;
 
         analyser.getByteFrequencyData(freqData);
 
@@ -383,9 +415,30 @@
         // Apply mappings
         applyMappings(now);
 
-        // Draw visualizer
-        drawViz();
+        // Feed the active audio scene (30-audio-scenes.js), if any. Reuses one
+        // frame object to stay allocation-free at 60fps.
+        if (window.AudioScenes && window.AudioScenes.active()) {
+            var sf = _sceneFrame;
+            sf.now = now; sf.dt = dt;
+            sf.bass = bass; sf.mid = mid; sf.treble = treble; sf.overall = overall;
+            sf.flux = flux; sf.fluxInstant = fluxInstant;
+            sf.brightness = brightness; sf.loudness = loudness;
+            sf.beat = beatDetected; sf.midBeat = midBeatDetected; sf.trebleBeat = trebleBeatDetected;
+            sf.onset = onsetDetected; sf.beatPulse = beatPulse; sf.sizeEnv = sizeEnv;
+            sf.sensitivity = sensitivity;
+            window.AudioScenes.tickFrame(sf);
+        }
+
+        // Draw visualizer: 30 Hz is plenty for a meter, and skip entirely
+        // while the drawer is closed (the canvas is registered eagerly but
+        // spends most of its life hidden)
+        if (now - _lastVizMs > 33 && vizCanvas && vizCanvas.offsetParent !== null) {
+            _lastVizMs = now;
+            drawViz();
+        }
     }
+
+    var _sceneFrame = {};
 
     function bandEnergy(startBin, endBin) {
         var sum = 0;
@@ -751,6 +804,56 @@
         },
 
         // Config setters
+        // Log-distributed n-band spectrum, 0-1 per band with a mild treble
+        // tilt (raw FFT magnitudes fall off toward high frequencies). Pass the
+        // previous return value as `out` to reuse the buffer allocation-free.
+        // lo/hi (0..1 on the log axis, default full) window the spectrum so a
+        // scene can zoom its bands into just the lows/mids/highs.
+        getSpectrum: function (n, out, lo, hi) {
+            if (!freqData || !n) return null;
+            if (!out || out.length !== n) out = new Float32Array(n);
+            lo = (typeof lo === 'number') ? lo : 0;
+            hi = (typeof hi === 'number') ? hi : 1;
+            // Band edges on the SAME 20 Hz – 20 kHz log10 axis the gate editors
+            // draw, so lane positions, range windows, and the hi-res context
+            // curve all line up exactly.
+            var binHz = audioCtx ? (audioCtx.sampleRate / FFT_SIZE) : 21.5;
+            function edge(t) {
+                t = lo + (hi - lo) * t;
+                var hz = 20 * Math.pow(10, t * 3); // 3 decades: 20 → 20k
+                return Math.max(BASS_START, Math.round(hz / binHz));
+            }
+            for (var k = 0; k < n; k++) {
+                var b0 = edge(k / n);
+                var b1 = Math.max(b0 + 1, edge((k + 1) / n));
+                var sum = 0, cnt = 0;
+                for (var i = b0; i < b1 && i < freqData.length; i++) { sum += freqData[i]; cnt++; }
+                var v = cnt ? (sum / cnt) / 255 : 0;
+                // Tilt tracks the band's TRUE spectral position, not its slot
+                var tt = lo + (hi - lo) * (k / n);
+                out[k] = Math.min(1, v * (1 + 1.8 * tt));
+            }
+            return out;
+        },
+
+        // Hi-res spectrum for the spectral gate editor. Fills a single reused
+        // Uint8Array (zero-alloc; at most one FFT read per 8 ms regardless of
+        // how many callers poll). Returns null until audio is running.
+        getHiRes: function () {
+            if (!audioCtx || !sourceNode || !enabled) return null;
+            var hr = ensureHiRes();
+            if (!hr) return null;
+            var now = performance.now();
+            if (now - hr.lastFill > 8) {
+                hr.analyser.getByteFrequencyData(hr.data);
+                hr.lastFill = now;
+            }
+            _hiResRet.data = hr.data;
+            _hiResRet.sampleRate = audioCtx.sampleRate;
+            _hiResRet.fftSize = hr.analyser.fftSize;
+            return _hiResRet;
+        },
+
         setSensitivity: function (v) {
             sensitivity = v;
             try { if (window.settingsManager) window.settingsManager.set('audio.sensitivity', v); } catch (_) {}

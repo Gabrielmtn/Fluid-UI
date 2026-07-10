@@ -19,6 +19,8 @@
         // fade-to-zero path and batching it would change preset feel.
         let dyeDecayAccum = 0, velDecayAccum = 0;
         let lastDyeDiss = -1, lastVelDiss = -1;
+        // Resize settle deadline for the debounced FBO rebuild (0 = none pending)
+        let _fboSettleAtMs = 0;
         function computeDecayDt(dissipation, accum, dt) {
             if (dissipation >= 1.0) return { decayDt: dt, accum: 0 };
             accum = Math.min(accum + dt, 1.0);
@@ -62,21 +64,40 @@
             const targetWidth = canvasWrapper.clientWidth;
             const targetHeight = canvasWrapper.clientHeight;
             const canvasSizeChanged = canvas.width !== targetWidth || canvas.height !== targetHeight;
-            if (canvasSizeChanged || window.needsFramebufferReinit) {
-                // Assigning canvas.width/height — even to the SAME value — clears
-                // the drawing buffer to transparent, flashing any layer div under
-                // the canvas until the next display blit. Governor tier changes
-                // arrive here via needsFramebufferReinit with an unchanged canvas
-                // size (they only rescale internal FBOs), so only touch the
-                // canvas dims when they actually differ.
-                if (canvasSizeChanged) {
-                    canvas.width = targetWidth;
-                    canvas.height = targetHeight;
-                    // Lock CSS to explicit pixels (matches updateCanvasSize behavior).
-                    // Without this, the CSS '100%' sizing can cause compositor differences
-                    // in Electron's transparent window mode.
-                    canvas.style.width = targetWidth + 'px';
-                    canvas.style.height = targetHeight + 'px';
+            if (canvasSizeChanged) {
+                // Track the wrapper VISUALLY every frame (cheap style writes;
+                // explicit px matches updateCanvasSize — CSS '100%' causes
+                // compositor differences in Electron's transparent window mode)…
+                canvas.style.width = targetWidth + 'px';
+                canvas.style.height = targetHeight + 'px';
+                // …but DEFER the drawing-buffer realloc to the settle below,
+                // alongside the FBO rebuild. Assigning canvas.width reallocates
+                // and clears the buffer — doing that every frame of a UI
+                // collapse/expand animation was a per-frame full-res realloc on
+                // top of the layout work, and the dominant source of resize
+                // jank. Until settle, the display blit fills the OLD buffer and
+                // CSS stretches it — same tradeoff the FBO debounce already
+                // accepted (comment below).
+                // Debounce the FBO rebuild until the size stops changing: UI
+                // collapse/expand animations resize the wrapper EVERY frame, and
+                // rebuilding 17 FBOs per frame — now including gl.delete* of
+                // textures the GPU used one frame ago (leak fix), which forces a
+                // driver sync — stalled the whole transition. The display pass
+                // just stretches the old-resolution FBOs until the settle fires.
+                _fboSettleAtMs = nowMs + 180;
+            }
+            if (window.needsFramebufferReinit || (_fboSettleAtMs && nowMs >= _fboSettleAtMs)) {
+                _fboSettleAtMs = 0;
+                // One buffer realloc per resize gesture, just before the FBO
+                // rebuild (governor-only reinits arrive with unchanged dims and
+                // must not clear the canvas — see canvasSizeChanged note above)
+                const settleW = canvasWrapper.clientWidth;
+                const settleH = canvasWrapper.clientHeight;
+                if (canvas.width !== settleW || canvas.height !== settleH) {
+                    canvas.width = settleW;
+                    canvas.height = settleH;
+                    canvas.style.width = settleW + 'px';
+                    canvas.style.height = settleH + 'px';
                 }
                 initFramebuffers();
                 exposeSimStats(); // Update stats after resize
@@ -151,12 +172,25 @@
                 gl.bindTexture(gl.TEXTURE_2D, curl.texture);
                 blit(velocity.write.fbo);
                 velocity.swap();
+                // Obstacle participation in the projection (divergence /
+                // pressure / gradient): solids become walls the solve flows
+                // around, instead of relying solely on the post-projection
+                // damp pass. Same gate as that pass.
+                const obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
                 // 3. Divergence
+                const _openBoundary = window.__edgeAbsorb ? 1.0 : 0.0;
                 divergenceProg.bind();
                 gl.uniform2f(divergenceProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform1f(divergenceProg.uniforms.openBoundary, _openBoundary);
+                gl.uniform1i(divergenceProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(divergenceProg.uniforms.uVelocity, 0);
+                gl.uniform1i(divergenceProg.uniforms.uObstacle, 1);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                if (obsActive) {
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                }
                 blit(divergence.fbo);
                 // 4. Clear pressure (decay previous frame's pressure field)
                 clearProg.bind();
@@ -166,32 +200,56 @@
                 gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
                 blit(pressure.write.fbo);
                 pressure.swap();
-                // 5. Pressure solve (Jacobi iterations)
-                pressureProg.bind();
-                gl.uniform2f(pressureProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
-                gl.uniform1i(pressureProg.uniforms.uDivergence, 0);
-                gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, divergence.texture);
+                // 5. Pressure solve — multigrid V-cycle when enabled, with
+                // warm-started Jacobi as the governor floor and toggle-off
+                // path. The governor's iteration budget maps onto the ladder:
+                // ≥24 → 2 V-cycles, ≥12 → 1 V-cycle, below → Jacobi at the
+                // budget (V-cycle fill cost ≈ 10-15 Jacobi iterations, so the
+                // rungs stay monotonic in GPU cost).
                 // [GOVERNOR HOOK] effective iteration count (config untouched)
                 const _pIters = window.QualityGovernor
                     ? window.QualityGovernor.effIters(config.PRESSURE_ITERATIONS)
                     : config.PRESSURE_ITERATIONS;
-                for (let i = 0; i < _pIters; i++) {
-                    gl.uniform1i(pressureProg.uniforms.uPressure, 1);
-                    gl.activeTexture(gl.TEXTURE1);
-                    gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
-                    blit(pressure.write.fbo);
-                    pressure.swap();
+                const _mgOn = !!config.MULTIGRID && typeof mgSolvePressure === 'function' && _pIters >= 12;
+                if (_mgOn) {
+                    mgSolvePressure(_pIters >= 24 ? 2 : 1, obsActive, 2, 2, 8);
+                } else {
+                    pressureProg.bind();
+                    gl.uniform2f(pressureProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                    gl.uniform1f(pressureProg.uniforms.hSq, 1.0);
+                    gl.uniform1i(pressureProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                    gl.uniform1i(pressureProg.uniforms.uDivergence, 0);
+                    gl.uniform1i(pressureProg.uniforms.uObstacle, 2);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, divergence.texture);
+                    if (obsActive) {
+                        gl.activeTexture(gl.TEXTURE2);
+                        gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    }
+                    for (let i = 0; i < _pIters; i++) {
+                        gl.uniform1i(pressureProg.uniforms.uPressure, 1);
+                        gl.activeTexture(gl.TEXTURE1);
+                        gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
+                        blit(pressure.write.fbo);
+                        pressure.swap();
+                    }
                 }
                 // 6. Gradient subtract → divergence-free velocity
                 gradientProg.bind();
                 gl.uniform2f(gradientProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform1f(gradientProg.uniforms.openBoundary, _openBoundary);
+                gl.uniform1i(gradientProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(gradientProg.uniforms.uPressure, 0);
                 gl.uniform1i(gradientProg.uniforms.uVelocity, 1);
+                gl.uniform1i(gradientProg.uniforms.uObstacle, 2);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                if (obsActive) {
+                    gl.activeTexture(gl.TEXTURE2);
+                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                }
                 blit(velocity.write.fbo);
                 velocity.swap();
                 // Obstacle damping pass — runs only when collision layers are active.
@@ -213,8 +271,12 @@
                 gl.uniform2f(advectionProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(advectionProg.uniforms.dt, dt);
+                // Overflow borders (audio scenes / future toggles): same value
+                // for the velocity and dye passes below
+                gl.uniform1f(advectionProg.uniforms.edgeAbsorb, window.__edgeAbsorb || 0.0);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 0);
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, 0);
+                gl.uniform1i(advectionProg.uniforms.macMode, 0);
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
                 gl.uniform1i(advectionProg.uniforms.uSource, 0);
                 gl.uniform1f(advectionProg.uniforms.dissipation, config.VELOCITY_DISSIPATION);
@@ -232,8 +294,52 @@
                 blit(velocity.write.fbo);
                 velocity.swap();
                 // 8. Advect density (dye) using the projected velocity
-                const obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
+                // (obsActive computed above, before the projection)
+                // [MacCormack] Two extra dye-res passes before the main
+                // advection: forward SL → error-correct+limit (05b). The main
+                // pass then self-fetches the corrected field (macMode=1) and
+                // applies decay/drains exactly once, so all the fp16 decay
+                // machinery stays in one shader. Gated on the governor's fx
+                // gate for now — sheds with post-FX under load (a dedicated
+                // ladder rung comes with the multigrid work).
+                // Scratch FBOs: `sharpened` and `detailed` are dye-res buffers
+                // written+consumed strictly inside the same-frame post-FX
+                // chain below, so borrowing them during the sim step adds
+                // zero VRAM. If the post-FX pass order ever changes, revisit.
+                const macActive = !!config.MACCORMACK &&
+                    (window.QualityGovernor ? window.QualityGovernor.fxOn() : true);
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                if (macActive) {
+                    macAdvectProg.bind();
+                    gl.uniform2f(macAdvectProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                    gl.uniform2f(macAdvectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
+                    gl.uniform1f(macAdvectProg.uniforms.dt, dt);
+                    gl.uniform1i(macAdvectProg.uniforms.uVelocity, 0);
+                    gl.uniform1i(macAdvectProg.uniforms.uSource, 1);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    blit(sharpened.fbo); // φ̂ⁿ⁺¹ (forward estimate)
+                    macCorrectProg.bind();
+                    gl.uniform2f(macCorrectProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                    gl.uniform2f(macCorrectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
+                    gl.uniform1f(macCorrectProg.uniforms.dt, dt);
+                    gl.uniform1i(macCorrectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                    gl.uniform1i(macCorrectProg.uniforms.uVelocity, 0);
+                    gl.uniform1i(macCorrectProg.uniforms.uSource, 1);
+                    gl.uniform1i(macCorrectProg.uniforms.uForward, 2);
+                    gl.uniform1i(macCorrectProg.uniforms.uObstacle, 3);
+                    gl.activeTexture(gl.TEXTURE2);
+                    gl.bindTexture(gl.TEXTURE_2D, sharpened.texture);
+                    if (obsActive) {
+                        gl.activeTexture(gl.TEXTURE3);
+                        gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    }
+                    blit(detailed.fbo); // corrected+limited φⁿ⁺¹ (pre-decay)
+                    advectionProg.bind();
+                }
+                gl.uniform1i(advectionProg.uniforms.macMode, macActive ? 1 : 0);
                 gl.uniform2f(advectionProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);
@@ -255,7 +361,9 @@
                 // (obstacle drain should still clear dye pinned against masks)
                 gl.uniform1f(advectionProg.uniforms.frozen, window.__fluidFrozen ? 1.0 : 0.0);
                 gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                // macMode=1: source is the corrected field from the passes
+                // above (self-fetched); otherwise the raw dye as before.
+                gl.bindTexture(gl.TEXTURE_2D, macActive ? detailed.texture : density.read.texture);
                 if (obsActive) {
                     gl.activeTexture(gl.TEXTURE2);
                     gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);

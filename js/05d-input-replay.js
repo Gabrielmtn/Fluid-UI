@@ -213,6 +213,18 @@
                     savedVal = window.Settings.loadSelect('fpsCap', '60');
                 }
             } catch (_) {}
+            // Uncapped modes do not survive a boot. The sim's visual character
+            // was tuned at ~60 Hz stepping: advection bilinear-refilters the
+            // whole dye texture every sim step, so at 300+ fps strokes take 5×
+            // more resample blur per second and smear out soft and lifeless
+            // (dissipation is decayDt-batched and immune, but refiltering is
+            // per-step by nature). Historically the boot profile rewrote the
+            // cap to 30/60 on every launch, so the app's whole tuned look
+            // implicitly assumes it. 'Native' stays selectable in-session.
+            if (savedVal === 'native' || savedVal === '0') {
+                console.log('[FPS Cap] persisted uncapped mode reset to 60 at boot (sim feel is tuned for 60 Hz stepping)');
+                savedVal = '60';
+            }
             fpsCapSel.value = savedVal;
             // If the saved value doesn't match any option, fall back to '60'
             if (fpsCapSel.value !== savedVal) {

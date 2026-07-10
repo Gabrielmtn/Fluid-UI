@@ -50,7 +50,13 @@
 
             Object.assign(config, safePreset);
 
-            if (window.QualityGovernor) window.QualityGovernor.reset();
+            // Soft reset: the preset changes the workload (stale statistics) but
+            // not the hardware — keep the current quality tier, re-learn from it.
+            // A hard reset snapped to full quality here and caused seconds of
+            // over-budget frames after every preset click.
+            if (window.QualityGovernor) {
+                (window.QualityGovernor.softReset || window.QualityGovernor.reset)();
+            }
 
             
 

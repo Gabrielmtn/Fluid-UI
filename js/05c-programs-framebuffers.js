@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05c-programs-framebuffers.js — part 3/14 of former 05-fluid-sim.js (lines 967–1191)
 // LOAD ORDER: after 05b-shader-sim.js, before 05d-input-replay.js
-// PROVIDES: all Program instances, exposeSimStats, createFBO, createDoubleFBO, initFramebuffers (+load-time call), updateObstacleTexture, blit; lexical: dyeTexWidth/.., density, velocity, pressure, ..
+// PROVIDES: all Program instances (incl. macAdvectProg/macCorrectProg, mg*Prog), exposeSimStats, createFBO, createDoubleFBO, initFramebuffers (+load-time call), mgSolvePressure, updateObstacleTexture, blit; lexical: dyeTexWidth/.., density, velocity, pressure, mgLevels, ..
 // REQUIRES: gl, config (04); Program + frag sources (05a/05b); QualityGovernor hooks (08a, guarded)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -13,10 +13,15 @@
         const lightShiftProg = new Program(baseVert, lightShiftFrag);
         const splatProg = new Program(baseVert, splatFrag);
         const advectionProg = new Program(baseVert, advectionFrag);
+        const macAdvectProg = new Program(baseVert, macAdvectFrag);
+        const macCorrectProg = new Program(baseVert, macCorrectFrag);
         const divergenceProg = new Program(baseVert, divergenceFrag);
         const curlProg = new Program(baseVert, curlFrag);
         const vorticityProg = new Program(baseVert, vorticityFrag);
         const pressureProg = new Program(baseVert, pressureFrag);
+        const mgResidualProg = new Program(baseVert, mgResidualFrag);
+        const mgRestrictProg = new Program(baseVert, mgRestrictFrag);
+        const mgProlongProg = new Program(baseVert, mgProlongFrag);
         const gradientProg = new Program(baseVert, gradientFrag);
         const clearProg = new Program(baseVert, clearFrag);
         const obstacleDampProg = new Program(baseVert, obstacleDampFrag);
@@ -63,6 +68,10 @@
         let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, lightShifted, obstacle;
         let sunrays, sunraysTemp;
         let shadeForm, shadeFormTemp;
+        // Multigrid pressure pyramid: mgRes0 = level-0 residual scratch;
+        // mgLevels[i] = level i+1 {w, h, rhs, res, p(double), obs}. Level 0
+        // aliases the live pressure/divergence/obstacle buffers.
+        let mgRes0 = null, mgLevels = null;
         function initFramebuffers() {
             // Use canvas attribute dimensions (not gl.drawingBufferWidth) for aspect ratio.
             // In Electron with transparent windows or DPR scaling, the drawing buffer
@@ -90,6 +99,10 @@
             }
             [sharpened, detailed, lit, lightShifted, divergence, curl, obstacle,
              sunrays, sunraysTemp, shadeForm, shadeFormTemp].forEach(_deleteFBO);
+            _deleteFBO(mgRes0);
+            if (mgLevels) mgLevels.forEach(function (l) {
+                [l.rhs, l.res, l.obs, l.p.read, l.p.write].forEach(_deleteFBO);
+            });
             // [GOVERNOR HOOK] scale internal resolution (config untouched)
             const _gov = window.QualityGovernor;
             const dyeBase = Math.max(64, Math.round((config.DYE_RESOLUTION || 1024) * (_gov ? _gov.dyeScale() : 1)));
@@ -141,6 +154,26 @@
             pressure = createDoubleFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             // Obstacle texture for collision layers (single-channel, sim resolution)
             obstacle = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.LINEAR);
+            // Multigrid pressure pyramid (halve until ~12 cells or 6 levels;
+            // LINEAR filter — restriction box-samples and prolongation
+            // interpolates). All R16F: whole pyramid costs ~a third of one
+            // extra sim-res field per texture kind.
+            mgRes0 = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.LINEAR);
+            mgLevels = [];
+            (function () {
+                let mw = simTexWidth, mh = simTexHeight;
+                while (mgLevels.length < 6 && Math.min(mw, mh) > 12) {
+                    mw = Math.max(4, Math.round(mw / 2));
+                    mh = Math.max(4, Math.round(mh / 2));
+                    mgLevels.push({
+                        w: mw, h: mh,
+                        rhs: createFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR),
+                        res: createFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR),
+                        p: createDoubleFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR),
+                        obs: createFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR)
+                    });
+                }
+            })();
             // Sunrays FBOs
             const sunRes = config.SUNRAYS_RESOLUTION || 196;
             const sunAspect = displayW / Math.max(1, displayH);
@@ -183,8 +216,12 @@
                 divergence, curl,
                 pressure.read, pressure.write,
                 sharpened, detailed, lit, lightShifted, obstacle,
-                sunrays, sunraysTemp, shadeForm, shadeFormTemp
+                sunrays, sunraysTemp, shadeForm, shadeFormTemp,
+                mgRes0
             ];
+            mgLevels.forEach(function (l) {
+                allFBOs.push(l.rhs, l.res, l.obs, l.p.read, l.p.write);
+            });
             for (let i = 0; i < allFBOs.length; i++) {
                 if (allFBOs[i] && allFBOs[i].fbo) {
                     gl.bindFramebuffer(gl.FRAMEBUFFER, allFBOs[i].fbo);
@@ -223,6 +260,112 @@
         }
         initFramebuffers();
         exposeSimStats(); // Expose to window for stats panel
+        // ─── Multigrid pressure V-cycle (called from 05j instead of the
+        // Jacobi loop when config.MULTIGRID and the governor budget allow).
+        // Level 0 is the live pressure/divergence/obstacle; deeper levels
+        // solve the error equation on the pyramid. hSq bookkeeping keeps all
+        // stored fields at divergence magnitude (see pressureFrag note).
+        // One V-cycle ≈ the accuracy of hundreds of Jacobi iterations at the
+        // fill cost of ~10 (residual reduction is what kills the large-scale
+        // divergence Jacobi can't reach).
+        function mgSolvePressure(cycles, obsActive, nPre, nPost, nCoarse) {
+            // Rebuild the obstacle-fraction pyramid (fractions, not binary —
+            // thin solids must survive coarsening). Cheap: 5-6 tiny draws.
+            if (obsActive) {
+                mgRestrictProg.bind();
+                gl.uniform1i(mgRestrictProg.uniforms.uTexture, 0);
+                let src = obstacle;
+                for (let i = 0; i < mgLevels.length; i++) {
+                    const lvl = mgLevels[i];
+                    gl.viewport(0, 0, lvl.w, lvl.h);
+                    gl.uniform2f(mgRestrictProg.uniforms.fineTexelSize, 1.0 / src.width, 1.0 / src.height);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, src.texture);
+                    blit(lvl.obs.fbo);
+                    src = lvl.obs;
+                }
+            }
+            function smooth(lv, n) {
+                pressureProg.bind();
+                gl.viewport(0, 0, lv.w, lv.h);
+                gl.uniform2f(pressureProg.uniforms.texelSize, 1.0 / lv.w, 1.0 / lv.h);
+                gl.uniform1f(pressureProg.uniforms.hSq, lv.hSq);
+                gl.uniform1i(pressureProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                gl.uniform1i(pressureProg.uniforms.uDivergence, 0);
+                gl.uniform1i(pressureProg.uniforms.uPressure, 1);
+                gl.uniform1i(pressureProg.uniforms.uObstacle, 2);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, lv.rhs.texture);
+                if (obsActive) {
+                    gl.activeTexture(gl.TEXTURE2);
+                    gl.bindTexture(gl.TEXTURE_2D, lv.obs.texture);
+                }
+                for (let i = 0; i < n; i++) {
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, lv.p.read.texture);
+                    blit(lv.p.write.fbo);
+                    lv.p.swap();
+                }
+            }
+            const levels = [{ w: simTexWidth, h: simTexHeight, p: pressure, rhs: divergence, res: mgRes0, obs: obstacle, hSq: 1.0 }];
+            for (let i = 0; i < mgLevels.length; i++) {
+                const l = mgLevels[i];
+                levels.push({ w: l.w, h: l.h, p: l.p, rhs: l.rhs, res: l.res, obs: l.obs, hSq: Math.pow(4, i + 1) });
+            }
+            const N = levels.length - 1;
+            for (let c = 0; c < cycles; c++) {
+                // Descent: smooth, measure what's left, push it down
+                for (let L = 0; L < N; L++) {
+                    const lv = levels[L], nx = levels[L + 1];
+                    smooth(lv, nPre);
+                    mgResidualProg.bind();
+                    gl.viewport(0, 0, lv.w, lv.h);
+                    gl.uniform2f(mgResidualProg.uniforms.texelSize, 1.0 / lv.w, 1.0 / lv.h);
+                    gl.uniform1f(mgResidualProg.uniforms.hSq, lv.hSq);
+                    gl.uniform1i(mgResidualProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                    gl.uniform1i(mgResidualProg.uniforms.uPressure, 0);
+                    gl.uniform1i(mgResidualProg.uniforms.uDivergence, 1);
+                    gl.uniform1i(mgResidualProg.uniforms.uObstacle, 2);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, lv.p.read.texture);
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, lv.rhs.texture);
+                    if (obsActive) {
+                        gl.activeTexture(gl.TEXTURE2);
+                        gl.bindTexture(gl.TEXTURE_2D, lv.obs.texture);
+                    }
+                    blit(lv.res.fbo);
+                    mgRestrictProg.bind();
+                    gl.viewport(0, 0, nx.w, nx.h);
+                    gl.uniform1i(mgRestrictProg.uniforms.uTexture, 0);
+                    gl.uniform2f(mgRestrictProg.uniforms.fineTexelSize, 1.0 / lv.w, 1.0 / lv.h);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, lv.res.texture);
+                    blit(nx.rhs.fbo);
+                    // zero initial guess for the error solve
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, nx.p.read.fbo);
+                    gl.clearColor(0, 0, 0, 0);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+                }
+                // Coarsest: a few Jacobi sweeps stand in for an exact solve
+                smooth(levels[N], nCoarse);
+                // Ascent: interpolate each error solve up, add, re-smooth
+                for (let L = N - 1; L >= 0; L--) {
+                    const lv = levels[L], nx = levels[L + 1];
+                    mgProlongProg.bind();
+                    gl.viewport(0, 0, lv.w, lv.h);
+                    gl.uniform1i(mgProlongProg.uniforms.uPressure, 0);
+                    gl.uniform1i(mgProlongProg.uniforms.uCoarse, 1);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, lv.p.read.texture);
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, nx.p.read.texture);
+                    blit(lv.p.write.fbo);
+                    lv.p.swap();
+                    smooth(lv, nPost);
+                }
+            }
+        }
         // Obstacle texture upload for collision layers
         // Cached buffers to avoid per-frame allocations (GPU crash prevention)
         var _obsTempCanvas = null, _obsTempCtx = null;

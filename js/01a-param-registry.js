@@ -81,6 +81,10 @@
         enableLighting: {def: false, mutScope: "extended"},
         enableLightShift: {def: false, mutScope: "extended"},
         microDetailToggle: {def: false, mutScope: "extended"},
+        // Render-quality plumbing, not an aesthetic param: never mutate
+        // (a mutation flipping advection quality reads as a perf bug).
+        macCormackToggle: {def: true, mutScope: null},
+        multigridToggle: {def: true, mutScope: null},
         sunraysToggle: {def: false, mutScope: "extended"},
         ascendToggle: {def: false, mutScope: "extended"},
         ascendRandomness: {def: false, mutScope: "extended"},
@@ -106,6 +110,7 @@
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
         recMode: {options: ["off", "min", "full"], def: "off", mut: null},
         recPlaybackSpeed: {options: ["0.25", "0.5", "1", "2", "4"], def: "0.25", mut: null},
+        audioMode: {options: ["off", "tunnel", "eq", "ferro", "min", "full"], def: "off", mut: null},
         audioReactSource: {options: null, def: null, mut: null},
         audioAutoSplatMode: {options: null, def: null, mut: null},
         splatInMode: {options: null, def: null, mut: null},

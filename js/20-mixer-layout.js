@@ -1271,6 +1271,8 @@
         moveControlGroup('fpsCap', body);
         moveControlGroup('pressureDissipation', body);
         moveControlGroup('pressureIteration', body);
+        moveCheckboxGroup('macCormackToggle', body);
+        moveCheckboxGroup('multigridToggle', body);
 
         return sec;
     }
@@ -2128,10 +2130,28 @@
         modeLbl.textContent = 'Audio Mode';
         var modeSel = document.createElement('select');
         modeSel.id = 'audioMode';
-        modeSel.innerHTML = '<option value="off" selected>Off</option><option value="min">Minimized</option><option value="full">Full</option>';
+        // off → three fire-and-forget scenes (30-audio-scenes.js) → min → full
+        modeSel.innerHTML =
+            '<option value="off" selected>Off</option>' +
+            '<option value="tunnel">🌀 Tunnel</option>' +
+            '<option value="eq">📊 EQ Bars</option>' +
+            '<option value="ferro">🧲 Ferrofluid</option>' +
+            '<option value="min">Minimized</option>' +
+            '<option value="full">Full</option>';
         modeGroup.appendChild(modeLbl);
         modeGroup.appendChild(modeSel);
         body.appendChild(modeGroup);
+
+        // Scene widget: hosts the shared enable row + the active scene's
+        // quick controls. Shown only while a scene mode is selected.
+        var sceneBox = document.createElement('div');
+        sceneBox.id = 'audioSceneBox';
+        sceneBox.className = 'audio-mini';
+        sceneBox.style.display = 'none';
+        var sceneCtlHost = document.createElement('div');
+        sceneCtlHost.id = 'audioSceneControls';
+        sceneBox.appendChild(sceneCtlHost);
+        body.appendChild(sceneBox);
 
         // Minimized widget: enable + source + small segments timeline + Full button
         var mini = document.createElement('div');
@@ -2190,20 +2210,42 @@
             modeSel.dispatchEvent(new Event('change'));
         });
 
-        function applyAudioMode(mode) {
+        function applyAudioMode(mode, userInitiated) {
+            var isScene = !!(window.AudioScenes && window.AudioScenes.isScene(mode));
             // Park the shared enable row where the active mode can reach it
             var enableHost = document.getElementById('audioDrawerEnableHost');
             if (mode === 'full' && enableHost && enableRow) {
                 enableHost.appendChild(enableRow);
+            } else if (isScene && enableRow) {
+                sceneBox.insertBefore(enableRow, sceneBox.firstChild);
             } else if (enableRow && enableRow.parentElement !== mini) {
                 mini.insertBefore(enableRow, mini.firstChild);
             }
+            // Scene lifecycle: activate on scene modes, tear down otherwise
+            if (window.AudioScenes) {
+                if (isScene) window.AudioScenes.activate(mode);
+                else window.AudioScenes.deactivate();
+            }
+            if (!isScene) sceneBox.style.display = 'none';
             if (mode === 'off') {
                 mini.style.display = 'none';
                 if (window.audioReactive) window.audioReactive.disable();
                 if (enableCb) enableCb.checked = false;
                 if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
                 stopAudioMiniLoop();
+            } else if (isScene) {
+                mini.style.display = 'none';
+                sceneBox.style.display = '';
+                if (window.AudioScenes) window.AudioScenes.buildControls(mode, sceneCtlHost);
+                if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
+                stopAudioMiniLoop();
+                // Fire-and-forget: a user picking a scene wants sound NOW — start
+                // the engine from the selected source. Restored sessions (synthetic
+                // change events) skip this so page load never pops a mic prompt.
+                if (userInitiated && window.audioReactive && !window.audioReactive.isEnabled()) {
+                    enableCb.checked = true;
+                    enableFromSource();
+                }
             } else if (mode === 'min') {
                 mini.style.display = '';
                 if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
@@ -2215,7 +2257,7 @@
                 stopAudioMiniLoop();
             }
         }
-        modeSel.addEventListener('change', function (e) { applyAudioMode(e.target.value); });
+        modeSel.addEventListener('change', function (e) { applyAudioMode(e.target.value, e.isTrusted); });
 
         // Build the drawer controls + composer up front (into the hidden panel) so
         // their element IDs always exist for save/load, mutation locks, and the
@@ -2238,7 +2280,18 @@
     // \u2500\u2500 Mini segments timeline (overlapping active areas) \u2500\u2500
     function startAudioMiniLoop() {
         if (audioMiniRaf) return;
-        var draw = function () { drawAudioMiniTimeline(); audioMiniRaf = requestAnimationFrame(draw); };
+        // rAF is uncapped in Electron — throttle to ~30 Hz and skip while the
+        // mini is hidden (a timeline preview needs no more)
+        var lastDraw = 0;
+        var draw = function () {
+            audioMiniRaf = requestAnimationFrame(draw);
+            var now = performance.now();
+            if (now - lastDraw < 33) return;
+            var cv = document.getElementById('audioMiniTimeline');
+            if (!cv || cv.offsetParent === null) return;
+            lastDraw = now;
+            drawAudioMiniTimeline();
+        };
         audioMiniRaf = requestAnimationFrame(draw);
     }
     function stopAudioMiniLoop() {

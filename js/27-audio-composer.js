@@ -133,6 +133,10 @@
 
     function frame(now) {
         if (!playing) return;
+        rafId = requestAnimationFrame(frame);
+        // rAF is uncapped in the Electron build — ~60 Hz is plenty for segment
+        // application + playhead DOM writes (dt-based, so timing stays exact)
+        if (lastFrameMs && now - lastFrameMs < 15) return;
         if (!lastFrameMs) lastFrameMs = now;
         var dt = Math.min(100, now - lastFrameMs);
         lastFrameMs = now;
@@ -140,7 +144,6 @@
         if (playheadMs >= state.durationMs) { playheadMs = 0; appliedByTrack = {}; } // loop
         applyActive();
         updatePlayhead();
-        rafId = requestAnimationFrame(frame);
     }
 
     // ─── RENDER ─────────────────────────────────────────────────

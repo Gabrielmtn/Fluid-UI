@@ -254,6 +254,11 @@ class DepthEstimator {
     var obstacleCanvas = null;   // offscreen canvas for rasterizing masks
     var obstacleCtx = null;
     var webcamStreams = {};       // layerIndex → { stream, video, intervalId }
+    // Procedural obstacle source: a draw(ctx, simW, simH) callback composited
+    // over the layer-based obstacles on every recomposite (incl. resize), so
+    // code-drawn colliders (e.g. audio-scene EQ lane walls) survive FBO
+    // rebuilds without needing a fake collision layer.
+    var proceduralDraw = null;
 
     // Expose collision API
     window.collisionLayers = {
@@ -274,7 +279,30 @@ class DepthEstimator {
 
         // Recomposite all collision layers into the obstacle texture
         updateObstacleFromLayers: updateObstacleFromLayers,
+
+        // Install/remove a procedural obstacle source (draw(ctx, simW, simH)).
+        // Pass null to remove; collision auto-disables if no layer obstacles
+        // remain either.
+        setProcedural: setProcedural,
     };
+
+    function setProcedural(fn) {
+        proceduralDraw = (typeof fn === 'function') ? fn : null;
+        if (proceduralDraw) {
+            collisionEnabled = true;
+            updateObstacleFromLayers();
+        } else {
+            var hasLayers = !!(window.layers && window.layers.some(function (l) { return l.isCollision; }));
+            if (hasLayers) {
+                updateObstacleFromLayers();
+            } else {
+                // Clear synchronously: the rAF recomposite would early-return
+                // once collisionEnabled is false and leave the walls burned in.
+                collisionEnabled = false;
+                clearObstacle();
+            }
+        }
+    }
 
     // Create a collision layer from an existing image layer's mask and/or
     // threshold setting.  Three modes:
@@ -780,11 +808,12 @@ class DepthEstimator {
 
     function _doUpdateObstacle() {
         _obsDirty = false;
-        if (!window.layers) return;
+        if (!window.layers && !proceduralDraw) return;
 
         // Auto-enable collision if any collision layers exist (e.g. after preset restore)
         if (!collisionEnabled) {
-            var hasCollision = window.layers.some(function (l) { return l.isCollision; });
+            var hasCollision = !!proceduralDraw ||
+                (window.layers && window.layers.some(function (l) { return l.isCollision; }));
             if (!hasCollision) return;
             collisionEnabled = true;
         }
@@ -806,7 +835,7 @@ class DepthEstimator {
         obstacleCtx.clearRect(0, 0, simW, simH);
 
         var hasAny = false;
-        window.layers.forEach(function (layer) {
+        (window.layers || []).forEach(function (layer) {
             if (!layer.isCollision) return;
             if (!layer.mask || !layer.mask.enabled) return;
 
@@ -877,6 +906,15 @@ class DepthEstimator {
                 obstacleCtx.restore();
             });
         });
+
+        // Composite the procedural source (e.g. EQ lane walls) over the layers
+        if (proceduralDraw) {
+            hasAny = true;
+            obstacleCtx.save();
+            obstacleCtx.globalCompositeOperation = 'lighter';
+            try { proceduralDraw(obstacleCtx, simW, simH); } catch (_) {}
+            obstacleCtx.restore();
+        }
 
         if (hasAny && typeof window.updateObstacleTexture === 'function') {
             window.updateObstacleTexture(obstacleCanvas);

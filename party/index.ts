@@ -3,7 +3,7 @@ import {
   roomKind,
   capacityFor,
   uidFromRequestUrl,
-  INTERNAL_SECRET,
+  internalSecret,
   MAX_MESSAGE_BYTES,
 } from "./shared";
 
@@ -214,7 +214,7 @@ export default class FluidPartyServer implements Party.Server {
     try {
       const path =
         "/vacate?s=" +
-        encodeURIComponent(INTERNAL_SECRET) +
+        encodeURIComponent(internalSecret(this.room.env)) +
         "&room=" +
         encodeURIComponent(this.room.id);
       void this.room.context.parties.lobby.get("main").fetch(path);

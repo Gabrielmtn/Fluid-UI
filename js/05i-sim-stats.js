@@ -20,6 +20,8 @@
             gl.uniform1f(splatProg.uniforms.stampNoise, config.STAMP_NOISE || 0);
             gl.uniform2f(splatProg.uniforms.stampSeed, Math.random() * 19.7, Math.random() * 23.3);
             gl.uniform1i(splatProg.uniforms.stampShape, config.STAMP_SHAPE || 0);
+            gl.uniform1f(splatProg.uniforms.ringRadius, 0); // classic blob — never inherit a stale ring stamp
+            gl.uniform1f(splatProg.uniforms.barHalfW, 0);   // ...or a stale bar stamp
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
             // Block injection inside collision masks (prevents burned-in dye)
             const _splatObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
@@ -47,6 +49,95 @@
             blit(density.write.fbo);
             density.swap();
         }
+        // Ring-band splat: paints a thin elliptical band of dye and pushes it
+        // radially in ONE velocity+dye pass (vs stamping dozens of dots along
+        // the circle). Used by the Tunnel audio scene's solid-ring mode.
+        //   cx/cy/ringRadiusPx — canvas pixels; thickness — SPLAT_RADIUS units
+        //   (gaussian width² of the band); radialSpeed >0 pushes outward,
+        //   <0 toward the center; squash <1 flattens the ellipse vertically.
+        function ringSplat(cx, cy, ringRadiusPx, thickness, radialSpeed, swirl, squash, color) {
+            const aspectRatio = canvas.width / canvas.height;
+            splatProg.bind();
+            gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
+            gl.uniform2f(splatProg.uniforms.point, cx / canvas.width, 1.0 - cy / canvas.height);
+            gl.uniform1f(splatProg.uniforms.radius, thickness);
+            // p-space distances are canvas-height-normalized (p.x carries the
+            // aspect correction), so pixels convert via /canvas.height
+            gl.uniform1f(splatProg.uniforms.ringRadius, ringRadiusPx / canvas.height);
+            gl.uniform1f(splatProg.uniforms.ringSquash, squash || 1);
+            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
+            gl.uniform1f(splatProg.uniforms.stampNoise, 0);
+            gl.uniform1i(splatProg.uniforms.stampShape, 0);
+            gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
+            const _ringObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
+            gl.uniform1i(splatProg.uniforms.hasObstacle, _ringObsActive ? 1 : 0);
+            if (_ringObsActive) {
+                gl.uniform1i(splatProg.uniforms.uObstacle, 1);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            }
+            // Velocity: color.x = signed radial speed, color.y = tangential swirl
+            gl.viewport(0, 0, simTexWidth, simTexHeight);
+            gl.uniform1i(splatProg.uniforms.isVelocity, 1);
+            gl.uniform1i(splatProg.uniforms.uTarget, 0);
+            gl.uniform3f(splatProg.uniforms.color, radialSpeed, swirl || 0, 1.0);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+            blit(velocity.write.fbo);
+            velocity.swap();
+            // Dye: the visible thin band
+            gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+            gl.uniform1i(splatProg.uniforms.isVelocity, 0);
+            gl.uniform3fv(splatProg.uniforms.color, color);
+            gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+            blit(density.write.fbo);
+            density.swap();
+            gl.uniform1f(splatProg.uniforms.ringRadius, 0); // belt-and-braces: no leak into classic splats
+        }
+        window.applyRingSplat = ringSplat;
+        // Bar-slab splat: a crisp lane-wide horizontal slab of dye + velocity
+        // in one pass — the EQ scene's per-lane paint, shaped like the lane
+        // itself instead of a round blob bleeding over the walls.
+        //   cx/cy/halfWidthPx/pointPx — canvas pixels; thickness — SPLAT_RADIUS
+        //   units (gaussian width² of the slab's vertical profile); pointPx
+        //   lifts the stamp's centerline into a pointed arch (0 = flat slab).
+        function barSplat(cx, cy, halfWidthPx, thickness, pointPx, dx, dy, color) {
+            const aspectRatio = canvas.width / canvas.height;
+            splatProg.bind();
+            gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
+            gl.uniform2f(splatProg.uniforms.point, cx / canvas.width, 1.0 - cy / canvas.height);
+            gl.uniform1f(splatProg.uniforms.radius, thickness);
+            gl.uniform1f(splatProg.uniforms.barHalfW, halfWidthPx / canvas.height); // p-space is height-normalized
+            gl.uniform1f(splatProg.uniforms.barPoint, (pointPx || 0) / canvas.height);
+            gl.uniform1f(splatProg.uniforms.ringRadius, 0);
+            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
+            gl.uniform1f(splatProg.uniforms.stampNoise, 0);
+            gl.uniform1i(splatProg.uniforms.stampShape, 0);
+            gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
+            const _barObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
+            gl.uniform1i(splatProg.uniforms.hasObstacle, _barObsActive ? 1 : 0);
+            if (_barObsActive) {
+                gl.uniform1i(splatProg.uniforms.uObstacle, 1);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            }
+            gl.viewport(0, 0, simTexWidth, simTexHeight);
+            gl.uniform1i(splatProg.uniforms.isVelocity, 1);
+            gl.uniform1i(splatProg.uniforms.uTarget, 0);
+            gl.uniform3f(splatProg.uniforms.color, dx, -dy, 1.0);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+            blit(velocity.write.fbo);
+            velocity.swap();
+            gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+            gl.uniform1i(splatProg.uniforms.isVelocity, 0);
+            gl.uniform3fv(splatProg.uniforms.color, color);
+            gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+            blit(density.write.fbo);
+            density.swap();
+            gl.uniform1f(splatProg.uniforms.barHalfW, 0); // no leak into classic splats
+        }
+        window.applyBarSplat = barSplat;
         let lastTime = performance.now();
         let lastDrawTimeMs = 0;
         // ─── FPS Ring Buffer (zero-GC) ────────────────────────────────

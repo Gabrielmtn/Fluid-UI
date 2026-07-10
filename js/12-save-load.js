@@ -66,6 +66,8 @@
         // Effects
         'enableLighting','enableLightShift','microDetailToggle',
         'sunraysToggle',
+        // Simulation
+        'macCormackToggle','multigridToggle',
         // Animations
         'ascendToggle','ascendRandomness','shootingStarToggle',
         // Layers
@@ -92,7 +94,7 @@
         // Recording
         'recMode','recPlaybackSpeed',
         // Audio Reactive
-        'audioReactSource','audioAutoSplatMode',
+        'audioMode','audioReactSource','audioAutoSplatMode',
         // Brush
         'splatInMode','splatOutMode'
     ];
@@ -716,7 +718,12 @@
     function applyPresetSnapshot(snapshot) {
         if (!snapshot) return;
         var reg = window.ParamRegistry;
-        if (window.QualityGovernor) window.QualityGovernor.reset();
+        // Soft reset: keep the governor's quality tier across snapshot loads —
+        // a hard reset snapped to full quality and stuttered for seconds while
+        // the 1 Hz evaluator re-degraded (see 08a-quality-governor.js)
+        if (window.QualityGovernor) {
+            (window.QualityGovernor.softReset || window.QualityGovernor.reset)();
+        }
 
         // ── Sliders ── (clamped through the param registry; unknown ids warn + skip)
         try {

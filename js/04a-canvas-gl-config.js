@@ -232,11 +232,23 @@
 
             VIBRANCE: 0,              // Selective saturation boost (0 = off, 1.0 = max)
 
-            DYE_RESOLUTION: 1024,     // 1024 looks great, 2048 is overkill
+            DYE_RESOLUTION: 2048,     // Ultra (2K) by default on desktop — the highest real-time tier.
+                                      // The governor's boot ascent starts light and ramps up to this;
+                                      // Cinematic 4K stays a dropdown choice for capture work (a live
+                                      // realloc to 4096 can spike VRAM enough to lose the GL context).
 
-            SIM_RESOLUTION: 384,      // 384 gives noticeably better physics detail than 256
+            SIM_RESOLUTION: 512,      // Ultra physics by default on desktop (mobile overrides below)
 
             VELOCITY_INFLUENCE: 2.5,  // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
+
+            MACCORMACK: true,         // Crisp advection: MacCormack error-corrected dye transport
+                                      // (2 extra dye-res passes; governor sheds it with post-FX)
+
+            MULTIGRID: true,          // Multigrid pressure V-cycle — converges like hundreds of
+                                      // Jacobi iterations at ~1/3 the fill cost of the 32 default
+                                      // (governor ladder: 2 cycles → 1 → Jacobi floor)
+
+
 
             SUNRAYS: false,           // Sunrays post-FX enabled (toggled in Effects)
 
@@ -283,6 +295,12 @@
                     config.PRESSURE_ITERATIONS = 15; // Fewer iterations (was 40)
 
                     config.SHARPNESS = 0.0;        // Disable sharpening on mobile
+
+                    config.MACCORMACK = false;     // Skip the 2 extra dye passes on mobile
+                                                   // (tile-GPU pass overhead; toggle re-enables)
+
+                    config.MULTIGRID = false;      // ~40 small draws/frame is real overhead on
+                                                   // tile GPUs; 15 warm Jacobi stays the default
 
                     config.SPLAT_RADIUS = 0.012;   // Slightly larger for touch
 

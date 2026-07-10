@@ -193,9 +193,9 @@
             <label for="visualResolution">Visual Quality</label>
             <select id="visualResolution">
                 <option value="4096">Cinematic (4K)</option>
-                <option value="2048">Ultra (2K)</option>
+                <option value="2048" selected>Ultra (2K)</option>
                 <option value="1536">Very High (1.5K)</option>
-                <option value="1024" selected>High (1K) - Recommended</option>
+                <option value="1024">High (1K)</option>
                 <option value="512">Medium (512)</option>
                 <option value="256">Low (256)</option>
             </select>
@@ -204,8 +204,8 @@
             <label for="physicsResolution">Physics Detail</label>
             <select id="physicsResolution">
                 <option value="1024">Extreme (1K)</option>
-                <option value="512">Ultra (512)</option>
-                <option value="384" selected>High (384) - Recommended</option>
+                <option value="512" selected>Ultra (512)</option>
+                <option value="384">High (384)</option>
                 <option value="256">Standard (256)</option>
                 <option value="192">Balanced (192)</option>
                 <option value="128">Medium (128)</option>
@@ -240,6 +240,14 @@
         <div class="control-group">
             <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">32</span></label>
             <input type="range" id="pressureIteration" min="1" max="50" value="32" step="1">
+        </div>
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="macCormackToggle" checked>
+            <label for="macCormackToggle" style="margin: 0" title="MacCormack error-corrected dye advection — sharper strokes, less smearing (2 extra GPU passes)">Crisp Advection</label>
+        </div>
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="multigridToggle" checked>
+            <label for="multigridToggle" style="margin: 0" title="Multigrid pressure solve — much better incompressibility (crisper vortices, less mushy expansion) at lower GPU cost than high iteration counts">Multigrid Pressure</label>
         </div>
         <div class="control-group">
             <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">2.500</span></label>
@@ -954,6 +962,7 @@
     <script src="js/24-path-layers.js"></script>
     <script src="js/26-layer-transform.js"></script>
     <script src="js/27-audio-composer.js"></script>
+    <script src="js/30-audio-scenes.js"></script>
     <script src="js/20-mixer-layout.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">

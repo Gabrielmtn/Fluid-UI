@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05b-shader-sim.js — part 2/14 of former 05-fluid-sim.js (lines 654–966)
 // LOAD ORDER: after 05a-shader-core.js, before 05c-programs-framebuffers.js
-// PROVIDES: splat/advection/divergence/curl/turbulence/vorticity/pressure/gradient/clear/obstacleDamp/sunrays frag sources
+// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/sunrays frag sources
 // REQUIRES: PRECISION (05a)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -18,6 +18,10 @@
             uniform float stampNoise;  // 0 = classic gaussian splat; >0 blends in the clay stamp
             uniform vec2 stampSeed;    // per-splat offset so consecutive stamps differ
             uniform int stampShape;    // 0 = blob, 1 = chisel (square press), 2 = streak (elongated smear)
+            uniform float ringRadius;  // >0: thin ring-band stamp at this radius (aspect-corrected UV); 0 = classic blob
+            uniform float ringSquash;  // ring ellipse squash (1 = circle, <1 = flattened vertically)
+            uniform float barHalfW;    // >0: crisp bar stamp this half-width wide (aspect-corrected UV); EQ lane slabs
+            uniform float barPoint;    // bar stamp tip lift: 0 = flat slab, >0 = pointed arch (flame tongue)
             uniform int gateColor;     // 1 = clamp dye at the splat's own color (no HDR overflow into white)
             uniform int isVelocity; // 1 for velocity, 0 for density
             uniform int hasObstacle;
@@ -54,6 +58,28 @@
                     float dist = dot(p, p);
                     float splatIntensity = exp(-dist / radius);
                     vec3 splat = splatIntensity * color;
+                    if (ringRadius > 0.0) {
+                        // Ring band: intensity peaks along the ellipse, and the
+                        // velocity is injected RADIALLY per fragment — color.x is
+                        // the signed radial speed (>0 outward), color.y a
+                        // tangential swirl — so one draw pushes the whole band.
+                        vec2 ps = vec2(p.x, p.y / max(ringSquash, 0.05));
+                        float d = length(ps);
+                        float rr = d - ringRadius;
+                        splatIntensity = exp(-(rr * rr) / radius);
+                        vec2 dirv = d > 1e-5 ? ps / d : vec2(0.0);
+                        splat = vec3((dirv * color.x + vec2(-dirv.y, dirv.x) * color.y) * splatIntensity, 0.0);
+                    } else if (barHalfW > 0.0) {
+                        // Bar stamp (EQ lanes): crisp box in x; the slab's
+                        // centerline lifts parabolically toward lane center
+                        // (barPoint), so the stamp is a pointed flame tongue
+                        float q = clamp(abs(p.x) / barHalfW, 0.0, 1.0);
+                        float bx = 1.0 - smoothstep(0.8, 1.0, q);
+                        float cy = barPoint * (1.0 - q * q);
+                        float dy2 = p.y - cy;
+                        splatIntensity = bx * exp(-(dy2 * dy2) / radius);
+                        splat = splatIntensity * color;
+                    }
                     // Measure existing velocity magnitude
                     float existingVelMag = length(base.xy);
                     // Smoother isolation curve using pow(x, 1.5)
@@ -76,6 +102,19 @@
                     // ─── Additive mixing (original) ───────────────────────
                     float r2 = dot(p, p) / radius;
                     float shape = exp(-r2);
+                    if (ringRadius > 0.0) {
+                        // Ring band: dye deposits only along the thin ellipse
+                        vec2 ps = vec2(p.x, p.y / max(ringSquash, 0.05));
+                        float rr = length(ps) - ringRadius;
+                        shape = exp(-(rr * rr) / radius);
+                    } else if (barHalfW > 0.0) {
+                        // Bar stamp: lane-wide at the base, pointed arch on top
+                        float q = clamp(abs(p.x) / barHalfW, 0.0, 1.0);
+                        float bx = 1.0 - smoothstep(0.8, 1.0, q);
+                        float cy = barPoint * (1.0 - q * q);
+                        float dy2 = p.y - cy;
+                        shape = bx * exp(-(dy2 * dy2) / radius);
+                    }
                     if (stampNoise > 0.0) {
                         // Clay stamp: hard-edged footprint with a noise-notched rim
                         // and surface grain instead of the gaussian bloom. Dye only —
@@ -115,6 +154,36 @@
                 }
             }
         `;
+        // ─── Shared backtrace: RK2 (midpoint) + settle ease-out ─────────
+        // Interpolated into the main advection pass AND both MacCormack
+        // passes below. MUST stay a single shared string: the MacCormack
+        // correction is only valid if the correct pass recomputes the exact
+        // same displacement the forward pass used (same code + same highp
+        // arithmetic → bit-identical).
+        //
+        // RK2: sample velocity at the half-step midpoint instead of at the
+        // start point — one extra fetch, second-order characteristics, so
+        // curved strokes stop corner-cutting through swirls.
+        //
+        // Settle ease-out. Repeated re-filtering + fp16 re-rounding of
+        // near-still fluid is what carves the terraced "cooled" banding,
+        // so settled fluid must stop being resampled — but a binary
+        // stillness snap freezes striation bands one-by-one as velocity
+        // dies ("dominoes"). Instead: below ~0.002 source texels/frame
+        // (imperceptible, <0.12 texel/s) displacement scales to exactly
+        // zero — an exact self-fetch, bit-stable at rest — and the
+        // approach is eased smoothly from 0.05 texels/frame down, so
+        // fluid glides to rest instead of crawling for many seconds
+        // through the worst re-filtering regime and snapping still
+        // along a moving frontier. (At rest this also zeroes the
+        // MacCormack correction exactly — see macCorrectFrag.)
+        const rk2Backtrace = `
+                vec2 vHalf = texture(uVelocity, vUv).xy;
+                vec2 midUv = clamp(vUv - 0.5 * dt * vHalf * texelSize, 0.0, 1.0);
+                vec2 disp = dt * texture(uVelocity, midUv).xy * texelSize;
+                float mTexels = length(disp / srcTexelSize);
+                disp *= smoothstep(0.002, 0.05, mTexels);
+        `;
         const advectionFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
@@ -127,24 +196,15 @@
             uniform float decayDt; // accumulated decay timestep; 0.0 = skip decay this frame
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
+            uniform float edgeAbsorb; // >0: absorbing borders — fluid vents off-canvas instead of bouncing
             uniform int isDensity;
             uniform int hasObstacle;
+            uniform int macMode; // 1 = uSource is the already-advected MacCormack
+                                 // result (macCorrectFrag output): self-fetch it
+                                 // and apply only the decay/drain logic below.
             void main() {
-                vec2 disp = dt * texture(uVelocity, vUv).xy * texelSize;
-                // Settle ease-out. Repeated re-filtering + fp16 re-rounding of
-                // near-still fluid is what carves the terraced "cooled" banding,
-                // so settled fluid must stop being resampled — but a binary
-                // stillness snap freezes striation bands one-by-one as velocity
-                // dies ("dominoes"). Instead: below ~0.002 source texels/frame
-                // (imperceptible, <0.12 texel/s) displacement scales to exactly
-                // zero — an exact self-fetch, bit-stable at rest — and the
-                // approach is eased smoothly from 0.05 texels/frame down, so
-                // fluid glides to rest instead of crawling for many seconds
-                // through the worst re-filtering regime and snapping still
-                // along a moving frontier.
-                float mTexels = length(disp / srcTexelSize);
-                disp *= smoothstep(0.002, 0.05, mTexels);
-                vec2 coord = clamp(vUv - disp, 0.0, 1.0);
+                ${rk2Backtrace}
+                vec2 coord = (macMode == 1) ? vUv : clamp(vUv - disp, 0.0, 1.0);
                 // Time-independent dissipation: pow(d, t*60) so decay rate is
                 // constant regardless of framerate. 60.0 = reference FPS these
                 // values were tuned for. Uses decayDt, not dt: when dt is tiny
@@ -251,7 +311,111 @@
                     // Velocity pass: keep alpha at 1.0
                     color.a = 1.0;
                 }
+                // Overflow mode rim drain: with open boundaries (divergence and
+                // gradient passes stop treating edges as walls) outbound fluid
+                // exits freely — this hairline drain at the outermost ~2.5%
+                // just guarantees whatever crosses the rim dies there and never
+                // washes back in via the clamped edge texels. Invisible: it sits
+                // at the border, not inside the composition.
+                if (edgeAbsorb > 0.0) {
+                    float ed = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+                    float bandK = (1.0 - smoothstep(0.0, 0.025, ed)) * edgeAbsorb;
+                    color *= max(0.0, 1.0 - bandK * 0.55 * dt * 60.0);
+                    if (isDensity == 0) color.a = 1.0;
+                }
                 fragColor = color;
+            }
+        `;
+        // ─── MacCormack dye advection, passes 1–2 of 3 ──────────────────
+        // (Selle et al. 2008 via GPU Gems 3 ch. 30.) Pass 1 (macAdvectFrag):
+        // plain forward semi-Lagrangian advect of the dye → φ̂ⁿ⁺¹, no decay
+        // or drains — those run exactly once, in the main advection pass,
+        // which consumes pass 2's output with macMode=1. Bilinear on purpose
+        // throughout, same reason as the main pass: kernels with >1 gain
+        // etch permanent artifacts in this forever-feedback loop.
+        const macAdvectFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity, uSource;
+            uniform vec2 texelSize;    // sim-grid texel (velocity lives there)
+            uniform vec2 srcTexelSize; // dye-grid texel
+            uniform float dt;
+            void main() {
+                ${rk2Backtrace}
+                fragColor = texture(uSource, clamp(vUv - disp, 0.0, 1.0));
+            }
+        `;
+        // Pass 2: back-advect φ̂ⁿ⁺¹ to estimate the scheme's own error, apply
+        // half of it as a correction, then LIMIT. The limiter (clamp to the
+        // min/max of the 4 dye texels the forward lookup interpolated
+        // between) is what makes this safe where Catmull-Rom crackled: the
+        // corrected value can never be a new local extremum, so per-texel
+        // gain stays ≤ 1 across frames. At rest the shared ease-out zeroes
+        // disp, every fetch is an exact self-fetch, the correction is
+        // exactly 0.0, and the output equals the input bit-for-bit — the
+        // settled-fluid banding fix survives unchanged.
+        const macCorrectFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity;
+            uniform sampler2D uSource;   // φⁿ  (dye, pre-advection)
+            uniform sampler2D uForward;  // φ̂ⁿ⁺¹ (macAdvectFrag output)
+            uniform sampler2D uObstacle;
+            uniform vec2 texelSize;      // sim-grid texel
+            uniform vec2 srcTexelSize;   // dye-grid texel
+            uniform float dt;
+            uniform int hasObstacle;
+            void main() {
+                ${rk2Backtrace}
+                vec4 fwd = texture(uForward, vUv);
+                vec2 fwdCoord = vUv - disp;   // where pass 1 sampled φⁿ
+                vec2 backCoord = vUv + disp;  // back-advection of φ̂ⁿ⁺¹
+                // Revert to plain semi-Lagrangian (correction = 0) when the
+                // characteristic leaves the domain — clamped edge fetches
+                // would fabricate error — or touches an obstacle, where
+                // MacCormack's dispersive overshoot rings against the wall
+                // (Selle 2008 practice).
+                float revert = 0.0;
+                if (fwdCoord.x < 0.0 || fwdCoord.x > 1.0 || fwdCoord.y < 0.0 || fwdCoord.y > 1.0 ||
+                    backCoord.x < 0.0 || backCoord.x > 1.0 || backCoord.y < 0.0 || backCoord.y > 1.0) revert = 1.0;
+                if (hasObstacle == 1) {
+                    float obs = max(texture(uObstacle, vUv).r,
+                                    texture(uObstacle, clamp(fwdCoord, 0.0, 1.0)).r);
+                    if (obs > 0.05) revert = 1.0;
+                }
+                vec4 phiN  = texture(uSource, vUv);
+                vec4 backN = texture(uForward, clamp(backCoord, 0.0, 1.0));
+                vec4 corrected = fwd + 0.5 * (phiN - backN);
+                // Limiter: 4-corner neighborhood of the forward lookup in φⁿ.
+                ivec2 sz = textureSize(uSource, 0);
+                vec2 st = clamp(fwdCoord, 0.0, 1.0) * vec2(sz) - 0.5;
+                ivec2 base = ivec2(floor(st));
+                ivec2 maxT = sz - 1;
+                vec4 t00 = texelFetch(uSource, clamp(base,               ivec2(0), maxT), 0);
+                vec4 t10 = texelFetch(uSource, clamp(base + ivec2(1, 0), ivec2(0), maxT), 0);
+                vec4 t01 = texelFetch(uSource, clamp(base + ivec2(0, 1), ivec2(0), maxT), 0);
+                vec4 t11 = texelFetch(uSource, clamp(base + ivec2(1, 1), ivec2(0), maxT), 0);
+                vec4 mn = min(min(t00, t10), min(t01, t11));
+                vec4 mx = max(max(t00, t10), max(t01, t11));
+                corrected = clamp(corrected, mn, mx);
+                fragColor = mix(corrected, fwd, revert);
+            }
+        `;
+        // Obstacle-aware projection (divergence/pressure/gradient below):
+        // solids participate in the pressure solve itself, so flow deflects
+        // AROUND collision masks instead of ramming into them and relying on
+        // the post-hoc damp pass to kill it there (the root cause of dye
+        // piling at stagnation zones — the burn-halo class). The obstacle
+        // texture is treated as a continuous fluid/solid fraction, not a
+        // binary mask: real masks are written at collisionStrength (default
+        // 0.7) with antialiased edges, so the curve saturates at 0.5 — same
+        // convention as the splat shader's obsBlock. (The multigrid solve
+        // will restrict these fractions down its pyramid — keep them float.)
+        const obstacleSolidityGLSL = `
+            float solidity(vec2 uv) {
+                return smoothstep(0.1, 0.5, texture(uObstacle, uv).r);
             }
         `;
         const divergenceFrag = `#version 300 es
@@ -259,14 +423,25 @@
             in vec2 vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uVelocity;
+            uniform sampler2D uObstacle;
+            uniform float openBoundary; // 1 = overflow mode: edges stop being walls
+            uniform int hasObstacle;
+            ${obstacleSolidityGLSL}
             vec2 sampleVelocity(vec2 uv) {
                 vec2 m = vec2(1.0);
-                if(uv.x < 0.0 || uv.x > 1.0) { uv.x = clamp(uv.x, 0.0, 1.0); m.x = -1.0; }
-                if(uv.y < 0.0 || uv.y > 1.0) { uv.y = clamp(uv.y, 0.0, 1.0); m.y = -1.0; }
-                return m * texture(uVelocity, uv).xy;
+                // Closed boundary: mirror velocity beyond the edge so the
+                // pressure solve sees a wall. Open boundary (overflow mode):
+                // zero-gradient instead — flow exits without pushback.
+                if(uv.x < 0.0 || uv.x > 1.0) { uv.x = clamp(uv.x, 0.0, 1.0); if (openBoundary < 0.5) m.x = -1.0; }
+                if(uv.y < 0.0 || uv.y > 1.0) { uv.y = clamp(uv.y, 0.0, 1.0); if (openBoundary < 0.5) m.y = -1.0; }
+                vec2 v = m * texture(uVelocity, uv).xy;
+                // Solid neighbors contribute zero velocity: the solve then
+                // computes the pressure that pushes flow around the wall.
+                if (hasObstacle == 1) v *= 1.0 - solidity(uv);
+                return v;
             }
             void main() {
-                float div = 0.5 * (sampleVelocity(vR).x - sampleVelocity(vL).x + 
+                float div = 0.5 * (sampleVelocity(vR).x - sampleVelocity(vL).x +
                                    sampleVelocity(vT).y - sampleVelocity(vB).y);
                 fragColor = vec4(div, 0.0, 0.0, 1.0);
             }
@@ -317,18 +492,109 @@
                 fragColor = vec4(texture(uVelocity, vUv).xy + force * dt, 0.0, 1.0);
             }
         `;
+        // Doubles as the multigrid smoother: hSq = (2^level)² converts the
+        // level's RHS — stored in level-0 "continuous" units all the way down
+        // the pyramid so fp16 storage never sees compounding 4^L factors —
+        // into this level's texel-Laplacian units inside highp registers.
+        // Plain Jacobi path sets hSq = 1.0 (level 0), making this exactly the
+        // shader it always was.
         const pressureFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uPressure, uDivergence;
+            uniform sampler2D uObstacle;
+            uniform int hasObstacle;
+            uniform float hSq;
+            ${obstacleSolidityGLSL}
             void main() {
                 vec2 L = clamp(vL, 0.0, 1.0), R = clamp(vR, 0.0, 1.0);
                 vec2 T = clamp(vT, 0.0, 1.0), B = clamp(vB, 0.0, 1.0);
-                float pressure = (texture(uPressure, L).x + texture(uPressure, R).x + 
-                                 texture(uPressure, B).x + texture(uPressure, T).x - 
-                                 texture(uDivergence, vUv).x) * 0.25;
+                float pL = texture(uPressure, L).x;
+                float pR = texture(uPressure, R).x;
+                float pB = texture(uPressure, B).x;
+                float pT = texture(uPressure, T).x;
+                if (hasObstacle == 1) {
+                    // Neumann at solids (∂p/∂n = 0): a solid neighbor reflects
+                    // the cell's own pressure back — same treatment the clamped
+                    // fetches already give the domain edges.
+                    float pC = texture(uPressure, vUv).x;
+                    pL = mix(pL, pC, solidity(L));
+                    pR = mix(pR, pC, solidity(R));
+                    pB = mix(pB, pC, solidity(B));
+                    pT = mix(pT, pC, solidity(T));
+                }
+                float pressure = (pL + pR + pB + pT -
+                                 texture(uDivergence, vUv).x * hSq) * 0.25;
                 fragColor = vec4(pressure, 0.0, 0.0, 1.0);
+            }
+        `;
+        // ─── Multigrid V-cycle passes (pressure solve) ──────────────────
+        // Residual of the level's equation: r = F − (Σp' − 4p)/hSq, with the
+        // same Neumann-at-solids stencil as the smoother (mismatched stencils
+        // make the coarse correction fight the fine solve). F is the level's
+        // RHS in level-0 units; division by hSq keeps r in those units too,
+        // so every pyramid texture stays at the divergence field's magnitude
+        // and fp16 storage never overflows. Math in highp.
+        const mgResidualFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR, vT, vB;
+            out vec4 fragColor;
+            uniform sampler2D uPressure, uDivergence;
+            uniform sampler2D uObstacle;
+            uniform int hasObstacle;
+            uniform float hSq;
+            ${obstacleSolidityGLSL}
+            void main() {
+                vec2 L = clamp(vL, 0.0, 1.0), R = clamp(vR, 0.0, 1.0);
+                vec2 T = clamp(vT, 0.0, 1.0), B = clamp(vB, 0.0, 1.0);
+                float pC = texture(uPressure, vUv).x;
+                float pL = texture(uPressure, L).x;
+                float pR = texture(uPressure, R).x;
+                float pB = texture(uPressure, B).x;
+                float pT = texture(uPressure, T).x;
+                if (hasObstacle == 1) {
+                    pL = mix(pL, pC, solidity(L));
+                    pR = mix(pR, pC, solidity(R));
+                    pB = mix(pB, pC, solidity(B));
+                    pT = mix(pT, pC, solidity(T));
+                }
+                float lap = pL + pR + pB + pT - 4.0 * pC;
+                float r = texture(uDivergence, vUv).x - lap / hSq;
+                fragColor = vec4(r, 0.0, 0.0, 1.0);
+            }
+        `;
+        // Restriction: 4-tap box average of the finer level (works for the
+        // odd non-power-of-2 grid sizes the aspect fit produces). Used for
+        // both residual→RHS and the obstacle-fraction pyramid — restricting
+        // FRACTIONS, not a binary mask, is what keeps thin solids alive at
+        // coarse levels (cut-cell MG, Weber 2015).
+        const mgRestrictFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform vec2 fineTexelSize;
+            void main() {
+                vec4 sum = texture(uTexture, vUv + vec2(-0.5, -0.5) * fineTexelSize)
+                         + texture(uTexture, vUv + vec2( 0.5, -0.5) * fineTexelSize)
+                         + texture(uTexture, vUv + vec2(-0.5,  0.5) * fineTexelSize)
+                         + texture(uTexture, vUv + vec2( 0.5,  0.5) * fineTexelSize);
+                fragColor = sum * 0.25;
+            }
+        `;
+        // Prolongation: bilinear-interpolate the coarse error and add it to
+        // the fine pressure. Correction magnitude is already in fine units
+        // (the hSq bookkeeping lives entirely in smoother/residual).
+        const mgProlongFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uPressure; // fine level, pre-correction
+            uniform sampler2D uCoarse;   // coarse error solve
+            void main() {
+                float p = texture(uPressure, vUv).x + texture(uCoarse, vUv).x;
+                fragColor = vec4(p, 0.0, 0.0, 1.0);
             }
         `;
         const gradientFrag = `#version 300 es
@@ -336,17 +602,54 @@
             in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uPressure, uVelocity;
+            uniform sampler2D uObstacle;
             uniform vec2 texelSize;
+            uniform float openBoundary; // 1 = overflow mode: edges stop being walls
+            uniform int hasObstacle;
+            ${obstacleSolidityGLSL}
             void main() {
                 vec2 L = clamp(vL, 0.0, 1.0), R = clamp(vR, 0.0, 1.0);
                 vec2 T = clamp(vT, 0.0, 1.0), B = clamp(vB, 0.0, 1.0);
-                vec2 vel = texture(uVelocity, vUv).xy - vec2(texture(uPressure, R).x - texture(uPressure, L).x,
-                                                              texture(uPressure, T).x - texture(uPressure, B).x);
-                // No-penetration boundary: zero velocity normal to wall at edges
-                if (vUv.x < texelSize.x)       vel.x = max(vel.x, 0.0);
-                if (vUv.x > 1.0 - texelSize.x) vel.x = min(vel.x, 0.0);
-                if (vUv.y < texelSize.y)        vel.y = max(vel.y, 0.0);
-                if (vUv.y > 1.0 - texelSize.y)  vel.y = min(vel.y, 0.0);
+                float pL = texture(uPressure, L).x;
+                float pR = texture(uPressure, R).x;
+                float pB = texture(uPressure, B).x;
+                float pT = texture(uPressure, T).x;
+                float sL = 0.0, sR = 0.0, sB = 0.0, sT = 0.0;
+                if (hasObstacle == 1) {
+                    // Mirror the pressure pass's Neumann treatment so the
+                    // gradient this pass subtracts is the same one the solve
+                    // converged with — mismatched stencils leak flow into walls.
+                    sL = solidity(L); sR = solidity(R);
+                    sB = solidity(B); sT = solidity(T);
+                    float pC = texture(uPressure, vUv).x;
+                    pL = mix(pL, pC, sL);
+                    pR = mix(pR, pC, sR);
+                    pB = mix(pB, pC, sB);
+                    pT = mix(pT, pC, sT);
+                }
+                vec2 vel = texture(uVelocity, vUv).xy - vec2(pR - pL, pT - pB);
+                // No-penetration boundary: zero velocity normal to wall at edges.
+                // Skipped in overflow mode — outbound velocity keeps flowing out.
+                if (openBoundary < 0.5) {
+                    if (vUv.x < texelSize.x)       vel.x = max(vel.x, 0.0);
+                    if (vUv.x > 1.0 - texelSize.x) vel.x = min(vel.x, 0.0);
+                    if (vUv.y < texelSize.y)        vel.y = max(vel.y, 0.0);
+                    if (vUv.y > 1.0 - texelSize.y)  vel.y = min(vel.y, 0.0);
+                }
+                if (hasObstacle == 1) {
+                    // No-penetration at solid faces, same max/min trick as the
+                    // domain edges above but blended by the face's solidity so
+                    // antialiased mask edges stay soft.
+                    vel.x = mix(vel.x, max(vel.x, 0.0), sL);
+                    vel.x = mix(vel.x, min(vel.x, 0.0), sR);
+                    vel.y = mix(vel.y, max(vel.y, 0.0), sB);
+                    vel.y = mix(vel.y, min(vel.y, 0.0), sT);
+                    // Inside the solid itself velocity dies outright — the
+                    // damp pass used to be the only thing doing this; keeping
+                    // it here makes the projected field consistent even if
+                    // that pass is ever retired.
+                    vel *= 1.0 - solidity(vUv);
+                }
                 fragColor = vec4(vel, 0.0, 1.0);
             }
         `;

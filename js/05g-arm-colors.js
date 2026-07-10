@@ -183,24 +183,34 @@
                 updatePaletteStepIndicator();
             });
         }
-        // Generate vibrant random color (avoids washed out/pale colors)
+        // Generate vibrant random color (avoids washed out/pale/gloomy colors)
         function generateVibrantColor() {
             // Use HSL to control saturation and lightness
             const hue = Math.random() * 360; // Full spectrum
-            const sat = 0.7 + Math.random() * 0.3; // 70-100% saturation (vibrant)
-            const light = 0.45 + Math.random() * 0.2; // 45-65% lightness (not too bright/dark)
-            // Convert HSL to RGB
-            const c = (1 - Math.abs(2 * light - 1)) * sat;
-            const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
-            const m = light - c / 2;
-            let r, g, b;
-            if (hue < 60) { r = c; g = x; b = 0; }
-            else if (hue < 120) { r = x; g = c; b = 0; }
-            else if (hue < 180) { r = 0; g = c; b = x; }
-            else if (hue < 240) { r = 0; g = x; b = c; }
-            else if (hue < 300) { r = x; g = 0; b = c; }
-            else { r = c; g = 0; b = x; }
-            return [r + m, g + m, b + m];
+            const sat = 0.85 + Math.random() * 0.15; // 85-100% saturation (sharp, clear hues)
+            let light = 0.5 + Math.random() * 0.15; // 50-65% lightness (luminous, never muddy)
+            function hslToRgb(h, s, l) {
+                const c = (1 - Math.abs(2 * l - 1)) * s;
+                const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+                const m = l - c / 2;
+                let r, g, b;
+                if (h < 60) { r = c; g = x; b = 0; }
+                else if (h < 120) { r = x; g = c; b = 0; }
+                else if (h < 180) { r = 0; g = c; b = x; }
+                else if (h < 240) { r = 0; g = x; b = c; }
+                else if (h < 300) { r = x; g = 0; b = c; }
+                else { r = c; g = 0; b = x; }
+                return [r + m, g + m, b + m];
+            }
+            let rgb = hslToRgb(hue, sat, light);
+            // Equal HSL lightness is not equal perceived brightness: a deep blue at
+            // L 0.5 reads near-black on the dark canvas while a yellow glows. Lift
+            // lightness until the color clears a luma floor so every hue lands legible.
+            while ((0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) < 0.22 && light < 0.78) {
+                light += 0.04;
+                rgb = hslToRgb(hue, sat, light);
+            }
+            return rgb;
         }
         function rgbToHex(r, g, b) {
             var hr = Math.round(r * 255).toString(16).padStart(2, '0');
@@ -213,7 +223,18 @@
             if (cp) cp.value = rgbToHex(r, g, b);
         }
         // Read whatever the picker currently shows into pointer.color
+        var firstPaintColorFreshened = false;
         function applyPickerColor() {
+            // The session's first stroke would otherwise paint whatever the picker
+            // was left holding (palette preseed / restored state) — a color that
+            // never went through generateVibrantColor, since advanceColor only runs
+            // on mouseup. In random mode, advance once up front so the vibrancy
+            // guarantee covers the very first paint too.
+            if (!firstPaintColorFreshened) {
+                firstPaintColorFreshened = true;
+                const rndEl = document.getElementById('randomColor');
+                if (rndEl && rndEl.checked) advanceColor();
+            }
             const hex = document.getElementById('colorPicker').value;
             const r = parseInt(hex.slice(1, 3), 16) / 255;
             const g = parseInt(hex.slice(3, 5), 16) / 255;

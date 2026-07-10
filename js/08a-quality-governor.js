@@ -40,6 +40,107 @@
     var allowResolution = false;
     var level = 0;
 
+    // ── Boot quality ascent ──────────────────────────────────────────
+    // Desktop boots with config at Ultra (2048 dye / 512 sim), but rendering
+    // that cold makes load janky on rigs that can't do it — and the ladder
+    // only sheds quality slowly, through visible jank. So invert it: the sim
+    // STARTS at a light effective resolution (the old balanced-boot workload)
+    // and steps UP to the config target once measured fps proves out. Dye is
+    // preserved across the reinit; on a just-loaded canvas the step is
+    // invisible. If fps doesn't hold, the ascent parks at the light stage for
+    // the session. Any explicit resolution change (user dropdown, preset,
+    // rescue) wins exactly: the boot factor snaps to 1 the moment config
+    // diverges from the boot values.
+    var BOOT_STAGES = [
+        { dye: 0.5, sim: 0.5 },   // ≈1024/256 at the 2048/512 default — snappy load
+        { dye: 1.0, sim: 1.0 }    // full Ultra
+    ];
+    var bootStage = 0;
+    var bootDone = false;          // stop stepping (complete, parked, or overridden)
+    var bootInit = false;
+    var bootHighStreak = 0;
+    var bootLowStreak = 0;
+    var bootDye0 = 0, bootSim0 = 0; // config at ascent start (override detection)
+
+    function bootFactors() {
+        if (!bootInit) {
+            // Lazy eligibility check on first use — config doesn't exist yet
+            // when this file loads. Only a cinematic-class boot target needs
+            // the ramp; mobile / modest configs already load fast.
+            bootInit = true;
+            if (!window.config || window.config.DYE_RESOLUTION < 2048) {
+                bootStage = BOOT_STAGES.length - 1;
+                bootDone = true;
+            } else {
+                bootDye0 = window.config.DYE_RESOLUTION;
+                bootSim0 = window.config.SIM_RESOLUTION;
+            }
+        } else if (!bootDone && window.config &&
+                   (window.config.DYE_RESOLUTION !== bootDye0 ||
+                    window.config.SIM_RESOLUTION !== bootSim0)) {
+            // Explicit resolution change mid-ascent (dropdown/preset/rescue):
+            // the chosen values must apply exactly. The change already queued
+            // its own framebuffer reinit, which is what called us.
+            bootStage = BOOT_STAGES.length - 1;
+            bootDone = true;
+            console.log('[Governor] boot ascent ended — resolution set explicitly');
+        }
+        return BOOT_STAGES[bootStage];
+    }
+
+    function maybeBootAscent(nowMs, fps, target) {
+        var bf = bootFactors(); // also runs override detection
+        if (bootDone) return false;
+        // Judge purely by measured fps — the ladder level is NOT a signal here:
+        // a load-transient dip parks the ladder at L1 for a long time (its 98%
+        // recovery bar sits above what a frame-skip fps cap jitters at), and
+        // gating on it deadlocked the ascent at stage 0 with fps at target.
+        if (fps < 0.90 * target) {
+            bootHighStreak = 0;
+            // Only a climb we made can be "undone"; at stage 0 a low eval is
+            // load-transient jank or a genuinely weak rig — either way just
+            // keep waiting (a weak rig simply never climbs, which is already
+            // the parked state, and the ladder provides any further relief).
+            if (bootStage > 0 && ++bootLowStreak >= 2) {
+                bootStage--;
+                window.needsFramebufferReinit = true;
+                freezeUntilMs = nowMs + 3000;
+                bootDone = true;
+                console.log('[Governor] boot ascent parked at dye ×' + BOOT_STAGES[bootStage].dye +
+                    ' (fps ' + fps.toFixed(1) + ' vs target ' + target + ')');
+                return true;
+            }
+            return false;
+        }
+        bootLowStreak = 0;
+        if (fps >= 0.95 * target) {
+            bootHighStreak++;
+            // Hold reinit steps while a fresh stroke is on screen — the
+            // resample pop stays invisible on a settled canvas.
+            var recentPaint = window.__lastPaintMs && (nowMs - window.__lastPaintMs) < 4000;
+            if (bootHighStreak >= 2 && !recentPaint) {
+                bootHighStreak = 0;
+                bootStage++;
+                window.needsFramebufferReinit = true;
+                freezeUntilMs = nowMs + 3000;
+                lowStreak = 0;
+                highStreak = 0;
+                if (bootStage >= BOOT_STAGES.length - 1) {
+                    bootDone = true;
+                    console.log('[Governor] boot ascent complete — full quality (fps ' + fps.toFixed(1) + ')');
+                } else {
+                    console.log('[Governor] boot ascent → dye ×' + BOOT_STAGES[bootStage].dye +
+                        ' (fps ' + fps.toFixed(1) + ')');
+                }
+                updateStatusLine();
+                return true;
+            }
+        } else {
+            bootHighStreak = 0;
+        }
+        return false;
+    }
+
     // 1 Hz evaluation state
     var frameCount = 0;
     var lastEvalMs = 0;
@@ -59,9 +160,14 @@
 
     function targetFps() {
         var cap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 0;
-        if (cap > 0) return cap;
         var s = window.__stats; // reassigned each frame — always read fresh
-        return (s && s.displayHz) || 60;
+        var t = cap > 0 ? cap : ((s && s.displayHz) || 60);
+        // Quality decisions must not chase a high-refresh display: against a
+        // 240 Hz target a session rendering a fluid 165-210 fps reads as
+        // "failing" forever, and the ladder sheds real quality (with reinit
+        // churn) to chase it. Above ~90 fps painting is already smooth —
+        // judge quality there; the render loop itself stays uncapped.
+        return Math.min(t, 90);
     }
 
     function effectiveScales(lv) {
@@ -107,10 +213,18 @@
         frameCount = 0;
         lastEvalMs = nowMs;
 
+        // Rescue detection runs even during step-change hysteresis freezes —
+        // a toxic workload shouldn't wait out the ladder to be noticed
+        maybeOfferRescue(nowMs, fps);
+
         if (nowMs < freezeUntilMs) return;
 
         var target = targetFps();
         var budgetMs = 1000 / target;
+
+        // Boot ascent gets first claim on this eval; if it stepped (either
+        // direction) the fps sample predates the reinit — skip the ladder.
+        if (maybeBootAscent(nowMs, fps, target)) return;
 
         if (fps < 0.90 * target) {
             lowStreak++;
@@ -142,6 +256,93 @@
             highStreak = 0;
         }
         updateStatusLine();
+    }
+
+    // ── Performance rescue: an escape hatch for toxic workloads ─────────
+    // If the ladder is fully shed and fps is still unusable (heavy legacy
+    // preset: huge resolutions + iterations + stacked FX), no amount of
+    // adaptation will save the session — offer the user a one-click way out.
+    // "Severe" means genuinely unusable (≈<15-20 fps), NOT merely missing an
+    // ambitious 240 fps cap; a catastrophic fast-path (<8 fps) offers rescue
+    // immediately without waiting for the ladder to bottom out.
+    var severeStreak = 0;
+    var rescueCooldownUntil = 0;
+    var rescueEl = null;
+
+    function atLadderBottom() { return nextDown(level) === level; }
+
+    function severeThreshold() {
+        var t = targetFps();
+        return Math.min(20, Math.max(10, 0.5 * t));
+    }
+
+    function maybeOfferRescue(nowMs, fps) {
+        var severe = fps < severeThreshold();
+        severeStreak = severe ? severeStreak + 1 : 0;
+        if (!severe) { hideRescue(false); return; } // performance recovered — retract quietly
+        if (nowMs < rescueCooldownUntil) return;
+        if ((severeStreak >= 4 && atLadderBottom()) || (severeStreak >= 4 && fps < 8)) {
+            showRescue();
+        }
+    }
+
+    function buildRescue() {
+        if (rescueEl) return;
+        rescueEl = document.createElement('div');
+        rescueEl.id = 'perfRescueToast';
+        rescueEl.style.cssText =
+            'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:10005;' +
+            'display:none;align-items:center;gap:10px;padding:10px 12px;' +
+            'background:linear-gradient(180deg,#2a2016,#1c1610);border:1px solid rgba(255,178,71,0.55);' +
+            'border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.6);color:#e6edf3;' +
+            'font-size:13px;font-family:inherit;';
+        rescueEl.innerHTML =
+            '<span>🐌 Running very slowly</span>' +
+            '<button id="perfRescueBtn" style="padding:6px 12px;border-radius:8px;cursor:pointer;' +
+                'font-weight:700;font-size:12px;background:linear-gradient(#4a3a1a,#33280f);' +
+                'color:#ffd699;border:1px solid rgba(255,178,71,0.6);">Boost performance</button>' +
+            '<button id="perfRescueClose" title="Dismiss" style="padding:4px 8px;border-radius:6px;' +
+                'cursor:pointer;background:transparent;color:rgba(255,255,255,0.5);border:none;font-size:13px;">✕</button>';
+        document.body.appendChild(rescueEl);
+        rescueEl.querySelector('#perfRescueBtn').addEventListener('click', applyRescue);
+        rescueEl.querySelector('#perfRescueClose').addEventListener('click', function () {
+            hideRescue(true); // user said no — don't nag for a while
+        });
+    }
+
+    function showRescue() {
+        buildRescue();
+        rescueEl.style.display = 'flex';
+    }
+
+    function hideRescue(withCooldown) {
+        if (rescueEl) rescueEl.style.display = 'none';
+        if (withCooldown) rescueCooldownUntil = performance.now() + 60000;
+        severeStreak = 0;
+    }
+
+    // Set a control through its OWN handlers so UI, config, and framebuffers
+    // stay in sync (same contract as user interaction)
+    function setCtl(id, value, evt) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.value = String(value);
+        el.dispatchEvent(new Event(evt || 'change', { bubbles: true }));
+    }
+
+    function applyRescue() {
+        // Resolution dominates cost — drop to modest-but-fine values; ease the
+        // pressure solve too. Artwork survives (initFramebuffers preserves dye).
+        setCtl('visualResolution', '1024', 'change');
+        setCtl('physicsResolution', '256', 'change');
+        setCtl('pressureIteration', 20, 'input');
+        if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
+        // The workload just dropped massively and deliberately — a HARD reset
+        // to full tier is correct here (unlike preset clicks, which soft-reset)
+        window.QualityGovernor.reset();
+        rescueCooldownUntil = performance.now() + 20000;
+        hideRescue(false);
+        console.log('[Governor] performance rescue applied (dye 1024, sim 256, iters 20)');
     }
 
     // Highest quality level that does NOT change resolution — stepping through these
@@ -176,11 +377,15 @@
         if (!enabled) { el.textContent = 'off'; return; }
         var L = LEVELS[level];
         var sc = effectiveScales(level);
+        var bf = bootInit ? BOOT_STAGES[bootStage] : { dye: 1, sim: 1 };
+        var dyeX = sc.dye * bf.dye;
+        var simX = sc.sim * bf.sim;
         var iters = window.config
             ? Math.min(window.config.PRESSURE_ITERATIONS, L.iterCap) + '/' + window.config.PRESSURE_ITERATIONS
             : (isFinite(L.iterCap) ? String(L.iterCap) : 'full');
-        el.textContent = 'L' + level + ' — iters ' + iters + ', dye ×' + sc.dye +
-            (sc.sim !== 1 ? ', sim ×' + sc.sim : '') + (L.fx ? '' : ', fx off');
+        el.textContent = 'L' + level + ' — iters ' + iters + ', dye ×' + dyeX +
+            (simX !== 1 ? ', sim ×' + simX : '') + (L.fx ? '' : ', fx off') +
+            (bootInit && !bootDone ? ' ↑warming' : '');
     }
 
     window.QualityGovernor = {
@@ -197,12 +402,28 @@
             if (!enabled) return n;
             return Math.min(n, LEVELS[level].iterCap);
         },
-        dyeScale: function () { return enabled ? effectiveScales(level).dye : 1; },
-        simScale: function () { return enabled ? effectiveScales(level).sim : 1; },
+        dyeScale: function () { return enabled ? effectiveScales(level).dye * bootFactors().dye : 1; },
+        simScale: function () { return enabled ? effectiveScales(level).sim * bootFactors().sim : 1; },
         fxOn: function () { return enabled ? LEVELS[level].fx : true; },
         reset: function () {
             if (level !== 0 && scalesDiffer(level, 0)) window.needsFramebufferReinit = true;
             level = 0;
+            frameCount = 0;
+            lastEvalMs = 0;
+            cpuEma = 0;
+            lowStreak = 0;
+            highStreak = 0;
+            freezeUntilMs = 0;
+            fastFreezeUntil = 0;
+            updateStatusLine();
+        },
+        // For workload changes (preset apply, snapshot restore): the OLD
+        // adaptation statistics are stale, but the hardware didn't get any
+        // faster — keep the current quality tier and just re-learn from here.
+        // The hard reset() above snapped to L0 on every preset click, which
+        // meant seconds of over-budget frames (plus a framebuffer reinit)
+        // until the 1 Hz evaluator crawled back down the ladder.
+        softReset: function () {
             frameCount = 0;
             lastEvalMs = 0;
             cpuEma = 0;
