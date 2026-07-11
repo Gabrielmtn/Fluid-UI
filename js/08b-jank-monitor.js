@@ -73,6 +73,36 @@
         po.observe({ entryTypes: ['longtask'] });
     } catch (_) { /* older engines: frame-gap detection still works */ }
 
+    // ── Event Timing: slow event dispatches below the longtask radar ──
+    // duration = input delay + handler processing + presentation delay.
+    // proc >> 0 → a JS handler is the cost (and its target names it);
+    // proc ≈ 0 with big duration → presentation-bound (compositor/GPU),
+    // and no JS hunting will find it. This split is the diagnosis the
+    // 2026-07-09 field data (188 drops/s, zero long tasks) needs.
+    var slowEvents = [];
+    try {
+        var eo = new PerformanceObserver(function (list) {
+            list.getEntries().forEach(function (e) {
+                var rec = {
+                    type: e.name,
+                    dur: Math.round(e.duration),
+                    proc: Math.round((e.processingEnd || 0) - (e.processingStart || 0)),
+                    target: e.target
+                        ? (e.target.id ? '#' + e.target.id
+                            : (e.target.className ? String(e.target.className).split(' ')[0] : e.target.tagName))
+                        : '?'
+                };
+                slowEvents.push(rec);
+                if (slowEvents.length > 300) slowEvents.shift();
+                if (current) {
+                    current.slowEvents.push(rec);
+                    if (current.slowEvents.length > 25) current.slowEvents.shift();
+                }
+            });
+        });
+        eo.observe({ type: 'event', durationThreshold: 24 });
+    } catch (_) { /* Event Timing unsupported: drops + long tasks still work */ }
+
     // ── Interaction windows ─────────────────────────────────────────
     function begin(label) {
         var t = performance.now();
@@ -88,7 +118,8 @@
         }
         finish();
         current = { label: label, start: t, deadline: t + WINDOW_MS,
-                    dropped: 0, longTasks: 0, worstTask: 0, worstGap: 0, dropAt: {} };
+                    dropped: 0, longTasks: 0, worstTask: 0, worstGap: 0, dropAt: {},
+                    slowEvents: [] };
     }
     function baselineRate() { // ambient drops/sec with no interaction open
         return baseline.ms > 2000 ? baseline.dropped / (baseline.ms / 1000) : 0;
@@ -204,14 +235,25 @@
                 .map(function (r) {
                     return { label: r.label, excess: r.excess, dropped: r.dropped,
                              durationMs: Math.round(r.duration), longTasks: r.longTasks,
-                             worstTask: Math.round(r.worstTask), dropAt: r.dropAt };
+                             worstTask: Math.round(r.worstTask), dropAt: r.dropAt,
+                             slowEvents: r.slowEvents };
                 });
         },
         // one-line health check: ambient drop rate vs in-interaction rate
         summary: function () {
             var uiMs = 0, uiDrops = 0, uiExcess = 0;
             interactions.forEach(function (r) { uiMs += r.duration; uiDrops += r.dropped; uiExcess += r.excess; });
+            // aggregate slow events by type: the proc-vs-duration split says
+            // whether jank is JS handlers (proc high) or presentation/GPU
+            var byType = {};
+            slowEvents.forEach(function (e) {
+                var t = byType[e.type] || (byType[e.type] = { count: 0, worstDur: 0, worstProc: 0, worstTarget: '' });
+                t.count++;
+                if (e.dur > t.worstDur) { t.worstDur = e.dur; t.worstTarget = e.target; }
+                if (e.proc > t.worstProc) t.worstProc = e.proc;
+            });
             return {
+                slowEventsByType: byType,
                 baselineDropsPerSec: +baselineRate().toFixed(2),
                 baselineMinutes: +(baseline.ms / 60000).toFixed(1),
                 interactionDropsPerSec: uiMs > 500 ? +((uiDrops / (uiMs / 1000))).toFixed(2) : 0,
