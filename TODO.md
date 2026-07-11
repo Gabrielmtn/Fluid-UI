@@ -113,7 +113,7 @@ For EACH section: collapse/expand animation perf, hover states, content audit (s
 ### Stage 3 — Sidebar customization + layout system rework
 - [ ] Design: how users customize section order/visibility (drag-to-reorder? pin favorites? per-workspace presets?). Capture Gabriel's ideas here before building.
 - [ ] Rework how 20-mixer-layout.js constructs the layout: today it *moves* DOM out of the hidden legacy `.controls` div after an 800ms splash timer — fragile load-order coupling (deferred wiring hacks in multiple modules exist because of it). Replace with declarative section registry (id, title, accent, builder, default position) + persisted user layout (save-load integration).
-- [ ] Delete dead code: 17-mixer-ui-init.js and 18-layout-manager.js are marked "NOT LOADED" — remove (git history keeps them), plus buildBrandingSection_OLD_UNUSED in 20-mixer-layout.js.
+- [x] Delete dead code — DONE 2026-07-09 (96ac09b): 17-mixer-ui-init.js, 18-layout-manager.js, buildBrandingSection_OLD_UNUSED (~1400 lines); zero live references verified, sidebar builds all 17 sections cleanly.
 - [ ] Retire the legacy hidden `.controls` markup in index.html progressively as Stage 4 components replace it (it's ~560 lines of inline-styled markup that exists only to be scavenged).
 - [ ] Layout: main-area/canvas/sidebar/strip flex interplay, mobile mode, focus mode, ui-scale — one documented system instead of scattered rules across styles.css / 20-mixer-strip.css / 21-sidebar.css / init-responsive.css.
 
