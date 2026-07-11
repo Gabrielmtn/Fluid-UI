@@ -683,10 +683,18 @@
             const top  = Math.max(CANVAS_MARGIN, Math.min((areaRect.height - h) / 2, areaRect.height - h - CANVAS_MARGIN));
             canvasWrapper.style.left = Math.round(left) + 'px';
             canvasWrapper.style.top  = Math.round(top)  + 'px';
+
+            // Sync the canvas AFTER the initial placement actually lands.
+            // The old flow called updateCanvasSize() unconditionally right
+            // after the initial initializeCanvasPosition() — but when the
+            // area wasn't laid out yet (Electron boots small then maximizes),
+            // placement deferred itself via rAF while the canvas synced to
+            // the PRE-retry wrapper size, leaving the sim smaller than the
+            // wrapper border (the "init size bug", 2026-07-09).
+            if (opts.initial) updateCanvasSize();
         }
 
         initializeCanvasPosition({ initial: true });
-        updateCanvasSize();
         
         // Force a micro-resize cycle to lock in canvas/framebuffer sync.
         // This prevents a rendering glitch when the mouse leaves the canvas

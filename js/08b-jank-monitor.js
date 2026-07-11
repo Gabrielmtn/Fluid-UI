@@ -382,6 +382,16 @@
         },
         governorState: function () {
             try { return JSON.stringify(window.QualityGovernor.getState()); } catch (_) { return undefined; }
+        },
+        // wrapper vs canvas-buffer divergence: the init-size bug class.
+        // Healthy = both equal within a settle window (~200ms); a logged
+        // transition that never converges names the moment sync was lost.
+        canvasSync: function () {
+            var w = document.getElementById('canvas-wrapper');
+            var c = document.getElementById('canvas');
+            if (!w || !c) return undefined;
+            var ok = (c.width === w.clientWidth && c.height === w.clientHeight);
+            return ok ? 'in-sync' : ('DIVERGED wrapper ' + w.clientWidth + 'x' + w.clientHeight + ' vs canvas ' + c.width + 'x' + c.height);
         }
     };
     var lwPrev = {};
