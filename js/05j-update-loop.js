@@ -21,6 +21,9 @@
         let lastDyeDiss = -1, lastVelDiss = -1;
         // Resize settle deadline for the debounced FBO rebuild (0 = none pending)
         let _fboSettleAtMs = 0;
+        // Last frame's wrapper size — the settle deadline re-arms only when
+        // THIS moves (see below), not merely while buffer≠wrapper persists
+        let _lastTargetW = 0, _lastTargetH = 0;
         function computeDecayDt(dissipation, accum, dt) {
             if (dissipation >= 1.0) return { decayDt: dt, accum: 0 };
             accum = Math.min(accum + dt, 1.0);
@@ -84,8 +87,22 @@
                 // textures the GPU used one frame ago (leak fix), which forces a
                 // driver sync — stalled the whole transition. The display pass
                 // just stretches the old-resolution FBOs until the settle fires.
-                _fboSettleAtMs = nowMs + 180;
+                //
+                // Re-arm the deadline ONLY while the wrapper itself is moving.
+                // The old code re-armed whenever buffer≠wrapper — a condition
+                // that stays true until the settle fires — so the deadline slid
+                // forward every frame and the tracker could never heal on its
+                // own; it only worked when an external needsFramebufferReinit
+                // (handle-drag pointerup, governor level change) rescued it.
+                // With the governor off, a monitor move / OS-driven wrapper
+                // reflow left the sim permanently smaller than the wrapper
+                // (the 2026-07-09 "init size" bug, second act).
+                if (targetWidth !== _lastTargetW || targetHeight !== _lastTargetH || !_fboSettleAtMs) {
+                    _fboSettleAtMs = nowMs + 180;
+                }
             }
+            _lastTargetW = targetWidth;
+            _lastTargetH = targetHeight;
             if (window.needsFramebufferReinit || (_fboSettleAtMs && nowMs >= _fboSettleAtMs)) {
                 _fboSettleAtMs = 0;
                 // One buffer realloc per resize gesture, just before the FBO

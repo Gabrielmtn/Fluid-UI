@@ -383,15 +383,29 @@
         governorState: function () {
             try { return JSON.stringify(window.QualityGovernor.getState()); } catch (_) { return undefined; }
         },
-        // wrapper vs canvas-buffer divergence: the init-size bug class.
-        // Healthy = both equal within a settle window (~200ms); a logged
-        // transition that never converges names the moment sync was lost.
+        // wrapper vs canvas divergence: the init-size / monitor-move bug
+        // class. Healthy = buffer matches wrapper layout AND the painted
+        // rect matches the wrapper rect (within 2px). A persistent BUFFER
+        // divergence = the update-loop tracker isn't healing; a persistent
+        // VISUAL divergence with matching buffers = zoom/DPR class.
         canvasSync: function () {
             var w = document.getElementById('canvas-wrapper');
             var c = document.getElementById('canvas');
             if (!w || !c) return undefined;
-            var ok = (c.width === w.clientWidth && c.height === w.clientHeight);
-            return ok ? 'in-sync' : ('DIVERGED wrapper ' + w.clientWidth + 'x' + w.clientHeight + ' vs canvas ' + c.width + 'x' + c.height);
+            var bufOk = (c.width === w.clientWidth && c.height === w.clientHeight);
+            var visOk = true;
+            try {
+                var wr = w.getBoundingClientRect();
+                var cr = c.getBoundingClientRect();
+                if (wr.height > 0) { // hidden pages report zero rects — skip
+                    visOk = Math.abs(wr.width - cr.width) <= 2 && Math.abs(wr.height - cr.height) <= 2;
+                }
+            } catch (_) {}
+            if (bufOk && visOk) return 'in-sync';
+            var msg = [];
+            if (!bufOk) msg.push('BUFFER ' + c.width + 'x' + c.height + ' vs wrapper ' + w.clientWidth + 'x' + w.clientHeight);
+            if (!visOk) msg.push('VISUAL canvas-rect ≠ wrapper-rect');
+            return 'DIVERGED ' + msg.join(' + ');
         }
     };
     var lwPrev = {};
