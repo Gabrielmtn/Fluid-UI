@@ -38,6 +38,13 @@
 
     var enabled = true;
     var allowResolution = false;
+    // Effect shedding (the L5 fx:false rung) is OPT-IN, default off.
+    // Principle (TODO.md, Gabriel 2026-07-09): quality machinery may trade
+    // FPS and fidelity, NEVER the aesthetic. The fx gate turns off sharpen +
+    // micro-detail + sunrays + MacCormack in one stroke — a wholesale look
+    // change that used to fire ~15s into a heavy session with no user input
+    // (caught by LookWatchdog: governorFx true→false @ L4→L5).
+    var allowFx = false;
     var level = 0;
 
     // ── Boot quality ascent ──────────────────────────────────────────
@@ -76,7 +83,20 @@
             // first framebuffer init lands here, settings are hydrated.
             try {
                 var _s = settings();
-                if (_s && _s.get('governor.enabled', true) === false) enabled = false;
+                if (_s) {
+                    if (_s.get('governor.enabled', true) === false) enabled = false;
+                    allowResolution = !!_s.get('governor.allowResolution', true);
+                    allowFx = !!_s.get('governor.allowFx', false);
+                    // keep the stats-panel checkboxes honest if they were
+                    // wired before settings hydrated (the mismatch that made
+                    // "Adaptive off" look true while the ladder was live)
+                    var _t = document.getElementById('governorToggle');
+                    var _r = document.getElementById('governorAllowRes');
+                    var _f = document.getElementById('governorAllowFx');
+                    if (_t) _t.checked = enabled;
+                    if (_r) _r.checked = allowResolution;
+                    if (_f) _f.checked = allowFx;
+                }
             } catch (_) {}
             if (!enabled || !window.config || window.config.DYE_RESOLUTION < 2048) {
                 bootStage = BOOT_STAGES.length - 1;
@@ -414,7 +434,7 @@
         },
         dyeScale: function () { return enabled ? effectiveScales(level).dye * bootFactors().dye : 1; },
         simScale: function () { return enabled ? effectiveScales(level).sim * bootFactors().sim : 1; },
-        fxOn: function () { return enabled ? LEVELS[level].fx : true; },
+        fxOn: function () { return (enabled && allowFx) ? LEVELS[level].fx : true; },
         reset: function () {
             if (level !== 0 && scalesDiffer(level, 0)) window.needsFramebufferReinit = true;
             level = 0;
@@ -453,6 +473,15 @@
             updateStatusLine();
             console.log('[Governor]', b ? 'enabled' : 'disabled');
         },
+        setAllowFx: function (b) {
+            b = !!b;
+            if (b === allowFx) return;
+            allowFx = b;
+            var s = settings();
+            if (s) s.set('governor.allowFx', b);
+            updateStatusLine();
+            console.log('[Governor] effect shedding', b ? 'allowed' : 'disallowed');
+        },
         setAllowResolution: function (b) {
             b = !!b;
             if (b === allowResolution) return;
@@ -474,9 +503,11 @@
         if (s) {
             enabled = s.get('governor.enabled', true) !== false;
             allowResolution = !!s.get('governor.allowResolution', true);
+            allowFx = !!s.get('governor.allowFx', false); // opt-in, default off
         }
         var toggle = document.getElementById('governorToggle');
         var resToggle = document.getElementById('governorAllowRes');
+        var fxToggle = document.getElementById('governorAllowFx');
         if (toggle) {
             toggle.checked = enabled;
             toggle.addEventListener('change', function () {
@@ -487,6 +518,12 @@
             resToggle.checked = allowResolution;
             resToggle.addEventListener('change', function () {
                 window.QualityGovernor.setAllowResolution(resToggle.checked);
+            });
+        }
+        if (fxToggle) {
+            fxToggle.checked = allowFx;
+            fxToggle.addEventListener('change', function () {
+                window.QualityGovernor.setAllowFx(fxToggle.checked);
             });
         }
         updateStatusLine();
