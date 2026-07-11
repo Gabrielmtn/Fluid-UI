@@ -103,7 +103,7 @@ For EACH section: collapse/expand animation perf, hover states, content audit (s
 - [ ] Multi Artist
 - [ ] Settings
 - [x] Cross-section: compositor isolation — DONE 2026-07-09 from first JankMonitor field data (72 dropped frames on a sidebar hover pass, ZERO long tasks = compositor contention, not JS). #sidebar-right + #mixer-strip promoted to own layers (translateZ(0)) + contain: layout style on both and .sidebar-section. AWAITING Gabriel's re-measure to confirm the drop count falls; dropAt maps now name residual offenders per element.
-- [ ] Cross-section: section open/close is a raw class toggle — audit the CSS transition it triggers (height animation = layout thrash; move to grid-template-rows/max-height on compositor or content-visibility)
+- [x] Cross-section: section open/close animation — FIXED 2026-07-09, confirmed by Gabriel's Event Timing round (presentation delays up to 1.2s on toggles, proc=0 everywhere) + his own visual diagnosis. `transition: grid-template-rows` (and animated padding) re-laid-out everything below the section EVERY FRAME for 250–300ms. Removed at all 6 sites: .sidebar-section, .section-body (padding), .anim-settings(+inner), .collapsible-section (legacy styles.css), .path-layer-item (22-overlays — also relevant to the Stage 5 path-layers complaint), .layer-item-collapsible. Collapse now snaps in one layout; a 0.15s compositor-only opacity fade on the body carries the motion feel. AWAITING re-measure.
 - [ ] Sidebar resize handle (initSidebarResize) — continuous resize triggers canvas reflow? Throttle/snap.
 
 ### Stage 3 — Sidebar customization + layout system rework

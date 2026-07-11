@@ -465,7 +465,7 @@ body.focus-mode #canvas {
     overflow: hidden;
     display: grid;
     grid-template-rows: auto 1fr;
-    transition: grid-template-rows 0.25s ease;
+    /* not transitioned — per-frame layout (see 21-sidebar.css) */
 }
 .path-layer-item.collapsed {
     grid-template-rows: auto 0fr;
@@ -754,7 +754,7 @@ body.focus-mode #canvas {
     border: 1px solid rgba(255, 255, 255, 0.04);
     border-radius: 6px;
     overflow: hidden;
-    transition: grid-template-rows 0.25s ease;
+    /* not transitioned — per-frame layout (see 21-sidebar.css) */
 }
 .layer-item-collapsible.collapsed {
     grid-template-rows: auto 0fr;

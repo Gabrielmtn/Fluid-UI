@@ -763,10 +763,11 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 6px;
             overflow: hidden;
-            /* Grid-based collapse: scales to any content height */
+            /* Grid-based collapse: scales to any content height.
+               Not transitioned — animated grid rows re-layout everything
+               below on every frame (see 21-sidebar.css .sidebar-section) */
             display: grid;
             grid-template-rows: auto 1fr;
-            transition: grid-template-rows 0.3s ease;
         }
         .collapsible-section.collapsed {
             grid-template-rows: auto 0fr;

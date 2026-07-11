@@ -46,10 +46,15 @@
 /* ── SIDEBAR SECTIONS ── */
 .sidebar-section {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    /* Grid-based collapse: scales to any content height */
+    /* Grid-based collapse: scales to any content height.
+       NOT transitioned: animating grid-template-rows re-lays-out the
+       section and everything below it EVERY FRAME for the duration —
+       measured as the app's worst jank source (Event Timing 2026-07-09:
+       presentation delays up to 1.2s on section toggles, proc=0).
+       Collapse now snaps in one layout; the body opacity fade below
+       (compositor-only) carries the motion feel. */
     display: grid;
     grid-template-rows: auto 1fr;
-    transition: grid-template-rows 0.3s ease;
 }
 .sidebar-section.collapsed {
     grid-template-rows: auto 0fr;
@@ -96,7 +101,9 @@
     overflow: hidden;
     min-height: 0; /* Required for grid 0fr collapse */
     opacity: 1;
-    transition: padding 0.2s ease, opacity 0.2s ease;
+    /* opacity ONLY — padding was animated too, which is a per-frame
+       layout just like the grid rows (see .sidebar-section note) */
+    transition: opacity 0.15s ease;
 }
 
 .sidebar-section.collapsed .section-body {
@@ -287,7 +294,8 @@
 .anim-settings {
     display: grid;
     grid-template-rows: 0fr;
-    transition: grid-template-rows 0.25s ease, opacity 0.2s ease;
+    /* opacity only — same per-frame-layout trap as .sidebar-section */
+    transition: opacity 0.15s ease;
     opacity: 0;
     border-radius: 0 0 6px 6px;
 }
@@ -299,7 +307,7 @@
     overflow: hidden;
     min-height: 0;
     padding: 0 10px;
-    transition: padding 0.2s ease;
+    /* not transitioned — padding animates layout per frame */
 }
 .anim-settings.open .anim-settings-inner {
     padding: 6px 10px 10px;
