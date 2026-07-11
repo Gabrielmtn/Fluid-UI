@@ -252,10 +252,12 @@
                                       // Painterly sub-grid wisps on moving paint; dies with
                                       // motion so settled artwork stays bit-stable
 
-            RIDGES: 1,                // Sharpen kernel radius in 2048-reference texels.
-                                      // 1 = classic look, resolution-independent; >1 =
-                                      // coarse emboss ridges (the boot-ascent accident,
-                                      // now a deliberate dialable effect)
+            RIDGES: 0,                // Sharpen kernel radius in 2048-reference texels.
+                                      // 0 = sharpen OFF (default — the smooth look; the
+                                      // pass is skipped entirely), 1 = classic unsharp
+                                      // look, >1 = coarse emboss ridges. NOTE: the
+                                      // Viscosity/sharpness strength only acts when
+                                      // this is > 0.
 
 
 

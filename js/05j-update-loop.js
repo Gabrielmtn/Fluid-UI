@@ -402,8 +402,11 @@
             gl.disable(gl.BLEND);
             // [GOVERNOR HOOK] post-FX gate (sharpen, micro-detail, sunrays)
             const _fxOn = window.QualityGovernor ? window.QualityGovernor.fxOn() : true;
-            // Apply sharpness pass if enabled (config.SHARPNESS > 0)
-            const sharpnessEnabled = _fxOn && config.SHARPNESS > 0;
+            // Apply sharpness pass if enabled. RIDGES 0 makes the kernel a
+            // mathematical no-op (zero-radius offsets → detail = 0), so skip
+            // the whole dye-res pass — sharpening is opt-in via the Ridges
+            // slider now (default 0 = the smooth look).
+            const sharpnessEnabled = _fxOn && config.SHARPNESS > 0 && (config.RIDGES || 0) > 0;
             let displayTexture = density.read.texture;
             if (sharpnessEnabled) {
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
