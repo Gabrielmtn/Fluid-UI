@@ -222,7 +222,18 @@
                 if (swirl > 0.0) {
                     disp += swirlCurl(vUv, swirlTime) * (mTexels * swirl) * srcTexelSize;
                 }
-                disp *= smoothstep(0.002, 0.05, mTexels);
+                // Frame-rate-honest ease-out: the thresholds were tuned as
+                // texels-per-frame AT 60FPS. At 144Hz dt halves, so the same
+                // physical speed reads 2.4x smaller and slow swirls spend
+                // 2.4x longer in the partial-scale band — the worst
+                // re-filtering regime, which visibly dissolved fine dye
+                // structure after the 144Hz unlock (2026-07-09). Normalizing
+                // by dt makes the criterion pure physical speed (texels/s in
+                // 60fps-reference units): identical behavior at 60fps,
+                // identical PHYSICS at any refresh rate. At rest mTexels=0
+                // regardless — the bit-stability guarantee is untouched.
+                float mRef = mTexels * (0.0166667 / max(dt, 1e-4));
+                disp *= smoothstep(0.002, 0.05, mRef);
         `;
         const advectionFrag = `#version 300 es
             precision ${PRECISION} float;
