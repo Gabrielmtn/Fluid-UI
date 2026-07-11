@@ -71,6 +71,15 @@
                 if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
             });
         }
+        // Ridges slider (sharpen kernel scale, 2048-reference texels)
+        const ridgesSlider = document.getElementById('ridges');
+        if (ridgesSlider) {
+            ridgesSlider.addEventListener('input', (e) => {
+                config.RIDGES = parseFloat(e.target.value);
+                const sp = document.getElementById('ridgesValue');
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(1);
+            });
+        }
         // Sunrays slider
         const sunraysWeightSlider = document.getElementById('sunraysWeight');
         if (sunraysWeightSlider) {

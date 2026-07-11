@@ -319,6 +319,12 @@
             uniform sampler2D uVelocity;
             uniform float sharpness;
             uniform vec2 texelSize;
+            uniform float kernelScale; // kernel radius in 2048-reference texels
+                                       // (CPU pre-multiplies by dyeRes/2048): the
+                                       // LOOK stops changing when governor/battery/
+                                       // boot-ascent changes dye resolution, and
+                                       // values >1 recreate the coarse "ridges"
+                                       // emboss deliberately (Ridges slider).
             void main() {
                 vec3 center = texture(uTexture, vUv).rgb;
                 float centerIntensity = dot(center, vec3(0.299, 0.587, 0.114));
@@ -331,11 +337,12 @@
                 }
                 float lowFade = smoothstep(0.003, 0.03, centerIntensity);
                 // Sample neighbors for detail extraction (unsharp mask technique)
+                vec2 off = texelSize * kernelScale;
                 vec3 blur = vec3(0.0);
-                blur += texture(uTexture, vUv + vec2(texelSize.x, 0.0)).rgb;
-                blur += texture(uTexture, vUv - vec2(texelSize.x, 0.0)).rgb;
-                blur += texture(uTexture, vUv + vec2(0.0, texelSize.y)).rgb;
-                blur += texture(uTexture, vUv - vec2(0.0, texelSize.y)).rgb;
+                blur += texture(uTexture, vUv + vec2(off.x, 0.0)).rgb;
+                blur += texture(uTexture, vUv - vec2(off.x, 0.0)).rgb;
+                blur += texture(uTexture, vUv + vec2(0.0, off.y)).rgb;
+                blur += texture(uTexture, vUv - vec2(0.0, off.y)).rgb;
                 blur *= 0.25;
                 // Extract high-frequency detail, bounded to the local
                 // intensity so faint dye is never more than ~doubled

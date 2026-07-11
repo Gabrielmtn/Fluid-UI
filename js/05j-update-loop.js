@@ -412,6 +412,13 @@
                 gl.uniform1i(sharpenProg.uniforms.uVelocity, 1);
                 gl.uniform1f(sharpenProg.uniforms.sharpness, config.SHARPNESS);
                 gl.uniform2f(sharpenProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
+                // Kernel radius normalized to the 2048 reference: the sharpen
+                // LOOK stays constant when dye resolution changes (boot ascent,
+                // governor, battery tiers) — resolution now only affects
+                // fidelity, not character. RIDGES > 1 recreates the coarse
+                // emboss (the boot-ascent "ridges" look) deliberately.
+                gl.uniform1f(sharpenProg.uniforms.kernelScale,
+                    (config.RIDGES || 1.0) * (Math.max(dyeTexWidth, dyeTexHeight) / 2048));
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
                 gl.activeTexture(gl.TEXTURE1);

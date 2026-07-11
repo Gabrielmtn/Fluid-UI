@@ -31,7 +31,7 @@
     var SLIDER_IDS = [
         // Simulation
         'densityDissipation','velocityDissipation','pressureDissipation','pressureIteration',
-        'velocityInfluence','curl','sharpness','swirl','brushSize','multiplier','timeScale','canvasOpacity','captureDimming',
+        'velocityInfluence','curl','sharpness','swirl','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming',
         // Kaleidoscope
         'kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments',
         // Light Source

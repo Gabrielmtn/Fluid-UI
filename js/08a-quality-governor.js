@@ -68,7 +68,17 @@
             // when this file loads. Only a cinematic-class boot target needs
             // the ramp; mobile / modest configs already load fast.
             bootInit = true;
-            if (!window.config || window.config.DYE_RESOLUTION < 2048) {
+            // Late re-read of the persisted toggle: initUI's DCL-time restore
+            // can lose to async settings hydration in Electron, leaving the
+            // ascent running under a stale enabled=true even though the user
+            // saved it off — every launch then flashed the half-res look and
+            // visibly "snapped" to full res moments later. By the time the
+            // first framebuffer init lands here, settings are hydrated.
+            try {
+                var _s = settings();
+                if (_s && _s.get('governor.enabled', true) === false) enabled = false;
+            } catch (_) {}
+            if (!enabled || !window.config || window.config.DYE_RESOLUTION < 2048) {
                 bootStage = BOOT_STAGES.length - 1;
                 bootDone = true;
             } else {

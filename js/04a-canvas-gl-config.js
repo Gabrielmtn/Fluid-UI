@@ -252,6 +252,11 @@
                                       // Painterly sub-grid wisps on moving paint; dies with
                                       // motion so settled artwork stays bit-stable
 
+            RIDGES: 1,                // Sharpen kernel radius in 2048-reference texels.
+                                      // 1 = classic look, resolution-independent; >1 =
+                                      // coarse emboss ridges (the boot-ascent accident,
+                                      // now a deliberate dialable effect)
+
 
 
             SUNRAYS: false,           // Sunrays post-FX enabled (toggled in Effects)

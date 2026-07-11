@@ -1286,6 +1286,8 @@
 
         // Curl-noise micro-swirl (dye advection wisps)
         moveControlGroup('swirl', body);
+        // Sharpen kernel scale (coarse emboss at high values)
+        moveControlGroup('ridges', body);
 
         // Surface shading (Pavel-style pseudo-normal lighting)
         moveCheckboxGroup('displayShadingToggle', body);
