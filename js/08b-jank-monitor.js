@@ -296,6 +296,13 @@
                     gapMedianMs: +gapMedian.toFixed(1),
                     expectedGapMs: +expected.toFixed(1),
                     displayHzEst: +(1000 / Math.max(1, gapMedian)).toFixed(0),
+                    // OS-reported panel rate (Electron screen API via 05i).
+                    // displayHzOS >> displayHzEst = the OS knows the panel is
+                    // fast but Chromium is presenting slow — renderer-side
+                    // problem (flags/ANGLE/monitor assignment), not Windows
+                    // settings. Both at 60 = check Windows refresh-rate
+                    // setting / cable first.
+                    displayHzOS: window.__displayHz || 'unknown',
                     fpsCap: (typeof window.fpsCap === 'number') ? window.fpsCap : 'unknown',
                     simFps: simHealth.fps
                 },
