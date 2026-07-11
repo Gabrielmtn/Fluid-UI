@@ -16,7 +16,15 @@
     var MAX_WINDOW_MS = 4000; // continuous mousing splits into ≤4s windows
 
     var lastT = 0;
-    var expected = 16.7;     // adapts to actual display cadence (median of recent gaps)
+    // Expected gap = p90 of recent gaps, NOT the median: with an FPS cap
+    // below the display Hz the update loop early-returns most rAF ticks
+    // (fast cadence) and does real work on cap-interval ticks (slow
+    // cadence). A median adapts to the fast mode and then counts every
+    // legitimate render tick as 1-2 "drops" — the phantom 82 drops/sec
+    // baseline of 2026-07-09. p90 adopts the slow structural mode as
+    // normal; only gaps beyond it (real stalls) count.
+    var expected = 16.7;
+    var gapMedian = 16.7;
     var deltas = [];
     var interactions = [];   // ring buffer of closed interaction windows
     var current = null;      // open interaction window
@@ -35,7 +43,8 @@
             if (d < 100) { deltas.push(d); if (deltas.length > 120) deltas.shift(); }
             if (deltas.length >= 30) {
                 var s = deltas.slice().sort(function (a, b) { return a - b; });
-                expected = s[s.length >> 1];
+                gapMedian = s[s.length >> 1];
+                expected = s[Math.min(s.length - 1, Math.floor(s.length * 0.9))];
             }
             var dropped = d > expected * DROP_FACTOR ? Math.round(d / expected) - 1 : 0;
             if (current) {
@@ -147,6 +156,30 @@
         if (current && performance.now() > current.deadline) finish();
     }, 250);
 
+    // ── Sim health: achieved render rate vs the FPS cap ────────────
+    // 05j's lastDrawTimeMs advances by exactly one cap-interval per
+    // rendered frame (drift-aligned), so its slope IS the render rate —
+    // sampled read-only here, no changes to the loop. This is the number
+    // that says whether the sim is actually missing ITS deadline, as
+    // opposed to rAF-cadence noise.
+    var simHealth = { lastVal: 0, lastAt: 0, fps: -1 };
+    setInterval(function () {
+        try {
+            if (typeof lastDrawTimeMs === 'number') {
+                var t = performance.now();
+                var cap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 0;
+                if (simHealth.lastAt && cap > 0) {
+                    var frames = (lastDrawTimeMs - simHealth.lastVal) / (1000 / cap);
+                    simHealth.fps = Math.max(0, +(frames / ((t - simHealth.lastAt) / 1000)).toFixed(1));
+                } else if (!cap) {
+                    simHealth.fps = -1; // uncapped: rAF cadence IS the sim rate
+                }
+                simHealth.lastVal = lastDrawTimeMs;
+                simHealth.lastAt = t;
+            }
+        } catch (_) {}
+    }, 1000);
+
     // ── Delegated interaction hooks (capture phase, passive) ───────
     function labelFor(el) {
         var sec = el.closest && el.closest('.sidebar-section');
@@ -253,6 +286,19 @@
                 if (e.proc > t.worstProc) t.worstProc = e.proc;
             });
             return {
+                // cadence diagnostics: interpret drop counts with these.
+                // gapMedianMs ≈ display frame time; expectedGapMs = what a
+                // "normal" gap looks like here (p90 — absorbs the FPS-cap
+                // skip/render bimodal pattern); simFps = achieved sim rate
+                // vs fpsCap (-1 when uncapped/unknown). If simFps ≈ fpsCap,
+                // the sim is healthy regardless of the drop counts.
+                cadence: {
+                    gapMedianMs: +gapMedian.toFixed(1),
+                    expectedGapMs: +expected.toFixed(1),
+                    displayHzEst: +(1000 / Math.max(1, gapMedian)).toFixed(0),
+                    fpsCap: (typeof window.fpsCap === 'number') ? window.fpsCap : 'unknown',
+                    simFps: simHealth.fps
+                },
                 slowEventsByType: byType,
                 baselineDropsPerSec: +baselineRate().toFixed(2),
                 baselineMinutes: +(baseline.ms / 60000).toFixed(1),
