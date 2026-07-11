@@ -376,6 +376,9 @@
             uniform vec2 texelSize;
             uniform float clarity;    // 0–1: local contrast boost
             uniform float vibrance;   // 0–1: selective saturation
+            uniform float kernelScale; // 2048-reference normalization (same
+                                       // principle as sharpen): resolution
+                                       // changes must not change the look
             void main() {
                 vec3 center = texture(uTexture, vUv).rgb;
                 vec3 lumaW = vec3(0.299, 0.587, 0.114);
@@ -393,7 +396,7 @@
                 // Same proven additive approach as the sharpening pass
                 // but with a wider 2-ring kernel for mid-frequency contrast.
                 if (clarity > 0.0) {
-                    vec2 t = texelSize;
+                    vec2 t = texelSize * kernelScale;
                     vec2 t2 = t * 2.0;
                     // 12-tap weighted blur (8 inner + 4 outer at half weight)
                     vec3 blur = vec3(0.0);

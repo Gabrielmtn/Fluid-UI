@@ -439,6 +439,10 @@
                 gl.uniform1i(microDetailProg.uniforms.uTexture, 0);
                 gl.uniform1i(microDetailProg.uniforms.uVelocity, 1);
                 gl.uniform2f(microDetailProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
+                // 2048-reference kernel normalization (aesthetic-decoupling
+                // principle — see sharpen pass above)
+                gl.uniform1f(microDetailProg.uniforms.kernelScale,
+                    Math.max(dyeTexWidth, dyeTexHeight) / 2048);
                 gl.uniform1f(microDetailProg.uniforms.clarity, mdClarity);
                 gl.uniform1f(microDetailProg.uniforms.vibrance, mdVibrance);
                 gl.activeTexture(gl.TEXTURE0);

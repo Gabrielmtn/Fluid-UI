@@ -805,20 +805,21 @@
         body.appendChild(chainWrap);
 
         // ── Wire up logic ──
-        // Pass button references directly to avoid getElementById issues
-        setTimeout(function () { 
-            wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn); 
-        }, 200);
+        // Pass button references directly to avoid getElementById issues.
+        // No arbitrary delay: wireMutationUI already self-retries every
+        // 100ms until its dependencies (mutation engine + snapshot fns)
+        // exist — the old flat 200ms just added dead air (UI audit Stage 2).
+        wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn);
 
         return sec;
     }
 
     function wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn) {
+        // Self-retry until ALL dependencies exist (engine + snapshot fns) —
+        // the engine check used to warn-and-die, silently leaving the panel
+        // dead if load order ever shifted; now every path converges.
         var engine = window.mutationEngine;
-        if (!engine) { console.warn('[Mutation] Engine not loaded'); return; }
-        
-        // Wait for snapshot functions to be available (exposed by save-load.js)
-        if (!window.capturePresetSnapshot || !window.applyPresetSnapshot) {
+        if (!engine || !window.capturePresetSnapshot || !window.applyPresetSnapshot) {
             setTimeout(function() { wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn); }, 100);
             return;
         }
