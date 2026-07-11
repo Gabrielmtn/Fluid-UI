@@ -5,6 +5,11 @@
 //   to the UI interaction that caused them (hover/click on mixer-strip
 //   channels, sidebar sections, drawers), so every Stage 1/2 audit item
 //   gets a before/after number instead of a feeling.
+// PROVIDES: window.LookWatchdog — polls every look-affecting piece of
+//   state (config keys, live FBO resolutions, material mode, fps cap,
+//   governor/boot state, freeze) and logs exactly what changed and when.
+//   Purpose: NOTHING may change the shader aesthetic without user input
+//   (principle in TODO.md); whatever does gets named in the log.
 // Dev instrumentation: passive capture-phase listeners + one extra rAF
 // callback; zero cost to the sim path and no behavior changes.
 // ═══════════════════════════════════════════════════════════════════
@@ -325,5 +330,96 @@
             interactions.length = 0;
             renderStats();
         }
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // LookWatchdog — catches ANY change to look-affecting state.
+    // Getter-based and try/catch-guarded so missing globals (load
+    // order, web build) simply read as undefined until they exist.
+    // Watching EFFECTS (config values, live FBO sizes) rather than
+    // actors means every mutator is caught: governor, battery manager,
+    // boot ascent, settings autoload, material modes, presets, user.
+    // ═══════════════════════════════════════════════════════════════
+    var lwBootMs = performance.now();
+    var lwWatch = {
+        // sim + effect config (the look)
+        densityDiss: function () { return window.config && window.config.DENSITY_DISSIPATION; },
+        velocityDiss: function () { return window.config && window.config.VELOCITY_DISSIPATION; },
+        pressureDiss: function () { return window.config && window.config.PRESSURE_DISSIPATION; },
+        pressureIters: function () { return window.config && window.config.PRESSURE_ITERATIONS; },
+        curl: function () { return window.config && window.config.CURL; },
+        splatRadius: function () { return window.config && window.config.SPLAT_RADIUS; },
+        sharpness: function () { return window.config && window.config.SHARPNESS; },
+        clarity: function () { return window.config && window.config.CLARITY; },
+        vibrance: function () { return window.config && window.config.VIBRANCE; },
+        ridges: function () { return window.config && window.config.RIDGES; },
+        swirl: function () { return window.config && window.config.SWIRL; },
+        macCormack: function () { return window.config && window.config.MACCORMACK; },
+        multigrid: function () { return window.config && window.config.MULTIGRID; },
+        sunrays: function () { return window.config && window.config.SUNRAYS; },
+        bloomCeiling: function () { return window.config && window.config.BLOOM_CEILING; },
+        velInfluence: function () { return window.config && window.config.VELOCITY_INFLUENCE; },
+        // configured vs LIVE resolutions (live catches every FBO reinit,
+        // including the boot ascent, whoever ordered it)
+        dyeResConfig: function () { return window.config && window.config.DYE_RESOLUTION; },
+        simResConfig: function () { return window.config && window.config.SIM_RESOLUTION; },
+        dyeResLive: function () { return window.dyeTexWidth + 'x' + window.dyeTexHeight; },
+        simResLive: function () { return window.simTexWidth + 'x' + window.simTexHeight; },
+        // pacing (dt changes advection/decay character)
+        fpsCap: function () { return window.fpsCap; },
+        timeScale: function () { return window.timeScale; },
+        // modes + gates
+        materialMode: function () { var el = document.getElementById('materialMode'); return el && el.value; },
+        displayShading: function () { var el = document.getElementById('displayShadingToggle'); return el && el.checked; },
+        microDetail: function () { var el = document.getElementById('microDetailToggle'); return el && el.checked; },
+        lighting: function () { return !!(window.lightSource && window.lightSource.enabled); },
+        lightShift: function () { return !!(window.lightShift && window.lightShift.enabled); },
+        frozen: function () { return !!window.__fluidFrozen; },
+        governorFx: function () { return window.QualityGovernor ? window.QualityGovernor.fxOn() : undefined; },
+        governorIters: function () {
+            return (window.QualityGovernor && window.config)
+                ? window.QualityGovernor.effIters(window.config.PRESSURE_ITERATIONS) : undefined;
+        },
+        governorState: function () {
+            try { return JSON.stringify(window.QualityGovernor.getState()); } catch (_) { return undefined; }
+        }
+    };
+    var lwPrev = {};
+    var lwHistory = [];
+    var lwArmed = false;
+    setInterval(function () {
+        var t = +((performance.now() - lwBootMs) / 1000).toFixed(1);
+        for (var key in lwWatch) {
+            var v;
+            try { v = lwWatch[key](); } catch (_) { v = undefined; }
+            if (v === undefined || v === null || (typeof v === 'number' && isNaN(v))) continue;
+            if (!(key in lwPrev)) { lwPrev[key] = v; continue; } // first sighting = baseline
+            if (lwPrev[key] !== v) {
+                // coalesce same-key runs within 1.5s (slider drags)
+                var last = lwHistory[lwHistory.length - 1];
+                if (last && last.key === key && (t - last.t) < 1.5) {
+                    last.to = v; last.t = t;
+                } else {
+                    var entry = { t: t, key: key, from: lwPrev[key], to: v };
+                    lwHistory.push(entry);
+                    if (lwHistory.length > 200) lwHistory.shift();
+                    console.warn('[LookWatchdog] ' + key + ': ' + lwPrev[key] + ' → ' + v + '  @ ' + t + 's');
+                }
+                lwPrev[key] = v;
+            }
+        }
+        if (!lwArmed && Object.keys(lwPrev).length > 5) {
+            lwArmed = true;
+            console.log('[LookWatchdog] armed — any look-state change will be logged');
+        }
+    }, 250);
+    window.LookWatchdog = {
+        history: lwHistory,
+        snapshot: function () {
+            var out = {};
+            for (var key in lwWatch) { try { out[key] = lwWatch[key](); } catch (_) {} }
+            return out;
+        },
+        reset: function () { lwHistory.length = 0; }
     };
 })();
