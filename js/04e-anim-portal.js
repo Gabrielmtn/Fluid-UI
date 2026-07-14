@@ -140,7 +140,7 @@
 
                     
 
-                    multiSplat(x, y, dx, dy, color);
+                    multiSplat(x, y, dx, dy, color, false, true);
 
                     
 
@@ -346,7 +346,7 @@
 
                                     
 
-                                    multiSplat(x, y, dx, dy, color);
+                                    multiSplat(x, y, dx, dy, color, false, true);
 
                                 }, i * 30);
 
@@ -384,7 +384,7 @@
 
                                     
 
-                                    multiSplat(x, y, dx, dy, color);
+                                    multiSplat(x, y, dx, dy, color, false, true);
 
                                 }, i * 30);
 

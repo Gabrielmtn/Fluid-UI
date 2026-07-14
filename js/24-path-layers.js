@@ -566,7 +566,9 @@
         
         // Apply splat using the exposed function
         if (typeof window.applyMultiSplatWith === 'function') {
-            window.applyMultiSplatWith(x, y, dx, dy, scaledColor, 1, layer.brushSize);
+            // exactColor=true: the path layer's configured color must not be
+            // hijacked by arm color modes (regression 2026-07-13)
+            window.applyMultiSplatWith(x, y, dx, dy, scaledColor, 1, layer.brushSize, true);
         }
     }
 

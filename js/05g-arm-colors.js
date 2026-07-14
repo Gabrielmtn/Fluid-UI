@@ -77,7 +77,11 @@
             }
         }
         window.advanceArmColors = advanceArmColors;
-        function multiSplat(x, y, dx, dy, color, shouldBroadcast) {
+        // exactColor: programmatic splat sources (path layers, audio scenes,
+        // animations) pass true so their configured color is deposited as-is on
+        // every arm. Pointer strokes, stroke replay, and remote-peer strokes
+        // leave it false — they ARE user strokes, so arm color modes apply.
+        function multiSplat(x, y, dx, dy, color, shouldBroadcast, exactColor) {
             // Kaleidoscope behavior
             const centerX = canvas.width * 0.5;
             const centerY = canvas.height * 0.5;
@@ -91,7 +95,7 @@
                 const finalY = rotatedY + centerY;
                 const rotatedDx = dx * Math.cos(angle) - dy * Math.sin(angle);
                 const rotatedDy = dx * Math.sin(angle) + dy * Math.cos(angle);
-                const armColor = resolveArmColor(i, color);
+                const armColor = exactColor ? color : resolveArmColor(i, color);
                 splat(finalX, finalY, rotatedDx, rotatedDy, armColor);
             }
             if (shouldBroadcast && typeof broadcastSplat === 'function') {
@@ -107,12 +111,12 @@
             }
         }
         // Helper to apply a multiSplat with specific multiplier and radius, restoring after
-        window.applyMultiSplatWith = function(x, y, dx, dy, color, mult, radius) {
+        window.applyMultiSplatWith = function(x, y, dx, dy, color, mult, radius, exactColor) {
             const prevM = (typeof animationMultiplier === 'number') ? animationMultiplier : 1;
             const prevR = config.SPLAT_RADIUS;
             animationMultiplier = Math.max(1, Math.round(mult || 1));
             config.SPLAT_RADIUS = (typeof radius === 'number') ? radius : prevR;
-            try { multiSplat(x, y, dx, dy, color, false); } finally {
+            try { multiSplat(x, y, dx, dy, color, false, exactColor); } finally {
                 animationMultiplier = prevM;
                 config.SPLAT_RADIUS = prevR;
             }

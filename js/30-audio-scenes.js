@@ -39,7 +39,7 @@
 
     function splat(x, y, dx, dy, color, radius, mult) {
         if (typeof window.applyMultiSplatWith === 'function') {
-            window.applyMultiSplatWith(x, y, dx, dy, color, mult || 1, radius);
+            window.applyMultiSplatWith(x, y, dx, dy, color, mult || 1, radius, true);
         }
     }
 

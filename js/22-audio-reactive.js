@@ -667,7 +667,7 @@
             if (!e) continue;
             var color = e.color || pickerColor();
             if (typeof window.applyMultiSplatWith === 'function') {
-                window.applyMultiSplatWith(e.x, e.y, e.dx, e.dy, color, mult, e.radius);
+                window.applyMultiSplatWith(e.x, e.y, e.dx, e.dy, color, mult, e.radius, true);
             }
         }
     }
