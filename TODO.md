@@ -15,9 +15,11 @@
 
 ## Phase 1 closeout (small, mostly Gabriel-side)
 
-- [ ] **Regression pass** on the local build: settle-banding soak (slow presets), freeze preservation, Gate overflow, collision feel, edge-absorb mode, recording/replay, video export, multiplayer, web + mobile defaults.
-- [ ] **Preset retune**: drift `PRESSURE_DISSIPATION` toward ~0.95 (multigrid removed its stabilizer double-duty); taste-check all 8 presets (Marble/Thick most likely to shift).
-- [ ] Mobile/real-GPU check of the multigrid pyramid (defaults off there — verify that's right).
+- [x] **Preset active states** — FIXED 2026-07-13: `updatePresetButtons` queried the legacy `.presets` container the mixer refactor had emptied, AND a three-way specificity war (JS inline cssText vs `all:unset !important` stylesheet rule vs `.active` class) made active styling unrenderable on every presets-channel button. All styling now class-based (`.mixer-preset-btn`); built-in ↔ user preset actives supersede each other through the real state owner (clearActivePreset), synced across both user-preset surfaces (strip + sidebar); slider divergence clears. Verified in harness.
+- [x] **Preset retune** — DONE 2026-07-13 (engineering half): `PRESSURE_DISSIPATION` compressed into 0.925–0.97 preserving each preset's relative order (old values in comments in 04b for revert); default + registry def 0.944 → 0.95. AWAITING Gabriel's taste pass across all 8.
+- [x] **Multigrid small-grid verification** — DONE 2026-07-13: sim 128 → pyramid 64x53>32x27>16x14>8x7, sim 64 → 3 levels; zero NaNs, finite pressure at both. Correctness holds at mobile-class grids; real-phone PERF check (toggle defaults off there) still Gabriel-side when convenient.
+- [x] **Collision feel** — instrumented 2026-07-13: A/B tests (hard wall + feathered depth-style mask) show the legacy damp pass barely alters outcomes anymore — the obstacle-aware projection dominates and already provides tangential slip. Added `config.WALL_SLIP` (0 = legacy apron damp, 1 = interior-only; default 0.6, console-tunable, no UI) for feel experiments on real content. Gabriel's feel pass decides if the knob deserves a slider or the damp pass retires entirely.
+- [ ] **Regression pass** on the local build: settle-banding soak (slow presets), freeze preservation, Gate overflow, collision feel (incl. WALL_SLIP 0-vs-1), edge-absorb mode, recording/replay, video export, multiplayer, web + mobile defaults, preset taste-check.
 - [ ] Watch items (act only if seen): fp16 pressure headroom on violent presets; MacCormack checkerboard dithering (→ soft-revert); 144Hz cadence confirm (`JankMonitor.summary().cadence`).
 
 ## Phase 1.5 — Painterly upgrades (UNSHELVED 2026-07-13: execute + test)

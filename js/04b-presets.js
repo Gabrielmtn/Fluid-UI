@@ -6,23 +6,31 @@
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
 // ═══════════════════════════════════════════════════════════════════
+        // PRESSURE_DISSIPATION retune 2026-07-13: with the multigrid solve the
+        // low decay values no longer double-duty as stabilizers for an
+        // unconverged Jacobi — they just threw away the (now-meaningful)
+        // warm-started pressure. Compressed into the 0.925–0.97 band with the
+        // ORIGINAL ORDERING preserved, so each preset keeps its relative
+        // character while the solve keeps its convergence. Old values in
+        // comments for taste-revert.
+
         const presets = {
 
-            silky: { DENSITY_DISSIPATION: 0.9995, VELOCITY_DISSIPATION: 1.0001, PRESSURE_DISSIPATION: 0.8, PRESSURE_ITERATIONS: 20, CURL: 30, SPLAT_RADIUS: 0.011 },
+            silky: { DENSITY_DISSIPATION: 0.9995, VELOCITY_DISSIPATION: 1.0001, PRESSURE_DISSIPATION: 0.93, PRESSURE_ITERATIONS: 20, CURL: 30, SPLAT_RADIUS: 0.011 },  // PD was 0.8
 
-            thick: { DENSITY_DISSIPATION: 0.999, VELOCITY_DISSIPATION: 0.99, PRESSURE_DISSIPATION: 0.95, PRESSURE_ITERATIONS: 35, CURL: 1, SPLAT_RADIUS: 0.015 },  // Was 120
+            thick: { DENSITY_DISSIPATION: 0.999, VELOCITY_DISSIPATION: 0.99, PRESSURE_DISSIPATION: 0.955, PRESSURE_ITERATIONS: 35, CURL: 1, SPLAT_RADIUS: 0.015 },  // Was 120; PD was 0.95
 
-            wispy: { DENSITY_DISSIPATION: 0.9972, VELOCITY_DISSIPATION: 0.9996, PRESSURE_DISSIPATION: 0.92, PRESSURE_ITERATIONS: 25, CURL: 60, SPLAT_RADIUS: 0.01 },  // Was 40
+            wispy: { DENSITY_DISSIPATION: 0.9972, VELOCITY_DISSIPATION: 0.9996, PRESSURE_DISSIPATION: 0.945, PRESSURE_ITERATIONS: 25, CURL: 60, SPLAT_RADIUS: 0.01 },  // Was 40; PD was 0.92
 
-            chaotic: { DENSITY_DISSIPATION: 0.996, VELOCITY_DISSIPATION: 0.9938, PRESSURE_DISSIPATION: 0.934, PRESSURE_ITERATIONS: 25, CURL: 12, SPLAT_RADIUS: 0.0151 },
+            chaotic: { DENSITY_DISSIPATION: 0.996, VELOCITY_DISSIPATION: 0.9938, PRESSURE_DISSIPATION: 0.95, PRESSURE_ITERATIONS: 25, CURL: 12, SPLAT_RADIUS: 0.0151 },  // PD was 0.934
 
-            ethereal: { DENSITY_DISSIPATION: 0.9998, VELOCITY_DISSIPATION: 1.0005, PRESSURE_DISSIPATION: 0.75, PRESSURE_ITERATIONS: 15, CURL: 45, SPLAT_RADIUS: 0.008 },
+            ethereal: { DENSITY_DISSIPATION: 0.9998, VELOCITY_DISSIPATION: 1.0005, PRESSURE_DISSIPATION: 0.925, PRESSURE_ITERATIONS: 15, CURL: 45, SPLAT_RADIUS: 0.008 },  // PD was 0.75
 
-            turbulent: { DENSITY_DISSIPATION: 0.994, VELOCITY_DISSIPATION: 0.997, PRESSURE_DISSIPATION: 0.88, PRESSURE_ITERATIONS: 30, CURL: 55, SPLAT_RADIUS: 0.013 },  // Was 60
+            turbulent: { DENSITY_DISSIPATION: 0.994, VELOCITY_DISSIPATION: 0.997, PRESSURE_DISSIPATION: 0.94, PRESSURE_ITERATIONS: 30, CURL: 55, SPLAT_RADIUS: 0.013 },  // Was 60; PD was 0.88
 
-            marble: { DENSITY_DISSIPATION: 0.9992, VELOCITY_DISSIPATION: 0.9985, PRESSURE_DISSIPATION: 0.98, PRESSURE_ITERATIONS: 35, CURL: 8, SPLAT_RADIUS: 0.018 },  // Was 100
+            marble: { DENSITY_DISSIPATION: 0.9992, VELOCITY_DISSIPATION: 0.9985, PRESSURE_DISSIPATION: 0.97, PRESSURE_ITERATIONS: 35, CURL: 8, SPLAT_RADIUS: 0.018 },  // Was 100; PD was 0.98
 
-            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.82, PRESSURE_ITERATIONS: 25, CURL: 52, SPLAT_RADIUS: 0.006 }  // Was 35
+            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.935, PRESSURE_ITERATIONS: 25, CURL: 52, SPLAT_RADIUS: 0.006 }  // Was 35; PD was 0.82
 
         };
 
@@ -64,9 +72,15 @@
 
             updateSliderValues();
 
-            
 
-            // Update button states
+
+            // Update button states; a built-in preset supersedes any active
+
+            // user preset (both surfaces: sidebar list + mixer strip)
+
+            document.querySelectorAll('.user-preset-btn.active, .mixer-user-preset-btn.active')
+
+                .forEach(btn => btn.classList.remove('active'));
 
             updatePresetButtons();
 
@@ -92,27 +106,17 @@
 
         function updatePresetButtons() {
 
-            const presetContainer = document.querySelector('.presets');
+            // Built-in preset buttons live in the mixer strip (.mixer-preset-btn)
+            // after the layout refactor moved them out of the legacy .presets
+            // container — which this function kept querying, so active states
+            // silently stopped rendering (fixed 2026-07-13). The .presets
+            // selector stays as a fallback for the pre-mixer mobile layout.
 
-            if (!presetContainer) return;
-
-            
-
-            const buttons = presetContainer.querySelectorAll('button');
+            const buttons = document.querySelectorAll('.mixer-preset-btn, .presets button');
 
             buttons.forEach(btn => {
 
-                const presetName = btn.textContent.trim().toLowerCase();
-
-                if (presetName === activePreset) {
-
-                    btn.classList.add('active');
-
-                } else {
-
-                    btn.classList.remove('active');
-
-                }
+                btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === activePreset);
 
             });
 

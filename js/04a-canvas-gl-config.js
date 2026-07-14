@@ -218,7 +218,8 @@
 
             VELOCITY_DISSIPATION: 0.999,
 
-            PRESSURE_DISSIPATION: 0.944,
+            PRESSURE_DISSIPATION: 0.95, // was 0.944 — retuned with the multigrid solve
+                                        // (low values were stabilizing unconverged Jacobi)
 
             PRESSURE_ITERATIONS: 32,  // 32 gives clean incompressible flow without being expensive
 
@@ -247,6 +248,11 @@
             MULTIGRID: true,          // Multigrid pressure V-cycle — converges like hundreds of
                                       // Jacobi iterations at ~1/3 the fill cost of the 32 default
                                       // (governor ladder: 2 cycles → 1 → Jacobi floor)
+
+            WALL_SLIP: 0.6,           // Collision feel: 0 = legacy sticky walls (damp pass
+                                      // kills a wide apron), 1 = interior-only damp (the
+                                      // projection's tangential slip fully shows). Console-
+                                      // tunable for feel testing; no UI slider yet.
 
             SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
                                       // Painterly sub-grid wisps on moving paint; dies with

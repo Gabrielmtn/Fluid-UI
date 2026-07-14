@@ -1272,9 +1272,13 @@
                 var snapshot = presets[name];
                 applyPresetSnapshot(snapshot);
                 showPresetStatus('Loaded: ' + name, '#3fb950');
-                // Highlight active
-                list.querySelectorAll('.user-preset-btn').forEach(function(b) { b.classList.remove('active'); });
-                btn.classList.add('active');
+                // A user preset supersedes any built-in active state (via the
+                // real state owner in 04b), and highlights on BOTH user-preset
+                // surfaces (this sidebar list + the mixer strip's).
+                if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
+                document.querySelectorAll('.user-preset-btn, .mixer-user-preset-btn').forEach(function(b) {
+                    b.classList.toggle('active', b.textContent === name);
+                });
             });
 
             var overwriteBtn = document.createElement('button');

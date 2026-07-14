@@ -272,6 +272,8 @@
                 // Obstacle damping pass — runs only when collision layers are active.
                 if (window.collisionLayers && window.collisionLayers.enabled && obstacle) {
                     obstacleDampProg.bind();
+                    gl.uniform1f(obstacleDampProg.uniforms.wallSlip,
+                        (typeof config.WALL_SLIP === 'number') ? config.WALL_SLIP : 0.6);
                     gl.uniform2f(obstacleDampProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform1i(obstacleDampProg.uniforms.uVelocity, 0);
                     gl.uniform1i(obstacleDampProg.uniforms.uObstacle, 1);

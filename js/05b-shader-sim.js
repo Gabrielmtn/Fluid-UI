@@ -724,6 +724,15 @@
             uniform sampler2D uVelocity;
             uniform sampler2D uObstacle;
             uniform vec2 texelSize;
+            uniform float wallSlip; // 0 = legacy full-apron damp ("sticky" walls),
+                                    // 1 = interior-mostly damp. The obstacle-aware
+                                    // projection (Phase 1) already enforces
+                                    // no-penetration and kills interior velocity —
+                                    // this pass's wide apron was also killing the
+                                    // TANGENTIAL flow the projection deliberately
+                                    // preserves, making collisions feel sluggish
+                                    // instead of fluid-sliding-around-stone.
+                                    // Driven by config.WALL_SLIP (default 0.6).
             void main() {
                 vec2 vel = texture(uVelocity, vUv).xy;
                 // Sample obstacle with neighbors for smooth boundary (anti-alias)
@@ -733,8 +742,9 @@
                 float t  = texture(uObstacle, vUv + vec2(0.0, texelSize.y)).r;
                 float b  = texture(uObstacle, vUv - vec2(0.0, texelSize.y)).r;
                 float obs = (c * 4.0 + l + r + t + b) * 0.125;
-                // Smooth damping curve — gradual slowdown instead of hard kill
-                float damp = 1.0 - smoothstep(0.0, 0.8, obs);
+                // Smooth damping curve; wallSlip narrows it toward the interior
+                // (wallSlip=0 reproduces the legacy smoothstep(0.0, 0.8) exactly)
+                float damp = 1.0 - smoothstep(wallSlip * 0.45, 0.8 + wallSlip * 0.1, obs);
                 vel *= damp;
                 fragColor = vec4(vel, 0.0, 1.0);
             }

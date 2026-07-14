@@ -519,13 +519,15 @@
         const wrap = document.createElement('div');
         wrap.className = 'mixer-presets';
 
-        // Move built-in preset buttons and apply inline styles
+        // Move built-in preset buttons; styling lives in 20-mixer-strip.css
+        // (.mixer-preset-btn) — inline cssText here used to beat the .active
+        // class, so applied presets never highlighted.
         const presetsDiv = controls.querySelector('.presets');
         if (presetsDiv) {
             while (presetsDiv.firstChild) {
                 var child = presetsDiv.firstChild;
                 if (child.tagName === 'BUTTON') {
-                    child.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 8px;font-size:9px;border-radius:3px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.1);cursor:pointer;line-height:1.2;font-weight:500;';
+                    child.classList.add('mixer-preset-btn');
                 }
                 wrap.appendChild(child);
             }
@@ -628,20 +630,22 @@
             userWrap.innerHTML = '';
             names.forEach(function(name) {
                 var btn = document.createElement('button');
-                btn.className = 'mixer-user-preset-btn';
+                btn.className = 'mixer-user-preset-btn'; // styled in 20-mixer-strip.css
                 btn.textContent = name;
                 btn.title = 'Load "' + name + '"';
-                btn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 8px;font-size:9px;border-radius:3px;background:rgba(100,200,255,0.12);color:rgba(100,200,255,0.8);border:1px solid rgba(100,200,255,0.2);cursor:pointer;line-height:1.2;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;';
                 btn.addEventListener('click', function() {
                     var snapshot = presets[name];
                     if (snapshot && typeof window.applyPresetSnapshot === 'function') {
                         window.applyPresetSnapshot(snapshot);
                     }
-                    // Highlight
-                    userWrap.querySelectorAll('.mixer-user-preset-btn').forEach(function(b) { b.classList.remove('active'); });
-                    btn.classList.add('active');
-                    // Clear built-in active state
-                    wrap.querySelectorAll('.presets button, button[onclick]').forEach(function(b) { b.classList.remove('active'); });
+                    // Built-in active state clears through the real state owner
+                    // (04b activePreset), not a cosmetic class sweep.
+                    if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
+                    // Highlight this preset in BOTH user-preset surfaces
+                    // (strip + sidebar list render the same presets).
+                    document.querySelectorAll('.mixer-user-preset-btn, .user-preset-btn').forEach(function(b) {
+                        b.classList.toggle('active', b.textContent === name);
+                    });
                 });
                 userWrap.appendChild(btn);
             });

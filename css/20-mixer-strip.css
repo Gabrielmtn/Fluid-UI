@@ -348,23 +348,11 @@ body > .controls {
     background: rgba(255, 255, 255, 0.12);
     border-radius: 2px;
 }
-.mixer-presets button,
-#mixer-strip .mixer-presets button {
-    all: unset !important;
-    box-sizing: border-box !important;
-    padding: 3px 8px !important;
-    font-size: 10px !important;
-    border-radius: 3px !important;
-    background: rgba(255,255,255,0.08) !important;
-    color: rgba(255,255,255,0.7) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    cursor: pointer !important;
-    line-height: 1.2 !important;
-    font-weight: 500 !important;
-}
-.mixer-presets button:hover {
-    opacity: 0.8;
-}
+/* (legacy `.mixer-presets button { all: unset !important; ... }` block
+   removed 2026-07-13 — it was one side of a three-way specificity war
+   with the JS inline styles (also removed) and made .active states
+   unrenderable on every button in the presets channel. All preset-button
+   styling now lives in the class rules below.) */
 /* Separator between built-in and user presets */
 .preset-sep {
     width: 1px;
@@ -372,6 +360,31 @@ body > .controls {
     background: rgba(255,255,255,0.15);
     margin: 0 3px;
     flex-shrink: 0;
+}
+/* Built-in preset buttons in mixer strip (styles moved out of JS inline
+   cssText 2026-07-13 — inline styles beat any class, which is why .active
+   never rendered on these) */
+#mixer-strip .mixer-preset-btn {
+    all: unset;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    font-size: 9px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.1);
+    cursor: pointer;
+    line-height: 1.2;
+    font-weight: 500;
+}
+#mixer-strip .mixer-preset-btn:hover {
+    opacity: 0.8;
+}
+#mixer-strip .mixer-preset-btn.active {
+    background: rgba(100,200,255,0.28);
+    border-color: rgba(100,200,255,0.55);
+    color: white;
+    font-weight: 600;
 }
 /* User preset buttons in mixer strip */
 .mixer-user-presets {
@@ -383,9 +396,11 @@ body > .controls {
     padding: 4px 8px;
     font-size: 9px;
     border-radius: 3px;
-    background: rgba(100,200,255,0.12) !important;
-    color: rgba(100,200,255,0.8) !important;
-    border: 1px solid rgba(100,200,255,0.2) !important;
+    /* no !important — it existed to beat the JS inline styles (now gone)
+       and collaterally defeated the .active rule below */
+    background: rgba(100,200,255,0.12);
+    color: rgba(100,200,255,0.8);
+    border: 1px solid rgba(100,200,255,0.2);
     cursor: pointer;
     line-height: 1.2;
     max-width: 80px;
