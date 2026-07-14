@@ -259,17 +259,20 @@
         strip.id = 'mixer-strip';
 
         // Channel faders for key controls
-        strip.appendChild(faderChannel('Brush', 'orange', 'brushSize', null, 'mixer-brushValue'));
+        // (renames 2026-07-13: 'Brush'→'Size' and 'Multiply'→'Brush' — the
+        // multiplier channel is where the brush controls live, so it owns
+        // the name; the size fader says what it actually is)
+        strip.appendChild(faderChannel('Size', 'orange', 'brushSize', null, 'mixer-brushValue'));
         strip.appendChild(faderChannel('Curl', 'blue', 'curl', 'curlValue'));
         strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
-        var multiplyChannel = faderChannel('Multiply', 'yellow', 'multiplier', 'multiplierValue');
-        // The multiplier value ("1x") IS the arm-colors trigger — click it to
+        var brushChannel = faderChannel('Brush', 'yellow', 'multiplier', 'multiplierValue');
+        // The multiplier value ("1x") IS the brush-colors trigger — click it to
         // open the per-arm brush color controls (no separate icon button).
         // Query from the (detached) channel: faderChannel already re-parented
         // the value element, so document.getElementById would miss it here.
-        buildArmColorsDropdown(multiplyChannel.querySelector('#multiplierValue'));
-        strip.appendChild(multiplyChannel);
+        buildArmColorsDropdown(brushChannel.querySelector('#multiplierValue'));
+        strip.appendChild(brushChannel);
         strip.appendChild(faderChannel('Time', 'pink', 'timeScale', 'timeScaleValue'));
         strip.appendChild(faderChannel('Density', 'cyan', 'densityDissipation', 'densityValue'));
         strip.appendChild(faderChannel('Velocity', 'cyan', 'velocityDissipation', 'velocityValue'));
@@ -294,11 +297,11 @@
 
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
-        'Brush': 'Brush size for painting fluid',
+        'Size': 'Brush size for painting fluid',
         'Curl': 'Vorticity strength - creates swirling motion',
         'Viscosity': 'Sharpness/detail enhancement',
         'Isolation': 'Motion isolation - how much color follows velocity',
-        'Multiply': 'Kaleidoscope multiplier (1-8x)',
+        'Brush': 'Brush arms (1-8x mirrored strokes) — click the value to open brush color controls',
         'Time': 'Simulation time scale',
         'Density': 'How fast color fades',
         'Velocity': 'How fast motion fades',
@@ -2834,7 +2837,7 @@
 
         var header = document.createElement('div');
         header.className = 'arm-colors-header';
-        header.textContent = 'Arm Colors';
+        header.textContent = 'Brush Colors';
         panel.appendChild(header);
 
         var rowsWrap = document.createElement('div');
@@ -2856,6 +2859,8 @@
                 return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0 };
             }));
         }
+        // Exposed for the picker→arm-0 sync in 05g (two-way brush color sync)
+        window.persistArmColors = persistArmColors;
 
         // Restore persisted arm colors once the sim script (which declares
         // `var multiArmColors`) has loaded — mutate the array in place so the
@@ -2873,17 +2878,30 @@
             if (panel.style.display !== 'none') rebuildRows();
         })();
 
+        // Two-way sync, panel → main picker: arm 0 IS the brush, so giving it
+        // a fixed color should be the same act as picking a color in the
+        // sidebar picker (dispatching 'input' also unchecks random/step and
+        // applies pointer.color via 05g's listener). The reverse direction
+        // (picker → arm 0) lives in 05g's colorPicker input handler.
+        function syncMainPickerFromArm0() {
+            var cfg = (window.multiArmColors || [])[0];
+            if (!cfg || cfg.mode !== 'fixed' || !cfg.color) return;
+            var cp = document.getElementById('colorPicker');
+            if (cp && cp.value !== cfg.color) {
+                cp.value = cfg.color;
+                cp.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+
         function rebuildRows() {
             rowsWrap.innerHTML = '';
             var slider = document.getElementById('multiplier');
             var count = slider ? parseInt(slider.value, 10) || 1 : 1;
-            if (count < 2) {
-                var hint = document.createElement('div');
-                hint.className = 'arm-colors-hint';
-                hint.textContent = 'Set multiplier to 2+ to configure arm colors';
-                rowsWrap.appendChild(hint);
-                return;
-            }
+            // Brush controls exist at EVERY arm count (2026-07-13) — at 1x the
+            // single row IS the brush's color mode (follow/fixed/rainbow/
+            // random/step). The old "set multiplier to 2+" hint gated the
+            // whole panel behind multi-arm mode.
+            count = Math.max(1, count);
             ensureArmConfig(count);
             var arr = window.multiArmColors;
 
@@ -2945,6 +2963,7 @@
                             picker.disabled = m.key !== 'fixed';
                             picker.style.opacity = m.key === 'fixed' ? '1' : '0.35';
                             persistArmColors();
+                            if (idx === 0) syncMainPickerFromArm0();
                         });
                         btns.push(btn);
                         modeWrap.appendChild(btn);
@@ -2965,6 +2984,7 @@
                             picker.style.opacity = '1';
                         }
                         persistArmColors();
+                        if (idx === 0) syncMainPickerFromArm0();
                     });
 
                     row.appendChild(picker);

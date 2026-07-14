@@ -269,10 +269,17 @@
                 const elapsed = Date.now() - replayStartTime;
                 while (replayIndex < events.length && events[replayIndex].t <= elapsed) {
                     const ev = events[replayIndex++];
-                    // Use current live settings (brush size, multiplier) so changes
-                    // during replay are reflected immediately. Position, velocity,
-                    // timing and color come from the recording.
-                    multiSplat(ev.x, ev.y, ev.dx, ev.dy, ev.color, false);
+                    // Faithful reproduction (2026-07-13): replay uses the brush
+                    // size and arm count RECORDED with each event. The old
+                    // "use current live settings" behavior meant a stroke
+                    // painted small replayed at whatever the slider says now —
+                    // and remote strokes replayed at the RECEIVER's brush size.
+                    if (typeof window.applyMultiSplatWith === 'function') {
+                        window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, ev.color,
+                            ev.mult || 1, (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS);
+                    } else {
+                        multiSplat(ev.x, ev.y, ev.dx, ev.dy, ev.color, false);
+                    }
                     if (typeof recRecordInteraction === 'function' && recEnabled) {
                         try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}
                     }

@@ -276,6 +276,13 @@ function onMultiplayerMessage(event) {
                 }
                 break;
 
+            case 'stroke-chunk':
+                // Large stroke split under the relay's 16KB message cap
+                if (data.clientId !== clientId) {
+                    handleStrokeChunk(data);
+                }
+                break;
+
             case 'cursor':
                 if (data.clientId !== clientId) {
                     handleRemoteCursor(data);
@@ -480,16 +487,65 @@ function handleRemoteSplat(data) {
     }
 }
 
-// Broadcast a full stroke (array of normalized events)
+// Broadcast a full stroke (array of normalized events).
+// The party server silently DROPS messages over MAX_MESSAGE_BYTES (16KB,
+// party/shared.ts) — which is why replay never reached peers: any decent
+// stroke's JSON blows the cap. Quantize the numbers (≈halves the bytes)
+// and chunk under the limit; the receiver reassembles by sid/seq (2026-07-13).
+const STROKE_CHUNK_EVENTS = 80; // ~90 quantized bytes/event → ~7KB/chunk, wide margin
 function broadcastReplayStroke(events) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
         return;
     }
-    partySocket.send(JSON.stringify({
-        type: 'stroke',
-        data: { events },
-        timestamp: Date.now()
+    const q = (events || []).map(ev => ({
+        t: Math.round(ev.t || 0),
+        x: +(+ev.x || 0).toFixed(4),
+        y: +(+ev.y || 0).toFixed(4),
+        dx: +(+ev.dx || 0).toFixed(4),
+        dy: +(+ev.dy || 0).toFixed(4),
+        color: (ev.color || [1, 1, 1]).map(c => +(+c).toFixed(3)),
+        mult: ev.mult || 1,
+        radius: +(+ev.radius || 0.01).toFixed(5)
     }));
+    if (q.length <= STROKE_CHUNK_EVENTS) {
+        partySocket.send(JSON.stringify({ type: 'stroke', data: { events: q }, timestamp: Date.now() }));
+        return;
+    }
+    const sid = Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+    const total = Math.ceil(q.length / STROKE_CHUNK_EVENTS);
+    for (let i = 0; i < total; i++) {
+        partySocket.send(JSON.stringify({
+            type: 'stroke-chunk',
+            data: { sid, seq: i, total, events: q.slice(i * STROKE_CHUNK_EVENTS, (i + 1) * STROKE_CHUNK_EVENTS) },
+            timestamp: Date.now()
+        }));
+    }
+}
+
+// Reassembly of chunked stroke replays (see broadcastReplayStroke)
+const strokeChunkBuffers = new Map(); // clientId|sid → { chunks, received, total, at }
+function handleStrokeChunk(data) {
+    const d = data.data || {};
+    if (typeof d.seq !== 'number' || typeof d.total !== 'number' || !Array.isArray(d.events)) return;
+    if (d.total < 1 || d.total > 64 || d.seq < 0 || d.seq >= d.total) return;
+    const key = data.clientId + '|' + d.sid;
+    let buf = strokeChunkBuffers.get(key);
+    if (!buf) {
+        buf = { chunks: new Array(d.total), received: 0, total: d.total, at: Date.now() };
+        strokeChunkBuffers.set(key, buf);
+    }
+    if (!buf.chunks[d.seq]) {
+        buf.chunks[d.seq] = d.events;
+        buf.received++;
+    }
+    if (buf.received === buf.total) {
+        strokeChunkBuffers.delete(key);
+        const all = [].concat.apply([], buf.chunks);
+        if (typeof window.scheduleStrokeReplay === 'function') window.scheduleStrokeReplay(all);
+    }
+    // GC stale partial buffers (peer left mid-stroke)
+    const now = Date.now();
+    strokeChunkBuffers.forEach((b, k) => { if (now - b.at > 15000) strokeChunkBuffers.delete(k); });
 }
 
 function handleRemoteCursor(data) {

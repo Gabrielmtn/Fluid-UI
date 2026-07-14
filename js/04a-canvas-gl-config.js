@@ -90,7 +90,14 @@
 
                 color: [...pointer.color],
 
-                velocity: { dx: pointer.dx, dy: pointer.dy }
+                velocity: { dx: pointer.dx, dy: pointer.dy },
+
+                // recorded so the hold-to-replay trail reproduces the stroke
+                // faithfully (same fix as processReplay, 2026-07-13)
+
+                radius: config.SPLAT_RADIUS,
+
+                mult: (typeof animationMultiplier === 'number') ? animationMultiplier : 1
 
             };
 
@@ -132,7 +139,19 @@
 
                 if (progress <= replayProgress) {
 
-                    splat(pos.x, pos.y, pos.velocity.dx, pos.velocity.dy, pos.color);
+                    // Faithful trail: recorded radius + arm count (2026-07-13)
+
+                    if (typeof window.applyMultiSplatWith === 'function') {
+
+                        window.applyMultiSplatWith(pos.x, pos.y, pos.velocity.dx, pos.velocity.dy,
+                            pos.color, pos.mult || 1,
+                            (typeof pos.radius === 'number') ? pos.radius : config.SPLAT_RADIUS);
+
+                    } else {
+
+                        splat(pos.x, pos.y, pos.velocity.dx, pos.velocity.dy, pos.color);
+
+                    }
 
                     
 

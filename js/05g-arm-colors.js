@@ -11,12 +11,12 @@
         var multiArmColors = [];
         window.multiArmColors = multiArmColors;
         function resolveArmColor(armIndex, fallbackColor) {
-            // Per-arm colors only apply with 2+ arms ("multi brush"). At multiplier 1
-            // the single splat must follow the pointer / solo #colorPicker, even if
-            // arm 0 was left on a non-'main' mode from a prior multi session — the
-            // arm-colors panel can't edit arm 0 below 2 arms, so it never resets it,
-            // which otherwise hijacks the solo picker. (Mirrors multiSplat's loop bound.)
-            if (animationMultiplier < 2) return fallbackColor;
+            // Arm 0's color mode applies at EVERY multiplier (2026-07-13): the
+            // brush-colors panel now renders arm 0 at 1x, and two-way sync with
+            // the main #colorPicker keeps the solo brush coherent (the old
+            // hijack this gate prevented — a stale non-'main' arm 0 from a
+            // multi session overriding the picker — can't happen when the
+            // panel and picker mirror each other).
             var cfg = multiArmColors[armIndex];
             if (!cfg || cfg.mode === 'main') return fallbackColor;
             if (cfg.mode === 'fixed') {
@@ -159,6 +159,17 @@
                 if (stepEl) stepEl.checked = false;
                 applyPickerColor();
                 updatePaletteStepIndicator();
+                // Two-way sync, picker → arm 0: if the brush's arm 0 holds a
+                // fixed color, an explicit pick IS that color changing (panel →
+                // picker direction lives in the brush-colors panel, 20-mixer).
+                var arm0 = (window.multiArmColors || [])[0];
+                if (arm0 && arm0.mode === 'fixed' && arm0.color !== colorPickerEl.value) {
+                    arm0.color = colorPickerEl.value;
+                    // refresh the panel's swatch if it's open
+                    var armPicker = document.querySelector('.arm-colors-panel .arm-row .arm-picker');
+                    if (armPicker) armPicker.value = colorPickerEl.value;
+                    if (typeof window.persistArmColors === 'function') window.persistArmColors();
+                }
             });
         }
         const randomColorCheckboxEl = document.getElementById('randomColor');
