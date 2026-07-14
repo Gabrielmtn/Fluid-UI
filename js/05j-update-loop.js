@@ -196,8 +196,13 @@
                 const obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
                 // 3. Divergence
                 const _openBoundary = window.__edgeAbsorb ? 1.0 : 0.0;
+                // fp16 headroom rescale for the whole pressure system (see
+                // divergenceFrag); gradient divides it back out below
+                const _pScale = (typeof config.PRESSURE_SCALE === 'number' && config.PRESSURE_SCALE > 0)
+                    ? config.PRESSURE_SCALE : 1 / 64;
                 divergenceProg.bind();
                 gl.uniform2f(divergenceProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform1f(divergenceProg.uniforms.pScale, _pScale);
                 gl.uniform1f(divergenceProg.uniforms.openBoundary, _openBoundary);
                 gl.uniform1i(divergenceProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(divergenceProg.uniforms.uVelocity, 0);
@@ -229,11 +234,21 @@
                     : config.PRESSURE_ITERATIONS;
                 const _mgOn = !!config.MULTIGRID && typeof mgSolvePressure === 'function' && _pIters >= 12;
                 if (_mgOn) {
-                    mgSolvePressure(_pIters >= 24 ? 2 : 1, obsActive, 2, 2, 8);
+                    // Slider-driven V-cycle shape (Effects → Multigrid panel);
+                    // the governor's budget still caps cycles to 1 under load
+                    const _mgCycles = _pIters >= 24 ? (config.MG_CYCLES || 2) : 1;
+                    mgSolvePressure(_mgCycles, obsActive,
+                        (typeof config.MG_PRE === 'number') ? config.MG_PRE : 2,
+                        (typeof config.MG_POST === 'number') ? config.MG_POST : 2,
+                        (typeof config.MG_COARSE === 'number') ? config.MG_COARSE : 8,
+                        (typeof config.MG_RELAX === 'number') ? config.MG_RELAX : 1.0);
                 } else {
                     pressureProg.bind();
                     gl.uniform2f(pressureProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform1f(pressureProg.uniforms.hSq, 1.0);
+                    // Plain Jacobi keeps ω = 1.0 — bit-identical to the
+                    // pre-relax shader (mix(pC, jacobi, 1.0) == jacobi)
+                    gl.uniform1f(pressureProg.uniforms.relax, 1.0);
                     gl.uniform1i(pressureProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                     gl.uniform1i(pressureProg.uniforms.uDivergence, 0);
                     gl.uniform1i(pressureProg.uniforms.uObstacle, 2);
@@ -254,6 +269,7 @@
                 // 6. Gradient subtract → divergence-free velocity
                 gradientProg.bind();
                 gl.uniform2f(gradientProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform1f(gradientProg.uniforms.pScale, _pScale);
                 gl.uniform1f(gradientProg.uniforms.openBoundary, _openBoundary);
                 gl.uniform1i(gradientProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(gradientProg.uniforms.uPressure, 0);

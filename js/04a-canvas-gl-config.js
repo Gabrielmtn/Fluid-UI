@@ -268,6 +268,23 @@
                                       // Jacobi iterations at ~1/3 the fill cost of the 32 default
                                       // (governor ladder: 2 cycles → 1 → Jacobi floor)
 
+            MG_CYCLES: 2,             // V-cycles per frame (governor caps to 1 under load)
+            MG_PRE: 2,                // Smoother sweeps before each restriction
+            MG_POST: 2,               // Smoother sweeps after each prolongation
+            MG_COARSE: 8,             // Jacobi sweeps standing in for the coarsest-level solve
+            MG_RELAX: 1.0,            // Smoother damping ω. 1.0 = the shipped undamped
+                                      // behavior; the slider exists for experiments
+                                      // (textbook MG uses ~0.8, but it measured neutral
+                                      // here — see pressureFrag).
+
+            PRESSURE_SCALE: 1 / 64,   // fp16 headroom rescale of the pressure system.
+                                      // Multigrid converges the TRUE pressure, which
+                                      // saturated fp16 (pegged 65504) under fast multi-arm
+                                      // strokes — clipped peaks → glitchy projection →
+                                      // speed-scaled jitter (2026-07-14). Stored p is
+                                      // p·this; gradient divides it back out. Console-
+                                      // tunable for A/B (1 = legacy unscaled).
+
             WALL_SLIP: 0.6,           // Collision feel: 0 = legacy sticky walls (damp pass
                                       // kills a wide apron), 1 = interior-only damp (the
                                       // projection's tangential slip fully shows). Console-

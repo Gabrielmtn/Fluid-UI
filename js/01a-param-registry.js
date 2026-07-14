@@ -29,6 +29,13 @@
         velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.5, max: 1.0009}, def: 0.999, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
         pressureDissipation: {configKey: "PRESSURE_DISSIPATION", ui: {min: 0.9, max: 1.0333, step: 0.001}, hard: {min: 0.75, max: 1.0333}, def: 0.95, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0333, step: 0.001, scope: "basic"}},
         pressureIteration: {configKey: "PRESSURE_ITERATIONS", ui: {min: 1, max: 50, step: 1}, hard: {min: 1, max: 50}, def: 32, decimals: 0, category: "simulation", perfTier: 3, simSlider: true, mut: {min: 1, max: 50, step: 1, scope: "basic"}},
+        // Multigrid V-cycle internals — deliberately no `mut`: the mutation
+        // engine randomizing solver shape reads as a bug, not a style variant
+        mgCycles: {configKey: "MG_CYCLES", ui: {min: 1, max: 4, step: 1}, hard: {min: 1, max: 4}, def: 2, decimals: 0, category: "simulation", perfTier: 3},
+        mgPre: {configKey: "MG_PRE", ui: {min: 0, max: 8, step: 1}, hard: {min: 0, max: 8}, def: 2, decimals: 0, category: "simulation", perfTier: 2},
+        mgPost: {configKey: "MG_POST", ui: {min: 0, max: 8, step: 1}, hard: {min: 0, max: 8}, def: 2, decimals: 0, category: "simulation", perfTier: 2},
+        mgCoarse: {configKey: "MG_COARSE", ui: {min: 2, max: 32, step: 1}, hard: {min: 2, max: 32}, def: 8, decimals: 0, category: "simulation", perfTier: 1},
+        mgRelax: {configKey: "MG_RELAX", ui: {min: 0.5, max: 1, step: 0.01}, hard: {min: 0.5, max: 1}, def: 1, decimals: 2, category: "simulation", perfTier: 0},
         swirl: {configKey: "SWIRL", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "effects", perfTier: 1, mut: {min: 0, max: 0.8, step: 0.01, scope: "extended"}},
         ridges: {configKey: "RIDGES", ui: {min: 0, max: 6, step: 0.1}, hard: {min: 0, max: 6}, def: 0, decimals: 1, category: "effects", perfTier: 1, mut: {min: 0, max: 4, step: 0.1, scope: "extended"}},
         velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 2.5, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},

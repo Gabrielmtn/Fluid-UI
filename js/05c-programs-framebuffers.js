@@ -268,7 +268,10 @@
         // One V-cycle ≈ the accuracy of hundreds of Jacobi iterations at the
         // fill cost of ~10 (residual reduction is what kills the large-scale
         // divergence Jacobi can't reach).
-        function mgSolvePressure(cycles, obsActive, nPre, nPost, nCoarse) {
+        function mgSolvePressure(cycles, obsActive, nPre, nPost, nCoarse, relax) {
+            // Smoother damping ω (see pressureFrag): 1.0 = shipped behavior;
+            // the Relaxation slider exposes it for experiments
+            const _relax = (typeof relax === 'number') ? relax : 1.0;
             // Rebuild the obstacle-fraction pyramid (fractions, not binary —
             // thin solids must survive coarsening). Cheap: 5-6 tiny draws.
             if (obsActive) {
@@ -290,6 +293,7 @@
                 gl.viewport(0, 0, lv.w, lv.h);
                 gl.uniform2f(pressureProg.uniforms.texelSize, 1.0 / lv.w, 1.0 / lv.h);
                 gl.uniform1f(pressureProg.uniforms.hSq, lv.hSq);
+                gl.uniform1f(pressureProg.uniforms.relax, _relax);
                 gl.uniform1i(pressureProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(pressureProg.uniforms.uDivergence, 0);
                 gl.uniform1i(pressureProg.uniforms.uPressure, 1);

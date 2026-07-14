@@ -250,6 +250,28 @@
             <input type="checkbox" id="multigridToggle" checked>
             <label for="multigridToggle" style="margin: 0" title="Multigrid pressure solve — much better incompressibility (crisper vortices, less mushy expansion) at lower GPU cost than high iteration counts">Multigrid Pressure</label>
         </div>
+        <div id="multigridPanel">
+            <div class="control-group">
+                <label for="mgCycles" title="Full V-cycles per frame — each adds accuracy at ~10-15 Jacobi iterations of GPU cost">V-Cycles <span id="mgCyclesValue" class="value-display">2</span></label>
+                <input type="range" id="mgCycles" min="1" max="4" value="2" step="1">
+            </div>
+            <div class="control-group">
+                <label for="mgPre" title="Smoother sweeps before pushing the residual down to the next-coarser level">Pre-Smooth <span id="mgPreValue" class="value-display">2</span></label>
+                <input type="range" id="mgPre" min="0" max="8" value="2" step="1">
+            </div>
+            <div class="control-group">
+                <label for="mgPost" title="Smoother sweeps after the coarse correction is interpolated back up">Post-Smooth <span id="mgPostValue" class="value-display">2</span></label>
+                <input type="range" id="mgPost" min="0" max="8" value="2" step="1">
+            </div>
+            <div class="control-group">
+                <label for="mgCoarse" title="Jacobi sweeps standing in for an exact solve on the coarsest (tiny) level">Coarse Solve <span id="mgCoarseValue" class="value-display">8</span></label>
+                <input type="range" id="mgCoarse" min="2" max="32" value="8" step="1">
+            </div>
+            <div class="control-group">
+                <label for="mgRelax" title="Smoother damping ω — 1.0 is the classic behavior; lower values are the textbook damped-Jacobi smoother, exposed for experiments">Relaxation <span id="mgRelaxValue" class="value-display">1.00</span></label>
+                <input type="range" id="mgRelax" min="0.5" max="1" value="1" step="0.01">
+            </div>
+        </div>
         <div class="control-group">
             <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">2.500</span></label>
             <input type="range" id="velocityInfluence" min="1" max="5" value="2.5" step="0.001">

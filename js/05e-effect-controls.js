@@ -44,14 +44,35 @@
                 config.MACCORMACK = e.target.checked;
             });
         }
-        // Multigrid Pressure toggle — same pattern as Crisp Advection above
+        // Multigrid Pressure toggle — same pattern as Crisp Advection above.
+        // The tuning panel follows the checkbox (hidden when the V-cycle is
+        // off — its sliders would be dead controls on the Jacobi path).
         const multigridToggle = document.getElementById('multigridToggle');
+        const multigridPanel = document.getElementById('multigridPanel');
         if (multigridToggle) {
             multigridToggle.checked = !!config.MULTIGRID;
+            if (multigridPanel) multigridPanel.style.display = config.MULTIGRID ? '' : 'none';
             multigridToggle.addEventListener('change', (e) => {
                 config.MULTIGRID = e.target.checked;
+                if (multigridPanel) multigridPanel.style.display = e.target.checked ? '' : 'none';
             });
         }
+        // Multigrid tuning sliders (V-cycle shape + smoother damping)
+        [
+            { id: 'mgCycles', key: 'MG_CYCLES', decimals: 0 },
+            { id: 'mgPre', key: 'MG_PRE', decimals: 0 },
+            { id: 'mgPost', key: 'MG_POST', decimals: 0 },
+            { id: 'mgCoarse', key: 'MG_COARSE', decimals: 0 },
+            { id: 'mgRelax', key: 'MG_RELAX', decimals: 2 }
+        ].forEach(({ id, key, decimals }) => {
+            const sl = document.getElementById(id);
+            if (!sl) return;
+            sl.addEventListener('input', (e) => {
+                config[key] = parseFloat(e.target.value);
+                const sp = document.getElementById(id + 'Value');
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(decimals);
+            });
+        });
         // Sunrays toggle
         const sunraysToggle = document.getElementById('sunraysToggle');
         const sunraysPanel = document.getElementById('sunraysPanel');

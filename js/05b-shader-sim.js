@@ -479,6 +479,19 @@
             uniform sampler2D uVelocity;
             uniform sampler2D uObstacle;
             uniform float openBoundary; // 1 = overflow mode: edges stop being walls
+            uniform float pScale; // fp16 headroom rescale of the WHOLE pressure
+                                  // system (default 1/64). The multigrid solve
+                                  // actually converges the true pressure, whose
+                                  // peaks under fast multi-arm strokes SATURATE
+                                  // fp16 (measured pegged at 65504, 2026-07-14):
+                                  // the clipped plateau's gradients go wrong and
+                                  // the projection glitches erratically right
+                                  // under fast strokes — the speed-scaled jitter.
+                                  // Scaling the RHS here scales the linear system
+                                  // end-to-end (solve, MG pyramid, warm start are
+                                  // all linear); gradientFrag divides it back out.
+                                  // fp16 RELATIVE precision is scale-invariant,
+                                  // so mild regimes are visually identical.
             uniform int hasObstacle;
             ${obstacleSolidityGLSL}
             vec2 sampleVelocity(vec2 uv) {
@@ -497,7 +510,7 @@
             void main() {
                 float div = 0.5 * (sampleVelocity(vR).x - sampleVelocity(vL).x +
                                    sampleVelocity(vT).y - sampleVelocity(vB).y);
-                fragColor = vec4(div, 0.0, 0.0, 1.0);
+                fragColor = vec4(div * pScale, 0.0, 0.0, 1.0);
             }
         `;
         const curlFrag = `#version 300 es
@@ -560,10 +573,23 @@
             uniform sampler2D uObstacle;
             uniform int hasObstacle;
             uniform float hSq;
+            uniform float relax; // Jacobi damping ω (1.0 = plain Jacobi, the
+                                 // shipped default on BOTH solver paths).
+                                 // Exposed as the Relaxation slider for
+                                 // experiments: textbook multigrid prefers
+                                 // ω≈0.8 (damps the checkerboard error mode
+                                 // undamped Jacobi leaves oscillating, factor
+                                 // 1-2ω per sweep). Measured on this system
+                                 // (2026-07-14) it made no reliable difference
+                                 // to pressure/dye temporal jitter — the fast-
+                                 // stroke jitter was fp16 pressure saturation
+                                 // (see divergenceFrag pScale) — so the default
+                                 // stays at the historical behavior.
             ${obstacleSolidityGLSL}
             void main() {
                 vec2 L = clamp(vL, 0.0, 1.0), R = clamp(vR, 0.0, 1.0);
                 vec2 T = clamp(vT, 0.0, 1.0), B = clamp(vB, 0.0, 1.0);
+                float pC = texture(uPressure, vUv).x;
                 float pL = texture(uPressure, L).x;
                 float pR = texture(uPressure, R).x;
                 float pB = texture(uPressure, B).x;
@@ -572,15 +598,16 @@
                     // Neumann at solids (∂p/∂n = 0): a solid neighbor reflects
                     // the cell's own pressure back — same treatment the clamped
                     // fetches already give the domain edges.
-                    float pC = texture(uPressure, vUv).x;
                     pL = mix(pL, pC, solidity(L));
                     pR = mix(pR, pC, solidity(R));
                     pB = mix(pB, pC, solidity(B));
                     pT = mix(pT, pC, solidity(T));
                 }
-                float pressure = (pL + pR + pB + pT -
-                                 texture(uDivergence, vUv).x * hSq) * 0.25;
-                fragColor = vec4(pressure, 0.0, 0.0, 1.0);
+                float jacobi = (pL + pR + pB + pT -
+                               texture(uDivergence, vUv).x * hSq) * 0.25;
+                // mix(pC, jacobi, 1.0) returns jacobi exactly, so the legacy
+                // path (relax 1.0) is bit-identical to the old shader.
+                fragColor = vec4(mix(pC, jacobi, relax), 0.0, 0.0, 1.0);
             }
         `;
         // ─── Multigrid V-cycle passes (pressure solve) ──────────────────
@@ -659,6 +686,9 @@
             uniform sampler2D uObstacle;
             uniform vec2 texelSize;
             uniform float openBoundary; // 1 = overflow mode: edges stop being walls
+            uniform float pScale; // undo the divergence pass's fp16 headroom
+                                  // rescale (see divergenceFrag) — the stored
+                                  // pressure is p·pScale, so gradients divide it out
             uniform int hasObstacle;
             ${obstacleSolidityGLSL}
             void main() {
@@ -681,7 +711,7 @@
                     pB = mix(pB, pC, sB);
                     pT = mix(pT, pC, sT);
                 }
-                vec2 vel = texture(uVelocity, vUv).xy - vec2(pR - pL, pT - pB);
+                vec2 vel = texture(uVelocity, vUv).xy - vec2(pR - pL, pT - pB) / pScale;
                 // No-penetration boundary: zero velocity normal to wall at edges.
                 // Skipped in overflow mode — outbound velocity keeps flowing out.
                 if (openBoundary < 0.5) {
