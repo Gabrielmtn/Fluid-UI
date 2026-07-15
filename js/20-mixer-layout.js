@@ -1285,6 +1285,10 @@
         moveControlGroup('pressureIteration', body);
         moveCheckboxGroup('macCormackToggle', body);
         moveCheckboxGroup('multigridToggle', body);
+        // Multigrid tuning panel — same toggle+panel pattern as
+        // microDetailPanel/sunraysPanel in the Effects section
+        const multigridPanel = document.getElementById('multigridPanel');
+        if (multigridPanel) body.appendChild(multigridPanel);
 
         return sec;
     }
