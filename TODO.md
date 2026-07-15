@@ -13,7 +13,11 @@
 
 ---
 
-## Phase 1 closeout (small, mostly Gabriel-side)
+## To revisit (parked 2026-07-14 — Gabriel: jump straight to the Drawing Foundation)
+
+**Why parked:** the jagged feel of shapes/masks/colliders is an architecture problem, not a polish problem — "drawing should feel good so we can sketch little colliders as easily as we import them." Everything below stays valid; it resumes after (or gets absorbed into) Phase 1.75.
+
+### Phase 1 closeout leftovers (small, mostly Gabriel-side)
 
 - [x] **Preset active states** — FIXED 2026-07-13: `updatePresetButtons` queried the legacy `.presets` container the mixer refactor had emptied, AND a three-way specificity war (JS inline cssText vs `all:unset !important` stylesheet rule vs `.active` class) made active styling unrenderable on every presets-channel button. All styling now class-based (`.mixer-preset-btn`); built-in ↔ user preset actives supersede each other through the real state owner (clearActivePreset), synced across both user-preset surfaces (strip + sidebar); slider divergence clears. Verified in harness.
 - [x] **Preset retune** — DONE 2026-07-13 (engineering half): `PRESSURE_DISSIPATION` compressed into 0.925–0.97 preserving each preset's relative order (old values in comments in 04b for revert); default + registry def 0.944 → 0.95. AWAITING Gabriel's taste pass across all 8.
@@ -23,7 +27,7 @@
 - [x] **fp16 pressure headroom** — CONFIRMED + FIXED 2026-07-14: Gabriel reported speed-scaled jitter with Multigrid on (gone with it off). Harness measured the MG-converged pressure PEGGED at fp16 max 65504 under fast multi-arm strokes (Jacobi's under-converged field peaks ~1.8k — why MG-off "cured" it); clipped peaks → glitchy projection under fast strokes. Fix: whole pressure system rescaled by `config.PRESSURE_SCALE` (1/64; console A/B: set 1 for legacy) — divergence scales at the source, gradient divides back out, everything between is linear. Mild-regime look preserved (measured). Also shipped: Multigrid tuning sliders (V-Cycles / Pre / Post / Coarse / Relaxation ω) in a panel under the toggle; ω default 1.0 = historical behavior (damped-Jacobi theory tested and refuted — neutral here). NOTE for Gabriel's verify: if fast-stroke jitter persists, next suspect is the governor ladder's MG cliffs (fast-relief flips 2-cycles→1→Jacobi mid-stroke) — JankMonitor `governorState` during a fast stroke will show it.
 - [ ] Watch items (act only if seen): MacCormack checkerboard dithering (→ soft-revert); 144Hz cadence confirm (`JankMonitor.summary().cadence`).
 
-## Phase 1.5 — Painterly upgrades (UNSHELVED 2026-07-13: execute + test)
+### Phase 1.5 — Painterly upgrades (parked 2026-07-14; wetness attempt reverted 2026-07-14 — land atomically next time; D1 wires these as brush properties)
 
 **Shipped first (822e328): brush-system fixes** — strip renames (Size / Brush), Brush Colors panel at 1x, two-way arm-0 ↔ picker color sync, faithful replay (recorded radius+mult per event, both replay paths), multiplayer replay unblocked (16KB relay cap → quantize + chunk + reassemble). Web deploy still pending for the multiplayer fix to reach web peers (`npm run deploy`).
 
@@ -31,7 +35,7 @@
 
 Research-sourced (sources in git history of this file). Adoption order per the survey; each ships behind a control, each gets a verify pass. These double as brush-engine groundwork for the Drawing Foundation below.
 
-- [ ] **Wetness/drying map** (NEXT after the regression fix) — one fp16 channel: decays over time, refreshed by splats; scales dye advection/dissipation/swirl. Dry paint holds; wet paint flows and re-wets neighbors. Unlocks rewetting-brush + blow-dry tools. THE paint-vs-smoke feature.
+- [ ] **Wetness/drying map** — one fp16 channel: decays over time, refreshed by splats; scales dye advection/dissipation/swirl. Dry paint holds; wet paint flows and re-wets neighbors. Unlocks rewetting-brush + blow-dry tools. THE paint-vs-smoke feature.
   - Implementation notes from design pass: wetness lives at SIM res (cheap; R16F double-FBO, preserved across reinits like density); advect+dry in one pass (reuse the shared RK2 snippet with swirl=0; drying = batched half-life decay, fp16-safe like decayDt); splat deposits via a small dedicated add-shader called from splat() when enabled. CRITICAL: the dye-mobility scaling (disp *= mobility(wetness)) must live INSIDE the shared rk2Backtrace snippet with uWetness/wetInfluence uniforms on all three dye passes — MacCormack forward/correct/main must compute identical displacements or the correction dis-coheres. At-rest bit-stability preserved (mobility 0 → disp exactly 0). Params: WET_INFLUENCE slider (0 = feature fully off, passes skipped) + WET_DRYING half-life slider; Effects section next to Swirl.
 - [ ] **Edge darkening + granulation** — darken dye ∝ |∇density| (watercolor pooling); static paper-noise modulation (pigment settling). Post-FX siblings of the heightfield shading; hours each.
 - [ ] **Pigment-space color mixing** — Kubelka-Munk mixing at splat time via spectral.js port (MIT; NOT Mixbox — CC BY-NC). Blue+yellow=green. Write-time only, no latent storage.
@@ -41,9 +45,11 @@ Research-sourced (sources in git history of this file). Adoption order per the s
 - [ ] **Gravity from device orientation** (mobile) — small gravity term from accelerometer.
 - [ ] Experiments while here: dye:sim ratio (we run 4:1; Dobryakov ships 8:1 — test higher ratio + lower sim res with MacCormack compensating); fp16 linear-filtering fallback check for old Android.
 
-## Phase 1.75 — Drawing Foundation: painting / masking / collision architecture overhaul
+## ▶ ACTIVE — Phase 1.75 — Drawing Foundation: painting / masking / collision architecture overhaul
 
 **Vision:** a Krita-grade drawing and sketching core with the fluid sim as its star layer type — not a fluid toy with drawing bolted on. Unify today's parallel systems (splat pipeline; PNG/capture/path/collision layer flavors; three masking stacks — 15-layer-masking, 05m-layer-masks, SAM/depth-collision) into one architecture.
+
+**The vibe (Gabriel, 2026-07-14):** shapes/masks/colliders currently feel jagged — it's a smoothness/sharpness problem that runs through drawing, masking, AND collision together. Drawing should feel good enough that sketching a little collider is as natural as importing one. Every D-stage should be judged against that: stroke quality, mask edge quality, and collider edge quality are ONE pipeline, not three.
 
 ### D0 — Architecture design (do first; everything hangs off this)
 - [ ] Current-state inventory: every layer flavor, mask system, stroke path, undo path, and their couplings (multiplayer stroke events, save/load format, video export compositing).
