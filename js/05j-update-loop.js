@@ -236,13 +236,21 @@
                     : config.PRESSURE_ITERATIONS;
                 const _mgOn = !!config.MULTIGRID && typeof mgSolvePressure === 'function' && _pIters >= 12;
                 if (_mgOn) {
-                    // Slider-driven V-cycle shape (Effects → Multigrid panel);
-                    // the governor's budget still caps cycles to 1 under load
-                    const _mgCycles = _pIters >= 24 ? (config.MG_CYCLES || 2) : 1;
+                    // Slider-driven V-cycle shape (Effects → Multigrid panel).
+                    // NEVER a single cycle: 1-cycle MG is UNSTABLE around
+                    // colliders (measured 2026-07-14: velocity 507→10,280 in
+                    // 30 frames on a many-walled scene — each cycle's
+                    // overcorrection feeds back through the Neumann walls;
+                    // the second cycle is what cleans it up). This was the
+                    // "fuzzing out" class: the governor's old low rung capped
+                    // to 1 cycle exactly under load. The low rung is now 2
+                    // LIGHT cycles (1/1/4 ≈ the GPU cost of the old 1×(2,2,8)).
+                    const _mgBudgetLow = _pIters < 24;
+                    const _mgCycles = _mgBudgetLow ? 2 : Math.max(2, config.MG_CYCLES || 2);
                     mgSolvePressure(_mgCycles, obsActive,
-                        (typeof config.MG_PRE === 'number') ? config.MG_PRE : 2,
-                        (typeof config.MG_POST === 'number') ? config.MG_POST : 2,
-                        (typeof config.MG_COARSE === 'number') ? config.MG_COARSE : 8,
+                        _mgBudgetLow ? 1 : ((typeof config.MG_PRE === 'number') ? config.MG_PRE : 2),
+                        _mgBudgetLow ? 1 : ((typeof config.MG_POST === 'number') ? config.MG_POST : 2),
+                        _mgBudgetLow ? 4 : ((typeof config.MG_COARSE === 'number') ? config.MG_COARSE : 8),
                         (typeof config.MG_RELAX === 'number') ? config.MG_RELAX : 1.0);
                 } else {
                     pressureProg.bind();

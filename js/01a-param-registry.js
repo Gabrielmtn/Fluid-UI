@@ -31,7 +31,7 @@
         pressureIteration: {configKey: "PRESSURE_ITERATIONS", ui: {min: 1, max: 50, step: 1}, hard: {min: 1, max: 50}, def: 32, decimals: 0, category: "simulation", perfTier: 3, simSlider: true, mut: {min: 1, max: 50, step: 1, scope: "basic"}},
         // Multigrid V-cycle internals — deliberately no `mut`: the mutation
         // engine randomizing solver shape reads as a bug, not a style variant
-        mgCycles: {configKey: "MG_CYCLES", ui: {min: 1, max: 4, step: 1}, hard: {min: 1, max: 4}, def: 2, decimals: 0, category: "simulation", perfTier: 3},
+        mgCycles: {configKey: "MG_CYCLES", ui: {min: 2, max: 4, step: 1}, hard: {min: 2, max: 4}, def: 2, decimals: 0, category: "simulation", perfTier: 3},
         mgPre: {configKey: "MG_PRE", ui: {min: 0, max: 8, step: 1}, hard: {min: 0, max: 8}, def: 2, decimals: 0, category: "simulation", perfTier: 2},
         mgPost: {configKey: "MG_POST", ui: {min: 0, max: 8, step: 1}, hard: {min: 0, max: 8}, def: 2, decimals: 0, category: "simulation", perfTier: 2},
         mgCoarse: {configKey: "MG_COARSE", ui: {min: 2, max: 32, step: 1}, hard: {min: 2, max: 32}, def: 8, decimals: 0, category: "simulation", perfTier: 1},
