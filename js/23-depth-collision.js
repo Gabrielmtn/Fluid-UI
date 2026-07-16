@@ -896,10 +896,38 @@ class DepthEstimator {
         var built = buildSketchDepth(true); // empty sketch → zeroed collider
         if (!built) return;
         updateLayerDepthMask(_sketchColliderIndex, built.depth);
-        // Keep the visible mask preview in sync with what now collides
-        layer.data = built.previewUrl;
+        // Keep every visible surface in sync with what now collides, using
+        // the SAME opaque-grayscale convention addCollisionLayer uses for
+        // layer.data (the transparent alpha=coverage preview went blank on
+        // dark thumbnails — the painted shape never showed in the Layers
+        // panel, and full renderLayers() re-renders showed nothing at all).
+        var opaqueUrl = _depthToOpaqueUrl(built.depth);
+        layer.data = opaqueUrl;              // panel thumbnail source
+        layer.originalData = built.previewUrl; // alpha-coverage mask (data)
         var layerDiv = document.getElementById('layer' + _sketchColliderIndex);
-        if (layerDiv) layerDiv.style.backgroundImage = 'url(' + built.previewUrl + ')';
+        if (layerDiv) layerDiv.style.backgroundImage = 'url(' + opaqueUrl + ')';
+        // Update the Layers-panel thumbnail IN PLACE (no full re-render per
+        // stroke — renderLayers rebuilds the whole panel and would fight
+        // scroll position / drag state at painting cadence).
+        var thumb = document.querySelector('.layer-item[data-layer-index="' + _sketchColliderIndex + '"] .layer-thumbnail');
+        if (thumb) thumb.style.backgroundImage = 'url(' + opaqueUrl + ')';
+        else if (typeof window.renderLayers === 'function') window.renderLayers();
+    }
+
+    // Opaque grayscale data-URL from a depth map — matches the conversion
+    // addCollisionLayer performs internally for layer.data.
+    function _depthToOpaqueUrl(depth) {
+        var pc = document.createElement('canvas');
+        pc.width = depth.width; pc.height = depth.height;
+        var ctx = pc.getContext('2d');
+        var img = ctx.createImageData(depth.width, depth.height);
+        for (var i = 0, m = depth.width * depth.height; i < m; i++) {
+            var v = depth.data[i], o = i << 2;
+            img.data[o] = v; img.data[o + 1] = v; img.data[o + 2] = v;
+            img.data[o + 3] = 255;
+        }
+        ctx.putImageData(img, 0, 0);
+        return pc.toDataURL('image/png');
     }
 
     function scheduleSketchRefresh() {
@@ -1125,15 +1153,33 @@ class DepthEstimator {
         }
     }
 
-    // Listen for layer deletion to clean up webcam streams
-    var origDeleteLayer = window.deleteLayer;
-    if (typeof origDeleteLayer === 'function') {
+    // Listen for layer deletion to clean up webcam streams + live binding.
+    // MUST poll: this file is a <script type="module"> (deferred) while
+    // window.deleteLayer comes from 05l in the dynamic async chain — the
+    // eval order is a RACE, and when the module won, the old eval-time
+    // `if (typeof deleteLayer === 'function')` wrap silently never
+    // installed. Symptom: deleting a collision layer left its wall in the
+    // sim (no updateObstacleFromLayers), webcams kept streaming, and the
+    // ⟳ Live binding stayed lit against a dead layer.
+    (function installDeleteHook() {
+        var origDeleteLayer = window.deleteLayer;
+        if (typeof origDeleteLayer !== 'function') {
+            setTimeout(installDeleteHook, 250);
+            return;
+        }
         window.deleteLayer = function (index) {
             removeWebcam(index);
+            // Deleting the live-bound sketch collider unbinds IMMEDIATELY
+            // (the ⟳ Live button follows via __onSketchLiveChanged) — the
+            // next-mutation auto-disable stays as the fallback.
+            if (_sketchColliderIndex != null && index === _sketchColliderIndex) {
+                setSketchLive(false);
+                _sketchColliderIndex = null;
+            }
             origDeleteLayer(index);
             updateObstacleFromLayers();
         };
-    }
+    })();
 
     console.log('🧱 Depth Collision system loaded');
 })();
