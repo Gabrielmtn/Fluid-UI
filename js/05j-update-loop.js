@@ -151,7 +151,11 @@
                         splatStrokeDist += Math.hypot(d.dx, d.dy) / 10 / Math.max(1, canvas.width);
                         const inMult = getSplatInMult();
                         const sizeMul = window.BrushEngine.sizeScale(d.p);
-                        const flowMul = window.BrushEngine.flowScale(d.p);
+                        // Flow = pressure response × the Flow slider (D1):
+                        // scales deposited dye, baked into the recorded color
+                        // so stroke replay stays faithful.
+                        const flowMul = window.BrushEngine.flowScale(d.p)
+                            * ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1);
                         const col = flowMul === 1 ? pointer.color
                             : [pointer.color[0] * flowMul, pointer.color[1] * flowMul, pointer.color[2] * flowMul];
                         multiSplatWithRadius(d.x, d.y, d.dx, d.dy, col, config.SPLAT_RADIUS * inMult * sizeMul);
@@ -186,7 +190,11 @@
                             pendingArmAdvance = false;
                         }
                     } else {
-                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * 0.9, splatOutDy * 0.9, splatOutColor, config.SPLAT_RADIUS * splatReleaseInMult * outMult);
+                        // Tail dye honors the Flow slider like the stroke it ends
+                        const tailFlow = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
+                        const tailCol = tailFlow === 1 ? splatOutColor
+                            : [splatOutColor[0] * tailFlow, splatOutColor[1] * tailFlow, splatOutColor[2] * tailFlow];
+                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * 0.9, splatOutDy * 0.9, tailCol, config.SPLAT_RADIUS * splatReleaseInMult * outMult);
                         // Advance the tail along the decaying velocity + accumulate
                         // its travel for the distance-based taper.
                         splatOutX += splatOutDx / 10;

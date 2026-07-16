@@ -331,6 +331,19 @@
             BRUSH_HARDNESS: 0.8,      // Sketch stamp edge: 0 = soft gaussian, 1 = hard AA disc
             SKETCH_VISIBLE: true,     // Sketch layer visibility (display composite)
 
+            BRUSH_FLOW: 1,            // D1 dye intensity per dab (fluid: scales splat color;
+                                      // sketch: scales stamp alpha). 1 = legacy full flow.
+            BRUSH_JITTER: 0,          // D1 per-dab scatter, fraction of brush diameter
+                                      // (0 = clean line; spray/charcoal territory above ~0.3)
+            BRUSH_PRESSURE_CURVE: 0.7,// D1 pressure response gamma for size/flow: <1 lifts
+                                      // the light-touch range (0.7 = legacy feel), 1 = linear,
+                                      // >1 demands a heavy hand
+            BRUSH_TIP: 0,             // D1 brush tip on USER strokes (fluid dye only; velocity
+                                      // stays gaussian, programmatic splats unaffected):
+                                      // 0 = gaussian, 1 = blob, 2 = chisel, 3 = streak, 4 = ring
+            BRUSH_TIP_TEXTURE: 0.7,   // Stamp grain/blend for blob/chisel/streak tips
+                                      // (splatFrag stampNoise; ring ignores it)
+
             SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
                                       // Painterly sub-grid wisps on moving paint; dies with
                                       // motion so settled artwork stays bit-stable

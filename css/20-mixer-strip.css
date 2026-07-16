@@ -531,6 +531,166 @@ body > .controls {
 }
 
 
+/* ── Brush settings panel (D1): dropdown off the Brush channel label ── */
+#mixer-strip .ch-label.brush-trigger {
+    cursor: pointer;
+    user-select: none;
+}
+#mixer-strip .ch-label.brush-trigger:hover,
+#mixer-strip .ch-label.brush-trigger.active {
+    color: rgba(255, 220, 80, 1);
+}
+.brush-trigger-chev {
+    font-size: 8px;
+    margin-left: 3px;
+    opacity: 0.6;
+}
+.brush-settings-panel {
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.brush-settings-panel .brush-section-label {
+    margin-top: 10px;
+}
+.brush-settings-panel .control-group {
+    margin-bottom: 8px;
+}
+.brush-settings-panel .control-group label {
+    display: block;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 2px;
+}
+.brush-settings-panel .control-group label .value-display {
+    float: right;
+    font-family: 'Courier New', monospace;
+    color: rgba(255, 220, 80, 0.9);
+}
+.brush-settings-panel .control-group input[type="range"] {
+    width: 100%;
+    margin: 0;
+}
+.brush-settings-panel .control-group.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+.brush-settings-panel .control-group.checkbox-group label {
+    display: inline;
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+/* Tip picker */
+.brush-tip-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+.brush-tip-btn {
+    all: unset;
+    box-sizing: border-box;
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 26px;
+    font-size: 12px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+}
+.brush-tip-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.brush-tip-btn.active {
+    background: rgba(255, 220, 80, 0.2);
+    border-color: rgba(255, 220, 80, 0.45);
+    color: rgba(255, 220, 80, 1);
+}
+
+/* Brush preset chips */
+.brush-presets-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.brush-preset-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 7px;
+    font-size: 10px;
+    font-weight: 500;
+    border-radius: 3px;
+    background: rgba(255, 220, 80, 0.1);
+    border: 1px solid rgba(255, 220, 80, 0.2);
+    color: rgba(255, 220, 80, 0.85);
+    cursor: pointer;
+    max-width: 110px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.brush-preset-btn:hover {
+    background: rgba(255, 220, 80, 0.18);
+}
+.brush-preset-btn.active {
+    background: rgba(255, 220, 80, 0.3);
+    border-color: rgba(255, 220, 80, 0.55);
+    color: #fff;
+    font-weight: 600;
+}
+.brush-preset-btn.eraser {
+    background: rgba(255, 120, 120, 0.1);
+    border-color: rgba(255, 120, 120, 0.25);
+    color: rgba(255, 150, 150, 0.9);
+}
+.brush-preset-del {
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0;
+    color: rgba(255, 255, 255, 0.6);
+}
+.brush-preset-btn:hover .brush-preset-del {
+    opacity: 0.8;
+}
+.brush-preset-del:hover {
+    color: #ff6b6b;
+    opacity: 1;
+}
+.brush-presets-save-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+/* The strip scopes .mixer-preset-save; the panel lives on <body>, so it
+   needs its own copy of the save-button look. */
+.brush-settings-panel .mixer-preset-save {
+    all: unset;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 3px;
+    background: rgba(63,185,80,0.15);
+    color: rgba(63,185,80,0.9);
+    border: 1px solid rgba(63,185,80,0.25);
+    cursor: pointer;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.brush-settings-panel .mixer-preset-save:hover {
+    opacity: 0.8;
+}
+
 /* ── Compositor isolation (UI audit Stage 1, 2026-07-09) ──────────────
    Same treatment as #sidebar-right (see 21-sidebar.css): promote the
    strip to its own compositor layer so channel hover repaints stop

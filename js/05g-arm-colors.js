@@ -82,6 +82,14 @@
         // every arm. Pointer strokes, stroke replay, and remote-peer strokes
         // leave it false — they ARE user strokes, so arm color modes apply.
         function multiSplat(x, y, dx, dy, color, shouldBroadcast, exactColor) {
+            // Brush tip (D1) rides the exactColor split: user strokes (live
+            // pointer, replay, remote peers — exactColor falsy) stamp with the
+            // configured BRUSH_TIP; programmatic sources (path layers, audio
+            // scenes, animations) stay classic gaussian. splat() reads the
+            // flag; cleared in finally so direct splat() callers never
+            // inherit it.
+            window.__brushTipOn = !exactColor;
+            try {
             // Kaleidoscope behavior
             const centerX = canvas.width * 0.5;
             const centerY = canvas.height * 0.5;
@@ -109,6 +117,7 @@
                     config.SPLAT_RADIUS
                 );
             }
+            } finally { window.__brushTipOn = false; }
         }
         // Helper to apply a multiSplat with specific multiplier and radius, restoring after
         window.applyMultiSplatWith = function(x, y, dx, dy, color, mult, radius, exactColor) {

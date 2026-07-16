@@ -272,6 +272,11 @@
         // Query from the (detached) channel: faderChannel already re-parented
         // the value element, so document.getElementById would miss it here.
         buildArmColorsDropdown(brushChannel.querySelector('#multiplierValue'));
+        // The LABEL is the brush-settings trigger (D1): the everyday brush
+        // controls (presets / target / tip / feel) live in a strip dropdown —
+        // too common to bury in the sidebar. The sidebar Brush section keeps
+        // the rarer replay + splat-ramp controls.
+        buildBrushPanel(brushChannel.querySelector('.ch-label'));
         strip.appendChild(brushChannel);
         strip.appendChild(faderChannel('Time', 'pink', 'timeScale', 'timeScaleValue'));
         strip.appendChild(faderChannel('Density', 'cyan', 'densityDissipation', 'densityValue'));
@@ -301,7 +306,7 @@
         'Curl': 'Vorticity strength - creates swirling motion',
         'Viscosity': 'Sharpness/detail enhancement',
         'Isolation': 'Motion isolation - how much color follows velocity',
-        'Brush': 'Brush arms (1-8x mirrored strokes) — click the value to open brush color controls',
+        'Brush': 'Brush arms (1-8x mirrored strokes) — click BRUSH for brush settings & presets, click the value for arm colors',
         'Time': 'Simulation time scale',
         'Density': 'How fast color fades',
         'Velocity': 'How fast motion fades',
@@ -1380,59 +1385,10 @@
     }
 
     function buildBrushSection() {
-        const { sec, body } = makeSection('🖌️ Brush', 'orange', true);
-
-        // --- D2 Paint Target: fluid splats vs the persistent sketch layer ---
-        var targetLabel = document.createElement('label');
-        targetLabel.className = 'brush-section-label';
-        targetLabel.textContent = 'Paint Into';
-        body.appendChild(targetLabel);
-        var targetRow = document.createElement('div');
-        targetRow.className = 'brush-mode-row';
-        var fluidBtn = document.createElement('button');
-        fluidBtn.type = 'button'; fluidBtn.className = 'brush-mode-btn active'; fluidBtn.textContent = 'Fluid';
-        fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
-        var sketchBtn = document.createElement('button');
-        sketchBtn.type = 'button'; sketchBtn.className = 'brush-mode-btn'; sketchBtn.textContent = 'Sketch';
-        sketchBtn.title = 'Strokes paint the persistent sketch layer — normal-control drawing that never decays or flows (backgrounds, guides, colliders)';
-        targetRow.appendChild(fluidBtn); targetRow.appendChild(sketchBtn);
-        body.appendChild(targetRow);
-        function setBrushTarget(t) {
-            if (window.config) window.config.BRUSH_TARGET = t;
-            fluidBtn.classList.toggle('active', t === 'fluid');
-            sketchBtn.classList.toggle('active', t === 'sketch');
-            try { if (window.settingsManager) window.settingsManager.set('brush.target', t); } catch (_) {}
-        }
-        fluidBtn.addEventListener('click', function () { setBrushTarget('fluid'); });
-        sketchBtn.addEventListener('click', function () { setBrushTarget('sketch'); });
-        engineCheckbox('brushEraser', 'Eraser (Sketch)', 'BRUSH_ERASER');
-        engineSlider('brushHardness', 'Hardness', 0, 1, 0.01, 'BRUSH_HARDNESS',
-            function (v) { return Math.round(v * 100) + '%'; });
-        engineCheckbox('sketchVisible', 'Show Sketch Layer', 'SKETCH_VISIBLE');
-        var sketchBtnRow = document.createElement('div');
-        sketchBtnRow.className = 'brush-mode-row';
-        var clearSketchBtn = document.createElement('button');
-        clearSketchBtn.type = 'button'; clearSketchBtn.className = 'brush-mode-btn';
-        clearSketchBtn.textContent = 'Clear Sketch';
-        clearSketchBtn.addEventListener('click', function () {
-            if (typeof window.__clearSketch === 'function') window.__clearSketch();
-        });
-        var sketchColliderBtn = document.createElement('button');
-        sketchColliderBtn.type = 'button'; sketchColliderBtn.className = 'brush-mode-btn';
-        sketchColliderBtn.textContent = '→ Collider';
-        sketchColliderBtn.title = 'Turn the sketch layer into a collision layer — the fluid flows around what you drew';
-        sketchColliderBtn.addEventListener('click', function () {
-            if (window.collisionLayers && typeof window.collisionLayers.createFromSketch === 'function') {
-                window.collisionLayers.createFromSketch();
-            }
-        });
-        sketchBtnRow.appendChild(clearSketchBtn);
-        sketchBtnRow.appendChild(sketchColliderBtn);
-        body.appendChild(sketchBtnRow);
-        try {
-            var savedTarget = window.settingsManager && window.settingsManager.get('brush.target');
-            setBrushTarget(savedTarget === 'sketch' ? 'sketch' : 'fluid');
-        } catch (_) { setBrushTarget('fluid'); }
+        // Everyday brush controls (target/tip/feel/presets) moved to the strip's
+        // Brush dropdown (buildBrushPanel) 2026-07-16 — this section keeps the
+        // rarer stroke-replay + splat-ramp machinery.
+        const { sec, body } = makeSection('🖌️ Stroke & Replay', 'orange', true);
 
         // --- Replay Mode ---
         var modeLabel = document.createElement('label');
@@ -1508,68 +1464,6 @@
         rateGroup.appendChild(rateLbl);
         rateGroup.appendChild(rateSlider);
         body.appendChild(rateGroup);
-
-        // --- D1 Stroke Engine (stabilizer / spacing / pressure) ---
-        var engineLabel = document.createElement('label');
-        engineLabel.className = 'brush-section-label';
-        engineLabel.textContent = 'Stroke Engine';
-        body.appendChild(engineLabel);
-
-        function engineSlider(id, label, min, max, step, key, fmt) {
-            var group = document.createElement('div');
-            group.className = 'control-group';
-            var lbl = document.createElement('label');
-            lbl.setAttribute('for', id);
-            lbl.innerHTML = label + ' <span class="value-display" id="' + id + 'Value"></span>';
-            var slider = document.createElement('input');
-            slider.type = 'range'; slider.id = id;
-            slider.min = String(min); slider.max = String(max); slider.step = String(step);
-            var cur = (window.config && typeof window.config[key] === 'number') ? window.config[key] : min;
-            try {
-                var saved = window.settingsManager && window.settingsManager.get('brush.' + id);
-                if (typeof saved === 'number') { cur = saved; if (window.config) window.config[key] = saved; }
-            } catch (_) {}
-            slider.value = String(cur);
-            var disp = lbl.querySelector('.value-display');
-            disp.textContent = fmt(cur);
-            slider.addEventListener('input', function () {
-                var v = parseFloat(slider.value);
-                if (window.config) window.config[key] = v;
-                disp.textContent = fmt(v);
-                try { if (window.settingsManager) window.settingsManager.set('brush.' + id, v); } catch (_) {}
-            });
-            group.appendChild(lbl); group.appendChild(slider);
-            body.appendChild(group);
-        }
-        engineSlider('brushStabilizer', 'Stabilizer', 0, 1, 0.01, 'BRUSH_STABILIZER',
-            function (v) { return Math.round(v * 100) + '%'; });
-        engineSlider('brushSpacing', 'Spacing', 0.01, 1, 0.01, 'BRUSH_SPACING',
-            function (v) { return Math.round(v * 100) + '%'; });
-
-        function engineCheckbox(id, label, key) {
-            var row = document.createElement('div');
-            row.className = 'control-group checkbox-group';
-            var cb = document.createElement('input');
-            cb.type = 'checkbox'; cb.id = id;
-            var on = !!(window.config && window.config[key]);
-            try {
-                var saved = window.settingsManager && window.settingsManager.get('brush.' + id);
-                if (typeof saved === 'boolean') { on = saved; if (window.config) window.config[key] = saved; }
-            } catch (_) {}
-            cb.checked = on;
-            var lbl = document.createElement('label');
-            lbl.setAttribute('for', id);
-            lbl.style.margin = '0';
-            lbl.textContent = label;
-            cb.addEventListener('change', function () {
-                if (window.config) window.config[key] = cb.checked;
-                try { if (window.settingsManager) window.settingsManager.set('brush.' + id, cb.checked); } catch (_) {}
-            });
-            row.appendChild(cb); row.appendChild(lbl);
-            body.appendChild(row);
-        }
-        engineCheckbox('brushPressureSize', 'Pen Pressure → Size', 'BRUSH_PRESSURE_SIZE');
-        engineCheckbox('brushPressureFlow', 'Pen Pressure → Flow', 'BRUSH_PRESSURE_FLOW');
 
         // --- Splat In ---
         var splatInLabel = document.createElement('label');
@@ -1748,6 +1642,423 @@
         if (!window.splatOutMode) window.splatOutMode = 'instant';
 
         return sec;
+    }
+
+    // ─── BRUSH PANEL (D1) ────────────────────────────────────────────
+    // The everyday brush controls in a dropdown off the strip's Brush
+    // channel LABEL (the value stays the arm-colors trigger). Built
+    // eagerly so saved settings restore at startup, shown on demand.
+    // Controls keep their legacy element ids + 'brush.*' settings keys,
+    // so values saved when they lived in the sidebar migrate untouched.
+    function buildBrushPanel(trigger) {
+        if (!trigger) return;
+        trigger.classList.add('brush-trigger');
+        var chev = document.createElement('span');
+        chev.className = 'brush-trigger-chev';
+        chev.textContent = '▾';
+        trigger.appendChild(chev);
+
+        var panel = document.createElement('div');
+        panel.className = 'arm-colors-panel brush-settings-panel';
+        panel.style.display = 'none';
+        panel.style.position = 'fixed';
+        document.body.appendChild(panel);
+
+        var PANEL_W = 252;
+        function positionPanel() {
+            // Zoomed via --ui-scale: compute in screen px, divide by zoom
+            // (same math as the arm-colors panel).
+            var z = window.UIScale ? window.UIScale.get() : 1;
+            var rect = trigger.getBoundingClientRect();
+            var left = rect.left + rect.width / 2 - (PANEL_W * z) / 2;
+            left = Math.max(4, Math.min(left, window.innerWidth - PANEL_W * z - 4));
+            panel.style.left = (left / z) + 'px';
+            panel.style.top = ((rect.bottom + 6) / z) + 'px';
+            panel.style.width = PANEL_W + 'px';
+        }
+
+        var header = document.createElement('div');
+        header.className = 'arm-colors-header';
+        header.textContent = 'Brush';
+        panel.appendChild(header);
+
+        function num(v, d) { return typeof v === 'number' ? v : d; }
+        function pct(v) { return Math.round(v * 100) + '%'; }
+
+        // Manual tweaks diverge from the applied preset → clear the chip
+        // highlight. Preset apply drives the same handlers, so it flags
+        // itself to keep its own highlight.
+        var applyingPreset = false;
+        function markDirty() {
+            if (applyingPreset) return;
+            panel.querySelectorAll('.brush-preset-btn.active').forEach(function (b) {
+                b.classList.remove('active');
+            });
+        }
+
+        // Setter registry: preset apply drives every control through the
+        // same commit path as user input (config + persist + display).
+        var SETTERS = {};
+
+        function sLabel(text) {
+            var l = document.createElement('label');
+            l.className = 'brush-section-label';
+            l.textContent = text;
+            panel.appendChild(l);
+        }
+
+        function pSlider(id, label, min, max, step, key, fmt, presetKey) {
+            var group = document.createElement('div');
+            group.className = 'control-group';
+            var lbl = document.createElement('label');
+            lbl.setAttribute('for', id);
+            lbl.innerHTML = label + ' <span class="value-display" id="' + id + 'Value"></span>';
+            var slider = document.createElement('input');
+            slider.type = 'range'; slider.id = id;
+            slider.min = String(min); slider.max = String(max); slider.step = String(step);
+            var cur = (window.config && typeof window.config[key] === 'number') ? window.config[key] : min;
+            try {
+                var saved = window.settingsManager && window.settingsManager.get('brush.' + id);
+                if (typeof saved === 'number') { cur = saved; if (window.config) window.config[key] = saved; }
+            } catch (_) {}
+            slider.value = String(cur);
+            var disp = lbl.querySelector('.value-display');
+            disp.textContent = fmt(cur);
+            function commit(v) {
+                if (window.config) window.config[key] = v;
+                disp.textContent = fmt(v);
+                try { if (window.settingsManager) window.settingsManager.set('brush.' + id, v); } catch (_) {}
+            }
+            slider.addEventListener('input', function () {
+                commit(parseFloat(slider.value));
+                markDirty();
+            });
+            if (presetKey) SETTERS[presetKey] = function (v) {
+                if (typeof v !== 'number') return;
+                v = Math.max(min, Math.min(max, v));
+                slider.value = String(v);
+                commit(v);
+            };
+            group.appendChild(lbl); group.appendChild(slider);
+            panel.appendChild(group);
+            return group;
+        }
+
+        function pCheckbox(id, label, key, presetKey) {
+            var row = document.createElement('div');
+            row.className = 'control-group checkbox-group';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.id = id;
+            var on = !!(window.config && window.config[key]);
+            try {
+                var saved = window.settingsManager && window.settingsManager.get('brush.' + id);
+                if (typeof saved === 'boolean') { on = saved; if (window.config) window.config[key] = saved; }
+            } catch (_) {}
+            cb.checked = on;
+            var lbl = document.createElement('label');
+            lbl.setAttribute('for', id);
+            lbl.style.margin = '0';
+            lbl.textContent = label;
+            function commit(v) {
+                cb.checked = v;
+                if (window.config) window.config[key] = v;
+                try { if (window.settingsManager) window.settingsManager.set('brush.' + id, v); } catch (_) {}
+            }
+            cb.addEventListener('change', function () { commit(cb.checked); markDirty(); });
+            if (presetKey) SETTERS[presetKey] = function (v) { if (typeof v === 'boolean') commit(v); };
+            row.appendChild(cb); row.appendChild(lbl);
+            panel.appendChild(row);
+            return row;
+        }
+
+        // ── Presets: named brush states, quick-switch chips ──
+        var chipsWrap = document.createElement('div');
+        chipsWrap.className = 'brush-presets-chips';
+        panel.appendChild(chipsWrap);
+
+        var saveRow = document.createElement('div');
+        saveRow.className = 'brush-presets-save-row';
+        var saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'mixer-preset-save';
+        saveBtn.textContent = '+';
+        saveBtn.title = 'Save the current brush as a preset';
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'mixer-preset-name-input';
+        nameInput.placeholder = 'Brush name...';
+        nameInput.maxLength = 24;
+        nameInput.spellcheck = false;
+        nameInput.autocomplete = 'off';
+        nameInput.style.display = 'none';
+        saveRow.appendChild(saveBtn);
+        saveRow.appendChild(nameInput);
+        panel.appendChild(saveRow);
+
+        function loadBrushPresets() {
+            try {
+                var arr = window.settingsManager && window.settingsManager.get('brush.presets');
+                return Array.isArray(arr) ? arr : [];
+            } catch (_) { return []; }
+        }
+        function storeBrushPresets(list) {
+            try { if (window.settingsManager) window.settingsManager.set('brush.presets', list); } catch (_) {}
+        }
+        function captureBrushPreset(name) {
+            var c = window.config || {};
+            var sizeSlider = document.getElementById('brushSize');
+            return {
+                name: name,
+                size: sizeSlider ? parseFloat(sizeSlider.value) : num(c.SPLAT_RADIUS, 0.011) * 1000,
+                target: c.BRUSH_TARGET === 'sketch' ? 'sketch' : 'fluid',
+                eraser: !!c.BRUSH_ERASER,
+                tip: c.BRUSH_TIP | 0,
+                tipTexture: num(c.BRUSH_TIP_TEXTURE, 0.7),
+                flow: num(c.BRUSH_FLOW, 1),
+                hardness: num(c.BRUSH_HARDNESS, 0.8),
+                stabilizer: num(c.BRUSH_STABILIZER, 0),
+                spacing: num(c.BRUSH_SPACING, 0.35),
+                jitter: num(c.BRUSH_JITTER, 0),
+                pressureSize: !!c.BRUSH_PRESSURE_SIZE,
+                pressureFlow: !!c.BRUSH_PRESSURE_FLOW,
+                pressureCurve: num(c.BRUSH_PRESSURE_CURVE, 0.7)
+            };
+        }
+        function applyBrushPreset(p) {
+            applyingPreset = true;
+            try {
+                if (typeof p.size === 'number') {
+                    // The Size fader owns SPLAT_RADIUS — drive it like a user
+                    // drag so 05h's binding and the strip display both update.
+                    var s = document.getElementById('brushSize');
+                    if (s) {
+                        var v = Math.max(parseFloat(s.min), Math.min(parseFloat(s.max), p.size));
+                        s.value = v;
+                        s.style.setProperty('--val', s.value);
+                        s.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+                if (SETTERS.target) SETTERS.target(p.target);
+                if (SETTERS.tip) SETTERS.tip(p.tip | 0);
+                ['tipTexture', 'flow', 'hardness', 'stabilizer', 'spacing', 'jitter',
+                 'pressureSize', 'pressureFlow', 'pressureCurve', 'eraser'
+                ].forEach(function (k) {
+                    if (SETTERS[k] && p[k] !== undefined) SETTERS[k](p[k]);
+                });
+            } finally { applyingPreset = false; }
+        }
+        function renderPresetChips() {
+            chipsWrap.innerHTML = '';
+            var list = loadBrushPresets();
+            if (!list.length) {
+                var hint = document.createElement('div');
+                hint.className = 'arm-colors-hint';
+                hint.textContent = 'No brush presets yet — dial in a brush and hit +';
+                chipsWrap.appendChild(hint);
+                return;
+            }
+            list.forEach(function (p) {
+                var chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'brush-preset-btn' + (p.eraser ? ' eraser' : '');
+                chip.textContent = p.name;
+                chip.title = 'Load brush "' + p.name + '"' + (p.eraser ? ' (eraser)' : '');
+                var del = document.createElement('span');
+                del.className = 'brush-preset-del';
+                del.textContent = '×';
+                del.title = 'Delete "' + p.name + '"';
+                del.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    storeBrushPresets(loadBrushPresets().filter(function (q) { return q.name !== p.name; }));
+                    renderPresetChips();
+                });
+                chip.appendChild(del);
+                chip.addEventListener('click', function () {
+                    applyBrushPreset(p);
+                    chipsWrap.querySelectorAll('.brush-preset-btn').forEach(function (b) {
+                        b.classList.toggle('active', b === chip);
+                    });
+                });
+                chipsWrap.appendChild(chip);
+            });
+        }
+        function cancelPresetSave() {
+            nameInput.style.display = 'none';
+            nameInput.value = '';
+            saveBtn.textContent = '+';
+        }
+        function doSaveBrushPreset() {
+            var name = (nameInput.value || '').trim();
+            if (!name) { cancelPresetSave(); return; }
+            // Same name = overwrite (a brush you re-dial is the same brush)
+            var list = loadBrushPresets().filter(function (q) { return q.name !== name; });
+            list.unshift(captureBrushPreset(name));
+            if (list.length > 24) list.length = 24;
+            storeBrushPresets(list);
+            cancelPresetSave();
+            renderPresetChips();
+        }
+        saveBtn.addEventListener('click', function () {
+            if (nameInput.style.display === 'none') {
+                nameInput.style.display = '';
+                nameInput.value = '';
+                nameInput.focus();
+                saveBtn.textContent = '✓';
+            } else {
+                doSaveBrushPreset();
+            }
+        });
+        nameInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); doSaveBrushPreset(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancelPresetSave(); }
+        });
+
+        // ── Paint target: fluid splats vs the persistent sketch layer ──
+        sLabel('Paint Into');
+        var targetRow = document.createElement('div');
+        targetRow.className = 'brush-mode-row';
+        var fluidBtn = document.createElement('button');
+        fluidBtn.type = 'button'; fluidBtn.className = 'brush-mode-btn active'; fluidBtn.textContent = 'Fluid';
+        fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
+        var sketchBtn = document.createElement('button');
+        sketchBtn.type = 'button'; sketchBtn.className = 'brush-mode-btn'; sketchBtn.textContent = 'Sketch';
+        sketchBtn.title = 'Strokes paint the persistent sketch layer — normal-control drawing that never decays or flows (backgrounds, guides, colliders)';
+        targetRow.appendChild(fluidBtn); targetRow.appendChild(sketchBtn);
+        panel.appendChild(targetRow);
+        function setBrushTarget(t) {
+            if (window.config) window.config.BRUSH_TARGET = t;
+            fluidBtn.classList.toggle('active', t === 'fluid');
+            sketchBtn.classList.toggle('active', t === 'sketch');
+            try { if (window.settingsManager) window.settingsManager.set('brush.target', t); } catch (_) {}
+        }
+        SETTERS.target = function (t) { setBrushTarget(t === 'sketch' ? 'sketch' : 'fluid'); };
+        fluidBtn.addEventListener('click', function () { setBrushTarget('fluid'); markDirty(); });
+        sketchBtn.addEventListener('click', function () { setBrushTarget('sketch'); markDirty(); });
+        try {
+            var savedTarget = window.settingsManager && window.settingsManager.get('brush.target');
+            setBrushTarget(savedTarget === 'sketch' ? 'sketch' : 'fluid');
+        } catch (_) { setBrushTarget('fluid'); }
+
+        // ── Tip: the splat-shader stamp shapes as brush tips (D1) ──
+        sLabel('Tip');
+        var tipRow = document.createElement('div');
+        tipRow.className = 'brush-tip-row';
+        var TIPS = [
+            { v: 0, glyph: '◌', name: 'Soft',   title: 'Soft — the classic gaussian dab' },
+            { v: 1, glyph: '⬤', name: 'Blob',   title: 'Blob — noise-notched round stamp' },
+            { v: 2, glyph: '■', name: 'Chisel', title: 'Chisel — squared press' },
+            { v: 3, glyph: '▬', name: 'Streak', title: 'Streak — elongated smear' },
+            { v: 4, glyph: '◯', name: 'Ring',   title: 'Ring — thin dye band, hollow center' }
+        ];
+        var tipBtns = [];
+        function setBrushTip(v) {
+            v = v | 0;
+            if (v < 0 || v > 4) v = 0;
+            if (window.config) window.config.BRUSH_TIP = v;
+            tipBtns.forEach(function (b) {
+                b.classList.toggle('active', parseInt(b.dataset.tip, 10) === v);
+            });
+            syncTexState();
+            try { if (window.settingsManager) window.settingsManager.set('brush.tip', v); } catch (_) {}
+        }
+        SETTERS.tip = setBrushTip;
+        TIPS.forEach(function (t) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'brush-tip-btn';
+            b.dataset.tip = String(t.v);
+            b.textContent = t.glyph;
+            b.title = t.title;
+            b.addEventListener('click', function () { setBrushTip(t.v); markDirty(); });
+            tipBtns.push(b);
+            tipRow.appendChild(b);
+        });
+        panel.appendChild(tipRow);
+        var texGroup = pSlider('brushTipTexture', 'Texture', 0, 1, 0.01, 'BRUSH_TIP_TEXTURE', pct, 'tipTexture');
+        function syncTexState() {
+            // Texture (stamp grain/blend) only shapes blob/chisel/streak
+            var t = ((window.config && window.config.BRUSH_TIP) | 0);
+            var on = t >= 1 && t <= 3;
+            texGroup.style.opacity = on ? '1' : '0.4';
+            var sl = texGroup.querySelector('input');
+            if (sl) sl.disabled = !on;
+        }
+        (function restoreTip() {
+            var saved = null;
+            try { saved = window.settingsManager && window.settingsManager.get('brush.tip'); } catch (_) {}
+            setBrushTip(typeof saved === 'number' ? saved : ((window.config && window.config.BRUSH_TIP) | 0));
+        })();
+
+        // ── Flow + stroke feel ──
+        pSlider('brushFlow', 'Flow', 0.05, 1, 0.01, 'BRUSH_FLOW', pct, 'flow');
+        sLabel('Stroke');
+        pSlider('brushStabilizer', 'Stabilizer', 0, 1, 0.01, 'BRUSH_STABILIZER', pct, 'stabilizer');
+        pSlider('brushSpacing', 'Spacing', 0.01, 1, 0.01, 'BRUSH_SPACING', pct, 'spacing');
+        pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
+
+        // ── Pen pressure ──
+        sLabel('Pen Pressure');
+        pCheckbox('brushPressureSize', 'Pressure → Size', 'BRUSH_PRESSURE_SIZE', 'pressureSize');
+        pCheckbox('brushPressureFlow', 'Pressure → Flow', 'BRUSH_PRESSURE_FLOW', 'pressureFlow');
+        pSlider('brushPressureCurve', 'Curve', 0.25, 2.5, 0.05, 'BRUSH_PRESSURE_CURVE',
+            function (v) { return v < 1 ? 'soft ' + v.toFixed(2) : (v > 1 ? 'hard ' + v.toFixed(2) : 'linear'); },
+            'pressureCurve');
+
+        // ── Sketch layer ──
+        sLabel('Sketch Layer');
+        pCheckbox('brushEraser', 'Eraser (Sketch)', 'BRUSH_ERASER', 'eraser');
+        pSlider('brushHardness', 'Hardness', 0, 1, 0.01, 'BRUSH_HARDNESS', pct, 'hardness');
+        pCheckbox('sketchVisible', 'Show Sketch Layer', 'SKETCH_VISIBLE');
+        var sketchBtnRow = document.createElement('div');
+        sketchBtnRow.className = 'brush-mode-row';
+        var clearSketchBtn = document.createElement('button');
+        clearSketchBtn.type = 'button'; clearSketchBtn.className = 'brush-mode-btn';
+        clearSketchBtn.textContent = 'Clear Sketch';
+        clearSketchBtn.addEventListener('click', function () {
+            if (typeof window.__clearSketch === 'function') window.__clearSketch();
+        });
+        var sketchColliderBtn = document.createElement('button');
+        sketchColliderBtn.type = 'button'; sketchColliderBtn.className = 'brush-mode-btn';
+        sketchColliderBtn.textContent = '→ Collider';
+        sketchColliderBtn.title = 'Turn the sketch layer into a collision layer — the fluid flows around what you drew';
+        sketchColliderBtn.addEventListener('click', function () {
+            if (window.collisionLayers && typeof window.collisionLayers.createFromSketch === 'function') {
+                window.collisionLayers.createFromSketch();
+            }
+        });
+        sketchBtnRow.appendChild(clearSketchBtn);
+        sketchBtnRow.appendChild(sketchColliderBtn);
+        panel.appendChild(sketchBtnRow);
+
+        // Size fader tweaks also diverge from an applied preset
+        var sizeFader = document.getElementById('brushSize');
+        if (sizeFader) sizeFader.addEventListener('input', markDirty);
+
+        // ── Open / close ──
+        trigger.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var open = panel.style.display !== 'none';
+            if (open) {
+                panel.style.display = 'none';
+                trigger.classList.remove('active');
+            } else {
+                panel.style.display = 'block';
+                trigger.classList.add('active');
+                positionPanel();
+                renderPresetChips();
+            }
+        });
+        document.addEventListener('click', function (e) {
+            if (panel.style.display !== 'none' && !panel.contains(e.target)
+                && e.target !== trigger && !trigger.contains(e.target)) {
+                panel.style.display = 'none';
+                trigger.classList.remove('active');
+            }
+        });
+        panel.addEventListener('click', function (e) { e.stopPropagation(); });
+        window.addEventListener('resize', function () {
+            if (panel.style.display !== 'none') positionPanel();
+        });
     }
 
 

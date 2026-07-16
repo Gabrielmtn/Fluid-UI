@@ -8,18 +8,36 @@
 // ═══════════════════════════════════════════════════════════════════
         function splat(x, y, dx, dy, color) {
             const aspectRatio = canvas.width / canvas.height;
+            const baseRadius = config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1);
+            // D1 brush tip: only on user strokes (multiSplat sets __brushTipOn
+            // for non-exactColor calls) and never while a material mode owns
+            // the STAMP_* keys (clay's stamp config stays authoritative).
+            // Tips are DYE-ONLY, like the clay stamps — the velocity pass
+            // stays gaussian or motion reads as glitch.
+            let brushTip = 0;
+            if (window.__brushTipOn && !(window.MaterialModes && window.MaterialModes.active())) {
+                brushTip = config.BRUSH_TIP | 0;
+            }
             splatProg.bind();
             gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
             gl.uniform2f(splatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
             // Material modes may scale the dab (clay Depth): applies to both the
             // dye footprint and the velocity push so they stay congruent.
-            gl.uniform1f(splatProg.uniforms.radius, config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1));
+            gl.uniform1f(splatProg.uniforms.radius, baseRadius);
             gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
             // Clay stamp (material modes): 0 = classic gaussian. Fresh seed per
             // splat so consecutive stamps get distinct notch patterns.
-            gl.uniform1f(splatProg.uniforms.stampNoise, config.STAMP_NOISE || 0);
+            if (brushTip >= 1 && brushTip <= 3) {
+                // Blob/chisel/streak tips reuse the clay stamp machinery:
+                // shape from the tip, grain/blend from the Texture slider.
+                const tex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 0.7;
+                gl.uniform1f(splatProg.uniforms.stampNoise, Math.max(0, Math.min(1, tex)));
+                gl.uniform1i(splatProg.uniforms.stampShape, brushTip - 1);
+            } else {
+                gl.uniform1f(splatProg.uniforms.stampNoise, config.STAMP_NOISE || 0);
+                gl.uniform1i(splatProg.uniforms.stampShape, config.STAMP_SHAPE || 0);
+            }
             gl.uniform2f(splatProg.uniforms.stampSeed, Math.random() * 19.7, Math.random() * 23.3);
-            gl.uniform1i(splatProg.uniforms.stampShape, config.STAMP_SHAPE || 0);
             gl.uniform1f(splatProg.uniforms.ringRadius, 0); // classic blob — never inherit a stale ring stamp
             gl.uniform1f(splatProg.uniforms.barHalfW, 0);   // ...or a stale bar stamp
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
@@ -46,9 +64,18 @@
             gl.uniform1i(splatProg.uniforms.isVelocity, 0); // Density pass
             gl.uniform1i(splatProg.uniforms.uTarget, 0);
             gl.uniform3fv(splatProg.uniforms.color, color);
+            if (brushTip === 4) {
+                // Ring tip: thin dye band at ~the gaussian's visible radius
+                // (≈√radius in p-space) — dye pass ONLY, so the ring uniform
+                // never reinterprets the velocity pass as a radial push.
+                gl.uniform1f(splatProg.uniforms.radius, baseRadius * 0.08); // band width²
+                gl.uniform1f(splatProg.uniforms.ringRadius, 0.75 * Math.sqrt(baseRadius));
+                gl.uniform1f(splatProg.uniforms.ringSquash, 1);
+            }
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
             blit(density.write.fbo);
             density.swap();
+            if (brushTip === 4) gl.uniform1f(splatProg.uniforms.ringRadius, 0); // no leak into the next caller
         }
         // Ring-band splat: paints a thin elliptical band of dye and pushes it
         // radially in ONE velocity+dye pass (vs stamping dozens of dots along
@@ -151,7 +178,9 @@
             const aspectRatio = canvas.width / canvas.height;
             const p = (typeof pressure === 'number' && pressure > 0) ? pressure : 1;
             const sizeMul = window.BrushEngine ? window.BrushEngine.sizeScale(p) : 1;
-            const flowMul = window.BrushEngine ? window.BrushEngine.flowScale(p) : 1;
+            // Pressure response × the Flow slider (matches the fluid route)
+            const flowMul = (window.BrushEngine ? window.BrushEngine.flowScale(p) : 1)
+                * ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1);
             rasterStampProg.bind();
             gl.uniform2f(rasterStampProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
             // 0.5× the fluid footprint: the sketch disc edge sits where the

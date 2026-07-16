@@ -18,11 +18,13 @@
 // travelled matches the legacy one-dab-per-frame path at normal speeds —
 // fast strokes no longer under-inject, slow strokes are unchanged.
 //
-// Config (04a defaults; sliders in the Brush section):
+// Config (04a defaults; controls in the strip's Brush panel):
 //   BRUSH_STABILIZER   0..1   (0 = raw input, no lag)
 //   BRUSH_SPACING      0.02..1 dab spacing as a fraction of brush diameter
+//   BRUSH_JITTER       0..1   per-dab scatter, fraction of brush diameter
 //   BRUSH_PRESSURE_SIZE  bool  pressure → dab radius
 //   BRUSH_PRESSURE_FLOW  bool  pressure → dye intensity
+//   BRUSH_PRESSURE_CURVE 0.25..2.5 response gamma for both pressure maps
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -74,14 +76,27 @@
         // (see header). 10 = the legacy delta→velocity gain in 05d.
         var vx = 10 * spacing * ux, vy = 10 * spacing * uy;
         var p0 = lastP;
+        // Jitter: uniform scatter inside a disc of radius jitter × brush
+        // diameter ÷ 2 around each dab. Applied to emitted positions only —
+        // the walker's anchors stay on the true stroke path, so spacing and
+        // stabilizer behavior are jitter-independent. Recorded stroke events
+        // carry the jittered position (05j records d.x/d.y), so replay is
+        // faithful to what was actually deposited.
+        var jitterR = Math.max(0, cfg('BRUSH_JITTER', 0)) * brushDiameterPx() * 0.5;
         var offset = spacing - residual; // distance along THIS segment to dab 1
         var emitted = 0;
         while (offset <= dist) {
             var t = offset / dist;
             if (queue.length < MAX_QUEUE) {
+                var jx = 0, jy = 0;
+                if (jitterR > 0) {
+                    var ja = Math.random() * Math.PI * 2;
+                    var jr = Math.sqrt(Math.random()) * jitterR;
+                    jx = Math.cos(ja) * jr; jy = Math.sin(ja) * jr;
+                }
                 queue.push({
-                    x: lastEmitX + dx * t,
-                    y: lastEmitY + dy * t,
+                    x: lastEmitX + dx * t + jx,
+                    y: lastEmitY + dy * t + jy,
                     dx: vx, dy: vy,
                     p: p0 + (p1 - p0) * t
                 });
@@ -148,14 +163,16 @@
         },
 
         // Pressure response curves (used by 05j when applying dabs).
-        // Gamma 0.7 lifts the light-touch range — linear feels dead.
+        // BRUSH_PRESSURE_CURVE is the gamma: <1 lifts the light-touch range
+        // (0.7 = the original hard-coded feel — linear feels dead), >1
+        // demands a heavy hand before the brush opens up.
         sizeScale: function (p) {
             if (!window.config || !window.config.BRUSH_PRESSURE_SIZE) return 1;
-            return 0.35 + 0.65 * Math.pow(Math.min(1, Math.max(0.02, p)), 0.7);
+            return 0.35 + 0.65 * Math.pow(Math.min(1, Math.max(0.02, p)), cfg('BRUSH_PRESSURE_CURVE', 0.7));
         },
         flowScale: function (p) {
             if (!window.config || !window.config.BRUSH_PRESSURE_FLOW) return 1;
-            return 0.3 + 0.7 * Math.pow(Math.min(1, Math.max(0.02, p)), 0.7);
+            return 0.3 + 0.7 * Math.pow(Math.min(1, Math.max(0.02, p)), cfg('BRUSH_PRESSURE_CURVE', 0.7));
         }
     };
 })();
