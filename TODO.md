@@ -70,7 +70,7 @@ Research-sourced (sources in git history of this file). Adoption order per the s
 - [ ] Wire Phase 1.5 features as brush properties: wetness deposit, bristle count, pickup amount, pigment mixing toggle.
 
 ### D2 — Persistent raster paint layers
-- [ ] GPU raster layer type: paint that does not decay or advect (unless told to); the drawing/sketching surface.
+- [x] **Slice 1 (f8d77a6): Sketch layer live** — RGBA8 dye-res FBO composited in displayFrag (after fluid effects, raw vUv — kaleido never warps it), survives FBO reinits. "Paint Into" Fluid|Sketch routing on the D1 engine (sketch = plain draughtsman stamp: no arms/ramps/replay/broadcast); Eraser (destination-out) + Hardness slider + Show/Clear controls; **Sketch → Collider button** (alpha → ≤512 depth-mask collision layer — the "sketch a collider" vibe payoff, one button). Verified E2E: continuous 942-column stroke, eraser 253→3 alpha, reinit survival, collider lights 6,960 obstacle texels, fluid path regression-clean. GAPS for next slices: sketch not in save/load (D7), not in video export compositing (24-video-export reads DOM divs + sim snapshot — sketch is inside the GL canvas so exportStill/video DO capture it via the canvas ✓ but GIF path untested), single layer only (full stack = D2 proper), fluid-target eraser still open (dye-subtract stamp).
 - [ ] Compositing pipeline: raster layers + fluid layer + existing PNG/capture layers in one ordered stack with blend modes; meets the existing 05k render + video export.
 - [ ] Stroke routing UX: paint INTO fluid vs INTO active raster layer vs INTO mask — one modal choice, obvious in UI.
 - [ ] Bridge tools: "ignite" (raster → dye source), "capture" (fluid → raster; exists as Capture Layer — fold in).
