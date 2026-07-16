@@ -55,7 +55,7 @@
                     // respects (burned-in rims). See the solidity() comment.
                     float ocov = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
                     float osr = clamp(uObsMax, 0.0, 1.0);
-                    osr = osr * osr * osr; // full-range strength curve (matches solidity())
+                    osr = min(osr * osr * osr, 0.997); // full-range strength curve + stability ceiling (matches solidity())
                     obsBlock = 1.0 - osr * smoothstep(0.35, 0.85, ocov);
                 }
                 if (isVelocity == 1) {
@@ -231,9 +231,15 @@
                 // slider needs a response that stays low through the mid
                 // range — measured with an even S-curve the wall still
                 // cliffed between 0.5 and 0.8. Cubic spreads usable
-                // permeability across the upper half; only 1.0 is rigid.
+                // permeability across the upper half.
+                // Ceiling 0.997 (2026-07-15, Gabriel): a PERFECT seal is the
+                // degenerate extreme — dye/energy pressed against zero-leak
+                // walls pile into HDR blowout ("intense overflow destruction
+                // at 1.0, really nice at 0.999"). 0.997 is exactly the
+                // response slider-0.999 produced, so 1.0 now means "as solid
+                // as is stable" — visually rigid, never mathematically sealed.
                 float s = clamp(uObsMax, 0.0, 1.0);
-                return s * s * s;
+                return min(s * s * s, 0.997);
             }
             float solidity(vec2 uv) {
                 // COVERAGE and STRENGTH are different quantities (D0.5 rev 3,
@@ -936,7 +942,7 @@
                 // interior (its window now operates on coverage 0..1).
                 float covAvg = clamp(obs / max(uObsMax, 0.05), 0.0, 1.0);
                 float osr = clamp(uObsMax, 0.0, 1.0);
-                osr = osr * osr * osr;
+                osr = min(osr * osr * osr, 0.997); // stability ceiling (matches solidity())
                 float damp = 1.0 - osr * smoothstep(wallSlip * 0.45, 0.8 + wallSlip * 0.1, covAvg);
                 vel *= damp;
                 fragColor = vec4(vel, 0.0, 1.0);
