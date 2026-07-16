@@ -48,7 +48,11 @@
                 // partial-strength texels must still block firmly.
                 float obsBlock = 1.0;
                 if (hasObstacle == 1) {
-                    obsBlock = 1.0 - smoothstep(0.1, 0.5, texture(uObstacle, vUv).r);
+                    // Must match obstacleSolidityGLSL's curve (0.25→0.5): dye
+                    // injection blocking and the projection's wall must agree
+                    // on where the wall IS, or paint deposits inside a wall
+                    // the flow respects (burned-in rims).
+                    obsBlock = 1.0 - smoothstep(0.25, 0.5, texture(uObstacle, vUv).r);
                 }
                 if (isVelocity == 1) {
                     // Motion Isolation: prevent new velocity from affecting areas with existing velocity
@@ -469,7 +473,20 @@
         // will restrict these fractions down its pyramid — keep them float.)
         const obstacleSolidityGLSL = `
             float solidity(vec2 uv) {
-                return smoothstep(0.1, 0.5, texture(uObstacle, uv).r);
+                // Lower edge 0.25 (was 0.1): with D0.5's antialiased obstacle
+                // fractions, colliders carry a soft coverage apron. At 0.1 the
+                // apron's weak tail acted near-solid, and the MG pyramid's
+                // fraction restriction re-saturated it at EVERY level — a fat
+                // phantom wall well outside the visible edge that only the
+                // converged (multigrid) solve could feel ("feels bad with MG
+                // on", 2026-07-14). 0.25 puts the effective wall back at the
+                // half-coverage contour (masks write at collisionStrength 0.7
+                // → AA edge texels read ~0.35) while weak tails stay fluid.
+                // Saturation at 0.5 unchanged — interiors block exactly as
+                // before. NOTE: sub-half-coverage THIN lines (< ~1 sim texel)
+                // now block partially, not firmly — D1's brush guarantees
+                // sketched colliders a minimum width.
+                return smoothstep(0.25, 0.5, texture(uObstacle, uv).r);
             }
         `;
         const divergenceFrag = `#version 300 es
