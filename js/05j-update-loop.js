@@ -176,6 +176,13 @@
                     pushStrokeEvent(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
                     pointer.moved = false;
                 }
+                // D6: close the sketch-undo stroke boundary once the engine is
+                // fully idle (no active stroke, no queued dabs) — the next
+                // sketch dab then opens a fresh undo snapshot.
+                if (window.BrushEngine && !window.BrushEngine.isActive() && !window.BrushEngine.pending()
+                    && typeof window.__sketchStrokeEnd === 'function') {
+                    window.__sketchStrokeEnd();
+                }
                 // Splat-out: a trailing tail along the release velocity, tapering
                 // in size over splatOutDist of travel. Ends when the size taper
                 // completes OR the velocity has effectively died (so it can never

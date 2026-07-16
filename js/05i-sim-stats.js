@@ -175,6 +175,11 @@
         // draughtsman's brush sharing the Size fader and picker color.
         function stampSketchDab(x, y, pressure) {
             if (!sketch) return;
+            // D6: one undo snapshot per stroke, taken before its first dab
+            if (!_sketchStrokeOpen) {
+                window.__sketchUndoPush();
+                _sketchStrokeOpen = true;
+            }
             const aspectRatio = canvas.width / canvas.height;
             const p = (typeof pressure === 'number' && pressure > 0) ? pressure : 1;
             const sizeMul = window.BrushEngine ? window.BrushEngine.sizeScale(p) : 1;
@@ -207,10 +212,124 @@
         window.__sketchStamp = stampSketchDab;
         window.__clearSketch = function () {
             if (!sketch) return;
+            window.__sketchUndoPush(); // D6: Clear is undoable
             gl.bindFramebuffer(gl.FRAMEBUFFER, sketch.fbo);
             gl.clearColor(0, 0, 0, 0);
             gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            notifySketchMutated();
+        };
+        // ─── D2 bridges: sketch ↔ fluid ─────────────────────────────────
+        // Ignite: pour the sketch into the fluid as dye (one-shot; the sim's
+        // velocity field takes it from there). Mutates DYE, not sketch — no
+        // undo snapshot.
+        window.__igniteSketch = function (gain) {
+            if (!sketch || !density) return;
+            igniteProg.bind();
+            gl.disable(gl.BLEND);
+            gl.uniform1i(igniteProg.uniforms.uDye, 0);
+            gl.uniform1i(igniteProg.uniforms.uSketch, 1);
+            gl.uniform1f(igniteProg.uniforms.gain, (typeof gain === 'number' && gain > 0) ? gain : 1);
+            gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, sketch.texture);
+            blit(density.write.fbo);
+            density.swap();
+            gl.activeTexture(gl.TEXTURE0);
+        };
+        // Capture: freeze the current fluid dye into the sketch layer —
+        // over-composited (captureFrag emits premultiplied color with
+        // alpha = max channel), so existing sketch content shows through
+        // where the dye is faint. Folds in the old Capture Layer idea at
+        // the raster level.
+        window.__captureToSketch = function () {
+            if (!sketch || !density) return;
+            window.__sketchUndoPush(); // D6: Capture mutates the sketch
+            captureProg.bind();
+            gl.uniform1i(captureProg.uniforms.uDye, 0);
+            gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+            gl.enable(gl.BLEND);
+            gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            blit(sketch.fbo);
+            gl.disable(gl.BLEND);
+            notifySketchMutated();
+        };
+        // ─── D6 slice 1: sketch stroke undo/redo ────────────────────────
+        // GPU snapshot ring: one RGBA8 dye-res copy per mutating op (stroke
+        // start / Clear / Capture), bounded depth, FBOs pooled + lazily
+        // (re)created so resolution changes just invalidate pool entries.
+        // Restoring an old-res snapshot into a new-res sketch rescales via
+        // the normalized-UV copy — acceptable for undo.
+        const SKETCH_UNDO_DEPTH = 6;
+        const sketchUndoStack = [];
+        const sketchRedoStack = [];
+        const sketchSnapPool = [];
+        let _sketchStrokeOpen = false;
+        // Fired on every sketch mutation (stroke end / Clear / Capture /
+        // undo / redo) — 23-depth-collision listens for the live collider
+        // binding; cheap no-op otherwise.
+        function notifySketchMutated() {
+            if (typeof window.__onSketchMutated === 'function') window.__onSketchMutated();
+        }
+        window.__sketchStrokeEnd = function () {
+            if (!_sketchStrokeOpen) return;
+            _sketchStrokeOpen = false;
+            notifySketchMutated();
+        };
+        function copySketchTex(srcTex, dstFbo, w, h) {
+            clearProg.bind();
+            gl.disable(gl.BLEND);
+            gl.uniform1i(clearProg.uniforms.uTexture, 0);
+            gl.uniform1f(clearProg.uniforms.value, 1.0);
+            gl.uniform1f(clearProg.uniforms.softClamp, 0.0); // plain copy, no valve
+            gl.viewport(0, 0, w, h);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, srcTex);
+            blit(dstFbo);
+        }
+        function takeSketchSnapshot() {
+            let snap = sketchSnapPool.pop();
+            if (snap && (snap.w !== dyeTexWidth || snap.h !== dyeTexHeight)) {
+                gl.deleteTexture(snap.texture);
+                gl.deleteFramebuffer(snap.fbo);
+                snap = null;
+            }
+            if (!snap) {
+                snap = createFBO(dyeTexWidth, dyeTexHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR);
+                snap.w = dyeTexWidth;
+                snap.h = dyeTexHeight;
+            }
+            copySketchTex(sketch.texture, snap.fbo, snap.w, snap.h);
+            return snap;
+        }
+        window.__sketchUndoPush = function () {
+            if (!sketch) return;
+            sketchUndoStack.push(takeSketchSnapshot());
+            if (sketchUndoStack.length > SKETCH_UNDO_DEPTH) sketchSnapPool.push(sketchUndoStack.shift());
+            while (sketchRedoStack.length) sketchSnapPool.push(sketchRedoStack.pop());
+        };
+        window.__sketchUndo = function () {
+            if (!sketch || !sketchUndoStack.length) return;
+            sketchRedoStack.push(takeSketchSnapshot());
+            const snap = sketchUndoStack.pop();
+            copySketchTex(snap.texture, sketch.fbo, dyeTexWidth, dyeTexHeight);
+            sketchSnapPool.push(snap);
+            notifySketchMutated();
+        };
+        window.__sketchRedo = function () {
+            if (!sketch || !sketchRedoStack.length) return;
+            sketchUndoStack.push(takeSketchSnapshot());
+            const snap = sketchRedoStack.pop();
+            copySketchTex(snap.texture, sketch.fbo, dyeTexWidth, dyeTexHeight);
+            sketchSnapPool.push(snap);
+            notifySketchMutated();
+        };
+        window.__sketchUndoDepths = function () {
+            return { undo: sketchUndoStack.length, redo: sketchRedoStack.length, pool: sketchSnapPool.length };
         };
         let lastTime = performance.now();
         let lastDrawTimeMs = 0;

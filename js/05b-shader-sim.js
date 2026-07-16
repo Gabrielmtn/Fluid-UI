@@ -976,6 +976,39 @@
                 fragColor = vec4(color * a, a); // premultiplied
             }
         `;
+        // ─── D2 bridge: Ignite — pour the sketch into the fluid dye ─────
+        // One-shot additive deposit (sketch is premultiplied, so rgb already
+        // carries its own alpha weighting). Dye only — the sim's existing
+        // velocity field takes it from there.
+        const igniteFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uDye;
+            uniform sampler2D uSketch;
+            uniform float gain;
+            void main() {
+                vec3 dye = texture(uDye, vUv).rgb;
+                vec4 s = texture(uSketch, vUv);
+                fragColor = vec4(dye + s.rgb * gain, 1.0);
+            }
+        `;
+        // ─── D2 bridge: Capture — freeze the fluid dye into the sketch ──
+        // Emits a premultiplied color for over-compositing onto the sketch:
+        // alpha = the dye's max channel, so bright dye lands opaque and faint
+        // haze lands translucent; each rgb channel <= alpha by construction,
+        // which is exactly valid premultiplied coverage.
+        const captureFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uDye;
+            void main() {
+                vec3 c = clamp(texture(uDye, vUv).rgb, 0.0, 1.0);
+                float a = max(c.r, max(c.g, c.b));
+                fragColor = vec4(c, a);
+            }
+        `;
         // ─── Sunrays shaders ────────────────────────────────────────────
         const sunraysMaskFrag = `#version 300 es
             precision ${PRECISION} float;

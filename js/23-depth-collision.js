@@ -272,6 +272,8 @@ class DepthEstimator {
         createFromSnapshot: createCollisionFromSnapshot,
         createFromLayerMask: createCollisionFromLayerMask,
         createFromSketch: createFromSketch,
+        setSketchLive: setSketchLive,   // D3/D4: live sketch → collider binding
+        isSketchLive: isSketchLive,
 
         // Refresh depth estimation for a layer
         refreshDepth: refreshLayerDepth,
@@ -810,13 +812,16 @@ class DepthEstimator {
     // 1.75 vibe): read the sketch layer's alpha coverage, downsample to
     // ≤512, and add it as a standard depth-mask collision layer — the
     // whole D0.5 edge pipeline (adaptive cut, blur, coverage solidity)
-    // applies from there. One-shot readback; only runs on button click.
-    function createFromSketch() {
+    // applies from there. One-shot readback (button click / live refresh).
+    // Returns {depth, previewUrl, any} or null; allowEmpty=true returns a
+    // zeroed mask for an empty sketch (live mode: erasing everything must
+    // CLEAR the bound collider, not freeze its last state).
+    function buildSketchDepth(allowEmpty) {
         var sk = window.sketch;
         var canvasEl = document.getElementById('canvas');
         if (!sk || !sk.texture || !canvasEl || typeof gl === 'undefined') {
             console.warn('Sketch layer not available');
-            return;
+            return null;
         }
         var sw = sk.width, sh = sk.height;
         var px = new Uint8Array(sw * sh * 4);
@@ -844,7 +849,7 @@ class DepthEstimator {
                 if (v > 12) any++;
             }
         }
-        if (!any) { console.warn('Sketch is empty — nothing to turn into a collider'); return; }
+        if (!any && !allowEmpty) return null;
         // Grayscale preview PNG for the layer div
         var pc = document.createElement('canvas');
         pc.width = tw; pc.height = th;
@@ -856,10 +861,82 @@ class DepthEstimator {
             img.data[idx + 3] = dv;
         }
         pctx.putImageData(img, 0, 0);
-        var depth = { width: tw, height: th, data: depthData };
-        addCollisionLayer(depth, pc.toDataURL('image/png'), 'Sketch Collision',
-            { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
+        return { depth: { width: tw, height: th, data: depthData }, previewUrl: pc.toDataURL('image/png'), any: any };
     }
+
+    function createFromSketch() {
+        var built = buildSketchDepth(false);
+        if (!built) { console.warn('Sketch is empty — nothing to turn into a collider'); return; }
+        var idx = addCollisionLayer(built.depth, built.previewUrl, 'Sketch Collision',
+            { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
+        // The newest sketch collider is the live-binding target (D4: collision
+        // = a mask binding; the sketch is the mask source).
+        if (idx != null) _sketchColliderIndex = idx;
+        return idx;
+    }
+
+    // ── D3/D4 slice: LIVE sketch → collider binding ───────────────────
+    // While live, every sketch mutation (stroke end / eraser / Clear /
+    // Capture / undo / redo — 05i fires window.__onSketchMutated) refreshes
+    // the bound collision layer in place through updateLayerDepthMask, so
+    // the fluid flows around the drawing AS you draw it. Coalesced to one
+    // readback per 120 ms; refresh runs on stroke END, never per dab.
+    var _sketchLive = false;
+    var _sketchColliderIndex = null;
+    var _sketchRefreshPending = false;
+
+    function _sketchColliderLayer() {
+        if (_sketchColliderIndex == null || !window.layers) return null;
+        return window.layers.find(function (l) { return l.index === _sketchColliderIndex; }) || null;
+    }
+
+    function refreshSketchCollider() {
+        var layer = _sketchColliderLayer();
+        if (!layer) { setSketchLive(false); _sketchColliderIndex = null; return; }
+        var built = buildSketchDepth(true); // empty sketch → zeroed collider
+        if (!built) return;
+        updateLayerDepthMask(_sketchColliderIndex, built.depth);
+        // Keep the visible mask preview in sync with what now collides
+        layer.data = built.previewUrl;
+        var layerDiv = document.getElementById('layer' + _sketchColliderIndex);
+        if (layerDiv) layerDiv.style.backgroundImage = 'url(' + built.previewUrl + ')';
+    }
+
+    function scheduleSketchRefresh() {
+        if (!_sketchLive || _sketchRefreshPending) return;
+        _sketchRefreshPending = true;
+        setTimeout(function () {
+            _sketchRefreshPending = false;
+            if (_sketchLive) refreshSketchCollider();
+        }, 120);
+    }
+    // 05i fires this on every sketch mutation; a cheap no-op unless live.
+    window.__onSketchMutated = scheduleSketchRefresh;
+
+    function setSketchLive(on) {
+        on = !!on;
+        if (on === _sketchLive) return _sketchLive;
+        if (on) {
+            // Bind (or create) the target collider. Empty sketch is fine —
+            // the layer starts zeroed and lights up as you draw.
+            if (!_sketchColliderLayer()) {
+                var built = buildSketchDepth(true);
+                if (!built) return false; // GL/sketch unavailable
+                var idx = addCollisionLayer(built.depth, built.previewUrl, 'Sketch Collision (live)',
+                    { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
+                if (idx == null) return false;
+                _sketchColliderIndex = idx;
+            }
+            _sketchLive = true;
+            refreshSketchCollider();
+        } else {
+            _sketchLive = false; // binding stays; the collider just stops tracking
+        }
+        if (typeof window.__onSketchLiveChanged === 'function') window.__onSketchLiveChanged(_sketchLive);
+        return _sketchLive;
+    }
+
+    function isSketchLive() { return _sketchLive; }
 
     // Throttled entry point — coalesces multiple calls into one rAF
     function updateObstacleFromLayers() {

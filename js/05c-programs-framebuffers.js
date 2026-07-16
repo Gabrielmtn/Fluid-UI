@@ -26,6 +26,8 @@
         const clearProg = new Program(baseVert, clearFrag);
         const obstacleDampProg = new Program(baseVert, obstacleDampFrag);
         const rasterStampProg = new Program(baseVert, rasterStampFrag);
+        const igniteProg = new Program(baseVert, igniteFrag);   // D2 bridge: sketch → dye
+        const captureProg = new Program(baseVert, captureFrag); // D2 bridge: dye → sketch
         const blurProg = new Program(blurVert, blurFrag);
         const sunraysMaskProg = new Program(baseVert, sunraysMaskFrag);
         const sunraysProg = new Program(baseVert, sunraysFrag);

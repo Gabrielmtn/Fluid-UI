@@ -27,6 +27,11 @@
 - [x] **fp16 pressure headroom** — CONFIRMED + FIXED 2026-07-14: Gabriel reported speed-scaled jitter with Multigrid on (gone with it off). Harness measured the MG-converged pressure PEGGED at fp16 max 65504 under fast multi-arm strokes (Jacobi's under-converged field peaks ~1.8k — why MG-off "cured" it); clipped peaks → glitchy projection under fast strokes. Fix: whole pressure system rescaled by `config.PRESSURE_SCALE` (1/64; console A/B: set 1 for legacy) — divergence scales at the source, gradient divides back out, everything between is linear. Mild-regime look preserved (measured). Also shipped: Multigrid tuning sliders (V-Cycles / Pre / Post / Coarse / Relaxation ω) in a panel under the toggle; ω default 1.0 = historical behavior (damped-Jacobi theory tested and refuted — neutral here). NOTE for Gabriel's verify: if fast-stroke jitter persists, next suspect is the governor ladder's MG cliffs (fast-relief flips 2-cycles→1→Jacobi mid-stroke) — JankMonitor `governorState` during a fast stroke will show it.
 - [ ] Watch items (act only if seen): MacCormack checkerboard dithering (→ soft-revert); 144Hz cadence confirm (`JankMonitor.summary().cadence`).
 
+### D7 — Integration & testing (moved here 2026-07-16, Gabriel: park it; resumes after D2–D6 land)
+- [ ] Save/load: versioned project format carrying the full stack (layers, masks, bindings, brush presets); migration from current saves.
+- [ ] Multiplayer: stroke events carry brush engine params; decide raster-layer sync scope (or fluid-only for v1).
+- [ ] Video export composites the full stack; perf budget via JankMonitor (stroke latency target: stamp-to-photon under ~30ms).
+
 ### Phase 1.5 — Painterly upgrades (parked 2026-07-14; wetness attempt reverted 2026-07-14 — land atomically next time; D1 wires these as brush properties)
 
 **Shipped first (822e328): brush-system fixes** — strip renames (Size / Brush), Brush Colors panel at 1x, two-way arm-0 ↔ picker color sync, faithful replay (recorded radius+mult per event, both replay paths), multiplayer replay unblocked (16KB relay cap → quantize + chunk + reassemble). Web deploy still pending for the multiplayer fix to reach web peers (`npm run deploy`).
@@ -71,9 +76,9 @@ Research-sourced (sources in git history of this file). Adoption order per the s
 
 ### D2 — Persistent raster paint layers
 - [x] **Slice 1 (f8d77a6): Sketch layer live** — RGBA8 dye-res FBO composited in displayFrag (after fluid effects, raw vUv — kaleido never warps it), survives FBO reinits. "Paint Into" Fluid|Sketch routing on the D1 engine (sketch = plain draughtsman stamp: no arms/ramps/replay/broadcast); Eraser (destination-out) + Hardness slider + Show/Clear controls; **Sketch → Collider button** (alpha → ≤512 depth-mask collision layer — the "sketch a collider" vibe payoff, one button). Verified E2E: continuous 942-column stroke, eraser 253→3 alpha, reinit survival, collider lights 6,960 obstacle texels, fluid path regression-clean. GAPS for next slices: sketch not in save/load (D7), not in video export compositing (24-video-export reads DOM divs + sim snapshot — sketch is inside the GL canvas so exportStill/video DO capture it via the canvas ✓ but GIF path untested), single layer only (full stack = D2 proper), fluid-target eraser still open (dye-subtract stamp).
+- [x] **Slice 2 (2026-07-16): Ignite + Capture bridges.** 🔥 Ignite pours the sketch into the fluid as dye (one-shot additive, `igniteFrag`; sketch untouched, sim velocity takes over) and ❄ Capture freezes the current dye into the sketch (`captureFrag`: premultiplied over-composite, alpha = max channel so faint haze lands translucent — folds the Capture Layer idea in at raster level; undoable). Both buttons in the strip Brush panel's Sketch group. Harness-verified via texture readbacks both directions. GAP: ignite is one-shot — a continuous "emitter region" binding is D3 mask-consumer territory.
 - [ ] Compositing pipeline: raster layers + fluid layer + existing PNG/capture layers in one ordered stack with blend modes; meets the existing 05k render + video export.
 - [ ] Stroke routing UX: paint INTO fluid vs INTO active raster layer vs INTO mask — one modal choice, obvious in UI.
-- [ ] Bridge tools: "ignite" (raster → dye source), "capture" (fluid → raster; exists as Capture Layer — fold in).
 
 ### D3 — Unified masking
 - [ ] Implement the Mask object + bindings from D0; migrate the three existing mask systems onto it (SAM and depth become mask *sources*, not separate stacks).
@@ -81,6 +86,7 @@ Research-sourced (sources in git history of this file). Adoption order per the s
 - [ ] Masks as first-class layer citizens: per-layer clip masks, visible overlays, invert/feather/threshold ops.
 
 ### D4 — Collision on the unified system
+- [x] **First live binding shipped (2026-07-16): ⟳ Live sketch → collider.** The Sketch Collision layer TRACKS the sketch — every mutation (stroke end, eraser, Clear, Capture, undo/redo; 05i fires `__onSketchMutated`) refreshes the bound layer in place via `updateLayerDepthMask` (readback coalesced to 1/120ms, stroke-END cadence, never per-dab). Empty sketch → zeroed collider (erasing everything clears the wall). Binding auto-disables if the bound layer is deleted (button state follows via `__onSketchLiveChanged`). Draw-a-wall-watch-the-fluid-part is now one toggle. This is the PROTOTYPE for D4's binding model — the mask source is the sketch; generalize to any mask source when D3 lands the Mask object.
 - [ ] Collision = a mask binding with strength/behavior params (existing collisionStrength/obstacle pipeline is the consumer — already fraction-based and multigrid-aware from Phase 1).
 - [ ] Any layer or mask can be bound as obstacle; animated/transforming masks keep collision live (existing transform hooks).
 - [ ] Depth-collision and webcam flows become mask-source presets on this path.
@@ -91,12 +97,8 @@ Research-sourced (sources in git history of this file). Adoption order per the s
 - [ ] Fill/gradient into selection; clear/cut/copy within selection.
 
 ### D6 — Undo/redo unification
-- [ ] One history stack across stroke, layer, mask, and binding ops (today: partial pushUndo for canvas ops only); memory-bounded (tile-based or snapshot-interval for raster).
-
-### D7 — Integration & testing
-- [ ] Save/load: versioned project format carrying the full stack (layers, masks, bindings, brush presets); migration from current saves.
-- [ ] Multiplayer: stroke events carry brush engine params; decide raster-layer sync scope (or fluid-only for v1).
-- [ ] Video export composites the full stack; perf budget via JankMonitor (stroke latency target: stamp-to-photon under ~30ms).
+- [x] **Slice 1 (2026-07-16): sketch stroke undo/redo.** GPU snapshot ring (RGBA8 dye-res, depth 6, FBO-pooled, lazily sized — res changes just invalidate pool entries; restoring an old-res snapshot rescales via normalized-UV copy). One snapshot per mutating op: stroke start (first dab opens, engine-idle closes via 05j), Clear, Capture. Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y route to sketch history while Paint Into = Sketch (deliberately no fall-through to the UI-state undo), plus ↶/↷ buttons in the Brush panel. Live collider follows undo/redo. Verified: stroke→undo→redo→clear→undo alpha round-trip exact. Memory bound: 6 × dye-res RGBA8 (≈96MB worst case at 2048; revisit for mobile in D6 proper).
+- [ ] One history stack across stroke, layer, mask, and binding ops (today: partial pushUndo for canvas ops only; sketch strokes now have their own GPU ring — fold both into the unified stack); memory-bounded (tile-based or snapshot-interval for raster).
 
 ## Phase 2 — UI audit (Stages 1–5) + componentization — AFTER the Drawing Foundation
 

@@ -265,11 +265,25 @@
             // Undo/Redo
             if (ctrlOrMeta && lower === 'z') {
                 e.preventDefault();
+                // D6 slice 1: while painting INTO the sketch layer, Ctrl+Z /
+                // Ctrl+Shift+Z operate on sketch strokes (GPU snapshot ring in
+                // 05i), NOT the UI-state undo — deliberately no fall-through,
+                // or an empty stroke history would silently rewind sliders.
+                if (window.config && window.config.BRUSH_TARGET === 'sketch'
+                    && typeof window.__sketchUndo === 'function') {
+                    if (e.shiftKey) window.__sketchRedo(); else window.__sketchUndo();
+                    return;
+                }
                 if (e.shiftKey) doRedo(); else doUndo();
                 return;
             }
             if (ctrlOrMeta && lower === 'y') {
                 e.preventDefault();
+                if (window.config && window.config.BRUSH_TARGET === 'sketch'
+                    && typeof window.__sketchRedo === 'function') {
+                    window.__sketchRedo();
+                    return;
+                }
                 doRedo();
                 return;
             }

@@ -2026,9 +2026,66 @@
                 window.collisionLayers.createFromSketch();
             }
         });
+        // D3/D4: live binding — the collider tracks the sketch as you draw
+        var liveColliderBtn = document.createElement('button');
+        liveColliderBtn.type = 'button'; liveColliderBtn.className = 'brush-mode-btn';
+        liveColliderBtn.textContent = '⟳ Live';
+        liveColliderBtn.title = 'Live collider: the collision layer keeps tracking the sketch — draw, erase, or undo and the fluid reacts after every stroke';
+        liveColliderBtn.addEventListener('click', function () {
+            if (!window.collisionLayers || typeof window.collisionLayers.setSketchLive !== 'function') return;
+            window.collisionLayers.setSketchLive(!window.collisionLayers.isSketchLive());
+        });
+        // Reflect state changes from either direction (click or auto-disable
+        // when the bound layer gets deleted).
+        window.__onSketchLiveChanged = function (on) {
+            liveColliderBtn.classList.toggle('active', !!on);
+        };
         sketchBtnRow.appendChild(clearSketchBtn);
         sketchBtnRow.appendChild(sketchColliderBtn);
+        sketchBtnRow.appendChild(liveColliderBtn);
         panel.appendChild(sketchBtnRow);
+
+        // D2 bridges: sketch ↔ fluid
+        var bridgeRow = document.createElement('div');
+        bridgeRow.className = 'brush-mode-row';
+        var igniteBtn = document.createElement('button');
+        igniteBtn.type = 'button'; igniteBtn.className = 'brush-mode-btn';
+        igniteBtn.textContent = '🔥 Ignite';
+        igniteBtn.title = 'Pour the sketch into the fluid as dye — the sim takes it from there (sketch is untouched)';
+        igniteBtn.addEventListener('click', function () {
+            if (typeof window.__igniteSketch === 'function') window.__igniteSketch(1);
+        });
+        var captureBtn = document.createElement('button');
+        captureBtn.type = 'button'; captureBtn.className = 'brush-mode-btn';
+        captureBtn.textContent = '❄ Capture';
+        captureBtn.title = 'Freeze the current fluid dye into the sketch layer (composited over what\'s there; undoable)';
+        captureBtn.addEventListener('click', function () {
+            if (typeof window.__captureToSketch === 'function') window.__captureToSketch();
+        });
+        bridgeRow.appendChild(igniteBtn);
+        bridgeRow.appendChild(captureBtn);
+        panel.appendChild(bridgeRow);
+
+        // D6: sketch stroke undo/redo (also Ctrl+Z / Ctrl+Shift+Z in Sketch mode)
+        var undoRow = document.createElement('div');
+        undoRow.className = 'brush-mode-row';
+        var undoBtn = document.createElement('button');
+        undoBtn.type = 'button'; undoBtn.className = 'brush-mode-btn';
+        undoBtn.textContent = '↶ Undo';
+        undoBtn.title = 'Undo the last sketch stroke / Clear / Capture (Ctrl+Z while painting into Sketch)';
+        undoBtn.addEventListener('click', function () {
+            if (typeof window.__sketchUndo === 'function') window.__sketchUndo();
+        });
+        var redoBtn = document.createElement('button');
+        redoBtn.type = 'button'; redoBtn.className = 'brush-mode-btn';
+        redoBtn.textContent = '↷ Redo';
+        redoBtn.title = 'Redo (Ctrl+Shift+Z or Ctrl+Y while painting into Sketch)';
+        redoBtn.addEventListener('click', function () {
+            if (typeof window.__sketchRedo === 'function') window.__sketchRedo();
+        });
+        undoRow.appendChild(undoBtn);
+        undoRow.appendChild(redoBtn);
+        panel.appendChild(undoRow);
 
         // Size fader tweaks also diverge from an applied preset
         var sizeFader = document.getElementById('brushSize');
