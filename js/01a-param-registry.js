@@ -71,6 +71,10 @@
         audioSensitivity: {configKey: null, ui: null, hard: {min: 0.1, max: 3}, def: null, decimals: 1, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.1, scope: "extended"}},
         audioBeatThreshold: {configKey: null, ui: null, hard: {min: 0.1, max: 1}, def: null, decimals: 2, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 1, step: 0.05, scope: "extended"}},
         brushRefreshRate: {configKey: null, ui: null, hard: {min: 0, max: 100}, def: null, decimals: 0, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0, max: 100, step: 1, scope: "extended"}},
+        // D1 stroke engine (dynamically-created in buildBrushSection; no mut —
+        // input-feel params, not style variants)
+        brushStabilizer: {configKey: "BRUSH_STABILIZER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushSpacing: {configKey: "BRUSH_SPACING", ui: null, hard: {min: 0.05, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         shadingIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.1, scope: "extended"}}
     };
     var CHECKBOXES = {
@@ -83,6 +87,8 @@
         preserveFluidOpacity: {def: true, mutScope: null},
         statsToggle: {def: false, mutScope: null},
         transparentMode: {def: false, mutScope: null},
+        brushPressureSize: {def: true, mutScope: null},
+        brushPressureFlow: {def: false, mutScope: null},
         randomColor: {def: true, mutScope: "basic"},
         stepPalette: {def: false, mutScope: "basic"},
         kaleidoToggle: {def: false, mutScope: "basic"},

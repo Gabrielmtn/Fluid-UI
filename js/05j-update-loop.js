@@ -127,7 +127,31 @@
             // Process replay even when paused so right-click replay always works
             processReplay();
             if (!isPaused) {
-                if (pointer.moved && pointer.down && !isReplayActive) {
+                if (window.BrushEngine && (window.BrushEngine.isActive() || window.BrushEngine.pending()) && !isReplayActive) {
+                    // D1 brush engine: drain this frame's dab train (distance-
+                    // parameterized spacing + stabilizer + gap-fill, built in
+                    // 05d0). Replaces the legacy one-splat-per-frame path —
+                    // a fast flick drains many dabs here instead of leaving
+                    // one dab per frame. Dab velocity already carries the
+                    // momentum-per-distance rule, so total injected energy
+                    // matches the legacy feel.
+                    const _dabs = window.BrushEngine.drain(64);
+                    if (_dabs.length) window.__lastPaintMs = nowMs;
+                    for (let di = 0; di < _dabs.length; di++) {
+                        const d = _dabs[di];
+                        // splat-in ramp stays distance-based (same accumulator)
+                        splatStrokeDist += Math.hypot(d.dx, d.dy) / 10 / Math.max(1, canvas.width);
+                        const inMult = getSplatInMult();
+                        const sizeMul = window.BrushEngine.sizeScale(d.p);
+                        const flowMul = window.BrushEngine.flowScale(d.p);
+                        const col = flowMul === 1 ? pointer.color
+                            : [pointer.color[0] * flowMul, pointer.color[1] * flowMul, pointer.color[2] * flowMul];
+                        multiSplatWithRadius(d.x, d.y, d.dx, d.dy, col, config.SPLAT_RADIUS * inMult * sizeMul);
+                        pushStrokeEvent(d.x, d.y, d.dx, d.dy, col);
+                    }
+                    pointer.moved = false;
+                } else if (pointer.moved && pointer.down && !isReplayActive) {
+                    // Legacy path (engine not loaded): one splat per frame
                     window.__lastPaintMs = nowMs; // governor: defer res-tier recovery while strokes are recent
                     // Accumulate cursor travel (fraction of canvas width) so the
                     // splat-in ramp is distance-based / speed-independent.

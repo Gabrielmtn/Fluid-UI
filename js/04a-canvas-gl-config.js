@@ -299,6 +299,18 @@
                                       // projection's tangential slip fully shows). Console-
                                       // tunable for feel testing; no UI slider yet.
 
+            BRUSH_STABILIZER: 0,      // D1 stroke stabilizer (weighted lag): 0 = raw input,
+                                      // 1 = heavy Krita-style smoothing. Brush section slider.
+
+            BRUSH_SPACING: 0.35,      // D1 dab spacing as a fraction of brush diameter —
+                                      // distance-parameterized stroke density (speed-
+                                      // independent; kills the 1-dab-per-frame gaps)
+
+            BRUSH_PRESSURE_SIZE: true,  // Pen pressure → dab size (gamma-0.7 curve;
+                                        // mouse/touch always report pressure 1)
+            BRUSH_PRESSURE_FLOW: false, // Pen pressure → dye intensity (off by default —
+                                        // additive dye reads strong already)
+
             SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
                                       // Painterly sub-grid wisps on moving paint; dies with
                                       // motion so settled artwork stays bit-stable

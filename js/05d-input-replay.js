@@ -358,6 +358,10 @@
             if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
             const inMult = getSplatInMult();
             multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+            // D1 brush engine: stroke movement is emitted as spaced dabs by
+            // the engine (fed from the pointermove listener below, drained in
+            // 05j). The immediate press splat above stays for latency.
+            if (window.BrushEngine) window.BrushEngine.begin(coords.x, coords.y, 1);
             if (typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
@@ -368,6 +372,33 @@
                     (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
                     config.SPLAT_RADIUS
                 );
+            }
+        });
+        // D1 brush engine sample feed: PointerEvents deliver coalesced
+        // sub-frame samples plus pen pressure (mouse/touch fire compatibility
+        // pointer events too, so this covers every device). The legacy
+        // mouse/touch listeners keep every side job (replay, broadcast,
+        // recording, splat-out state) — this listener ONLY feeds the engine.
+        // NOTE: the Splat Rate throttle deliberately does not apply here —
+        // dab density is governed by BRUSH_SPACING now.
+        canvas.addEventListener('pointermove', (e) => {
+            if (!window.BrushEngine || !window.BrushEngine.isActive()) return;
+            if (isPaused || isReplayActive) return;
+            // Touch feeds the engine from touchmove (pointermove for touch is
+            // unreliable without touch-action:none) — skip to avoid double-feed
+            if (e.pointerType === 'touch') return;
+            // Pressure only means something from a pen (mouse reports 0.5
+            // while a button is down per spec — that would shrink the brush)
+            const isPen = e.pointerType === 'pen';
+            const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
+            if (evs && evs.length) {
+                for (let i = 0; i < evs.length; i++) {
+                    const c = getCanvasCoordinates(evs[i]);
+                    window.BrushEngine.move(c.x, c.y, isPen ? evs[i].pressure : 1);
+                }
+            } else {
+                const c = getCanvasCoordinates(e);
+                window.BrushEngine.move(c.x, c.y, isPen ? e.pressure : 1);
             }
         });
         canvas.addEventListener('mousemove', (e) => {
@@ -470,6 +501,9 @@
                 pointer.down = false;
                 pointer.moved = false;
                 if (wasDown) {
+                    // Finish the engine stroke: the stabilizer's lagged tail
+                    // catches up to the release point (dabs drain in 05j)
+                    if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
                     archiveCurrentStroke();
                     advanceColor();
                     // Defer arm color advance until splatOut easing finishes
@@ -497,6 +531,7 @@
             isReplayActive = false;
             window._activeReplayEvents = null;
             window._pausedPointerState = null;
+            if (window.BrushEngine) window.BrushEngine.abort();
             if (pointer.down) {
                 pointer.down = false;
                 pointer.moved = false;
@@ -524,6 +559,11 @@
             if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
             const inMult = getSplatInMult();
             multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+            // D1 brush engine (see mousedown note); touch force where present
+            if (window.BrushEngine) {
+                window.BrushEngine.begin(coords.x, coords.y,
+                    (typeof touch.force === 'number' && touch.force > 0) ? touch.force : 1);
+            }
             if (typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
@@ -548,6 +588,12 @@
             // Notify battery manager of pointer interaction for burst mode
             if (typeof window.batteryHandleInput === 'function') {
                 window.batteryHandleInput();
+            }
+            // D1 engine feed for touch (see pointermove note); spacing governs
+            // density, so this bypasses the Splat Rate throttle below
+            if (pointer.down && window.BrushEngine && window.BrushEngine.isActive() && !isReplayActive) {
+                window.BrushEngine.move(coords.x, coords.y,
+                    (typeof touch.force === 'number' && touch.force > 0) ? touch.force : 1);
             }
             if (pointer.down) {
                 // Brush refresh rate throttle (same as mousemove)
@@ -591,6 +637,7 @@
                 }
                 pointer.down = false;
                 pointer.moved = false;
+                if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
                 archiveCurrentStroke();
                 advanceColor();
                 if (splatOutActive) {
@@ -607,6 +654,7 @@
             if (pointer.down) {
                 pointer.down = false;
                 pointer.moved = false;
+                if (window.BrushEngine) window.BrushEngine.abort();
                 if (typeof broadcastPointerUp === 'function') {
                     broadcastPointerUp();
                 }

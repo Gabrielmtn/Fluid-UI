@@ -1456,6 +1456,68 @@
         rateGroup.appendChild(rateSlider);
         body.appendChild(rateGroup);
 
+        // --- D1 Stroke Engine (stabilizer / spacing / pressure) ---
+        var engineLabel = document.createElement('label');
+        engineLabel.className = 'brush-section-label';
+        engineLabel.textContent = 'Stroke Engine';
+        body.appendChild(engineLabel);
+
+        function engineSlider(id, label, min, max, step, key, fmt) {
+            var group = document.createElement('div');
+            group.className = 'control-group';
+            var lbl = document.createElement('label');
+            lbl.setAttribute('for', id);
+            lbl.innerHTML = label + ' <span class="value-display" id="' + id + 'Value"></span>';
+            var slider = document.createElement('input');
+            slider.type = 'range'; slider.id = id;
+            slider.min = String(min); slider.max = String(max); slider.step = String(step);
+            var cur = (window.config && typeof window.config[key] === 'number') ? window.config[key] : min;
+            try {
+                var saved = window.settingsManager && window.settingsManager.get('brush.' + id);
+                if (typeof saved === 'number') { cur = saved; if (window.config) window.config[key] = saved; }
+            } catch (_) {}
+            slider.value = String(cur);
+            var disp = lbl.querySelector('.value-display');
+            disp.textContent = fmt(cur);
+            slider.addEventListener('input', function () {
+                var v = parseFloat(slider.value);
+                if (window.config) window.config[key] = v;
+                disp.textContent = fmt(v);
+                try { if (window.settingsManager) window.settingsManager.set('brush.' + id, v); } catch (_) {}
+            });
+            group.appendChild(lbl); group.appendChild(slider);
+            body.appendChild(group);
+        }
+        engineSlider('brushStabilizer', 'Stabilizer', 0, 1, 0.01, 'BRUSH_STABILIZER',
+            function (v) { return Math.round(v * 100) + '%'; });
+        engineSlider('brushSpacing', 'Spacing', 0.05, 1, 0.01, 'BRUSH_SPACING',
+            function (v) { return Math.round(v * 100) + '%'; });
+
+        function engineCheckbox(id, label, key) {
+            var row = document.createElement('div');
+            row.className = 'control-group checkbox-group';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.id = id;
+            var on = !!(window.config && window.config[key]);
+            try {
+                var saved = window.settingsManager && window.settingsManager.get('brush.' + id);
+                if (typeof saved === 'boolean') { on = saved; if (window.config) window.config[key] = saved; }
+            } catch (_) {}
+            cb.checked = on;
+            var lbl = document.createElement('label');
+            lbl.setAttribute('for', id);
+            lbl.style.margin = '0';
+            lbl.textContent = label;
+            cb.addEventListener('change', function () {
+                if (window.config) window.config[key] = cb.checked;
+                try { if (window.settingsManager) window.settingsManager.set('brush.' + id, cb.checked); } catch (_) {}
+            });
+            row.appendChild(cb); row.appendChild(lbl);
+            body.appendChild(row);
+        }
+        engineCheckbox('brushPressureSize', 'Pen Pressure → Size', 'BRUSH_PRESSURE_SIZE');
+        engineCheckbox('brushPressureFlow', 'Pen Pressure → Flow', 'BRUSH_PRESSURE_FLOW');
+
         // --- Splat In ---
         var splatInLabel = document.createElement('label');
         splatInLabel.className = 'brush-section-label';

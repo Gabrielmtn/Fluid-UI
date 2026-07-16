@@ -93,7 +93,9 @@
     }
 
     window.BrushEngine = {
-        // Begin a stroke at raw coords (canvas px). Emits the press dab.
+        // Begin a stroke at raw coords (canvas px). Does NOT emit a press dab —
+        // 05d's pointer-down handler fires its immediate press splat for
+        // latency; the engine takes over from the first movement.
         begin: function (x, y, pressure) {
             active = true;
             sx = x; sy = y;
@@ -101,7 +103,6 @@
             residual = 0;
             lastP = (typeof pressure === 'number' && pressure > 0) ? pressure : 1;
             queue.length = 0;
-            queue.push({ x: x, y: y, dx: 0, dy: 0, p: lastP });
         },
 
         // Feed one raw sample (call per pointermove AND per coalesced event).
