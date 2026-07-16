@@ -352,9 +352,33 @@
                     // frozen artwork must not erode.
                     // Batched on decayDt like the base decay (a per-frame
                     // 0.5%·dt boost also rounds to nothing in fp16 at tiny dt).
+                    // Coverage-normalized "am I at/inside a wall" factor, shared
+                    // by the stillness boost and the drain below. Uses the
+                    // INTERIOR band (0.55→0.95 of coverage): the D0.5 blurred
+                    // obstacle field has wide soft skirts, and the old raw-value
+                    // tests read the whole skirt as near-wall — a visible
+                    // forced-dissipation halo around detailed masks
+                    // ("something forcing dissipation", 2026-07-14).
+                    float obsInterior = 0.0;
+                    if (hasObstacle == 1) {
+                        // Dilate by one sim texel: sub-texel mask gaps and the
+                        // thin pinned rim still count as wall-adjacent.
+                        float obsD = texture(uObstacle, vUv).r;
+                        obsD = max(obsD, texture(uObstacle, vUv + vec2(texelSize.x, 0.0)).r);
+                        obsD = max(obsD, texture(uObstacle, vUv - vec2(texelSize.x, 0.0)).r);
+                        obsD = max(obsD, texture(uObstacle, vUv + vec2(0.0, texelSize.y)).r);
+                        obsD = max(obsD, texture(uObstacle, vUv - vec2(0.0, texelSize.y)).r);
+                        float covD = clamp(obsD / max(uObsMax, 0.05), 0.0, 1.0);
+                        obsInterior = smoothstep(0.55, 0.95, covD);
+                    }
                     if ((dissipation < 0.999 || hasObstacle == 1) && frozen < 0.5) {
                         float stillness = exp(-speed * 30.0);
                         float boostRate = stillness * 0.005 * decayDt * 60.0;
+                        // On preserve-style presets (dissipation ≈ 1.0) the
+                        // boost exists ONLY to clear dye pinned in walls — keep
+                        // it wall-local instead of eroding the whole artwork
+                        // the moment any mask is active.
+                        if (dissipation >= 0.999) boostRate *= obsInterior;
                         effectiveDecay *= max(1.0 - boostRate, 0.95);
                     }
                     color = effectiveDecay * source;
@@ -380,25 +404,17 @@
                     // dye pinned against colliders must still drain there — only
                     // true freeze mode preserves it.
                     if (hasObstacle == 1 && frozen < 0.5) {
-                        // Dilate by one sim texel: depth-thresholded masks leave
-                        // sub-texel gaps (image detail) and a thin rim where dye
-                        // is pinned without obs being high at the exact texel.
-                        float obs = texture(uObstacle, vUv).r;
-                        obs = max(obs, texture(uObstacle, vUv + vec2(texelSize.x, 0.0)).r);
-                        obs = max(obs, texture(uObstacle, vUv - vec2(texelSize.x, 0.0)).r);
-                        obs = max(obs, texture(uObstacle, vUv + vec2(0.0, texelSize.y)).r);
-                        obs = max(obs, texture(uObstacle, vUv - vec2(0.0, texelSize.y)).r);
-                        // Wider half-strength apron (±3 texels): with density
-                        // decay near 1.0 (e.g. 0.9969) dye that the flow presses
-                        // against the collider piles up at stagnation zones a few
-                        // texels out and otherwise never clears — the burn halo.
-                        float apron = texture(uObstacle, vUv + vec2(3.0 * texelSize.x, 0.0)).r;
-                        apron = max(apron, texture(uObstacle, vUv - vec2(3.0 * texelSize.x, 0.0)).r);
-                        apron = max(apron, texture(uObstacle, vUv + vec2(0.0, 3.0 * texelSize.y)).r);
-                        apron = max(apron, texture(uObstacle, vUv - vec2(0.0, 3.0 * texelSize.y)).r);
-                        obs = max(obs, apron * 0.55);
-                        float obsSmooth = smoothstep(0.0, 0.45, obs);
-                        color *= 1.0 - obsSmooth * 0.06 * dt * 60.0;
+                        // Interior-only drain (obsInterior above): dissolve dye
+                        // pinned INSIDE walls, not the AA skirt around them.
+                        // The old raw-value curve (smoothstep 0→0.45) plus a
+                        // ±3-texel apron, applied to the blurred coverage
+                        // field, drained a wide band around every mask edge —
+                        // on a fine-detail mask that band covered virtually
+                        // the whole region (the burned halo + forced fade).
+                        // The stagnation-pile-up the apron used to clear is
+                        // handled by the obstacle-aware projection now (flow
+                        // deflects instead of ramming).
+                        color *= 1.0 - obsInterior * 0.06 * dt * 60.0;
                     }
                     // Guaranteed-zero cleanup. Multiplicative decay alone never
                     // reaches zero (and half-float storage stalls it at a dim
@@ -426,11 +442,15 @@
                     // accumulate injected energy they can't advect away
                     // (measured 1.5k→8.4k over 6s of pumping, 2026-07-14) and
                     // a long session rides that to Inf → NaN → total field
-                    // breakdown. Soft-cap the speed far above anything
-                    // visually meaningful (16k texels/s ≈ 256 texels/frame
-                    // displacement) — a pure no-op below the cap.
+                    // breakdown. The cap is RESOLUTION-PROPORTIONAL (velocity
+                    // is stored in grid cells/s, which scale with sim res —
+                    // a fixed cap clipped real strokes at 1k physics detail
+                    // and read as static): 30 canvas-widths/s at any grid,
+                    // ≈ half a canvas of displacement per frame. A pure no-op
+                    // below the cap.
+                    float capSpd = 30.0 / texelSize.x;
                     float spd = length(color.xy);
-                    if (spd > 16000.0) color.xy *= 16000.0 / spd;
+                    if (spd > capSpd) color.xy *= capSpd / spd;
                 }
                 // Overflow mode rim drain: with open boundaries (divergence and
                 // gradient passes stop treating edges as walls) outbound fluid
