@@ -971,15 +971,24 @@
                 if (match) { r = parseInt(match[1]); g = parseInt(match[2]); b = parseInt(match[3]); a = match[4] ? parseFloat(match[4]) : 1.0; }
             }
 
-            // D0.5: soft coverage band matching the obstacle compositor —
-            // the editor preview edge must agree with the collider edge.
-            let band = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
-                ? window.config.DEPTH_EDGE_BAND : 16;
-            if (band < 0.5) band = 0.5;
+            // D0.5 rev 2: fwidth-style adaptive band matching the obstacle
+            // compositor — the editor preview edge must agree with the
+            // collider edge (AA at edges, hard cut on flat midtones).
+            let bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+                ? window.config.DEPTH_EDGE_BAND : 12;
+            if (bandCap < 0.5) bandCap = 0.5;
+            const ddp = shape.depthData;
+            const dpw = shape.depthWidth;
             // No flip: depth data is stored top-down, same as this canvas
             // (matches drawMaskShape in 05m and the obstacle compositor)
             for (let i = 0, n = shape.depthWidth * shape.depthHeight; i < n; i++) {
-                const dv = shape.depthData[i] || 0;
+                const dv = ddp[i] || 0;
+                const xI = i - ((i / dpw) | 0) * dpw;
+                const gx = Math.abs((ddp[i + (xI < dpw - 1 ? 1 : 0)] || 0) - (ddp[i - (xI > 0 ? 1 : 0)] || 0)) * 0.5;
+                const gy = Math.abs((ddp[i + (i < n - dpw ? dpw : 0)] || 0) - (ddp[i - (i >= dpw ? dpw : 0)] || 0)) * 0.5;
+                let band = (gx > gy ? gx : gy) * 0.75;
+                if (band < 0.5) band = 0.5;
+                if (band > bandCap) band = bandCap;
                 let t = (dv - (threshold - band)) / (band * 2);
                 if (t < 0) t = 0; else if (t > 1) t = 1;
                 let cov = t * t * (3 - 2 * t);

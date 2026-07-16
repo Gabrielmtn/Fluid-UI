@@ -25,6 +25,7 @@
             uniform int gateColor;     // 1 = clamp dye at the splat's own color (no HDR overflow into white)
             uniform int isVelocity; // 1 for velocity, 0 for density
             uniform int hasObstacle;
+            uniform float uObsMax;  // max collisionStrength (see obstacleSolidityGLSL)
             float sn_hash(vec2 q) {
                 q = fract(q * vec2(123.34, 345.45));
                 q += dot(q, q + 34.345);
@@ -48,11 +49,12 @@
                 // partial-strength texels must still block firmly.
                 float obsBlock = 1.0;
                 if (hasObstacle == 1) {
-                    // Must match obstacleSolidityGLSL's curve (0.25→0.5): dye
-                    // injection blocking and the projection's wall must agree
-                    // on where the wall IS, or paint deposits inside a wall
-                    // the flow respects (burned-in rims).
-                    obsBlock = 1.0 - smoothstep(0.25, 0.5, texture(uObstacle, vUv).r);
+                    // Must match obstacleSolidityGLSL's curve: dye injection
+                    // blocking and the projection's wall must agree on where
+                    // the wall IS, or paint deposits inside a wall the flow
+                    // respects (burned-in rims). See the solidity() comment.
+                    float ocov = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
+                    obsBlock = 1.0 - smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.2, 0.8, ocov);
                 }
                 if (isVelocity == 1) {
                     // Motion Isolation: prevent new velocity from affecting areas with existing velocity
@@ -472,21 +474,24 @@
         // convention as the splat shader's obsBlock. (The multigrid solve
         // will restrict these fractions down its pyramid — keep them float.)
         const obstacleSolidityGLSL = `
+            uniform float uObsMax; // max collisionStrength among composited
+                                   // collision sources (JS: window.__obsStrengthMax)
             float solidity(vec2 uv) {
-                // Lower edge 0.25 (was 0.1): with D0.5's antialiased obstacle
-                // fractions, colliders carry a soft coverage apron. At 0.1 the
-                // apron's weak tail acted near-solid, and the MG pyramid's
-                // fraction restriction re-saturated it at EVERY level — a fat
-                // phantom wall well outside the visible edge that only the
-                // converged (multigrid) solve could feel ("feels bad with MG
-                // on", 2026-07-14). 0.25 puts the effective wall back at the
-                // half-coverage contour (masks write at collisionStrength 0.7
-                // → AA edge texels read ~0.35) while weak tails stay fluid.
-                // Saturation at 0.5 unchanged — interiors block exactly as
-                // before. NOTE: sub-half-coverage THIN lines (< ~1 sim texel)
-                // now block partially, not firmly — D1's brush guarantees
-                // sketched colliders a minimum width.
-                return smoothstep(0.25, 0.5, texture(uObstacle, uv).r);
+                // COVERAGE and STRENGTH are different quantities (D0.5 rev 3,
+                // 2026-07-14). The obstacle texel stores coverage*strength; a
+                // fixed absolute smoothstep window therefore changed the
+                // EDGE GEOMETRY with the strength slider — at strength 1.0 it
+                // sliced a sub-texel band out of the AA ramp (binary walls →
+                // whole-canvas velocity fuzz under the converged MG solve),
+                // at 0.4 it never saturated (calm but leaky). Separating them:
+                //  - cov = texel / maxStrength  → the antialiased coverage,
+                //    given a strength-INDEPENDENT ~1-texel edge ramp (0.2→0.8
+                //    of the blur-bounded spatial ramp);
+                //  - the interior response keeps the EXACT legacy strength
+                //    curve smoothstep(0.25, 0.5, strength): 0.7 → fully
+                //    blocking, ≤0.25 → fluid, between → permeable wall.
+                float cov = clamp(texture(uObstacle, uv).r / max(uObsMax, 0.05), 0.0, 1.0);
+                return smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.2, 0.8, cov);
             }
         `;
         const divergenceFrag = `#version 300 es

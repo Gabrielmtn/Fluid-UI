@@ -205,6 +205,8 @@
                 gl.uniform1f(divergenceProg.uniforms.pScale, _pScale);
                 gl.uniform1f(divergenceProg.uniforms.openBoundary, _openBoundary);
                 gl.uniform1i(divergenceProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                const _obsMax = window.__obsStrengthMax || 0.7;
+                gl.uniform1f(divergenceProg.uniforms.uObsMax, _obsMax);
                 gl.uniform1i(divergenceProg.uniforms.uVelocity, 0);
                 gl.uniform1i(divergenceProg.uniforms.uObstacle, 1);
                 gl.activeTexture(gl.TEXTURE0);
@@ -249,6 +251,7 @@
                     // Plain Jacobi keeps ω = 1.0 — bit-identical to the
                     // pre-relax shader (mix(pC, jacobi, 1.0) == jacobi)
                     gl.uniform1f(pressureProg.uniforms.relax, 1.0);
+                    gl.uniform1f(pressureProg.uniforms.uObsMax, _obsMax);
                     gl.uniform1i(pressureProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                     gl.uniform1i(pressureProg.uniforms.uDivergence, 0);
                     gl.uniform1i(pressureProg.uniforms.uObstacle, 2);
@@ -269,6 +272,7 @@
                 // 6. Gradient subtract → divergence-free velocity
                 gradientProg.bind();
                 gl.uniform2f(gradientProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform1f(gradientProg.uniforms.uObsMax, _obsMax);
                 gl.uniform1f(gradientProg.uniforms.pScale, _pScale);
                 gl.uniform1f(gradientProg.uniforms.openBoundary, _openBoundary);
                 gl.uniform1i(gradientProg.uniforms.hasObstacle, obsActive ? 1 : 0);

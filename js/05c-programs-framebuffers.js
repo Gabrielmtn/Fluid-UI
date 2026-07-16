@@ -294,6 +294,7 @@
                 gl.uniform2f(pressureProg.uniforms.texelSize, 1.0 / lv.w, 1.0 / lv.h);
                 gl.uniform1f(pressureProg.uniforms.hSq, lv.hSq);
                 gl.uniform1f(pressureProg.uniforms.relax, _relax);
+                gl.uniform1f(pressureProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
                 gl.uniform1i(pressureProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(pressureProg.uniforms.uDivergence, 0);
                 gl.uniform1i(pressureProg.uniforms.uPressure, 1);
@@ -324,6 +325,7 @@
                     smooth(lv, nPre);
                     mgResidualProg.bind();
                     gl.viewport(0, 0, lv.w, lv.h);
+                    gl.uniform1f(mgResidualProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
                     gl.uniform2f(mgResidualProg.uniforms.texelSize, 1.0 / lv.w, 1.0 / lv.h);
                     gl.uniform1f(mgResidualProg.uniforms.hSq, lv.hSq);
                     gl.uniform1i(mgResidualProg.uniforms.hasObstacle, obsActive ? 1 : 0);

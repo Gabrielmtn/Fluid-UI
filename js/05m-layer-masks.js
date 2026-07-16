@@ -117,16 +117,25 @@
                 const data = _dmImgData.data;
                 // Zero out buffer — we only write obstacle pixels below
                 data.fill(0);
-                // D0.5 edge quality: soft coverage band around the threshold,
+                // D0.5 edge quality rev 2: fwidth-style ADAPTIVE soft cut,
                 // matching the obstacle compositor in 23-depth-collision.js —
                 // the visible mask edge and the collider edge must agree.
-                let band = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
-                    ? window.config.DEPTH_EDGE_BAND : 16;
-                if (band < 0.5) band = 0.5;
+                // Band scales with the local depth gradient: edges get ~0.75px
+                // of AA, flat midtone regions cut hard (no porous half-walls).
+                let bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+                    ? window.config.DEPTH_EDGE_BAND : 12;
+                if (bandCap < 0.5) bandCap = 0.5;
+                const dd = shape.depthData;
                 // No flip: depth data is stored top-down, same as this canvas.
                 // (GL orientation is handled once at obstacle-texture upload.)
                 for (let i = 0, n = w * h; i < n; i++) {
-                    const dv = shape.depthData[i] || 0;
+                    const dv = dd[i] || 0;
+                    const xI = i - ((i / w) | 0) * w;
+                    const gx = Math.abs((dd[i + (xI < w - 1 ? 1 : 0)] || 0) - (dd[i - (xI > 0 ? 1 : 0)] || 0)) * 0.5;
+                    const gy = Math.abs((dd[i + (i < n - w ? w : 0)] || 0) - (dd[i - (i >= w ? w : 0)] || 0)) * 0.5;
+                    let band = (gx > gy ? gx : gy) * 0.75;
+                    if (band < 0.5) band = 0.5;
+                    if (band > bandCap) band = bandCap;
                     let t = (dv - (threshold - band)) / (band * 2);
                     if (t < 0) t = 0; else if (t > 1) t = 1;
                     let cov = t * t * (3 - 2 * t);

@@ -252,6 +252,7 @@ class DepthEstimator {
     // Collision state
     var collisionEnabled = false;
     var obstacleCanvas = null;   // offscreen canvas for rasterizing masks
+    var _obsBlurCanvas = null, _obsBlurCtx = null; // sim-scale edge smoothing (D0.5 rev 3)
     var obstacleCtx = null;
     var webcamStreams = {};       // layerIndex → { stream, video, intervalId }
     // Procedural obstacle source: a draw(ctx, simW, simH) callback composited
@@ -845,9 +846,14 @@ class DepthEstimator {
         obstacleCtx.clearRect(0, 0, obsW, obsH);
 
         var hasAny = false;
+        // Max strength among composited sources — the shaders divide it back
+        // out to recover per-texel COVERAGE (see obstacleSolidityGLSL in 05b)
+        var strengthMax = proceduralDraw ? 1.0 : 0.0;
         (window.layers || []).forEach(function (layer) {
             if (!layer.isCollision) return;
             if (!layer.mask || !layer.mask.enabled) return;
+            var st = (layer.collisionStrength !== undefined) ? layer.collisionStrength : 0.7;
+            if (st > strengthMax) strengthMax = st;
 
             layer.mask.shapes.forEach(function (shape) {
                 if (shape.type !== 'depth-mask') return;
@@ -865,22 +871,32 @@ class DepthEstimator {
                 var invert = !!shape.invert;
                 var alphaVal = Math.round((layer.collisionStrength !== undefined ? layer.collisionStrength : 0.7) * 255);
 
-                // D0.5 edge quality: soft coverage across ±band depth units
-                // around the threshold instead of the old 1-bit cut. The hard
-                // cut froze the collider edge as a stair-step at depth-map
-                // resolution — nothing downstream could recover the sub-texel
-                // edge position. The smoothstep band preserves it as a
-                // continuous ramp (band console-tunable via
-                // config.DEPTH_EDGE_BAND; 0.5 ≈ the legacy hard edge).
-                var band = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
-                    ? window.config.DEPTH_EDGE_BAND : 16;
-                if (band < 0.5) band = 0.5;
+                // D0.5 edge quality, rev 2 (2026-07-14): fwidth-style ADAPTIVE
+                // soft cut. The band scales with the LOCAL depth gradient, so
+                // steep edges get ~0.75px of antialiasing (sub-texel collider
+                // edges) while flat midtone regions get a hard cut. The first
+                // rev's FIXED ±band turned every flat region hovering near the
+                // threshold — common in real photo/webcam depth — into a huge
+                // porous half-solidity field, and the converged MG solve read
+                // it as a noisy sponge: whole-canvas velocity fuzz that got
+                // worse with collisionStrength. config.DEPTH_EDGE_BAND is now
+                // the CAP on the band (0.5 ≈ fully hard everywhere).
+                var bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+                    ? window.config.DEPTH_EDGE_BAND : 12;
+                if (bandCap < 0.5) bandCap = 0.5;
+                var dd = shape.depthData;
                 // Composite in screen space (top-down). GL orientation is
                 // handled by a single vertical flip in updateObstacleTexture,
                 // so transforms here behave exactly like the CSS transform
                 // on the layer div.
                 for (var i = 0, n = tw * th; i < n; i++) {
-                    var dv = shape.depthData[i] || 0;
+                    var dv = dd[i] || 0;
+                    var xI = i - ((i / tw) | 0) * tw; // i % tw without modulo
+                    var gx = Math.abs((dd[i + (xI < tw - 1 ? 1 : 0)] || 0) - (dd[i - (xI > 0 ? 1 : 0)] || 0)) * 0.5;
+                    var gy = Math.abs((dd[i + (i < n - tw ? tw : 0)] || 0) - (dd[i - (i >= tw ? tw : 0)] || 0)) * 0.5;
+                    var band = (gx > gy ? gx : gy) * 0.75;
+                    if (band < 0.5) band = 0.5;
+                    if (band > bandCap) band = bandCap;
                     var t = (dv - (threshold - band)) / (band * 2);
                     if (t < 0) t = 0; else if (t > 1) t = 1;
                     var cov = t * t * (3 - 2 * t);
@@ -939,8 +955,27 @@ class DepthEstimator {
             obstacleCtx.restore();
         }
 
+        window.__obsStrengthMax = strengthMax > 0 ? strengthMax : 0.7;
         if (hasAny && typeof window.updateObstacleTexture === 'function') {
-            window.updateObstacleTexture(obstacleCanvas);
+            // D0.5 rev 3: constant-width smoothing at SIM scale before upload.
+            // Bounds every coverage ramp to ~1.5 sim texels regardless of the
+            // depth map's local gradient: hard "coastlines" through flat
+            // near-threshold regions stop reading as ragged binary walls (the
+            // whole-canvas velocity fuzz the converged MG solve produced at
+            // high collisionStrength), while wide mushy aprons stay impossible
+            // (the blur radius, not the depth data, caps the ramp). GPU blur
+            // via canvas filter — no pixel loops.
+            if (!_obsBlurCanvas || _obsBlurCanvas.width !== obsW || _obsBlurCanvas.height !== obsH) {
+                _obsBlurCanvas = document.createElement('canvas');
+                _obsBlurCanvas.width = obsW;
+                _obsBlurCanvas.height = obsH;
+                _obsBlurCtx = _obsBlurCanvas.getContext('2d');
+            }
+            _obsBlurCtx.clearRect(0, 0, obsW, obsH);
+            _obsBlurCtx.filter = 'blur(' + (ss * 0.5) + 'px)';
+            _obsBlurCtx.drawImage(obstacleCanvas, 0, 0);
+            _obsBlurCtx.filter = 'none';
+            window.updateObstacleTexture(_obsBlurCanvas);
         } else if (!hasAny && typeof window.clearObstacleTexture === 'function') {
             window.clearObstacleTexture();
         }

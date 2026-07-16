@@ -277,14 +277,14 @@
                                       // (textbook MG uses ~0.8, but it measured neutral
                                       // here — see pressureFrag).
 
-            DEPTH_EDGE_BAND: 6,       // D0.5 edge quality: depth-mask colliders cut with a
-                                      // smoothstep over ±band depth units around the layer's
-                                      // threshold instead of a 1-bit step — the collider edge
-                                      // stays a continuous ramp the cut-cell projection can
-                                      // resolve sub-texel. Console-tunable (0.5 ≈ legacy hard).
-                                      // Default 16 → 6 (2026-07-14): on smooth Depth-Anything
-                                      // gradients ±16 grew mushy aprons the converged MG solve
-                                      // felt as fat walls; 6 keeps the AA without the mush.
+            DEPTH_EDGE_BAND: 12,      // D0.5 edge quality (rev 2): CAP on the fwidth-style
+                                      // adaptive soft cut for depth-mask colliders. The band
+                                      // scales with the LOCAL depth gradient (edges get
+                                      // ~0.75px of AA; flat midtone regions cut hard), capped
+                                      // here. Rev 1's FIXED band turned flat regions near the
+                                      // threshold into porous half-walls — whole-canvas fuzz
+                                      // under high strength + multigrid. 0.5 ≈ legacy hard
+                                      // cut everywhere. Console-tunable.
 
             PRESSURE_SCALE: 1 / 64,   // fp16 headroom rescale of the pressure system.
                                       // Multigrid converges the TRUE pressure, which

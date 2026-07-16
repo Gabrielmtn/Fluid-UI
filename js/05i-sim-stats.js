@@ -27,6 +27,7 @@
             const _splatObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
             gl.uniform1i(splatProg.uniforms.hasObstacle, _splatObsActive ? 1 : 0);
             if (_splatObsActive) {
+                gl.uniform1f(splatProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
                 gl.uniform1i(splatProg.uniforms.uObstacle, 1);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
@@ -72,6 +73,7 @@
             const _ringObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
             gl.uniform1i(splatProg.uniforms.hasObstacle, _ringObsActive ? 1 : 0);
             if (_ringObsActive) {
+                gl.uniform1f(splatProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
                 gl.uniform1i(splatProg.uniforms.uObstacle, 1);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
@@ -117,6 +119,7 @@
             const _barObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
             gl.uniform1i(splatProg.uniforms.hasObstacle, _barObsActive ? 1 : 0);
             if (_barObsActive) {
+                gl.uniform1f(splatProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
                 gl.uniform1i(splatProg.uniforms.uObstacle, 1);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
