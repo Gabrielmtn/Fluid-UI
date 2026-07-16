@@ -824,15 +824,25 @@ class DepthEstimator {
         var simW = window.simTexWidth || 128;
         var simH = window.simTexHeight || 128;
 
+        // D0.5 edge quality: compose the obstacle at 2x sim resolution — the
+        // existing drawImage in updateObstacleTexture box-filters it back
+        // down to sim res, turning stair-steps into fractional coverage the
+        // cut-cell projection already consumes correctly (solidity is a
+        // smoothstep over fractions; the MG pyramid restricts fractions).
+        // Capped so the compose canvas never exceeds 2048 on a side.
+        var ss = (simW * 2 <= 2048 && simH * 2 <= 2048) ? 2 : 1;
+        var obsW = simW * ss;
+        var obsH = simH * ss;
+
         // Reuse obstacle canvas
-        if (!obstacleCanvas || obstacleCanvas.width !== simW || obstacleCanvas.height !== simH) {
+        if (!obstacleCanvas || obstacleCanvas.width !== obsW || obstacleCanvas.height !== obsH) {
             obstacleCanvas = document.createElement('canvas');
-            obstacleCanvas.width = simW;
-            obstacleCanvas.height = simH;
+            obstacleCanvas.width = obsW;
+            obstacleCanvas.height = obsH;
             obstacleCtx = obstacleCanvas.getContext('2d', { willReadFrequently: true });
         }
 
-        obstacleCtx.clearRect(0, 0, simW, simH);
+        obstacleCtx.clearRect(0, 0, obsW, obsH);
 
         var hasAny = false;
         (window.layers || []).forEach(function (layer) {
@@ -855,18 +865,31 @@ class DepthEstimator {
                 var invert = !!shape.invert;
                 var alphaVal = Math.round((layer.collisionStrength !== undefined ? layer.collisionStrength : 0.7) * 255);
 
+                // D0.5 edge quality: soft coverage across ±band depth units
+                // around the threshold instead of the old 1-bit cut. The hard
+                // cut froze the collider edge as a stair-step at depth-map
+                // resolution — nothing downstream could recover the sub-texel
+                // edge position. The smoothstep band preserves it as a
+                // continuous ramp (band console-tunable via
+                // config.DEPTH_EDGE_BAND; 0.5 ≈ the legacy hard edge).
+                var band = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+                    ? window.config.DEPTH_EDGE_BAND : 16;
+                if (band < 0.5) band = 0.5;
                 // Composite in screen space (top-down). GL orientation is
                 // handled by a single vertical flip in updateObstacleTexture,
                 // so transforms here behave exactly like the CSS transform
                 // on the layer div.
                 for (var i = 0, n = tw * th; i < n; i++) {
                     var dv = shape.depthData[i] || 0;
-                    var isObs = invert ? (dv < threshold) : (dv >= threshold);
+                    var t = (dv - (threshold - band)) / (band * 2);
+                    if (t < 0) t = 0; else if (t > 1) t = 1;
+                    var cov = t * t * (3 - 2 * t);
+                    if (invert) cov = 1 - cov;
                     var idx = i << 2; // *4 via shift
                     d[idx] = 255;
                     d[idx + 1] = 255;
                     d[idx + 2] = 255;
-                    d[idx + 3] = isObs ? alphaVal : 0;
+                    d[idx + 3] = (cov * alphaVal + 0.5) | 0;
                 }
 
                 _shapeCtx.putImageData(_shapeImgData, 0, 0);
@@ -879,15 +902,15 @@ class DepthEstimator {
                 var cssH = (wrap && wrap.clientHeight) || canvasEl.clientHeight || canvasEl.height || 1;
                 var bufW = canvasEl.width || 1;
                 var bufH = canvasEl.height || 1;
-                var lx = (layer.x || 0) * (simW / cssW);
-                var ly = (layer.y || 0) * (simH / cssH);
-                var sx = simW / bufW;
-                var sy = simH / bufH;
+                var lx = (layer.x || 0) * (obsW / cssW);
+                var ly = (layer.y || 0) * (obsH / cssH);
+                var sx = obsW / bufW;
+                var sy = obsH / bufH;
                 var lScaleX = layer.scaleX || 1;
                 var lScaleY = layer.scaleY || 1;
                 var lRot = (layer.rotation || 0) * Math.PI / 180;
-                var cx = simW * 0.5;
-                var cy = simH * 0.5;
+                var cx = obsW * 0.5;
+                var cy = obsH * 0.5;
 
                 obstacleCtx.save();
                 obstacleCtx.globalCompositeOperation = 'lighter';
@@ -912,7 +935,7 @@ class DepthEstimator {
             hasAny = true;
             obstacleCtx.save();
             obstacleCtx.globalCompositeOperation = 'lighter';
-            try { proceduralDraw(obstacleCtx, simW, simH); } catch (_) {}
+            try { proceduralDraw(obstacleCtx, obsW, obsH); } catch (_) {}
             obstacleCtx.restore();
         }
 

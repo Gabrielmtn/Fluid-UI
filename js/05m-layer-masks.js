@@ -117,17 +117,26 @@
                 const data = _dmImgData.data;
                 // Zero out buffer — we only write obstacle pixels below
                 data.fill(0);
+                // D0.5 edge quality: soft coverage band around the threshold,
+                // matching the obstacle compositor in 23-depth-collision.js —
+                // the visible mask edge and the collider edge must agree.
+                let band = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+                    ? window.config.DEPTH_EDGE_BAND : 16;
+                if (band < 0.5) band = 0.5;
                 // No flip: depth data is stored top-down, same as this canvas.
                 // (GL orientation is handled once at obstacle-texture upload.)
                 for (let i = 0, n = w * h; i < n; i++) {
                     const dv = shape.depthData[i] || 0;
-                    const isObstacle = invert ? (dv < threshold) : (dv >= threshold);
-                    if (isObstacle) {
+                    let t = (dv - (threshold - band)) / (band * 2);
+                    if (t < 0) t = 0; else if (t > 1) t = 1;
+                    let cov = t * t * (3 - 2 * t);
+                    if (invert) cov = 1 - cov;
+                    if (cov > 0) {
                         const idx = i * 4;
                         data[idx] = 255;
                         data[idx + 1] = 255;
                         data[idx + 2] = 255;
-                        data[idx + 3] = 255;
+                        data[idx + 3] = (cov * 255 + 0.5) | 0;
                     }
                 }
                 _dmTempCtx.putImageData(_dmImgData, 0, 0);
@@ -158,7 +167,10 @@
                         data[idx] = 255;       // R
                         data[idx + 1] = 255;   // G
                         data[idx + 2] = 255;   // B
-                        data[idx + 3] = 255;   // A
+                        // D0.5: soft masks (samSoft) store 0-255 coverage —
+                        // use it as alpha for antialiased edges. Legacy masks
+                        // store 0/1 and stay hard.
+                        data[idx + 3] = shape.samSoft ? v : 255;
                     }
                 }
                 // If the mask is empty for some reason, fall back to the

@@ -583,14 +583,46 @@ class SAMSegmenter {
                 });
             }
 
-            // If the SAM mask resolution differs from the display canvas
-            // (common for high-res images), rescale all candidates into the
-            // display coordinate system so that the preview and final mask
-            // shapes line up with what the user sees.
+            // D0.5 edge quality: candidates leave this function as CONTINUOUS
+            // 0-255 coverage (`soft: true`), never 1-bit. The old path
+            // nearest-neighbor-rescaled the binary mask to display size —
+            // stair-stepped edges frozen into every downstream consumer
+            // (visual clip, collider, point tests). Bilinear sampling of the
+            // binary field gives a proper ~1px antialiased edge for free.
+            // Legacy 0/1 masks (old saves, brightness fallback) carry no
+            // `soft` flag and consumers keep treating them as hard.
+
+            // Bilinear sample of a 0/1 field at continuous coords → 0..1
+            function sampleBilinear(srcData, srcW, srcH, fx, fy) {
+                const x0 = Math.floor(fx), y0 = Math.floor(fy);
+                const x1 = Math.min(x0 + 1, srcW - 1), y1 = Math.min(y0 + 1, srcH - 1);
+                const cx0 = Math.max(x0, 0), cy0 = Math.max(y0, 0);
+                const tx = fx - x0, ty = fy - y0;
+                const v00 = srcData[cy0 * srcW + cx0], v10 = srcData[cy0 * srcW + x1];
+                const v01 = srcData[y1 * srcW + cx0], v11 = srcData[y1 * srcW + x1];
+                return (v00 * (1 - tx) + v10 * tx) * (1 - ty) + (v01 * (1 - tx) + v11 * tx) * ty;
+            }
+            // 3x3 box filter: 0/1 field → 0-255 coverage with a 1px soft edge
+            // (used when no rescale is needed, so same-res masks get AA too)
+            function binaryToCoverage(srcData, srcW, srcH) {
+                const out = new Uint8Array(srcW * srcH);
+                for (let y = 0; y < srcH; y++) {
+                    const y0 = Math.max(y - 1, 0), y1 = Math.min(y + 1, srcH - 1);
+                    for (let x = 0; x < srcW; x++) {
+                        const x0 = Math.max(x - 1, 0), x1 = Math.min(x + 1, srcW - 1);
+                        let sum = 0, cnt = 0;
+                        for (let yy = y0; yy <= y1; yy++)
+                            for (let xx = x0; xx <= x1; xx++) { sum += srcData[yy * srcW + xx]; cnt++; }
+                        out[y * srcW + x] = Math.round((sum / cnt) * 255);
+                    }
+                }
+                return out;
+            }
+
             const dispW = this.displayWidth || width;
             const dispH = this.displayHeight || height;
             if ((dispW !== width || dispH !== height) && candidates.length) {
-                console.log('🔧 Rescaling SAM masks to display size:', {
+                console.log('🔧 Rescaling SAM masks to display size (bilinear coverage):', {
                     maskSize: [width, height],
                     displaySize: [dispW, dispH],
                 });
@@ -606,13 +638,13 @@ class SAMSegmenter {
                     let nonZero = 0;
 
                     for (let y = 0; y < dispH; y++) {
-                        const sy = Math.floor((y * srcH) / dispH);
+                        const fy = (y + 0.5) * srcH / dispH - 0.5;
                         for (let x = 0; x < dispW; x++) {
-                            const sx = Math.floor((x * srcW) / dispW);
-                            const srcIdx = sy * srcW + sx;
-                            if (srcData[srcIdx] > 0) {
+                            const fx = (x + 0.5) * srcW / dispW - 0.5;
+                            const cov = sampleBilinear(srcData, srcW, srcH, fx, fy);
+                            if (cov > 0) {
                                 const dstIdx = y * dispW + x;
-                                scaled[dstIdx] = 1;
+                                scaled[dstIdx] = Math.round(cov * 255);
                                 nonZero++;
                                 if (x < minX) minX = x;
                                 if (x > maxX) maxX = x;
@@ -628,6 +660,7 @@ class SAMSegmenter {
                     }
 
                     c.data = scaled;
+                    c.soft = true;
                     c.width = dispW;
                     c.height = dispH;
                     c.boundingBox = {
@@ -636,6 +669,21 @@ class SAMSegmenter {
                         width: maxX - minX + 1,
                         height: maxY - minY + 1,
                     };
+                }
+            } else {
+                // Same resolution: still convert 0/1 → antialiased coverage
+                for (let ci = 0; ci < candidates.length; ci++) {
+                    const c = candidates[ci];
+                    c.data = binaryToCoverage(c.data, c.width, c.height);
+                    c.soft = true;
+                    // The 3x3 filter grows the edge by 1px — expand the bbox
+                    // so the crop in runSAMSegmentation keeps the AA skirt
+                    const bb = c.boundingBox;
+                    const nx = Math.max(0, bb.x - 1), ny = Math.max(0, bb.y - 1);
+                    bb.width = Math.min(c.width - nx, bb.width + (bb.x - nx) + 1);
+                    bb.height = Math.min(c.height - ny, bb.height + (bb.y - ny) + 1);
+                    bb.x = nx;
+                    bb.y = ny;
                 }
             }
 

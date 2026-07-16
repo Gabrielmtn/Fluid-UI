@@ -277,6 +277,12 @@
                                       // (textbook MG uses ~0.8, but it measured neutral
                                       // here — see pressureFrag).
 
+            DEPTH_EDGE_BAND: 16,      // D0.5 edge quality: depth-mask colliders cut with a
+                                      // smoothstep over ±band depth units around the layer's
+                                      // threshold instead of a 1-bit step — the collider edge
+                                      // stays a continuous ramp the cut-cell projection can
+                                      // resolve sub-texel. Console-tunable (0.5 ≈ legacy hard).
+
             PRESSURE_SCALE: 1 / 64,   // fp16 headroom rescale of the pressure system.
                                       // Multigrid converges the TRUE pressure, which
                                       // saturated fp16 (pegged 65504) under fast multi-arm
