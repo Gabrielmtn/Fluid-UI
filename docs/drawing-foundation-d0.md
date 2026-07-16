@@ -113,12 +113,13 @@ Single normalized format `{t, x, y (0-1), pressure, dx, dy, brush:{radius, mult,
 
 ---
 
-## 4. Open questions for Gabriel
+## 4. Decisions (Gabriel, 2026-07-14)
 
-1. **D0.5 quick pass first?** Smoother colliders in days, before the real overhaul. Recommended: yes.
-2. **Tablet pressure/tilt** — D1 moves to PointerEvents regardless; is pressure→size/flow in v1, or wired-but-dormant?
-3. **V1 tool scope** for Krita parity: freehand + eraser + basic shapes + fill? Selections in D5 or sooner?
-4. **Raster layer compositing home**: inside the GL canvas (one export path, enables fluid↔raster blend modes) vs DOM divs like image layers (simpler, but export/multiplayer stay forked). Recommended: GL.
-5. **`.fluid` project format** — commit to the versioned container in D7, or keep extending the current preset JSON?
-6. **Multiplayer scope for drawing**: strokes already sync; raster/mask sync in v1 or fluid-only (recommended: fluid-only v1)?
-7. **Undo depth**: is stroke-level undo on raster layers required for v1, or is layer/mask-op undo enough to start?
+1. **D0.5 quick pass** — DONE (shipped same day; three field-tested revisions — see TODO. Structural lesson baked into D3: coverage and strength are separate channels).
+2. **Tablet pressure/tilt** — ✅ wired + basic curves in v1: PointerEvents with pressure→size/flow, graceful mouse/touch fallback; tilt captured in the schema, unused for now.
+3. **V1 tool scope** — ✅ freehand + eraser + mask brush. Shapes/fill/selections stay D3–D5.
+4. **Raster compositing home** — ✅ inside the GL canvas (GPU-texture layers, one export path, fluid↔raster blend modes possible).
+5. **`.fluid` format** — ✅ committed: versioned container in D7 with migration from current saves.
+6. **Multiplayer scope** — fluid-only v1 (strokes sync; raster/mask sync deferred).
+7. **Undo depth** — open; decide during D6 (default: layer/mask-op undo first, tile-based stroke undo if budget allows).
+8. **Device-orientation gravity** — DROPPED (out of scope, Gabriel 2026-07-14).
