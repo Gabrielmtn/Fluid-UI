@@ -215,6 +215,32 @@
                 return vec2(dy, -dx) * (0.5 / e);
             }
         `;
+        // Obstacle solidity: defined HERE (above the advection shaders)
+        // because rk2Backtrace's obstacle-aware probes call solidity() —
+        // every includer must interpolate this snippet first. Consumed by
+        // the projection passes (divergence/pressure/mgResidual/gradient)
+        // further down and by all three dye advection passes.
+        const obstacleSolidityGLSL = `
+            uniform float uObsMax; // max collisionStrength among composited
+                                   // collision sources (JS: window.__obsStrengthMax)
+            float solidity(vec2 uv) {
+                // COVERAGE and STRENGTH are different quantities (D0.5 rev 3,
+                // 2026-07-14). The obstacle texel stores coverage*strength; a
+                // fixed absolute smoothstep window therefore changed the
+                // EDGE GEOMETRY with the strength slider — at strength 1.0 it
+                // sliced a sub-texel band out of the AA ramp (binary walls →
+                // whole-canvas velocity fuzz under the converged MG solve),
+                // at 0.4 it never saturated (calm but leaky). Separating them:
+                //  - cov = texel / maxStrength  → the antialiased coverage,
+                //    given a strength-INDEPENDENT ~1-texel edge ramp (0.2→0.8
+                //    of the blur-bounded spatial ramp);
+                //  - the interior response keeps the EXACT legacy strength
+                //    curve smoothstep(0.25, 0.5, strength): 0.7 → fully
+                //    blocking, ≤0.25 → fluid, between → permeable wall.
+                float cov = clamp(texture(uObstacle, uv).r / max(uObsMax, 0.05), 0.0, 1.0);
+                return smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.2, 0.8, cov);
+            }
+        `;
         const rk2Backtrace = `
                 vec2 vHalf = texture(uVelocity, vUv).xy;
                 vec2 midUv = clamp(vUv - 0.5 * dt * vHalf * texelSize, 0.0, 1.0);
@@ -240,6 +266,23 @@
                 // regardless — the bit-stability guarantee is untouched.
                 float mRef = mTexels * (0.0166667 / max(dt, 1e-4));
                 disp *= smoothstep(0.002, 0.05, mRef);
+                // Obstacle-aware backtrace (uniform-gated; requires the
+                // including shader to declare uObstacle/hasObstacle and
+                // interpolate obstacleSolidityGLSL). At violent speeds the
+                // characteristic spans 10-30 texels and crosses collider
+                // walls — dye near an edge samples its history from the FAR
+                // side and "teleports" through, shredding edges into grain
+                // (measured: edge-zone dye HF 0.73 vs 0.17 open field at
+                // speed 2400, 2026-07-14). Two probes shorten the step so
+                // sampling stays on this side of the wall. At rest disp is
+                // exactly 0, both probes read vUv, and the bit-stability
+                // guarantee is untouched. MacCormack stays coherent because
+                // this lives in the SHARED snippet with identical uniforms
+                // on all three dye passes.
+                if (hasObstacle == 1) {
+                    if (solidity(clamp(vUv - disp * 0.5, 0.0, 1.0)) > 0.5) disp *= 0.25;
+                    else if (solidity(clamp(vUv - disp, 0.0, 1.0)) > 0.5) disp *= 0.5;
+                }
         `;
         const advectionFrag = `#version 300 es
             precision ${PRECISION} float;
@@ -260,6 +303,7 @@
                                  // result (macCorrectFrag output): self-fetch it
                                  // and apply only the decay/drain logic below.
             ${swirlGLSL}
+            ${obstacleSolidityGLSL}
             void main() {
                 ${rk2Backtrace}
                 vec2 coord = (macMode == 1) ? vUv : clamp(vUv - disp, 0.0, 1.0);
@@ -396,10 +440,13 @@
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uVelocity, uSource;
+            uniform sampler2D uObstacle; // for the shared backtrace's probes
             uniform vec2 texelSize;    // sim-grid texel (velocity lives there)
             uniform vec2 srcTexelSize; // dye-grid texel
             uniform float dt;
+            uniform int hasObstacle;
             ${swirlGLSL}
+            ${obstacleSolidityGLSL}
             void main() {
                 ${rk2Backtrace}
                 fragColor = texture(uSource, clamp(vUv - disp, 0.0, 1.0));
@@ -427,6 +474,7 @@
             uniform float dt;
             uniform int hasObstacle;
             ${swirlGLSL}
+            ${obstacleSolidityGLSL}
             void main() {
                 ${rk2Backtrace}
                 vec4 fwd = texture(uForward, vUv);
@@ -473,27 +521,9 @@
         // 0.7) with antialiased edges, so the curve saturates at 0.5 — same
         // convention as the splat shader's obsBlock. (The multigrid solve
         // will restrict these fractions down its pyramid — keep them float.)
-        const obstacleSolidityGLSL = `
-            uniform float uObsMax; // max collisionStrength among composited
-                                   // collision sources (JS: window.__obsStrengthMax)
-            float solidity(vec2 uv) {
-                // COVERAGE and STRENGTH are different quantities (D0.5 rev 3,
-                // 2026-07-14). The obstacle texel stores coverage*strength; a
-                // fixed absolute smoothstep window therefore changed the
-                // EDGE GEOMETRY with the strength slider — at strength 1.0 it
-                // sliced a sub-texel band out of the AA ramp (binary walls →
-                // whole-canvas velocity fuzz under the converged MG solve),
-                // at 0.4 it never saturated (calm but leaky). Separating them:
-                //  - cov = texel / maxStrength  → the antialiased coverage,
-                //    given a strength-INDEPENDENT ~1-texel edge ramp (0.2→0.8
-                //    of the blur-bounded spatial ramp);
-                //  - the interior response keeps the EXACT legacy strength
-                //    curve smoothstep(0.25, 0.5, strength): 0.7 → fully
-                //    blocking, ≤0.25 → fluid, between → permeable wall.
-                float cov = clamp(texture(uObstacle, uv).r / max(uObsMax, 0.05), 0.0, 1.0);
-                return smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.2, 0.8, cov);
-            }
-        `;
+        // (obstacleSolidityGLSL is defined ABOVE rk2Backtrace — the dye
+        // advection passes now include it too, for the obstacle-aware
+        // backtrace probes.)
         const divergenceFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vL, vR, vT, vB;

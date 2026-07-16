@@ -372,12 +372,21 @@
                     gl.uniform1f(macAdvectProg.uniforms.dt, dt);
                     gl.uniform1f(macAdvectProg.uniforms.swirl, _swirl);
                     gl.uniform1f(macAdvectProg.uniforms.swirlTime, _swirlT);
+                    // Obstacle-aware backtrace probes (shared snippet) — the
+                    // forward pass must see the same walls as correct/main
+                    gl.uniform1i(macAdvectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                    gl.uniform1f(macAdvectProg.uniforms.uObsMax, _obsMax);
+                    gl.uniform1i(macAdvectProg.uniforms.uObstacle, 2);
                     gl.uniform1i(macAdvectProg.uniforms.uVelocity, 0);
                     gl.uniform1i(macAdvectProg.uniforms.uSource, 1);
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                     gl.activeTexture(gl.TEXTURE1);
                     gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    if (obsActive) {
+                        gl.activeTexture(gl.TEXTURE2);
+                        gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    }
                     blit(sharpened.fbo); // φ̂ⁿ⁺¹ (forward estimate)
                     macCorrectProg.bind();
                     gl.uniform2f(macCorrectProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
@@ -385,6 +394,7 @@
                     gl.uniform1f(macCorrectProg.uniforms.dt, dt);
                     gl.uniform1f(macCorrectProg.uniforms.swirl, _swirl);
                     gl.uniform1f(macCorrectProg.uniforms.swirlTime, _swirlT);
+                    gl.uniform1f(macCorrectProg.uniforms.uObsMax, _obsMax);
                     gl.uniform1i(macCorrectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                     gl.uniform1i(macCorrectProg.uniforms.uVelocity, 0);
                     gl.uniform1i(macCorrectProg.uniforms.uSource, 1);
@@ -408,6 +418,7 @@
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                gl.uniform1f(advectionProg.uniforms.uObsMax, _obsMax);
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
                 gl.uniform1i(advectionProg.uniforms.uSource, 1);
                 gl.uniform1i(advectionProg.uniforms.uObstacle, 2);
