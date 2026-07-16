@@ -1283,6 +1283,7 @@
         moveControlGroup('fpsCap', body);
         moveControlGroup('pressureDissipation', body);
         moveControlGroup('pressureIteration', body);
+        moveControlGroup('velocityCap', body);
         moveCheckboxGroup('macCormackToggle', body);
         moveCheckboxGroup('multigridToggle', body);
         // Multigrid tuning panel — same toggle+panel pattern as

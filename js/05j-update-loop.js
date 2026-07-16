@@ -348,6 +348,8 @@
                 gl.uniform1i(advectionProg.uniforms.isDensity, 0);
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, 0);
                 gl.uniform1i(advectionProg.uniforms.macMode, 0);
+                gl.uniform1f(advectionProg.uniforms.uVelCap,
+                    (typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0);
                 // Swirl NEVER touches the velocity self-advection — the
                 // output IS the velocity texture, so any offset here would
                 // be written back and compound (dye-only by design).

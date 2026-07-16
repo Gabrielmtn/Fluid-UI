@@ -294,6 +294,12 @@
                                       // p·this; gradient divides it back out. Console-
                                       // tunable for A/B (1 = legacy unscaled).
 
+            VELOCITY_CAP: 30,         // "Max Speed" ceiling in canvas-widths/s (soft knee from
+                                      // 70%). fp16 safety AND an aesthetic knob: growth presets
+                                      // (velocity dissipation > 1) settle at this ceiling inside
+                                      // closed mask pockets — lower = calmer bounded swirls,
+                                      // higher = wilder motion before the sim reins it in.
+
             WALL_SLIP: 0.6,           // Collision feel: 0 = legacy sticky walls (damp pass
                                       // kills a wide apron), 1 = interior-only damp (the
                                       // projection's tangential slip fully shows). Console-

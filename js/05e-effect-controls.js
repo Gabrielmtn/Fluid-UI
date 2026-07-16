@@ -92,6 +92,15 @@
                 if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
             });
         }
+        // Max Speed slider (velocity ceiling, canvas-widths/s — soft knee)
+        const velocityCapSlider = document.getElementById('velocityCap');
+        if (velocityCapSlider) {
+            velocityCapSlider.addEventListener('input', (e) => {
+                config.VELOCITY_CAP = parseFloat(e.target.value);
+                const sp = document.getElementById('velocityCapValue');
+                if (sp) sp.textContent = Math.round(parseFloat(e.target.value));
+            });
+        }
         // Ridges slider (sharpen kernel scale, 2048-reference texels)
         const ridgesSlider = document.getElementById('ridges');
         if (ridgesSlider) {

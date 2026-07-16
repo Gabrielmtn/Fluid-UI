@@ -303,6 +303,7 @@
             uniform vec2 srcTexelSize; // texel size of uSource (dye and sim grids differ)
             uniform float dt, dissipation;
             uniform float decayDt; // accumulated decay timestep; 0.0 = skip decay this frame
+            uniform float uVelCap; // speed ceiling in canvas-widths/s (Max Speed slider)
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
             uniform float edgeAbsorb; // >0: absorbing borders — fluid vents off-canvas instead of bouncing
@@ -437,20 +438,30 @@
                 } else {
                     // Velocity pass: keep alpha at 1.0
                     color.a = 1.0;
-                    // fp16 safety valve: velocity is stored in half floats
-                    // (max 65504). Choked pockets in fine collision masks
-                    // accumulate injected energy they can't advect away
-                    // (measured 1.5k→8.4k over 6s of pumping, 2026-07-14) and
-                    // a long session rides that to Inf → NaN → total field
-                    // breakdown. The cap is RESOLUTION-PROPORTIONAL (velocity
-                    // is stored in grid cells/s, which scale with sim res —
-                    // a fixed cap clipped real strokes at 1k physics detail
-                    // and read as static): 30 canvas-widths/s at any grid,
-                    // ≈ half a canvas of displacement per frame. A pure no-op
-                    // below the cap.
-                    float capSpd = 30.0 / texelSize.x;
+                    // fp16 safety valve + speed ceiling: velocity is stored in
+                    // half floats (max 65504). Choked pockets in fine collision
+                    // masks accumulate injected energy they can't advect away,
+                    // and GROWTH presets (VELOCITY_DISSIPATION > 1) amplify
+                    // energy forever inside closed pockets — either rides to
+                    // Inf → NaN → total field breakdown without a ceiling.
+                    // Resolution-proportional (cells/s scale with sim res;
+                    // uVelCap is in canvas-widths/s, user slider "Max Speed").
+                    // SOFT KNEE (2026-07-15): a hard clamp pinned growth-preset
+                    // pockets at exactly max speed — chaotic jitter-churn in
+                    // whichever mask pocket reached the ceiling while its
+                    // neighbors stayed smooth. Above 70% of the cap, speed
+                    // compresses rationally toward the cap as an asymptote —
+                    // capped pockets settle into a smooth bounded swirl.
+                    // Exact no-op below the knee.
+                    float capSpd = uVelCap / texelSize.x;
+                    float knee = capSpd * 0.7;
                     float spd = length(color.xy);
-                    if (spd > capSpd) color.xy *= capSpd / spd;
+                    if (spd > knee) {
+                        float range = capSpd * 0.3;
+                        float excess = spd - knee;
+                        float compressed = knee + excess / (1.0 + excess / range);
+                        color.xy *= compressed / spd;
+                    }
                 }
                 // Overflow mode rim drain: with open boundaries (divergence and
                 // gradient passes stop treating edges as walls) outbound fluid

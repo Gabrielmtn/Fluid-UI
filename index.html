@@ -242,6 +242,10 @@
             <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">32</span></label>
             <input type="range" id="pressureIteration" min="1" max="50" value="32" step="1">
         </div>
+        <div class="control-group">
+            <label for="velocityCap" title="Speed ceiling in canvas-widths/sec (soft limit). Growth presets (velocity > 1) settle at this ceiling inside closed mask pockets — lower = calmer bounded swirls, higher = wilder motion. Also the fp16 overflow guard.">Max Speed <span id="velocityCapValue" class="value-display">30</span></label>
+            <input type="range" id="velocityCap" min="5" max="60" value="30" step="1">
+        </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="macCormackToggle" checked>
             <label for="macCormackToggle" style="margin: 0" title="MacCormack error-corrected dye advection — sharper strokes, less smearing (2 extra GPU passes)">Crisp Advection</label>
