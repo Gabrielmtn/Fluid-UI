@@ -286,7 +286,13 @@
                                       // under high strength + multigrid. 0.5 ≈ legacy hard
                                       // cut everywhere. Console-tunable.
 
-            PRESSURE_SCALE: 1 / 64,   // fp16 headroom rescale of the pressure system.
+            PRESSURE_SCALE: 1 / 256,  // fp16 headroom rescale of the pressure system.
+                                      // 1/64 → 1/256 (2026-07-15): a vortex confined in a
+                                      // SEALED strength-1.0 mask pocket generates real
+                                      // stagnation pressure ~v² — at Max-Speed-capped speeds
+                                      // that exceeded the stored fp16 ceiling at 1/64 and
+                                      // clipped ("breaks and flows away"). Relative fp16
+                                      // precision is scale-invariant, so this is look-free.
                                       // Multigrid converges the TRUE pressure, which
                                       // saturated fp16 (pegged 65504) under fast multi-arm
                                       // strokes — clipped peaks → glitchy projection →

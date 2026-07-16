@@ -244,6 +244,10 @@
                 clearProg.bind();
                 gl.uniform1i(clearProg.uniforms.uTexture, 0);
                 gl.uniform1f(clearProg.uniforms.value, config.PRESSURE_DISSIPATION);
+                // fp16 pressure valve (sealed-pocket stagnation pressure —
+                // see clearFrag): soft ceiling at 30000 stored units, well
+                // under the 65504 half-float limit
+                gl.uniform1f(clearProg.uniforms.softClamp, 30000.0);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture);
                 blit(pressure.write.fbo);

@@ -250,6 +250,10 @@
                 gl.disable(gl.BLEND);
                 clearProg.bind();
                 gl.uniform1i(clearProg.uniforms.uTexture, 0);
+                // passthrough copies (dye/velocity/pressure preservation):
+                // the pressure valve MUST be off here — velocity legitimately
+                // exceeds the clamp's knee at high sim res
+                gl.uniform1f(clearProg.uniforms.softClamp, 0.0);
                 const _velScale = _prevSimW > 0 ? simTexWidth / _prevSimW : 1.0;
                 if (_prevDensity) _copyPreserved(_prevDensity, density, dyeTexWidth, dyeTexHeight, 1.0);
                 if (_prevVelocity) _copyPreserved(_prevVelocity, velocity, simTexWidth, simTexHeight, _velScale);

@@ -267,7 +267,18 @@
                 // 0.4"). With coverage separated out, strength now owns the
                 // whole 0→1 range as permeability: 1.0 = fully solid wall,
                 // mid values = graded leaky walls, 0 = inert.
-                return obsStrengthResponse() * smoothstep(0.35, 0.85, cov);
+                // Capped at 0.995, NEVER exactly 1.0 (2026-07-15): at
+                // solidity 1.0 a fully sealed cell's pressure equation
+                // degenerates — every Neumann mix returns the cell's own
+                // pressure, the solve decouples, and pressure inside sealed
+                // solids INTEGRATES instead of relaxing (measured: stored
+                // pMax ~7000 at strength 1.0 vs ~300 at 0.9 — 20-40× — which
+                // then leaks through the MG pyramid's coarse levels and the
+                // LINEAR-filtered edges as eruptions of false flow, the
+                // "1.0 is still technically broken" runaway). 0.5% residual
+                // coupling keeps walls functionally rigid while the interior
+                // pressure always has a path to relax through.
+                return min(0.995, obsStrengthResponse() * smoothstep(0.35, 0.85, cov));
             }
         `;
         const rk2Backtrace = `
@@ -868,7 +879,27 @@
             out vec4 fragColor;
             uniform sampler2D uTexture;
             uniform float value;
-            void main() { fragColor = value * texture(uTexture, vUv); }
+            uniform float softClamp; // >0: rational soft ceiling on |x| of the
+                                     // FIRST channel (fp16 pressure valve for
+                                     // sealed-pocket stagnation pressure; the
+                                     // knee starts at 70% like the velocity
+                                     // cap). 0 = plain passthrough — REQUIRED
+                                     // for the preserved-copy reinit path,
+                                     // which reuses this program for dye and
+                                     // velocity.
+            void main() {
+                vec4 c = value * texture(uTexture, vUv);
+                if (softClamp > 0.0) {
+                    float knee = softClamp * 0.7;
+                    float ap = abs(c.x);
+                    if (ap > knee) {
+                        float range = softClamp * 0.3;
+                        float ex = ap - knee;
+                        c.x = sign(c.x) * (knee + ex / (1.0 + ex / range));
+                    }
+                }
+                fragColor = c;
+            }
         `;
         // Standalone obstacle damping — runs as a separate pass after normal physics
         // so the existing shaders are completely untouched.
