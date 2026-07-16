@@ -141,6 +141,48 @@
             gl.uniform1f(splatProg.uniforms.barHalfW, 0); // no leak into classic splats
         }
         window.applyBarSplat = barSplat;
+        // ─── D2 sketch stamping (raster layer) ──────────────────────────
+        // Normal-control drawing: premultiplied over-composite into the
+        // persistent sketch FBO; eraser = destination-out with the same
+        // stamp. No kaleido arms, no splat-in/out ramps — a plain
+        // draughtsman's brush sharing the Size fader and picker color.
+        function stampSketchDab(x, y, pressure) {
+            if (!sketch) return;
+            const aspectRatio = canvas.width / canvas.height;
+            const p = (typeof pressure === 'number' && pressure > 0) ? pressure : 1;
+            const sizeMul = window.BrushEngine ? window.BrushEngine.sizeScale(p) : 1;
+            const flowMul = window.BrushEngine ? window.BrushEngine.flowScale(p) : 1;
+            rasterStampProg.bind();
+            gl.uniform2f(rasterStampProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
+            // 0.5× the fluid footprint: the sketch disc edge sits where the
+            // fluid gaussian's visible core ends, so both brushes read as
+            // the same Size fader setting.
+            gl.uniform1f(rasterStampProg.uniforms.radius,
+                config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1) * 0.5 * sizeMul * sizeMul);
+            gl.uniform1f(rasterStampProg.uniforms.aspectRatio, aspectRatio);
+            const c = (window.pointer && window.pointer.color) ? window.pointer.color : [1, 1, 1];
+            gl.uniform3f(rasterStampProg.uniforms.color, c[0], c[1], c[2]);
+            gl.uniform1f(rasterStampProg.uniforms.flow, flowMul);
+            gl.uniform1f(rasterStampProg.uniforms.hardness,
+                (typeof config.BRUSH_HARDNESS === 'number') ? config.BRUSH_HARDNESS : 0.8);
+            gl.enable(gl.BLEND);
+            if (config.BRUSH_ERASER) {
+                gl.blendFuncSeparate(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+            } else {
+                gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            }
+            gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+            blit(sketch.fbo);
+            gl.disable(gl.BLEND);
+        }
+        window.__sketchStamp = stampSketchDab;
+        window.__clearSketch = function () {
+            if (!sketch) return;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, sketch.fbo);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        };
         let lastTime = performance.now();
         let lastDrawTimeMs = 0;
         // ─── FPS Ring Buffer (zero-GC) ────────────────────────────────

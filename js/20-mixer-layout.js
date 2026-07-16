@@ -1382,6 +1382,58 @@
     function buildBrushSection() {
         const { sec, body } = makeSection('🖌️ Brush', 'orange', true);
 
+        // --- D2 Paint Target: fluid splats vs the persistent sketch layer ---
+        var targetLabel = document.createElement('label');
+        targetLabel.className = 'brush-section-label';
+        targetLabel.textContent = 'Paint Into';
+        body.appendChild(targetLabel);
+        var targetRow = document.createElement('div');
+        targetRow.className = 'brush-mode-row';
+        var fluidBtn = document.createElement('button');
+        fluidBtn.type = 'button'; fluidBtn.className = 'brush-mode-btn active'; fluidBtn.textContent = 'Fluid';
+        fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
+        var sketchBtn = document.createElement('button');
+        sketchBtn.type = 'button'; sketchBtn.className = 'brush-mode-btn'; sketchBtn.textContent = 'Sketch';
+        sketchBtn.title = 'Strokes paint the persistent sketch layer — normal-control drawing that never decays or flows (backgrounds, guides, colliders)';
+        targetRow.appendChild(fluidBtn); targetRow.appendChild(sketchBtn);
+        body.appendChild(targetRow);
+        function setBrushTarget(t) {
+            if (window.config) window.config.BRUSH_TARGET = t;
+            fluidBtn.classList.toggle('active', t === 'fluid');
+            sketchBtn.classList.toggle('active', t === 'sketch');
+            try { if (window.settingsManager) window.settingsManager.set('brush.target', t); } catch (_) {}
+        }
+        fluidBtn.addEventListener('click', function () { setBrushTarget('fluid'); });
+        sketchBtn.addEventListener('click', function () { setBrushTarget('sketch'); });
+        engineCheckbox('brushEraser', 'Eraser (Sketch)', 'BRUSH_ERASER');
+        engineSlider('brushHardness', 'Hardness', 0, 1, 0.01, 'BRUSH_HARDNESS',
+            function (v) { return Math.round(v * 100) + '%'; });
+        engineCheckbox('sketchVisible', 'Show Sketch Layer', 'SKETCH_VISIBLE');
+        var sketchBtnRow = document.createElement('div');
+        sketchBtnRow.className = 'brush-mode-row';
+        var clearSketchBtn = document.createElement('button');
+        clearSketchBtn.type = 'button'; clearSketchBtn.className = 'brush-mode-btn';
+        clearSketchBtn.textContent = 'Clear Sketch';
+        clearSketchBtn.addEventListener('click', function () {
+            if (typeof window.__clearSketch === 'function') window.__clearSketch();
+        });
+        var sketchColliderBtn = document.createElement('button');
+        sketchColliderBtn.type = 'button'; sketchColliderBtn.className = 'brush-mode-btn';
+        sketchColliderBtn.textContent = '→ Collider';
+        sketchColliderBtn.title = 'Turn the sketch layer into a collision layer — the fluid flows around what you drew';
+        sketchColliderBtn.addEventListener('click', function () {
+            if (window.collisionLayers && typeof window.collisionLayers.createFromSketch === 'function') {
+                window.collisionLayers.createFromSketch();
+            }
+        });
+        sketchBtnRow.appendChild(clearSketchBtn);
+        sketchBtnRow.appendChild(sketchColliderBtn);
+        body.appendChild(sketchBtnRow);
+        try {
+            var savedTarget = window.settingsManager && window.settingsManager.get('brush.target');
+            setBrushTarget(savedTarget === 'sketch' ? 'sketch' : 'fluid');
+        } catch (_) { setBrushTarget('fluid'); }
+
         // --- Replay Mode ---
         var modeLabel = document.createElement('label');
         modeLabel.className = 'brush-section-label';

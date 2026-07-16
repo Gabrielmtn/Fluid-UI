@@ -76,6 +76,7 @@
         // input-feel params, not style variants)
         brushStabilizer: {configKey: "BRUSH_STABILIZER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushSpacing: {configKey: "BRUSH_SPACING", ui: null, hard: {min: 0.01, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushHardness: {configKey: "BRUSH_HARDNESS", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         shadingIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.1, scope: "extended"}}
     };
     var CHECKBOXES = {
@@ -90,6 +91,8 @@
         transparentMode: {def: false, mutScope: null},
         brushPressureSize: {def: true, mutScope: null},
         brushPressureFlow: {def: false, mutScope: null},
+        brushEraser: {def: false, mutScope: null},
+        sketchVisible: {def: true, mutScope: null},
         randomColor: {def: true, mutScope: "basic"},
         stepPalette: {def: false, mutScope: "basic"},
         kaleidoToggle: {def: false, mutScope: "basic"},

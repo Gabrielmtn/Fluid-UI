@@ -352,17 +352,25 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
-            // Begin stroke recording and include initial splat
-            startStroke(pointer.x, pointer.y);
-            pushStrokeEvent(pointer.x, pointer.y, 0, 0, pointer.color);
-            if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
-            const inMult = getSplatInMult();
-            multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+            // D2 routing: sketch strokes are plain raster paint — no fluid
+            // replay events, no recording timelines, no multiplayer
+            // broadcast (local-only until D7's unified schema)
+            const _sketchTarget = config.BRUSH_TARGET === 'sketch';
+            if (_sketchTarget) {
+                if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
+            } else {
+                // Begin stroke recording and include initial splat
+                startStroke(pointer.x, pointer.y);
+                pushStrokeEvent(pointer.x, pointer.y, 0, 0, pointer.color);
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
+                const inMult = getSplatInMult();
+                multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+            }
             // D1 brush engine: stroke movement is emitted as spaced dabs by
             // the engine (fed from the pointermove listener below, drained in
-            // 05j). The immediate press splat above stays for latency.
+            // 05j). The immediate press stamp above stays for latency.
             if (window.BrushEngine) window.BrushEngine.begin(coords.x, coords.y, 1);
-            if (typeof broadcastSplat === 'function') {
+            if (!_sketchTarget && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
                     coords.y / canvas.height,
@@ -429,8 +437,9 @@
                     lastSplatTime = now;
                 }
                 pointer.moved = true;
-                if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
-                if (typeof broadcastSplat === 'function') {
+                const _skT = config.BRUSH_TARGET === 'sketch';
+                if (!_skT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                if (!_skT && typeof broadcastSplat === 'function') {
                     if (!canvas._lastBroadcast || Date.now() - canvas._lastBroadcast > 33) {
                         broadcastSplat(
                             coords.x / canvas.width,
@@ -487,7 +496,7 @@
                 if (wasDown && typeof broadcastPointerUp === 'function') {
                     broadcastPointerUp();
                 }
-                if (wasDown && window.splatOutMode !== 'instant') {
+                if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
                     splatUpTime = Date.now();
                     splatOutActive = true;
                     splatTailDist = 0;
@@ -556,15 +565,20 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
-            if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
-            const inMult = getSplatInMult();
-            multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+            const _sketchTargetT = config.BRUSH_TARGET === 'sketch';
+            if (_sketchTargetT) {
+                if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
+            } else {
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
+                const inMult = getSplatInMult();
+                multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+            }
             // D1 brush engine (see mousedown note); touch force where present
             if (window.BrushEngine) {
                 window.BrushEngine.begin(coords.x, coords.y,
                     (typeof touch.force === 'number' && touch.force > 0) ? touch.force : 1);
             }
-            if (typeof broadcastSplat === 'function') {
+            if (!_sketchTargetT && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
                     coords.y / canvas.height,
@@ -604,8 +618,9 @@
                     lastSplatTime = now;
                 }
                 pointer.moved = true;
-                if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
-                if (typeof broadcastSplat === 'function') {
+                const _skTT = config.BRUSH_TARGET === 'sketch';
+                if (!_skTT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                if (!_skTT && typeof broadcastSplat === 'function') {
                     const now = Date.now();
                     if (!canvas._lastTouchBroadcast || now - canvas._lastTouchBroadcast > 50) {
                         broadcastSplat(
@@ -624,7 +639,7 @@
         }, { passive: false });
         window.addEventListener('touchend', () => {
             if (pointer.down) {
-                if (window.splatOutMode !== 'instant') {
+                if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
                     splatUpTime = Date.now();
                     splatOutActive = true;
                     splatTailDist = 0;

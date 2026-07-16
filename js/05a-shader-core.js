@@ -93,6 +93,8 @@
             out vec4 fragColor;
             uniform sampler2D uTexture;
             uniform sampler2D uSunrays;
+            uniform sampler2D uSketch;    // D2 raster sketch layer (premultiplied RGBA8)
+            uniform float sketchEnabled;
             uniform sampler2D uShadeForm; // quarter-res blurred frame: the shading height field
             uniform vec2 shadeTexelSize;
             uniform float sunraysEnabled;
@@ -293,6 +295,16 @@
                     float sr = texture(uSunrays, vUv).r;
                     color.rgb *= sr;
                 }
+                // D2 sketch layer: normal-control paint composited OVER the
+                // fluid, AFTER tone-map/shading/sunrays (fluid effects never
+                // touch it) and sampled at RAW vUv (kaleido never warps it —
+                // a sketch stays where you drew it). Premultiplied over.
+                float skA = 0.0;
+                if (sketchEnabled > 0.5) {
+                    vec4 sk = texture(uSketch, vUv);
+                    color.rgb = color.rgb * (1.0 - sk.a) + sk.rgb;
+                    skA = sk.a;
+                }
                 // ±0.5 LSB hash dither before the 8-bit store: smooth slow
                 // gradients otherwise quantize into visible contour bands that
                 // crawl as the field decays (the S-curve and saturation boost
@@ -304,7 +316,9 @@
                 if (preserveOpacity > 0.5) {
                     // Preserve fluid opacity - make alpha proportional to color intensity
                     // backgroundTransparency controls how transparent the black areas become
-                    float alpha = mix(1.0, intensity, backgroundTransparency);
+                    // (sketch coverage counts as content — dark sketch strokes
+                    // must not go transparent in layer mode)
+                    float alpha = mix(1.0, max(intensity, skA), backgroundTransparency);
                     fragColor = vec4(color.rgb, alpha);
                 } else {
                     fragColor = color;

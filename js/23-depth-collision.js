@@ -271,6 +271,7 @@ class DepthEstimator {
         createFromWebcam: createCollisionFromWebcam,
         createFromSnapshot: createCollisionFromSnapshot,
         createFromLayerMask: createCollisionFromLayerMask,
+        createFromSketch: createFromSketch,
 
         // Refresh depth estimation for a layer
         refreshDepth: refreshLayerDepth,
@@ -802,6 +803,62 @@ class DepthEstimator {
         _shapeImgData = _shapeCtx.createImageData(tw, th);
         _shapeBufW = tw;
         _shapeBufH = th;
+    }
+
+    // ── D2 bridge: Sketch → Collider ──────────────────────────────────
+    // "Sketch little colliders as easily as importing them" (the Phase
+    // 1.75 vibe): read the sketch layer's alpha coverage, downsample to
+    // ≤512, and add it as a standard depth-mask collision layer — the
+    // whole D0.5 edge pipeline (adaptive cut, blur, coverage solidity)
+    // applies from there. One-shot readback; only runs on button click.
+    function createFromSketch() {
+        var sk = window.sketch;
+        var canvasEl = document.getElementById('canvas');
+        if (!sk || !sk.texture || !canvasEl || typeof gl === 'undefined') {
+            console.warn('Sketch layer not available');
+            return;
+        }
+        var sw = sk.width, sh = sk.height;
+        var px = new Uint8Array(sw * sh * 4);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, sk.fbo);
+        gl.readPixels(0, 0, sw, sh, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        // Downsample alpha to ≤512 long side (box filter), flipping Y:
+        // GL rows are bottom-up, depth-mask data is stored top-down.
+        var scale = Math.min(1, 512 / Math.max(sw, sh));
+        var tw = Math.max(1, Math.round(sw * scale));
+        var th = Math.max(1, Math.round(sh * scale));
+        var depthData = new Uint8Array(tw * th);
+        var any = 0;
+        for (var y = 0; y < th; y++) {
+            var sy0 = Math.floor(y * sh / th), sy1 = Math.max(sy0 + 1, Math.floor((y + 1) * sh / th));
+            for (var x = 0; x < tw; x++) {
+                var sx0 = Math.floor(x * sw / tw), sx1 = Math.max(sx0 + 1, Math.floor((x + 1) * sw / tw));
+                var sum = 0, n = 0;
+                for (var yy = sy0; yy < sy1; yy++) {
+                    var rowBase = ((sh - 1 - yy) * sw) << 2; // flip Y
+                    for (var xx = sx0; xx < sx1; xx++) { sum += px[rowBase + (xx << 2) + 3]; n++; }
+                }
+                var v = n ? Math.round(sum / n) : 0;
+                depthData[y * tw + x] = v;
+                if (v > 12) any++;
+            }
+        }
+        if (!any) { console.warn('Sketch is empty — nothing to turn into a collider'); return; }
+        // Grayscale preview PNG for the layer div
+        var pc = document.createElement('canvas');
+        pc.width = tw; pc.height = th;
+        var pctx = pc.getContext('2d');
+        var img = pctx.createImageData(tw, th);
+        for (var i = 0, m = tw * th; i < m; i++) {
+            var dv = depthData[i], idx = i << 2;
+            img.data[idx] = dv; img.data[idx + 1] = dv; img.data[idx + 2] = dv;
+            img.data[idx + 3] = dv;
+        }
+        pctx.putImageData(img, 0, 0);
+        var depth = { width: tw, height: th, data: depthData };
+        addCollisionLayer(depth, pc.toDataURL('image/png'), 'Sketch Collision',
+            { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
     }
 
     // Throttled entry point — coalesces multiple calls into one rAF

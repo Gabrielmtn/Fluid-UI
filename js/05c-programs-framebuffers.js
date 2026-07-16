@@ -25,6 +25,7 @@
         const gradientProg = new Program(baseVert, gradientFrag);
         const clearProg = new Program(baseVert, clearFrag);
         const obstacleDampProg = new Program(baseVert, obstacleDampFrag);
+        const rasterStampProg = new Program(baseVert, rasterStampFrag);
         const blurProg = new Program(blurVert, blurFrag);
         const sunraysMaskProg = new Program(baseVert, sunraysMaskFrag);
         const sunraysProg = new Program(baseVert, sunraysFrag);
@@ -38,6 +39,7 @@
             window.density = density;
             window.velocity = velocity;
             window.pressure = pressure;
+            window.sketch = sketch;
             window.divergence = divergence;
             window.curl = curl;
         }
@@ -66,6 +68,7 @@
             };
         }
         let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, lightShifted, obstacle;
+        let sketch; // D2 raster sketch layer: RGBA8 dye-res, persistent (no decay/advection)
         let sunrays, sunraysTemp;
         let shadeForm, shadeFormTemp;
         // Multigrid pressure pyramid: mgRes0 = level-0 residual scratch;
@@ -86,6 +89,7 @@
             const _prevDensity = (typeof density !== 'undefined' && density && density.read) ? density : null;
             const _prevVelocity = (typeof velocity !== 'undefined' && velocity && velocity.read) ? velocity : null;
             const _prevPressure = (typeof pressure !== 'undefined' && pressure && pressure.read) ? pressure : null;
+            const _prevSketch = (typeof sketch !== 'undefined' && sketch && sketch.texture) ? sketch : null;
             const _prevSimW = simTexWidth || 0; // old grid width, for velocity rescale
             // GL objects are never garbage-collected while the context lives, so
             // every non-preserved FBO must be deleted before its variable is
@@ -139,6 +143,8 @@
             const filter = _linearOk ? gl.LINEAR : gl.NEAREST;
             // Visual dye buffers at dye resolution
             density = createDoubleFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
+            // D2 sketch layer: plain RGBA8 (normal paint, 0..1, premultiplied)
+            sketch = createFBO(dyeTexWidth, dyeTexHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, filter);
             // Sharpness buffer at dye resolution
             sharpened = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Micro detail buffer at dye resolution
@@ -246,7 +252,7 @@
                     if (f) { gl.deleteTexture(f.texture); gl.deleteFramebuffer(f.fbo); }
                 });
             }
-            if (_prevDensity || _prevVelocity || _prevPressure) {
+            if (_prevDensity || _prevVelocity || _prevPressure || _prevSketch) {
                 gl.disable(gl.BLEND);
                 clearProg.bind();
                 gl.uniform1i(clearProg.uniforms.uTexture, 0);
@@ -258,6 +264,18 @@
                 if (_prevDensity) _copyPreserved(_prevDensity, density, dyeTexWidth, dyeTexHeight, 1.0);
                 if (_prevVelocity) _copyPreserved(_prevVelocity, velocity, simTexWidth, simTexHeight, _velScale);
                 if (_prevPressure) _copyPreserved(_prevPressure, pressure, simTexWidth, simTexHeight, 1.0);
+                // Sketch is a SINGLE fbo (not a double) — copy + free by hand.
+                // Losing it on a governor/resize reinit would erase the
+                // user's drawing, so this is load-bearing.
+                if (_prevSketch) {
+                    gl.uniform1f(clearProg.uniforms.value, 1.0);
+                    gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, _prevSketch.texture);
+                    blit(sketch.fbo);
+                    gl.deleteTexture(_prevSketch.texture);
+                    gl.deleteFramebuffer(_prevSketch.fbo);
+                }
                 gl.enable(gl.BLEND);
             }
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);

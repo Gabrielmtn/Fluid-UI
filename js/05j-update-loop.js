@@ -137,8 +137,16 @@
                     // matches the legacy feel.
                     const _dabs = window.BrushEngine.drain(64);
                     if (_dabs.length) window.__lastPaintMs = nowMs;
+                    const _toSketch = config.BRUSH_TARGET === 'sketch';
                     for (let di = 0; di < _dabs.length; di++) {
                         const d = _dabs[di];
+                        if (_toSketch) {
+                            // D2 raster route: plain persistent paint — no
+                            // ramps, no arms, no fluid replay/broadcast
+                            // (sketch strokes are local-only until D7)
+                            if (typeof window.__sketchStamp === 'function') window.__sketchStamp(d.x, d.y, d.p);
+                            continue;
+                        }
                         // splat-in ramp stays distance-based (same accumulator)
                         splatStrokeDist += Math.hypot(d.dx, d.dy) / 10 / Math.max(1, canvas.width);
                         const inMult = getSplatInMult();
@@ -626,6 +634,10 @@
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
             gl.uniform1i(displayProg.uniforms.uSunrays, 1);
             gl.uniform1i(displayProg.uniforms.uShadeForm, 2);
+            // D2 sketch layer composite (raw-UV over, after fluid effects)
+            gl.uniform1i(displayProg.uniforms.uSketch, 3);
+            gl.uniform1f(displayProg.uniforms.sketchEnabled,
+                (config.SKETCH_VISIBLE === false || typeof sketch === 'undefined' || !sketch) ? 0.0 : 1.0);
             if (_shadingOn) {
                 gl.uniform2f(displayProg.uniforms.shadeTexelSize, shadeForm.texelSizeX, shadeForm.texelSizeY);
             }
@@ -651,6 +663,8 @@
             gl.bindTexture(gl.TEXTURE_2D, _sunraysOn ? sunrays.texture : null);
             gl.activeTexture(gl.TEXTURE2);
             gl.bindTexture(gl.TEXTURE_2D, _shadingOn ? shadeForm.texture : null);
+            gl.activeTexture(gl.TEXTURE3);
+            gl.bindTexture(gl.TEXTURE_2D, (typeof sketch !== 'undefined' && sketch) ? sketch.texture : null);
             blit(null);
             // ─── Stats update (ring buffer, zero-GC) ──────────────────
             pushFrameTimestamp(nowMs);

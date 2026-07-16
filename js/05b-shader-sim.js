@@ -942,6 +942,31 @@
                 fragColor = vec4(vel, 0.0, 1.0);
             }
         `;
+        // ─── D2 raster sketch stamp ─────────────────────────────────────
+        // Normal-control drawing: dabs stamp into the persistent `sketch`
+        // FBO (RGBA8, dye res — paint that never decays or advects). Output
+        // is PREMULTIPLIED and the caller blends with (ONE,
+        // ONE_MINUS_SRC_ALPHA) — exact over-compositing; the eraser reuses
+        // the same stamp with (ZERO, ONE_MINUS_SRC_ALPHA) = destination-out.
+        const rasterStampFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform vec2 point;
+            uniform vec3 color;
+            uniform float radius, aspectRatio;
+            uniform float flow;     // stamp alpha at the core
+            uniform float hardness; // 0 = soft gaussian edge, 1 = hard AA disc
+            void main() {
+                vec2 p = vUv - point;
+                p.x *= aspectRatio;
+                float r2 = dot(p, p) / radius;
+                float soft = exp(-r2 * 3.0);
+                float hard = 1.0 - smoothstep(0.72, 1.0, r2);
+                float a = mix(soft, hard, clamp(hardness, 0.0, 1.0)) * clamp(flow, 0.0, 1.0);
+                fragColor = vec4(color * a, a); // premultiplied
+            }
+        `;
         // ─── Sunrays shaders ────────────────────────────────────────────
         const sunraysMaskFrag = `#version 300 es
             precision ${PRECISION} float;
