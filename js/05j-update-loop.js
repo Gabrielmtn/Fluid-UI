@@ -229,9 +229,20 @@
                 // 3. Divergence
                 const _openBoundary = window.__edgeAbsorb ? 1.0 : 0.0;
                 // fp16 headroom rescale for the whole pressure system (see
-                // divergenceFrag); gradient divides it back out below
-                const _pScale = (typeof config.PRESSURE_SCALE === 'number' && config.PRESSURE_SCALE > 0)
-                    ? config.PRESSURE_SCALE : 1 / 64;
+                // divergenceFrag); gradient divides it back out below.
+                // RESOLUTION-AWARE (2026-07-15): velocity is stored in grid
+                // cells/s, so pressure (~v², × the finer grid) scales roughly
+                // with resolution SQUARED — the same sealed-pocket scene
+                // measured 616-777 stored at 512-class but 14k-15.7k at 1k,
+                // brushing the valve knee and riding toward fp16 clipping on
+                // long sessions ("pressure breakdown + static crashout at 1k
+                // physics"). Normalizing by (512/simLong)² makes stored
+                // pressure resolution-independent; 512 reference = the
+                // validated default behavior, exactly.
+                const _pBase = (typeof config.PRESSURE_SCALE === 'number' && config.PRESSURE_SCALE > 0)
+                    ? config.PRESSURE_SCALE : 1 / 256;
+                const _simLong = Math.max(simTexWidth, simTexHeight);
+                const _pScale = _pBase * Math.pow(512 / Math.max(512, _simLong), 2);
                 divergenceProg.bind();
                 gl.uniform2f(divergenceProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(divergenceProg.uniforms.pScale, _pScale);

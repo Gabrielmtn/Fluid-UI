@@ -493,7 +493,10 @@
                     // compresses rationally toward the cap as an asymptote —
                     // capped pockets settle into a smooth bounded swirl.
                     // Exact no-op below the knee.
-                    float capSpd = uVelCap / texelSize.x;
+                    // 45000 hard ceiling: at very high sim res the
+                    // resolution-proportional cap would approach the fp16
+                    // limit itself (30 widths/s × 2048 = 61k vs max 65504)
+                    float capSpd = min(uVelCap / texelSize.x, 45000.0);
                     float knee = capSpd * 0.7;
                     float spd = length(color.xy);
                     if (spd > knee) {
