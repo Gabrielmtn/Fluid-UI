@@ -54,7 +54,9 @@
                     // the wall IS, or paint deposits inside a wall the flow
                     // respects (burned-in rims). See the solidity() comment.
                     float ocov = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
-                    obsBlock = 1.0 - smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.35, 0.85, ocov);
+                    float osr = clamp(uObsMax, 0.0, 1.0);
+                    osr = osr * osr * osr; // full-range strength curve (matches solidity())
+                    obsBlock = 1.0 - osr * smoothstep(0.35, 0.85, ocov);
                 }
                 if (isVelocity == 1) {
                     // Motion Isolation: prevent new velocity from affecting areas with existing velocity
@@ -223,6 +225,16 @@
         const obstacleSolidityGLSL = `
             uniform float uObsMax; // max collisionStrength among composited
                                    // collision sources (JS: window.__obsStrengthMax)
+            float obsStrengthResponse() {
+                // s³: blocking COMPOUNDS over frames (a 65%-solidity wall
+                // already stops a steady jet), so a perceptually graded
+                // slider needs a response that stays low through the mid
+                // range — measured with an even S-curve the wall still
+                // cliffed between 0.5 and 0.8. Cubic spreads usable
+                // permeability across the upper half; only 1.0 is rigid.
+                float s = clamp(uObsMax, 0.0, 1.0);
+                return s * s * s;
+            }
             float solidity(vec2 uv) {
                 // COVERAGE and STRENGTH are different quantities (D0.5 rev 3,
                 // 2026-07-14). The obstacle texel stores coverage*strength; a
@@ -247,7 +259,15 @@
                 // partial solidity, 2026-07-14). Raising the window makes
                 // blur-bleed mid-coverage read as OPEN channel; the wall
                 // recedes ~half a texel and stays antialiased.
-                return smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.35, 0.85, cov);
+                //
+                // Strength response (2026-07-15): full-range S-curve. The
+                // legacy curve smoothstep(0.25, 0.5, strength) SATURATED at
+                // 0.5 — half the Strength slider was dead travel and the
+                // working quarter was a cliff ("aggressive at 0.5, not at
+                // 0.4"). With coverage separated out, strength now owns the
+                // whole 0→1 range as permeability: 1.0 = fully solid wall,
+                // mid values = graded leaky walls, 0 = inert.
+                return obsStrengthResponse() * smoothstep(0.35, 0.85, cov);
             }
         `;
         const rk2Backtrace = `
@@ -370,7 +390,10 @@
                         obsD = max(obsD, texture(uObstacle, vUv + vec2(0.0, texelSize.y)).r);
                         obsD = max(obsD, texture(uObstacle, vUv - vec2(0.0, texelSize.y)).r);
                         float covD = clamp(obsD / max(uObsMax, 0.05), 0.0, 1.0);
-                        obsInterior = smoothstep(0.55, 0.95, covD);
+                        // Scaled by the strength response: leaky (low-strength)
+                        // walls legitimately let dye THROUGH — draining it
+                        // there would eat paint the physics allows to pass.
+                        obsInterior = obsStrengthResponse() * smoothstep(0.55, 0.95, covD);
                     }
                     if ((dissipation < 0.999 || hasObstacle == 1) && frozen < 0.5) {
                         float stillness = exp(-speed * 30.0);
@@ -856,6 +879,7 @@
             uniform sampler2D uVelocity;
             uniform sampler2D uObstacle;
             uniform vec2 texelSize;
+            uniform float uObsMax;  // max collisionStrength (coverage normalizer)
             uniform float wallSlip; // 0 = legacy full-apron damp ("sticky" walls),
                                     // 1 = interior-mostly damp. The obstacle-aware
                                     // projection (Phase 1) already enforces
@@ -874,9 +898,15 @@
                 float t  = texture(uObstacle, vUv + vec2(0.0, texelSize.y)).r;
                 float b  = texture(uObstacle, vUv - vec2(0.0, texelSize.y)).r;
                 float obs = (c * 4.0 + l + r + t + b) * 0.125;
-                // Smooth damping curve; wallSlip narrows it toward the interior
-                // (wallSlip=0 reproduces the legacy smoothstep(0.0, 0.8) exactly)
-                float damp = 1.0 - smoothstep(wallSlip * 0.45, 0.8 + wallSlip * 0.1, obs);
+                // Coverage-normalized + strength-scaled (2026-07-15): the damp
+                // depth follows the same full-range strength S-curve as
+                // solidity(), so the Strength slider grades damping instead of
+                // cliffing at 0.5; wallSlip still narrows the curve toward the
+                // interior (its window now operates on coverage 0..1).
+                float covAvg = clamp(obs / max(uObsMax, 0.05), 0.0, 1.0);
+                float osr = clamp(uObsMax, 0.0, 1.0);
+                osr = osr * osr * osr;
+                float damp = 1.0 - osr * smoothstep(wallSlip * 0.45, 0.8 + wallSlip * 0.1, covAvg);
                 vel *= damp;
                 fragColor = vec4(vel, 0.0, 1.0);
             }

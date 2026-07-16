@@ -704,7 +704,11 @@ class DepthEstimator {
             rotation: opts.rotation || 0,
             isCollision: true,
             collisionMode: 'block',   // block | slow | deflect
-            collisionStrength: 0.7,
+            // 1.0 = fully rigid (2026-07-15): the strength response is now a
+            // full-range cubic — the old curve saturated at 0.5, so the old
+            // 0.7 default meant "solid". New layers start solid; the slider's
+            // lower range is graded permeability (leaky/porous walls).
+            collisionStrength: 1.0,
             mask: {
                 enabled: true,
                 mode: 'show',
