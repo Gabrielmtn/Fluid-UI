@@ -1490,7 +1490,7 @@
         }
         engineSlider('brushStabilizer', 'Stabilizer', 0, 1, 0.01, 'BRUSH_STABILIZER',
             function (v) { return Math.round(v * 100) + '%'; });
-        engineSlider('brushSpacing', 'Spacing', 0.05, 1, 0.01, 'BRUSH_SPACING',
+        engineSlider('brushSpacing', 'Spacing', 0.01, 1, 0.01, 'BRUSH_SPACING',
             function (v) { return Math.round(v * 100) + '%'; });
 
         function engineCheckbox(id, label, key) {

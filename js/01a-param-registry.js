@@ -74,7 +74,7 @@
         // D1 stroke engine (dynamically-created in buildBrushSection; no mut —
         // input-feel params, not style variants)
         brushStabilizer: {configKey: "BRUSH_STABILIZER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
-        brushSpacing: {configKey: "BRUSH_SPACING", ui: null, hard: {min: 0.05, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushSpacing: {configKey: "BRUSH_SPACING", ui: null, hard: {min: 0.01, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         shadingIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.1, scope: "extended"}}
     };
     var CHECKBOXES = {

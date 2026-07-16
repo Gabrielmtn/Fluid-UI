@@ -53,7 +53,10 @@
     }
 
     function spacingPx() {
-        return Math.max(2, cfg('BRUSH_SPACING', 0.35) * brushDiameterPx());
+        // 1px floor (not 2): the Spacing slider goes down to 1%, and dense
+        // "ink line" strokes are the point of that range. The drain cap
+        // (64 dabs/frame) and MAX_QUEUE bound the cost of a fast flick.
+        return Math.max(1, cfg('BRUSH_SPACING', 0.35) * brushDiameterPx());
     }
 
     // Emit dabs along the segment from the last processed sample toward
