@@ -225,6 +225,13 @@
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(curl.fbo);
+                // Obstacle participation in the projection (divergence /
+                // pressure / gradient): solids become walls the solve flows
+                // around, instead of relying solely on the post-projection
+                // damp pass. Same gate as that pass. Computed BEFORE the
+                // vorticity pass — confinement is gated off at walls (its
+                // wall-curl feedback loop was the strength-1.0 fuzz engine).
+                const obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
                 // 2. Vorticity confinement → velocity
                 vorticityProg.bind();
                 gl.uniform2f(vorticityProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
@@ -232,15 +239,18 @@
                 gl.uniform1i(vorticityProg.uniforms.uCurl, 1);
                 gl.uniform1f(vorticityProg.uniforms.curl, config.CURL);
                 gl.uniform1f(vorticityProg.uniforms.dt, dt);
+                gl.uniform1i(vorticityProg.uniforms.hasObstacle,
+                    (obsActive && config.CURL_WALL_GATE !== false) ? 1 : 0);
+                gl.uniform1f(vorticityProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                if (obsActive) {
+                    gl.uniform1i(vorticityProg.uniforms.uObstacle, 2);
+                    gl.activeTexture(gl.TEXTURE2);
+                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                }
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, curl.texture);
                 blit(velocity.write.fbo);
                 velocity.swap();
-                // Obstacle participation in the projection (divergence /
-                // pressure / gradient): solids become walls the solve flows
-                // around, instead of relying solely on the post-projection
-                // damp pass. Same gate as that pass.
-                const obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
                 // 3. Divergence
                 const _openBoundary = window.__edgeAbsorb ? 1.0 : 0.0;
                 // fp16 headroom rescale for the whole pressure system (see

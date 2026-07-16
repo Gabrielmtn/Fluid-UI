@@ -678,7 +678,10 @@
             in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uVelocity, uCurl;
+            uniform sampler2D uObstacle;
             uniform float curl, dt;
+            uniform int hasObstacle;
+            uniform float uObsMax;
             void main() {
                 vec2 cL = clamp(vL, 0.0, 1.0);
                 vec2 cR = clamp(vR, 0.0, 1.0);
@@ -700,6 +703,30 @@
                 // tiny numerical differences into spurious rotational forces.
                 float absC = abs(C);
                 float gate = smoothstep(0.0, 0.0005, absC);
+                // Obstacle apron gate (2026-07-16): the velocity discontinuity
+                // at a collider wall reads as a huge curl spike, so confinement
+                // kicked energy INTO the wall every frame — with a well-
+                // converged pressure solve (multigrid) this closed a feedback
+                // loop (kick → projection slams it along the wall → sharper
+                // shear → bigger curl → bigger kick) that pinned pockets at
+                // the velocity cap and shredded dye into grid-scale fuzz
+                // (strength-1.0 logo-collider breakdown). Measured at 512,
+                // CURL 25, MG 2 cycles: velocity-HF 360 → 195, peak stored
+                // pressure 6.5k → 2.7k, velocity unpinned from the cap
+                // (8-10k → 3.5-7k) — identical to CURL 0 near walls while
+                // the bulk keeps full confinement. Confinement is a
+                // bulk-fluid effect; it has no business at walls. The cross
+                // max of LINEAR obstacle samples widens the apron ~1 texel
+                // past the wall so the gate covers the whole discontinuity.
+                if (hasObstacle == 1) {
+                    float o = texture(uObstacle, vUv).r;
+                    o = max(o, texture(uObstacle, cL).r);
+                    o = max(o, texture(uObstacle, cR).r);
+                    o = max(o, texture(uObstacle, cT).r);
+                    o = max(o, texture(uObstacle, cB).r);
+                    float cov = clamp(o / max(uObsMax, 0.05), 0.0, 1.0);
+                    gate *= 1.0 - smoothstep(0.05, 0.5, cov);
+                }
                 vec2 force = curl * vec2(eta.y, -eta.x) * C * gate;
                 fragColor = vec4(texture(uVelocity, vUv).xy + force * dt, 0.0, 1.0);
             }
@@ -801,12 +828,21 @@
             out vec4 fragColor;
             uniform sampler2D uTexture;
             uniform vec2 fineTexelSize;
+            uniform int maxPool; // EXPERIMENT KNOB (config.MG_OBS_MAXPOOL,
+                                 // default off): 1 = max of the 4 samples for
+                                 // the obstacle pyramid. Tested as a fix for
+                                 // the strength-1.0 wall fuzz ("keep thin
+                                 // walls sealed at coarse levels") and
+                                 // REFUTED — over-blocking open channels
+                                 // measured 10× worse pressure/noise. Shipped
+                                 // behavior is box-average for everything.
             void main() {
-                vec4 sum = texture(uTexture, vUv + vec2(-0.5, -0.5) * fineTexelSize)
-                         + texture(uTexture, vUv + vec2( 0.5, -0.5) * fineTexelSize)
-                         + texture(uTexture, vUv + vec2(-0.5,  0.5) * fineTexelSize)
-                         + texture(uTexture, vUv + vec2( 0.5,  0.5) * fineTexelSize);
-                fragColor = sum * 0.25;
+                vec4 a = texture(uTexture, vUv + vec2(-0.5, -0.5) * fineTexelSize);
+                vec4 b = texture(uTexture, vUv + vec2( 0.5, -0.5) * fineTexelSize);
+                vec4 c = texture(uTexture, vUv + vec2(-0.5,  0.5) * fineTexelSize);
+                vec4 d = texture(uTexture, vUv + vec2( 0.5,  0.5) * fineTexelSize);
+                fragColor = (maxPool == 1) ? max(max(a, b), max(c, d))
+                                           : (a + b + c + d) * 0.25;
             }
         `;
         // Prolongation: bilinear-interpolate the coarse error and add it to

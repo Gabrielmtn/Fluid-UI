@@ -306,6 +306,14 @@
                                       // closed mask pockets — lower = calmer bounded swirls,
                                       // higher = wilder motion before the sim reins it in.
 
+            CURL_WALL_GATE: true,     // Suppress vorticity confinement in a ~1-texel apron
+                                      // around colliders (2026-07-16): wall shear reads as a
+                                      // huge curl spike, so confinement kicked energy into
+                                      // walls every frame — with multigrid's converged
+                                      // projection that closed a feedback loop (fuzz +
+                                      // pressure climb at strength 1.0). Console A/B:
+                                      // false = legacy everywhere-confinement.
+
             WALL_SLIP: 0.6,           // Collision feel: 0 = legacy sticky walls (damp pass
                                       // kills a wide apron), 1 = interior-only damp (the
                                       // projection's tangential slip fully shows). Console-

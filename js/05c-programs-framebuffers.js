@@ -44,6 +44,7 @@
             window.sketch = sketch;
             window.divergence = divergence;
             window.curl = curl;
+            window.mgLevels = mgLevels; // harness introspection (obstacle pyramid probes)
         }
         function createFBO(w, h, internalFormat, format, type, filter) {
             const texture = gl.createTexture();
@@ -301,6 +302,15 @@
             if (obsActive) {
                 mgRestrictProg.bind();
                 gl.uniform1i(mgRestrictProg.uniforms.uTexture, 0);
+                // Box-average (the shipped behavior). maxPool=1 was tested as
+                // a fix theory for the strength-1.0 wall fuzz and REFUTED
+                // hard (2026-07-16): sealing thin walls down the pyramid
+                // over-blocks legitimately-open channels, and measured 10×
+                // WORSE (pMax 62k vs 6.5k, vHF 4500 vs 360). The real fuzz
+                // engine was vorticity confinement at walls (see
+                // vorticityFrag). Knob kept for experiments only.
+                gl.uniform1i(mgRestrictProg.uniforms.maxPool,
+                    config.MG_OBS_MAXPOOL === true ? 1 : 0);
                 let src = obstacle;
                 for (let i = 0; i < mgLevels.length; i++) {
                     const lvl = mgLevels[i];
@@ -341,7 +351,12 @@
                 const l = mgLevels[i];
                 levels.push({ w: l.w, h: l.h, p: l.p, rhs: l.rhs, res: l.res, obs: l.obs, hSq: Math.pow(4, i + 1) });
             }
-            const N = levels.length - 1;
+            // Experiment knob (console): cap how deep the V-cycle descends
+            // (0/unset = full pyramid). Used to bisect the coarse-obstacle
+            // leakage; max-pool obstacles made full depth safe again.
+            let N = levels.length - 1;
+            const _depthCap = (typeof config.MG_MAX_DEPTH === 'number') ? (config.MG_MAX_DEPTH | 0) : 0;
+            if (_depthCap > 0 && _depthCap < N) N = _depthCap;
             for (let c = 0; c < cycles; c++) {
                 // Descent: smooth, measure what's left, push it down
                 for (let L = 0; L < N; L++) {
@@ -368,6 +383,7 @@
                     mgRestrictProg.bind();
                     gl.viewport(0, 0, nx.w, nx.h);
                     gl.uniform1i(mgRestrictProg.uniforms.uTexture, 0);
+                    gl.uniform1i(mgRestrictProg.uniforms.maxPool, 0); // residuals ALWAYS box-average
                     gl.uniform2f(mgRestrictProg.uniforms.fineTexelSize, 1.0 / lv.w, 1.0 / lv.h);
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, lv.res.texture);
