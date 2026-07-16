@@ -54,7 +54,7 @@
                     // the wall IS, or paint deposits inside a wall the flow
                     // respects (burned-in rims). See the solidity() comment.
                     float ocov = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
-                    obsBlock = 1.0 - smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.2, 0.8, ocov);
+                    obsBlock = 1.0 - smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.35, 0.85, ocov);
                 }
                 if (isVelocity == 1) {
                     // Motion Isolation: prevent new velocity from affecting areas with existing velocity
@@ -238,7 +238,16 @@
                 //    curve smoothstep(0.25, 0.5, strength): 0.7 → fully
                 //    blocking, ≤0.25 → fluid, between → permeable wall.
                 float cov = clamp(texture(uObstacle, uv).r / max(uObsMax, 0.05), 0.0, 1.0);
-                return smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.2, 0.8, cov);
+                // Ramp window 0.35→0.85 (was 0.2→0.8): the compositor's
+                // sim-scale blur bleeds coverage INTO narrow unmasked channels
+                // from both sides, and with the lower window a 2-texel channel
+                // (fine mask detail — scale patterns, thin gaps) never reached
+                // solidity 0 anywhere across its width, so fine channels
+                // "mostly stopped" (measured 26% of a fine-scale field at
+                // partial solidity, 2026-07-14). Raising the window makes
+                // blur-bleed mid-coverage read as OPEN channel; the wall
+                // recedes ~half a texel and stays antialiased.
+                return smoothstep(0.25, 0.5, uObsMax) * smoothstep(0.35, 0.85, cov);
             }
         `;
         const rk2Backtrace = `
@@ -412,6 +421,16 @@
                 } else {
                     // Velocity pass: keep alpha at 1.0
                     color.a = 1.0;
+                    // fp16 safety valve: velocity is stored in half floats
+                    // (max 65504). Choked pockets in fine collision masks
+                    // accumulate injected energy they can't advect away
+                    // (measured 1.5k→8.4k over 6s of pumping, 2026-07-14) and
+                    // a long session rides that to Inf → NaN → total field
+                    // breakdown. Soft-cap the speed far above anything
+                    // visually meaningful (16k texels/s ≈ 256 texels/frame
+                    // displacement) — a pure no-op below the cap.
+                    float spd = length(color.xy);
+                    if (spd > 16000.0) color.xy *= 16000.0 / spd;
                 }
                 // Overflow mode rim drain: with open boundaries (divergence and
                 // gradient passes stop treating edges as walls) outbound fluid
