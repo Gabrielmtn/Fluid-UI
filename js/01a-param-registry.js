@@ -133,7 +133,7 @@
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
         recMode: {options: ["off", "min", "full"], def: "off", mut: null},
         recPlaybackSpeed: {options: ["0.25", "0.5", "1", "2", "4"], def: "0.25", mut: null},
-        audioMode: {options: ["off", "tunnel", "eq", "ferro", "min", "full"], def: "off", mut: null},
+        audioMode: {options: ["off", "tunnel", "ferro", "min", "full"], def: "off", mut: null},
         audioReactSource: {options: null, def: null, mut: null},
         audioAutoSplatMode: {options: null, def: null, mut: null},
         splatInMode: {options: null, def: null, mut: null},
