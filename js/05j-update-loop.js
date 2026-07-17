@@ -252,6 +252,12 @@
                 gl.uniform1i(vorticityProg.uniforms.uCurl, 1);
                 gl.uniform1f(vorticityProg.uniforms.curl, config.CURL);
                 gl.uniform1f(vorticityProg.uniforms.dt, dt);
+                // M1 source gate: confinement stops pumping near the Max Speed
+                // ceiling (cells/s = widths/s × grid width, same 45k fp16
+                // guard as the advection knee). 0 disables.
+                gl.uniform1f(vorticityProg.uniforms.uCapSpd,
+                    config.VEL_SOURCE_GATE === false ? 0.0 :
+                    Math.min(((typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0) * simTexWidth, 45000));
                 gl.uniform1i(vorticityProg.uniforms.hasObstacle,
                     (obsActive && config.CURL_WALL_GATE !== false) ? 1 : 0);
                 gl.uniform1f(vorticityProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
@@ -412,6 +418,8 @@
                 gl.uniform1i(advectionProg.uniforms.macMode, 0);
                 gl.uniform1f(advectionProg.uniforms.uVelCap,
                     (typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0);
+                // M1 source gate: growth amplification tapers by speed headroom
+                gl.uniform1f(advectionProg.uniforms.srcGate, config.VEL_SOURCE_GATE === false ? 0.0 : 1.0);
                 // Swirl NEVER touches the velocity self-advection — the
                 // output IS the velocity texture, so any offset here would
                 // be written back and compound (dye-only by design).

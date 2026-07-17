@@ -324,6 +324,75 @@
                     : 'not enough data yet'
             };
         },
+        // M5 grain meter (2026-07-17): the collider-fuzz-round readback
+        // metrics made permanent. vHF = mean |v − 4-neighbor mean| over the
+        // sim grid (grid-scale velocity noise — the grain engine); dyeHF =
+        // same on the dye's dominant channel ×1000 (visible speckle);
+        // vMax/pMax for cap and fp16 headroom. Sync readbacks (one sim-res +
+        // one dye-res) — an on-demand instrument, never call it per frame.
+        grain: function () {
+            try {
+                var v = window.velocity, d = window.density, p = window.pressure;
+                if (!v || !v.read || typeof gl === 'undefined') return { error: 'sim not ready' };
+                var sw = window.simTexWidth, sh = window.simTexHeight;
+                var buf = new Float32Array(sw * sh * 4);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, v.read.fbo);
+                gl.readPixels(0, 0, sw, sh, gl.RGBA, gl.FLOAT, buf);
+                var vHF = 0, vMax = 0, n = 0, row = sw * 4;
+                for (var y = 1; y < sh - 1; y++) {
+                    for (var x = 1; x < sw - 1; x++) {
+                        var i = (y * sw + x) * 4;
+                        var vx = buf[i], vy = buf[i + 1];
+                        var spd = Math.sqrt(vx * vx + vy * vy);
+                        if (spd > vMax) vMax = spd;
+                        var ax = (buf[i - 4] + buf[i + 4] + buf[i - row] + buf[i + row]) * 0.25;
+                        var ay = (buf[i - 3] + buf[i + 5] + buf[i - row + 1] + buf[i + row + 1]) * 0.25;
+                        vHF += Math.hypot(vx - ax, vy - ay);
+                        n++;
+                    }
+                }
+                vHF /= Math.max(1, n);
+                var pMax = 0;
+                if (p && p.read) {
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, p.read.fbo);
+                    gl.readPixels(0, 0, sw, sh, gl.RGBA, gl.FLOAT, buf);
+                    for (var k = 0; k < sw * sh * 4; k += 4) {
+                        var pa = Math.abs(buf[k]);
+                        if (pa > pMax) pMax = pa;
+                    }
+                }
+                var dyeHF = 0;
+                if (d && d.read && window.dyeTexWidth) {
+                    var dw = window.dyeTexWidth, dh = window.dyeTexHeight, drow = dw * 4;
+                    var db = new Float32Array(dw * dh * 4);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, d.read.fbo);
+                    gl.readPixels(0, 0, dw, dh, gl.RGBA, gl.FLOAT, db);
+                    var m = 0, dn = 0;
+                    for (var yy = 1; yy < dh - 1; yy += 2) {
+                        for (var xx = 1; xx < dw - 1; xx += 2) {
+                            var j = (yy * dw + xx) * 4;
+                            var c = Math.max(db[j], db[j + 1], db[j + 2]);
+                            var cav = (Math.max(db[j - 4], db[j - 3], db[j - 2])
+                                     + Math.max(db[j + 4], db[j + 5], db[j + 6])
+                                     + Math.max(db[j - drow], db[j - drow + 1], db[j - drow + 2])
+                                     + Math.max(db[j + drow], db[j + drow + 1], db[j + drow + 2])) * 0.25;
+                            m += Math.abs(c - cav);
+                            dn++;
+                        }
+                    }
+                    dyeHF = m / Math.max(1, dn);
+                }
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                return {
+                    vHF: +vHF.toFixed(2),
+                    vMax: Math.round(vMax),
+                    pMax: +pMax.toFixed(1),
+                    dyeHF: +(dyeHF * 1000).toFixed(2),
+                    capSpd: window.config ? Math.min((window.config.VELOCITY_CAP || 30) * sw, 45000) : null,
+                    srcGate: window.config ? window.config.VEL_SOURCE_GATE !== false : null
+                };
+            } catch (e) { return { error: String(e) }; }
+        },
         reset: function () {
             totals.frames = 0; totals.dropped = 0; totals.longTasks = 0; totals.worstTask = 0;
             baseline.ms = 0; baseline.dropped = 0;

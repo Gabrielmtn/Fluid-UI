@@ -341,6 +341,7 @@
             uniform float dt, dissipation;
             uniform float decayDt; // accumulated decay timestep; 0.0 = skip decay this frame
             uniform float uVelCap; // speed ceiling in canvas-widths/s (Max Speed slider)
+            uniform float srcGate; // M1: 1 = taper growth amplification by speed headroom
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
             uniform float edgeAbsorb; // >0: absorbing borders — fluid vents off-canvas instead of bouncing
@@ -497,6 +498,22 @@
                     // resolution-proportional cap would approach the fp16
                     // limit itself (30 widths/s × 2048 = 61k vs max 65504)
                     float capSpd = min(uVelCap / texelSize.x, 45000.0);
+                    // M1 source gate (2026-07-17): growth presets (decay > 1)
+                    // amplify energy every frame; at the ceiling that inflow
+                    // is exactly what the knee below must strip back out — and
+                    // the strip is not divergence-free, so the next projection
+                    // answers with a push-back impulse. Inject → cap → rebound
+                    // → re-inject: a limit cycle sitting on the knee, read as
+                    // "jiggle" at top speed. Taper the GROWTH component to
+                    // neutral as speed approaches the cap so the steady state
+                    // settles BELOW the knee and the knee becomes a transient-
+                    // only backstop. Exact no-op below 45% of the cap and on
+                    // decay presets (decay ≤ 1).
+                    if (srcGate > 0.5 && decay > 1.0) {
+                        float spd0 = length(color.xy);
+                        float g = 1.0 - smoothstep(0.45 * capSpd, 0.7 * capSpd, spd0);
+                        color.xy *= (1.0 + (decay - 1.0) * g) / decay;
+                    }
                     float knee = capSpd * 0.7;
                     float spd = length(color.xy);
                     if (spd > knee) {
@@ -682,6 +699,7 @@
             uniform float curl, dt;
             uniform int hasObstacle;
             uniform float uObsMax;
+            uniform float uCapSpd; // M1: Max Speed cap in cells/s (0 = gate off)
             void main() {
                 vec2 cL = clamp(vL, 0.0, 1.0);
                 vec2 cR = clamp(vR, 0.0, 1.0);
@@ -727,8 +745,19 @@
                     float cov = clamp(o / max(uObsMax, 0.05), 0.0, 1.0);
                     gate *= 1.0 - smoothstep(0.05, 0.5, cov);
                 }
+                // M1 source gate (2026-07-17): confinement is an energy
+                // INJECTOR — gate it by speed headroom so it stops pumping
+                // texels already near the Max Speed ceiling. Pushing on a
+                // capped texel doesn't add motion; it adds divergence the
+                // projection bounces back (the same feedback family as the
+                // wall apron above). uCapSpd = 0 disables (VEL_SOURCE_GATE
+                // off). Exact no-op below 45% of the cap.
+                vec2 vel = texture(uVelocity, vUv).xy;
+                if (uCapSpd > 0.0) {
+                    gate *= 1.0 - smoothstep(0.45 * uCapSpd, 0.7 * uCapSpd, length(vel));
+                }
                 vec2 force = curl * vec2(eta.y, -eta.x) * C * gate;
-                fragColor = vec4(texture(uVelocity, vUv).xy + force * dt, 0.0, 1.0);
+                fragColor = vec4(vel + force * dt, 0.0, 1.0);
             }
         `;
         // Doubles as the multigrid smoother: hSq = (2^level)² converts the

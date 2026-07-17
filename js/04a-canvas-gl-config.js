@@ -306,6 +306,14 @@
                                       // closed mask pockets — lower = calmer bounded swirls,
                                       // higher = wilder motion before the sim reins it in.
 
+            VEL_SOURCE_GATE: true,    // M1 (2026-07-17): taper the energy SOURCES (growth
+                                      // amplification + vorticity confinement) to neutral as
+                                      // speed approaches VELOCITY_CAP, so pockets settle below
+                                      // the soft knee instead of slamming it every frame — the
+                                      // knee-strip → divergence → pressure-rebound limit cycle
+                                      // read as "jiggle" at top speed. Console A/B: false =
+                                      // legacy cap-only behavior. Exact no-op below 45% of cap.
+
             CURL_WALL_GATE: true,     // Suppress vorticity confinement in a ~1-texel apron
                                       // around colliders (2026-07-16): wall shear reads as a
                                       // huge curl spike, so confinement kicked energy into
