@@ -15,6 +15,19 @@
             panel.innerHTML = '';
             // layerOrder is in visual order: index 0 = top (closest to viewer), last = bottom (furthest)
             // We'll assign z-indices in reverse: top items get highest z-index
+            // D2: add-a-paint-layer button (GPU raster layers)
+            const addRow = document.createElement('div');
+            addRow.className = 'layer-add-row';
+            const addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.className = 'mask-control-btn';
+            addBtn.style.width = '100%';
+            addBtn.style.marginBottom = '6px';
+            addBtn.textContent = '➕ Paint Layer';
+            addBtn.title = 'Add a persistent paint layer — brush strokes into it never decay or flow';
+            addBtn.addEventListener('click', () => { if (window.rasterLayers) window.rasterLayers.create(); });
+            addRow.appendChild(addBtn);
+            panel.appendChild(addRow);
             // Add top drop zone
             const topZone = document.createElement('div');
             topZone.className = 'drop-zone';
@@ -60,6 +73,70 @@
                     const layer = layers.find(l => l.index === item.id);
                     if (!layer) return; // Skip if layer not found
                     element.dataset.layerIndex = layer.index;
+                    if (layer.isRaster) {
+                        // D2 raster paint layer: GPU-backed (composited in
+                        // displayFrag, no DOM div) — the panel item exposes
+                        // opacity / blend mode / paint-target instead of the
+                        // div-based mask + transform controls.
+                        element.dataset.raster = '1';
+                        const rOpacity = (typeof layer.opacity === 'number') ? layer.opacity : 1;
+                        const isActiveRaster = !!(window.rasterLayers && window.rasterLayers.activeId() === layer.index);
+                        if (isActiveRaster) element.classList.add('raster-active');
+                        element.innerHTML = `
+                            <div class="layer-item-header">
+                                <div class="layer-thumbnail" style="background-image: url(${layer.data}); background-size: cover;"></div>
+                                <div class="layer-info">
+                                    <input type="text" class="layer-title" value="${layer.title}"
+                                           onchange="updateLayerTitle(${layer.index}, this.value)">
+                                </div>
+                                <div class="layer-controls">
+                                    <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${layer.collapsed ? 'Expand' : 'Collapse'}">${layer.collapsed ? '▼' : '▲'}</button>
+                                    <button class="layer-btn raster-paint-btn ${isActiveRaster ? 'active' : ''}" onclick="window.rasterLayers && rasterLayers.setActive(${layer.index})" title="Paint into this layer (the brush's 'Paint Into: Sketch' route lands here)">🖌️</button>
+                                    <button class="layer-btn" onclick="toggleLayer(${layer.index})">
+                                        ${layer.visible ? '👁️' : '👁️‍🗨️'}
+                                    </button>
+                                    <button class="layer-btn" onclick="deleteLayer(${layer.index})">🗑️</button>
+                                </div>
+                            </div>
+                            <div class="layer-item-body">
+                                <div class="layer-threshold">
+                                    <span>Opacity:</span>
+                                    <div class="raster-opacity-host"></div>
+                                    <span class="raster-opacity-val">${Math.round(rOpacity * 100)}%</span>
+                                </div>
+                                <div class="collision-row" style="margin-top:4px;">
+                                    <label class="collision-label">Blend</label>
+                                    <select class="raster-blend-select">
+                                        <option value="normal" ${(!layer.blendMode || layer.blendMode === 'normal') ? 'selected' : ''}>Normal</option>
+                                        <option value="multiply" ${layer.blendMode === 'multiply' ? 'selected' : ''}>Multiply</option>
+                                        <option value="screen" ${layer.blendMode === 'screen' ? 'selected' : ''}>Screen</option>
+                                        <option value="add" ${layer.blendMode === 'add' ? 'selected' : ''}>Add</option>
+                                    </select>
+                                </div>
+                            </div>
+                        `;
+                        const headerElR = element.querySelector('.layer-item-header');
+                        if (headerElR) headerElR.draggable = true;
+                        const oHost = element.querySelector('.raster-opacity-host');
+                        const oVal = element.querySelector('.raster-opacity-val');
+                        if (oHost) {
+                            const oSlider = buildEncapsulatedRange({ min: 0, max: 100, value: Math.round(rOpacity * 100), step: 1, className: 'encapsulated-slider slider-gray' });
+                            oHost.appendChild(oSlider);
+                            oSlider.addEventListener('input', () => {
+                                layer.opacity = parseInt(oSlider.value, 10) / 100;
+                                if (oVal) oVal.textContent = oSlider.value + '%';
+                            });
+                            const disR = () => { isLayerSliderActive = true; if (headerElR) headerElR.draggable = false; };
+                            const enR = () => { isLayerSliderActive = false; if (headerElR) headerElR.draggable = true; };
+                            ['pointerdown','mousedown','touchstart'].forEach(evt => oSlider.addEventListener(evt, disR, { passive: true }));
+                            ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => oSlider.addEventListener(evt, enR, { passive: true }));
+                        }
+                        const bSel = element.querySelector('.raster-blend-select');
+                        if (bSel) {
+                            bSel.addEventListener('change', (e) => { e.stopPropagation(); layer.blendMode = e.target.value; });
+                            bSel.addEventListener('mousedown', (e) => e.stopPropagation());
+                        }
+                    } else {
                     if (layer.active) {
                         element.classList.add('active-layer');
                     }
@@ -229,6 +306,7 @@
                             });
                         }
                     }
+                    } // end non-raster item build
                 }
                 // Collapse toggle button handler
                 const collapseBtn = element.querySelector('.layer-collapse-btn');
@@ -388,6 +466,7 @@
                 } else {
                     const layer = layers.find(l => l.index === item.id);
                     if (layer) {
+                        if (layer.isRaster) return; // D2: GPU-composited, no div/z-index
                         const layerDiv = document.getElementById(`layer${layer.index}`);
                         if (layerDiv) {
                             layerDiv.style.zIndex = zIndex;

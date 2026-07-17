@@ -93,8 +93,20 @@
             out vec4 fragColor;
             uniform sampler2D uTexture;
             uniform sampler2D uSunrays;
-            uniform sampler2D uSketch;    // D2 raster sketch layer (premultiplied RGBA8)
-            uniform float sketchEnabled;
+            // D2 raster layer stack: up to 4 visible raster paint layers
+            // (premultiplied RGBA8), composited around the fluid. Per-slot
+            // params: x=enabled, y=opacity, z=blend mode (0 normal /
+            // 1 multiply / 2 screen / 3 add), w=1 below the fluid / 0 above.
+            // Slots arrive pre-sorted bottom-to-top, below-fluid slots first
+            // (see rasterLayers.collectSlots in 05l).
+            uniform sampler2D uRaster0;
+            uniform sampler2D uRaster1;
+            uniform sampler2D uRaster2;
+            uniform sampler2D uRaster3;
+            uniform vec4 uRasterP0;
+            uniform vec4 uRasterP1;
+            uniform vec4 uRasterP2;
+            uniform vec4 uRasterP3;
             uniform sampler2D uShadeForm; // quarter-res blurred frame: the shading height field
             uniform vec2 shadeTexelSize;
             uniform float sunraysEnabled;
@@ -163,6 +175,39 @@
                 uvz = vec2(0.5 - abs(mod(uvz.x + 0.5, 1.0) - 0.5), 
                           0.5 - abs(mod(uvz.y + 0.5, 1.0) - 0.5));
                 return uvz;
+            }
+            // D2: blend one premultiplied raster sample over the running
+            // color. Opacity is pre-applied by the caller (scales rgb AND a,
+            // which is exactly what fading a premultiplied source means).
+            vec3 rasterBlend(vec3 base, vec4 src, float mode) {
+                if (mode < 0.5) return base * (1.0 - src.a) + src.rgb;   // normal (premult over)
+                if (mode > 2.5) return base + src.rgb;                    // add
+                vec3 s = src.rgb / max(src.a, 1e-4);                      // unpremultiply for mode math
+                vec3 b = (mode < 1.5) ? base * s
+                                      : 1.0 - (1.0 - base) * (1.0 - s);  // multiply : screen
+                return mix(base, b, src.a);
+            }
+            // D2: fold one slot into the composite. Below-fluid slots
+            // accumulate into 'under' (plain premult over among themselves);
+            // the first above-fluid slot first merges 'under' beneath the
+            // fluid (fluid coverage = tone-mapped intensity — under-layers
+            // show where the dye is dark), then blends itself on top.
+            void rasterSlot(vec4 rs, vec4 p, inout vec3 col, inout vec4 under, inout float merged, inout float skA) {
+                if (p.w > 0.5) {
+                    under.rgb = under.rgb * (1.0 - rs.a) + rs.rgb;
+                    under.a = under.a * (1.0 - rs.a) + rs.a;
+                    return;
+                }
+                if (merged < 0.5) {
+                    if (under.a > 0.0) {
+                        float fA = min(1.0, max(max(col.r, col.g), col.b));
+                        col += under.rgb * (1.0 - fA);
+                        skA = max(skA, under.a);
+                    }
+                    merged = 1.0;
+                }
+                col = rasterBlend(col, rs, p.z);
+                skA = max(skA, rs.a);
             }
             // Mode 5: Spiral - Rings create concentric spiral bands
             vec2 spiralRings(vec2 uv) {
@@ -295,16 +340,27 @@
                     float sr = texture(uSunrays, vUv).r;
                     color.rgb *= sr;
                 }
-                // D2 sketch layer: normal-control paint composited OVER the
+                // D2 raster layer stack: paint layers composited around the
                 // fluid, AFTER tone-map/shading/sunrays (fluid effects never
-                // touch it) and sampled at RAW vUv (kaleido never warps it —
-                // a sketch stays where you drew it). Premultiplied over.
+                // touch them) and sampled at RAW vUv (kaleido never warps
+                // them — a sketch stays where you drew it). Unrolled ×4:
+                // GLSL ES 3.0 forbids dynamically-indexed sampler arrays.
                 float skA = 0.0;
-                if (sketchEnabled > 0.5) {
-                    vec4 sk = texture(uSketch, vUv);
-                    color.rgb = color.rgb * (1.0 - sk.a) + sk.rgb;
-                    skA = sk.a;
+                vec4 under = vec4(0.0);
+                float underMerged = 0.0;
+                vec3 cc = color.rgb;
+                if (uRasterP0.x > 0.5) rasterSlot(texture(uRaster0, vUv) * uRasterP0.y, uRasterP0, cc, under, underMerged, skA);
+                if (uRasterP1.x > 0.5) rasterSlot(texture(uRaster1, vUv) * uRasterP1.y, uRasterP1, cc, under, underMerged, skA);
+                if (uRasterP2.x > 0.5) rasterSlot(texture(uRaster2, vUv) * uRasterP2.y, uRasterP2, cc, under, underMerged, skA);
+                if (uRasterP3.x > 0.5) rasterSlot(texture(uRaster3, vUv) * uRasterP3.y, uRasterP3, cc, under, underMerged, skA);
+                // every slot was below the fluid — merge the accumulated
+                // under-stack beneath the dye now
+                if (under.a > 0.0 && underMerged < 0.5) {
+                    float fA = min(1.0, max(max(cc.r, cc.g), cc.b));
+                    cc += under.rgb * (1.0 - fA);
+                    skA = max(skA, under.a);
                 }
+                color.rgb = cc;
                 // ±0.5 LSB hash dither before the 8-bit store: smooth slow
                 // gradients otherwise quantize into visible contour bands that
                 // crawl as the field decays (the S-curve and saturation boost

@@ -817,7 +817,12 @@ class DepthEstimator {
     // zeroed mask for an empty sketch (live mode: erasing everything must
     // CLEAR the bound collider, not freeze its last state).
     function buildSketchDepth(allowEmpty) {
-        var sk = window.sketch;
+        // D2: read the BOUND raster layer's buffer (falls back to the
+        // active one) — switching the active paint layer must not silently
+        // re-target an existing live collider binding.
+        var sk = (typeof _sketchBoundRid === 'number' && window.rasterLayers)
+            ? window.rasterLayers.getFBO(_sketchBoundRid)
+            : window.sketch;
         var canvasEl = document.getElementById('canvas');
         if (!sk || !sk.texture || !canvasEl || typeof gl === 'undefined') {
             console.warn('Sketch layer not available');
@@ -865,6 +870,10 @@ class DepthEstimator {
     }
 
     function createFromSketch() {
+        // One-shot → Collider binds to the CURRENTLY active paint layer
+        // (also re-targets the live binding, matching the pre-D2 behavior
+        // where the newest sketch collider became the live target).
+        _sketchBoundRid = window.rasterLayers ? window.rasterLayers.activeId() : null;
         var built = buildSketchDepth(false);
         if (!built) { console.warn('Sketch is empty — nothing to turn into a collider'); return; }
         var idx = addCollisionLayer(built.depth, built.previewUrl, 'Sketch Collision',
@@ -884,6 +893,8 @@ class DepthEstimator {
     var _sketchLive = false;
     var _sketchColliderIndex = null;
     var _sketchRefreshPending = false;
+    // D2: which raster layer the sketch-collider reads (null = active)
+    var _sketchBoundRid = null;
 
     function _sketchColliderLayer() {
         if (_sketchColliderIndex == null || !window.layers) return null;
@@ -893,6 +904,13 @@ class DepthEstimator {
     function refreshSketchCollider() {
         var layer = _sketchColliderLayer();
         if (!layer) { setSketchLive(false); _sketchColliderIndex = null; return; }
+        // D2: bound source layer deleted → the binding has nothing to track
+        if (typeof _sketchBoundRid === 'number' && window.rasterLayers
+            && !window.rasterLayers.getFBO(_sketchBoundRid)) {
+            setSketchLive(false);
+            _sketchBoundRid = null;
+            return;
+        }
         var built = buildSketchDepth(true); // empty sketch → zeroed collider
         if (!built) return;
         updateLayerDepthMask(_sketchColliderIndex, built.depth);
@@ -930,8 +948,10 @@ class DepthEstimator {
         return pc.toDataURL('image/png');
     }
 
-    function scheduleSketchRefresh() {
+    function scheduleSketchRefresh(rid) {
         if (!_sketchLive || _sketchRefreshPending) return;
+        // D2: mutations on other raster layers don't touch this binding
+        if (rid != null && typeof _sketchBoundRid === 'number' && rid !== _sketchBoundRid) return;
         _sketchRefreshPending = true;
         setTimeout(function () {
             _sketchRefreshPending = false;
@@ -945,6 +965,11 @@ class DepthEstimator {
         on = !!on;
         if (on === _sketchLive) return _sketchLive;
         if (on) {
+            // D2: fresh binding reads the currently-active paint layer;
+            // re-enabling an existing binding keeps its original source.
+            if (_sketchBoundRid == null && window.rasterLayers) {
+                _sketchBoundRid = window.rasterLayers.activeId();
+            }
             // Bind (or create) the target collider. Empty sketch is fine —
             // the layer starts zeroed and lights up as you draw.
             if (!_sketchColliderLayer()) {

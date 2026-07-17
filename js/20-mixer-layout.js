@@ -2006,9 +2006,40 @@
 
         // ── Sketch layer ──
         sLabel('Sketch Layer');
+        // D2: which raster layer the Sketch route paints into + quick-add.
+        // Layers are managed in the sidebar Layers panel (🖌️ per row).
+        var activeLayerRow = document.createElement('div');
+        activeLayerRow.className = 'brush-mode-row';
+        var activeLayerLabel = document.createElement('div');
+        activeLayerLabel.className = 'arm-colors-hint';
+        activeLayerLabel.style.flex = '1';
+        activeLayerLabel.style.alignSelf = 'center';
+        function syncActiveRasterLabel() {
+            var nm = '—';
+            try {
+                if (window.rasterLayers) {
+                    var rid = window.rasterLayers.activeId();
+                    var rl = (window.layers || []).find(function (x) { return x.index === rid; });
+                    if (rl) nm = rl.title;
+                }
+            } catch (_) {}
+            activeLayerLabel.textContent = 'Paints into: ' + nm;
+        }
+        window.__onActiveRasterChanged = function () { syncActiveRasterLabel(); };
+        syncActiveRasterLabel();
+        var newLayerBtn = document.createElement('button');
+        newLayerBtn.type = 'button'; newLayerBtn.className = 'brush-mode-btn';
+        newLayerBtn.textContent = '+ Layer';
+        newLayerBtn.title = 'Add a new paint layer and make it the brush target (reorder it in the Layers panel — above or below the fluid)';
+        newLayerBtn.addEventListener('click', function () {
+            if (window.rasterLayers) { window.rasterLayers.create(); syncActiveRasterLabel(); }
+        });
+        activeLayerRow.appendChild(activeLayerLabel);
+        activeLayerRow.appendChild(newLayerBtn);
+        panel.appendChild(activeLayerRow);
         pCheckbox('brushEraser', 'Eraser (Sketch)', 'BRUSH_ERASER', 'eraser');
         pSlider('brushHardness', 'Hardness', 0, 1, 0.01, 'BRUSH_HARDNESS', pct, 'hardness');
-        pCheckbox('sketchVisible', 'Show Sketch Layer', 'SKETCH_VISIBLE');
+        pCheckbox('sketchVisible', 'Show Paint Layers', 'SKETCH_VISIBLE');
         var sketchBtnRow = document.createElement('div');
         sketchBtnRow.className = 'brush-mode-row';
         var clearSketchBtn = document.createElement('button');

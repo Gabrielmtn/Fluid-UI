@@ -71,7 +71,12 @@
             };
         }
         let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, lightShifted, obstacle;
-        let sketch; // D2 raster sketch layer: RGBA8 dye-res, persistent (no decay/advection)
+        // D2 raster paint layers: layer index -> single RGBA8 dye-res FBO,
+        // persistent (no decay/advection). Entries are created/owned by
+        // window.rasterLayers (05l); declared here so initFramebuffers can
+        // preserve every layer's pixels across a resize/governor reinit.
+        let rasterStore = {};
+        let sketch; // alias: the ACTIVE raster layer's FBO (assigned by rasterLayers.setActive)
         let sunrays, sunraysTemp;
         let shadeForm, shadeFormTemp;
         // Multigrid pressure pyramid: mgRes0 = level-0 residual scratch;
@@ -92,7 +97,11 @@
             const _prevDensity = (typeof density !== 'undefined' && density && density.read) ? density : null;
             const _prevVelocity = (typeof velocity !== 'undefined' && velocity && velocity.read) ? velocity : null;
             const _prevPressure = (typeof pressure !== 'undefined' && pressure && pressure.read) ? pressure : null;
-            const _prevSketch = (typeof sketch !== 'undefined' && sketch && sketch.texture) ? sketch : null;
+            // D2: stash every raster paint layer's FBO for preserve-and-copy
+            const _prevRaster = {};
+            Object.keys(rasterStore).forEach(function (rid) {
+                if (rasterStore[rid] && rasterStore[rid].texture) _prevRaster[rid] = rasterStore[rid];
+            });
             const _prevSimW = simTexWidth || 0; // old grid width, for velocity rescale
             // GL objects are never garbage-collected while the context lives, so
             // every non-preserved FBO must be deleted before its variable is
@@ -146,8 +155,12 @@
             const filter = _linearOk ? gl.LINEAR : gl.NEAREST;
             // Visual dye buffers at dye resolution
             density = createDoubleFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
-            // D2 sketch layer: plain RGBA8 (normal paint, 0..1, premultiplied)
-            sketch = createFBO(dyeTexWidth, dyeTexHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, filter);
+            // D2 raster paint layers: plain RGBA8 (normal paint, 0..1,
+            // premultiplied) — recreate each existing layer's buffer at the
+            // new dye res; old pixels are copied in below.
+            Object.keys(_prevRaster).forEach(function (rid) {
+                rasterStore[rid] = createFBO(dyeTexWidth, dyeTexHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, filter);
+            });
             // Sharpness buffer at dye resolution
             sharpened = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Micro detail buffer at dye resolution
@@ -255,7 +268,8 @@
                     if (f) { gl.deleteTexture(f.texture); gl.deleteFramebuffer(f.fbo); }
                 });
             }
-            if (_prevDensity || _prevVelocity || _prevPressure || _prevSketch) {
+            const _rasterIds = Object.keys(_prevRaster);
+            if (_prevDensity || _prevVelocity || _prevPressure || _rasterIds.length) {
                 gl.disable(gl.BLEND);
                 clearProg.bind();
                 gl.uniform1i(clearProg.uniforms.uTexture, 0);
@@ -267,19 +281,25 @@
                 if (_prevDensity) _copyPreserved(_prevDensity, density, dyeTexWidth, dyeTexHeight, 1.0);
                 if (_prevVelocity) _copyPreserved(_prevVelocity, velocity, simTexWidth, simTexHeight, _velScale);
                 if (_prevPressure) _copyPreserved(_prevPressure, pressure, simTexWidth, simTexHeight, 1.0);
-                // Sketch is a SINGLE fbo (not a double) — copy + free by hand.
-                // Losing it on a governor/resize reinit would erase the
-                // user's drawing, so this is load-bearing.
-                if (_prevSketch) {
+                // Raster layers are SINGLE fbos (not doubles) — copy + free
+                // by hand. Losing one on a governor/resize reinit would erase
+                // the user's drawing, so this is load-bearing.
+                _rasterIds.forEach(function (rid) {
+                    const prev = _prevRaster[rid];
                     gl.uniform1f(clearProg.uniforms.value, 1.0);
                     gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                     gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, _prevSketch.texture);
-                    blit(sketch.fbo);
-                    gl.deleteTexture(_prevSketch.texture);
-                    gl.deleteFramebuffer(_prevSketch.fbo);
-                }
+                    gl.bindTexture(gl.TEXTURE_2D, prev.texture);
+                    blit(rasterStore[rid].fbo);
+                    gl.deleteTexture(prev.texture);
+                    gl.deleteFramebuffer(prev.fbo);
+                });
                 gl.enable(gl.BLEND);
+            }
+            // Re-point the active-layer alias at the rebuilt store entry
+            if (window.rasterLayers) {
+                sketch = rasterStore[window.rasterLayers.activeId()] || null;
+                window.sketch = sketch;
             }
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }

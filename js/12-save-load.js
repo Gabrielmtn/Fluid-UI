@@ -574,6 +574,11 @@
         // ── Layers (data URLs, position, masks, collision) ──
         var layersData = null;
         try {
+            // D2: refresh raster layers' layer.data to full-res dataURLs so
+            // painted pixels round-trip (thumbnails overwrite it in between)
+            if (window.rasterLayers && window.rasterLayers.syncData) window.rasterLayers.syncData();
+        } catch(_){}
+        try {
             var ls = window.layers;
             if (ls && ls.length > 0) {
                 layersData = ls.map(function(layer) {
@@ -592,7 +597,10 @@
                         rotation: layer.rotation || 0,
                         isCollision: !!layer.isCollision,
                         collisionMode: layer.collisionMode || 'block',
-                        collisionStrength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
+                        collisionStrength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7,
+                        isRaster: !!layer.isRaster,
+                        opacity: typeof layer.opacity === 'number' ? layer.opacity : 1,
+                        blendMode: layer.blendMode || 'normal'
                     };
                     // Mask data — encode collision depthData as base64 for exact restoration
                     if (layer.mask) {
@@ -1031,7 +1039,12 @@
                     if (!ld.data) return;
 
                     var layerDiv;
-                    if (ld.isCollision) {
+                    if (ld.isRaster) {
+                        // D2 raster layers are GPU-composited — no div;
+                        // rasterLayers.reconcile() below recreates the FBO
+                        // and uploads ld.data into it
+                        layerDiv = null;
+                    } else if (ld.isCollision) {
                         // Collision layers REUSE the static layerN div like regular
                         // layers — a duplicate id is unreachable via getElementById,
                         // leaving an unhideable/undeletable ghost preview on screen.
@@ -1074,7 +1087,10 @@
                         rotation: ld.rotation || 0,
                         isCollision: !!ld.isCollision,
                         collisionMode: ld.collisionMode || 'block',
-                        collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7
+                        collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7,
+                        isRaster: !!ld.isRaster,
+                        opacity: typeof ld.opacity === 'number' ? ld.opacity : 1,
+                        blendMode: ld.blendMode || 'normal'
                     };
 
                     // Restore mask metadata and decode collision depthData from base64
@@ -1125,6 +1141,10 @@
                 }
 
                 if (typeof window.renderLayers === 'function') window.renderLayers();
+
+                // D2: rebuild raster-layer GPU buffers from the restored
+                // layer.data (also frees FBOs whose layers the load wiped)
+                if (window.rasterLayers && window.rasterLayers.reconcile) window.rasterLayers.reconcile();
 
                 // Step 4: Upload collision obstacle data immediately for layers with restored depthData
                 if (window.collisionLayers && window.collisionLayers.updateObstacleFromLayers) {

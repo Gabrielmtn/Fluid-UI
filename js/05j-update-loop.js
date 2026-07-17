@@ -670,10 +670,18 @@
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
             gl.uniform1i(displayProg.uniforms.uSunrays, 1);
             gl.uniform1i(displayProg.uniforms.uShadeForm, 2);
-            // D2 sketch layer composite (raw-UV over, after fluid effects)
-            gl.uniform1i(displayProg.uniforms.uSketch, 3);
-            gl.uniform1f(displayProg.uniforms.sketchEnabled,
-                (config.SKETCH_VISIBLE === false || typeof sketch === 'undefined' || !sketch) ? 0.0 : 1.0);
+            // D2 raster layer stack composite (raw-UV, after fluid effects):
+            // up to 4 visible raster layers, pre-sorted bottom→top with
+            // below-fluid slots first (rasterLayers.collectSlots, 05l).
+            // SKETCH_VISIBLE stays the master show/hide gate for the stack.
+            const _rSlots = (window.rasterLayers && config.SKETCH_VISIBLE !== false)
+                ? window.rasterLayers.collectSlots() : null;
+            for (let ri = 0; ri < 4; ri++) {
+                const _rs = _rSlots ? _rSlots[ri] : null;
+                gl.uniform1i(displayProg.uniforms['uRaster' + ri], 3 + ri);
+                gl.uniform4f(displayProg.uniforms['uRasterP' + ri],
+                    _rs ? 1 : 0, _rs ? _rs.opacity : 0, _rs ? _rs.mode : 0, (_rs && _rs.under) ? 1 : 0);
+            }
             if (_shadingOn) {
                 gl.uniform2f(displayProg.uniforms.shadeTexelSize, shadeForm.texelSizeX, shadeForm.texelSizeY);
             }
@@ -699,8 +707,11 @@
             gl.bindTexture(gl.TEXTURE_2D, _sunraysOn ? sunrays.texture : null);
             gl.activeTexture(gl.TEXTURE2);
             gl.bindTexture(gl.TEXTURE_2D, _shadingOn ? shadeForm.texture : null);
-            gl.activeTexture(gl.TEXTURE3);
-            gl.bindTexture(gl.TEXTURE_2D, (typeof sketch !== 'undefined' && sketch) ? sketch.texture : null);
+            for (let ri = 0; ri < 4; ri++) {
+                const _rs = _rSlots ? _rSlots[ri] : null;
+                gl.activeTexture(gl.TEXTURE3 + ri);
+                gl.bindTexture(gl.TEXTURE_2D, _rs ? _rs.texture : null);
+            }
             blit(null);
             // ─── Stats update (ring buffer, zero-GC) ──────────────────
             pushFrameTimestamp(nowMs);
