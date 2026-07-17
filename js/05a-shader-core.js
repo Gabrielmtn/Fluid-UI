@@ -112,6 +112,16 @@
             // which is why it composites after everything else)
             uniform sampler2D uMaskOverlay;
             uniform float maskOverlayOn;
+            // D3 clip bindings: per-slot mask coverage multiplied into the
+            // raster sample (premult scale = clip). x=hasClip, y=invert.
+            uniform sampler2D uRasterM0;
+            uniform sampler2D uRasterM1;
+            uniform sampler2D uRasterM2;
+            uniform sampler2D uRasterM3;
+            uniform vec4 uRasterC0;
+            uniform vec4 uRasterC1;
+            uniform vec4 uRasterC2;
+            uniform vec4 uRasterC3;
             uniform sampler2D uShadeForm; // quarter-res blurred frame: the shading height field
             uniform vec2 shadeTexelSize;
             uniform float sunraysEnabled;
@@ -354,10 +364,26 @@
                 vec4 under = vec4(0.0);
                 float underMerged = 0.0;
                 vec3 cc = color.rgb;
-                if (uRasterP0.x > 0.5) rasterSlot(texture(uRaster0, vUv) * uRasterP0.y, uRasterP0, cc, under, underMerged, skA);
-                if (uRasterP1.x > 0.5) rasterSlot(texture(uRaster1, vUv) * uRasterP1.y, uRasterP1, cc, under, underMerged, skA);
-                if (uRasterP2.x > 0.5) rasterSlot(texture(uRaster2, vUv) * uRasterP2.y, uRasterP2, cc, under, underMerged, skA);
-                if (uRasterP3.x > 0.5) rasterSlot(texture(uRaster3, vUv) * uRasterP3.y, uRasterP3, cc, under, underMerged, skA);
+                if (uRasterP0.x > 0.5) {
+                    vec4 rs0 = texture(uRaster0, vUv) * uRasterP0.y;
+                    if (uRasterC0.x > 0.5) { float m0 = texture(uRasterM0, vUv).a; rs0 *= (uRasterC0.y > 0.5) ? 1.0 - m0 : m0; }
+                    rasterSlot(rs0, uRasterP0, cc, under, underMerged, skA);
+                }
+                if (uRasterP1.x > 0.5) {
+                    vec4 rs1 = texture(uRaster1, vUv) * uRasterP1.y;
+                    if (uRasterC1.x > 0.5) { float m1 = texture(uRasterM1, vUv).a; rs1 *= (uRasterC1.y > 0.5) ? 1.0 - m1 : m1; }
+                    rasterSlot(rs1, uRasterP1, cc, under, underMerged, skA);
+                }
+                if (uRasterP2.x > 0.5) {
+                    vec4 rs2 = texture(uRaster2, vUv) * uRasterP2.y;
+                    if (uRasterC2.x > 0.5) { float m2 = texture(uRasterM2, vUv).a; rs2 *= (uRasterC2.y > 0.5) ? 1.0 - m2 : m2; }
+                    rasterSlot(rs2, uRasterP2, cc, under, underMerged, skA);
+                }
+                if (uRasterP3.x > 0.5) {
+                    vec4 rs3 = texture(uRaster3, vUv) * uRasterP3.y;
+                    if (uRasterC3.x > 0.5) { float m3 = texture(uRasterM3, vUv).a; rs3 *= (uRasterC3.y > 0.5) ? 1.0 - m3 : m3; }
+                    rasterSlot(rs3, uRasterP3, cc, under, underMerged, skA);
+                }
                 // every slot was below the fluid — merge the accumulated
                 // under-stack beneath the dye now
                 if (under.a > 0.0 && underMerged < 0.5) {

@@ -688,6 +688,10 @@
                 gl.uniform1i(displayProg.uniforms['uRaster' + ri], 3 + ri);
                 gl.uniform4f(displayProg.uniforms['uRasterP' + ri],
                     _rs ? 1 : 0, _rs ? _rs.opacity : 0, _rs ? _rs.mode : 0, (_rs && _rs.under) ? 1 : 0);
+                // D3 clip binding (mask coverage sampler on units 8-11)
+                gl.uniform1i(displayProg.uniforms['uRasterM' + ri], 8 + ri);
+                gl.uniform4f(displayProg.uniforms['uRasterC' + ri],
+                    (_rs && _rs.clipTex) ? 1 : 0, (_rs && _rs.clipInvert) ? 1 : 0, 0, 0);
             }
             // D3 mask overlay: auto-shown while painting into a mask, or
             // pinned on via the Show Mask checkbox (config.MASK_OVERLAY)
@@ -724,6 +728,8 @@
                 const _rs = _rSlots ? _rSlots[ri] : null;
                 gl.activeTexture(gl.TEXTURE3 + ri);
                 gl.bindTexture(gl.TEXTURE_2D, _rs ? _rs.texture : null);
+                gl.activeTexture(gl.TEXTURE8 + ri);
+                gl.bindTexture(gl.TEXTURE_2D, (_rs && _rs.clipTex) ? _rs.clipTex : null);
             }
             gl.activeTexture(gl.TEXTURE7);
             gl.bindTexture(gl.TEXTURE_2D, _mOverlay ? _mOverlay.texture : null);

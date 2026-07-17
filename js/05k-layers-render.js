@@ -113,6 +113,16 @@
                                         <option value="add" ${layer.blendMode === 'add' ? 'selected' : ''}>Add</option>
                                     </select>
                                 </div>
+                                <div class="collision-row" style="margin-top:4px;">
+                                    <label class="collision-label">Clip</label>
+                                    <select class="raster-clip-select">
+                                        <option value="">None</option>
+                                        ${(window.Masks ? window.Masks.list() : []).map(m =>
+                                            `<option value="${m.id}" ${layer.clipMaskId === m.id ? 'selected' : ''}>${m.name}</option>`
+                                        ).join('')}
+                                    </select>
+                                    <label class="collision-toggle"><input type="checkbox" class="raster-clip-invert" ${layer.clipInvert ? 'checked' : ''}> Inv</label>
+                                </div>
                             </div>
                         `;
                         const headerElR = element.querySelector('.layer-item-header');
@@ -135,6 +145,21 @@
                         if (bSel) {
                             bSel.addEventListener('change', (e) => { e.stopPropagation(); layer.blendMode = e.target.value; });
                             bSel.addEventListener('mousedown', (e) => e.stopPropagation());
+                        }
+                        // D3 clip binding controls
+                        const cSel = element.querySelector('.raster-clip-select');
+                        if (cSel) {
+                            cSel.addEventListener('change', (e) => {
+                                e.stopPropagation();
+                                layer.clipMaskId = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                            });
+                            cSel.addEventListener('mousedown', (e) => e.stopPropagation());
+                        }
+                        const cInv = element.querySelector('.raster-clip-invert');
+                        if (cInv) {
+                            const stopP = (ev) => ev.stopPropagation();
+                            ['click', 'mousedown', 'pointerdown', 'touchstart'].forEach(evt => cInv.addEventListener(evt, stopP));
+                            cInv.addEventListener('change', () => { layer.clipInvert = cInv.checked; });
                         }
                     } else {
                     if (layer.active) {
@@ -165,6 +190,7 @@
                         <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
                             <button class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">✏️ Edit Mask</button>
                             <button class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">🗑️ Clear</button>
+                            <button class="mask-control-btn" onclick="window.Masks && Masks.importFromLayer(${layer.index})" title="Import this layer's mask (SAM / depth / shapes) as a paintable Mask — edit it with the brush, clip layers with it, or bind it as a collider">⤓ Mask</button>
                             <span style="font-size:11px; opacity:0.7;">${layer.mask.shapes.length} shape${layer.mask.shapes.length !== 1 ? 's' : ''}</span>
                         </div>
                         ` : `
@@ -353,6 +379,11 @@
             panel.appendChild(bottomZone);
             updateLayerZIndices();
         }
+        // D3: keep the raster rows' Clip dropdowns in sync with the mask
+        // registry (create/delete/rename fire this — rare, full re-render ok)
+        window.__onMaskListChanged = function () {
+            if (document.getElementById('layersPanel')) renderLayers();
+        };
         let draggedElement = null;
         let isLayerSliderActive = false;
         let layerDragGuardInstalled = false;

@@ -600,7 +600,9 @@
                         collisionStrength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7,
                         isRaster: !!layer.isRaster,
                         opacity: typeof layer.opacity === 'number' ? layer.opacity : 1,
-                        blendMode: layer.blendMode || 'normal'
+                        blendMode: layer.blendMode || 'normal',
+                        clipMaskId: (typeof layer.clipMaskId === 'number') ? layer.clipMaskId : null,
+                        clipInvert: !!layer.clipInvert
                     };
                     // Mask data — encode collision depthData as base64 for exact restoration
                     if (layer.mask) {
@@ -1100,7 +1102,9 @@
                         collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7,
                         isRaster: !!ld.isRaster,
                         opacity: typeof ld.opacity === 'number' ? ld.opacity : 1,
-                        blendMode: ld.blendMode || 'normal'
+                        blendMode: ld.blendMode || 'normal',
+                        clipMaskId: (typeof ld.clipMaskId === 'number') ? ld.clipMaskId : null,
+                        clipInvert: !!ld.clipInvert
                     };
 
                     // Restore mask metadata and decode collision depthData from base64

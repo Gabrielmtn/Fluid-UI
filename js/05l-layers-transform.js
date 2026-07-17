@@ -534,6 +534,11 @@
                     s.opacity = (typeof layer.opacity === 'number') ? layer.opacity : 1;
                     s.mode = MODE_INT[layer.blendMode] || 0;
                     s.under = !passedSim;
+                    // D3 clip binding: a Mask's coverage gates this layer
+                    const cf = (layer.clipMaskId != null && window.Masks)
+                        ? window.Masks.getFBO(layer.clipMaskId) : null;
+                    s.clipTex = cf ? cf.texture : null;
+                    s.clipInvert = !!layer.clipInvert;
                     _slots.push(s);
                 }
                 return _slots;

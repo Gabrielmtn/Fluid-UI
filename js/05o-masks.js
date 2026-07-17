@@ -161,9 +161,48 @@
             window.__onActiveMaskChanged(_activeMaskId, _meta[_activeMaskId] ? _meta[_activeMaskId].name : null);
         }
     }
+    // ── D3: import existing mask sources into a paintable Mask ─────────
+    // Upload any white/alpha coverage canvas into a fresh Mask.
+    function importCoverage(srcCanvas, name) {
+        const id = create(name);
+        const f = maskStore[id];
+        const c = document.createElement('canvas');
+        c.width = f.width; c.height = f.height;
+        c.getContext('2d').drawImage(srcCanvas, 0, 0, f.width, f.height);
+        gl.bindTexture(gl.TEXTURE_2D, f.texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, c);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        if (typeof window.__onMaskMutated === 'function') window.__onMaskMutated(id);
+        return id;
+    }
+    // Rasterize a layer's mask shapes (SAM clicks, depth cuts, geometric
+    // shapes — the three legacy stacks) into ONE Mask via the same
+    // drawMaskShape renderer the visual clip uses, so the imported
+    // coverage matches what the user sees. SAM and depth are now mask
+    // SOURCES: click/estimate → import → paint on it → bind it.
+    function importFromLayer(layerIndex) {
+        const layer = (window.layers || []).find(function (l) { return l.index === layerIndex; });
+        if (!layer || !layer.mask || !layer.mask.shapes || !layer.mask.shapes.length) return null;
+        if (typeof window._drawMaskShape !== 'function') return null;
+        const mainCanvas = document.getElementById('canvas');
+        if (!mainCanvas) return null;
+        const c = document.createElement('canvas');
+        c.width = dyeTexWidth; c.height = dyeTexHeight;
+        const ctx = c.getContext('2d');
+        // shapes live in canvas-buffer px — map onto the dye-res raster
+        ctx.scale(dyeTexWidth / mainCanvas.width, dyeTexHeight / mainCanvas.height);
+        layer.mask.shapes.forEach(function (s) { window._drawMaskShape(ctx, s); });
+        return importCoverage(c, (layer.title || 'Layer') + ' mask');
+    }
     window.Masks = {
         create: create,
         ensureDefault: ensureDefault,
+        importCoverage: importCoverage,
+        importFromLayer: importFromLayer,
         setActive: setActive,
         activeId: function () { return _activeMaskId; },
         getFBO: function (id) { return maskStore[id] || null; },
