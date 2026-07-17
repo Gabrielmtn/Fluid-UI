@@ -46,6 +46,7 @@
             const layer = layers.find(l => l.index === index);
             if (layer && layer.mask) {
                 layer.mask.enabled = !layer.mask.enabled;
+                layer.__maskDirty = true; // 7.6: reorder-reapply memo
                 applyLayerMask(index);
                 renderLayers();
             }

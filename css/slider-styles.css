@@ -267,3 +267,18 @@ body.mobile-mode input[type=range]::-webkit-slider-thumb {
 body.mobile-mode input[type=range]::-moz-range-thumb {
     cursor: grab;
 }
+
+/* 13.6: touch usability — bigger hit areas + thumbs on coarse pointers
+   (phones/tablets). Pointer-media gated so desktop mice are untouched. */
+@media (pointer: coarse) {
+    input[type="range"] {
+        min-height: 28px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+        width: 22px;
+        height: 22px;
+    }
+    .encapsulated-slider {
+        min-height: 28px;
+    }
+}

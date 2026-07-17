@@ -236,6 +236,7 @@
                                 <label class="collision-toggle"><input type="checkbox" class="collision-invert-cb" data-cinv="${layer.index}" ${layer.mask?.shapes?.[0]?.invert ? 'checked' : ''}> Invert</label>
                                 <button type="button" class="collision-refresh-btn" data-cref="${layer.index}" title="Re-run depth estimation">🔄</button>
                             </div>
+                            <div style="font-size:10px;opacity:0.55;line-height:1.35;margin-top:4px;">💡 Soft edges: feather or mask the source first — the collider inherits the edge. Cleanest route: paint a Mask (Brush panel), then → Collider.</div>
                         </div>
                         ` : ''}
                         </div>
@@ -281,7 +282,7 @@
                                 const v = parseInt(sSlider.value) / 100;
                                 layer.collisionStrength = v;
                                 if (strengthVal) strengthVal.textContent = v.toFixed(1);
-                                if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
+                                scheduleObstacleUpdate(); // 7.6: debounced during drag
                             });
                             const dis = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; };
                             const en = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; };
@@ -299,10 +300,11 @@
                                 const v = parseInt(tSlider.value);
                                 if (threshVal) threshVal.textContent = v;
                                 if (depthShape) depthShape.threshold = v;
-                                if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
+                                scheduleObstacleUpdate(); // 7.6: debounced during drag
                             });
                             // Refresh the visible mask preview on release (full-res redraw is too heavy per input tick)
                             tSlider.addEventListener('change', () => {
+                                layer.__maskDirty = true; // 7.6: reorder-reapply memo
                                 if (layer.visible && typeof window.applyLayerMask === 'function') window.applyLayerMask(layer.index);
                             });
                             const dis = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; };
@@ -323,6 +325,7 @@
                             invertCb.addEventListener('change', () => {
                                 const depthShape = layer.mask?.shapes?.find(s => s.type === 'depth-mask');
                                 if (depthShape) depthShape.invert = invertCb.checked;
+                                layer.__maskDirty = true; // 7.6: reorder-reapply memo
                                 if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
                                 if (layer.visible && typeof window.applyLayerMask === 'function') window.applyLayerMask(layer.index);
                             });
@@ -388,6 +391,18 @@
         window.__onMaskListChanged = function () {
             if (document.getElementById('layersPanel')) renderLayers();
         };
+        // 7.6: trailing debounce for obstacle recomposites during collision
+        // slider drags — the rAF throttle still recomposited every FRAME of a
+        // drag (full CPU compose per tick on big masks); one recomposite per
+        // 100ms-idle is indistinguishable and cuts the drag jank.
+        let _obsDebounceTimer = null;
+        function scheduleObstacleUpdate() {
+            if (_obsDebounceTimer) clearTimeout(_obsDebounceTimer);
+            _obsDebounceTimer = setTimeout(() => {
+                _obsDebounceTimer = null;
+                if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
+            }, 100);
+        }
         let draggedElement = null;
         let isLayerSliderActive = false;
         let layerDragGuardInstalled = false;
@@ -519,14 +534,22 @@
                             } else {
                                 layerDiv.classList.remove('active');
                             }
-                            // Reapply mask / threshold so visual state survives reorder
-                            const hasMask = layer.mask?.shapes?.length > 0;
-                            if (hasMask && layer.mask.enabled) {
-                                applyLayerMask(layer.index);
-                            } else if (layer.threshold > 0) {
-                                applyRudimentaryMask(layer.index);
-                            } else {
-                                applyLayerMask(layer.index);
+                            // Reapply mask / threshold ONLY when mask state
+                            // changed since the last application (7.6: this ran
+                            // per layer on EVERY reorder/render — image decode +
+                            // full-canvas composite per layer was the layers-
+                            // panel jank source; the div's background persists
+                            // across reorders, so a clean layer needs nothing).
+                            if (layer.__maskDirty !== false) {
+                                const hasMask = layer.mask?.shapes?.length > 0;
+                                if (hasMask && layer.mask.enabled) {
+                                    applyLayerMask(layer.index);
+                                } else if (layer.threshold > 0) {
+                                    applyRudimentaryMask(layer.index);
+                                } else {
+                                    applyLayerMask(layer.index);
+                                }
+                                layer.__maskDirty = false;
                             }
                         }
                     }

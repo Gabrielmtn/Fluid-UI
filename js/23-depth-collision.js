@@ -1105,6 +1105,12 @@ class DepthEstimator {
                     strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
                 });
             });
+            // D0.5 edge quality on the GPU path too: without this the single
+            // bilinear tap of a dye-res mask yields sub-texel (hard) collider
+            // edges — measured 0-texel 0.9→0.1 transition, the jagged feel
+            // the whole D0.5 effort exists to prevent. One 1-sim-texel blur
+            // bounds every edge ramp ~1.5 texels, same as the CPU compositor.
+            if (typeof window.finishObstacleComposite === 'function') window.finishObstacleComposite();
             return;
         }
 

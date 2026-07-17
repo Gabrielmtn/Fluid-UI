@@ -510,6 +510,25 @@
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             return true;
         };
+        // M4 edge quality: one separable 1-texel blur over the composited
+        // obstacle (H into scratch, V back) — the GPU-path equivalent of the
+        // D0.5 sim-scale blur the CPU compositor applies. Call after the last
+        // compositeObstacleSource of a rebuild.
+        window.finishObstacleComposite = function () {
+            if (!obstacle || !obstacleScratch || gl.isContextLost()) return;
+            gl.disable(gl.BLEND);
+            blurProg.bind();
+            gl.uniform1i(blurProg.uniforms.uTexture, 0);
+            gl.viewport(0, 0, obstacle.width, obstacle.height);
+            gl.uniform2f(blurProg.uniforms.texelSize, obstacle.texelSizeX, 0.0);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            blit(obstacleScratch.fbo);
+            gl.uniform2f(blurProg.uniforms.texelSize, 0.0, obstacle.texelSizeY);
+            gl.bindTexture(gl.TEXTURE_2D, obstacleScratch.texture);
+            blit(obstacle.fbo);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        };
         window.updateObstacleTexture = function (sourceCanvas) {
             if (!obstacle || gl.isContextLost()) return;
             try {

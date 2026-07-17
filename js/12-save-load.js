@@ -353,18 +353,28 @@
         } catch(_){}
 
         // ── 10. Sidebar section collapsed states ──
+        // 5.2 timing: sections are MOVED into #sidebar-right by
+        // initMixerLayout ~800ms after load — at loadSettings time the
+        // container is empty and an immediate pass is a no-op. Poll until
+        // they exist (the 23-depth-collision deleteLayer-hook pattern).
         try {
             var savedSections = sm.get('sidebar.sections');
             if (savedSections && typeof savedSections === 'object') {
-                var sections = document.querySelectorAll('#sidebar-right .sidebar-section');
-                sections.forEach(function(sec) {
-                    var titleEl = sec.querySelector('.section-title');
-                    if (!titleEl) return;
-                    var title = titleEl.textContent.trim();
-                    if (title in savedSections) {
-                        sec.classList.toggle('collapsed', !!savedSections[title]);
+                (function applySections(tries) {
+                    var sections = document.querySelectorAll('#sidebar-right .sidebar-section');
+                    if (!sections.length) {
+                        if (tries < 60) setTimeout(function () { applySections(tries + 1); }, 250);
+                        return;
                     }
-                });
+                    sections.forEach(function (sec) {
+                        var titleEl = sec.querySelector('.section-title');
+                        if (!titleEl) return;
+                        var title = titleEl.textContent.trim();
+                        if (title in savedSections) {
+                            sec.classList.toggle('collapsed', !!savedSections[title]);
+                        }
+                    });
+                })(0);
             }
         } catch(_){}
 
@@ -533,6 +543,7 @@
             replayMode: window.replayMode || 'stroke',
             replayTimePeriod: window.replayTimePeriod || 5,
             replaySpeed: typeof window.replaySpeed === 'number' ? window.replaySpeed : 1,
+            replayLiveColors: !!window.replayLiveColors,
             refreshRate: window.brushRefreshRate || 0,
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
@@ -956,6 +967,11 @@
                     if (spSlider) spSlider.value = bs.replaySpeed;
                     var spVal = document.getElementById('replaySpeedValue');
                     if (spVal) spVal.textContent = bs.replaySpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
+                }
+                if (typeof bs.replayLiveColors === 'boolean') {
+                    window.replayLiveColors = bs.replayLiveColors;
+                    var lcCb = document.getElementById('replayLiveColors');
+                    if (lcCb) lcCb.checked = bs.replayLiveColors;
                 }
                 if (typeof bs.refreshRate === 'number') window.brushRefreshRate = bs.refreshRate;
                 if (bs.splatInMode) {

@@ -8,14 +8,14 @@
 ## 1. Replay System
 
 ### 1.1 Replay doesn't recall brush color settings
-- [ ] **Investigate why replay ignores color modes (random, step, fixed)**
+- [x] **Investigate why replay ignores color modes (random, step, fixed)**
 - `processReplay()` in `js/05d-input-replay.js` applies `ev.color` directly from the recorded event without considering `randomColor` or `stepPalette` settings
 - `pushStrokeEvent()` records `color: color.slice()` — the resolved color at time of recording, not the mode
 - Replay events do NOT set `exactColor: true`, so they *should* respect arm color modes via `resolveArmColor()`, but the recorded color overrides this
 - **Fix approach:** During replay, re-resolve color through `resolveArmColor()` / arm color mode logic instead of using the raw recorded color, OR record the color mode alongside the color
 
 ### 1.2 Add brush replay speed control
-- [ ] **Add a speed slider for brush stroke replay**
+- [x] **Add a speed slider for brush stroke replay**
 - Currently replay plays back at real-time speed (events have timestamps `ev.t` relative to stroke start)
 - Add a UI control (slider or select) to adjust replay playback speed (e.g., 0.25x–4x)
 - Files: `js/05d-input-replay.js` (replay loop), `js/20-mixer-layout.js` (UI for control)
@@ -59,13 +59,13 @@
 - **Verify:** Controls are accessible and functional at 1x multiplier
 
 ### 3.2 Brush easing out should have inertia
-- [ ] **Splat-out tail should feel more like inertia, not an abrupt stop**
+- [x] **Splat-out tail should feel more like inertia, not an abrupt stop**
 - Current splat-out in `js/05j-update-loop.js` (lines 193–220) uses velocity decay `* 0.9` and distance-based taper via `getSplatOutMult()`
 - The tail stops when `outMult <= 0.001` or velocity dies (`outVel2 < 0.0004`)
 - **Fix approach:** Add smoother deceleration curve, longer taper, or velocity-based inertia so the brush trails off naturally instead of cutting
 
 ### 3.3 Investigate pressure iteration behavior at 12+
-- [ ] **Pressure iterations may cause instability or visual artifacts at 12+**
+- [x] **Pressure iterations may cause instability or visual artifacts at 12+**
 - `pressureIteration` slider controls `config.PRESSURE_ITERATIONS`
 - High iteration counts (12+) may cause performance issues or visual glitches
 - **Investigate:** Test with 12–20 iterations, check for artifacts, performance impact, and whether a cap is needed
@@ -90,14 +90,14 @@
 ## 5. Page Refresh & UI State
 
 ### 5.1 Mobile sidebar flashes open then closes on refresh
-- [ ] **Fix mobile sidebar auto-opening on page refresh**
+- [x] **Fix mobile sidebar auto-opening on page refresh**
 - On mobile devices, the sidebar briefly flashes open then closes after page refresh
 - `js/13-mobile-mode.js` enables mobile mode on load if `isMobileDevice()` returns true
 - The sidebar `controls.classList` may briefly have `visible` before mobile mode removes it
 - **Fix approach:** Ensure mobile mode is applied before sidebar becomes visible (CSS `display: none` by default on mobile, or apply mobile class earlier in load order)
 
 ### 5.2 Sidebar sections auto-expand on refresh
-- [ ] **Sidebar sections should remember collapsed state on refresh**
+- [x] **Sidebar sections should remember collapsed state on refresh**
 - Preset system captures `sidebarSectionCollapsedStates` in snapshots
 - Sections may be expanding on refresh before saved state is applied
 - **Investigate:** Check load order — are sections built before saved collapsed state is restored?
@@ -107,7 +107,7 @@
 ## 6. Audio Reactive System
 
 ### 6.1 Remove EQ bars scene
-- [ ] **Remove the EQ bars audio reactive scene entirely**
+- [x] **Remove the EQ bars audio reactive scene entirely**
 - `js/30-audio-scenes.js` defines the `eq` scene with `applyBarSplat()` creating lane-shaped splats
 - User confirmed: EQ bars are too big and don't look great — remove completely
 - **Files:** `js/30-audio-scenes.js` (remove `eq` scene definition), `js/20-mixer-layout.js` (remove from scene select dropdown)
@@ -148,25 +148,25 @@
 ## 7. Layers UI
 
 ### 7.1 Layers doesn't collapse properly
-- [ ] **Fix layer item collapse/expand behavior**
+- [x] **Fix layer item collapse/expand behavior**
 - `css/22-overlays.css` defines `layer-item-collapsible` using `grid-template-rows` for collapse/expand
 - `js/05k-layers-render.js` handles collapse/expand logic
 - **Investigate:** Why isn't collapse working? Is the CSS class not being toggled, or is the grid-template-rows transition failing?
 
 ### 7.2 Row of buttons shouldn't be in the collapsible header
-- [ ] **Move layer action buttons out of the collapsible header**
+- [x] **Move layer action buttons out of the collapsible header**
 - `js/05k-layers-render.js` builds `layer-item-header` with `layer-controls` inside it
 - The buttons row should be in the collapsible body, not the header — header should only have the layer name/visibility toggle
 - **Fix approach:** Move button controls into the expandable body section
 
 ### 7.3 Educate users on masking/feathering for collider layers
-- [ ] **Add UI guidance for masking and feathering collider layers**
+- [x] **Add UI guidance for masking and feathering collider layers**
 - Users need to understand they should mask or feather layers to get clean collider layer setups
 - Without masking/feathering, the collider is just the whole block
 - **Fix approach:** Add tooltips, hints, or a brief tutorial/infobox when creating collider layers
 
 ### 7.4 Crisp edges for collider layers
-- [ ] **Ensure collider layers have crisp, non-jagged edges**
+- [x] **Ensure collider layers have crisp, non-jagged edges**
 - Current collider generation may produce jagged edges
 - **Fix approach:** Improve edge detection/feathering in collision generation logic
 - Files: `js/23-depth-collision.js` (collision generation), `js/15-layer-masking.js` (mask/feather controls)
@@ -181,7 +181,7 @@
   - Smooth animations (within Electron CSS constraints — no opacity transitions)
 
 ### 7.6 Investigate collider layer performance issues
-- [ ] **Investigate and fix performance issues with collider layers**
+- [x] **Investigate and fix performance issues with collider layers**
 - Collider layers may cause frame rate drops
 - **Investigate:** Profile with multiple collider layers, check collision computation in `js/23-depth-collision.js`
 - Look for unnecessary recomputation, texture reads, or shader overhead
@@ -191,7 +191,7 @@
 ## 8. Gate Control UI
 
 ### 8.1 Add vertical slider for gate max density
-- [ ] **Add a vertical slider control for gate max density**
+- [x] **Add a vertical slider control for gate max density**
 - Current gate control is a checkbox (`colorGate`) in `js/05h-slider-bindings.js` (lines 60–84)
 - `applyGateState()` sets `config.COLOR_GATE` and `config.BLOOM_CEILING` (hardcoded to 3.0)
 - **Fix approach:** Replace or augment the checkbox with a vertical slider that controls `BLOOM_CEILING` (max density), allowing users to set the cap value
@@ -217,7 +217,7 @@
 ## 10. Focus Mode
 
 ### 10.1 Change focus mode hotkey from 'S' to 'F'
-- [ ] **Change the focus mode toggle hotkey from 'S' to 'F'**
+- [x] **Change the focus mode toggle hotkey from 'S' to 'F'**
 - `js/21-focus-mode.js` binds the hotkey to 'S'
 - Change the keydown check from 'S'/'s' to 'F'/'f'
 - **Verify:** 'F' key doesn't conflict with other bindings (check `js/05n-hotkeys-init.js` and other hotkey handlers)
@@ -227,7 +227,7 @@
 ## 11. Battery UI Removal
 
 ### 11.1 Remove battery UI and auto-adjust
-- [ ] **Remove all battery management UI and auto-adjust functionality**
+- [x] **Remove all battery management UI and auto-adjust functionality**
 - `js/14-battery-manager.js` contains battery UI and auto-adjust controls
 - `css/battery-styles.css` contains battery styling
 - **Files to modify:**
@@ -242,7 +242,7 @@
 ## 12. ComfyUI Bridge Rename
 
 ### 12.1 Rename "ComfyUI Bridge" to "Set Save To Folder"
-- [ ] **Rename all references to "ComfyUI Bridge" to "Set Save To Folder"**
+- [x] **Rename all references to "ComfyUI Bridge" to "Set Save To Folder"**
 - `js/comfyui-bridge.js` handles the ComfyUI integration
 - UI label in settings section (`js/20-mixer-layout.js` buildSettingsSection) says "ComfyUI Bridge"
 - **Fix approach:** Update the display label text only — keep internal variable names and API as-is (`window.comfyuiBridge`, settings keys `comfyui.*`)
@@ -279,7 +279,7 @@
 - Files: `js/06-multiplayer.js` (add lock message type), `js/20-mixer-layout.js` (disable controls when locked)
 
 ### 13.6 Improve slider usability on mobile
-- [ ] **Make sliders easier to use on touch devices**
+- [x] **Make sliders easier to use on touch devices**
 - Current sliders may be too thin/short for finger control
 - **Fix approach:** Increase touch target size, add larger handle, ensure touch events work smoothly
 
@@ -289,7 +289,7 @@
 - Check `js/13-mobile-mode.js` and CSS responsive rules
 
 ### 13.8 Improve mobile color vibrance
-- [ ] **Improve color vibrance/contrast/brightness on mobile displays**
+- [x] **Improve color vibrance/contrast/brightness on mobile displays**
 - Mobile screens may show washed-out colors
 - **Fix approach:** Tune `config.VIBRANCE`, `config.CLARITY` defaults for mobile, or add mobile-specific color enhancement
 - May need HSL/contrast adjustments in the display shader for mobile
@@ -299,7 +299,7 @@
 ## 14. Capture Area
 
 ### 14.1 Fix capture area size consistency
-- [ ] **Ensure capture area size is consistent across different canvas sizes**
+- [x] **Ensure capture area size is consistent across different canvas sizes**
 - Capture via `toBlob()` in `js/comfyui-bridge.js` captures the canvas at its current resolution
 - Canvas size may vary based on window size, resolution settings, etc.
 - **Fix approach:** Standardize capture dimensions or allow user to set a fixed capture resolution

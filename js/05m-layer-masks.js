@@ -317,6 +317,7 @@
             const layer = layers.find(l => l.index === index);
             if (!layer) return;
             layer.threshold = parseInt(threshold, 10) || 0;
+            layer.__maskDirty = true; // 7.6: reorder-reapply memo
             const hasMask = layer.mask?.shapes?.length > 0;
             if (hasMask && layer.mask.enabled) {
                 // Has shape mask - threshold controls feathering

@@ -273,11 +273,17 @@
                     // "use current live settings" behavior meant a stroke
                     // painted small replayed at whatever the slider says now —
                     // and remote strokes replayed at the RECEIVER's brush size.
+                    // 1.1 Live colors (opt-in): repaint the stroke with the
+                    // CURRENT brush color instead of the recorded one — the
+                    // faithful-replay default stays (recorded color, arm modes
+                    // still resolve on top either way).
+                    var repCol = (window.replayLiveColors && window.pointer && window.pointer.color)
+                        ? window.pointer.color.slice() : ev.color;
                     if (typeof window.applyMultiSplatWith === 'function') {
-                        window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, ev.color,
+                        window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, repCol,
                             ev.mult || 1, (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS);
                     } else {
-                        multiSplat(ev.x, ev.y, ev.dx, ev.dy, ev.color, false);
+                        multiSplat(ev.x, ev.y, ev.dx, ev.dy, repCol, false);
                     }
                     if (typeof recRecordInteraction === 'function' && recEnabled) {
                         try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}

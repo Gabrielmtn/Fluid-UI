@@ -1526,6 +1526,31 @@
         speedGroup.appendChild(speedLbl);
         speedGroup.appendChild(speedSlider);
         body.appendChild(speedGroup);
+
+        // 1.1 Live colors: replay repaints with the CURRENT brush color
+        // instead of the recorded one (faithful replay stays the default)
+        var liveColGroup = document.createElement('div');
+        liveColGroup.className = 'control-group';
+        var liveColLabel = document.createElement('label');
+        liveColLabel.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;';
+        var liveColCb = document.createElement('input');
+        liveColCb.type = 'checkbox';
+        liveColCb.id = 'replayLiveColors';
+        var liveColText = document.createElement('span');
+        liveColText.textContent = 'Replay uses current color';
+        liveColLabel.title = 'Off = faithful replay (the colors you painted with). On = the stroke repaints with whatever color the brush has NOW.';
+        liveColLabel.appendChild(liveColCb);
+        liveColLabel.appendChild(liveColText);
+        liveColGroup.appendChild(liveColLabel);
+        body.appendChild(liveColGroup);
+        liveColCb.addEventListener('change', function () {
+            window.replayLiveColors = liveColCb.checked;
+            try { if (window.settingsManager) window.settingsManager.set('brush.replayLiveColors', liveColCb.checked); } catch (_) {}
+        });
+        try {
+            var savedLiveCol = window.settingsManager && window.settingsManager.get('brush.replayLiveColors');
+            if (savedLiveCol) { liveColCb.checked = true; window.replayLiveColors = true; }
+        } catch (_) {}
         var rateGroup = document.createElement('div');
         rateGroup.className = 'control-group';
 
