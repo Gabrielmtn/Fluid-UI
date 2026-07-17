@@ -57,7 +57,7 @@
         mainArea.appendChild(sidebar);
 
         // Move any remaining dynamic content from .controls to sidebar
-        // (e.g., battery manager UI, component system)
+        // (e.g., component system)
         const remaining = controls.querySelectorAll('.collapsible-section, #component-controls');
         remaining.forEach(function(el) {
             // Convert .collapsible-section to .sidebar-section format
@@ -471,12 +471,71 @@
                 gateEl.checked = !gateEl.checked;
                 gateEl.dispatchEvent(new Event('change', { bubbles: true }));
                 gateBtn.classList.toggle('active', gateEl.checked);
+                gateDensityWrap.style.display = gateEl.checked ? 'flex' : 'none';
             });
             gateEl.addEventListener('change', function () {
                 gateBtn.classList.toggle('active', gateEl.checked);
+                gateDensityWrap.style.display = gateEl.checked ? 'flex' : 'none';
             });
             ch.appendChild(gateEl);
             toggleRow.appendChild(gateBtn);
+
+            // Gate max density incrementer (BLOOM_CEILING) — compact ±0.1 stepper
+            var gateDensityWrap = document.createElement('div');
+            gateDensityWrap.className = 'ch-gate-density';
+            gateDensityWrap.style.cssText = 'display:' + (gateEl.checked ? 'flex' : 'none') + ';align-items:center;justify-content:center;gap:2px;height:16px;flex:0 0 auto;box-sizing:border-box;';
+
+            var GATE_MIN = 1.0, GATE_MAX = 6.0, GATE_STEP = 0.1;
+            var gateCurVal = typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3;
+
+            var gateDownBtn = document.createElement('button');
+            gateDownBtn.type = 'button';
+            gateDownBtn.textContent = '−';
+            gateDownBtn.title = 'Decrease max density';
+            gateDownBtn.style.cssText = 'width:16px;height:16px;padding:0;border:1px solid rgba(255,255,255,0.15);border-radius:3px;background:rgba(0,0,0,0.3);color:#c9d1d9;font-size:12px;line-height:1;cursor:pointer;';
+
+            var gateValSpan = document.createElement('span');
+            gateValSpan.className = 'ch-gate-density-val';
+            gateValSpan.style.cssText = 'font-size:10px;font-family:monospace;color:#4fc3f7;min-width:24px;text-align:center;';
+            gateValSpan.textContent = gateCurVal.toFixed(1);
+
+            var gateUpBtn = document.createElement('button');
+            gateUpBtn.type = 'button';
+            gateUpBtn.textContent = '+';
+            gateUpBtn.title = 'Increase max density';
+            gateUpBtn.style.cssText = 'width:16px;height:16px;padding:0;border:1px solid rgba(255,255,255,0.15);border-radius:3px;background:rgba(0,0,0,0.3);color:#c9d1d9;font-size:12px;line-height:1;cursor:pointer;';
+
+            function updateGateDensity(v) {
+                v = Math.round(v * 10) / 10;
+                v = Math.max(GATE_MIN, Math.min(GATE_MAX, v));
+                window.gateMaxDensity = v;
+                gateCurVal = v;
+                gateValSpan.textContent = v.toFixed(1);
+                if (typeof window.applyGateState === 'function' && gateEl.checked) {
+                    window.applyGateState(true);
+                }
+                try { if (window.settingsManager) window.settingsManager.set('gate.maxDensity', v); } catch (_) {}
+            }
+
+            gateDownBtn.addEventListener('click', function () { updateGateDensity((window.gateMaxDensity || gateCurVal) - GATE_STEP); });
+            gateUpBtn.addEventListener('click', function () { updateGateDensity((window.gateMaxDensity || gateCurVal) + GATE_STEP); });
+
+            // Load saved value
+            try {
+                if (window.settingsManager) {
+                    var savedGD = window.settingsManager.get('gate.maxDensity');
+                    if (typeof savedGD === 'number') {
+                        gateCurVal = Math.max(GATE_MIN, Math.min(GATE_MAX, savedGD));
+                        window.gateMaxDensity = gateCurVal;
+                        gateValSpan.textContent = gateCurVal.toFixed(1);
+                    }
+                }
+            } catch (_) {}
+
+            gateDensityWrap.appendChild(gateDownBtn);
+            gateDensityWrap.appendChild(gateValSpan);
+            gateDensityWrap.appendChild(gateUpBtn);
+            toggleRow.appendChild(gateDensityWrap);
         }
 
         ch.appendChild(toggleRow);
@@ -801,6 +860,7 @@
         const grid = document.createElement('div');
         grid.id = 'mutationGrid';
         grid.className = 'mutation-grid';
+        grid.style.display = 'none';
         body.appendChild(grid);
 
         // ── Diff panel (shows changes for hovered/selected variant) ──
@@ -910,9 +970,11 @@
             grid.innerHTML = '';
 
             if (_variants.length === 0) {
-                grid.innerHTML = '<div class="mutation-empty">Press Mutate to generate variants</div>';
+                grid.style.display = 'none';
+                grid.innerHTML = '';
                 return;
             }
+            grid.style.display = '';
 
             _variants.forEach(function (variant, idx) {
                 var card = document.createElement('div');
@@ -1445,7 +1507,25 @@
         timeGroup.appendChild(timeInputWrap);
         body.appendChild(timeGroup);
 
-        // --- Brush Refresh Rate ---
+        // --- Replay Speed ---
+        var speedGroup = document.createElement('div');
+        speedGroup.className = 'control-group';
+
+        var speedLbl = document.createElement('label');
+        speedLbl.setAttribute('for', 'replaySpeed');
+        speedLbl.innerHTML = 'Replay Speed <span class="value-display" id="replaySpeedValue">1.0×</span>';
+
+        var speedSlider = document.createElement('input');
+        speedSlider.type = 'range';
+        speedSlider.id = 'replaySpeed';
+        speedSlider.min = '0.25';
+        speedSlider.max = '4';
+        speedSlider.value = '1';
+        speedSlider.step = '0.25';
+
+        speedGroup.appendChild(speedLbl);
+        speedGroup.appendChild(speedSlider);
+        body.appendChild(speedGroup);
         var rateGroup = document.createElement('div');
         rateGroup.className = 'control-group';
 
@@ -1576,6 +1656,17 @@
             } catch (_) {}
         });
 
+        // --- Wire replay speed ---
+        var speedDisplay = speedLbl.querySelector('.value-display');
+        speedSlider.addEventListener('input', function () {
+            var v = parseFloat(speedSlider.value);
+            window.replaySpeed = v;
+            if (speedDisplay) speedDisplay.textContent = v.toFixed(2).replace(/\.?0+$/, '') + '×';
+            try {
+                if (window.settingsManager) window.settingsManager.set('brush.replaySpeed', v);
+            } catch (_) {}
+        });
+
         // --- Wire refresh rate ---
         var rateDisplay = rateLbl.querySelector('.value-display');
         rateSlider.addEventListener('input', function () {
@@ -1597,6 +1688,13 @@
                 if (typeof savedPeriod === 'number' && savedPeriod >= 1) {
                     timeInput.value = savedPeriod;
                     window.replayTimePeriod = savedPeriod;
+                }
+
+                var savedSpeed = window.settingsManager.get('brush.replaySpeed');
+                if (typeof savedSpeed === 'number') {
+                    speedSlider.value = savedSpeed;
+                    window.replaySpeed = savedSpeed;
+                    if (speedDisplay) speedDisplay.textContent = savedSpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
                 }
 
                 var savedRate = window.settingsManager.get('brush.refreshRate');
@@ -2473,7 +2571,6 @@
         modeSel.innerHTML =
             '<option value="off" selected>Off</option>' +
             '<option value="tunnel">🌀 Tunnel</option>' +
-            '<option value="eq">📊 EQ Bars</option>' +
             '<option value="ferro">🧲 Ferrofluid</option>' +
             '<option value="min">Minimized</option>' +
             '<option value="full">Full</option>';
@@ -3271,7 +3368,7 @@
 
         var comfyLabel = document.createElement('label');
         comfyLabel.style.cssText = 'display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:rgba(255,255,255,0.5); margin-bottom:6px;';
-        comfyLabel.textContent = 'ComfyUI Bridge (Ctrl+Enter)';
+        comfyLabel.textContent = 'Set Save To Folder (Ctrl+Enter)';
         comfySection.appendChild(comfyLabel);
 
         var comfyRow = document.createElement('div');
@@ -3315,6 +3412,45 @@
         comfyRow.appendChild(comfyFolderBtn);
 
         comfySection.appendChild(comfyRow);
+
+        // Capture resolution row (fixed output size for consistency)
+        var capRow = document.createElement('div');
+        capRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px;';
+        var capLbl = document.createElement('span');
+        capLbl.textContent = 'Capture';
+        capLbl.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.5);min-width:48px;';
+        var capW = document.createElement('input');
+        capW.type = 'number';
+        capW.placeholder = 'W';
+        capW.min = '0';
+        capW.style.cssText = 'width:60px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 6px;color:#c9d1d9;font-size:11px;';
+        var capH = document.createElement('input');
+        capH.type = 'number';
+        capH.placeholder = 'H';
+        capH.min = '0';
+        capH.style.cssText = 'width:60px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 6px;color:#c9d1d9;font-size:11px;';
+        var capHint = document.createElement('span');
+        capHint.textContent = '0=auto';
+        capHint.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.35);';
+        // Load saved values
+        if (window.comfyuiBridge) {
+            var capCfg = window.comfyuiBridge.getConfig();
+            if (capCfg.captureWidth) capW.value = capCfg.captureWidth;
+            if (capCfg.captureHeight) capH.value = capCfg.captureHeight;
+        }
+        function saveCapRes() {
+            if (!window.comfyuiBridge) return;
+            window.comfyuiBridge.setConfig('captureWidth', parseInt(capW.value, 10) || 0);
+            window.comfyuiBridge.setConfig('captureHeight', parseInt(capH.value, 10) || 0);
+        }
+        capW.addEventListener('change', saveCapRes);
+        capH.addEventListener('change', saveCapRes);
+        capRow.appendChild(capLbl);
+        capRow.appendChild(capW);
+        capRow.appendChild(capH);
+        capRow.appendChild(capHint);
+        comfySection.appendChild(capRow);
+
         // ComfyUI writes canvas frames to a local watched folder (Electron/filesystem
         // only) — it cannot work in a browser, so only show the control in the desktop
         // app. window.comfyuiBridge exists ONLY in Electron (comfyui-bridge.js guards on
@@ -3657,6 +3793,15 @@
         header.className = 'section-header';
         header.addEventListener('click', function() {
             this.parentElement.classList.toggle('collapsed');
+            // Persist collapsed states
+            try {
+                var sections = {};
+                document.querySelectorAll('#sidebar-right .sidebar-section').forEach(function(sec) {
+                    var titleEl = sec.querySelector('.section-title');
+                    if (titleEl) sections[titleEl.textContent.trim()] = sec.classList.contains('collapsed');
+                });
+                if (window.settingsManager) window.settingsManager.set('sidebar.sections', sections);
+            } catch(_) {}
         });
         header.innerHTML =
             '<span class="section-title">' + title + '</span>' +

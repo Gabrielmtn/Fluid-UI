@@ -462,6 +462,30 @@
     }
 }
 
+/* Prevent sidebar flash on mobile before JS adds .mobile-mode:
+   hide off-screen by default on phone-sized screens (portrait + landscape).
+   body.mobile-mode rules below take over once JS runs. */
+@media (max-width: 768px), (max-height: 500px) and (max-width: 1200px) {
+    #sidebar-right {
+        position: fixed;
+        right: 0;
+        top: 0;
+        height: 100vh;
+        height: 100dvh;
+        transform: translateX(100%);
+        z-index: 1000;
+    }
+    #sidebar-right.visible {
+        transform: translateX(0);
+    }
+    #main-area {
+        flex-direction: column;
+    }
+    #mixer-strip {
+        display: none;
+    }
+}
+
 /* Mobile mode (JS-toggled) */
 body.mobile-mode #mixer-strip {
     display: none;

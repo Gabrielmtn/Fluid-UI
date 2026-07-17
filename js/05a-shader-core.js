@@ -427,7 +427,7 @@
             uniform vec2 texelSize;
             uniform float kernelScale; // kernel radius in 2048-reference texels
                                        // (CPU pre-multiplies by dyeRes/2048): the
-                                       // LOOK stops changing when governor/battery/
+                                       // LOOK stops changing when governor/
                                        // boot-ascent changes dye resolution, and
                                        // values >1 recreate the coarse "ridges"
                                        // emboss deliberately (Ridges slider).

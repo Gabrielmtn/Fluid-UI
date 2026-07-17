@@ -251,3 +251,19 @@ input[type=range].slider-gray {
     --track-c0-rgb: 15, 15, 15;    /* #0f0f0f */
     --track-c1-rgb: 115, 115, 115; /* #737373 */
 }
+
+/* ========================================
+   MOBILE TOUCH TARGETS
+   Larger thumb + padding for finger control
+   ======================================== */
+body.mobile-mode input[type=range] {
+    --thumb-h: 2.4em;
+    --thumb-w: 2.4em;
+    --input-p: 0.7em;
+}
+body.mobile-mode input[type=range]::-webkit-slider-thumb {
+    cursor: grab;
+}
+body.mobile-mode input[type=range]::-moz-range-thumb {
+    cursor: grab;
+}

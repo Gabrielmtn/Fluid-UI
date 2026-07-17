@@ -337,7 +337,7 @@
     // Getter-based and try/catch-guarded so missing globals (load
     // order, web build) simply read as undefined until they exist.
     // Watching EFFECTS (config values, live FBO sizes) rather than
-    // actors means every mutator is caught: governor, battery manager,
+    // actors means every mutator is caught: governor,
     // boot ascent, settings autoload, material modes, presets, user.
     // ═══════════════════════════════════════════════════════════════
     var lwBootMs = performance.now();

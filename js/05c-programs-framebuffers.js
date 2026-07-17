@@ -96,7 +96,7 @@
             const aspect = displayW / Math.max(1, displayH);
             // [GOVERNOR HOOK] stash old sim state so it survives re-init.
             // Density carries the artwork; velocity/pressure carry the motion —
-            // without them every re-init (resize, governor/battery resolution
+            // without them every re-init (resize, governor resolution
             // change) froze the fluid mid-flow and the dye just faded out.
             const _prevDensity = (typeof density !== 'undefined' && density && density.read) ? density : null;
             const _prevVelocity = (typeof velocity !== 'undefined' && velocity && velocity.read) ? velocity : null;

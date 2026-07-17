@@ -197,7 +197,7 @@
                 if (splatOutActive) {
                     const outMult = getSplatOutMult();
                     const outVel2 = splatOutDx * splatOutDx + splatOutDy * splatOutDy;
-                    if (outMult <= 0.001 || outVel2 < 0.0004) {
+                    if (outMult <= 0.001 || outVel2 < 0.0002) {
                         splatOutActive = false;
                         if (pendingArmAdvance) {
                             advanceArmColors();
@@ -208,14 +208,20 @@
                         const tailFlow = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
                         const tailCol = tailFlow === 1 ? splatOutColor
                             : [splatOutColor[0] * tailFlow, splatOutColor[1] * tailFlow, splatOutColor[2] * tailFlow];
-                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * 0.9, splatOutDy * 0.9, tailCol, config.SPLAT_RADIUS * splatReleaseInMult * outMult);
+                        // Easing inertia: decay velocity with a cubic ease-out
+                        // curve (1 - (1-t)^3) instead of a fixed 0.9 multiplier.
+                        // This keeps momentum early in the tail and settles
+                        // softly — no abrupt stop.
+                        const outProgress = 1.0 - outMult; // 0 at start → 1 at end
+                        const decayRate = 0.96 - 0.06 * outProgress; // 0.96 → 0.90
+                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * decayRate, splatOutDy * decayRate, tailCol, config.SPLAT_RADIUS * splatReleaseInMult * outMult);
                         // Advance the tail along the decaying velocity + accumulate
                         // its travel for the distance-based taper.
                         splatOutX += splatOutDx / 10;
                         splatOutY += splatOutDy / 10;
                         splatTailDist += Math.sqrt(outVel2) / 10 / Math.max(1, canvas.width);
-                        splatOutDx *= 0.9;
-                        splatOutDy *= 0.9;
+                        splatOutDx *= decayRate;
+                        splatOutDy *= decayRate;
                     }
                 }
                 if (recEnabled) {
@@ -557,7 +563,7 @@
                 gl.uniform2f(sharpenProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 // Kernel radius normalized to the 2048 reference: the sharpen
                 // LOOK stays constant when dye resolution changes (boot ascent,
-                // governor, battery tiers) — resolution now only affects
+                // governor) — resolution now only affects
                 // fidelity, not character. RIDGES > 1 recreates the coarse
                 // emboss (the boot-ascent "ridges" look) deliberately.
                 gl.uniform1f(sharpenProg.uniforms.kernelScale,

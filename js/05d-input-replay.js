@@ -235,8 +235,6 @@
             fpsCapSel.addEventListener('change', (e) => {
                 const val = e.target.value;
                 applyFpsCap(val);
-                // Deactivate performance profile — user is overriding the cap
-                if (typeof window.clearActiveProfile === 'function') window.clearActiveProfile();
                 try {
                     if (window.Settings && typeof window.Settings.saveSelect === 'function') {
                         window.Settings.saveSelect('fpsCap', val);
@@ -266,7 +264,8 @@
             var events = window._activeReplayEvents;
             if (!events || !events.length) { isReplayActive = false; return; }
             try {
-                const elapsed = Date.now() - replayStartTime;
+                var speed = (typeof window.replaySpeed === 'number') ? window.replaySpeed : 1;
+                const elapsed = (Date.now() - replayStartTime) * speed;
                 while (replayIndex < events.length && events[replayIndex].t <= elapsed) {
                     const ev = events[replayIndex++];
                     // Faithful reproduction (2026-07-13): replay uses the brush
@@ -416,10 +415,6 @@
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
-            // Notify battery manager of pointer interaction for burst mode
-            if (typeof window.batteryHandleInput === 'function') {
-                window.batteryHandleInput();
-            }
             if (typeof broadcastCursor === 'function') {
                 broadcastCursor(coords.x / canvas.width, coords.y / canvas.height);
             }
@@ -599,10 +594,6 @@
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
-            // Notify battery manager of pointer interaction for burst mode
-            if (typeof window.batteryHandleInput === 'function') {
-                window.batteryHandleInput();
-            }
             // D1 engine feed for touch (see pointermove note); spacing governs
             // density, so this bypasses the Splat Rate throttle below
             if (pointer.down && window.BrushEngine && window.BrushEngine.isActive() && !isReplayActive) {

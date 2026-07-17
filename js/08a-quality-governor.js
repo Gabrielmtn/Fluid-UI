@@ -14,12 +14,6 @@
 // The governor NEVER writes config or slider DOM — it only provides
 // effective values. Saving a preset mid-throttle captures the user's true
 // settings.
-//
-// Interaction with 14-battery-manager.js (audited): battery tiers/profiles
-// write config.PRESSURE_ITERATIONS / SIM_RESOLUTION / DYE_RESOLUTION
-// directly (14:394,400-401,566-573). Those writes are user intent — they
-// change config — and the governor's multipliers stack on top of whatever
-// config currently holds.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';

@@ -352,6 +352,22 @@
             }
         } catch(_){}
 
+        // ── 10. Sidebar section collapsed states ──
+        try {
+            var savedSections = sm.get('sidebar.sections');
+            if (savedSections && typeof savedSections === 'object') {
+                var sections = document.querySelectorAll('#sidebar-right .sidebar-section');
+                sections.forEach(function(sec) {
+                    var titleEl = sec.querySelector('.section-title');
+                    if (!titleEl) return;
+                    var title = titleEl.textContent.trim();
+                    if (title in savedSections) {
+                        sec.classList.toggle('collapsed', !!savedSections[title]);
+                    }
+                });
+            }
+        } catch(_){}
+
         console.log('Settings loaded:', sliderCount, 'sliders restored');
     }
 
@@ -516,11 +532,13 @@
         var brushState = {
             replayMode: window.replayMode || 'stroke',
             replayTimePeriod: window.replayTimePeriod || 5,
+            replaySpeed: typeof window.replaySpeed === 'number' ? window.replaySpeed : 1,
             refreshRate: window.brushRefreshRate || 0,
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
             splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
-            splatOutDist: typeof window.splatOutDist === 'number' ? window.splatOutDist : 0.15
+            splatOutDist: typeof window.splatOutDist === 'number' ? window.splatOutDist : 0.15,
+            gateMaxDensity: typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3
         };
 
         // ── Shooting star origin ──
@@ -932,6 +950,13 @@
                     var tInput = document.getElementById('replayTimePeriod');
                     if (tInput) tInput.value = bs.replayTimePeriod;
                 }
+                if (typeof bs.replaySpeed === 'number') {
+                    window.replaySpeed = bs.replaySpeed;
+                    var spSlider = document.getElementById('replaySpeed');
+                    if (spSlider) spSlider.value = bs.replaySpeed;
+                    var spVal = document.getElementById('replaySpeedValue');
+                    if (spVal) spVal.textContent = bs.replaySpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
+                }
                 if (typeof bs.refreshRate === 'number') window.brushRefreshRate = bs.refreshRate;
                 if (bs.splatInMode) {
                     window.splatInMode = bs.splatInMode;
@@ -952,6 +977,15 @@
                     window.splatOutDist = bs.splatOutDist;
                     var soD = document.getElementById('splatOutDist');
                     if (soD) { soD.value = bs.splatOutDist; soD.dispatchEvent(new Event('input', { bubbles: true })); }
+                }
+                if (typeof bs.gateMaxDensity === 'number') {
+                    window.gateMaxDensity = bs.gateMaxDensity;
+                    var gdVal = document.querySelector('.ch-gate-density-val');
+                    if (gdVal) gdVal.textContent = bs.gateMaxDensity.toFixed(1);
+                    if (typeof window.applyGateState === 'function') {
+                        var gateChk = document.getElementById('colorGate');
+                        if (gateChk && gateChk.checked) window.applyGateState(true);
+                    }
                 }
             }
         } catch(_){}

@@ -153,8 +153,8 @@ body > .controls {
 
 /* ── Color channel ── */
 .mixer-channel.ch-wide {
-    min-width: 86px;
-    max-width: 112px;
+    min-width: 170px;
+    max-width: 180px;
     gap: 3px;
 }
 /* Label sits inline with the swatch on one row (saves a stacked row) */
@@ -334,8 +334,8 @@ body > .controls {
        set the strip's height: on narrow windows the chips wrap into many
        rows, so cap the block and scroll internally instead of letting it
        balloon the whole strip. */
-    flex: 1 1 280px;
-    min-width: 240px;
+    flex: 1 1 220px;
+    min-width: 180px;
     max-width: none;
     align-self: center;
     max-height: 64px;

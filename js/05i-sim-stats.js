@@ -124,50 +124,6 @@
             gl.uniform1f(splatProg.uniforms.ringRadius, 0); // belt-and-braces: no leak into classic splats
         }
         window.applyRingSplat = ringSplat;
-        // Bar-slab splat: a crisp lane-wide horizontal slab of dye + velocity
-        // in one pass — the EQ scene's per-lane paint, shaped like the lane
-        // itself instead of a round blob bleeding over the walls.
-        //   cx/cy/halfWidthPx/pointPx — canvas pixels; thickness — SPLAT_RADIUS
-        //   units (gaussian width² of the slab's vertical profile); pointPx
-        //   lifts the stamp's centerline into a pointed arch (0 = flat slab).
-        function barSplat(cx, cy, halfWidthPx, thickness, pointPx, dx, dy, color) {
-            const aspectRatio = canvas.width / canvas.height;
-            splatProg.bind();
-            gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
-            gl.uniform2f(splatProg.uniforms.point, cx / canvas.width, 1.0 - cy / canvas.height);
-            gl.uniform1f(splatProg.uniforms.radius, thickness);
-            gl.uniform1f(splatProg.uniforms.barHalfW, halfWidthPx / canvas.height); // p-space is height-normalized
-            gl.uniform1f(splatProg.uniforms.barPoint, (pointPx || 0) / canvas.height);
-            gl.uniform1f(splatProg.uniforms.ringRadius, 0);
-            gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
-            gl.uniform1f(splatProg.uniforms.stampNoise, 0);
-            gl.uniform1i(splatProg.uniforms.stampShape, 0);
-            gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
-            const _barObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
-            gl.uniform1i(splatProg.uniforms.hasObstacle, _barObsActive ? 1 : 0);
-            if (_barObsActive) {
-                gl.uniform1f(splatProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
-                gl.uniform1i(splatProg.uniforms.uObstacle, 1);
-                gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-            }
-            gl.viewport(0, 0, simTexWidth, simTexHeight);
-            gl.uniform1i(splatProg.uniforms.isVelocity, 1);
-            gl.uniform1i(splatProg.uniforms.uTarget, 0);
-            gl.uniform3f(splatProg.uniforms.color, dx, -dy, 1.0);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
-            blit(velocity.write.fbo);
-            velocity.swap();
-            gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
-            gl.uniform1i(splatProg.uniforms.isVelocity, 0);
-            gl.uniform3fv(splatProg.uniforms.color, color);
-            gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
-            blit(density.write.fbo);
-            density.swap();
-            gl.uniform1f(splatProg.uniforms.barHalfW, 0); // no leak into classic splats
-        }
-        window.applyBarSplat = barSplat;
         // ─── D2 sketch stamping (raster layer) ──────────────────────────
         // Normal-control drawing: premultiplied over-composite into the
         // persistent sketch FBO; eraser = destination-out with the same

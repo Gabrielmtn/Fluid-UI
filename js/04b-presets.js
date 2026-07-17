@@ -86,12 +86,6 @@
 
             
 
-            // Deactivate performance profile — style preset overrides profile settings
-
-            if (typeof window.clearActiveProfile === 'function') window.clearActiveProfile();
-
-
-
             // Broadcast to multiplayer clients
 
             if (typeof broadcastPreset === 'function') {

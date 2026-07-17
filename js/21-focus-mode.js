@@ -2,7 +2,7 @@
  * Focus Mode & Social Format Presets
  * 
  * - Focus Mode: Hides all UI, fills viewport with canvas, shows FOCUS badge
- *   Toggle via hotkey 'S' (no modifiers) or checkbox in sidebar
+ *   Toggle via hotkey 'F' (no modifiers) or checkbox in sidebar
  * - Format Presets: One-click aspect ratio switching for TikTok, Instagram, etc.
  */
 (function () {
@@ -38,7 +38,7 @@
         badge = document.createElement('div');
         badge.id = 'focus-mode-badge';
         badge.textContent = '● FOCUS';
-        badge.title = 'Click or press S to exit focus mode';
+        badge.title = 'Click or press F to exit focus mode';
         badge.addEventListener('click', function () {
             toggleFocus();
         });
@@ -125,8 +125,8 @@
             // Skip if typing in an input
             var tag = e.target.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
-            // 'S' without any modifiers = focus mode
-            if (e.key === 's' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            // 'F' without any modifiers = focus mode
+            if (e.key === 'f' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
                 e.preventDefault();
                 toggleFocus();
             }

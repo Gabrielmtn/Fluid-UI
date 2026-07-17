@@ -73,8 +73,8 @@ body.focus-mode #canvas {
     /* NOTE: deliberately NO animation here. The old infinite opacity pulse
        forced the Electron transparent-window compositor to recomposite the
        WebGL canvas every frame for as long as focus mode was active —
-       the same hazard documented in styles.css (canvas-size-display) and
-       battery-styles. Keep this badge fully static. */
+       the same hazard documented in styles.css (canvas-size-display).
+       Keep this badge fully static. */
 }
 #focus-mode-badge.visible { display: block; }
 
@@ -350,14 +350,6 @@ body.focus-mode #canvas {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     gap: 8px;
-    min-height: 60px;
-}
-.mutation-empty {
-    grid-column: 1 / -1;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 11px;
-    padding: 20px;
 }
 
 .mutation-card {
@@ -754,12 +746,11 @@ body.focus-mode #canvas {
     border: 1px solid rgba(255, 255, 255, 0.04);
     border-radius: 6px;
     overflow: hidden;
-    /* not transitioned — per-frame layout (see 21-sidebar.css) */
 }
 .layer-item-collapsible.collapsed {
     grid-template-rows: auto 0fr;
 }
-.layer-item-collapsible .layer-header {
+.layer-item-collapsible .layer-item-header {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -767,11 +758,12 @@ body.focus-mode #canvas {
     background: rgba(255, 255, 255, 0.04);
     cursor: grab;
 }
-.layer-item-collapsible .layer-body {
+.layer-item-collapsible .layer-item-body {
     overflow: hidden;
     min-height: 0;
+    padding: 6px 8px;
 }
-.layer-item-collapsible.collapsed .layer-body {
+.layer-item-collapsible.collapsed .layer-item-body {
     visibility: hidden;
 }
 

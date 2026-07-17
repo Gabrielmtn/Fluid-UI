@@ -16,7 +16,9 @@
     const DEFAULTS = {
         outputFolder: '',       // user must configure
         filenamePrefix: 'fluid_',
-        format: 'png'           // png or jpg
+        format: 'png',          // png or jpg
+        captureWidth: 0,        // 0 = use canvas native resolution
+        captureHeight: 0        // 0 = use canvas native resolution
     };
 
     let config = { ...DEFAULTS };
@@ -28,6 +30,8 @@
             config.outputFolder = localStorage.getItem('comfyui.outputFolder') || '';
             config.filenamePrefix = localStorage.getItem('comfyui.filenamePrefix') || DEFAULTS.filenamePrefix;
             config.format = localStorage.getItem('comfyui.format') || DEFAULTS.format;
+            config.captureWidth = parseInt(localStorage.getItem('comfyui.captureWidth'), 10) || 0;
+            config.captureHeight = parseInt(localStorage.getItem('comfyui.captureHeight'), 10) || 0;
         } catch (e) { /* ignore */ }
     }
 
@@ -36,6 +40,8 @@
             localStorage.setItem('comfyui.outputFolder', config.outputFolder);
             localStorage.setItem('comfyui.filenamePrefix', config.filenamePrefix);
             localStorage.setItem('comfyui.format', config.format);
+            localStorage.setItem('comfyui.captureWidth', String(config.captureWidth || 0));
+            localStorage.setItem('comfyui.captureHeight', String(config.captureHeight || 0));
         } catch (e) { /* ignore */ }
     }
 
@@ -111,10 +117,22 @@
                     img.src = task.src;
                 });
             })).then(images => {
+                // Determine output dimensions: use fixed capture size if set,
+                // otherwise native canvas resolution
+                const targetW = config.captureWidth > 0 ? config.captureWidth : w;
+                const targetH = config.captureHeight > 0 ? config.captureHeight : h;
+                const scaleX = targetW / w;
+                const scaleY = targetH / h;
+
                 const comp = document.createElement('canvas');
-                comp.width = w;
-                comp.height = h;
+                comp.width = targetW;
+                comp.height = targetH;
                 const ctx = comp.getContext('2d');
+
+                // If scaling, apply transform so all draw operations map to target size
+                if (scaleX !== 1 || scaleY !== 1) {
+                    ctx.scale(scaleX, scaleY);
+                }
 
                 drawList.forEach((task, idx) => {
                     ctx.globalAlpha = task.opacity;

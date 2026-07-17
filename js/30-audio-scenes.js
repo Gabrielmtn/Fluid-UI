@@ -15,9 +15,6 @@
 //   tunnel — each beat spawns a paint ring that recedes toward (or
 //            erupts from) a vanishing point, shrinking + squashing for
 //            perspective: leaving / entering a tunnel.
-//   eq     — vertical collider walls (procedural obstacle texture) pen
-//            the fluid into lanes; each lane is fed an upward dye jet
-//            proportional to its slice of the live spectrum.
 //   ferro  — a drifting magnet pulls the fluid inward continuously
 //            (loudness-scaled); beats flip polarity into spike bursts.
 //            Surface shading is raised for the glossy ferrofluid read.
@@ -128,7 +125,7 @@
         if (fired) lastFireMs = frame.now;
         return fired;
     }
-    // Soft gate for CONTINUOUS drivers (ferro pull, EQ lanes): below the
+    // Soft gate for CONTINUOUS drivers (ferro pull): below the
     // gate contributes nothing; above it rescales to 0..1 from the gate up.
     function gateLevel(v, gate) {
         if (!(gate > 0.01)) return v;
@@ -395,113 +392,6 @@
                     }
                 }
             });
-        }
-    };
-
-    // ─── Scene: EQ BARS ─────────────────────────────────────────────
-    scenes.eq = {
-        label: 'EQ Bars',
-        defaults: { lanes: 8, range: 'full', laneGates: [], gain: 1, force: 0.6, overflow: true },
-        controls: [
-            { type: 'cycle', key: 'lanes', label: 'Lanes', values: [6, 8, 12, 16] },
-            { type: 'cycle', key: 'range', label: 'Range',
-              values: ['full', 'lows', 'mids', 'highs'],
-              names: { full: 'Full spectrum', lows: 'Lows', mids: 'Mids', highs: 'Highs' } },
-            { type: 'lanegates', key: 'laneGates', label: 'Lane gates' },
-            { type: 'slider', key: 'gain', label: 'Gain', min: 0.1, max: 4, step: 0.05 },
-            { type: 'slider', key: 'force', label: 'Jet force', min: 0, max: 1, step: 0.01 },
-            { type: 'toggle', key: 'overflow', label: 'Overflow' }
-        ],
-        // Log-axis windows for the Range control (0..1 across the spectrum)
-        RANGES: { full: [0, 1], lows: [0, 0.38], mids: [0.3, 0.72], highs: [0.6, 1] },
-        enter: function (o, F) {
-            // Bars must FALL between hits: decay dye and velocity noticeably
-            F.snapConfig(['DENSITY_DISSIPATION', 'VELOCITY_DISSIPATION', 'CURL', 'VELOCITY_INFLUENCE']);
-            if (window.config) {
-                window.config.DENSITY_DISSIPATION = 0.93;
-                window.config.VELOCITY_DISSIPATION = 0.955;
-                window.config.CURL = 2;
-                // Continuous same-spot jets ACCUMULATE velocity (splats are
-                // additive) — at high gain the field blows past what advection
-                // can sample and the dye tears into dark veins. Strong motion
-                // isolation shields already-moving texels from re-injection,
-                // capping the feedback loop.
-                window.config.VELOCITY_INFLUENCE = 3.2;
-            }
-            // Overflow: absorbing canvas borders (edgeAbsorb uniform in the
-            // advection shader) — peaks vent past the edge instead of
-            // mushrooming back off an invisible ceiling.
-            this._prevAbsorb = window.__edgeAbsorb || 0;
-            window.__edgeAbsorb = o.overflow ? 1 : 0;
-            this._applyWalls(o);
-        },
-        exit: function () {
-            window.__edgeAbsorb = this._prevAbsorb || 0;
-            if (window.collisionLayers && window.collisionLayers.setProcedural) {
-                window.collisionLayers.setProcedural(null);
-            }
-        },
-        onChange: function (key, o) {
-            if (key === 'lanes') {
-                this._applyWalls(o);
-                syncLaneGates(o); // resample the threshold curve to the new lane count
-            }
-            if (key === 'overflow') window.__edgeAbsorb = o.overflow ? 1 : 0;
-        },
-        _applyWalls: function (o) {
-            if (!(window.collisionLayers && window.collisionLayers.setProcedural)) return;
-            var lanes = o.lanes;
-            window.collisionLayers.setProcedural(function (ctx, w, h) {
-                // Full-height, full-strength collider walls between lanes
-                ctx.fillStyle = 'rgba(255,255,255,1)';
-                var wallW = Math.max(1, Math.round(w * 0.008));
-                for (var i = 1; i < lanes; i++) {
-                    ctx.fillRect(Math.round((i / lanes) * w - wallW / 2), 0, wallW, h);
-                }
-            });
-        },
-        tick: function (frame, o, F) {
-            if (!window.audioReactive || !window.audioReactive.getSpectrum) return;
-            var c = F.canvas(); if (!c) return;
-            var W = c.width, H = c.height;
-            var rng = this.RANGES[o.range] || this.RANGES.full;
-            var spec = this._spec = window.audioReactive.getSpectrum(o.lanes, this._spec, rng[0], rng[1]);
-            if (!spec) return;
-            var lg = o.laneGates;
-            for (var i = 0; i < o.lanes; i++) {
-                // Post-gain, soft-gated against THIS lane's threshold: bands
-                // below their drawn line contribute nothing
-                var th = (lg && i < lg.length) ? (lg[i] || 0) : 0;
-                var v = Math.min(1, F.gateLevel(spec[i] * (o.gain || 1), th));
-                if (v < 0.05) continue;
-                var x = ((i + 0.5) / o.lanes) * W;
-                // Ceiling on per-frame jet force: past ~620 the advection step
-                // can't sample the displacement cleanly and the dye tears
-                var f = Math.min(620, v * (220 + 480 * o.force));
-                // Lane hue tracks its TRUE spectral position (red lows → violet
-                // highs), so a zoomed Range keeps honest colors
-                var t = rng[0] + (rng[1] - rng[0]) * (i / Math.max(1, o.lanes - 1));
-                var col = F.hueColor(t * 0.75, 0.85, 0.55);
-                if (typeof window.applyBarSplat === 'function') {
-                    // Lane-shaped flame tongue: crisp lane-wide base with a
-                    // pointed arch tip that sharpens with the lane's level
-                    var laneW = W / o.lanes;
-                    window.applyBarSplat(
-                        x, H * 0.93,
-                        laneW * 0.42,
-                        0.0005 + v * 0.0009,
-                        laneW * (0.5 + 0.9 * v),
-                        (Math.random() - 0.5) * 20, -f,
-                        col
-                    );
-                } else {
-                    F.splat(
-                        x + (Math.random() - 0.5) * W * 0.01, H * 0.86,
-                        (Math.random() - 0.5) * 30, -f,
-                        col, 0.008 + v * 0.014
-                    );
-                }
-            }
         }
     };
 
@@ -864,159 +754,6 @@
         requestAnimationFrame(draw);
     }
 
-    // ─── Lane-gate editor (EQ) ──────────────────────────────────────
-    // The spectral-gate UX adapted to fixed lanes: the spectrum (windowed to
-    // the scene's Range) is divided into exactly the current lane count, and
-    // dragging paints a per-lane threshold curve. Each lane bar shows the
-    // ACTUAL post-gain value the scene gates against (WYSIWYG); the faint
-    // curve behind it is the hi-res spectrum for context. Lanes below their
-    // line contribute nothing; drag to the bottom clears a lane's gate.
-    function syncLaneGates(opts) {
-        var N = opts.lanes || 8;
-        var lg = opts.laneGates;
-        if (!lg || !lg.length) { opts.laneGates = new Array(N); for (var i = 0; i < N; i++) opts.laneGates[i] = 0; }
-        else if (lg.length !== N) { // lanes changed: resample the curve shape
-            var out = new Array(N);
-            for (var j = 0; j < N; j++) out[j] = lg[Math.floor(j * lg.length / N)] || 0;
-            opts.laneGates = out;
-        }
-        return opts.laneGates;
-    }
-
-    function wireLaneGatesEditor(cv, spec, opts, changed, sceneName) {
-        var dragging = false;
-        var lastDraw = 0;
-        var specBuf = null;   // reused getSpectrum buffer
-        var colBins = null, lutW = 0, lutLo = -1, lutHi = -1;
-
-        function rect() { return cv.getBoundingClientRect(); }
-        function rangeOf() {
-            var sc = scenes[sceneName];
-            var rng = (sc && sc.RANGES && sc.RANGES[opts.range]) || [0, 1];
-            return rng;
-        }
-        function applyAt(e) {
-            var r = rect();
-            var N = opts.lanes || 8;
-            var lg = syncLaneGates(opts);
-            var lane = Math.max(0, Math.min(N - 1, Math.floor(((e.clientX - r.left) / r.width) * N)));
-            var th = Math.max(0, Math.min(0.98, 1 - (e.clientY - r.top) / r.height));
-            lg[lane] = th < 0.04 ? 0 : th; // drag to the floor = clear
-        }
-        cv.addEventListener('pointerdown', function (e) {
-            dragging = true;
-            try { cv.setPointerCapture(e.pointerId); } catch (_) {}
-            applyAt(e);
-        });
-        cv.addEventListener('pointermove', function (e) { if (dragging) applyAt(e); });
-        cv.addEventListener('pointerup', function () {
-            if (dragging) { dragging = false; changed(spec.key); }
-        });
-        cv.addEventListener('dblclick', function (e) {
-            var r = rect();
-            var N = opts.lanes || 8;
-            var lg = syncLaneGates(opts);
-            var lane = Math.max(0, Math.min(N - 1, Math.floor(((e.clientX - r.left) / r.width) * N)));
-            lg[lane] = 0;
-            changed(spec.key);
-        });
-
-        function fmtHz(hz) { return hz >= 1000 ? Math.round(hz / 1000) + 'k' : String(Math.round(hz)); }
-
-        function draw() {
-            if (!cv.isConnected) return;
-            requestAnimationFrame(draw);
-            var now = performance.now();
-            if (now - lastDraw < (dragging ? 16 : 33)) return;
-            lastDraw = now;
-            var r = rect();
-            if (r.width < 2) return;
-            var dpr = window.devicePixelRatio || 1;
-            var w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
-            if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-            var ctx = cv.getContext('2d');
-            ctx.clearRect(0, 0, w, h);
-            ctx.fillStyle = 'rgba(0,0,0,0.5)';
-            ctx.fillRect(0, 0, w, h);
-
-            var N = opts.lanes || 8;
-            var rng = rangeOf();
-            var gain = opts.gain || 1;
-            var ar = window.audioReactive;
-            var enabled = ar && ar.isEnabled();
-
-            // Faint hi-res spectrum context, windowed to the Range
-            var hr = (enabled && ar.getHiRes) ? ar.getHiRes() : null;
-            if (hr) {
-                var cols = Math.max(2, Math.floor(w / dpr));
-                if (!colBins || lutW !== cols || lutLo !== rng[0] || lutHi !== rng[1]) {
-                    colBins = new Int16Array(cols + 1);
-                    for (var c = 0; c <= cols; c++) {
-                        var t = rng[0] + (rng[1] - rng[0]) * (c / cols);
-                        colBins[c] = Math.max(1, hzToBin(x01ToHz(t), hr.sampleRate, hr.fftSize));
-                    }
-                    lutW = cols; lutLo = rng[0]; lutHi = rng[1];
-                }
-                ctx.fillStyle = 'rgba(255,255,255,0.14)';
-                ctx.beginPath();
-                ctx.moveTo(0, h);
-                for (var c2 = 0; c2 < cols; c2++) {
-                    var b0 = colBins[c2], b1 = Math.max(b0 + 1, colBins[c2 + 1]);
-                    var mx = 0;
-                    for (var b = b0; b < b1 && b < hr.data.length; b++) if (hr.data[b] > mx) mx = hr.data[b];
-                    ctx.lineTo((c2 / cols) * w, h - Math.min(1, (mx / 255) * gain) * h);
-                }
-                ctx.lineTo(w, h);
-                ctx.closePath();
-                ctx.fill();
-            }
-
-            // Lane bars: the exact post-gain values the scene gates against
-            var lg = syncLaneGates(opts);
-            if (enabled && ar.getSpectrum) {
-                specBuf = ar.getSpectrum(N, specBuf, rng[0], rng[1]);
-            }
-            var laneW = w / N;
-            for (var i = 0; i < N; i++) {
-                var v = specBuf ? Math.min(1, specBuf[i] * gain) : 0;
-                var th = lg[i] || 0;
-                var passing = th <= 0.01 || v >= th;
-                var t2 = rng[0] + (rng[1] - rng[0]) * (i / Math.max(1, N - 1));
-                var col = hueColor(t2 * 0.75, 0.85, passing ? 0.55 : 0.3);
-                ctx.fillStyle = 'rgb(' + Math.round(col[0] * 255) + ',' + Math.round(col[1] * 255) + ',' + Math.round(col[2] * 255) + ')';
-                ctx.globalAlpha = passing ? 0.9 : 0.35;
-                ctx.fillRect(i * laneW + dpr, h - v * h, laneW - 2 * dpr, v * h);
-                ctx.globalAlpha = 1;
-                // Lane divider
-                ctx.fillStyle = 'rgba(255,255,255,0.10)';
-                ctx.fillRect(Math.round(i * laneW), 0, dpr, h);
-                // Threshold line
-                if (th > 0.01) {
-                    var ty = (1 - th) * h;
-                    ctx.fillStyle = v >= th ? '#ffb347' : 'rgba(255,255,255,0.85)';
-                    ctx.fillRect(i * laneW + dpr, ty - dpr, laneW - 2 * dpr, 2 * dpr);
-                }
-            }
-
-            // Range edge labels
-            ctx.fillStyle = 'rgba(255,255,255,0.35)';
-            ctx.font = Math.max(8, Math.round(9 * dpr)) + 'px monospace';
-            ctx.textBaseline = 'top';
-            ctx.textAlign = 'left';
-            ctx.fillText(fmtHz(x01ToHz(rng[0])), 2 * dpr, 2 * dpr);
-            ctx.textAlign = 'right';
-            ctx.fillText(fmtHz(x01ToHz(rng[1])), w - 2 * dpr, 2 * dpr);
-
-            if (!enabled) {
-                ctx.fillStyle = 'rgba(255,255,255,0.4)';
-                ctx.font = Math.round(h * 0.14) + 'px sans-serif';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText('enable audio to see the lanes', w / 2, h / 2);
-            }
-        }
-        requestAnimationFrame(draw);
-    }
-
     // ─── Controls UI ────────────────────────────────────────────────
     // Renders a scene's control spec into a host element. Values persist
     // per scene in localStorage and apply live via scene.onChange.
@@ -1087,13 +824,6 @@
                 editor.title = 'Drag a box: width = frequency band, top edge = threshold. Double-click a box to delete.';
                 row.appendChild(editor);
                 wireGatesEditor(editor, spec, opts, changed, name);
-            } else if (spec.type === 'lanegates') {
-                row.classList.add('audio-gates-row');
-                var laneEd = document.createElement('canvas');
-                laneEd.className = 'audio-gates-editor';
-                laneEd.title = 'Drag across the lanes to paint per-lane gate thresholds. Drag to the bottom (or double-click) to clear a lane.';
-                row.appendChild(laneEd);
-                wireLaneGatesEditor(laneEd, spec, opts, changed, name);
             }
             host.appendChild(row);
         });

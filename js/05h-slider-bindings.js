@@ -66,8 +66,9 @@
         // Density dissipation itself stays entirely under user control.
         function applyGateState(on) {
             config.COLOR_GATE = on;
-            config.BLOOM_CEILING = on ? 3.0 : 0;
+            config.BLOOM_CEILING = on ? (typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3.0) : 0;
         }
+        window.applyGateState = applyGateState;
         const colorGateCheckbox = document.getElementById('colorGate');
         if (colorGateCheckbox) {
             colorGateCheckbox.addEventListener('change', (e) => {
@@ -84,7 +85,7 @@
         }
         // Resolution dropdowns (absolute resolution, independent of display canvas size)
         // Set a resolution <select> to a value, INJECTING it as an option if it isn't
-        // one of the presets. Battery profiles / the FPS-adaptive tier use non-standard
+        // one of the presets. The FPS-adaptive tier may use non-standard
         // resolutions (dye 1536, sim 192); the markup has no 'custom' option or input,
         // so the old code set value='custom' and left the dropdown BLANK ("not
         // initializing properly"). Injecting keeps the dropdown showing the real value.
@@ -110,7 +111,6 @@
         if (visualResSel) {
             window.setResolutionDropdown(visualResSel, config.DYE_RESOLUTION);
             visualResSel.addEventListener('change', (e) => {
-                if (typeof window.clearActiveProfile === 'function') window.clearActiveProfile();
                 if (e.target.value === 'custom') {
                     if (visualResCustom) {
                         visualResCustom.style.display = 'block';
@@ -145,7 +145,6 @@
         if (physicsResSel) {
             window.setResolutionDropdown(physicsResSel, config.SIM_RESOLUTION);
             physicsResSel.addEventListener('change', (e) => {
-                if (typeof window.clearActiveProfile === 'function') window.clearActiveProfile();
                 if (e.target.value === 'custom') {
                     if (physicsResCustom) {
                         physicsResCustom.style.display = 'block';
@@ -179,11 +178,6 @@
         let lastDensitySnapTime = 0;
         canvasArea.addEventListener('wheel', (e) => {
             e.preventDefault();
-            // Deactivate performance profile for modifier-key scrolls that change sim settings
-            // (not plain scroll which only changes brush size)
-            if ((e.ctrlKey || e.shiftKey || e.altKey) && typeof window.clearActiveProfile === 'function') {
-                window.clearActiveProfile();
-            }
             if (e.ctrlKey && e.shiftKey) {
                 // Ctrl+Shift+Scroll: Adjust Motion Isolation (Velocity Influence)
                 // Uses eased acceleration: faster scroll = bigger jumps
@@ -350,9 +344,6 @@
                 if (!window._profileApplying) {
                     if (typeof window.clearActivePreset === 'function') {
                         window.clearActivePreset();
-                    }
-                    if (typeof window.clearActiveProfile === 'function') {
-                        window.clearActiveProfile();
                     }
                 }
                 // Material modes own the curl slider when a material is selected:

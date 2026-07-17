@@ -227,7 +227,7 @@
         try { localStorage.setItem(LS_MODE, mode); } catch (e) { /* private mode */ }
     }
 
-    // An external sim-state writer (battery profile, preset apply, session
+    // An external sim-state writer (preset apply, session
     // load) is about to write raw CURL and friends: material mode must yield,
     // NOT reinterpret those raw values as macro amounts — and must NOT restore
     // its snapshot over the state the writer is installing.

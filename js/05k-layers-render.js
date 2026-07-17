@@ -91,14 +91,16 @@
                                 </div>
                                 <div class="layer-controls">
                                     <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${layer.collapsed ? 'Expand' : 'Collapse'}">${layer.collapsed ? '▼' : '▲'}</button>
+                                </div>
+                            </div>
+                            <div class="layer-item-body">
+                                <div class="layer-action-row">
                                     <button class="layer-btn raster-paint-btn ${isActiveRaster ? 'active' : ''}" onclick="window.rasterLayers && rasterLayers.setActive(${layer.index})" title="Paint into this layer (the brush's 'Paint Into: Sketch' route lands here)">🖌️</button>
                                     <button class="layer-btn" onclick="toggleLayer(${layer.index})">
                                         ${layer.visible ? '👁️' : '👁️‍🗨️'}
                                     </button>
                                     <button class="layer-btn" onclick="deleteLayer(${layer.index})">🗑️</button>
                                 </div>
-                            </div>
-                            <div class="layer-item-body">
                                 <div class="layer-threshold">
                                     <span>Opacity:</span>
                                     <div class="raster-opacity-host"></div>
@@ -175,17 +177,19 @@
                             </div>
                             <div class="layer-controls">
                                 <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${layer.collapsed ? 'Expand' : 'Collapse'}">${layer.collapsed ? '▼' : '▲'}</button>
-                                <button class="layer-btn" onclick="window.LayerTransform ? LayerTransform.open(${layer.index}) : toggleActiveLayer(${layer.index})" title="Move / resize / rotate layer">
-                                    ⤢
-                                </button>
-                                <button class="layer-btn" onclick="toggleLayer(${layer.index})">
-                                    ${layer.visible ? '👁️' : '👁️‍🗨️'}
-                                </button>
-                                <button class="layer-btn layer-mask-btn ${hasMask ? 'has-mask' : ''} ${layer.mask?.enabled ? 'active' : ''}" onclick="toggleImageLayerMask(${layer.index})" title="${hasMask ? (layer.mask?.enabled ? 'Disable Mask' : 'Enable Mask') : 'No mask defined'}">✂️</button>
-                                <button class="layer-btn" onclick="deleteLayer(${layer.index})">🗑️</button>
                             </div>
                         </div>
                         <div class="layer-item-body">
+                        <div class="layer-action-row">
+                            <button class="layer-btn" onclick="window.LayerTransform ? LayerTransform.open(${layer.index}) : toggleActiveLayer(${layer.index})" title="Move / resize / rotate layer">
+                                ⤢
+                            </button>
+                            <button class="layer-btn" onclick="toggleLayer(${layer.index})">
+                                ${layer.visible ? '👁️' : '👁️‍🗨️'}
+                            </button>
+                            <button class="layer-btn layer-mask-btn ${hasMask ? 'has-mask' : ''} ${layer.mask?.enabled ? 'active' : ''}" onclick="toggleImageLayerMask(${layer.index})" title="${hasMask ? (layer.mask?.enabled ? 'Disable Mask' : 'Enable Mask') : 'No mask defined'}">✂️</button>
+                            <button class="layer-btn" onclick="deleteLayer(${layer.index})">🗑️</button>
+                        </div>
                         ${hasMask ? `
                         <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
                             <button class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">✏️ Edit Mask</button>
