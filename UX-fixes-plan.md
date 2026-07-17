@@ -219,6 +219,35 @@ catches landscape phones for the sidebar; audit remaining horizontal paths in
 6. **Defer to final UI pass**: 6.3/6.4 (except playhead + duration input),
    9.1 underbar.
 
-Open questions for Gabriel (one-liners): 1.1 faithful-vs-live replay colors?
-1.3 which layer type? 2.2 now or D7? 4.1 parallel or sequential paths?
-6.2 direction (b)? 9.1 first contents? 13.5 lock scope?
+## D. Answers received (Gabriel, 2026-07-17) — build specs
+
+- **1.3 — RECORDING layers.** Per-recording-layer color behavior: lock to the
+  color it originally was, OR keep the MODE live ("we'll want random to be
+  random, not just a recording"). Spec: per-layer setting on recLayers with
+  three states — "as recorded" (baked colors) | "original color" (lock to the
+  layer's configured color) | "live mode" (re-resolve arm color modes at
+  replay time so random/step stay generative). Files: js/03-recording.js
+  (replay color path + per-layer UI), persistence in 12.
+- **2.2 — PARKED** (path-layer multiplayer sync waits for D7).
+- **4.1 — PARALLEL emitters, max 5 paths per layer, plus a Clear button.**
+  All paths emit simultaneously, each with its own playhead position/
+  direction; drawing appends until the cap (drop oldest or refuse + hint at
+  5); "Clear paths" button empties the layer. Migration: points → paths[0].
+- **6.2 — Attractor field APPROVED, with aesthetic direction:** the magnet
+  CAPTURES the liquid, never shreds it (gentle radial pull; M1/M2 floors keep
+  it clean — verify with grain meter). Sacred-geometry theme: attractors
+  arranged in geometric patterns (hexagonal rings / flower-of-life layouts —
+  real ferrofluid spikes form hex lattices), recursive/fractal collection
+  (sub-attractors nested inside pooled regions as intensity rises), beats
+  modulate strength/polarity/pattern order. Build behind the scene system;
+  iterate with Gabriel on the pattern set.
+- **13.5 — Lock = visual parity.** Locked clients mirror every look-affecting
+  setting (the preset-snapshot broadcast machinery is the transport);
+  performance-tier controls stay LOCAL (sim/dye resolution, governor, fps cap
+  — the governor's look-preserving ladder is the precedent). Masks/layers
+  don't sync in v1 (that's D7's raster/mask sync scope). Gate local edits at
+  the ParamRegistry/slider-binding choke point + a "locked by host" banner.
+
+Execution order for the remaining items: 4.1 multi-path → 1.3 recording color
+modes → 13.1-13.4 gesture layer → 7.5 drag UX → 13.5 settings lock →
+6.2 ferrofluid (aesthetic iteration loop) → 13.7 audit. Each lands atomically.
