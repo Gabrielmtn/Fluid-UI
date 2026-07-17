@@ -88,9 +88,13 @@
     let pathNextId = 1;
     let pathActiveId = null;
 
+    // Max paths per layer (parallel emitters)
+    const MAX_PATHS = 5;
+
     // Drawing state
     let isDrawingPath = false;
     let currentDrawPoints = [];
+    let currentDrawPath = null;
     let drawStartTime = 0;
 
     // Animation state
@@ -232,14 +236,42 @@
             brushSize: 0.012,
             flow: 0.3, // Flow/intensity (0.05 = very light, 1.0 = full intensity)
             color: defaultColor,
-            points: [], // Array of {x, y} normalized coords
-            position: 0, // Current playback position (0-1)
-            direction: 1, // 1 = forward, -1 = backward (for pingpong)
+            // Parallel emitters: each path has its own playhead position/direction
+            paths: [], // Array of { points: [{x,y}], position: 0-1, direction: 1|-1 }
             collapsed: false
         };
+        // Legacy alias: layer.points ⇄ paths[0].points (old saves + external readers)
+        Object.defineProperty(layer, 'points', {
+            get() { return layer.paths.length ? layer.paths[0].points : []; },
+            set(v) {
+                if (!layer.paths.length) layer.paths.push(newPath());
+                layer.paths[0].points = Array.isArray(v) ? v : [];
+            },
+            enumerable: false,
+            configurable: true
+        });
         pathLayers.push(layer);
         pathActiveId = id;
         return layer;
+    }
+
+    function newPath(points) {
+        return { points: points || [], position: 0, direction: 1 };
+    }
+
+    function layerHasPath(layer) {
+        return layer.paths.some(p => p.points.length >= 2);
+    }
+
+    // Coerce snapshot data (new paths format, legacy points, or bare arrays)
+    // into runtime paths with fresh playheads, capped at MAX_PATHS
+    function normalizeLayerPaths(layer) {
+        const raw = Array.isArray(layer.paths) ? layer.paths : [];
+        layer.paths = raw
+            .map(p => Array.isArray(p) ? { points: p } : p)
+            .filter(p => p && Array.isArray(p.points) && p.points.length > 0)
+            .slice(0, MAX_PATHS)
+            .map(p => newPath(p.points.map(pt => ({ x: pt.x, y: pt.y }))));
     }
 
     // Get active path layer
@@ -267,50 +299,61 @@
         }
     }
 
-    // Add a preset shape to active layer
+    // Add a preset shape to active layer (appends as a new path, up to the cap)
     function addShapeToLayer(shapeType, options = {}) {
-        const layer = getActivePathLayer();
-        if (!layer) {
-            createPathLayer();
-            return addShapeToLayer(shapeType, options);
-        }
-        
+        const layer = getActivePathLayer() || createPathLayer();
+
         const generator = SHAPE_PRESETS[shapeType];
         if (!generator) return;
-        
-        layer.points = generator(options.segments || options.points);
-        layer.position = 0;
+
+        if (layer.paths.length >= MAX_PATHS) {
+            flashPathCapHint(layer.id);
+            return;
+        }
+        layer.paths.push(newPath(generator(options.segments || options.points)));
         renderPathLayersUI();
     }
 
-    // Start freehand drawing
+    // Clear all paths from a layer
+    function clearLayerPaths(id) {
+        const layer = pathLayers.find(l => l.id === id);
+        if (!layer) return;
+        layer.paths = [];
+        layer.isPlaying = false;
+        renderPathLayersUI();
+    }
+
+    // Briefly show the path-cap hint in a layer's info row
+    function flashPathCapHint(id) {
+        const info = document.querySelector(`.path-layer-item[data-id="${id}"] .path-layer-info`);
+        if (!info) return;
+        info.textContent = `Max ${MAX_PATHS} paths — Clear paths to add more`;
+        info.style.color = '#ffb74d';
+        setTimeout(renderPathLayersUI, 1600);
+    }
+
+    // Start freehand drawing — appends a new path; false if the layer is at the cap
     function startDrawing(x, y) {
-        const layer = getActivePathLayer();
-        if (!layer) {
-            createPathLayer();
-            return startDrawing(x, y);
-        }
-        
+        const layer = getActivePathLayer() || createPathLayer();
+        if (layer.paths.length >= MAX_PATHS) return false;
+
         isDrawingPath = true;
         currentDrawPoints = [{ x, y }];
+        currentDrawPath = newPath(currentDrawPoints);
+        layer.paths.push(currentDrawPath);
         drawStartTime = performance.now();
-        layer.points = currentDrawPoints;
-        layer.position = 0;
+        return true;
     }
 
     // Continue freehand drawing
     function continueDrawing(x, y) {
         if (!isDrawingPath) return;
-        
-        const layer = getActivePathLayer();
-        if (!layer) return;
-        
+
         // Only add point if it's far enough from last point (reduces noise)
         const last = currentDrawPoints[currentDrawPoints.length - 1];
         const dist = Math.hypot(x - last.x, y - last.y);
         if (dist > 0.005) { // Minimum distance threshold
             currentDrawPoints.push({ x, y });
-            layer.points = currentDrawPoints;
         }
     }
 
@@ -318,12 +361,19 @@
     function endDrawing() {
         if (!isDrawingPath) return;
         isDrawingPath = false;
-        
+
         const layer = getActivePathLayer();
-        if (layer && currentDrawPoints.length > 1) {
-            // Simplify path using Douglas-Peucker algorithm
-            layer.points = simplifyPath(currentDrawPoints, 0.003);
+        if (currentDrawPath) {
+            if (currentDrawPoints.length > 1) {
+                // Simplify path using Douglas-Peucker algorithm
+                currentDrawPath.points = simplifyPath(currentDrawPoints, 0.003);
+            } else if (layer) {
+                // A click without a drag shouldn't consume a path slot
+                const idx = layer.paths.indexOf(currentDrawPath);
+                if (idx >= 0) layer.paths.splice(idx, 1);
+            }
         }
+        currentDrawPath = null;
         currentDrawPoints = [];
         renderPathLayersUI();
     }
@@ -370,8 +420,8 @@
     // Play/pause a path layer
     function togglePathPlayback(id) {
         const layer = pathLayers.find(l => l.id === id);
-        if (!layer || layer.points.length < 2) return;
-        
+        if (!layer || !layerHasPath(layer)) return;
+
         layer.isPlaying = !layer.isPlaying;
         if (layer.isPlaying) {
             startPathAnimation();
@@ -384,8 +434,11 @@
         const layer = pathLayers.find(l => l.id === id);
         if (layer) {
             layer.isPlaying = false;
-            layer.position = 0;
-            layer.direction = 1;
+            layer.paths.forEach(p => {
+                p.position = 0;
+                p.direction = 1;
+                delete p._done;
+            });
         }
         renderPathLayersUI();
     }
@@ -413,42 +466,56 @@
         let anyPlaying = false;
         
         pathLayers.forEach(layer => {
-            if (!layer.isPlaying || !layer.visible || layer.points.length < 2) return;
-            anyPlaying = true;
-            
-            // Calculate path length for consistent speed
-            const pathLength = calculatePathLength(layer.points);
+            if (!layer.isPlaying || !layer.visible || !layerHasPath(layer)) return;
+
             const baseSpeed = 0.15; // Base traversal speed (normalized units per second)
             const speedMult = layer.speed * baseSpeed;
-            
-            // Advance position
-            const positionDelta = (speedMult * dt) / Math.max(0.1, pathLength);
-            layer.position += positionDelta * layer.direction;
-            
-            // Handle playback modes
-            if (layer.playMode === 'loop') {
-                if (layer.position >= 1) layer.position -= 1;
-                if (layer.position < 0) layer.position += 1;
-            } else if (layer.playMode === 'pingpong') {
-                if (layer.position >= 1) {
-                    layer.position = 1 - (layer.position - 1);
-                    layer.direction = -1;
-                } else if (layer.position <= 0) {
-                    layer.position = -layer.position;
-                    layer.direction = 1;
+            let allDone = true; // for 'once' mode: layer stops when every path finishes
+
+            // Parallel emitters: every path advances its own playhead and splats
+            layer.paths.forEach(path => {
+                if (path.points.length < 2) return;
+
+                // Normalize by path length for consistent linear speed
+                const pathLength = calculatePathLength(path.points);
+                const positionDelta = (speedMult * dt) / Math.max(0.1, pathLength);
+                path.position += positionDelta * path.direction;
+
+                // Handle playback modes
+                if (layer.playMode === 'loop') {
+                    if (path.position >= 1) path.position -= 1;
+                    if (path.position < 0) path.position += 1;
+                    allDone = false;
+                } else if (layer.playMode === 'pingpong') {
+                    if (path.position >= 1) {
+                        path.position = 1 - (path.position - 1);
+                        path.direction = -1;
+                    } else if (path.position <= 0) {
+                        path.position = -path.position;
+                        path.direction = 1;
+                    }
+                    allDone = false;
+                } else if (layer.playMode === 'once') {
+                    if (path.position >= 1) {
+                        path.position = 1;
+                        if (path._done) return; // finished paths stop emitting
+                        path._done = true;
+                    } else {
+                        allDone = false;
+                    }
                 }
-            } else if (layer.playMode === 'once') {
-                if (layer.position >= 1) {
-                    layer.position = 1;
-                    layer.isPlaying = false;
+
+                // Get current point on path and apply splat
+                const { point, velocity } = getPointOnPath(path.points, path.position, path.direction);
+                if (point) {
+                    applyPathSplat(layer, point, velocity);
                 }
+            });
+
+            if (layer.playMode === 'once' && allDone) {
+                layer.isPlaying = false;
             }
-            
-            // Get current point on path and apply splat
-            const { point, velocity } = getPointOnPath(layer.points, layer.position, layer.direction);
-            if (point) {
-                applyPathSplat(layer, point, velocity);
-            }
+            if (layer.isPlaying) anyPlaying = true;
         });
         
         // Update playhead previews for all playing layers
@@ -469,7 +536,7 @@
         if (!container) return;
         
         pathLayers.forEach(layer => {
-            if (!layer.isPlaying && layer.position === 0) return;
+            if (!layer.isPlaying && !layer.paths.some(p => p.position > 0)) return;
             
             const item = container.querySelector(`.path-layer-item[data-id="${layer.id}"]`);
             if (!item) return;
@@ -607,8 +674,9 @@
             el.className = 'path-layer-item' + (layer.id === pathActiveId ? ' active-layer' : '') + (layer.collapsed ? ' collapsed' : '');
             el.dataset.id = layer.id;
             
-            const hasPath = layer.points.length >= 2;
-            
+            const hasPath = layerHasPath(layer);
+            const totalPoints = layer.paths.reduce((sum, p) => sum + p.points.length, 0);
+
             el.innerHTML = `
                 <div class="path-layer-header" draggable="true">
                     <div class="path-layer-thumb">✏️</div>
@@ -621,7 +689,7 @@
                     </div>
                 </div>
                 <div class="path-layer-body">
-                    <div class="path-layer-info">${layer.points.length} points | ${layer.playMode}</div>
+                    <div class="path-layer-info">${layer.paths.length}/${MAX_PATHS} paths | ${totalPoints} points | ${layer.playMode}</div>
                     <div class="path-layer-controls">
                         <div class="path-control-row">
                             <label>Speed</label>
@@ -663,7 +731,8 @@
                         </div>
                         <div class="path-action-row">
                             <button class="path-draw-btn" data-action="draw">✏️ Draw</button>
-                            <button class="path-transform-btn" data-action="transform" ${!hasPath ? 'disabled' : ''} title="Move or resize this path on the canvas">⤢ Move / Resize</button>
+                            <button class="path-transform-btn" data-action="transform" ${!hasPath ? 'disabled' : ''} title="Move or resize this layer's paths on the canvas">⤢ Move / Resize</button>
+                            <button class="path-clear-btn" data-action="clear-paths" ${layer.paths.length === 0 ? 'disabled' : ''} title="Remove all paths from this layer">✕ Clear paths</button>
                         </div>
                     </div>
                     <canvas class="path-preview-canvas" width="200" height="60"></canvas>
@@ -680,46 +749,51 @@
         bindPathLayerEvents();
     }
 
-    // Draw path preview on canvas
+    // Draw path preview on canvas (all paths + per-path playheads)
     function drawPathPreview(canvas, layer) {
-        if (!canvas || layer.points.length < 2) return;
-        
+        if (!canvas || !layerHasPath(layer)) return;
+
         const ctx = canvas.getContext('2d');
         const w = canvas.width;
         const h = canvas.height;
-        
+
         ctx.clearRect(0, 0, w, h);
-        
+
         // Background
         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.fillRect(0, 0, w, h);
-        
-        // Draw path with layer color
+
+        // Draw paths with layer color
         const pathColor = layer.color ? rgbToHex(layer.color) : '#4fc3f7';
         ctx.strokeStyle = pathColor;
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        
-        ctx.beginPath();
-        layer.points.forEach((p, i) => {
-            const x = p.x * w;
-            const y = p.y * h;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+
+        layer.paths.forEach(path => {
+            if (path.points.length < 2) return;
+            ctx.beginPath();
+            path.points.forEach((p, i) => {
+                const x = p.x * w;
+                const y = p.y * h;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
         });
-        ctx.stroke();
-        
-        // Draw current position indicator
-        if (layer.isPlaying || layer.position > 0) {
-            const { point } = getPointOnPath(layer.points, layer.position, layer.direction);
+
+        // Draw current position indicator per path
+        layer.paths.forEach(path => {
+            if (path.points.length < 2) return;
+            if (!layer.isPlaying && path.position === 0) return;
+            const { point } = getPointOnPath(path.points, path.position, path.direction);
             if (point) {
                 ctx.fillStyle = '#ff6b6b';
                 ctx.beginPath();
                 ctx.arc(point.x * w, point.y * h, 4, 0, Math.PI * 2);
                 ctx.fill();
             }
-        }
+        });
     }
 
     // Bind event listeners for path layer UI
@@ -785,6 +859,9 @@
                     setActivePathLayer(id);
                     enterDrawMode();
                     break;
+                case 'clear-paths':
+                    clearLayerPaths(id);
+                    break;
                 case 'transform':
                     setActivePathLayer(id);
                     enterTransformMode();
@@ -849,7 +926,10 @@
                     break;
                 case 'mode':
                     layer.playMode = target.value;
-                    layer.direction = 1;
+                    layer.paths.forEach(p => {
+                        p.direction = 1;
+                        delete p._done;
+                    });
                     renderPathLayersUI();
                     break;
             }
@@ -908,16 +988,19 @@
 
     function enterDrawMode() {
         if (drawOverlay) return;
-        
+
         const layer = getActivePathLayer();
         if (!layer) return;
-        
+
+        // Snapshot for cancel — reverts to the paths present on entry
+        const originalPaths = layer.paths.map(p => newPath(p.points.map(pt => ({ x: pt.x, y: pt.y }))));
+
         // Create overlay
         drawOverlay = document.createElement('div');
         drawOverlay.id = 'pathDrawOverlay';
         drawOverlay.innerHTML = `
             <div class="draw-toolbar">
-                <span>Draw your path on the canvas</span>
+                <span id="pathDrawStatus">Draw your paths on the canvas</span>
                 <button id="pathDrawDone" type="button">✓ Done</button>
                 <button id="pathDrawCancel" type="button">✕ Cancel</button>
             </div>
@@ -926,11 +1009,11 @@
             </div>
         `;
         document.body.appendChild(drawOverlay);
-        
+
         drawCanvas = document.getElementById('pathDrawCanvas');
         const mainCanvas = document.getElementById('canvas');
         const wrapper = document.getElementById('canvas-wrapper');
-        
+
         // Size draw canvas to match main canvas
         if (wrapper && mainCanvas) {
             const rect = wrapper.getBoundingClientRect();
@@ -940,9 +1023,41 @@
             drawCanvas.width = window.innerWidth;
             drawCanvas.height = window.innerHeight - 50;
         }
-        
+
         drawCtx = drawCanvas.getContext('2d');
-        
+
+        const statusEl = document.getElementById('pathDrawStatus');
+        const updateStatus = (msg) => {
+            if (!statusEl) return;
+            if (msg) {
+                statusEl.textContent = msg;
+                statusEl.style.color = '#ffb74d';
+            } else {
+                statusEl.textContent = `Draw your paths on the canvas — ${layer.paths.length}/${MAX_PATHS} paths`;
+                statusEl.style.color = '';
+            }
+        };
+
+        // Repaint the layer's existing paths (drawn strokes accumulate)
+        const repaintExisting = () => {
+            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            drawCtx.lineWidth = 3;
+            drawCtx.lineCap = 'round';
+            drawCtx.lineJoin = 'round';
+            drawCtx.strokeStyle = 'rgba(100, 200, 255, 0.55)';
+            layer.paths.forEach(p => {
+                if (p.points.length < 2) return;
+                drawCtx.beginPath();
+                p.points.forEach((pt, i) => {
+                    if (i === 0) drawCtx.moveTo(pt.x * drawCanvas.width, pt.y * drawCanvas.height);
+                    else drawCtx.lineTo(pt.x * drawCanvas.width, pt.y * drawCanvas.height);
+                });
+                drawCtx.stroke();
+            });
+        };
+        repaintExisting();
+        updateStatus();
+
         // Event handlers for drawing
         const getPos = (e) => {
             const rect = drawCanvas.getBoundingClientRect();
@@ -953,19 +1068,21 @@
                 y: (clientY - rect.top) / rect.height
             };
         };
-        
+
         const onStart = (e) => {
             e.preventDefault();
             const pos = getPos(e);
-            startDrawing(pos.x, pos.y);
-            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            if (!startDrawing(pos.x, pos.y)) {
+                updateStatus(`Max ${MAX_PATHS} paths — Clear paths to draw more`);
+                return;
+            }
             drawCtx.strokeStyle = 'rgba(100, 200, 255, 0.9)';
             drawCtx.lineWidth = 3;
             drawCtx.lineCap = 'round';
             drawCtx.beginPath();
             drawCtx.moveTo(pos.x * drawCanvas.width, pos.y * drawCanvas.height);
         };
-        
+
         const onMove = (e) => {
             if (!isDrawingPath) return;
             e.preventDefault();
@@ -976,13 +1093,15 @@
             drawCtx.beginPath();
             drawCtx.moveTo(pos.x * drawCanvas.width, pos.y * drawCanvas.height);
         };
-        
+
         const onEnd = (e) => {
             if (!isDrawingPath) return;
             e.preventDefault();
             endDrawing();
+            repaintExisting();
+            updateStatus();
         };
-        
+
         drawCanvas.addEventListener('mousedown', onStart);
         drawCanvas.addEventListener('mousemove', onMove);
         drawCanvas.addEventListener('mouseup', onEnd);
@@ -990,11 +1109,11 @@
         drawCanvas.addEventListener('touchstart', onStart, { passive: false });
         drawCanvas.addEventListener('touchmove', onMove, { passive: false });
         drawCanvas.addEventListener('touchend', onEnd);
-        
+
         // Button handlers - use direct references
         const doneBtn = document.getElementById('pathDrawDone');
         const cancelBtn = document.getElementById('pathDrawCancel');
-        
+
         if (doneBtn) {
             doneBtn.onclick = function(e) {
                 e.preventDefault();
@@ -1002,13 +1121,12 @@
                 exitDrawMode();
             };
         }
-        
+
         if (cancelBtn) {
             cancelBtn.onclick = function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                const activeLayer = getActivePathLayer();
-                if (activeLayer) activeLayer.points = [];
+                layer.paths = originalPaths;
                 exitDrawMode();
             };
         }
@@ -1022,6 +1140,7 @@
             drawCtx = null;
         }
         isDrawingPath = false;
+        currentDrawPath = null;
         currentDrawPoints = [];
         renderPathLayersUI();
     }
@@ -1032,10 +1151,10 @@
     function enterTransformMode() {
         if (transformOverlay) return;
         const layer = getActivePathLayer();
-        if (!layer || layer.points.length < 2) return;
+        if (!layer || !layerHasPath(layer)) return;
 
-        // Snapshot for cancel
-        const originalPoints = layer.points.map(p => ({ x: p.x, y: p.y }));
+        // Snapshot for cancel (all paths)
+        const originalPaths = layer.paths.map(p => p.points.map(pt => ({ x: pt.x, y: pt.y })));
 
         transformOverlay = document.createElement('div');
         transformOverlay.id = 'pathTransformOverlay';
@@ -1066,9 +1185,11 @@
 
         function bbox() {
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            layer.points.forEach(p => {
-                minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
-                maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+            layer.paths.forEach(path => {
+                path.points.forEach(p => {
+                    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+                });
             });
             return { minX, minY, maxX, maxY };
         }
@@ -1102,17 +1223,20 @@
             const w = tCanvas.width, h = tCanvas.height;
             tCtx.clearRect(0, 0, w, h);
 
-            // Path
+            // Paths
             tCtx.strokeStyle = rgbToHex(layer.color);
             tCtx.lineWidth = 3;
             tCtx.lineCap = 'round';
             tCtx.lineJoin = 'round';
-            tCtx.beginPath();
-            layer.points.forEach((p, i) => {
-                if (i === 0) tCtx.moveTo(p.x * w, p.y * h);
-                else tCtx.lineTo(p.x * w, p.y * h);
+            layer.paths.forEach(path => {
+                if (path.points.length < 2) return;
+                tCtx.beginPath();
+                path.points.forEach((p, i) => {
+                    if (i === 0) tCtx.moveTo(p.x * w, p.y * h);
+                    else tCtx.lineTo(p.x * w, p.y * h);
+                });
+                tCtx.stroke();
             });
-            tCtx.stroke();
 
             // Bounding box
             const b = bbox();
@@ -1149,7 +1273,7 @@
                 corner: hit.corner || null,
                 startX: pos.x,
                 startY: pos.y,
-                basePoints: layer.points.map(p => ({ x: p.x, y: p.y }))
+                basePaths: layer.paths.map(p => p.points.map(pt => ({ x: pt.x, y: pt.y })))
             };
             tCanvas.setPointerCapture(e.pointerId);
         }
@@ -1166,7 +1290,9 @@
             if (drag.mode === 'move') {
                 const dx = (pos.x - drag.startX) / w;
                 const dy = (pos.y - drag.startY) / h;
-                layer.points = drag.basePoints.map(p => ({ x: p.x + dx, y: p.y + dy }));
+                layer.paths.forEach((path, i) => {
+                    path.points = drag.basePaths[i].map(p => ({ x: p.x + dx, y: p.y + dy }));
+                });
             } else {
                 // Scale from the corner opposite the grabbed handle
                 const ax = drag.corner.ax, ay = drag.corner.ay; // anchor (normalized)
@@ -1174,10 +1300,12 @@
                 const curDx = pos.x / w - ax, curDy = pos.y / h - ay;
                 const sx = Math.abs(startDx) > 1e-4 ? Math.max(0.05, curDx / startDx) : 1;
                 const sy = Math.abs(startDy) > 1e-4 ? Math.max(0.05, curDy / startDy) : 1;
-                layer.points = drag.basePoints.map(p => ({
-                    x: ax + (p.x - ax) * sx,
-                    y: ay + (p.y - ay) * sy
-                }));
+                layer.paths.forEach((path, i) => {
+                    path.points = drag.basePaths[i].map(p => ({
+                        x: ax + (p.x - ax) * sx,
+                        y: ay + (p.y - ay) * sy
+                    }));
+                });
             }
             draw();
         }
@@ -1211,7 +1339,9 @@
         }
         function done() { cleanup(); }
         function cancel() {
-            layer.points = originalPoints;
+            layer.paths.forEach((path, i) => {
+                if (originalPaths[i]) path.points = originalPaths[i];
+            });
             cleanup();
         }
 
@@ -1236,10 +1366,12 @@
         getActive: getActivePathLayer,
         setActive: setActivePathLayer,
         addShape: addShapeToLayer,
+        clearPaths: clearLayerPaths,
         togglePlay: togglePathPlayback,
         stop: stopPathLayer,
         render: renderPathLayersUI,
         getLayers: () => pathLayers,
+        maxPaths: MAX_PATHS,
         enterDrawMode: enterDrawMode,
         exitDrawMode: exitDrawMode,
         enterTransformMode: enterTransformMode,
@@ -1254,8 +1386,11 @@
                 playMode: l.playMode,
                 speed: l.speed,
                 brushSize: l.brushSize,
+                flow: l.flow,
                 color: l.color,
-                points: l.points,
+                paths: l.paths.map(p => ({ points: p.points.map(pt => ({ x: pt.x, y: pt.y })) })),
+                // Legacy field so older builds still load the first path
+                points: l.paths.length ? l.paths[0].points.map(pt => ({ x: pt.x, y: pt.y })) : [],
                 collapsed: l.collapsed
             }));
         },
@@ -1266,10 +1401,10 @@
             pathNextId = 1;
             data.forEach(d => {
                 const layer = createPathLayer(d.name);
+                // Old saves carry `points` only — the alias setter routes it into paths[0]
                 Object.assign(layer, d);
+                normalizeLayerPaths(layer);
                 layer.isPlaying = false;
-                layer.position = 0;
-                layer.direction = 1;
             });
             pathActiveId = pathLayers.length > 0 ? pathLayers[0].id : null;
             renderPathLayersUI();

@@ -75,7 +75,7 @@
 ## 4. Path Layers
 
 ### 4.1 Path layers should support multiple paths
-- [ ] **Allow a single path layer to contain multiple paths (not just one)**
+- [x] **Allow a single path layer to contain multiple paths (not just one)**
 - `js/24-path-layers.js` `createPathLayer()` creates a layer with a single path
 - `applyPathSplat()` iterates over one path's points
 - **Fix approach:** Store an array of paths per layer, allow adding/appendng paths, and iterate all paths in `applyPathSplat()`
