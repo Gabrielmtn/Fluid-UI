@@ -383,12 +383,15 @@
                     dyeHF = m / Math.max(1, dn);
                 }
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                // M3 units: velocity is stored in UV/s now — report vHF/vMax
+                // in CURRENT-GRID texels/s (×simTexWidth) so readings stay
+                // comparable with the pre-M3 baselines in TODO/commits.
                 return {
-                    vHF: +vHF.toFixed(2),
-                    vMax: Math.round(vMax),
-                    pMax: +pMax.toFixed(1),
+                    vHF: +(vHF * sw).toFixed(2),
+                    vMax: Math.round(vMax * sw),
+                    pMax: +pMax.toFixed(3),
                     dyeHF: +(dyeHF * 1000).toFixed(2),
-                    capSpd: window.config ? Math.min((window.config.VELOCITY_CAP || 30) * sw, 45000) : null,
+                    capSpd: window.config ? Math.round((window.config.VELOCITY_CAP || 30) * sw) : null,
                     srcGate: window.config ? window.config.VEL_SOURCE_GATE !== false : null
                 };
             } catch (e) { return { error: String(e) }; }

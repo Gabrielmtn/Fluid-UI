@@ -15,6 +15,7 @@
             uniform vec2 point;
             uniform vec3 color;
             uniform float radius, aspectRatio, velocityInfluence;
+            uniform float velocityScale;
             uniform float stampNoise;  // 0 = classic gaussian splat; >0 blends in the clay stamp
             uniform vec2 stampSeed;    // per-splat offset so consecutive stamps differ
             uniform int stampShape;    // 0 = blob, 1 = chisel (square press), 2 = streak (elongated smear)
@@ -88,6 +89,7 @@
                         splatIntensity = bx * exp(-(dy2 * dy2) / radius);
                         splat = splatIntensity * color;
                     }
+                    splat.xy *= velocityScale;
                     // Measure existing velocity magnitude
                     float existingVelMag = length(base.xy);
                     // Smoother isolation curve using pow(x, 1.5)
@@ -102,7 +104,11 @@
                     float isolationStrength = pow(normalizedInfluence, 1.5);
                     // Velocity-based falloff using smoothstep for natural gradient
                     // Areas with existing motion are shielded proportional to their speed
-                    float velShield = smoothstep(0.0, 0.5, existingVelMag);
+                    // M3 units: 0.5 cells/s (the old near-zero threshold,
+                    // tuned at 512) ≈ 0.001 UV/s — without the rescale,
+                    // motion isolation only engaged at ~256× the intended
+                    // speed, i.e. never ("paints move other paint" returns).
+                    float velShield = smoothstep(0.0, 0.001, existingVelMag);
                     float impactReduction = 1.0 - (velShield * isolationStrength * 0.85);
                     impactReduction = max(0.15, impactReduction); // Minimum 15% impact always allowed
                     fragColor = vec4(base + splat * impactReduction * obsBlock, 1.0);
@@ -289,8 +295,8 @@
         `;
         const rk2Backtrace = `
                 vec2 vHalf = texture(uVelocity, vUv).xy;
-                vec2 midUv = clamp(vUv - 0.5 * dt * vHalf * texelSize, 0.0, 1.0);
-                vec2 disp = dt * texture(uVelocity, midUv).xy * texelSize;
+                vec2 midUv = clamp(vUv - 0.5 * dt * vHalf, 0.0, 1.0);
+                vec2 disp = dt * texture(uVelocity, midUv).xy;
                 float mTexels = length(disp / srcTexelSize);
                 // Swirl magnitude rides on the LOCAL advective displacement
                 // (mTexels factor): moving paint wisps, settled paint gets
@@ -337,11 +343,13 @@
             uniform sampler2D uVelocity, uSource;
             uniform sampler2D uObstacle;
             uniform vec2 texelSize;
+            uniform vec2 obstacleTexelSize;
             uniform vec2 srcTexelSize; // texel size of uSource (dye and sim grids differ)
             uniform float dt, dissipation;
             uniform float decayDt; // accumulated decay timestep; 0.0 = skip decay this frame
             uniform float uVelCap; // speed ceiling in canvas-widths/s (Max Speed slider)
             uniform float srcGate; // M1: 1 = taper growth amplification by speed headroom
+            uniform float hfFloorDye; // M2: dye Nyquist-removal strength (0 = off)
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
             uniform float edgeAbsorb; // >0: absorbing borders — fluid vents off-canvas instead of bouncing
@@ -403,10 +411,10 @@
                         // Dilate by one sim texel: sub-texel mask gaps and the
                         // thin pinned rim still count as wall-adjacent.
                         float obsD = texture(uObstacle, vUv).r;
-                        obsD = max(obsD, texture(uObstacle, vUv + vec2(texelSize.x, 0.0)).r);
-                        obsD = max(obsD, texture(uObstacle, vUv - vec2(texelSize.x, 0.0)).r);
-                        obsD = max(obsD, texture(uObstacle, vUv + vec2(0.0, texelSize.y)).r);
-                        obsD = max(obsD, texture(uObstacle, vUv - vec2(0.0, texelSize.y)).r);
+                        obsD = max(obsD, texture(uObstacle, vUv + vec2(obstacleTexelSize.x, 0.0)).r);
+                        obsD = max(obsD, texture(uObstacle, vUv - vec2(obstacleTexelSize.x, 0.0)).r);
+                        obsD = max(obsD, texture(uObstacle, vUv + vec2(0.0, obstacleTexelSize.y)).r);
+                        obsD = max(obsD, texture(uObstacle, vUv - vec2(0.0, obstacleTexelSize.y)).r);
                         float covD = clamp(obsD / max(uObsMax, 0.05), 0.0, 1.0);
                         // Scaled by the strength response: leaky (low-strength)
                         // walls legitimately let dye THROUGH — draining it
@@ -414,7 +422,11 @@
                         obsInterior = obsStrengthResponse() * smoothstep(0.55, 0.95, covD);
                     }
                     if ((dissipation < 0.999 || hasObstacle == 1) && frozen < 0.5) {
-                        float stillness = exp(-speed * 30.0);
+                        // M3 units: speed is UV/s now (was cells/s). The old
+                        // constant (30, tuned at 512) must scale by the 512
+                        // reference or "still" reads slow-drifting dye as
+                        // settled and the clearing boost erodes moving artwork.
+                        float stillness = exp(-speed * 15360.0);
                         float boostRate = stillness * 0.005 * decayDt * 60.0;
                         // On preserve-style presets (dissipation ≈ 1.0) the
                         // boost exists ONLY to clear dye pinned in walls — keep
@@ -424,6 +436,35 @@
                         effectiveDecay *= max(1.0 - boostRate, 0.95);
                     }
                     color = effectiveDecay * source;
+                    // M2 dye spectral floor: remove a fraction of the dye's
+                    // Laplacian (Nyquist) component where the fluid is MOVING.
+                    // Bilinear transport physically cannot sustain per-texel
+                    // contrast in moving dye — whatever is there is numerical
+                    // (wall-injection speckle that preserve/growth presets
+                    // never decay: the measured 17.7→24.1→31.6 dyeHF ratchet).
+                    // Still dye and frozen artwork: motion gate is exactly 0.
+                    // Straight edges: zero Laplacian — moving fronts stay crisp.
+                    if (hfFloorDye > 0.0 && frozen < 0.5) {
+                        vec4 nAvg = 0.25 * (
+                            texture(uSource, clamp(coord + vec2(srcTexelSize.x, 0.0), 0.0, 1.0)) +
+                            texture(uSource, clamp(coord - vec2(srcTexelSize.x, 0.0), 0.0, 1.0)) +
+                            texture(uSource, clamp(coord + vec2(0.0, srcTexelSize.y), 0.0, 1.0)) +
+                            texture(uSource, clamp(coord - vec2(0.0, srcTexelSize.y), 0.0, 1.0)));
+                        vec4 hfc = color - effectiveDecay * nAvg;
+                        // Gate opens at slow DRIFT (0.03-0.3 dye texels/frame
+                        // ≈ 2-20 texels/s): any transport at all makes
+                        // per-texel contrast physically unsustainable, and the
+                        // wall-injected speckle lives in slow-moving dye near
+                        // colliders — a fast-transport-only gate misses it
+                        // (measured: ratchet 14→27→34 survived at 0.5-4).
+                        // True stillness (settle ease-out zeroes disp) stays
+                        // exactly 0 — frozen artwork untouched.
+                        float transportTexels = length(disp / srcTexelSize);
+                        float mGate = smoothstep(0.03, 0.3, transportTexels);
+                        float kD = min(hfFloorDye * mGate * (dt * 60.0), 0.85);
+                        color -= hfc * kD;
+                        color = max(color, 0.0);
+                    }
                     // Bloom ceiling (Gate breathing): the up-phase (dissipation
                     // > 1) grows dye into HDR; without a cap it eventually
                     // tone-maps out to white. Scale the WHOLE color down when
@@ -497,7 +538,7 @@
                     // 45000 hard ceiling: at very high sim res the
                     // resolution-proportional cap would approach the fp16
                     // limit itself (30 widths/s × 2048 = 61k vs max 65504)
-                    float capSpd = min(uVelCap / texelSize.x, 45000.0);
+                    float capSpd = max(uVelCap, 0.0);
                     // M1 source gate (2026-07-17): growth presets (decay > 1)
                     // amplify energy every frame; at the ceiling that inflow
                     // is exactly what the knee below must strip back out — and
@@ -603,6 +644,18 @@
                                     texture(uObstacle, clamp(fwdCoord, 0.0, 1.0)).r);
                     if (obs > 0.05) revert = 1.0;
                 }
+                vec2 velocityTexel = 1.0 / vec2(textureSize(uVelocity, 0));
+                vec2 velocityC = texture(uVelocity, vUv).xy;
+                vec2 velocityAvg = 0.25 * (
+                    texture(uVelocity, clamp(vUv + vec2(velocityTexel.x, 0.0), 0.0, 1.0)).xy +
+                    texture(uVelocity, clamp(vUv - vec2(velocityTexel.x, 0.0), 0.0, 1.0)).xy +
+                    texture(uVelocity, clamp(vUv + vec2(0.0, velocityTexel.y), 0.0, 1.0)).xy +
+                    texture(uVelocity, clamp(vUv - vec2(0.0, velocityTexel.y), 0.0, 1.0)).xy);
+                float velocityHF = length(velocityC - velocityAvg);
+                float velocityRelativeHF = velocityHF / max(length(velocityC), 0.01);
+                float transportGate = smoothstep(1.0, 8.0, length(disp / srcTexelSize));
+                float noisyTransport = smoothstep(0.15, 0.6, velocityRelativeHF) * transportGate;
+                if (noisyTransport > 0.35) revert = 1.0;
                 vec4 phiN  = texture(uSource, vUv);
                 vec4 backN = texture(uForward, clamp(backCoord, 0.0, 1.0));
                 vec4 corrected = fwd + 0.5 * (phiN - backN);
@@ -758,6 +811,72 @@
                 }
                 vec2 force = curl * vec2(eta.y, -eta.x) * C * gate;
                 fragColor = vec4(vel + force * dt, 0.0, 1.0);
+            }
+        `;
+        // M2 spectral floor (2026-07-17): the sim's small-scale energy sink.
+        // Removes a fraction of the velocity field's Laplacian (Nyquist-band)
+        // component where it reads as NOISE. Wall injection (M2b) and cap
+        // churn deposit energy at grid scale; with zero viscosity anywhere it
+        // otherwise accumulates and advects outward until the whole field is
+        // static ("miasma"). Selectivity guarantees:
+        //   - at rest: c = avg = 0 → exact no-op (bit-stable settle preserved)
+        //   - smooth flow / straight shear: Laplacian ≈ 0 → untouched
+        //   - relative gate: HF must be significant vs local speed
+        //     (decorrelation), so energetic coherent swirls keep their texture
+        //   - collider apron skipped (~1 texel): tangential wall flow reads as
+        //     HF against damped in-wall neighbors — eating it would put wall
+        //     drag back (the WALL_SLIP work). Wall-injected noise advects one
+        //     texel out and is eaten there instead.
+        const hfFloorFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR, vT, vB;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity;
+            uniform sampler2D uObstacle;
+            uniform vec2 texelSize;
+            uniform int hasObstacle;
+            uniform float uObsMax;
+            uniform float dt;
+            uniform float strength; // per-frame HF removal fraction (pre-scaled by dt·60, ≤0.85)
+            void main() {
+                vec2 cL = clamp(vL, 0.0, 1.0), cR = clamp(vR, 0.0, 1.0);
+                vec2 cT = clamp(vT, 0.0, 1.0), cB = clamp(vB, 0.0, 1.0);
+                vec2 c = texture(uVelocity, vUv).xy;
+                vec2 avg = 0.25 * (texture(uVelocity, cL).xy + texture(uVelocity, cR).xy
+                                 + texture(uVelocity, cT).xy + texture(uVelocity, cB).xy);
+                vec2 hfv = c - avg;
+                float hf = length(hfv);
+                float spd = length(c);
+                float rel = hf / max(spd, 0.01);
+                float motion = smoothstep(0.001, 0.02, spd * dt);
+                float energy = smoothstep(0.002, 0.02, hf);
+                float k = strength * motion * smoothstep(0.15, 0.6, rel) * energy;
+                if (hasObstacle == 1) {
+                    float cov = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
+                    k *= 1.0 - smoothstep(0.65, 0.98, cov);
+                }
+                fragColor = vec4(c - hfv * k, 0.0, 1.0);
+            }
+        `;
+        const obstacleCompositeFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uSource;
+            uniform sampler2D uObstacle;
+            uniform vec4 sourceTransform;
+            uniform float sourceRotation;
+            uniform float strength;
+            void main() {
+                vec2 q = vUv - vec2(0.5) - sourceTransform.xy;
+                float c = cos(sourceRotation);
+                float s = sin(sourceRotation);
+                q = vec2(c * q.x + s * q.y, -s * q.x + c * q.y);
+                q /= max(abs(sourceTransform.zw), vec2(0.0001));
+                vec2 sourceUv = clamp(q + vec2(0.5), 0.0, 1.0);
+                float coverage = texture(uSource, sourceUv).a * strength;
+                float previous = texture(uObstacle, vUv).r;
+                fragColor = vec4(min(1.0, previous + coverage), 0.0, 0.0, 1.0);
             }
         `;
         // Doubles as the multigrid smoother: hSq = (2^level)² converts the

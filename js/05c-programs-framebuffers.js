@@ -25,6 +25,8 @@
         const gradientProg = new Program(baseVert, gradientFrag);
         const clearProg = new Program(baseVert, clearFrag);
         const obstacleDampProg = new Program(baseVert, obstacleDampFrag);
+        const obstacleCompositeProg = new Program(baseVert, obstacleCompositeFrag);
+        const hfFloorProg = new Program(baseVert, hfFloorFrag); // M2 spectral floor
         const rasterStampProg = new Program(baseVert, rasterStampFrag);
         const igniteProg = new Program(baseVert, igniteFrag);   // D2 bridge: sketch → dye
         const captureProg = new Program(baseVert, captureFrag); // D2 bridge: dye → sketch
@@ -70,7 +72,7 @@
                 swap() { [fbo1, fbo2] = [fbo2, fbo1]; }
             };
         }
-        let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, lightShifted, obstacle;
+        let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, lightShifted, obstacle, obstacleScratch;
         // D2 raster paint layers: layer index -> single RGBA8 dye-res FBO,
         // persistent (no decay/advection). Entries are created/owned by
         // window.rasterLayers (05l); declared here so initFramebuffers can
@@ -122,7 +124,7 @@
                 if (f.texture) gl.deleteTexture(f.texture);
                 if (f.fbo) gl.deleteFramebuffer(f.fbo);
             }
-            [sharpened, detailed, lit, lightShifted, divergence, curl, obstacle,
+            [sharpened, detailed, lit, lightShifted, divergence, curl, obstacle, obstacleScratch,
              sunrays, sunraysTemp, shadeForm, shadeFormTemp].forEach(_deleteFBO);
             _deleteFBO(mgRes0);
             if (mgLevels) mgLevels.forEach(function (l) {
@@ -188,6 +190,7 @@
             pressure = createDoubleFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             // Obstacle texture for collision layers (single-channel, sim resolution)
             obstacle = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.LINEAR);
+            obstacleScratch = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.LINEAR);
             // Multigrid pressure pyramid (halve until ~12 cells or 6 levels;
             // LINEAR filter — restriction box-samples and prolongation
             // interpolates). All R16F: whole pyramid costs ~a third of one
@@ -196,7 +199,9 @@
             mgLevels = [];
             (function () {
                 let mw = simTexWidth, mh = simTexHeight;
-                while (mgLevels.length < 6 && Math.min(mw, mh) > 12) {
+                const mgLevelLimit = Math.min(10, Math.max(1,
+                    Math.ceil(Math.log2(Math.max(1, Math.min(simTexWidth, simTexHeight) / 16)))));
+                while (mgLevels.length < mgLevelLimit && Math.min(mw, mh) > 4) {
                     mw = Math.max(4, Math.round(mw / 2));
                     mh = Math.max(4, Math.round(mh / 2));
                     mgLevels.push({
@@ -249,7 +254,7 @@
                 velocity.read, velocity.write,
                 divergence, curl,
                 pressure.read, pressure.write,
-                sharpened, detailed, lit, lightShifted, obstacle,
+                sharpened, detailed, lit, lightShifted, obstacle, obstacleScratch,
                 sunrays, sunraysTemp, shadeForm, shadeFormTemp,
                 mgRes0
             ];
@@ -290,7 +295,7 @@
                 // the pressure valve MUST be off here — velocity legitimately
                 // exceeds the clamp's knee at high sim res
                 gl.uniform1f(clearProg.uniforms.softClamp, 0.0);
-                const _velScale = _prevSimW > 0 ? simTexWidth / _prevSimW : 1.0;
+                const _velScale = 1.0;
                 if (_prevDensity) _copyPreserved(_prevDensity, density, dyeTexWidth, dyeTexHeight, 1.0);
                 if (_prevVelocity) _copyPreserved(_prevVelocity, velocity, simTexWidth, simTexHeight, _velScale);
                 if (_prevPressure) _copyPreserved(_prevPressure, pressure, simTexWidth, simTexHeight, 1.0);
@@ -472,6 +477,39 @@
             _obsLastW = w;
             _obsLastH = h;
         }
+        window.beginObstacleTexture = function () {
+            if (!obstacle || gl.isContextLost()) return false;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, obstacle.fbo);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return true;
+        };
+        window.compositeObstacleSource = function (source, opts) {
+            if (!source || !source.texture || !obstacle || !obstacleScratch || gl.isContextLost()) return false;
+            opts = opts || {};
+            obstacleCompositeProg.bind();
+            gl.uniform2f(obstacleCompositeProg.uniforms.texelSize, 1.0 / obstacle.width, 1.0 / obstacle.height);
+            gl.uniform1i(obstacleCompositeProg.uniforms.uSource, 0);
+            gl.uniform1i(obstacleCompositeProg.uniforms.uObstacle, 1);
+            gl.uniform4f(obstacleCompositeProg.uniforms.sourceTransform,
+                Number(opts.x) || 0, Number(opts.y) || 0,
+                Number(opts.scaleX) || 1, Number(opts.scaleY) || 1);
+            gl.uniform1f(obstacleCompositeProg.uniforms.sourceRotation, Number(opts.rotation) || 0);
+            gl.uniform1f(obstacleCompositeProg.uniforms.strength,
+                Math.max(0, Math.min(1, Number(opts.strength) || 0)));
+            gl.viewport(0, 0, obstacle.width, obstacle.height);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, source.texture);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            blit(obstacleScratch.fbo);
+            var previous = obstacle;
+            obstacle = obstacleScratch;
+            obstacleScratch = previous;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return true;
+        };
         window.updateObstacleTexture = function (sourceCanvas) {
             if (!obstacle || gl.isContextLost()) return;
             try {

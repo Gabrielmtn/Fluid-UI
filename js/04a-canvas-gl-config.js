@@ -300,11 +300,33 @@
                                       // p·this; gradient divides it back out. Console-
                                       // tunable for A/B (1 = legacy unscaled).
 
+            VELOCITY_REFERENCE_RESOLUTION: 512,
+
             VELOCITY_CAP: 30,         // "Max Speed" ceiling in canvas-widths/s (soft knee from
                                       // 70%). fp16 safety AND an aesthetic knob: growth presets
                                       // (velocity dissipation > 1) settle at this ceiling inside
                                       // closed mask pockets — lower = calmer bounded swirls,
                                       // higher = wilder motion before the sim reins it in.
+
+            HF_FLOOR: 0.85,           // M2 spectral floor (2026-07-17): fraction of the
+                                      // velocity field's Nyquist (Laplacian) component
+                                      // removed per frame where it reads as NOISE — HF
+                                      // decorrelated from local speed. The sim's missing
+                                      // small-scale energy sink: wall injection and cap
+                                      // churn park energy at grid scale and nothing else
+                                      // ever removes it. Exact no-op at rest, on smooth
+                                      // flow, and on straight shear (zero Laplacian).
+                                      // Skips a ~1-texel collider apron (wall slip stays).
+                                      // 0 = off (console A/B).
+            HF_FLOOR_DYE: 0.6,        // M2 dye floor: same idea on the dye, gated by
+                                      // MOTION — per-texel contrast in moving dye is
+                                      // always numerical (bilinear transport cannot
+                                      // sustain it), which is what lets preserve/growth
+                                      // presets ratchet stroke speckle forever (the
+                                      // "paint a mask and the page tears" chain). Still
+                                      // dye and frozen artwork are never touched.
+                                      // Straight dye edges have zero Laplacian — moving
+                                      // fronts keep their crispness. 0 = off.
 
             VEL_SOURCE_GATE: true,    // M1 (2026-07-17): taper the energy SOURCES (growth
                                       // amplification + vorticity confinement) to neutral as

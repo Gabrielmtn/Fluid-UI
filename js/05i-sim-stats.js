@@ -25,6 +25,8 @@
             // dye footprint and the velocity push so they stay congruent.
             gl.uniform1f(splatProg.uniforms.radius, baseRadius);
             gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
+            gl.uniform1f(splatProg.uniforms.velocityScale,
+                1.0 / Math.max(1, config.VELOCITY_REFERENCE_RESOLUTION || 512));
             // Clay stamp (material modes): 0 = classic gaussian. Fresh seed per
             // splat so consecutive stamps get distinct notch patterns.
             if (brushTip >= 1 && brushTip <= 3) {
@@ -94,6 +96,8 @@
             gl.uniform1f(splatProg.uniforms.ringRadius, ringRadiusPx / canvas.height);
             gl.uniform1f(splatProg.uniforms.ringSquash, squash || 1);
             gl.uniform1f(splatProg.uniforms.velocityInfluence, config.VELOCITY_INFLUENCE || 1.2);
+            gl.uniform1f(splatProg.uniforms.velocityScale,
+                1.0 / Math.max(1, config.VELOCITY_REFERENCE_RESOLUTION || 512));
             gl.uniform1f(splatProg.uniforms.stampNoise, 0);
             gl.uniform1i(splatProg.uniforms.stampShape, 0);
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);

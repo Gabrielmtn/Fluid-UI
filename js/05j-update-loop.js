@@ -257,7 +257,7 @@
                 // guard as the advection knee). 0 disables.
                 gl.uniform1f(vorticityProg.uniforms.uCapSpd,
                     config.VEL_SOURCE_GATE === false ? 0.0 :
-                    Math.min(((typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0) * simTexWidth, 45000));
+                    ((typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0));
                 gl.uniform1i(vorticityProg.uniforms.hasObstacle,
                     (obsActive && config.CURL_WALL_GATE !== false) ? 1 : 0);
                 gl.uniform1f(vorticityProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
@@ -286,7 +286,7 @@
                 const _pBase = (typeof config.PRESSURE_SCALE === 'number' && config.PRESSURE_SCALE > 0)
                     ? config.PRESSURE_SCALE : 1 / 256;
                 const _simLong = Math.max(simTexWidth, simTexHeight);
-                const _pScale = _pBase * Math.pow(512 / Math.max(512, _simLong), 2);
+                const _pScale = _pBase;
                 divergenceProg.bind();
                 gl.uniform2f(divergenceProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(divergenceProg.uniforms.pScale, _pScale);
@@ -407,7 +407,8 @@
                 // 7. Advect velocity (using now-divergence-free field)
                 advectionProg.bind();
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
-                gl.uniform2f(advectionProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform2f(advectionProg.uniforms.texelSize, 1.0, 1.0);
+                gl.uniform2f(advectionProg.uniforms.obstacleTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(advectionProg.uniforms.dt, dt);
                 // Overflow borders (audio scenes / future toggles): same value
@@ -440,6 +441,29 @@
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(velocity.write.fbo);
                 velocity.swap();
+                // 7b. M2 spectral floor: selective Nyquist dissipation on the
+                // advected velocity (the small-scale energy sink — see
+                // hfFloorFrag). One sim-res pass, ~one Jacobi iteration's cost.
+                if ((config.HF_FLOOR || 0) > 0) {
+                    hfFloorProg.bind();
+                    gl.uniform2f(hfFloorProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                    gl.uniform1f(hfFloorProg.uniforms.dt, dt);
+                    gl.uniform1i(hfFloorProg.uniforms.uVelocity, 0);
+                    gl.uniform1i(hfFloorProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                    gl.uniform1f(hfFloorProg.uniforms.uObsMax, _obsMax);
+                    if (obsActive) {
+                        gl.uniform1i(hfFloorProg.uniforms.uObstacle, 1);
+                        gl.activeTexture(gl.TEXTURE1);
+                        gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    }
+                    gl.uniform1f(hfFloorProg.uniforms.strength,
+                        Math.min(0.85, config.HF_FLOOR * Math.min(dt * 60, 2)));
+                    gl.viewport(0, 0, simTexWidth, simTexHeight);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                    blit(velocity.write.fbo);
+                    velocity.swap();
+                }
                 // 8. Advect density (dye) using the projected velocity
                 // (obsActive computed above, before the projection)
                 // [MacCormack] Two extra dye-res passes before the main
@@ -463,7 +487,7 @@
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 if (macActive) {
                     macAdvectProg.bind();
-                    gl.uniform2f(macAdvectProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                    gl.uniform2f(macAdvectProg.uniforms.texelSize, 1.0, 1.0);
                     gl.uniform2f(macAdvectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                     gl.uniform1f(macAdvectProg.uniforms.dt, dt);
                     gl.uniform1f(macAdvectProg.uniforms.swirl, _swirl);
@@ -485,7 +509,7 @@
                     }
                     blit(sharpened.fbo); // φ̂ⁿ⁺¹ (forward estimate)
                     macCorrectProg.bind();
-                    gl.uniform2f(macCorrectProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                    gl.uniform2f(macCorrectProg.uniforms.texelSize, 1.0, 1.0);
                     gl.uniform2f(macCorrectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                     gl.uniform1f(macCorrectProg.uniforms.dt, dt);
                     gl.uniform1f(macCorrectProg.uniforms.swirl, _swirl);
@@ -510,7 +534,7 @@
                 // but the plain-SL dye path uses it directly.
                 gl.uniform1f(advectionProg.uniforms.swirl, macActive ? 0.0 : _swirl);
                 gl.uniform1f(advectionProg.uniforms.swirlTime, _swirlT);
-                gl.uniform2f(advectionProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                gl.uniform2f(advectionProg.uniforms.texelSize, 1.0, 1.0);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, obsActive ? 1 : 0);
@@ -520,6 +544,8 @@
                 gl.uniform1i(advectionProg.uniforms.uObstacle, 2);
                 gl.uniform1f(advectionProg.uniforms.dissipation, config.DENSITY_DISSIPATION);
                 gl.uniform1f(advectionProg.uniforms.bloomCeiling, config.BLOOM_CEILING || 0.0);
+                // M2 dye floor (motion-gated Nyquist removal — see 05b)
+                gl.uniform1f(advectionProg.uniforms.hfFloorDye, config.HF_FLOOR_DYE || 0.0);
                 if (config.DENSITY_DISSIPATION !== lastDyeDiss) {
                     lastDyeDiss = config.DENSITY_DISSIPATION;
                     dyeDecayAccum = 0;
