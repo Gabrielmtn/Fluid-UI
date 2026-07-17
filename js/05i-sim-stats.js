@@ -182,6 +182,7 @@
             if (!_sketchStrokeOpen) {
                 window.__sketchUndoPush();
                 _sketchStrokeOpen = true;
+                _strokeKind = 'raster';
             }
             const aspectRatio = canvas.width / canvas.height;
             const p = (typeof pressure === 'number' && pressure > 0) ? pressure : 1;
@@ -213,6 +214,46 @@
             gl.disable(gl.BLEND);
         }
         window.__sketchStamp = stampSketchDab;
+        // ─── D3 mask stamping ────────────────────────────────────────────
+        // Same draughtsman stamp, but coverage-only (white) into the ACTIVE
+        // Mask object's buffer. Eraser carves coverage back out. Shares the
+        // undo ring (entries tagged kind:'mask').
+        function stampMaskDab(x, y, pressure) {
+            const M = window.Masks;
+            if (!M) return;
+            if (M.activeId() == null) M.ensureDefault();
+            const mf = M.getFBO(M.activeId());
+            if (!mf) return;
+            if (!_sketchStrokeOpen) {
+                window.__maskUndoPush();
+                _sketchStrokeOpen = true;
+                _strokeKind = 'mask';
+            }
+            const aspectRatio = canvas.width / canvas.height;
+            const p = (typeof pressure === 'number' && pressure > 0) ? pressure : 1;
+            const sizeMul = window.BrushEngine ? window.BrushEngine.sizeScale(p) : 1;
+            const flowMul = (window.BrushEngine ? window.BrushEngine.flowScale(p) : 1)
+                * ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1);
+            rasterStampProg.bind();
+            gl.uniform2f(rasterStampProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
+            gl.uniform1f(rasterStampProg.uniforms.radius,
+                config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1) * 0.5 * sizeMul * sizeMul);
+            gl.uniform1f(rasterStampProg.uniforms.aspectRatio, aspectRatio);
+            gl.uniform3f(rasterStampProg.uniforms.color, 1, 1, 1); // coverage is the alpha
+            gl.uniform1f(rasterStampProg.uniforms.flow, flowMul);
+            gl.uniform1f(rasterStampProg.uniforms.hardness,
+                (typeof config.BRUSH_HARDNESS === 'number') ? config.BRUSH_HARDNESS : 0.8);
+            gl.enable(gl.BLEND);
+            if (config.BRUSH_ERASER) {
+                gl.blendFuncSeparate(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+            } else {
+                gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            }
+            gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+            blit(mf.fbo);
+            gl.disable(gl.BLEND);
+        }
+        window.__maskStamp = stampMaskDab;
         window.__clearSketch = function () {
             if (!sketch) return;
             window.__sketchUndoPush(); // D6: Clear is undoable
@@ -272,6 +313,7 @@
         const sketchRedoStack = [];
         const sketchSnapPool = [];
         let _sketchStrokeOpen = false;
+        let _strokeKind = 'raster'; // which route opened the current stroke
         // Fired on every raster-layer mutation (stroke end / Clear / Capture
         // / undo / redo) — 23-depth-collision listens for the live collider
         // binding, rasterLayers (05l) for panel thumbnails; cheap no-op
@@ -281,17 +323,25 @@
             if (typeof window.__onSketchMutated === 'function') window.__onSketchMutated(rid);
             if (typeof window.__onRasterMutated === 'function') window.__onRasterMutated(rid);
         }
-        // Resolve an undo entry's target FBO — the entry's own layer, so
-        // undo restores the layer it was recorded on even if the user has
-        // since switched the active layer. null = layer was deleted.
-        function _rasterFboFor(rid) {
-            if (rid == null) return sketch;
-            return (window.rasterLayers && window.rasterLayers.getFBO(rid)) || null;
+        // D3: mask mutations get their own listener channel (thumbnail-less,
+        // but the live collider binding cares).
+        function notifyMaskMutated(mid) {
+            if (mid == null && window.Masks) mid = window.Masks.activeId();
+            if (typeof window.__onMaskMutated === 'function') window.__onMaskMutated(mid);
+        }
+        // Resolve an undo entry's target FBO — the entry's own surface, so
+        // undo restores the layer/mask it was recorded on even if the user
+        // has since switched targets. null = surface was deleted.
+        function _targetFboFor(kind, id) {
+            if (kind === 'mask') return (window.Masks && window.Masks.getFBO(id)) || null;
+            if (id == null) return sketch;
+            return (window.rasterLayers && window.rasterLayers.getFBO(id)) || null;
         }
         window.__sketchStrokeEnd = function () {
             if (!_sketchStrokeOpen) return;
             _sketchStrokeOpen = false;
-            notifySketchMutated();
+            if (_strokeKind === 'mask') notifyMaskMutated();
+            else notifySketchMutated();
         };
         function copySketchTex(srcTex, dstFbo, w, h) {
             clearProg.bind();
@@ -319,48 +369,49 @@
             copySketchTex((src || sketch).texture, snap.fbo, snap.w, snap.h);
             return snap;
         }
-        window.__sketchUndoPush = function () {
-            if (!sketch) return;
-            // D2: entries are tagged with their layer — one Krita-style
-            // global ring across all raster layers; undo restores whichever
-            // layer the mutation happened on.
-            const rid = window.rasterLayers ? window.rasterLayers.activeId() : null;
-            sketchUndoStack.push({ snap: takeSketchSnapshot(sketch), rid: rid });
+        // One Krita-style global ring across all paint surfaces: entries are
+        // tagged {kind:'raster'|'mask', id}; undo restores whichever surface
+        // the mutation happened on.
+        function _pushEntry(kind, id, srcFbo) {
+            sketchUndoStack.push({ snap: takeSketchSnapshot(srcFbo), kind: kind, id: id });
             if (sketchUndoStack.length > SKETCH_UNDO_DEPTH) sketchSnapPool.push(sketchUndoStack.shift().snap);
             while (sketchRedoStack.length) sketchSnapPool.push(sketchRedoStack.pop().snap);
+        }
+        window.__sketchUndoPush = function () {
+            if (!sketch) return;
+            _pushEntry('raster', window.rasterLayers ? window.rasterLayers.activeId() : null, sketch);
         };
-        window.__sketchUndo = function () {
-            while (sketchUndoStack.length) {
-                const entry = sketchUndoStack.pop();
-                const target = _rasterFboFor(entry.rid);
-                if (!target) { sketchSnapPool.push(entry.snap); continue; } // layer deleted — skip entry
-                sketchRedoStack.push({ snap: takeSketchSnapshot(target), rid: entry.rid });
+        window.__maskUndoPush = function () {
+            const M = window.Masks;
+            if (!M) return;
+            const mid = M.activeId();
+            const mf = M.getFBO(mid);
+            if (mf) _pushEntry('mask', mid, mf);
+        };
+        function _applyHistory(fromStack, toStack) {
+            while (fromStack.length) {
+                const entry = fromStack.pop();
+                const target = _targetFboFor(entry.kind, entry.id);
+                if (!target) { sketchSnapPool.push(entry.snap); continue; } // surface deleted — skip entry
+                toStack.push({ snap: takeSketchSnapshot(target), kind: entry.kind, id: entry.id });
                 copySketchTex(entry.snap.texture, target.fbo, dyeTexWidth, dyeTexHeight);
                 sketchSnapPool.push(entry.snap);
-                notifySketchMutated(entry.rid);
+                if (entry.kind === 'mask') notifyMaskMutated(entry.id);
+                else notifySketchMutated(entry.id);
                 return;
             }
-        };
-        window.__sketchRedo = function () {
-            while (sketchRedoStack.length) {
-                const entry = sketchRedoStack.pop();
-                const target = _rasterFboFor(entry.rid);
-                if (!target) { sketchSnapPool.push(entry.snap); continue; } // layer deleted — skip entry
-                sketchUndoStack.push({ snap: takeSketchSnapshot(target), rid: entry.rid });
-                copySketchTex(entry.snap.texture, target.fbo, dyeTexWidth, dyeTexHeight);
-                sketchSnapPool.push(entry.snap);
-                notifySketchMutated(entry.rid);
-                return;
-            }
-        };
-        // D2: drop history entries for a deleted raster layer (their
-        // snapshots go back to the pool; the layer's pixels are gone).
-        window.__sketchUndoPurge = function (rid) {
+        }
+        window.__sketchUndo = function () { _applyHistory(sketchUndoStack, sketchRedoStack); };
+        window.__sketchRedo = function () { _applyHistory(sketchRedoStack, sketchUndoStack); };
+        // Drop history entries for a deleted surface (their snapshots go
+        // back to the pool; the surface's pixels are gone).
+        window.__sketchUndoPurge = function (id, kind) {
+            kind = kind || 'raster';
             for (let i = sketchUndoStack.length - 1; i >= 0; i--) {
-                if (sketchUndoStack[i].rid === rid) sketchSnapPool.push(sketchUndoStack.splice(i, 1)[0].snap);
+                if (sketchUndoStack[i].id === id && sketchUndoStack[i].kind === kind) sketchSnapPool.push(sketchUndoStack.splice(i, 1)[0].snap);
             }
             for (let i = sketchRedoStack.length - 1; i >= 0; i--) {
-                if (sketchRedoStack[i].rid === rid) sketchSnapPool.push(sketchRedoStack.splice(i, 1)[0].snap);
+                if (sketchRedoStack[i].id === id && sketchRedoStack[i].kind === kind) sketchSnapPool.push(sketchRedoStack.splice(i, 1)[0].snap);
             }
         };
         window.__sketchUndoDepths = function () {

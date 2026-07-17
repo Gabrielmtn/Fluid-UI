@@ -107,6 +107,11 @@
             uniform vec4 uRasterP1;
             uniform vec4 uRasterP2;
             uniform vec4 uRasterP3;
+            // D3: active mask shown as a red film while painting into it
+            // (UI affordance only — never part of the exported content,
+            // which is why it composites after everything else)
+            uniform sampler2D uMaskOverlay;
+            uniform float maskOverlayOn;
             uniform sampler2D uShadeForm; // quarter-res blurred frame: the shading height field
             uniform vec2 shadeTexelSize;
             uniform float sunraysEnabled;
@@ -361,6 +366,11 @@
                     skA = max(skA, under.a);
                 }
                 color.rgb = cc;
+                // D3 mask overlay film (raw vUv, over everything)
+                if (maskOverlayOn > 0.5) {
+                    float mcov = texture(uMaskOverlay, vUv).a;
+                    color.rgb = mix(color.rgb, vec3(1.0, 0.25, 0.2), mcov * 0.45);
+                }
                 // ±0.5 LSB hash dither before the 8-bit store: smooth slow
                 // gradients otherwise quantize into visible contour bands that
                 // crawl as the field decays (the S-curve and saturation boost

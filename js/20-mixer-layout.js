@@ -1810,7 +1810,7 @@
             return {
                 name: name,
                 size: sizeSlider ? parseFloat(sizeSlider.value) : num(c.SPLAT_RADIUS, 0.011) * 1000,
-                target: c.BRUSH_TARGET === 'sketch' ? 'sketch' : 'fluid',
+                target: (c.BRUSH_TARGET === 'sketch' || c.BRUSH_TARGET === 'mask') ? c.BRUSH_TARGET : 'fluid',
                 eraser: !!c.BRUSH_ERASER,
                 tip: c.BRUSH_TIP | 0,
                 tipTexture: num(c.BRUSH_TIP_TEXTURE, 0.7),
@@ -1913,7 +1913,7 @@
             if (e.key === 'Escape') { e.preventDefault(); cancelPresetSave(); }
         });
 
-        // ── Paint target: fluid splats vs the persistent sketch layer ──
+        // ── Paint target: fluid splats vs raster paint layer vs mask ──
         sLabel('Paint Into');
         var targetRow = document.createElement('div');
         targetRow.className = 'brush-mode-row';
@@ -1922,21 +1922,28 @@
         fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
         var sketchBtn = document.createElement('button');
         sketchBtn.type = 'button'; sketchBtn.className = 'brush-mode-btn'; sketchBtn.textContent = 'Sketch';
-        sketchBtn.title = 'Strokes paint the persistent sketch layer — normal-control drawing that never decays or flows (backgrounds, guides, colliders)';
-        targetRow.appendChild(fluidBtn); targetRow.appendChild(sketchBtn);
+        sketchBtn.title = 'Strokes paint the active paint layer — normal-control drawing that never decays or flows (backgrounds, guides, colliders)';
+        var maskBtn = document.createElement('button');
+        maskBtn.type = 'button'; maskBtn.className = 'brush-mode-btn'; maskBtn.textContent = 'Mask';
+        maskBtn.title = 'Strokes paint coverage into the active Mask (shown as a red film) — bind it as a collider or clip (D3)';
+        targetRow.appendChild(fluidBtn); targetRow.appendChild(sketchBtn); targetRow.appendChild(maskBtn);
         panel.appendChild(targetRow);
+        var VALID_TARGETS = { fluid: 1, sketch: 1, mask: 1 };
         function setBrushTarget(t) {
+            if (!VALID_TARGETS[t]) t = 'fluid';
             if (window.config) window.config.BRUSH_TARGET = t;
             fluidBtn.classList.toggle('active', t === 'fluid');
             sketchBtn.classList.toggle('active', t === 'sketch');
+            maskBtn.classList.toggle('active', t === 'mask');
             try { if (window.settingsManager) window.settingsManager.set('brush.target', t); } catch (_) {}
         }
-        SETTERS.target = function (t) { setBrushTarget(t === 'sketch' ? 'sketch' : 'fluid'); };
+        SETTERS.target = setBrushTarget;
         fluidBtn.addEventListener('click', function () { setBrushTarget('fluid'); markDirty(); });
         sketchBtn.addEventListener('click', function () { setBrushTarget('sketch'); markDirty(); });
+        maskBtn.addEventListener('click', function () { setBrushTarget('mask'); markDirty(); });
         try {
             var savedTarget = window.settingsManager && window.settingsManager.get('brush.target');
-            setBrushTarget(savedTarget === 'sketch' ? 'sketch' : 'fluid');
+            setBrushTarget(savedTarget);
         } catch (_) { setBrushTarget('fluid'); }
 
         // ── Tip: the splat-shader stamp shapes as brush tips (D1) ──
@@ -2037,7 +2044,7 @@
         activeLayerRow.appendChild(activeLayerLabel);
         activeLayerRow.appendChild(newLayerBtn);
         panel.appendChild(activeLayerRow);
-        pCheckbox('brushEraser', 'Eraser (Sketch)', 'BRUSH_ERASER', 'eraser');
+        pCheckbox('brushEraser', 'Eraser (Sketch/Mask)', 'BRUSH_ERASER', 'eraser');
         pSlider('brushHardness', 'Hardness', 0, 1, 0.01, 'BRUSH_HARDNESS', pct, 'hardness');
         pCheckbox('sketchVisible', 'Show Paint Layers', 'SKETCH_VISIBLE');
         var sketchBtnRow = document.createElement('div');
@@ -2067,9 +2074,12 @@
             window.collisionLayers.setSketchLive(!window.collisionLayers.isSketchLive());
         });
         // Reflect state changes from either direction (click or auto-disable
-        // when the bound layer gets deleted).
-        window.__onSketchLiveChanged = function (on) {
-            liveColliderBtn.classList.toggle('active', !!on);
+        // when the bound source gets deleted). One live-binding slot exists;
+        // src says whether it currently tracks a paint layer or a mask.
+        window.__onSketchLiveChanged = function (on, src) {
+            var isMask = !!(src && src.kind === 'mask');
+            liveColliderBtn.classList.toggle('active', !!on && !isMask);
+            if (window.__maskLiveBtn) window.__maskLiveBtn.classList.toggle('active', !!on && isMask);
         };
         sketchBtnRow.appendChild(clearSketchBtn);
         sketchBtnRow.appendChild(sketchColliderBtn);
@@ -2117,6 +2127,72 @@
         undoRow.appendChild(undoBtn);
         undoRow.appendChild(redoBtn);
         panel.appendChild(undoRow);
+
+        // ── D3: Masks — paint coverage, bind it as a collider ──
+        sLabel('Mask');
+        var maskInfoRow = document.createElement('div');
+        maskInfoRow.className = 'brush-mode-row';
+        var maskInfoLabel = document.createElement('div');
+        maskInfoLabel.className = 'arm-colors-hint';
+        maskInfoLabel.style.flex = '1';
+        maskInfoLabel.style.alignSelf = 'center';
+        function syncActiveMaskLabel() {
+            var nm = '—';
+            try {
+                if (window.Masks) {
+                    var mid = window.Masks.activeId();
+                    var m = window.Masks.list().find(function (x) { return x.id === mid; });
+                    if (m) nm = m.name;
+                }
+            } catch (_) {}
+            maskInfoLabel.textContent = 'Active mask: ' + nm;
+        }
+        window.__onActiveMaskChanged = function () { syncActiveMaskLabel(); };
+        syncActiveMaskLabel();
+        var newMaskBtn = document.createElement('button');
+        newMaskBtn.type = 'button'; newMaskBtn.className = 'brush-mode-btn';
+        newMaskBtn.textContent = '+ Mask';
+        newMaskBtn.title = 'Create a new mask and make it the paint target';
+        newMaskBtn.addEventListener('click', function () {
+            if (window.Masks) { window.Masks.create(); setBrushTarget('mask'); syncActiveMaskLabel(); }
+        });
+        maskInfoRow.appendChild(maskInfoLabel);
+        maskInfoRow.appendChild(newMaskBtn);
+        panel.appendChild(maskInfoRow);
+        pCheckbox('maskOverlayVisible', 'Show Mask Film', 'MASK_OVERLAY');
+        var maskBtnRow = document.createElement('div');
+        maskBtnRow.className = 'brush-mode-row';
+        var clearMaskBtn = document.createElement('button');
+        clearMaskBtn.type = 'button'; clearMaskBtn.className = 'brush-mode-btn';
+        clearMaskBtn.textContent = 'Clear Mask';
+        clearMaskBtn.title = 'Erase the active mask\'s coverage (undoable)';
+        clearMaskBtn.addEventListener('click', function () {
+            if (window.Masks) window.Masks.clear();
+        });
+        var maskColliderBtn = document.createElement('button');
+        maskColliderBtn.type = 'button'; maskColliderBtn.className = 'brush-mode-btn';
+        maskColliderBtn.textContent = '→ Collider';
+        maskColliderBtn.title = 'Turn the active mask into a collision layer — the fluid flows around the painted coverage';
+        maskColliderBtn.addEventListener('click', function () {
+            if (window.collisionLayers && typeof window.collisionLayers.createFromMask === 'function') {
+                window.collisionLayers.createFromMask();
+            }
+        });
+        var maskLiveBtn = document.createElement('button');
+        maskLiveBtn.type = 'button'; maskLiveBtn.className = 'brush-mode-btn';
+        maskLiveBtn.textContent = '⟳ Live';
+        maskLiveBtn.title = 'Live collider: the collision layer keeps tracking the active mask — paint, erase, or undo and the fluid reacts after every stroke';
+        maskLiveBtn.addEventListener('click', function () {
+            if (!window.collisionLayers || typeof window.collisionLayers.setMaskLive !== 'function') return;
+            var src = window.collisionLayers.boundColliderSource && window.collisionLayers.boundColliderSource();
+            var onAsMask = window.collisionLayers.isSketchLive() && src && src.kind === 'mask';
+            window.collisionLayers.setMaskLive(!onAsMask);
+        });
+        window.__maskLiveBtn = maskLiveBtn;
+        maskBtnRow.appendChild(clearMaskBtn);
+        maskBtnRow.appendChild(maskColliderBtn);
+        maskBtnRow.appendChild(maskLiveBtn);
+        panel.appendChild(maskBtnRow);
 
         // Size fader tweaks also diverge from an applied preset
         var sizeFader = document.getElementById('brushSize');

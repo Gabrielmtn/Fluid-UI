@@ -331,10 +331,13 @@
             BRUSH_PRESSURE_FLOW: false, // Pen pressure → dye intensity (off by default —
                                         // additive dye reads strong already)
 
-            BRUSH_TARGET: 'fluid',    // D2 stroke routing: 'fluid' (splats) or 'sketch'
-                                      // (the persistent raster layer — normal-control
-                                      // drawing for backgrounds/masks; local-only,
-                                      // no replay/broadcast until D7)
+            BRUSH_TARGET: 'fluid',    // D2/D3 stroke routing: 'fluid' (splats), 'sketch'
+                                      // (the active raster paint layer — normal-control
+                                      // drawing; local-only, no replay/broadcast until
+                                      // D7), or 'mask' (paint coverage into the active
+                                      // Mask object — D3)
+            MASK_OVERLAY: false,      // D3: show the active mask as a red film even when
+                                      // not painting into it (auto-shown while target=mask)
             BRUSH_ERASER: false,      // Eraser mode (sketch target: destination-out)
             BRUSH_HARDNESS: 0.8,      // Sketch stamp edge: 0 = soft gaussian, 1 = hard AA disc
             SKETCH_VISIBLE: true,     // Sketch layer visibility (display composite)

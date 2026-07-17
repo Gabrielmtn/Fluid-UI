@@ -638,6 +638,15 @@
             }
         } catch(_){}
 
+        // ── D3 masks (coverage PNGs + names) ──
+        var masksData = null;
+        try {
+            if (window.Masks && window.Masks.serialize) {
+                var ms = window.Masks.serialize();
+                if (ms.length > 0) masksData = ms;
+            }
+        } catch(_){}
+
         // ── Branding overlays ──
         var brandingData = null;
         try {
@@ -715,6 +724,7 @@
             sidebarSections: sidebarSections,
             layers: layersData,
             layerOrder: layerOrderData,
+            masks: masksData,
             branding: brandingData,
             recordedLayers: recordedLayers,
             cosOscillator: cosState,
@@ -1161,6 +1171,13 @@
                 }
             }
         } catch(e) { console.warn('Preset: layer restore failed', e); }
+
+        // ── D3 masks ──
+        try {
+            if (window.Masks && window.Masks.restore && snapshot.masks !== undefined) {
+                window.Masks.restore(snapshot.masks);
+            }
+        } catch(e) { console.warn('Preset: mask restore failed', e); }
 
         // ── Branding overlays ──
         try {

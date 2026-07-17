@@ -272,8 +272,11 @@ class DepthEstimator {
         createFromSnapshot: createCollisionFromSnapshot,
         createFromLayerMask: createCollisionFromLayerMask,
         createFromSketch: createFromSketch,
-        setSketchLive: setSketchLive,   // D3/D4: live sketch → collider binding
+        createFromMask: createFromMask, // D3: active Mask → collider
+        setSketchLive: setSketchLive,   // D3/D4: live source → collider binding
+        setMaskLive: setMaskLive,       // D3/D4: bind the active Mask live
         isSketchLive: isSketchLive,
+        boundColliderSource: boundColliderSource,
 
         // Refresh depth estimation for a layer
         refreshDepth: refreshLayerDepth,
@@ -817,12 +820,10 @@ class DepthEstimator {
     // zeroed mask for an empty sketch (live mode: erasing everything must
     // CLEAR the bound collider, not freeze its last state).
     function buildSketchDepth(allowEmpty) {
-        // D2: read the BOUND raster layer's buffer (falls back to the
-        // active one) — switching the active paint layer must not silently
-        // re-target an existing live collider binding.
-        var sk = (typeof _sketchBoundRid === 'number' && window.rasterLayers)
-            ? window.rasterLayers.getFBO(_sketchBoundRid)
-            : window.sketch;
+        // D3/D4: read the BOUND source's buffer (raster layer OR mask;
+        // falls back to the active paint layer) — switching the active
+        // surface must not silently re-target an existing live binding.
+        var sk = _resolveBoundFBO();
         var canvasEl = document.getElementById('canvas');
         if (!sk || !sk.texture || !canvasEl || typeof gl === 'undefined') {
             console.warn('Sketch layer not available');
@@ -869,20 +870,41 @@ class DepthEstimator {
         return { depth: { width: tw, height: th, data: depthData }, previewUrl: pc.toDataURL('image/png'), any: any };
     }
 
-    function createFromSketch() {
-        // One-shot → Collider binds to the CURRENTLY active paint layer
-        // (also re-targets the live binding, matching the pre-D2 behavior
-        // where the newest sketch collider became the live target).
-        _sketchBoundRid = window.rasterLayers ? window.rasterLayers.activeId() : null;
+    // D3/D4: the binding source — {kind:'raster'|'mask', id} or null
+    // (null = whatever paint layer is active right now).
+    var _boundSrc = null;
+    function _resolveBoundFBO() {
+        if (_boundSrc) {
+            if (_boundSrc.kind === 'mask') return (window.Masks && window.Masks.getFBO(_boundSrc.id)) || null;
+            return (window.rasterLayers && window.rasterLayers.getFBO(_boundSrc.id)) || null;
+        }
+        return window.sketch;
+    }
+    function _bindActiveSource(kind) {
+        if (kind === 'mask' && window.Masks) {
+            _boundSrc = { kind: 'mask', id: window.Masks.ensureDefault() };
+        } else if (window.rasterLayers) {
+            _boundSrc = { kind: 'raster', id: window.rasterLayers.activeId() };
+        } else {
+            _boundSrc = null;
+        }
+    }
+    function _createColliderFromSource(kind, title) {
+        // One-shot → Collider binds to the CURRENTLY active surface (also
+        // re-targets the live binding, matching the pre-D2 behavior where
+        // the newest sketch collider became the live target).
+        _bindActiveSource(kind);
         var built = buildSketchDepth(false);
-        if (!built) { console.warn('Sketch is empty — nothing to turn into a collider'); return; }
-        var idx = addCollisionLayer(built.depth, built.previewUrl, 'Sketch Collision',
+        if (!built) { console.warn((kind === 'mask' ? 'Mask' : 'Sketch') + ' is empty — nothing to turn into a collider'); return; }
+        var idx = addCollisionLayer(built.depth, built.previewUrl, title,
             { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
-        // The newest sketch collider is the live-binding target (D4: collision
-        // = a mask binding; the sketch is the mask source).
+        // The newest collider is the live-binding target (D4: collision =
+        // a mask binding; the sketch/mask is the mask source).
         if (idx != null) _sketchColliderIndex = idx;
         return idx;
     }
+    function createFromSketch() { return _createColliderFromSource('raster', 'Sketch Collision'); }
+    function createFromMask() { return _createColliderFromSource('mask', 'Mask Collision'); }
 
     // ── D3/D4 slice: LIVE sketch → collider binding ───────────────────
     // While live, every sketch mutation (stroke end / eraser / Clear /
@@ -893,8 +915,6 @@ class DepthEstimator {
     var _sketchLive = false;
     var _sketchColliderIndex = null;
     var _sketchRefreshPending = false;
-    // D2: which raster layer the sketch-collider reads (null = active)
-    var _sketchBoundRid = null;
 
     function _sketchColliderLayer() {
         if (_sketchColliderIndex == null || !window.layers) return null;
@@ -904,11 +924,10 @@ class DepthEstimator {
     function refreshSketchCollider() {
         var layer = _sketchColliderLayer();
         if (!layer) { setSketchLive(false); _sketchColliderIndex = null; return; }
-        // D2: bound source layer deleted → the binding has nothing to track
-        if (typeof _sketchBoundRid === 'number' && window.rasterLayers
-            && !window.rasterLayers.getFBO(_sketchBoundRid)) {
+        // D3/D4: bound source deleted → the binding has nothing to track
+        if (_boundSrc && !_resolveBoundFBO()) {
             setSketchLive(false);
-            _sketchBoundRid = null;
+            _boundSrc = null;
             return;
         }
         var built = buildSketchDepth(true); // empty sketch → zeroed collider
@@ -948,34 +967,37 @@ class DepthEstimator {
         return pc.toDataURL('image/png');
     }
 
-    function scheduleSketchRefresh(rid) {
+    function scheduleSketchRefresh(kind, id) {
         if (!_sketchLive || _sketchRefreshPending) return;
-        // D2: mutations on other raster layers don't touch this binding
-        if (rid != null && typeof _sketchBoundRid === 'number' && rid !== _sketchBoundRid) return;
+        // D3/D4: mutations on surfaces other than the bound one are ignored
+        if (_boundSrc && id != null && (kind !== _boundSrc.kind || id !== _boundSrc.id)) return;
         _sketchRefreshPending = true;
         setTimeout(function () {
             _sketchRefreshPending = false;
             if (_sketchLive) refreshSketchCollider();
         }, 120);
     }
-    // 05i fires this on every sketch mutation; a cheap no-op unless live.
-    window.__onSketchMutated = scheduleSketchRefresh;
+    // 05i fires these on every paint-surface mutation; cheap no-ops unless live.
+    window.__onSketchMutated = function (rid) { scheduleSketchRefresh('raster', rid); };
+    window.__onMaskMutated = function (mid) { scheduleSketchRefresh('mask', mid); };
 
-    function setSketchLive(on) {
+    // Live binding: the collider keeps tracking its source surface.
+    // kind (optional) = 'raster' | 'mask': which ACTIVE surface a fresh
+    // binding should read; re-enabling with no kind keeps the old source.
+    function setSketchLive(on, kind) {
         on = !!on;
-        if (on === _sketchLive) return _sketchLive;
+        if (on === _sketchLive && (!on || !kind || (_boundSrc && _boundSrc.kind === kind))) return _sketchLive;
         if (on) {
-            // D2: fresh binding reads the currently-active paint layer;
-            // re-enabling an existing binding keeps its original source.
-            if (_sketchBoundRid == null && window.rasterLayers) {
-                _sketchBoundRid = window.rasterLayers.activeId();
+            if (!_boundSrc || (kind && _boundSrc.kind !== kind)) {
+                _bindActiveSource(kind || 'raster');
             }
-            // Bind (or create) the target collider. Empty sketch is fine —
+            // Bind (or create) the target collider. Empty source is fine —
             // the layer starts zeroed and lights up as you draw.
             if (!_sketchColliderLayer()) {
                 var built = buildSketchDepth(true);
-                if (!built) return false; // GL/sketch unavailable
-                var idx = addCollisionLayer(built.depth, built.previewUrl, 'Sketch Collision (live)',
+                if (!built) return false; // GL/source unavailable
+                var idx = addCollisionLayer(built.depth, built.previewUrl,
+                    ((_boundSrc && _boundSrc.kind === 'mask') ? 'Mask' : 'Sketch') + ' Collision (live)',
                     { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
                 if (idx == null) return false;
                 _sketchColliderIndex = idx;
@@ -985,11 +1007,13 @@ class DepthEstimator {
         } else {
             _sketchLive = false; // binding stays; the collider just stops tracking
         }
-        if (typeof window.__onSketchLiveChanged === 'function') window.__onSketchLiveChanged(_sketchLive);
+        if (typeof window.__onSketchLiveChanged === 'function') window.__onSketchLiveChanged(_sketchLive, _boundSrc);
         return _sketchLive;
     }
+    function setMaskLive(on) { return setSketchLive(on, 'mask'); }
 
     function isSketchLive() { return _sketchLive; }
+    function boundColliderSource() { return _boundSrc ? { kind: _boundSrc.kind, id: _boundSrc.id } : null; }
 
     // Throttled entry point — coalesces multiple calls into one rAF
     function updateObstacleFromLayers() {

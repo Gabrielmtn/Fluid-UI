@@ -76,6 +76,10 @@
         // window.rasterLayers (05l); declared here so initFramebuffers can
         // preserve every layer's pixels across a resize/governor reinit.
         let rasterStore = {};
+        // D3 masks: mask id -> single RGBA8 dye-res FBO (alpha = coverage,
+        // rgb = white·alpha premult). Owned by window.Masks (05o); declared
+        // here for the same reinit-preservation as rasterStore.
+        let maskStore = {};
         let sketch; // alias: the ACTIVE raster layer's FBO (assigned by rasterLayers.setActive)
         let sunrays, sunraysTemp;
         let shadeForm, shadeFormTemp;
@@ -101,6 +105,11 @@
             const _prevRaster = {};
             Object.keys(rasterStore).forEach(function (rid) {
                 if (rasterStore[rid] && rasterStore[rid].texture) _prevRaster[rid] = rasterStore[rid];
+            });
+            // D3: same for mask coverage buffers
+            const _prevMask = {};
+            Object.keys(maskStore).forEach(function (mid) {
+                if (maskStore[mid] && maskStore[mid].texture) _prevMask[mid] = maskStore[mid];
             });
             const _prevSimW = simTexWidth || 0; // old grid width, for velocity rescale
             // GL objects are never garbage-collected while the context lives, so
@@ -160,6 +169,9 @@
             // new dye res; old pixels are copied in below.
             Object.keys(_prevRaster).forEach(function (rid) {
                 rasterStore[rid] = createFBO(dyeTexWidth, dyeTexHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, filter);
+            });
+            Object.keys(_prevMask).forEach(function (mid) {
+                maskStore[mid] = createFBO(dyeTexWidth, dyeTexHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, filter);
             });
             // Sharpness buffer at dye resolution
             sharpened = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
@@ -269,7 +281,8 @@
                 });
             }
             const _rasterIds = Object.keys(_prevRaster);
-            if (_prevDensity || _prevVelocity || _prevPressure || _rasterIds.length) {
+            const _maskIds = Object.keys(_prevMask);
+            if (_prevDensity || _prevVelocity || _prevPressure || _rasterIds.length || _maskIds.length) {
                 gl.disable(gl.BLEND);
                 clearProg.bind();
                 gl.uniform1i(clearProg.uniforms.uTexture, 0);
@@ -291,6 +304,16 @@
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, prev.texture);
                     blit(rasterStore[rid].fbo);
+                    gl.deleteTexture(prev.texture);
+                    gl.deleteFramebuffer(prev.fbo);
+                });
+                _maskIds.forEach(function (mid) {
+                    const prev = _prevMask[mid];
+                    gl.uniform1f(clearProg.uniforms.value, 1.0);
+                    gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, prev.texture);
+                    blit(maskStore[mid].fbo);
                     gl.deleteTexture(prev.texture);
                     gl.deleteFramebuffer(prev.fbo);
                 });

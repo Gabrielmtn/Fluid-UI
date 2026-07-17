@@ -138,6 +138,7 @@
                     const _dabs = window.BrushEngine.drain(64);
                     if (_dabs.length) window.__lastPaintMs = nowMs;
                     const _toSketch = config.BRUSH_TARGET === 'sketch';
+                    const _toMask = config.BRUSH_TARGET === 'mask';
                     for (let di = 0; di < _dabs.length; di++) {
                         const d = _dabs[di];
                         if (_toSketch) {
@@ -145,6 +146,12 @@
                             // ramps, no arms, no fluid replay/broadcast
                             // (sketch strokes are local-only until D7)
                             if (typeof window.__sketchStamp === 'function') window.__sketchStamp(d.x, d.y, d.p);
+                            continue;
+                        }
+                        if (_toMask) {
+                            // D3 mask route: paint coverage into the active
+                            // Mask object (shown as the red overlay film)
+                            if (typeof window.__maskStamp === 'function') window.__maskStamp(d.x, d.y, d.p);
                             continue;
                         }
                         // splat-in ramp stays distance-based (same accumulator)
@@ -682,6 +689,12 @@
                 gl.uniform4f(displayProg.uniforms['uRasterP' + ri],
                     _rs ? 1 : 0, _rs ? _rs.opacity : 0, _rs ? _rs.mode : 0, (_rs && _rs.under) ? 1 : 0);
             }
+            // D3 mask overlay: auto-shown while painting into a mask, or
+            // pinned on via the Show Mask checkbox (config.MASK_OVERLAY)
+            const _mOverlay = (window.Masks && (config.BRUSH_TARGET === 'mask' || config.MASK_OVERLAY))
+                ? window.Masks.getFBO(window.Masks.activeId()) : null;
+            gl.uniform1i(displayProg.uniforms.uMaskOverlay, 7);
+            gl.uniform1f(displayProg.uniforms.maskOverlayOn, _mOverlay ? 1 : 0);
             if (_shadingOn) {
                 gl.uniform2f(displayProg.uniforms.shadeTexelSize, shadeForm.texelSizeX, shadeForm.texelSizeY);
             }
@@ -712,6 +725,8 @@
                 gl.activeTexture(gl.TEXTURE3 + ri);
                 gl.bindTexture(gl.TEXTURE_2D, _rs ? _rs.texture : null);
             }
+            gl.activeTexture(gl.TEXTURE7);
+            gl.bindTexture(gl.TEXTURE_2D, _mOverlay ? _mOverlay.texture : null);
             blit(null);
             // ─── Stats update (ring buffer, zero-GC) ──────────────────
             pushFrameTimestamp(nowMs);
