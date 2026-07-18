@@ -1236,11 +1236,10 @@
         // Close menu on outside click
         document.addEventListener('click', function () { collisionMenu.style.display = 'none'; });
 
-        const chevron = header.querySelector('.section-chevron');
-        header.insertBefore(actions, chevron);
-
-        // Prevent action button clicks from toggling section collapse
-        actions.addEventListener('click', function(e) { e.stopPropagation(); });
+        // 7.2: action buttons belong in the section BODY, not the header —
+        // the header stays title-only (matches the per-layer-item fix in 05k).
+        actions.classList.add('layers-toolbar');
+        body.appendChild(actions);
 
         moveEl('layersPanel', body);
 

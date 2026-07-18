@@ -158,6 +158,7 @@
 - `js/05k-layers-render.js` builds `layer-item-header` with `layer-controls` inside it
 - The buttons row should be in the collapsible body, not the header — header should only have the layer name/visibility toggle
 - **Fix approach:** Move button controls into the expandable body section
+- **Follow-up (2026-07-18):** the per-layer-item fix landed, but the **📑 Layers *section* header** still carried its own action row (Capture Layer / 📁 upload / ✏️ path / 🧱 collision) via `section-header-actions`. Moved that row out of the section header into the top of the section **body** as a `.layers-toolbar` (`js/20-mixer-layout.js` `buildLayersSection`; CSS in `css/21-sidebar.css`). Section header is now title-only.
 
 ### 7.3 Educate users on masking/feathering for collider layers
 - [x] **Add UI guidance for masking and feathering collider layers**

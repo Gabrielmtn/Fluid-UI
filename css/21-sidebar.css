@@ -398,6 +398,15 @@
     display: flex;
     gap: 4px;
 }
+/* 7.2: the Layers action buttons live in the section body as a toolbar
+   above the list — not crammed into the (title-only) section header. */
+.section-header-actions.layers-toolbar {
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 0 0 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
 .section-header-actions button {
     padding: 2px 6px;
     font-size: 11px;
