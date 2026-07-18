@@ -380,8 +380,9 @@
                     visible: layer.visible,
                     isLooping: layer.isLooping,
                     loopMaxMs: layer.loopMaxMs,
-                    colorMode: layer.colorMode || 'live',
-                    layerColor: layer.layerColor || null,
+                    colorMode: layer.colorMode || 'original',
+                    recordMode: layer.recordMode || 'main',
+                    recordStepPalette: layer.recordStepPalette || null,
                     mask: layer.mask ? {
                         enabled: layer.mask.enabled,
                         mode: layer.mask.mode,
@@ -405,8 +406,9 @@
                 layer.visible = ld.visible !== false;
                 layer.isLooping = ld.isLooping !== undefined ? !!ld.isLooping : true;
                 layer.loopMaxMs = (typeof ld.loopMaxMs === 'number') ? ld.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000);
-                layer.colorMode = ld.colorMode || 'live';
-                layer.layerColor = ld.layerColor || null;
+                layer.colorMode = (typeof recMigrateColorMode === 'function') ? recMigrateColorMode(ld.colorMode) : (ld.colorMode || 'original');
+                layer.recordMode = ld.recordMode || 'main';
+                layer.recordStepPalette = ld.recordStepPalette || null;
                 if (ld.mask) {
                     layer.mask = {
                         enabled: !!ld.mask.enabled,

@@ -103,6 +103,13 @@
             a.timeline.isRecording = true;
             a.timeline.recordingStartTime = Date.now() - a.timeline.playbackPosition;
             a.timeline.duration = recMaxDurationMs;
+            // Capture the brush's color mode at record start so 'Original Mode'
+            // can reproduce it on replay (random keeps being random, etc.)
+            var _arm0 = (window.multiArmColors && window.multiArmColors[0]) ? window.multiArmColors[0] : null;
+            a.recordMode = (_arm0 && _arm0.mode) ? _arm0.mode : 'main';
+            a.recordStepPalette = (a.recordMode === 'step' && typeof getStepColorList === 'function')
+                ? getStepColorList().slice() : null;
+            a._repKey = null;
             if (a.timeline.isPlaying) a.timeline.isPlaying = false;
             recUpdateButtonStates(); // PERF: lightweight - no DOM rebuild during recording
             
@@ -171,11 +178,12 @@
                 name: name || `Layer ${id}`,
                 visible: true,
                 isLooping: true,
-                // Replay color behavior: 'live' = re-resolve arm color modes at
-                // replay time (random stays random); 'recorded' = faithful baked
-                // colors; 'layer' = lock every splat to layerColor
-                colorMode: 'live',
-                layerColor: null, // hex; lazily defaults to first recorded color
+                // Replay color behavior (1.3 rework): 'original' (default) =
+                // reproduce the record-time brush (random keeps regenerating);
+                // 'exact' = frozen captured colors; 'live' = current settings.
+                colorMode: 'original',
+                recordMode: 'main',       // arm-0 mode captured at record start
+                recordStepPalette: null,  // step palette captured at record start
                 loopMaxMs: (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000),
                 mask: {
                     enabled: false,
@@ -206,8 +214,9 @@
             nl.timeline.duration = a.timeline.duration;
             nl.isLooping = a.isLooping;
             nl.loopMaxMs = a.loopMaxMs;
-            nl.colorMode = a.colorMode || 'live';
-            nl.layerColor = a.layerColor || null;
+            nl.colorMode = a.colorMode || 'original';
+            nl.recordMode = a.recordMode || 'main';
+            nl.recordStepPalette = a.recordStepPalette ? a.recordStepPalette.slice() : null;
             // Copy mask data
             if (a.mask) {
                 nl.mask = JSON.parse(JSON.stringify(a.mask));
@@ -358,14 +367,35 @@
                 const prevTime = currentTime - scaledDelta;
                 const cappedPrev = Math.min(prevTime, eff);
                 const cappedCurr = Math.min(currentTime, eff);
-                // Per-layer replay color behavior (1.3): 'live' re-resolves arm
-                // color modes (exactColor falsy — today's behavior); 'recorded'
-                // bakes i.color; 'layer' locks to the layer's configured color.
-                const cMode = layer.colorMode || 'live';
-                const exactReplayColor = cMode !== 'live';
-                const lockColor = (cMode === 'layer')
-                    ? recHexToRgb(layer.layerColor || recDefaultLayerColor(layer))
-                    : null;
+                // Per-layer replay color behavior (1.3, reworked 2026-07-18):
+                //   'original' (default) — reproduce the record-time brush
+                //        behavior: generative modes (random/rainbow/step)
+                //        REGENERATE per stroke so a random recording keeps
+                //        being random; fixed/main replay the baked colors.
+                //   'exact' — the literal captured colors (frozen sequence).
+                //   'live'  — defer to the CURRENT brush settings.
+                // All final colors are computed here and applied with
+                // exactColor=true: arm resolution freezes its per-stroke cache
+                // during replay (no mouseup to advance it), so letting it run
+                // would collapse a random recording to ONE frozen color — the
+                // bug this rework fixes.
+                const cMode = layer.colorMode || 'original';
+                let genMode = null, genPalette = null, liveSolid = null;
+                if (cMode === 'original') {
+                    if (/^(random|rainbow|step)$/.test(layer.recordMode || '')) {
+                        genMode = layer.recordMode;
+                        genPalette = layer.recordStepPalette || null;
+                    }
+                } else if (cMode === 'live') {
+                    const cm = (window.multiArmColors && window.multiArmColors[0] && window.multiArmColors[0].mode) || 'main';
+                    if (/^(random|rainbow|step)$/.test(cm)) {
+                        genMode = cm; // current palette (recGenerativeColor reads it live)
+                    } else if (cm === 'fixed' && window.multiArmColors[0].color) {
+                        liveSolid = recHexToRgb(window.multiArmColors[0].color);
+                    } else {
+                        liveSolid = (window.pointer && window.pointer.color) ? window.pointer.color.slice() : null;
+                    }
+                }
                 // Binary search for start index instead of O(n) filter
                 const interactions = layer.timeline.interactions;
                 let lo = 0, hi = interactions.length;
@@ -383,15 +413,32 @@
                     }
                     const x = i.x * canvas.width;
                     const y = i.y * canvas.height;
-                    const replayColor = lockColor || i.color;
+                    let replayColor;
+                    if (cMode === 'exact') {
+                        replayColor = i.color;
+                    } else if (genMode) {
+                        // Regenerate per stroke: a change in the baked color
+                        // marks a new stroke (random holds one color per stroke,
+                        // rainbow changes per splat — both fall out naturally).
+                        const key = ((i.color[0] * 255) | 0) + ',' + ((i.color[1] * 255) | 0) + ',' + ((i.color[2] * 255) | 0);
+                        if (key !== layer._repKey) {
+                            layer._repKey = key;
+                            layer._repColor = recGenerativeColor(genMode, genPalette, layer) || i.color;
+                        }
+                        replayColor = layer._repColor;
+                    } else if (cMode === 'live') {
+                        replayColor = liveSolid || i.color;
+                    } else { // original, non-generative → the baked colors
+                        replayColor = i.color;
+                    }
                     if (typeof window.applyMultiSplatWith === 'function') {
-                        window.applyMultiSplatWith(x, y, i.vx, i.vy, replayColor, i.mult || 1, (typeof i.radius === 'number') ? i.radius : undefined, exactReplayColor);
+                        window.applyMultiSplatWith(x, y, i.vx, i.vy, replayColor, i.mult || 1, (typeof i.radius === 'number') ? i.radius : undefined, true);
                     } else {
                         const prevM = (typeof window.animationMultiplier === 'number') ? window.animationMultiplier : 1;
                         const prevR = window.config ? window.config.SPLAT_RADIUS : undefined;
                         window.animationMultiplier = Math.max(1, Math.round(i.mult || 1));
                         if (window.config && typeof i.radius === 'number') window.config.SPLAT_RADIUS = i.radius;
-                        multiSplat(x, y, i.vx, i.vy, replayColor, false, exactReplayColor);
+                        multiSplat(x, y, i.vx, i.vy, replayColor, false, true);
                         window.animationMultiplier = prevM;
                         if (window.config && typeof prevR === 'number') window.config.SPLAT_RADIUS = prevR;
                     }
@@ -403,6 +450,8 @@
                         layer.timeline.isPlaying = false;
                         layer.timeline.playbackPosition = 0;
                     }
+                    // Fresh generative colors each loop ("keeps being random")
+                    layer._repKey = null;
                 }
             });
             recLastPlaybackTime = now;
@@ -516,14 +565,11 @@
                             <input type="text" class="time-input layer-max" data-id="${layer.id}" value="${recFormatTime((typeof layer.loopMaxMs === 'number' ? layer.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : layer.timeline.duration || 0)))}" style="margin-left:6px; width:110px;">
                         </label>
                     </div>
-                    <div class="layer-colormode-row" style="margin-bottom:6px; display:flex; align-items:center; gap:6px;">
-                        <label style="font-size:11px; opacity:0.85;">Colors</label>
-                        <select class="rec-color-mode" data-id="${layer.id}" title="How replay colors this layer's splats" style="flex:1; font-size:11px;">
-                            <option value="live" ${(layer.colorMode || 'live') === 'live' ? 'selected' : ''}>Live brush modes</option>
-                            <option value="recorded" ${layer.colorMode === 'recorded' ? 'selected' : ''}>As recorded</option>
-                            <option value="layer" ${layer.colorMode === 'layer' ? 'selected' : ''}>Layer color</option>
+                    <div class="layer-colormode-row">
+                        <label>Colors</label>
+                        <select class="rec-color-mode" data-id="${layer.id}" title="How replay colors this layer's splats">
+                            ${REC_COLOR_MODES.map(m => `<option value="${m.v}" ${(layer.colorMode || 'original') === m.v ? 'selected' : ''}>${m.label}</option>`).join('')}
                         </select>
-                        <input type="color" class="rec-layer-color" data-id="${layer.id}" value="${layer.layerColor || recDefaultLayerColor(layer)}" title="Color every replayed splat uses" style="display:${layer.colorMode === 'layer' ? 'block' : 'none'}; width:28px; height:22px; padding:0; border:none; background:none; cursor:pointer;">
                     </div>
                     <canvas id="recMiniTimeline-${layer.id}" class="rec-mini-timeline"></canvas>
                 `;
@@ -585,6 +631,7 @@
                 const idx = (idx0 >= 0 ? (idx0 + 1) : 0);
                 miniStatus.textContent = (total > 0 && idx > 0) ? `${idx}/${total}` : '0/0';
             }
+            recSyncMiniColorMode();
         }
 
         function recBindLayerListEvents() {
@@ -647,18 +694,10 @@
                     const layer = recLayers.find(l => l.id === id);
                     if (layer) {
                         layer.colorMode = modeSel.value;
-                        if (layer.colorMode === 'layer' && !layer.layerColor) {
-                            layer.layerColor = recDefaultLayerColor(layer);
-                        }
-                        recScheduleRender(); // shows/hides the color swatch
+                        layer._repKey = null; // re-seed generative replay colors
+                        recSyncMiniColorMode();
                     }
                     return;
-                }
-                const colInp = e.target.closest('input.rec-layer-color');
-                if (colInp) {
-                    const id = parseInt(colInp.getAttribute('data-id'), 10);
-                    const layer = recLayers.find(l => l.id === id);
-                    if (layer) layer.layerColor = colInp.value;
                 }
             });
             function commitLayerMax(inputEl) {
@@ -677,13 +716,6 @@
                 recRefreshTimelinesUI();
             }
             list.addEventListener('input', (e) => {
-                const colInp = e.target.closest('input.rec-layer-color');
-                if (colInp) {
-                    const cid = parseInt(colInp.getAttribute('data-id'), 10);
-                    const clayer = recLayers.find(l => l.id === cid);
-                    if (clayer) clayer.layerColor = colInp.value; // live while dragging the picker
-                    return;
-                }
                 const input = e.target.closest('input.layer-max');
                 if (!input) return;
                 const id = parseInt(input.getAttribute('data-id'), 10);
@@ -757,16 +789,61 @@
             ];
         }
 
-        function recRgbToHex(arr) {
-            if (!arr || arr.length < 3) return '#ffffff';
-            const f = v => Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).padStart(2, '0');
-            return '#' + f(arr[0]) + f(arr[1]) + f(arr[2]);
+        // Fresh replay color for a generative record/live mode (1.3 rework):
+        // random/rainbow → a new vibrant color; step → the next palette entry
+        // (record-time palette for 'original', current for 'live'). Non-
+        // generative modes never call this. Per-layer step index on the layer.
+        function recGenerativeColor(mode, palette, layer) {
+            if (mode === 'random' || mode === 'rainbow') {
+                return window.generateVibrantColor ? window.generateVibrantColor()
+                    : [Math.random(), Math.random(), Math.random()];
+            }
+            if (mode === 'step') {
+                var list = (palette && palette.length) ? palette
+                    : (typeof getStepColorList === 'function' ? getStepColorList() : []);
+                if (!list || !list.length) return null;
+                if (typeof layer._repStep !== 'number') layer._repStep = 0;
+                var hex = list[layer._repStep % list.length];
+                layer._repStep++;
+                return recHexToRgb(hex);
+            }
+            return null;
         }
 
-        // "The color it originally was": first recorded interaction's color
-        function recDefaultLayerColor(layer) {
-            const first = layer.timeline && layer.timeline.interactions && layer.timeline.interactions[0];
-            return (first && first.color) ? recRgbToHex(first.color) : '#ffffff';
+        // Human-readable labels for the color-mode dropdowns (full + mini)
+        var REC_COLOR_MODES = [
+            { v: 'original', label: 'Original Mode' },
+            { v: 'exact', label: 'Exact Recording' },
+            { v: 'live', label: 'Live Colors' }
+        ];
+
+        // Migrate saved color-mode values to the reworked set (2026-07-18):
+        // old 'recorded' → 'exact'; old 'layer'/'live'/absent → 'original'
+        // (the new default, which preserves the recorded brush behavior).
+        function recMigrateColorMode(v) {
+            if (v === 'original' || v === 'exact' || v === 'live') return v;
+            if (v === 'recorded') return 'exact';
+            return 'original';
+        }
+
+        // Keep the minimized-panel color-mode dropdown in step with the active
+        // layer (populated once, value set here on every render / layer switch).
+        function recSyncMiniColorMode() {
+            var sel = document.getElementById('recMiniColorMode');
+            if (!sel) return;
+            if (!sel.options.length) {
+                sel.innerHTML = REC_COLOR_MODES.map(function (m) {
+                    return '<option value="' + m.v + '">' + m.label + '</option>';
+                }).join('');
+            }
+            var a = recGetActiveLayer();
+            if (a) {
+                sel.value = a.colorMode || 'original';
+                sel.disabled = false;
+            } else {
+                sel.value = 'original';
+                sel.disabled = true;
+            }
         }
 
         function recColorToCss(arr) {
@@ -1034,8 +1111,9 @@
                     visible: layer.visible,
                     isLooping: layer.isLooping,
                     loopMaxMs: layer.loopMaxMs,
-                    colorMode: layer.colorMode || 'live',
-                    layerColor: layer.layerColor || null,
+                    colorMode: layer.colorMode || 'original',
+                    recordMode: layer.recordMode || 'main',
+                    recordStepPalette: layer.recordStepPalette || null,
                     mask: layer.mask ? {
                         enabled: layer.mask.enabled,
                         mode: layer.mask.mode,
@@ -1071,8 +1149,9 @@
                             layer.visible = !!ld.visible;
                             layer.isLooping = ld.isLooping !== undefined ? !!ld.isLooping : true;
                             layer.loopMaxMs = (typeof ld.loopMaxMs === 'number') ? ld.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000);
-                            layer.colorMode = ld.colorMode || 'live';
-                            layer.layerColor = ld.layerColor || null;
+                            layer.colorMode = recMigrateColorMode(ld.colorMode);
+                            layer.recordMode = ld.recordMode || 'main';
+                            layer.recordStepPalette = ld.recordStepPalette || null;
                             // Import mask data if present (v2.1+)
                             if (ld.mask) {
                                 layer.mask = {
@@ -1435,6 +1514,16 @@
     if (recMiniPrevLayerBtn) recMiniPrevLayerBtn.addEventListener('click', () => { recCycleLayer(-1); });
     if (recMiniNextLayerBtn) recMiniNextLayerBtn.addEventListener('click', () => { recCycleLayer(1); });
     if (recMiniAddLayerBtn) recMiniAddLayerBtn.addEventListener('click', recAddLayer);
+    // Minimized color-mode dropdown: mirrors + sets the active layer's mode,
+    // resyncs when layers are switched (recSyncMiniColorMode runs in render).
+    const recMiniColorMode = document.getElementById('recMiniColorMode');
+    if (recMiniColorMode) {
+        recMiniColorMode.addEventListener('change', () => {
+            const a = recGetActiveLayer();
+            if (a) { a.colorMode = recMiniColorMode.value; a._repKey = null; recRenderUI(); }
+        });
+    }
+    recSyncMiniColorMode();
     // Click flash effect for lively feedback
     const miniBtns = document.querySelectorAll('#recMini button');
     miniBtns.forEach(btn => {
