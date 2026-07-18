@@ -772,8 +772,22 @@
             const sel = document.getElementById(pair[0]);
             if (sel) bar.appendChild(makeQubDropdown(sel, pair[1]));
         });
-        // Docked bottom-left via CSS (fixed) — no JS positioning needed.
         document.body.appendChild(bar);
+        // Full-width bottom bar: CSS hugs bottom + left; JS trims the right edge
+        // so the bar stops at the nav (sidebar) instead of running under it.
+        // Deferred (init reads an unlaid-out sidebar) + re-run on resize.
+        const place = function () {
+            const sb = document.getElementById('sidebar-right');
+            let right = 0;
+            if (sb) {
+                const r = sb.getBoundingClientRect();
+                if (r.width > 0 && r.left < window.innerWidth - 5) right = Math.round(window.innerWidth - r.left);
+            }
+            bar.style.right = right + 'px';
+        };
+        requestAnimationFrame(place);
+        setTimeout(place, 300);
+        window.addEventListener('resize', place);
     }
 
     // Custom themeable dropdown that drives a hidden native <select> (so all

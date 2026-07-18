@@ -12,18 +12,20 @@
    to the bottom-left corner. Room to keep adding compact controls. */
 #quality-underbar {
     position: fixed;
-    left: 10px;
-    bottom: 10px;
+    left: 0;
+    right: 0; /* JS trims the right edge to the nav/sidebar */
+    bottom: 0;
     z-index: 200;
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 6px;
-    padding: 5px 8px;
+    gap: 8px;
+    padding: 8px 14px; /* content height + ~10px breathing */
     background: linear-gradient(180deg, #2c2f34, #1b1e23);
-    border: 1px solid rgba(0, 0, 0, 0.5);
-    border-radius: 8px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-top: 1px solid rgba(0, 0, 0, 0.55);
+    border-right: 1px solid rgba(0, 0, 0, 0.55);
+    border-top-right-radius: 10px;
+    box-shadow: 0 -3px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
     user-select: none;
 }
 /* Native <select> stays as the hidden state-holder (drives all bindings). */
