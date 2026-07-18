@@ -759,8 +759,9 @@
                     (_rs && _rs.clipTex) ? 1 : 0, (_rs && _rs.clipInvert) ? 1 : 0, 0, 0);
             }
             // D3 mask overlay: auto-shown while painting into a mask, or
-            // pinned on via the Show Mask checkbox (config.MASK_OVERLAY)
-            const _mOverlay = (window.Masks && (config.BRUSH_TARGET === 'mask' || config.MASK_OVERLAY))
+            // pinned on via the Show Mask checkbox (config.MASK_OVERLAY).
+            // D3-4: the red film is a UI overlay — never bake it into an export.
+            const _mOverlay = (!window.__exporting && window.Masks && (config.BRUSH_TARGET === 'mask' || config.MASK_OVERLAY))
                 ? window.Masks.getFBO(window.Masks.activeId()) : null;
             gl.uniform1i(displayProg.uniforms.uMaskOverlay, 7);
             gl.uniform1f(displayProg.uniforms.maskOverlayOn, _mOverlay ? 1 : 0);
