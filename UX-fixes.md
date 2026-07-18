@@ -21,7 +21,7 @@
 - Files: `js/05d-input-replay.js` (replay loop), `js/20-mixer-layout.js` (UI for control)
 
 ### 1.3 Color setting during recording should respect "lock layer" color checkbox
-- [ ] **When recording, color changes should honor the layer's color lock setting**
+- [x] **When recording, color changes should honor the layer's color lock setting**
 - If a layer has a "lock color" checkbox enabled, color changes during recording should not override the layer's configured color
 - Need to check if path layers or recording layers have a color-lock mechanism and wire it into the recording color capture
 

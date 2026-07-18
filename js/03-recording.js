@@ -171,6 +171,11 @@
                 name: name || `Layer ${id}`,
                 visible: true,
                 isLooping: true,
+                // Replay color behavior: 'live' = re-resolve arm color modes at
+                // replay time (random stays random); 'recorded' = faithful baked
+                // colors; 'layer' = lock every splat to layerColor
+                colorMode: 'live',
+                layerColor: null, // hex; lazily defaults to first recorded color
                 loopMaxMs: (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000),
                 mask: {
                     enabled: false,
@@ -201,6 +206,8 @@
             nl.timeline.duration = a.timeline.duration;
             nl.isLooping = a.isLooping;
             nl.loopMaxMs = a.loopMaxMs;
+            nl.colorMode = a.colorMode || 'live';
+            nl.layerColor = a.layerColor || null;
             // Copy mask data
             if (a.mask) {
                 nl.mask = JSON.parse(JSON.stringify(a.mask));
@@ -351,6 +358,14 @@
                 const prevTime = currentTime - scaledDelta;
                 const cappedPrev = Math.min(prevTime, eff);
                 const cappedCurr = Math.min(currentTime, eff);
+                // Per-layer replay color behavior (1.3): 'live' re-resolves arm
+                // color modes (exactColor falsy — today's behavior); 'recorded'
+                // bakes i.color; 'layer' locks to the layer's configured color.
+                const cMode = layer.colorMode || 'live';
+                const exactReplayColor = cMode !== 'live';
+                const lockColor = (cMode === 'layer')
+                    ? recHexToRgb(layer.layerColor || recDefaultLayerColor(layer))
+                    : null;
                 // Binary search for start index instead of O(n) filter
                 const interactions = layer.timeline.interactions;
                 let lo = 0, hi = interactions.length;
@@ -368,14 +383,15 @@
                     }
                     const x = i.x * canvas.width;
                     const y = i.y * canvas.height;
+                    const replayColor = lockColor || i.color;
                     if (typeof window.applyMultiSplatWith === 'function') {
-                        window.applyMultiSplatWith(x, y, i.vx, i.vy, i.color, i.mult || 1, (typeof i.radius === 'number') ? i.radius : undefined);
+                        window.applyMultiSplatWith(x, y, i.vx, i.vy, replayColor, i.mult || 1, (typeof i.radius === 'number') ? i.radius : undefined, exactReplayColor);
                     } else {
                         const prevM = (typeof window.animationMultiplier === 'number') ? window.animationMultiplier : 1;
                         const prevR = window.config ? window.config.SPLAT_RADIUS : undefined;
                         window.animationMultiplier = Math.max(1, Math.round(i.mult || 1));
                         if (window.config && typeof i.radius === 'number') window.config.SPLAT_RADIUS = i.radius;
-                        multiSplat(x, y, i.vx, i.vy, i.color);
+                        multiSplat(x, y, i.vx, i.vy, replayColor, false, exactReplayColor);
                         window.animationMultiplier = prevM;
                         if (window.config && typeof prevR === 'number') window.config.SPLAT_RADIUS = prevR;
                     }
@@ -500,6 +516,15 @@
                             <input type="text" class="time-input layer-max" data-id="${layer.id}" value="${recFormatTime((typeof layer.loopMaxMs === 'number' ? layer.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : layer.timeline.duration || 0)))}" style="margin-left:6px; width:110px;">
                         </label>
                     </div>
+                    <div class="layer-colormode-row" style="margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                        <label style="font-size:11px; opacity:0.85;">Colors</label>
+                        <select class="rec-color-mode" data-id="${layer.id}" title="How replay colors this layer's splats" style="flex:1; font-size:11px;">
+                            <option value="live" ${(layer.colorMode || 'live') === 'live' ? 'selected' : ''}>Live brush modes</option>
+                            <option value="recorded" ${layer.colorMode === 'recorded' ? 'selected' : ''}>As recorded</option>
+                            <option value="layer" ${layer.colorMode === 'layer' ? 'selected' : ''}>Layer color</option>
+                        </select>
+                        <input type="color" class="rec-layer-color" data-id="${layer.id}" value="${layer.layerColor || recDefaultLayerColor(layer)}" title="Color every replayed splat uses" style="display:${layer.colorMode === 'layer' ? 'block' : 'none'}; width:28px; height:22px; padding:0; border:none; background:none; cursor:pointer;">
+                    </div>
                     <canvas id="recMiniTimeline-${layer.id}" class="rec-mini-timeline"></canvas>
                 `;
                 list.appendChild(el);
@@ -610,10 +635,31 @@
             });
             list.addEventListener('change', (e) => {
                 const input = e.target.closest('input.layer-title[data-action="rename"]');
-                if (!input) return;
-                const id = parseInt(input.getAttribute('data-id'), 10);
-                const layer = recLayers.find(l => l.id === id);
-                if (layer) { layer.name = input.value; recScheduleRender(); }
+                if (input) {
+                    const id = parseInt(input.getAttribute('data-id'), 10);
+                    const layer = recLayers.find(l => l.id === id);
+                    if (layer) { layer.name = input.value; recScheduleRender(); }
+                    return;
+                }
+                const modeSel = e.target.closest('select.rec-color-mode');
+                if (modeSel) {
+                    const id = parseInt(modeSel.getAttribute('data-id'), 10);
+                    const layer = recLayers.find(l => l.id === id);
+                    if (layer) {
+                        layer.colorMode = modeSel.value;
+                        if (layer.colorMode === 'layer' && !layer.layerColor) {
+                            layer.layerColor = recDefaultLayerColor(layer);
+                        }
+                        recScheduleRender(); // shows/hides the color swatch
+                    }
+                    return;
+                }
+                const colInp = e.target.closest('input.rec-layer-color');
+                if (colInp) {
+                    const id = parseInt(colInp.getAttribute('data-id'), 10);
+                    const layer = recLayers.find(l => l.id === id);
+                    if (layer) layer.layerColor = colInp.value;
+                }
             });
             function commitLayerMax(inputEl) {
                 const id = parseInt(inputEl.getAttribute('data-id'), 10);
@@ -631,6 +677,13 @@
                 recRefreshTimelinesUI();
             }
             list.addEventListener('input', (e) => {
+                const colInp = e.target.closest('input.rec-layer-color');
+                if (colInp) {
+                    const cid = parseInt(colInp.getAttribute('data-id'), 10);
+                    const clayer = recLayers.find(l => l.id === cid);
+                    if (clayer) clayer.layerColor = colInp.value; // live while dragging the picker
+                    return;
+                }
                 const input = e.target.closest('input.layer-max');
                 if (!input) return;
                 const id = parseInt(input.getAttribute('data-id'), 10);
@@ -693,6 +746,27 @@
                     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                 }
             });
+        }
+
+        function recHexToRgb(hex) {
+            if (typeof hex !== 'string' || !/^#[0-9a-f]{6}$/i.test(hex)) return [1, 1, 1];
+            return [
+                parseInt(hex.slice(1, 3), 16) / 255,
+                parseInt(hex.slice(3, 5), 16) / 255,
+                parseInt(hex.slice(5, 7), 16) / 255
+            ];
+        }
+
+        function recRgbToHex(arr) {
+            if (!arr || arr.length < 3) return '#ffffff';
+            const f = v => Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).padStart(2, '0');
+            return '#' + f(arr[0]) + f(arr[1]) + f(arr[2]);
+        }
+
+        // "The color it originally was": first recorded interaction's color
+        function recDefaultLayerColor(layer) {
+            const first = layer.timeline && layer.timeline.interactions && layer.timeline.interactions[0];
+            return (first && first.color) ? recRgbToHex(first.color) : '#ffffff';
         }
 
         function recColorToCss(arr) {
@@ -960,6 +1034,8 @@
                     visible: layer.visible,
                     isLooping: layer.isLooping,
                     loopMaxMs: layer.loopMaxMs,
+                    colorMode: layer.colorMode || 'live',
+                    layerColor: layer.layerColor || null,
                     mask: layer.mask ? {
                         enabled: layer.mask.enabled,
                         mode: layer.mask.mode,
@@ -995,6 +1071,8 @@
                             layer.visible = !!ld.visible;
                             layer.isLooping = ld.isLooping !== undefined ? !!ld.isLooping : true;
                             layer.loopMaxMs = (typeof ld.loopMaxMs === 'number') ? ld.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000);
+                            layer.colorMode = ld.colorMode || 'live';
+                            layer.layerColor = ld.layerColor || null;
                             // Import mask data if present (v2.1+)
                             if (ld.mask) {
                                 layer.mask = {
