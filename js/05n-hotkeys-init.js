@@ -100,17 +100,15 @@
                 applyingState = false;
             }
         }
+        // D6: UI-state undo entries are { s: snapshot, seq } so the unified
+        // UndoManager can order them against sketch/layer histories by recency.
         function pushUndo() {
             if (applyingState) return;
             try {
                 const current = getState();
                 const last = undoStack.length ? undoStack[undoStack.length - 1] : null;
-                if (last) {
-                    const lastStr = JSON.stringify(last);
-                    const currStr = JSON.stringify(current);
-                    if (lastStr === currStr) return; // skip duplicate snapshot
-                }
-                undoStack.push(current);
+                if (last && JSON.stringify(last.s) === JSON.stringify(current)) return; // skip duplicate
+                undoStack.push({ s: current, seq: (window.__undoSeq = (window.__undoSeq | 0) + 1) });
                 if (undoStack.length > 100) undoStack.shift();
                 redoStack.length = 0;
             } catch (e) { /* noop */ }
@@ -121,12 +119,12 @@
             // Skip no-op snapshots equal to current state
             while (undoStack.length) {
                 const top = undoStack[undoStack.length - 1];
-                if (JSON.stringify(top) === JSON.stringify(current)) { undoStack.pop(); } else { break; }
+                if (JSON.stringify(top.s) === JSON.stringify(current)) { undoStack.pop(); } else { break; }
             }
             if (!undoStack.length) return;
-            const st = undoStack.pop();
-            redoStack.push(current);
-            applyState(st);
+            const entry = undoStack.pop();
+            redoStack.push({ s: current, seq: entry.seq });
+            applyState(entry.s);
         }
         function doRedo() {
             if (!redoStack.length) return;
@@ -134,13 +132,45 @@
             // Skip no-op snapshots equal to current state
             while (redoStack.length) {
                 const top = redoStack[redoStack.length - 1];
-                if (JSON.stringify(top) === JSON.stringify(current)) { redoStack.pop(); } else { break; }
+                if (JSON.stringify(top.s) === JSON.stringify(current)) { redoStack.pop(); } else { break; }
             }
             if (!redoStack.length) return;
-            const st = redoStack.pop();
-            undoStack.push(current);
-            applyState(st);
+            const entry = redoStack.pop();
+            undoStack.push({ s: current, seq: entry.seq });
+            applyState(entry.s);
         }
+        // D6: unified recency-ordered undo. Each provider owns its own stack and
+        // stamps events with a global seq; UndoManager dispatches Ctrl+Z to the
+        // provider whose top undoable action is the most recent (highest seq),
+        // and redo to the most-recently-undone (lowest redo seq).
+        window.__undoSeq = window.__undoSeq | 0;
+        const uiUndoProvider = {
+            canUndo: function () { return undoStack.length > 0; },
+            canRedo: function () { return redoStack.length > 0; },
+            topUndoSeq: function () { return undoStack.length ? undoStack[undoStack.length - 1].seq : -Infinity; },
+            topRedoSeq: function () { return redoStack.length ? redoStack[redoStack.length - 1].seq : Infinity; },
+            undo: doUndo, redo: doRedo
+        };
+        window.UndoManager = (function () {
+            const providers = [];
+            function register(p) { if (p && providers.indexOf(p) < 0) providers.push(p); }
+            function undo() {
+                let best = null, bestSeq = -Infinity;
+                providers.forEach(function (p) { try { if (p.canUndo()) { const s = p.topUndoSeq(); if (s > bestSeq) { bestSeq = s; best = p; } } } catch (e) {} });
+                if (best) { best.undo(); return true; }
+                return false;
+            }
+            function redo() {
+                let best = null, bestSeq = Infinity;
+                providers.forEach(function (p) { try { if (p.canRedo()) { const s = p.topRedoSeq(); if (s < bestSeq) { bestSeq = s; best = p; } } } catch (e) {} });
+                if (best) { best.redo(); return true; }
+                return false;
+            }
+            return { register: register, undo: undo, redo: redo, _providers: providers };
+        })();
+        window.UndoManager.register(uiUndoProvider);
+        if (window.__sketchUndoProvider) window.UndoManager.register(window.__sketchUndoProvider);
+        if (window.__layerHistory) window.UndoManager.register(window.__layerHistory);
         function toggleCheckbox(id) {
             const el = document.getElementById(id);
             if (!el) return;
@@ -265,27 +295,15 @@
             // Undo/Redo
             if (ctrlOrMeta && lower === 'z') {
                 e.preventDefault();
-                // D6 slice 1: while painting INTO a paint layer or mask,
-                // Ctrl+Z / Ctrl+Shift+Z operate on paint strokes (GPU
-                // snapshot ring in 05i), NOT the UI-state undo — deliberately
-                // no fall-through, or an empty stroke history would silently
-                // rewind sliders.
-                if (window.config && (window.config.BRUSH_TARGET === 'sketch' || window.config.BRUSH_TARGET === 'mask')
-                    && typeof window.__sketchUndo === 'function') {
-                    if (e.shiftKey) window.__sketchRedo(); else window.__sketchUndo();
-                    return;
-                }
-                if (e.shiftKey) doRedo(); else doUndo();
+                // D6: unified recency-ordered undo across paint strokes, UI-state
+                // and layer ops — Ctrl+Z undoes the most-recent action regardless
+                // of paint mode (UndoManager picks the highest-seq provider).
+                if (e.shiftKey) window.UndoManager.redo(); else window.UndoManager.undo();
                 return;
             }
             if (ctrlOrMeta && lower === 'y') {
                 e.preventDefault();
-                if (window.config && (window.config.BRUSH_TARGET === 'sketch' || window.config.BRUSH_TARGET === 'mask')
-                    && typeof window.__sketchRedo === 'function') {
-                    window.__sketchRedo();
-                    return;
-                }
-                doRedo();
+                window.UndoManager.redo();
                 return;
             }
             // Ctrl+Shift+N: new recording layer

@@ -517,6 +517,23 @@
             const target = e.target.closest('.layer-item');
             if (target) target.classList.remove('drag-over');
         }
+        // D6: reorder undo — restore the whole layerOrder in place.
+        function _applyLayerOrder(arr) {
+            layerOrder.length = 0;
+            arr.forEach(function (it) { layerOrder.push(it); });
+            window.layerOrder = layerOrder;
+            renderLayers();
+        }
+        function _recordReorderUndo(before) {
+            if (!window.__layerHistory || window.__layerHistory.isApplying()) return;
+            const after = layerOrder.slice();
+            if (JSON.stringify(before) === JSON.stringify(after)) return; // no-op
+            window.__layerHistory.push({
+                label: 'reorder layers',
+                undo: function () { _applyLayerOrder(before); },
+                redo: function () { _applyLayerOrder(after); }
+            });
+        }
         function handleDrop(e) {
             if (e.stopPropagation) e.stopPropagation();
             e.preventDefault();
@@ -527,11 +544,13 @@
             }
             const draggedOrderIndex = parseInt(draggedElement.dataset.orderIndex);
             const targetOrderIndex = parseInt(target.dataset.orderIndex);
+            const _before = layerOrder.slice(); // D6
             // Simple reordering: remove from old position, insert at target position
             const [draggedItem] = layerOrder.splice(draggedOrderIndex, 1);
             layerOrder.splice(targetOrderIndex, 0, draggedItem);
             endDragUX(); // dragend may not fire on the detached source node
             renderLayers();
+            _recordReorderUndo(_before); // D6
             target.classList.remove('drag-over');
             return false;
         }
@@ -556,6 +575,7 @@
             e.preventDefault();
             const dropPosition = this.dataset.dropPosition;
             const draggedOrderIndex = parseInt(draggedElement.dataset.orderIndex);
+            const _before = layerOrder.slice(); // D6
             // Remove from current position
             const [draggedItem] = layerOrder.splice(draggedOrderIndex, 1);
             if (dropPosition === 'top') {
@@ -567,6 +587,7 @@
             }
             endDragUX(); // dragend may not fire on the detached source node
             renderLayers();
+            _recordReorderUndo(_before); // D6
             this.classList.remove('drag-over');
             return false;
         }

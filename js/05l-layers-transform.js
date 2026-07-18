@@ -21,7 +21,74 @@
                 renderLayers();
             }
         };
+        // ── D6: layer-ops undo history (reorder + delete), a provider for the
+        // unified UndoManager. Records reversible closures stamped with a global
+        // seq so Ctrl+Z picks the most-recent action across sketch / UI / layers.
+        window.__layerHistory = (function () {
+            const past = [], future = [], LIMIT = 60;
+            let _applying = false;
+            function push(entry) {
+                if (_applying) return; // don't record ops caused by an undo/redo
+                entry.seq = (window.__undoSeq = (window.__undoSeq | 0) + 1);
+                past.push(entry);
+                if (past.length > LIMIT) past.shift();
+                future.length = 0;
+            }
+            function undo() {
+                if (!past.length) return;
+                const e = past.pop(); _applying = true;
+                try { e.undo(); } catch (err) { console.warn('[undo] layer undo failed', err); }
+                _applying = false; future.push(e);
+            }
+            function redo() {
+                if (!future.length) return;
+                const e = future.pop(); _applying = true;
+                try { e.redo(); } catch (err) { console.warn('[undo] layer redo failed', err); }
+                _applying = false; past.push(e);
+            }
+            return {
+                push: push, undo: undo, redo: redo,
+                clear: function () { past.length = 0; future.length = 0; },
+                isApplying: function () { return _applying; },
+                canUndo: function () { return past.length > 0; },
+                canRedo: function () { return future.length > 0; },
+                topUndoSeq: function () { return past.length ? past[past.length - 1].seq : -Infinity; },
+                topRedoSeq: function () { return future.length ? future[future.length - 1].seq : Infinity; }
+            };
+        })();
+        // Re-insert a deleted layer object at its old order slot and rebuild its
+        // backing surface (raster FBO via reconcile / image + collision div).
+        function __restoreDeletedLayer(removed, orderIdx, orderEntry) {
+            if (!removed) return;
+            if (!window.layers.some(l => l.index === removed.index)) window.layers.push(removed);
+            if (!window.layerOrder.some(it => it.type === 'layer' && it.id === removed.index)) {
+                const at = Math.max(0, Math.min(orderIdx < 0 ? window.layerOrder.length : orderIdx, window.layerOrder.length));
+                window.layerOrder.splice(at, 0, orderEntry || { type: 'layer', id: removed.index });
+            }
+            removed.__maskDirty = true;
+            const div = document.getElementById('layer' + removed.index);
+            if (removed.isRaster) {
+                if (window.rasterLayers && window.rasterLayers.reconcile) window.rasterLayers.reconcile();
+            } else if (div) {
+                const src = removed.data || removed.originalData;
+                if (src) div.style.backgroundImage = 'url(' + src + ')';
+                div.style.display = removed.visible === false ? 'none' : 'block';
+                if (removed.isCollision) { div.style.backgroundSize = '100% 100%'; div.style.opacity = '0.55'; }
+            }
+            if (typeof renderLayers === 'function') renderLayers();
+            if (removed.isCollision && window.collisionLayers && window.collisionLayers.updateObstacleFromLayers) window.collisionLayers.updateObstacleFromLayers();
+            if (typeof window.reapplyImageLayerClips === 'function') window.reapplyImageLayerClips();
+        }
         window.deleteLayer = (index) => {
+            // D6: snapshot for undo BEFORE anything is freed
+            const _removed = layers.find(l => l.index === index);
+            const _orderIdx = layerOrder.findIndex(item => item.type === 'layer' && item.id === index);
+            const _orderEntry = _orderIdx >= 0 ? layerOrder[_orderIdx] : { type: 'layer', id: index };
+            // flush the raster layer's live pixels into .data so the FBO can be
+            // rebuilt from it on undo (rasterLayers._onDeleted frees the buffer).
+            if (_removed && _removed.isRaster && window.rasterLayers && window.rasterLayers.syncData) {
+                try { window.rasterLayers.syncData(); } catch (e) {}
+            }
             // D2: free a raster layer's GPU buffer + history before the
             // arrays forget it existed
             if (window.rasterLayers) window.rasterLayers._onDeleted(index);
@@ -43,6 +110,14 @@
             window.layerOrder = layerOrder;
             // Re-render and update z-indices
             renderLayers();
+            // D6: record the delete as undoable (skipped while applying undo/redo)
+            if (_removed && window.__layerHistory) {
+                window.__layerHistory.push({
+                    label: 'delete layer',
+                    undo: function () { __restoreDeletedLayer(_removed, _orderIdx, _orderEntry); },
+                    redo: function () { window.deleteLayer(index); }
+                });
+            }
         };
         // Image layer mask functions
         window.toggleImageLayerMask = (index) => {

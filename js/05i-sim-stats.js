@@ -333,7 +333,10 @@
         // tagged {kind:'raster'|'mask', id}; undo restores whichever surface
         // the mutation happened on.
         function _pushEntry(kind, id, srcFbo) {
-            sketchUndoStack.push({ snap: takeSketchSnapshot(srcFbo), kind: kind, id: id });
+            // D6: stamp a global monotonic seq so the unified UndoManager can
+            // undo the most-recent action across sketch / UI / layer histories.
+            const seq = (window.__undoSeq = (window.__undoSeq | 0) + 1);
+            sketchUndoStack.push({ snap: takeSketchSnapshot(srcFbo), kind: kind, id: id, seq: seq });
             if (sketchUndoStack.length > SKETCH_UNDO_DEPTH) sketchSnapPool.push(sketchUndoStack.shift().snap);
             while (sketchRedoStack.length) sketchSnapPool.push(sketchRedoStack.pop().snap);
         }
@@ -353,7 +356,7 @@
                 const entry = fromStack.pop();
                 const target = _targetFboFor(entry.kind, entry.id);
                 if (!target) { sketchSnapPool.push(entry.snap); continue; } // surface deleted — skip entry
-                toStack.push({ snap: takeSketchSnapshot(target), kind: entry.kind, id: entry.id });
+                toStack.push({ snap: takeSketchSnapshot(target), kind: entry.kind, id: entry.id, seq: entry.seq });
                 copySketchTex(entry.snap.texture, target.fbo, dyeTexWidth, dyeTexHeight);
                 sketchSnapPool.push(entry.snap);
                 if (entry.kind === 'mask') notifyMaskMutated(entry.id);
@@ -376,6 +379,15 @@
         };
         window.__sketchUndoDepths = function () {
             return { undo: sketchUndoStack.length, redo: sketchRedoStack.length, pool: sketchSnapPool.length };
+        };
+        // D6: provider for the unified UndoManager (recency-ordered by seq).
+        window.__sketchUndoProvider = {
+            canUndo: function () { return sketchUndoStack.length > 0; },
+            canRedo: function () { return sketchRedoStack.length > 0; },
+            topUndoSeq: function () { return sketchUndoStack.length ? sketchUndoStack[sketchUndoStack.length - 1].seq : -Infinity; },
+            topRedoSeq: function () { return sketchRedoStack.length ? sketchRedoStack[sketchRedoStack.length - 1].seq : Infinity; },
+            undo: function () { window.__sketchUndo(); },
+            redo: function () { window.__sketchRedo(); }
         };
         let lastTime = performance.now();
         let lastDrawTimeMs = 0;
