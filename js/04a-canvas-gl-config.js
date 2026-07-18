@@ -328,6 +328,13 @@
                                       // Straight dye edges have zero Laplacian — moving
                                       // fronts keep their crispness. 0 = off.
 
+            DEBAND: 0.0,              // De-band / "organic" taper (2026-07-18): softens the
+                                      // MacCormack anti-diffusion where dye is BOTH hard-edged
+                                      // and moving fast (the terrace cliffs of no-curl acrylic
+                                      // flow — with curl the turbulence revert already blurs
+                                      // them). 0 = off / bit-exact. ~0.3-0.6 = organic. See
+                                      // macCorrectFrag in 05b. Console-tunable; slider TBD.
+
             VEL_SOURCE_GATE: true,    // M1 (2026-07-17): taper the energy SOURCES (growth
                                       // amplification + vorticity confinement) to neutral as
                                       // speed approaches VELOCITY_CAP, so pockets settle below

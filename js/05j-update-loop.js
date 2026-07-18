@@ -528,6 +528,8 @@
                     gl.uniform1i(macCorrectProg.uniforms.uSource, 1);
                     gl.uniform1i(macCorrectProg.uniforms.uForward, 2);
                     gl.uniform1i(macCorrectProg.uniforms.uObstacle, 3);
+                    // De-band taper (organic no-curl fix — see macCorrectFrag)
+                    gl.uniform1f(macCorrectProg.uniforms.deband, config.DEBAND || 0.0);
                     gl.activeTexture(gl.TEXTURE2);
                     gl.bindTexture(gl.TEXTURE_2D, sharpened.texture);
                     if (obsActive) {

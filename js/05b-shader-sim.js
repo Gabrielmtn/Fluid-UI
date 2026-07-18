@@ -624,6 +624,7 @@
             uniform vec2 srcTexelSize;   // dye-grid texel
             uniform float dt;
             uniform int hasObstacle;
+            uniform float deband;        // 0 = off (bit-exact); >0 softens fast-moving dye cliffs
             ${swirlGLSL}
             ${obstacleSolidityGLSL}
             void main() {
@@ -671,6 +672,20 @@
                 vec4 mn = min(min(t00, t10), min(t01, t11));
                 vec4 mx = max(max(t00, t10), max(t01, t11));
                 corrected = clamp(corrected, mn, mx);
+                // De-band ("organic") taper: where dye is BOTH hard-edged and
+                // moving fast, MacCormack's anti-diffusion razors smooth shear
+                // into 1-2 texel cliffs → terraces. Worst with no curl, where
+                // the turbulence revert above never fires (smooth velocity =
+                // low relative-HF). Blend back toward plain diffusive semi-
+                // Lagrangian (fwd) ∝ local dye contrast × transport speed.
+                // Static edges (fastMove≈0) and soft gradients (dyeContrast≈0)
+                // are untouched; deband=0 is a bit-exact no-op.
+                if (deband > 0.0) {
+                    float dyeContrast = length((mx - mn).rgb);
+                    float fastMove = smoothstep(2.0, 10.0, length(disp / srcTexelSize));
+                    float db = smoothstep(0.15, 0.5, dyeContrast) * fastMove * deband;
+                    corrected = mix(corrected, fwd, db);
+                }
                 fragColor = mix(corrected, fwd, revert);
             }
         `;
