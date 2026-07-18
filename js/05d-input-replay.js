@@ -367,8 +367,9 @@
                 // Begin stroke recording and include initial splat
                 startStroke(pointer.x, pointer.y);
                 pushStrokeEvent(pointer.x, pointer.y, 0, 0, pointer.color);
-                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
                 const inMult = getSplatInMult();
+                window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
                 multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
             }
             // D1 brush engine: stroke movement is emitted as spaced dabs by
@@ -660,8 +661,9 @@
             if (_sketchTargetT) {
                 if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
             } else {
-                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
                 const inMult = getSplatInMult();
+                window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
                 multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
             }
             // D1 brush engine (see mousedown note); touch force where present

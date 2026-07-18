@@ -168,7 +168,11 @@
                             * ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1);
                         const col = flowMul === 1 ? pointer.color
                             : [pointer.color[0] * flowMul, pointer.color[1] * flowMul, pointer.color[2] * flowMul];
-                        multiSplatWithRadius(d.x, d.y, d.dx, d.dy, col, config.SPLAT_RADIUS * inMult * sizeMul);
+                        // Publish the true painted radius so recording captures
+                        // the actual (ramp- + pressure-modulated) brush size,
+                        // not the base — see recRecordInteraction.
+                        window.__lastPaintRadius = config.SPLAT_RADIUS * inMult * sizeMul;
+                        multiSplatWithRadius(d.x, d.y, d.dx, d.dy, col, window.__lastPaintRadius);
                         pushStrokeEvent(d.x, d.y, d.dx, d.dy, col);
                     }
                     pointer.moved = false;
@@ -181,6 +185,7 @@
                     const inMult = getSplatInMult();
                     const savedR = config.SPLAT_RADIUS;
                     config.SPLAT_RADIUS = savedR * inMult;
+                    window.__lastPaintRadius = savedR * inMult; // recording captures the true painted size
                     multiSplat(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color, false);
                     config.SPLAT_RADIUS = savedR;
                     pushStrokeEvent(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);

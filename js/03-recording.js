@@ -289,7 +289,15 @@
                 return;
             }
             const mult = (typeof window.animationMultiplier === 'number') ? window.animationMultiplier : 1;
-            const radius = (window.config && typeof window.config.SPLAT_RADIUS === 'number') ? window.config.SPLAT_RADIUS : undefined;
+            // Capture the EFFECTIVE brush size actually painted, not just the
+            // base SPLAT_RADIUS: the brush engine tapers each dab by the
+            // splat-in ramp (and pen pressure), so storing the base made replay
+            // uniformly full-size while the live stroke ramped in — the "replay
+            // size ≠ recording size" bug. The paint path publishes the true
+            // per-dab radius to window.__lastPaintRadius; fall back to the base.
+            const radius = (typeof window.__lastPaintRadius === 'number' && window.__lastPaintRadius > 0)
+                ? window.__lastPaintRadius
+                : ((window.config && typeof window.config.SPLAT_RADIUS === 'number') ? window.config.SPLAT_RADIUS : undefined);
             const interaction = { timestamp, x: x / canvas.width, y: y / canvas.height, vx: dx, vy: dy, color: colorArray.slice(), mult, radius };
             a.timeline.interactions.push(interaction);
             // PERF: During recording, skip ALL UI updates - just record data
