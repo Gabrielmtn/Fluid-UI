@@ -763,18 +763,22 @@
         if (document.getElementById('quality-underbar')) return;
         const bar = document.createElement('div');
         bar.id = 'quality-underbar';
-        bar.title = 'Rendering quality — Visual Quality (display resolution) and Physics Detail (sim resolution)';
-        // Titled header gives it a "window" identity and an anchor for the
-        // controls we'll keep adding to this dock over time.
-        const header = document.createElement('div');
-        header.className = 'qub-header';
-        header.innerHTML = '<span class="qub-dot"></span><span class="qub-title">Quality</span>';
-        bar.appendChild(header);
-        const body = document.createElement('div');
-        body.className = 'qub-body';
-        bar.appendChild(body);
-        moveControlGroup('visualResolution', body);
-        moveControlGroup('physicsResolution', body);
+        // Minimalist (After Effects): no external labels — just the compact
+        // dropdowns; context comes from the value + hover title, and from an
+        // <optgroup> label that sits ABOVE the options when the list opens
+        // (Chromium flips the list upward here since we're at the bottom edge).
+        [['visualResolution', 'Visual Quality'], ['physicsResolution', 'Physics Detail']].forEach(function (pair) {
+            const sel = document.getElementById(pair[0]);
+            if (!sel) return;
+            if (!sel.querySelector('optgroup')) {
+                const og = document.createElement('optgroup');
+                og.label = pair[1];
+                while (sel.firstChild) og.appendChild(sel.firstChild);
+                sel.appendChild(og);
+            }
+            sel.title = pair[1];
+            bar.appendChild(sel); // move just the <select>, drop its external <label>
+        });
         // Docked bottom-left via CSS (fixed) — no JS positioning needed.
         document.body.appendChild(bar);
     }
