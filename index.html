@@ -481,13 +481,13 @@
             </div>
             <div class="control-group" style="margin-bottom: 8px;">
                 <label style="font-size: 12px; margin-bottom: 4px;">Blend Mode</label>
-                <select id="lightShiftMode" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,150,100,0.3); color: white; border-radius: 4px;">
-                    <option value="replace">Replace</option>
-                    <option value="tint">Tint</option>
-                    <option value="overlay">Overlay</option>
-                    <option value="multiply">Multiply</option>
-                    <option value="screen">Screen</option>
-                    <option value="add">Additive</option>
+                <select id="lightShiftMode" title="How the shift color is applied to overblown/white areas" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,150,100,0.3); color: white; border-radius: 4px;">
+                    <option value="replace" title="Replaces overblown/white areas with the shift color.">Replace</option>
+                    <option value="tint" title="Tints bright areas with the color while keeping their brightness.">Tint</option>
+                    <option value="overlay" title="Contrast-blends the color into bright areas (Photoshop Overlay).">Overlay</option>
+                    <option value="multiply" title="Darkens bright areas toward the color.">Multiply</option>
+                    <option value="screen" title="Lightens bright areas toward the color — good for glows.">Screen</option>
+                    <option value="add" title="Adds the color to bright areas for a glowing bloom.">Additive</option>
                 </select>
             </div>
             <div class="control-group">

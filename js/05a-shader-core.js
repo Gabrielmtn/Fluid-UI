@@ -1,11 +1,11 @@
-// ═══════════════════════════════════════════════════════════════════
-// js/05a-shader-core.js — part 1/14 of former 05-fluid-sim.js (lines 1–653)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// js/05a-shader-core.js â€” part 1/14 of former 05-fluid-sim.js (lines 1â€“653)
 // LOAD ORDER: after 04-ui-interactions.js (async loader), before 05b-shader-sim.js
 // PROVIDES: compileShader, Program, PRECISION, baseVert/blur/display/sharpen/microDetail/lighting/lightShift frag sources
 // REQUIRES: gl (04)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
-//   Correctness comes from preserved source order — do not reorder.
-// ═══════════════════════════════════════════════════════════════════
+//   Correctness comes from preserved source order â€” do not reorder.
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         function compileShader(type, source) {
             const shader = gl.createShader(type);
             gl.shaderSource(shader, source);
@@ -108,7 +108,7 @@
             uniform vec4 uRasterP2;
             uniform vec4 uRasterP3;
             // D3: active mask shown as a red film while painting into it
-            // (UI affordance only — never part of the exported content,
+            // (UI affordance only â€” never part of the exported content,
             // which is why it composites after everything else)
             uniform sampler2D uMaskOverlay;
             uniform float maskOverlayOn;
@@ -138,7 +138,24 @@
             uniform float shadeInvert;    // 1 = flip relief normals (clay chiaroscuro: strokes read as carved dents)
             uniform float gateVibrance;   // 1 = Gate on: re-add the saturation the Reinhard tone-map strips from HDR dye
             uniform vec2 texelSize;
+            // â”€â”€ Light Shift (unified, 2026-07-18) â”€â”€
+            // ONE implementation, run here at the END of display â€” on the
+            // actually-displayed (post tone-map / vibrance / shading) color â€”
+            // so "overblown white" means the white you SEE, identically whether
+            // Lighting is on or off. Replaces the two divergent versions that
+            // used to run pre-tone-map in the lighting/standalone passes.
+            uniform float lightShiftEnabled;   // >0.5 = on
+            uniform vec3  lightShiftColor;
+            uniform float lightShiftThreshold; // 0-1 on displayed brightness
+            uniform float lightShiftIntensity;
+            uniform int   lightShiftMode;      // 0=replace,1=tint,2=overlay,3=multiply,4=screen,5=add
             const float PI = 3.141592653589793;
+            vec3 lsOverlay(vec3 b, vec3 s) {
+                return vec3(
+                    b.r < 0.5 ? 2.0*b.r*s.r : 1.0 - 2.0*(1.0-b.r)*(1.0-s.r),
+                    b.g < 0.5 ? 2.0*b.g*s.g : 1.0 - 2.0*(1.0-b.g)*(1.0-s.g),
+                    b.b < 0.5 ? 2.0*b.b*s.b : 1.0 - 2.0*(1.0-b.b)*(1.0-s.b));
+            }
             // Mode 1: Wedge - Facets create angular reflections
             vec2 kaleidoWedge(vec2 uv) {
                 vec2 center = vec2(0.5);
@@ -205,7 +222,7 @@
             // D2: fold one slot into the composite. Below-fluid slots
             // accumulate into 'under' (plain premult over among themselves);
             // the first above-fluid slot first merges 'under' beneath the
-            // fluid (fluid coverage = tone-mapped intensity — under-layers
+            // fluid (fluid coverage = tone-mapped intensity â€” under-layers
             // show where the dye is dark), then blends itself on top.
             void rasterSlot(vec4 rs, vec4 p, inout vec3 col, inout vec4 under, inout float merged, inout float skA) {
                 if (p.w > 0.5) {
@@ -272,10 +289,10 @@
                 // Tone map HDR to displayable range (per-channel Reinhard)
                 color.rgb = color.rgb / (1.0 + color.rgb);
                 // Gate vibrance: per-channel Reinhard flattens channel ratios as
-                // dye climbs into HDR — the washed-out look near the bloom
+                // dye climbs into HDR â€” the washed-out look near the bloom
                 // ceiling. Re-widen saturation in proportion to how deep into
                 // HDR the dye sits (the richness the pre-Gate blowout showed in
-                // transit, but bounded — dye can't pass the ceiling, so neither
+                // transit, but bounded â€” dye can't pass the ceiling, so neither
                 // can the boost).
                 if (gateVibrance > 0.0) {
                     float satW = smoothstep(0.8, 2.5, hdrMax) * 0.35 * gateVibrance;
@@ -293,11 +310,11 @@
                     // paint hard lines along those steps.
                     float shadeFade = smoothstep(0.005, 0.06, centerLuma);
                     // Gradient from the blurred quarter-res form field (raw
-                    // HDR for strong gradients) — the paint-engine approach:
+                    // HDR for strong gradients) â€” the paint-engine approach:
                     // relief is lit from a smoothed height map, so pigment
                     // texel noise (fp16 grain, stir micro-laminae) physically
                     // cannot read as texture; only actual swirl forms shade.
-                    // Sobel at 1 form texel ≈ 4 dye texels; 0.0625 keeps the
+                    // Sobel at 1 form texel â‰ˆ 4 dye texels; 0.0625 keeps the
                     // same response as the original 1-texel differences on
                     // smooth ramps.
                     vec2 t2 = shadeTexelSize;
@@ -332,7 +349,7 @@
                     ao = mix(1.0, ao, displayShading * 0.6 * shadeFade);
                     // Combine lighting, normalized against a flat surface:
                     // without this, raising the intensity tilts normals away
-                    // from the fixed lights and the WHOLE image darkens — the
+                    // from the fixed lights and the WHOLE image darkens â€” the
                     // slider read as a brightness knob, not a relief knob.
                     // Dividing by the flat-normal lighting keeps flat areas at
                     // constant brightness at every intensity; only actual
@@ -340,7 +357,7 @@
                     vec3 lighting = vec3(0.35) + keyDiff * warmKey * 0.55 + fillDiff * coolFill * 0.2;
                     vec3 lightFlat = vec3(0.35) + keyDir.z * warmKey * 0.55 + fillDir.z * coolFill * 0.2;
                     color.rgb = color.rgb * (lighting / lightFlat) * ao + spec * warmKey * 0.2 * centerLuma;
-                    // S-curve contrast, faded at low luminance — near black it
+                    // S-curve contrast, faded at low luminance â€” near black it
                     // crushes faint dye toward zero and hardens the fade edge
                     color.rgb = min(color.rgb, vec3(1.0));
                     vec3 sCurved = color.rgb * color.rgb * (3.0 - 2.0 * color.rgb);
@@ -355,10 +372,41 @@
                     float sr = texture(uSunrays, vUv).r;
                     color.rgb *= sr;
                 }
+                // â”€â”€ Light Shift â”€â”€ recolor overblown/white areas of the fluid.
+                // Keyed on the DISPLAYED color: brightness weighted by whiteness
+                // (desaturated bright = the real target), so pure white always
+                // maxes the factor and a saturated hue does not read as "white".
+                if (lightShiftEnabled > 0.5) {
+                    float lsMaxC = max(color.r, max(color.g, color.b));
+                    float lsMinC = min(color.r, min(color.g, color.b));
+                    float lsSat = lsMaxC > 0.001 ? (lsMaxC - lsMinC) / lsMaxC : 0.0;
+                    float lsLum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                    float lsOver = max(lsLum, lsMaxC) * (1.0 - 0.6 * lsSat);
+                    if (lsOver > lightShiftThreshold) {
+                        float lt = clamp((lsOver - lightShiftThreshold) / (1.0 - lightShiftThreshold + 0.001), 0.0, 1.0);
+                        lt = lt * lt * (3.0 - 2.0 * lt);
+                        float amt = lt * lightShiftIntensity;
+                        vec3 c = color.rgb, b = lightShiftColor, res;
+                        if (lightShiftMode == 0) {        // Replace
+                            res = mix(c, b * (0.6 + lsLum * 0.4), amt);
+                        } else if (lightShiftMode == 1) { // Tint (preserve luminance)
+                            res = mix(c, b * lsLum, amt);
+                        } else if (lightShiftMode == 2) { // Overlay
+                            res = mix(c, lsOverlay(c, b), amt);
+                        } else if (lightShiftMode == 3) { // Multiply
+                            res = mix(c, c * b, amt);
+                        } else if (lightShiftMode == 4) { // Screen
+                            res = mix(c, 1.0 - (1.0 - c) * (1.0 - b), amt);
+                        } else {                          // Add
+                            res = c + b * amt;
+                        }
+                        color.rgb = clamp(res, 0.0, 1.0);
+                    }
+                }
                 // D2 raster layer stack: paint layers composited around the
                 // fluid, AFTER tone-map/shading/sunrays (fluid effects never
                 // touch them) and sampled at RAW vUv (kaleido never warps
-                // them — a sketch stays where you drew it). Unrolled ×4:
+                // them â€” a sketch stays where you drew it). Unrolled Ã—4:
                 // GLSL ES 3.0 forbids dynamically-indexed sampler arrays.
                 float skA = 0.0;
                 vec4 under = vec4(0.0);
@@ -384,7 +432,7 @@
                     if (uRasterC3.x > 0.5) { float m3 = texture(uRasterM3, vUv).a; rs3 *= (uRasterC3.y > 0.5) ? 1.0 - m3 : m3; }
                     rasterSlot(rs3, uRasterP3, cc, under, underMerged, skA);
                 }
-                // every slot was below the fluid — merge the accumulated
+                // every slot was below the fluid â€” merge the accumulated
                 // under-stack beneath the dye now
                 if (under.a > 0.0 && underMerged < 0.5) {
                     float fA = min(1.0, max(max(cc.r, cc.g), cc.b));
@@ -397,10 +445,10 @@
                     float mcov = texture(uMaskOverlay, vUv).a;
                     color.rgb = mix(color.rgb, vec3(1.0, 0.25, 0.2), mcov * 0.45);
                 }
-                // ±0.5 LSB hash dither before the 8-bit store: smooth slow
+                // Â±0.5 LSB hash dither before the 8-bit store: smooth slow
                 // gradients otherwise quantize into visible contour bands that
                 // crawl as the field decays (the S-curve and saturation boost
-                // in the shading pass steepen them further). Static pattern —
+                // in the shading pass steepen them further). Static pattern â€”
                 // temporal dither would shimmer.
                 float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
                 color.rgb = max(color.rgb + dn * (1.0 / 255.0), 0.0);
@@ -408,7 +456,7 @@
                 if (preserveOpacity > 0.5) {
                     // Preserve fluid opacity - make alpha proportional to color intensity
                     // backgroundTransparency controls how transparent the black areas become
-                    // (sketch coverage counts as content — dark sketch strokes
+                    // (sketch coverage counts as content â€” dark sketch strokes
                     // must not go transparent in layer mode)
                     float alpha = mix(1.0, max(intensity, skA), backgroundTransparency);
                     fragColor = vec4(color.rgb, alpha);
@@ -470,7 +518,7 @@
                 fragColor = vec4(sharpened, 1.0);
             }
         `;
-        // ─── Micro Detail Pass ─────────────────────────────────────
+        // â”€â”€â”€ Micro Detail Pass â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Clarity + Vibrance only. Keeps fluid texture sharp through
         // TikTok / H.264 encoding without color artifacts.
         const microDetailFrag = `#version 300 es
@@ -480,8 +528,8 @@
             uniform sampler2D uTexture;
             uniform sampler2D uVelocity;
             uniform vec2 texelSize;
-            uniform float clarity;    // 0–1: local contrast boost
-            uniform float vibrance;   // 0–1: selective saturation
+            uniform float clarity;    // 0â€“1: local contrast boost
+            uniform float vibrance;   // 0â€“1: selective saturation
             uniform float kernelScale; // 2048-reference normalization (same
                                        // principle as sharpen): resolution
                                        // changes must not change the look
@@ -490,7 +538,7 @@
                 vec3 lumaW = vec3(0.299, 0.587, 0.114);
                 float centerLuma = dot(center, lumaW);
                 // Early exit only for truly black pixels; the effect fades in
-                // smoothly above that (same fix as the sharpen pass — a hard
+                // smoothly above that (same fix as the sharpen pass â€” a hard
                 // cutoff draws a jagged seam through fading dye).
                 if (centerLuma < 0.001) {
                     fragColor = vec4(center, 1.0);
@@ -498,7 +546,7 @@
                 }
                 float lowFade = smoothstep(0.003, 0.03, centerLuma);
                 vec3 result = center;
-                // ── Clarity — Wide-kernel unsharp mask ──
+                // â”€â”€ Clarity â€” Wide-kernel unsharp mask â”€â”€
                 // Same proven additive approach as the sharpening pass
                 // but with a wider 2-ring kernel for mid-frequency contrast.
                 if (clarity > 0.0) {
@@ -522,7 +570,7 @@
                     // Extract detail and apply (same as sharpening pass)
                     vec3 detail = center - blur;
                     // Bound the swing to the local luminance so faint dye is
-                    // never more than ~doubled — unbounded, fp16 quantization
+                    // never more than ~doubled â€” unbounded, fp16 quantization
                     // steps in fading dye amplify into hard speckle and lines.
                     detail = clamp(detail, vec3(-centerLuma), vec3(centerLuma));
                     // Velocity-adaptive strength, faded out at low luminance
@@ -533,7 +581,7 @@
                     vec3 maxVal = max(center * 2.0, vec3(1.0));
                     result = clamp(result, vec3(0.0), maxVal);
                 }
-                // ── Vibrance — RGB-space selective saturation ──
+                // â”€â”€ Vibrance â€” RGB-space selective saturation â”€â”€
                 if (vibrance > 0.0) {
                     float gray = dot(result, lumaW);
                     float maxC = max(result.r, max(result.g, result.b));
@@ -556,12 +604,7 @@
             uniform float intensity;
             uniform float ambient;
             uniform vec2 texelSize;
-            // Light Shift uniforms
-            uniform bool lightShiftEnabled;
-            uniform vec3 lightShiftColor;
-            uniform float lightShiftThreshold;
-            uniform float lightShiftIntensity;
-            uniform int lightShiftMode; // 0=replace, 1=tint, 2=overlay, 3=multiply, 4=screen, 5=add
+            // Light Shift moved to the unified pass in displayFrag (2026-07-18)
             // Calculate very subtle pseudo-normal from color gradients
             vec3 calculateNormal(vec2 uv) {
                 float left = dot(texture(uTexture, vL).rgb, vec3(0.299, 0.587, 0.114));
@@ -594,7 +637,7 @@
                 // === DIFFUSE LIGHTING (main effect) ===
                 vec3 normal = calculateNormal(vUv);
                 vec3 lightDir3D = normalize(vec3(lightDir.x, lightDir.y, 0.5));
-                // Lambertian diffuse (N · L) - this is the key lighting term
+                // Lambertian diffuse (N Â· L) - this is the key lighting term
                 float diffuse = max(0.0, dot(normal, lightDir3D));
                 diffuse = mix(1.0, diffuse, 0.5); // More directional influence
                 // === COMBINE LIGHTING ===
@@ -621,169 +664,7 @@
                 litColor += vec3(specular) * 0.5;
                 // Soft clamp
                 litColor = min(litColor, vec3(1.2));
-                // === LIGHT SHIFT (color overexposure) ===
-                if (lightShiftEnabled) {
-                    // Calculate brightness of lit color
-                    float litBrightness = dot(litColor, vec3(0.299, 0.587, 0.114));
-                    // If brightness exceeds threshold, apply color shift
-                    if (litBrightness > lightShiftThreshold) {
-                        // Calculate how much over the threshold we are (0-1)
-                        float overexposure = (litBrightness - lightShiftThreshold) / (1.2 - lightShiftThreshold);
-                        overexposure = clamp(overexposure, 0.0, 1.0);
-                        float shiftAmount = overexposure * lightShiftIntensity;
-                        vec3 shiftedColor;
-                        // Apply different blend modes
-                        if (lightShiftMode == 0) {
-                            // Replace: Direct color replacement
-                            shiftedColor = mix(litColor, lightShiftColor * litBrightness, shiftAmount);
-                        } else if (lightShiftMode == 1) {
-                            // Tint: Preserve luminance, shift hue
-                            shiftedColor = mix(litColor, lightShiftColor * litBrightness * 0.8 + litColor * 0.2, shiftAmount);
-                        } else if (lightShiftMode == 2) {
-                            // Overlay: Photoshop-style overlay blend
-                            vec3 overlay;
-                            for (int i = 0; i < 3; i++) {
-                                if (litColor[i] < 0.5) {
-                                    overlay[i] = 2.0 * litColor[i] * lightShiftColor[i];
-                                } else {
-                                    overlay[i] = 1.0 - 2.0 * (1.0 - litColor[i]) * (1.0 - lightShiftColor[i]);
-                                }
-                            }
-                            shiftedColor = mix(litColor, overlay, shiftAmount);
-                        } else if (lightShiftMode == 3) {
-                            // Multiply: Darken with color
-                            shiftedColor = mix(litColor, litColor * lightShiftColor, shiftAmount);
-                        } else if (lightShiftMode == 4) {
-                            // Screen: Lighten with color
-                            vec3 screen = vec3(1.0) - (vec3(1.0) - litColor) * (vec3(1.0) - lightShiftColor);
-                            shiftedColor = mix(litColor, screen, shiftAmount);
-                        } else {
-                            // Add: Additive blend
-                            shiftedColor = mix(litColor, litColor + lightShiftColor * shiftAmount, shiftAmount);
-                        }
-                        litColor = shiftedColor;
-                    }
-                }
+                // (Light Shift now runs once in displayFrag, on the displayed color)
                 fragColor = vec4(litColor, color.a);
-            }
-        `;
-        // Standalone Light Shift shader (works without lighting
-        // Applies color to overexposed/bright areas above threshold
-        const lightShiftFrag = `#version 300 es
-            precision ${PRECISION} float;
-            in vec2 vUv;
-            out vec4 fragColor;
-            uniform sampler2D uTexture;
-            uniform vec3 lightShiftColor;
-            uniform float lightShiftThreshold;
-            uniform float lightShiftIntensity;
-            uniform int lightShiftMode; // 0=replace, 1=tint, 2=overlay, 3=multiply, 4=screen, 5=add
-            // Standard blend mode functions
-            vec3 blendMultiply(vec3 base, vec3 blend) {
-                return base * blend;
-            }
-            vec3 blendScreen(vec3 base, vec3 blend) {
-                return 1.0 - (1.0 - base) * (1.0 - blend);
-            }
-            vec3 blendOverlay(vec3 base, vec3 blend) {
-                vec3 result;
-                result.r = base.r < 0.5 ? (2.0 * base.r * blend.r) : (1.0 - 2.0 * (1.0 - base.r) * (1.0 - blend.r));
-                result.g = base.g < 0.5 ? (2.0 * base.g * blend.g) : (1.0 - 2.0 * (1.0 - base.g) * (1.0 - blend.g));
-                result.b = base.b < 0.5 ? (2.0 * base.b * blend.b) : (1.0 - 2.0 * (1.0 - base.b) * (1.0 - blend.b));
-                return result;
-            }
-            vec3 blendSoftLight(vec3 base, vec3 blend) {
-                vec3 result;
-                result.r = blend.r < 0.5 ? (2.0 * base.r * blend.r + base.r * base.r * (1.0 - 2.0 * blend.r)) : (sqrt(base.r) * (2.0 * blend.r - 1.0) + 2.0 * base.r * (1.0 - blend.r));
-                result.g = blend.g < 0.5 ? (2.0 * base.g * blend.g + base.g * base.g * (1.0 - 2.0 * blend.g)) : (sqrt(base.g) * (2.0 * blend.g - 1.0) + 2.0 * base.g * (1.0 - blend.g));
-                result.b = blend.b < 0.5 ? (2.0 * base.b * blend.b + base.b * base.b * (1.0 - 2.0 * blend.b)) : (sqrt(base.b) * (2.0 * blend.b - 1.0) + 2.0 * base.b * (1.0 - blend.b));
-                return result;
-            }
-            vec3 blendAdd(vec3 base, vec3 blend) {
-                return min(base + blend, 1.0);
-            }
-            void main() {
-                vec4 color = texture(uTexture, vUv);
-                // Skip fully transparent pixels
-                if (color.a < 0.01) {
-                    fragColor = color;
-                    return;
-                }
-                // Multiple methods to detect "overblown" / bright areas:
-                // 1. Luminance (perceived brightness)
-                float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-                // 2. Max channel (catches saturated bright colors)
-                float maxChannel = max(max(color.r, color.g), color.b);
-                // 3. Average (simple brightness)
-                float avgBrightness = (color.r + color.g + color.b) / 3.0;
-                // 4. "Clipping" detection - how close channels are to 1.0
-                //    This catches areas that WOULD be overblown if not clamped
-                float clipR = smoothstep(0.9, 1.0, color.r);
-                float clipG = smoothstep(0.9, 1.0, color.g);
-                float clipB = smoothstep(0.9, 1.0, color.b);
-                float clipping = max(max(clipR, clipG), clipB);
-                // 5. Saturation loss detection - white areas have low saturation
-                float minChannel = min(min(color.r, color.g), color.b);
-                float saturation = maxChannel > 0.001 ? (maxChannel - minChannel) / maxChannel : 0.0;
-                float desaturated = 1.0 - saturation; // High when approaching white
-                // Combine detection methods:
-                // - Use max of luminance and maxChannel for general brightness
-                // - Weight by clipping detection for near-white areas
-                // - Consider desaturation (white = bright + desaturated)
-                float brightness = max(luminance, maxChannel);
-                // Boost detection for desaturated bright areas (actual white/overblown)
-                float overblownFactor = brightness;
-                if (brightness > 0.7 && desaturated > 0.5) {
-                    // This is likely an overblown area - boost the factor
-                    overblownFactor = mix(brightness, 1.0, desaturated * 0.5);
-                }
-                // Also consider clipping
-                overblownFactor = max(overblownFactor, clipping * 0.9 + brightness * 0.1);
-                // Check against threshold
-                if (overblownFactor > lightShiftThreshold) {
-                    // Calculate blend strength - how far above threshold
-                    float t = (overblownFactor - lightShiftThreshold) / (1.0 - lightShiftThreshold + 0.001);
-                    t = clamp(t, 0.0, 1.0);
-                    // Smooth transition
-                    t = t * t * (3.0 - 2.0 * t); // smoothstep curve
-                    // Final blend amount
-                    float blendAmount = t * lightShiftIntensity;
-                    // For very bright/white areas, increase the effect
-                    if (desaturated > 0.7 && brightness > 0.85) {
-                        blendAmount = min(blendAmount * 1.5, 1.0);
-                    }
-                    vec3 blendedColor;
-                    if (lightShiftMode == 0) {
-                        // Replace: Direct color replacement in bright areas
-                        // Scale shift color by brightness to maintain some variation
-                        float brightnessScale = 0.7 + luminance * 0.5;
-                        blendedColor = mix(color.rgb, lightShiftColor * brightnessScale, blendAmount);
-                    } else if (lightShiftMode == 1) {
-                        // Tint: Colorize while preserving luminance structure
-                        vec3 tinted = lightShiftColor * luminance;
-                        blendedColor = mix(color.rgb, tinted, blendAmount);
-                    } else if (lightShiftMode == 2) {
-                        // Overlay: Standard Photoshop overlay blend
-                        vec3 overlayed = blendOverlay(color.rgb, lightShiftColor);
-                        blendedColor = mix(color.rgb, overlayed, blendAmount);
-                    } else if (lightShiftMode == 3) {
-                        // Multiply: Darkens and colorizes
-                        vec3 multiplied = blendMultiply(color.rgb, lightShiftColor);
-                        blendedColor = mix(color.rgb, multiplied, blendAmount);
-                    } else if (lightShiftMode == 4) {
-                        // Screen: Lightens and colorizes (good for glows)
-                        vec3 screened = blendScreen(color.rgb, lightShiftColor);
-                        blendedColor = mix(color.rgb, screened, blendAmount);
-                    } else {
-                        // Add: Additive glow effect
-                        vec3 added = blendAdd(color.rgb, lightShiftColor * blendAmount);
-                        blendedColor = added;
-                    }
-                    // Clamp to valid range
-                    fragColor = vec4(clamp(blendedColor, 0.0, 1.0), color.a);
-                } else {
-                    // Below threshold, pass through unchanged
-                    fragColor = color;
-                }
             }
         `;

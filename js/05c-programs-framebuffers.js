@@ -10,7 +10,6 @@
         const sharpenProg = new Program(baseVert, sharpenFrag);
         const microDetailProg = new Program(baseVert, microDetailFrag);
         const lightingProg = new Program(baseVert, lightingFrag);
-        const lightShiftProg = new Program(baseVert, lightShiftFrag);
         const splatProg = new Program(baseVert, splatFrag);
         const advectionProg = new Program(baseVert, advectionFrag);
         const macAdvectProg = new Program(baseVert, macAdvectFrag);
@@ -73,7 +72,7 @@
                 swap() { [fbo1, fbo2] = [fbo2, fbo1]; }
             };
         }
-        let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, lightShifted, obstacle, obstacleScratch;
+        let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, obstacle, obstacleScratch;
         // D2 raster paint layers: layer index -> single RGBA8 dye-res FBO,
         // persistent (no decay/advection). Entries are created/owned by
         // window.rasterLayers (05l); declared here so initFramebuffers can
@@ -125,7 +124,7 @@
                 if (f.texture) gl.deleteTexture(f.texture);
                 if (f.fbo) gl.deleteFramebuffer(f.fbo);
             }
-            [sharpened, detailed, lit, lightShifted, divergence, curl, obstacle, obstacleScratch,
+            [sharpened, detailed, lit, divergence, curl, obstacle, obstacleScratch,
              sunrays, sunraysTemp, shadeForm, shadeFormTemp].forEach(_deleteFBO);
             _deleteFBO(mgRes0);
             if (mgLevels) mgLevels.forEach(function (l) {
@@ -182,8 +181,6 @@
             detailed = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Lighting buffer at dye resolution
             lit = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
-            // Light shift buffer at dye resolution
-            lightShifted = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Physics buffers at simulation resolution
             velocity = createDoubleFBO(simTexWidth, simTexHeight, rg.internalFormat, rg.format, texType, filter);
             divergence = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
@@ -255,7 +252,7 @@
                 velocity.read, velocity.write,
                 divergence, curl,
                 pressure.read, pressure.write,
-                sharpened, detailed, lit, lightShifted, obstacle, obstacleScratch,
+                sharpened, detailed, lit, obstacle, obstacleScratch,
                 sunrays, sunraysTemp, shadeForm, shadeFormTemp,
                 mgRes0
             ];

@@ -690,46 +690,12 @@
                 gl.uniform1f(lightingProg.uniforms.intensity, window.lightSource.intensity || 0.5);
                 gl.uniform1f(lightingProg.uniforms.ambient, window.lightSource.ambient || 0.3);
                 gl.uniform2f(lightingProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
-                // Light Shift uniforms
-                const lightShiftEnabled = window.lightShift && window.lightShift.enabled && window.lightShift.colorPath.length > 0;
-                gl.uniform1i(lightingProg.uniforms.lightShiftEnabled, lightShiftEnabled ? 1 : 0);
-                if (lightShiftEnabled) {
-                    const shiftColor = window.lightShift.getCurrentColor();
-                    gl.uniform3f(lightingProg.uniforms.lightShiftColor, shiftColor.r, shiftColor.g, shiftColor.b);
-                    gl.uniform1f(lightingProg.uniforms.lightShiftThreshold, window.lightShift.threshold || 0.85);
-                    gl.uniform1f(lightingProg.uniforms.lightShiftIntensity, window.lightShift.intensity || 0.5);
-                    // Blend mode: convert string to int
-                    const modeMap = { 'replace': 0, 'tint': 1, 'overlay': 2, 'multiply': 3, 'screen': 4, 'add': 5 };
-                    const modeInt = modeMap[window.lightShift.mode] || 0;
-                    gl.uniform1i(lightingProg.uniforms.lightShiftMode, modeInt);
-                }
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, displayTexture);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(lit.fbo);
                 displayTexture = lit.texture;
-            }
-            // If light shift is enabled but lighting is NOT, apply standalone light shift
-            else {
-                const lightShiftEnabled = window.lightShift && window.lightShift.enabled && window.lightShift.colorPath.length > 0;
-                if (lightShiftEnabled) {
-                    gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
-                    lightShiftProg.bind();
-                    gl.uniform1i(lightShiftProg.uniforms.uTexture, 0);
-                    const shiftColor = window.lightShift.getCurrentColor();
-                    gl.uniform3f(lightShiftProg.uniforms.lightShiftColor, shiftColor.r, shiftColor.g, shiftColor.b);
-                    gl.uniform1f(lightShiftProg.uniforms.lightShiftThreshold, window.lightShift.threshold || 0.85);
-                    gl.uniform1f(lightShiftProg.uniforms.lightShiftIntensity, window.lightShift.intensity || 0.5);
-                    // Blend mode: convert string to int
-                    const modeMap = { 'replace': 0, 'tint': 1, 'overlay': 2, 'multiply': 3, 'screen': 4, 'add': 5 };
-                    const modeInt = modeMap[window.lightShift.mode] || 0;
-                    gl.uniform1i(lightShiftProg.uniforms.lightShiftMode, modeInt);
-                    gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, displayTexture);
-                    blit(lightShifted.fbo);
-                    displayTexture = lightShifted.texture;
-                }
             }
             // ── Sunrays post-processing ──
             const _sunraysOn = _fxOn && !!config.SUNRAYS; // [GOVERNOR HOOK]
@@ -759,6 +725,18 @@
             gl.uniform1f(displayProg.uniforms.displayShading, window.displayShading || 0.0);
             gl.uniform1f(displayProg.uniforms.shadeInvert, window.displayShadingInvert || 0.0);
             gl.uniform1f(displayProg.uniforms.gateVibrance, (config.BLOOM_CEILING > 0) ? 1.0 : 0.0);
+            // Light Shift (unified 2026-07-18): one pass, here on the displayed
+            // color. Recolors overblown/white fluid; identical with lighting on/off.
+            const lightShiftOn = window.lightShift && window.lightShift.enabled && window.lightShift.colorPath && window.lightShift.colorPath.length > 0;
+            gl.uniform1f(displayProg.uniforms.lightShiftEnabled, lightShiftOn ? 1.0 : 0.0);
+            if (lightShiftOn) {
+                const _lsc = window.lightShift.getCurrentColor();
+                gl.uniform3f(displayProg.uniforms.lightShiftColor, _lsc.r, _lsc.g, _lsc.b);
+                gl.uniform1f(displayProg.uniforms.lightShiftThreshold, window.lightShift.threshold || 0.85);
+                gl.uniform1f(displayProg.uniforms.lightShiftIntensity, window.lightShift.intensity || 0.5);
+                const _lsModeMap = { replace: 0, tint: 1, overlay: 2, multiply: 3, screen: 4, add: 5 };
+                gl.uniform1i(displayProg.uniforms.lightShiftMode, _lsModeMap[window.lightShift.mode] || 0);
+            }
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
             gl.uniform1i(displayProg.uniforms.uSunrays, 1);
             gl.uniform1i(displayProg.uniforms.uShadeForm, 2);
