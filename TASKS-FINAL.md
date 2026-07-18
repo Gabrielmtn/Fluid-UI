@@ -32,7 +32,7 @@
 | D3-1 | **One mask editor** — consolidate mask-editor/15/16 onto the Mask object (15/16 still write `layer.mask.shapes`; ⤓ Mask import is today's bridge). | L | open | |
 | D3-2 | **Mask-level feather/threshold ops** on the Mask object itself (invert exists per-consumer; feather/band only on the collider consumer today). | M | open | |
 | D3-3 | **Clip masks for DOM image layers** (raster layers ✔; image layers still clip via 05m shapes). | M | open | |
-| D3-4 | **Mask-film export gap** — the red mask film is in the GL canvas; a video export while it's visible bakes it in. Force `maskOverlayOn=0` on export (one uniform). | S | open | |
+| D3-4 | **Mask-film export gap** — ✅ **DONE** (`pre-usertest`): export `guard()`/`finish()` set `window.__exporting`, display pass suppresses the film (covers still/video/GIF/sequence). E2E-verified. | S | done | |
 
 ---
 
