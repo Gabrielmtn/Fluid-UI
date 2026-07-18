@@ -40,7 +40,7 @@
 
 | ID | Task | Size | Status | Prio |
 |----|------|:----:|:------:|:----:|
-| D6-1 | **One history stack** across stroke, layer, mask, binding ops (today: sketch strokes have a GPU ring, canvas ops a partial `pushUndo` — fold both together); memory-bounded (tile/snapshot-interval for raster). | L | open | |
+| D6-1 | **One history stack** — ✅ **core DONE** (`pre-usertest`): seq-based `UndoManager` unifies sketch ring + UI-state + a new layer-ops history; Ctrl+Z undoes most-recent across all (recency, not mode). Layer reorder + delete undoable. **Remaining:** mask-object + binding-op undo. | L | core done | |
 
 ---
 

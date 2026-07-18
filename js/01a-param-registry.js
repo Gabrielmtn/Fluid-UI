@@ -40,7 +40,7 @@
         ridges: {configKey: "RIDGES", ui: {min: 0, max: 6, step: 0.1}, hard: {min: 0, max: 6}, def: 0, decimals: 1, category: "effects", perfTier: 1, mut: {min: 0, max: 4, step: 0.1, scope: "extended"}},
         velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 2.5, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
         curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 25, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
-        velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false},
+        velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 15, max: 60, step: 1, scope: "extended"}},
         sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "simulation", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
         brushSize: {configKey: null, ui: {min: 0.1, max: 30, step: 0.1}, hard: {min: 0.1, max: 30}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
