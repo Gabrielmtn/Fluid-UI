@@ -551,9 +551,99 @@
         window.addEventListener('blur', abortPointerStroke);
         window.addEventListener('dragstart', abortPointerStroke);
         window.addEventListener('pointercancel', abortPointerStroke);
+        // ── Mobile gesture layer (13.1-13.3) ─────────────────────────
+        // Two-finger gestures on the canvas: pinch = brush size (drives
+        // the #brushSize slider like the wheel path in 05h), two-finger
+        // vertical drag = replay period. The role locks on the dominant
+        // axis once movement passes a threshold; painting is suppressed
+        // from the moment a second finger lands until ALL fingers lift.
+        const TouchGestures = (() => {
+            let active = false;    // 2-finger gesture in progress
+            let suppress = false;  // no painting until all fingers lift
+            let role = null;       // 'pinch' | 'vdrag' | null (undecided)
+            let dist0 = 0, cy0 = 0;
+            let size0 = 0, period0 = 5;
+            let toastEl = null, toastTimer = null;
+
+            function metrics(e) {
+                const a = e.touches[0], b = e.touches[1];
+                return {
+                    dist: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY),
+                    cy: (a.clientY + b.clientY) / 2
+                };
+            }
+            // On-canvas indicator (13.3): display toggling only — no
+            // opacity transitions (Electron CSS constraint)
+            function toast(text) {
+                if (!toastEl) {
+                    toastEl = document.createElement('div');
+                    toastEl.id = 'gestureIndicator';
+                    toastEl.style.cssText = 'position:fixed;left:50%;top:20%;transform:translateX(-50%);' +
+                        'z-index:10001;padding:10px 18px;border-radius:10px;background:rgba(15,20,27,0.9);' +
+                        'border:1px solid rgba(100,200,255,0.4);color:#fff;font-size:20px;font-weight:600;' +
+                        'pointer-events:none;display:none;';
+                    document.body.appendChild(toastEl);
+                }
+                toastEl.textContent = text;
+                toastEl.style.display = 'block';
+                if (toastTimer) clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => { toastEl.style.display = 'none'; }, 900);
+            }
+            function begin(e) {
+                abortPointerStroke(); // second finger cancels the paint stroke
+                active = true; suppress = true; role = null;
+                const m = metrics(e);
+                dist0 = m.dist; cy0 = m.cy;
+                const s = document.getElementById('brushSize');
+                size0 = s ? parseFloat(s.value) : config.SPLAT_RADIUS * 1000;
+                period0 = window.replayTimePeriod || 5;
+            }
+            function move(e) {
+                if (!active || e.touches.length < 2) return;
+                const m = metrics(e);
+                if (!role) {
+                    const pinchD = Math.abs(m.dist - dist0);
+                    const vertD = Math.abs(m.cy - cy0);
+                    if (pinchD < 18 && vertD < 18) return; // undecided yet
+                    role = pinchD >= vertD ? 'pinch' : 'vdrag';
+                }
+                if (role === 'pinch') {
+                    const s = document.getElementById('brushSize');
+                    if (!s) return;
+                    let v = size0 * (m.dist / Math.max(1, dist0));
+                    v = Math.max(parseFloat(s.min), Math.min(parseFloat(s.max), Math.round(v * 10) / 10));
+                    s.value = v;
+                    s.style.setProperty('--val', v);
+                    config.SPLAT_RADIUS = v / 1000; // same drive as the 05h wheel path
+                    toast('🖌 Brush ' + v.toFixed(1));
+                } else {
+                    let v = Math.round(period0 + (cy0 - m.cy) / 25); // drag up = longer
+                    v = Math.max(1, Math.min(60, v));
+                    if (v !== window.replayTimePeriod) {
+                        window.replayTimePeriod = v;
+                        const inp = document.getElementById('replayTimePeriod');
+                        if (inp) inp.value = v;
+                        try { if (window.settingsManager) window.settingsManager.set('brush.replayTimePeriod', v); } catch (_) {}
+                    }
+                    toast('⏱ Replay ' + v + 's');
+                }
+            }
+            function end(e) {
+                if (e.touches.length >= 2) return; // still gesturing
+                active = false; role = null;
+                if (e.touches.length === 0) suppress = false;
+            }
+            return { begin, move, end, isActive: () => active, isSuppressed: () => suppress };
+        })();
+        window.__touchGestures = TouchGestures; // harness/testing access
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (isPaused) return;
+            if (e.touches.length >= 2) {
+                if (!TouchGestures.isActive()) TouchGestures.begin(e);
+                return;
+            }
+            if (TouchGestures.isSuppressed()) return;
             const touch = e.touches[0];
             const coords = getCanvasCoordinates(touch);
             pointer.down = true;
@@ -594,6 +684,8 @@
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
             if (isPaused) return;
+            if (TouchGestures.isActive()) { TouchGestures.move(e); return; }
+            if (TouchGestures.isSuppressed()) return;
             const touch = e.touches[0];
             const coords = getCanvasCoordinates(touch);
             pointer.dx = (coords.x - pointer.x) * 10.0;
@@ -634,7 +726,8 @@
                 }
             }
         }, { passive: false });
-        window.addEventListener('touchend', () => {
+        window.addEventListener('touchend', (e) => {
+            TouchGestures.end(e);
             if (pointer.down) {
                 if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
                     splatUpTime = Date.now();
@@ -662,7 +755,8 @@
                 }
             }
         });
-        window.addEventListener('touchcancel', () => {
+        window.addEventListener('touchcancel', (e) => {
+            TouchGestures.end(e);
             if (pointer.down) {
                 pointer.down = false;
                 pointer.moved = false;

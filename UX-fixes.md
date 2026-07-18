@@ -252,23 +252,23 @@
 ## 13. Mobile Improvements
 
 ### 13.1 Pinch/zoom to change brush size
-- [ ] **Add pinch gesture to control brush size on mobile**
+- [x] **Add pinch gesture to control brush size on mobile**
 - Currently brush size is controlled via slider or scroll wheel (`js/05h-slider-bindings.js` lines 300–324)
 - **Fix approach:** Add touch pinch detection (two-finger pinch) that maps pinch scale to brush size slider value
 - Show visual indicator of current brush size during pinch
 
 ### 13.2 Two-finger up/down for duration
-- [ ] **Add two-finger swipe up/down to adjust replay duration**
+- [x] **Add two-finger swipe up/down to adjust replay duration**
 - Map two-finger vertical swipe to replay time period adjustment
 - Show visual indicator of current duration value
 
 ### 13.3 Visual indicators for gestures
-- [ ] **Add on-screen visual indicators when using mobile gestures**
+- [x] **Add on-screen visual indicators when using mobile gestures**
 - Show temporary overlay/text indicating brush size change, duration change, etc.
 - Must be non-intrusive and auto-dismiss
 
 ### 13.4 Audio gate clearing on mobile
-- [ ] **Ensure audio gates can be cleared easily on mobile**
+- [x] **Ensure audio gates can be cleared easily on mobile**
 - Gate editors in `js/30-audio-scenes.js` use canvas drag + double-click
 - Double-click may not work reliably on touch — add a clear button or long-press gesture
 

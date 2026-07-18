@@ -754,6 +754,22 @@
         requestAnimationFrame(draw);
     }
 
+    // Small ✕ Clear button for gate widgets (13.4 — double-click is
+    // unreliable on touch devices)
+    function makeGateClearBtn(onClear) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'audio-gate-clear';
+        btn.textContent = '✕ Clear';
+        btn.title = 'Clear this gate';
+        btn.style.cssText = 'flex:0 0 auto; margin-top:4px; padding:3px 8px; font-size:10px; cursor:pointer;';
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            onClear();
+        });
+        return btn;
+    }
+
     // ─── Controls UI ────────────────────────────────────────────────
     // Renders a scene's control spec into a host element. Values persist
     // per scene in localStorage and apply live via scene.onChange.
@@ -814,16 +830,25 @@
             } else if (spec.type === 'gate') {
                 var meter = document.createElement('canvas');
                 meter.className = 'audio-gate-meter';
-                meter.title = 'Drag to set the trigger gate — double-click to clear';
+                meter.title = 'Drag to set the trigger gate — double-click or ✕ to clear';
                 row.appendChild(meter);
                 wireGateMeter(meter, spec, opts, changed);
+                // 13.4: dbl-click is unreliable on touch — honest Clear button
+                row.appendChild(makeGateClearBtn(function () {
+                    opts[spec.key] = 0;
+                    changed(spec.key);
+                }));
             } else if (spec.type === 'gates') {
                 row.classList.add('audio-gates-row');
                 var editor = document.createElement('canvas');
                 editor.className = 'audio-gates-editor';
-                editor.title = 'Drag a box: width = frequency band, top edge = threshold. Double-click a box to delete.';
+                editor.title = 'Drag a box: width = frequency band, top edge = threshold. Double-click a box (or ✕) to delete.';
                 row.appendChild(editor);
                 wireGatesEditor(editor, spec, opts, changed, name);
+                row.appendChild(makeGateClearBtn(function () {
+                    opts[spec.key] = [];
+                    changed(spec.key);
+                }));
             }
             host.appendChild(row);
         });
