@@ -766,6 +766,10 @@
 
     function applyPresetSnapshot(snapshot) {
         if (!snapshot) return;
+        // 13.5: look settings locked by the multiplayer host — local snapshot
+        // applies (user presets, autoload) are gated; the host's lock snapshot
+        // itself arrives under __mpApplyingRemote and passes through.
+        if (window.__mpSettingsLocked && !window.__mpApplyingRemote) return;
         var reg = window.ParamRegistry;
         // Soft reset: keep the governor's quality tier across snapshot loads —
         // a hard reset snapped to full quality and stuttered for seconds while

@@ -38,6 +38,11 @@
 
         window.applyPreset = (name) => {
 
+            // 13.5: look settings locked by the multiplayer host — local preset
+            // clicks are gated; the host's own broadcasts still come through
+            // (remote applies run under __mpApplyingRemote / remote-event flags)
+            if (window.__mpSettingsLocked && !window.__mpApplyingRemote) return;
+
             const preset = presets[name];
 
             if (!preset) return;

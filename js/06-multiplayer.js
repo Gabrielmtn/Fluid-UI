@@ -137,6 +137,115 @@ function toggleLock() {
     partySocket.send(JSON.stringify({ type: 'lock', locked: !roomLocked }));
 }
 
+// ── 13.5 host settings lock ─────────────────────────────────────────
+// Lock = visual parity: locked guests mirror the host's look-affecting
+// settings (sliders/checkboxes/selects/arm colors via a filtered preset
+// snapshot — the relay caps messages at 16KB so layers/masks/recordings
+// never ride along). Performance-tier controls stay LOCAL on every
+// client. Guests' local edits are gated at the slider-binding/preset
+// choke points via window.__mpSettingsLocked.
+var settingsLockOn = false;        // host's intent (host side only)
+var settingsLockDebounce = null;
+var hostMirrorInstalled = false;
+window.__mpSettingsLocked = false; // guest-side gate (read by 05h/04b/12)
+window.__mpApplyingRemote = false; // lets the host's snapshot through the gate
+
+// Perf-tier + local-workflow controls that never ride the lock snapshot:
+// resolution/governor/fps stay local (the governor's look-preserving
+// ladder is the precedent), recording/stats/autoload are per-user UI.
+var MP_PERF_LOCAL_KEYS = [
+    'visualResolution', 'physicsResolution', 'fpsCap',
+    'recMode', 'recPlaybackSpeed', 'statsToggle', 'autoloadSettings'
+];
+
+function captureLookSnapshot() {
+    if (typeof window.capturePresetSnapshot !== 'function') return null;
+    var full;
+    try { full = window.capturePresetSnapshot(); } catch (_) { return null; }
+    if (!full) return null;
+    var snap = {
+        version: full.version,
+        sliders: full.sliders || {},
+        checkboxes: {},
+        selects: {},
+        armColors: full.armColors || null
+    };
+    Object.keys(full.selects || {}).forEach(function (k) {
+        if (MP_PERF_LOCAL_KEYS.indexOf(k) === -1) snap.selects[k] = full.selects[k];
+    });
+    Object.keys(full.checkboxes || {}).forEach(function (k) {
+        if (MP_PERF_LOCAL_KEYS.indexOf(k) === -1) snap.checkboxes[k] = full.checkboxes[k];
+    });
+    return snap;
+}
+
+function broadcastSettingsLock() {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    var msg = { type: 'settings-lock', locked: settingsLockOn, timestamp: Date.now() };
+    if (settingsLockOn) msg.snapshot = captureLookSnapshot();
+    partySocket.send(JSON.stringify(msg));
+}
+
+// While locked, the host's live edits re-broadcast (debounced) so
+// locked guests track them — "mirror every look-affecting setting"
+function hostLockMirrorHandler() {
+    if (!settingsLockOn) return;
+    if (settingsLockDebounce) clearTimeout(settingsLockDebounce);
+    settingsLockDebounce = setTimeout(broadcastSettingsLock, 400);
+}
+function installHostLockMirror() {
+    if (hostMirrorInstalled) return;
+    document.addEventListener('input', hostLockMirrorHandler, true);
+    document.addEventListener('change', hostLockMirrorHandler, true);
+    hostMirrorInstalled = true;
+}
+function removeHostLockMirror() {
+    if (!hostMirrorInstalled) return;
+    document.removeEventListener('input', hostLockMirrorHandler, true);
+    document.removeEventListener('change', hostLockMirrorHandler, true);
+    hostMirrorInstalled = false;
+    if (settingsLockDebounce) { clearTimeout(settingsLockDebounce); settingsLockDebounce = null; }
+}
+
+function toggleSettingsLock() {
+    settingsLockOn = !settingsLockOn;
+    broadcastSettingsLock();
+    if (settingsLockOn) installHostLockMirror(); else removeHostLockMirror();
+    updateConnectedView();
+}
+
+// Guest side: enter/leave the locked state (banner + gate + mirror apply)
+function setSettingsLockedByHost(locked, snapshot) {
+    window.__mpSettingsLocked = !!locked;
+    var banner = document.getElementById('mpSettingsLockBanner');
+    if (locked) {
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'mpSettingsLockBanner';
+            banner.textContent = '🔒 Settings locked by host';
+            banner.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10002;' +
+                'padding:6px 14px;border-radius:8px;background:rgba(15,20,27,0.92);border:1px solid rgba(255,178,71,0.5);' +
+                'color:#ffb347;font-size:12px;font-weight:600;pointer-events:none;';
+            document.body.appendChild(banner);
+        }
+        if (snapshot && typeof window.applyPresetSnapshot === 'function') {
+            isProcessingRemoteEvent = true;
+            window.__mpApplyingRemote = true;
+            try { window.applyPresetSnapshot(snapshot); }
+            catch (e) { console.warn('settings-lock: snapshot apply failed', e); }
+            finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
+        }
+    } else if (banner) {
+        banner.remove();
+    }
+}
+
+function resetSettingsLock() {
+    settingsLockOn = false;
+    removeHostLockMirror();
+    setSettingsLockedByHost(false, null);
+}
+
 // Core connect logic
 function connectToRoom(roomCode) {
     // Tear down any existing socket (OPEN *or* still CONNECTING) so we never leak one.
@@ -148,6 +257,7 @@ function connectToRoom(roomCode) {
     reconnectAttempts = 0;
     myRole = 'guest';
     roomLocked = false;
+    resetSettingsLock();
 
     // Stranger rooms are ephemeral — keep them out of the shareable URL hash;
     // private/code rooms stay in the hash so a #CODE deep-link auto-joins.
@@ -207,6 +317,7 @@ function disconnectMultiplayer() {
     currentRoom = null;
     myRole = 'guest';
     roomLocked = false;
+    resetSettingsLock();
     if (partySocket) {
         partySocket.close();
         partySocket = null;
@@ -257,6 +368,8 @@ function onMultiplayerMessage(event) {
 
             case 'host-changed':
                 myRole = (data.hostId === DEVICE_UID) ? 'host' : 'guest';
+                // Promotion to host frees this client from any settings lock
+                if (myRole === 'host') resetSettingsLock();
                 updateConnectedView();
                 break;
 
@@ -309,8 +422,17 @@ function onMultiplayerMessage(event) {
                 // it as a remote event so broadcastPreset() skips the re-send.
                 if (data.clientId !== clientId && typeof applyPreset === 'function') {
                     isProcessingRemoteEvent = true;
+                    window.__mpApplyingRemote = true;
                     try { applyPreset(data.data.preset); }
-                    finally { isProcessingRemoteEvent = false; }
+                    finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
+                }
+                break;
+
+            case 'settings-lock':
+                // Host locked/unlocked look settings (13.5). Hosts never
+                // gate themselves — only guests enter the locked state.
+                if (data.clientId !== clientId && myRole !== 'host') {
+                    setSettingsLockedByHost(!!data.locked, data.snapshot || null);
                 }
                 break;
         }
@@ -695,6 +817,13 @@ function updateConnectedView() {
         lockBtn.style.display = canLock ? '' : 'none';
         lockBtn.textContent = roomLocked ? '🔓 Unlock room' : '🔒 Lock room';
     }
+    // Settings lock (13.5): any host can lock look settings (incl. stranger rooms).
+    var sLockBtn = document.getElementById('settingsLockBtn');
+    if (sLockBtn) {
+        sLockBtn.style.display = isHost ? '' : 'none';
+        sLockBtn.textContent = settingsLockOn ? '🎛 Unlock settings' : '🎛 Lock settings';
+        sLockBtn.classList.toggle('active', settingsLockOn);
+    }
     // Locked badge: non-host members see why no one else can join.
     setShown('lockBadge', !stranger && roomLocked && !isHost);
 
@@ -791,6 +920,9 @@ function initMultiplayerUI() {
 
     var lockBtn = document.getElementById('lockRoomBtn');
     if (lockBtn) lockBtn.addEventListener('click', toggleLock);
+
+    var sLockBtn = document.getElementById('settingsLockBtn');
+    if (sLockBtn) sLockBtn.addEventListener('click', toggleSettingsLock);
 
     // Auto-join if URL has room hash
     var hashRoom = getRoomFromHash();

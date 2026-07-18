@@ -273,7 +273,7 @@
 - Double-click may not work reliably on touch — add a clear button or long-press gesture
 
 ### 13.5 Lock settings for invited users (multiplayer)
-- [ ] **Allow host to lock settings so invited users can't change them**
+- [x] **Allow host to lock settings so invited users can't change them**
 - In multiplayer mode, the host should be able to lock certain settings
 - Locked users can paint but not modify sim parameters, layers, or other config
 - Files: `js/06-multiplayer.js` (add lock message type), `js/20-mixer-layout.js` (disable controls when locked)

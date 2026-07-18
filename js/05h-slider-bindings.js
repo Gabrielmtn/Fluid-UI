@@ -338,6 +338,13 @@
             const valueSpanId = valueSpanMap[id] || (id + 'Value');
             const valueSpan = document.getElementById(valueSpanId);
             slider.addEventListener('input', (e) => {
+                // 13.5: settings locked by the multiplayer host — swallow local
+                // edits on registry-bound sim sliders (host's snapshot re-syncs
+                // the thumb). Painting controls (brushSize etc.) are unaffected.
+                if (window.__mpSettingsLocked && !window.__mpApplyingRemote) {
+                    e.stopImmediatePropagation();
+                    return;
+                }
                 let val = parseFloat(e.target.value);
                 // Clear active preset and performance profile when manually adjusting sliders
                 // (skip if a profile is currently being applied programmatically)
