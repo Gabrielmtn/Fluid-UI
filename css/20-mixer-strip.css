@@ -6,51 +6,63 @@
    MIXER LAYOUT - Audio mixer-inspired UI
    ================================================================ */
 
-/* ── UX-9.1: quality underbar — always-visible top-right quick access ──
-   (Visual Quality + Physics Detail; top/right pinned in JS, appearance here) */
+/* ── UX-9.1: quality underbar — slim AE-style toolbar, top-right ──
+   (Visual Quality + Physics Detail; top/right pinned in JS, appearance here.
+   After-Effects reference: one thin horizontal row of tightly-packed controls
+   with inset wells + hairline dividers between clusters.) */
 #quality-underbar {
     position: fixed;
     top: 8px;
     right: 14px;
     z-index: 200;
     display: flex;
-    flex-direction: column;
-    gap: 5px;
-    padding: 7px 11px;
-    background: linear-gradient(180deg, #171b23, #0e1219);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 8px;
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
-    color: #fff;
+    flex-direction: row;
+    align-items: stretch;
+    height: 28px;
+    padding: 0;
+    background: linear-gradient(180deg, #33373e, #202329);
+    border: 1px solid rgba(0, 0, 0, 0.55);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    color: #cfd2d6;
+    overflow: hidden;
+    user-select: none;
 }
 #quality-underbar .control-group {
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    gap: 6px;
     margin: 0;
-    padding: 0;
+    padding: 0 10px;
+    border-right: 1px solid rgba(0, 0, 0, 0.45);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
+}
+#quality-underbar .control-group:last-child {
+    border-right: none;
+    box-shadow: none;
 }
 #quality-underbar label {
     font-size: 9.5px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.6;
+    letter-spacing: 0.04em;
+    opacity: 0.5;
     margin: 0;
     white-space: nowrap;
 }
 #quality-underbar select {
     font-size: 11px;
-    padding: 2px 4px;
-    min-width: 104px;
-    background: rgba(255, 255, 255, 0.07);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 4px;
+    height: 20px;
+    padding: 1px 4px;
+    background: rgba(0, 0, 0, 0.28);
+    color: #e6e8ea;
+    border: 1px solid rgba(0, 0, 0, 0.45);
+    border-radius: 3px;
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.3);
     cursor: pointer;
 }
+#quality-underbar select:hover { background: rgba(0, 0, 0, 0.4); }
 /* Mobile: strip + sidebar are drawers — keep the canvas clean */
 @media (max-width: 768px), (max-height: 500px) and (max-width: 1200px) {
     #quality-underbar { display: none; }
