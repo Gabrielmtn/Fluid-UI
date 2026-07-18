@@ -1208,6 +1208,44 @@
                     });
                 }
 
+                // Step 3.5: reconcile screen ↔ panel. renderLayers() only walks
+                // layerOrder, but the restore above set a DOM div for every
+                // snapshot.layers entry. If a snapshot's layerOrder omits a layer
+                // it still lists in .layers (corrupt/cross-version presets, or a
+                // pre-existing ghost that capturePresetSnapshot baked in), that
+                // layer would render on screen yet never appear in the panel — an
+                // unmanageable ghost that can't be hidden or deleted from the UI.
+                // Enforce the invariant "a layer is visible IFF it's in the panel":
+                // drop any layer not referenced by the final layerOrder and clear
+                // its backing div / GPU buffer. Mutate arrays in place — 05k/05l
+                // hold the same references (reassigning would desync them).
+                var _orderedIds = {};
+                window.layerOrder.forEach(function(it) { if (it.type === 'layer') _orderedIds[it.id] = true; });
+                for (var _li = window.layers.length - 1; _li >= 0; _li--) {
+                    var _orphan = window.layers[_li];
+                    if (_orderedIds[_orphan.index]) continue;
+                    if (_orphan.isRaster && window.rasterLayers && window.rasterLayers._onDeleted) {
+                        window.rasterLayers._onDeleted(_orphan.index);
+                    }
+                    var _od = document.getElementById('layer' + _orphan.index);
+                    if (_od) {
+                        _od.style.backgroundImage = '';
+                        _od.style.display = 'none';
+                        _od.style.zIndex = '';
+                        _od.classList.remove('active');
+                    }
+                    window.layers.splice(_li, 1);
+                }
+                // Prune any layerOrder entry whose layer no longer exists (reverse
+                // mismatch: renderLayers silently skips these, but a dangling entry
+                // would re-propagate through the next capturePresetSnapshot).
+                for (var _oi = window.layerOrder.length - 1; _oi >= 0; _oi--) {
+                    var _it = window.layerOrder[_oi];
+                    if (_it.type === 'layer' && !window.layers.some(function(l) { return l.index === _it.id; })) {
+                        window.layerOrder.splice(_oi, 1);
+                    }
+                }
+
                 if (typeof window.renderLayers === 'function') window.renderLayers();
 
                 // D2: rebuild raster-layer GPU buffers from the restored
