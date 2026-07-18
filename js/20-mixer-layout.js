@@ -764,29 +764,19 @@
         const bar = document.createElement('div');
         bar.id = 'quality-underbar';
         bar.title = 'Rendering quality — Visual Quality (display resolution) and Physics Detail (sim resolution)';
-        moveControlGroup('visualResolution', bar);
-        moveControlGroup('physicsResolution', bar);
+        // Titled header gives it a "window" identity and an anchor for the
+        // controls we'll keep adding to this dock over time.
+        const header = document.createElement('div');
+        header.className = 'qub-header';
+        header.innerHTML = '<span class="qub-dot"></span><span class="qub-title">Quality</span>';
+        bar.appendChild(header);
+        const body = document.createElement('div');
+        body.className = 'qub-body';
+        bar.appendChild(body);
+        moveControlGroup('visualResolution', body);
+        moveControlGroup('physicsResolution', body);
+        // Docked bottom-left via CSS (fixed) — no JS positioning needed.
         document.body.appendChild(bar);
-        // Pin to the top-right of the canvas: below the (scrolling) mixer strip
-        // and left of the docked sidebar, so it never overlaps either. Recompute
-        // on resize; CSS hides it on mobile where both are drawers.
-        const place = function () {
-            const strip = document.getElementById('mixer-strip');
-            const sb = document.getElementById('sidebar-right');
-            const top = strip ? Math.round(strip.getBoundingClientRect().bottom) + 8 : 8;
-            let right = 14;
-            if (sb) {
-                const r = sb.getBoundingClientRect();
-                if (r.left < window.innerWidth - 5) right = Math.round(window.innerWidth - r.left) + 12;
-            }
-            bar.style.top = top + 'px';
-            bar.style.right = right + 'px';
-        };
-        // Defer until the strip/sidebar have laid out (a synchronous call during
-        // init reads a 0-height strip and pins to the top, overlapping it).
-        requestAnimationFrame(place);
-        setTimeout(place, 300);
-        window.addEventListener('resize', place);
     }
 
     // --- Section builders ---
