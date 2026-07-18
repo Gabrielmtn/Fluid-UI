@@ -813,6 +813,70 @@
                 fragColor = vec4(vel + force * dt, 0.0, 1.0);
             }
         `;
+        // ── Attractor field (6.2 ferrofluid, 2026-07-18) ────────────────
+        // A DYE-TRANSPORT gather that captures the fluid toward a set of
+        // "magnet" points — the sacred-geometry attractor layout the ferro
+        // scene drives (hex rings / flower-of-life). Runs after dye
+        // advection, moving the DYE itself (a semi-Lagrangian resample),
+        // NOT the velocity field. Why not a velocity body force: a radial
+        // pull is pure divergence, so the incompressible pressure solve
+        // fights it and throws an oscillating return flow (measured: blob
+        // velocity flips sign frame-to-frame, dye churns outward) — that IS
+        // the "shreds / glitches out" failure of the old ferro. Transporting
+        // dye directly (exactly how the Swirl feature offsets the dye
+        // backtrace, never the velocity) pools cleanly and CAN'T destabilize
+        // the sim: "capture, never shred" by construction.
+        //
+        // newDye(p) = oldDye(p - toward*speed*dt): each texel pulls dye from
+        // its OUTWARD neighbor, so dye creeps inward and beads at the magnet.
+        // Gates: (1) fill gate — a filled region stops pulling so the pool
+        // settles instead of clipping (and it's the hook for recursive
+        // collection: sub-attractors light up inside filled regions); (2) a
+        // dead-zone at each exact center so normalize() never jitters. A
+        // tangential (swirl) fraction makes each pool orbit/live rather than
+        // sit as a dead dot. Negative strength = repel (beat spikes push out).
+        const MAX_ATTRACTORS = 12;
+        const attractorFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uDensity;   // dye field (this pass reads + writes it)
+            uniform float aspectRatio;    // W/H — screen-circular falloff on non-square canvases
+            uniform float dt;
+            uniform float uForce;         // dye transport rate (UV/s at full falloff)
+            uniform float uSwirl;         // tangential fraction (0 = pure radial)
+            uniform float uDensityGate;   // 0..1: how hard filled regions back off
+            uniform float uMaxDensity;    // dye level treated as "full"
+            uniform int   uCount;
+            uniform vec4  uAtt[${MAX_ATTRACTORS}]; // xy = UV pos, z = signed strength, w = radius (UV)
+            void main() {
+                vec3 here = texture(uDensity, vUv).rgb;
+                float fill = max(here.r, max(here.g, here.b));
+                // Filled regions stop gathering (pool settles; no runaway)
+                float fillGate = 1.0 - uDensityGate * smoothstep(0.3 * uMaxDensity, uMaxDensity, fill);
+                vec2 transport = vec2(0.0);
+                for (int i = 0; i < ${MAX_ATTRACTORS}; i++) {
+                    if (i >= uCount) break;
+                    vec4 A = uAtt[i];
+                    vec2 delta = A.xy - vUv;                 // toward the attractor (UV)
+                    vec2 ds = vec2(delta.x * aspectRatio, delta.y);
+                    float dist = length(ds);                 // screen-circular distance
+                    float r = max(A.w, 1e-4);
+                    // Soft peaked falloff, zeroed at the exact center (dead zone)
+                    float f = exp(-(dist * dist) / (r * r * 0.5));
+                    f *= smoothstep(0.0, r * 0.06, dist);
+                    if (f <= 0.0001) continue;
+                    vec2 dir = delta / (length(delta) + 1e-5); // inward, in UV
+                    vec2 tang = vec2(-dir.y, dir.x);           // swirl keeps the pool alive
+                    transport += (dir + tang * uSwirl) * (A.z * f);
+                }
+                transport *= uForce * fillGate;
+                // Semi-Lagrangian gather: sample from the OUTWARD side so dye
+                // creeps toward the magnet. Pure resample — bounded, no energy.
+                vec2 src = clamp(vUv - transport * dt, 0.0, 1.0);
+                fragColor = vec4(texture(uDensity, src).rgb, 1.0);
+            }
+        `;
         // M2 spectral floor (2026-07-17): the sim's small-scale energy sink.
         // Removes a fraction of the velocity field's Laplacian (Nyquist-band)
         // component where it reads as NOISE. Wall injection (M2b) and cap

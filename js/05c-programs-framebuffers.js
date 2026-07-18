@@ -18,6 +18,7 @@
         const divergenceProg = new Program(baseVert, divergenceFrag);
         const curlProg = new Program(baseVert, curlFrag);
         const vorticityProg = new Program(baseVert, vorticityFrag);
+        const attractorProg = new Program(baseVert, attractorFrag); // 6.2 attractor forcing field
         const pressureProg = new Program(baseVert, pressureFrag);
         const mgResidualProg = new Program(baseVert, mgResidualFrag);
         const mgRestrictProg = new Program(baseVert, mgRestrictFrag);

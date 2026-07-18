@@ -500,6 +500,141 @@
         }
     };
 
+    // ─── Scene: FERRO FIELD (attractor-driven, 6.2) ──────────────────
+    // Direction (b), approved: an analytic force field (attractorFrag, run
+    // in the sim by 05j) CAPTURES the fluid toward a sacred-geometry set of
+    // magnet points instead of faking pull with velocity splats. The scene
+    // only (1) publishes the attractor layout each frame and (2) feeds a
+    // little metallic dye at each magnet so there's something to pool — the
+    // sim does the pulling, so it never shreds. Real ferrofluid spikes form
+    // hex lattices, hence the hex-ring layout; beats modulate strength and
+    // flip polarity (spikes). Pattern set will iterate with Gabriel.
+    var FF_DYE = [0.16, 0.18, 0.24];   // cool metallic feed
+    var FF_HI = [0.42, 0.46, 0.58];    // spike highlight
+
+    // Regular hexagon ring of `n` points (UV) around center (cx,cy), radius
+    // rx/ry (aspect-corrected by the caller), phase-rotated by `rot`.
+    function ringPoints(cx, cy, rx, ry, n, rot, strength, radius) {
+        var out = [];
+        for (var i = 0; i < n; i++) {
+            var a = rot + (i / n) * Math.PI * 2;
+            out.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, strength, radius]);
+        }
+        return out;
+    }
+
+    scenes.ferrofield = {
+        label: 'Ferrofluid ✨',
+        defaults: { strength: 0.6, reach: 0.5, kick: 0.7, swirl: 0.25, spin: true,
+                    trigger: 'bass', gates: [], gain: 1 },
+        controls: [
+            { type: 'slider', key: 'strength', label: 'Magnet pull', min: 0, max: 1, step: 0.01 },
+            { type: 'slider', key: 'reach', label: 'Reach', min: 0, max: 1, step: 0.01 },
+            { type: 'slider', key: 'swirl', label: 'Swirl', min: 0, max: 1, step: 0.01 },
+            { type: 'slider', key: 'kick', label: 'Beat spike', min: 0, max: 1, step: 0.01 },
+            { type: 'toggle', key: 'spin', label: 'Rotate pattern' },
+            { type: 'gates', key: 'gates', label: 'Gates' },
+            { type: 'cycle', key: 'trigger', label: 'No-gate mode',
+              values: ['bass', 'mid', 'treble', 'onset', 'any'],
+              names: { bass: 'Bass', mid: 'Mids', treble: 'Treble', onset: 'Onset', any: 'Any hit' } },
+            { type: 'slider', key: 'gain', label: 'Gain', min: 0.1, max: 4, step: 0.05 }
+        ],
+        enter: function (o, F) {
+            this._gs = { above: false, lastFire: 0 };
+            this._rot = 0;
+            this._spikeUntil = 0;
+            this._lastFeed = 0;
+            F.snapConfig(['VELOCITY_DISSIPATION', 'DENSITY_DISSIPATION', 'CURL']);
+            if (window.config) {
+                // Preserve dye (pools accumulate), let velocity travel, keep
+                // curl low so the field pulls cleanly instead of churning.
+                window.config.VELOCITY_DISSIPATION = 0.985;
+                window.config.DENSITY_DISSIPATION = 0.992;
+                window.config.CURL = 6;
+            }
+            this._shadePrev = { s: window.displayShading || 0, inv: window.displayShadingInvert || 0 };
+            window.displayShading = Math.max(this._shadePrev.s, 0.9);
+            window.displayShadingInvert = 0;
+        },
+        exit: function () {
+            window.__attractorField = null; // stop the sim-side force
+            if (this._shadePrev) {
+                window.displayShading = this._shadePrev.s;
+                window.displayShadingInvert = this._shadePrev.inv;
+                this._shadePrev = null;
+            }
+        },
+        tick: function (frame, o, F) {
+            var c = F.canvas(); if (!c) return;
+            var W = c.width, H = c.height;
+            var aspect = W / Math.max(1, H);
+            var now = frame.now;
+            var lv = Math.min(1, frame.loudness * (o.gain || 1));
+
+            // Beat → brief polarity flip (spike burst outward), then recapture
+            var sfire = 0;
+            if (o.gates && o.gates.length) {
+                if (!this._gss) this._gss = [];
+                sfire = F.gatesTrigger(this._gss, frame, o.gates, o.gain, 'ferrofield');
+            } else {
+                if (!this._gs) this._gs = { above: false, lastFire: 0 };
+                if (F.gateTrigger(this._gs, frame, o.trigger, o.gain, 0, 170)) {
+                    sfire = Math.min(1, F.bandEnergy(frame, o.trigger) * (o.gain || 1));
+                }
+            }
+            if (sfire > 0) this._spikeUntil = now + 90 + sfire * 160 * o.kick;
+            var spiking = now < this._spikeUntil;
+
+            // Sacred geometry: center magnet + a hexagon ring (real ferro
+            // spikes lattice hexagonally). Ring radius follows Reach; pull
+            // follows Strength × loudness. Radii are UV; x is aspect-scaled
+            // so the ring reads circular on any canvas.
+            if (o.spin) this._rot += 0.0016 + lv * 0.004;
+            var ringR = 0.16 + o.reach * 0.26;
+            var rx = ringR / aspect, ry = ringR;
+            var baseStr = o.strength * (0.4 + lv * 1.4);
+            // Spike = repel (negative) for a beat, then back to capture
+            var sign = spiking ? -1.4 : 1.0;
+            var coreRadius = 0.13 + o.reach * 0.10;
+            var ringRadius = 0.10 + o.reach * 0.08;
+
+            var att = [[0.5, 0.5, baseStr * sign * 1.1, coreRadius]];
+            var ring = ringPoints(0.5, 0.5, rx, ry, 6, this._rot, baseStr * sign, ringRadius);
+            for (var i = 0; i < ring.length; i++) att.push(ring[i]);
+
+            window.__attractorField = {
+                a: att,
+                force: 0.55,   // dye-transport rate (UV/s at full falloff)
+                swirl: (spiking ? 0.05 : o.swirl),
+                densityGate: 0.75,
+                maxDensity: 1.6,
+                ts: now // staleness guard: 05j ignores a field older than ~0.5s
+            };
+
+            // Feed a little metallic dye so the magnets have something to
+            // pool. Fed AT the ring points (and center) — the field carries
+            // it inward into growing beads. Throttled; brighter on beats.
+            if (now - this._lastFeed > 55) {
+                this._lastFeed = now;
+                var dk = 0.5 + lv * 0.6;
+                var col = [FF_DYE[0] * dk, FF_DYE[1] * dk, FF_DYE[2] * dk];
+                F.splat(0.5 * W, 0.5 * H, 0, 0, col, 0.02);
+                for (var j = 0; j < ring.length; j++) {
+                    F.splat(ring[j][0] * W, ring[j][1] * H, 0, 0, col, 0.016);
+                }
+            }
+            // Spike highlight: a puff of bright dye at the ring points as they
+            // erupt, so the beat reads as glinting spikes
+            if (sfire > 0) {
+                var hk = 0.4 + sfire * 0.7;
+                var hc = [FF_HI[0] * hk, FF_HI[1] * hk, FF_HI[2] * hk];
+                for (var k = 0; k < ring.length; k++) {
+                    F.splat(ring[k][0] * W, ring[k][1] * H, 0, 0, hc, 0.01 + sfire * 0.008);
+                }
+            }
+        }
+    };
+
     // ─── Gate meter widget ──────────────────────────────────────────
     // Live post-gain level of the scene's trigger band with a draggable
     // gate line: what you see is exactly what gates. Flashes on each fire.

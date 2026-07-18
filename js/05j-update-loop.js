@@ -19,6 +19,9 @@
         // fade-to-zero path and batching it would change preset feel.
         let dyeDecayAccum = 0, velDecayAccum = 0;
         let lastDyeDiss = -1, lastVelDiss = -1;
+        // Reusable upload buffer for the attractor forcing field (6.2):
+        // 12 attractors × vec4, zero-alloc per frame.
+        const attractorFieldScratch = new Float32Array(48);
         // Resize settle deadline for the debounced FBO rebuild (0 = none pending)
         let _fboSettleAtMs = 0;
         // Last frame's wrapper size — the settle deadline re-arms only when
@@ -567,6 +570,43 @@
                 }
                 blit(density.write.fbo);
                 density.swap();
+                // 8b. Attractor field (6.2 ferrofluid) — dye-transport gather
+                // toward the scene's magnet layout. Runs on the advected dye,
+                // moves the DYE only (never velocity → cannot destabilize the
+                // sim). No-op with zero cost unless a scene set
+                // window.__attractorField. See attractorFrag for the design.
+                const _af = window.__attractorField;
+                // Staleness guard: if the driving scene stopped ticking (audio
+                // disabled, tab hidden), let the field expire so dye isn't
+                // pulled forever by a frozen layout.
+                if (_af && _af.a && _af.a.length &&
+                    (typeof _af.ts !== 'number' || nowMs - _af.ts < 500)) {
+                    const _n = Math.min(_af.a.length, 12);
+                    const _flat = attractorFieldScratch;
+                    for (let i = 0; i < _n; i++) {
+                        const a = _af.a[i];
+                        _flat[i * 4] = a[0];
+                        _flat[i * 4 + 1] = a[1];
+                        _flat[i * 4 + 2] = a[2];
+                        _flat[i * 4 + 3] = a[3];
+                    }
+                    for (let i = _n * 4; i < _flat.length; i++) _flat[i] = 0;
+                    attractorProg.bind();
+                    gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                    gl.uniform1f(attractorProg.uniforms.aspectRatio, canvas.width / Math.max(1, canvas.height));
+                    gl.uniform1f(attractorProg.uniforms.dt, dt);
+                    gl.uniform1f(attractorProg.uniforms.uForce, (typeof _af.force === 'number') ? _af.force : 0.6);
+                    gl.uniform1f(attractorProg.uniforms.uSwirl, (typeof _af.swirl === 'number') ? _af.swirl : 0.25);
+                    gl.uniform1f(attractorProg.uniforms.uDensityGate, (typeof _af.densityGate === 'number') ? _af.densityGate : 0.75);
+                    gl.uniform1f(attractorProg.uniforms.uMaxDensity, (typeof _af.maxDensity === 'number') ? _af.maxDensity : 1.6);
+                    gl.uniform1i(attractorProg.uniforms.uCount, _n);
+                    if (attractorProg.uniforms['uAtt[0]']) gl.uniform4fv(attractorProg.uniforms['uAtt[0]'], _flat);
+                    gl.uniform1i(attractorProg.uniforms.uDensity, 0);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    blit(density.write.fbo);
+                    density.swap();
+                }
             }
             // Post-FX passes (sharpen, micro-detail, lighting, light shift,
             // sunrays) are full-quad rewrites into persistent FBOs — they must
