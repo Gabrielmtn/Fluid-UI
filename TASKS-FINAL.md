@@ -21,7 +21,7 @@
 | UX-6.2 | **Ferrofluid aesthetic iteration** — first pass shipped (`ferrofield` dye-transport attractor). Iterate the pattern set (hex / flower-of-life, recursive sub-attractors), beat modulation, feel. | L | feel | |
 | UX-6.3 | **Mini audio composer editing** — mini timeline (27) is draw-only; add segment hit-test / drag-resize / overlap layout / playhead in the sidebar form factor. (Cheap early wins: playhead indicator + duration numeric input.) | L | open | |
 | UX-6.4 | **Full audio-tab UX** — input sizing, onboarding/guidance, clearer segment layout. | L | open | |
-| UX-9.1 | **Underbar component** — context-sensitive settings strip. **v1 (Gabriel): visual-quality + physics-detail controls, top-right corner.** Do a single hard-coded instance for that case now; generalize into the Stage-4 component library later. | M | open | |
+| UX-9.1 | **Underbar component** — ✅ **v1 SHIPPED** (`pre-usertest`): `#quality-underbar` top-right hosts Visual Quality + Physics Detail. Remaining: generalize into the Stage-4 component library; optionally reposition on sidebar open (today z-index keeps it on top). | M | v1 done | |
 
 ---
 
