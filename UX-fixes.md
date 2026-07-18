@@ -172,7 +172,7 @@
 - Files: `js/23-depth-collision.js` (collision generation), `js/15-layer-masking.js` (mask/feather controls)
 
 ### 7.5 Overhaul "Drop here for bottom" section
-- [ ] **Improve the drag-and-drop bottom zone with smooth auto-scroll and collapse-others**
+- [x] **Improve the drag-and-drop bottom zone with smooth auto-scroll and collapse-others**
 - `js/05k-layers-render.js` has drop zones for top/bottom reordering
 - **Needed:**
   - Smooth auto-scroll when dragging near the top/bottom of the layers list

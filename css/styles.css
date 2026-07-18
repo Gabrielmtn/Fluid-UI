@@ -700,14 +700,24 @@
         
         
         .layer-item.drag-over {
-            border-top: 3px solid rgba(100, 200, 255, 0.8);
+            border-top: 3px solid rgba(100, 200, 255, 0.95);
             margin-top: 8px;
+            background: rgba(100, 200, 255, 0.08);
         }
-        
+
         .layer-item.dragging {
             opacity: 0.5;
         }
-        
+
+        /* 7.5: while dragging, every OTHER layer item collapses to its
+           header so the list is scannable and drop targets stay dense */
+        #layersPanel.layers-dragging .layer-item-collapsible:not(.dragging) {
+            grid-template-rows: auto 0fr;
+        }
+        #layersPanel.layers-dragging .layer-item-collapsible:not(.dragging) .layer-item-body {
+            visibility: hidden;
+        }
+
         .drop-zone {
             height: 40px;
             border: 2px dashed rgba(100, 200, 255, 0.3);
@@ -720,9 +730,23 @@
             color: rgba(255, 255, 255, 0.4);
             background: rgba(100, 200, 255, 0.05);
         }
-        
+
         .drop-zone:hover, .drop-zone.drag-over {
             height: 50px;
+        }
+
+        /* 7.5: drop zones light up as soon as a drag starts... */
+        #layersPanel.layers-dragging .drop-zone {
+            border-color: rgba(100, 200, 255, 0.55);
+            background: rgba(100, 200, 255, 0.10);
+            color: rgba(255, 255, 255, 0.75);
+        }
+        /* ...and go bright when they're the active target */
+        .drop-zone.drag-over {
+            border-color: rgba(100, 200, 255, 0.95);
+            border-style: solid;
+            background: rgba(100, 200, 255, 0.20);
+            color: #fff;
         }
         
         .layer-thumbnail {

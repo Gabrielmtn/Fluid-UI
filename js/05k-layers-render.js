@@ -415,6 +415,49 @@
             }, true);
             layerDragGuardInstalled = true;
         }
+        // ── 7.5 drag UX: auto-scroll near panel edges + collapse-others ──
+        let dragScrollEl = null;
+        let dragScrollRAF = null;
+        let dragClientY = -1;
+        function findScrollParent(el) {
+            let n = el;
+            while (n && n !== document.body) {
+                const cs = getComputedStyle(n);
+                if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && n.scrollHeight > n.clientHeight + 4) return n;
+                n = n.parentElement;
+            }
+            return null;
+        }
+        function dragScrollTick() {
+            dragScrollRAF = null;
+            if (!draggedElement || !dragScrollEl) return;
+            if (dragClientY >= 0) {
+                const r = dragScrollEl.getBoundingClientRect();
+                const EDGE = 48;
+                let dy = 0;
+                // Speed grows with proximity to the edge (max ~12px/frame)
+                if (dragClientY < r.top + EDGE) dy = -Math.ceil(Math.min(48, r.top + EDGE - dragClientY) / 4);
+                else if (dragClientY > r.bottom - EDGE) dy = Math.ceil(Math.min(48, dragClientY - (r.bottom - EDGE)) / 4);
+                if (dy !== 0) dragScrollEl.scrollTop += dy;
+            }
+            dragScrollRAF = requestAnimationFrame(dragScrollTick);
+        }
+        function onDocDragOver(e) { dragClientY = e.clientY; }
+        function startDragUX() {
+            const panel = document.getElementById('layersPanel');
+            if (panel) panel.classList.add('layers-dragging'); // CSS collapses other items
+            dragScrollEl = panel ? findScrollParent(panel) : null;
+            dragClientY = -1;
+            document.addEventListener('dragover', onDocDragOver);
+            if (!dragScrollRAF) dragScrollRAF = requestAnimationFrame(dragScrollTick);
+        }
+        function endDragUX() {
+            const panel = document.getElementById('layersPanel');
+            if (panel) panel.classList.remove('layers-dragging');
+            document.removeEventListener('dragover', onDocDragOver);
+            if (dragScrollRAF) { cancelAnimationFrame(dragScrollRAF); dragScrollRAF = null; }
+            dragScrollEl = null;
+        }
         function handleDragStart(e) {
             // If slider is active on this item, cancel
             const item = (e.currentTarget && e.currentTarget.closest) ? e.currentTarget.closest('.layer-item') : null;
@@ -424,12 +467,16 @@
             draggedElement = item || this;
             if (draggedElement && draggedElement.classList) draggedElement.classList.add('dragging');
             if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+            startDragUX();
         }
         function handleDragOver(e) {
             if (e.preventDefault) e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             const target = e.target.closest('.layer-item');
-            if (target && target !== draggedElement) {
+            if (target && target !== draggedElement && !target.classList.contains('drag-over')) {
+                // Only one insertion marker at a time (fast moves used to strand them)
+                const panel = document.getElementById('layersPanel');
+                if (panel) panel.querySelectorAll('.drag-over').forEach(el => { if (el !== target) el.classList.remove('drag-over'); });
                 target.classList.add('drag-over');
             }
             return false;
@@ -451,6 +498,7 @@
             // Simple reordering: remove from old position, insert at target position
             const [draggedItem] = layerOrder.splice(draggedOrderIndex, 1);
             layerOrder.splice(targetOrderIndex, 0, draggedItem);
+            endDragUX(); // dragend may not fire on the detached source node
             renderLayers();
             target.classList.remove('drag-over');
             return false;
@@ -460,10 +508,14 @@
             document.querySelectorAll('.layer-item, .drop-zone').forEach(item => {
                 item.classList.remove('drag-over');
             });
+            endDragUX();
+            draggedElement = null;
         }
         function handleDropZoneDragOver(e) {
             if (e.preventDefault) e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
+            const panel = document.getElementById('layersPanel');
+            if (panel) panel.querySelectorAll('.layer-item.drag-over').forEach(el => el.classList.remove('drag-over'));
             this.classList.add('drag-over');
             return false;
         }
@@ -481,6 +533,7 @@
                 // Add to end (bottom = furthest from viewer = lowest z-index)
                 layerOrder.push(draggedItem);
             }
+            endDragUX(); // dragend may not fire on the detached source node
             renderLayers();
             this.classList.remove('drag-over');
             return false;
