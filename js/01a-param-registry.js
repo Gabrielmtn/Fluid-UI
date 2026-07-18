@@ -26,11 +26,21 @@
     // ["audioSensitivity","audioBeatThreshold","brushRefreshRate","audioReactToggle","arMapAutoSplat","arMapSize","arMapKaleido","arMapColor","focusModeToggle","streamFormatLock","audioReactSource","audioAutoSplatMode","splatInMode","splatOutMode"]
     var SLIDERS = {
         densityDissipation: {configKey: "DENSITY_DISSIPATION", ui: {min: 0.85, max: 1.005, step: 0.0001}, hard: {min: 0.85, max: 1.005}, def: 0.993, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.85, max: 1.005, step: 0.0001, scope: "basic"}},
-        velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.9, max: 1.0009}, def: 0.999, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
-        pressureDissipation: {configKey: "PRESSURE_DISSIPATION", ui: {min: 0.9, max: 1.0333, step: 0.001}, hard: {min: 0.75, max: 1.0333}, def: 0.944, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0333, step: 0.001, scope: "basic"}},
+        velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.5, max: 1.0009}, def: 0.999, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
+        pressureDissipation: {configKey: "PRESSURE_DISSIPATION", ui: {min: 0.9, max: 1.0333, step: 0.001}, hard: {min: 0.75, max: 1.0333}, def: 0.95, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0333, step: 0.001, scope: "basic"}},
         pressureIteration: {configKey: "PRESSURE_ITERATIONS", ui: {min: 1, max: 50, step: 1}, hard: {min: 1, max: 50}, def: 32, decimals: 0, category: "simulation", perfTier: 3, simSlider: true, mut: {min: 1, max: 50, step: 1, scope: "basic"}},
+        // Multigrid V-cycle internals — deliberately no `mut`: the mutation
+        // engine randomizing solver shape reads as a bug, not a style variant
+        mgCycles: {configKey: "MG_CYCLES", ui: {min: 2, max: 4, step: 1}, hard: {min: 2, max: 4}, def: 2, decimals: 0, category: "simulation", perfTier: 3},
+        mgPre: {configKey: "MG_PRE", ui: {min: 0, max: 8, step: 1}, hard: {min: 0, max: 8}, def: 2, decimals: 0, category: "simulation", perfTier: 2},
+        mgPost: {configKey: "MG_POST", ui: {min: 0, max: 8, step: 1}, hard: {min: 0, max: 8}, def: 2, decimals: 0, category: "simulation", perfTier: 2},
+        mgCoarse: {configKey: "MG_COARSE", ui: {min: 2, max: 32, step: 1}, hard: {min: 2, max: 32}, def: 8, decimals: 0, category: "simulation", perfTier: 1},
+        mgRelax: {configKey: "MG_RELAX", ui: {min: 0.5, max: 1, step: 0.01}, hard: {min: 0.5, max: 1}, def: 1, decimals: 2, category: "simulation", perfTier: 0},
+        swirl: {configKey: "SWIRL", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "effects", perfTier: 1, mut: {min: 0, max: 0.8, step: 0.01, scope: "extended"}},
+        ridges: {configKey: "RIDGES", ui: {min: 0, max: 6, step: 0.1}, hard: {min: 0, max: 6}, def: 0, decimals: 1, category: "effects", perfTier: 1, mut: {min: 0, max: 4, step: 0.1, scope: "extended"}},
         velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 2.5, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
         curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 25, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
+        velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false},
         sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "simulation", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
         brushSize: {configKey: null, ui: {min: 0.1, max: 30, step: 0.1}, hard: {min: 0.1, max: 30}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
@@ -62,6 +72,15 @@
         audioSensitivity: {configKey: null, ui: null, hard: {min: 0.1, max: 3}, def: null, decimals: 1, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.1, scope: "extended"}},
         audioBeatThreshold: {configKey: null, ui: null, hard: {min: 0.1, max: 1}, def: null, decimals: 2, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 1, step: 0.05, scope: "extended"}},
         brushRefreshRate: {configKey: null, ui: null, hard: {min: 0, max: 100}, def: null, decimals: 0, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0, max: 100, step: 1, scope: "extended"}},
+        // D1 stroke engine (dynamically-created in buildBrushSection; no mut —
+        // input-feel params, not style variants)
+        brushStabilizer: {configKey: "BRUSH_STABILIZER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushSpacing: {configKey: "BRUSH_SPACING", ui: null, hard: {min: 0.01, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushHardness: {configKey: "BRUSH_HARDNESS", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushFlow: {configKey: "BRUSH_FLOW", ui: null, hard: {min: 0.05, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushJitter: {configKey: "BRUSH_JITTER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushPressureCurve: {configKey: "BRUSH_PRESSURE_CURVE", ui: null, hard: {min: 0.25, max: 2.5}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushTipTexture: {configKey: "BRUSH_TIP_TEXTURE", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         shadingIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.1, scope: "extended"}}
     };
     var CHECKBOXES = {
@@ -74,6 +93,10 @@
         preserveFluidOpacity: {def: true, mutScope: null},
         statsToggle: {def: false, mutScope: null},
         transparentMode: {def: false, mutScope: null},
+        brushPressureSize: {def: true, mutScope: null},
+        brushPressureFlow: {def: false, mutScope: null},
+        brushEraser: {def: false, mutScope: null},
+        sketchVisible: {def: true, mutScope: null},
         randomColor: {def: true, mutScope: "basic"},
         stepPalette: {def: false, mutScope: "basic"},
         kaleidoToggle: {def: false, mutScope: "basic"},
@@ -81,8 +104,11 @@
         enableLighting: {def: false, mutScope: "extended"},
         enableLightShift: {def: false, mutScope: "extended"},
         microDetailToggle: {def: false, mutScope: "extended"},
+        // Render-quality plumbing, not an aesthetic param: never mutate
+        // (a mutation flipping advection quality reads as a perf bug).
+        macCormackToggle: {def: true, mutScope: null},
+        multigridToggle: {def: true, mutScope: null},
         sunraysToggle: {def: false, mutScope: "extended"},
-        turbulenceMode: {def: false, mutScope: "basic"},
         ascendToggle: {def: false, mutScope: "extended"},
         ascendRandomness: {def: false, mutScope: "extended"},
         shootingStarToggle: {def: false, mutScope: "extended"},
@@ -107,6 +133,7 @@
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
         recMode: {options: ["off", "min", "full"], def: "off", mut: null},
         recPlaybackSpeed: {options: ["0.25", "0.5", "1", "2", "4"], def: "0.25", mut: null},
+        audioMode: {options: ["off", "tunnel", "ferro", "min", "full"], def: "off", mut: null},
         audioReactSource: {options: null, def: null, mut: null},
         audioAutoSplatMode: {options: null, def: null, mut: null},
         splatInMode: {options: null, def: null, mut: null},

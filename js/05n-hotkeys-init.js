@@ -111,6 +111,7 @@
                     if (lastStr === currStr) return; // skip duplicate snapshot
                 }
                 undoStack.push(current);
+                if (undoStack.length > 100) undoStack.shift();
                 redoStack.length = 0;
             } catch (e) { /* noop */ }
         }
@@ -264,11 +265,26 @@
             // Undo/Redo
             if (ctrlOrMeta && lower === 'z') {
                 e.preventDefault();
+                // D6 slice 1: while painting INTO a paint layer or mask,
+                // Ctrl+Z / Ctrl+Shift+Z operate on paint strokes (GPU
+                // snapshot ring in 05i), NOT the UI-state undo — deliberately
+                // no fall-through, or an empty stroke history would silently
+                // rewind sliders.
+                if (window.config && (window.config.BRUSH_TARGET === 'sketch' || window.config.BRUSH_TARGET === 'mask')
+                    && typeof window.__sketchUndo === 'function') {
+                    if (e.shiftKey) window.__sketchRedo(); else window.__sketchUndo();
+                    return;
+                }
                 if (e.shiftKey) doRedo(); else doUndo();
                 return;
             }
             if (ctrlOrMeta && lower === 'y') {
                 e.preventDefault();
+                if (window.config && (window.config.BRUSH_TARGET === 'sketch' || window.config.BRUSH_TARGET === 'mask')
+                    && typeof window.__sketchRedo === 'function') {
+                    window.__sketchRedo();
+                    return;
+                }
                 doRedo();
                 return;
             }
@@ -364,6 +380,9 @@
                     visible: layer.visible,
                     isLooping: layer.isLooping,
                     loopMaxMs: layer.loopMaxMs,
+                    colorMode: layer.colorMode || 'original',
+                    recordMode: layer.recordMode || 'main',
+                    recordStepPalette: layer.recordStepPalette || null,
                     mask: layer.mask ? {
                         enabled: layer.mask.enabled,
                         mode: layer.mask.mode,
@@ -387,6 +406,9 @@
                 layer.visible = ld.visible !== false;
                 layer.isLooping = ld.isLooping !== undefined ? !!ld.isLooping : true;
                 layer.loopMaxMs = (typeof ld.loopMaxMs === 'number') ? ld.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : 10000);
+                layer.colorMode = (typeof recMigrateColorMode === 'function') ? recMigrateColorMode(ld.colorMode) : (ld.colorMode || 'original');
+                layer.recordMode = ld.recordMode || 'main';
+                layer.recordStepPalette = ld.recordStepPalette || null;
                 if (ld.mask) {
                     layer.mask = {
                         enabled: !!ld.mask.enabled,

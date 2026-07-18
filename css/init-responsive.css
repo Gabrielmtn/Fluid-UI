@@ -278,13 +278,11 @@
     border: 1px solid rgba(100, 200, 255, 0.35);
 }
 
-/* Header: wrap into two rows — thumbnail+title on top, buttons below */
+/* Header: single row — thumbnail + title + collapse toggle */
 #sidebar-right .layer-item-header {
-    display: grid;
-    grid-template-columns: 36px 1fr;
-    grid-template-rows: auto auto;
-    gap: 6px 8px;
+    display: flex;
     align-items: center;
+    gap: 8px;
 }
 
 /* Thumbnail */
@@ -292,15 +290,13 @@
     width: 36px;
     height: 36px;
     border-radius: 6px;
-    grid-row: 1;
-    grid-column: 1;
+    flex-shrink: 0;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* Title info area - gets full remaining width */
 #sidebar-right .layer-info {
-    grid-row: 1;
-    grid-column: 2;
+    flex: 1;
     min-width: 0;
     display: flex;
     align-items: center;
@@ -326,13 +322,19 @@
     outline: none;
 }
 
-/* Controls row - spans full width below thumbnail+title */
+/* Collapse toggle in header */
 #sidebar-right .layer-controls {
-    grid-row: 2;
-    grid-column: 1 / -1;
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+/* Action buttons row inside layer body (moved out of header) */
+#sidebar-right .layer-action-row {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
+    margin-bottom: 6px;
 }
 
 /* Compact layer buttons with clearer styling */

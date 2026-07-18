@@ -153,8 +153,8 @@ body > .controls {
 
 /* ── Color channel ── */
 .mixer-channel.ch-wide {
-    min-width: 86px;
-    max-width: 112px;
+    min-width: 170px;
+    max-width: 180px;
     gap: 3px;
 }
 /* Label sits inline with the swatch on one row (saves a stacked row) */
@@ -334,8 +334,8 @@ body > .controls {
        set the strip's height: on narrow windows the chips wrap into many
        rows, so cap the block and scroll internally instead of letting it
        balloon the whole strip. */
-    flex: 1 1 280px;
-    min-width: 240px;
+    flex: 1 1 220px;
+    min-width: 180px;
     max-width: none;
     align-self: center;
     max-height: 64px;
@@ -348,23 +348,11 @@ body > .controls {
     background: rgba(255, 255, 255, 0.12);
     border-radius: 2px;
 }
-.mixer-presets button,
-#mixer-strip .mixer-presets button {
-    all: unset !important;
-    box-sizing: border-box !important;
-    padding: 3px 8px !important;
-    font-size: 10px !important;
-    border-radius: 3px !important;
-    background: rgba(255,255,255,0.08) !important;
-    color: rgba(255,255,255,0.7) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    cursor: pointer !important;
-    line-height: 1.2 !important;
-    font-weight: 500 !important;
-}
-.mixer-presets button:hover {
-    opacity: 0.8;
-}
+/* (legacy `.mixer-presets button { all: unset !important; ... }` block
+   removed 2026-07-13 — it was one side of a three-way specificity war
+   with the JS inline styles (also removed) and made .active states
+   unrenderable on every button in the presets channel. All preset-button
+   styling now lives in the class rules below.) */
 /* Separator between built-in and user presets */
 .preset-sep {
     width: 1px;
@@ -372,6 +360,31 @@ body > .controls {
     background: rgba(255,255,255,0.15);
     margin: 0 3px;
     flex-shrink: 0;
+}
+/* Built-in preset buttons in mixer strip (styles moved out of JS inline
+   cssText 2026-07-13 — inline styles beat any class, which is why .active
+   never rendered on these) */
+#mixer-strip .mixer-preset-btn {
+    all: unset;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    font-size: 9px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.1);
+    cursor: pointer;
+    line-height: 1.2;
+    font-weight: 500;
+}
+#mixer-strip .mixer-preset-btn:hover {
+    opacity: 0.8;
+}
+#mixer-strip .mixer-preset-btn.active {
+    background: rgba(100,200,255,0.28);
+    border-color: rgba(100,200,255,0.55);
+    color: white;
+    font-weight: 600;
 }
 /* User preset buttons in mixer strip */
 .mixer-user-presets {
@@ -383,9 +396,11 @@ body > .controls {
     padding: 4px 8px;
     font-size: 9px;
     border-radius: 3px;
-    background: rgba(100,200,255,0.12) !important;
-    color: rgba(100,200,255,0.8) !important;
-    border: 1px solid rgba(100,200,255,0.2) !important;
+    /* no !important — it existed to beat the JS inline styles (now gone)
+       and collaterally defeated the .active rule below */
+    background: rgba(100,200,255,0.12);
+    color: rgba(100,200,255,0.8);
+    border: 1px solid rgba(100,200,255,0.2);
     cursor: pointer;
     line-height: 1.2;
     max-width: 80px;
@@ -515,3 +530,172 @@ body > .controls {
     gap: 3px;
 }
 
+
+/* ── Brush settings panel (D1): dropdown off the Brush channel label ── */
+#mixer-strip .ch-label.brush-trigger {
+    cursor: pointer;
+    user-select: none;
+}
+#mixer-strip .ch-label.brush-trigger:hover,
+#mixer-strip .ch-label.brush-trigger.active {
+    color: rgba(255, 220, 80, 1);
+}
+.brush-trigger-chev {
+    font-size: 8px;
+    margin-left: 3px;
+    opacity: 0.6;
+}
+.brush-settings-panel {
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.brush-settings-panel .brush-section-label {
+    margin-top: 10px;
+}
+.brush-settings-panel .control-group {
+    margin-bottom: 8px;
+}
+.brush-settings-panel .control-group label {
+    display: block;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 2px;
+}
+.brush-settings-panel .control-group label .value-display {
+    float: right;
+    font-family: 'Courier New', monospace;
+    color: rgba(255, 220, 80, 0.9);
+}
+.brush-settings-panel .control-group input[type="range"] {
+    width: 100%;
+    margin: 0;
+}
+.brush-settings-panel .control-group.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+.brush-settings-panel .control-group.checkbox-group label {
+    display: inline;
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+/* Tip picker */
+.brush-tip-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+.brush-tip-btn {
+    all: unset;
+    box-sizing: border-box;
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 26px;
+    font-size: 12px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+}
+.brush-tip-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.brush-tip-btn.active {
+    background: rgba(255, 220, 80, 0.2);
+    border-color: rgba(255, 220, 80, 0.45);
+    color: rgba(255, 220, 80, 1);
+}
+
+/* Brush preset chips */
+.brush-presets-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.brush-preset-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 7px;
+    font-size: 10px;
+    font-weight: 500;
+    border-radius: 3px;
+    background: rgba(255, 220, 80, 0.1);
+    border: 1px solid rgba(255, 220, 80, 0.2);
+    color: rgba(255, 220, 80, 0.85);
+    cursor: pointer;
+    max-width: 110px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.brush-preset-btn:hover {
+    background: rgba(255, 220, 80, 0.18);
+}
+.brush-preset-btn.active {
+    background: rgba(255, 220, 80, 0.3);
+    border-color: rgba(255, 220, 80, 0.55);
+    color: #fff;
+    font-weight: 600;
+}
+.brush-preset-btn.eraser {
+    background: rgba(255, 120, 120, 0.1);
+    border-color: rgba(255, 120, 120, 0.25);
+    color: rgba(255, 150, 150, 0.9);
+}
+.brush-preset-del {
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0;
+    color: rgba(255, 255, 255, 0.6);
+}
+.brush-preset-btn:hover .brush-preset-del {
+    opacity: 0.8;
+}
+.brush-preset-del:hover {
+    color: #ff6b6b;
+    opacity: 1;
+}
+.brush-presets-save-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+/* The strip scopes .mixer-preset-save; the panel lives on <body>, so it
+   needs its own copy of the save-button look. */
+.brush-settings-panel .mixer-preset-save {
+    all: unset;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 3px;
+    background: rgba(63,185,80,0.15);
+    color: rgba(63,185,80,0.9);
+    border: 1px solid rgba(63,185,80,0.25);
+    cursor: pointer;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.brush-settings-panel .mixer-preset-save:hover {
+    opacity: 0.8;
+}
+
+/* ── Compositor isolation (UI audit Stage 1, 2026-07-09) ──────────────
+   Same treatment as #sidebar-right (see 21-sidebar.css): promote the
+   strip to its own compositor layer so channel hover repaints stop
+   contending with the WebGL canvas underneath. */
+#mixer-strip {
+    transform: translateZ(0);
+    contain: layout style;
+}

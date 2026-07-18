@@ -209,16 +209,22 @@
         }
     }
 
-    // Animation loop
+    // Animation loop. Gated to ~60 Hz: rAF is uncapped in the Electron build,
+    // and animateRandomMode advances PER CALL — ungated, the random walk ran
+    // ~16× faster than designed on high-refresh rigs.
+    let _lsLastStep = 0;
     function startAnimation() {
         function animate() {
             animationFrame = requestAnimationFrame(animate);
-            
+
             if (!window.lightSource.enabled) return;
-            
+            const _stepNow = performance.now();
+            if (_stepNow - _lsLastStep < 15) return;
+            _lsLastStep = _stepNow;
+
             const mode = window.lightSource.mode;
             const speed = window.lightSource.speed;
-            
+
             if (mode === 'random') {
                 animateRandomMode(speed);
             }

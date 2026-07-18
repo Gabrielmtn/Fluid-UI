@@ -15,12 +15,16 @@
             const layer = layers.find(l => l.index === index);
             if (layer) {
                 layer.visible = !layer.visible;
+                // D2 raster layers have no backing div (GPU-composited)
                 const layerDiv = document.getElementById(`layer${index}`);
-                layerDiv.style.display = layer.visible ? 'block' : 'none';
+                if (layerDiv) layerDiv.style.display = layer.visible ? 'block' : 'none';
                 renderLayers();
             }
         };
         window.deleteLayer = (index) => {
+            // D2: free a raster layer's GPU buffer + history before the
+            // arrays forget it existed
+            if (window.rasterLayers) window.rasterLayers._onDeleted(index);
             const layerDiv = document.getElementById(`layer${index}`);
             if (layerDiv) {
                 layerDiv.style.backgroundImage = '';
@@ -42,6 +46,7 @@
             const layer = layers.find(l => l.index === index);
             if (layer && layer.mask) {
                 layer.mask.enabled = !layer.mask.enabled;
+                layer.__maskDirty = true; // 7.6: reorder-reapply memo
                 applyLayerMask(index);
                 renderLayers();
             }
@@ -410,3 +415,263 @@
             // Apply mask if enabled
             applyLayerMask(index);
         }
+        // ═══ D2: raster paint layers ════════════════════════════════════
+        // GPU-backed persistent paint layers: pixels live in rasterStore
+        // (RGBA8 dye-res FBOs, declared in 05c so initFramebuffers can
+        // preserve them across reinits). They are first-class layers[]
+        // citizens — ordered/reordered in layerOrder alongside the sim and
+        // the DOM image layers — but have NO backing div: displayFrag
+        // composites them inside the GL canvas (raw vUv, after fluid
+        // effects), so stills/video export inherit them from the canvas
+        // snapshot for free. The lexical `sketch` alias (05c) always points
+        // at the ACTIVE raster layer's FBO, which keeps every existing
+        // __sketch* path (stamp/clear/ignite/capture/undo) working verbatim
+        // on "the layer you're painting into".
+        (function () {
+            const RASTER_SLOTS = 4; // displayFrag sampler budget (uRaster0..3)
+            const MODE_INT = { normal: 0, multiply: 1, screen: 2, add: 3 };
+            let _activeRasterId = null;
+            const _slots = [];                        // reused per frame (zero-GC)
+            const _slotPool = [{}, {}, {}, {}];
+            let _thumbTimer = null;
+            const _thumbPending = {};
+            const _EMPTY_THUMB = (function () {
+                const c = document.createElement('canvas');
+                c.width = c.height = 8;
+                return c.toDataURL();
+            })();
+            function _layerFor(id) { return layers.find(l => l.index === id && l.isRaster) || null; }
+            function _nextIndex() {
+                // ≥100 keeps clear of the 0-9 static-div slots; dynamic
+                // collision indices (maxIndex+1) simply continue above us
+                let mx = 99;
+                layers.forEach(l => { if (l.index > mx) mx = l.index; });
+                return mx + 1;
+            }
+            function _newFBO() {
+                return createFBO(dyeTexWidth, dyeTexHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR);
+            }
+            function setActive(id) {
+                const layer = _layerFor(id);
+                if (!layer || !rasterStore[id]) return false;
+                _activeRasterId = id;
+                sketch = rasterStore[id];
+                window.sketch = sketch;
+                // patch the panel highlight in place (no full re-render)
+                document.querySelectorAll('.layer-item[data-raster="1"]').forEach(el => {
+                    const on = parseInt(el.dataset.layerIndex, 10) === id;
+                    el.classList.toggle('raster-active', on);
+                    const btn = el.querySelector('.raster-paint-btn');
+                    if (btn) btn.classList.toggle('active', on);
+                });
+                if (typeof window.__onActiveRasterChanged === 'function') window.__onActiveRasterChanged(id, layer.title);
+                return true;
+            }
+            function create(name) {
+                const id = _nextIndex();
+                rasterStore[id] = _newFBO();
+                layers.push({
+                    index: id,
+                    title: name || ('Paint ' + (layers.filter(l => l.isRaster).length + 1)),
+                    data: _EMPTY_THUMB, originalData: null,
+                    visible: true, active: false, threshold: 0,
+                    x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0,
+                    isRaster: true, opacity: 1, blendMode: 'normal',
+                    mask: { enabled: false, mode: 'show', shapes: [] }
+                });
+                // insert just above the sim entry — new paint composites
+                // over the fluid, like the original sketch layer did
+                const simIdx = layerOrder.findIndex(o => o.type === 'sim');
+                layerOrder.splice(simIdx >= 0 ? simIdx : 0, 0, { type: 'layer', id: id });
+                setActive(id);
+                if (typeof renderLayers === 'function') renderLayers();
+                return id;
+            }
+            function ensureDefault() {
+                if (layers.some(l => l.isRaster)) {
+                    if (_activeRasterId == null || !_layerFor(_activeRasterId) || !rasterStore[_activeRasterId]) {
+                        const first = layers.find(l => l.isRaster && rasterStore[l.index]);
+                        if (first) setActive(first.index);
+                    }
+                    return _activeRasterId;
+                }
+                return create('Sketch');
+            }
+            function _onDeleted(id) {
+                if (!rasterStore[id]) return;
+                gl.deleteTexture(rasterStore[id].texture);
+                gl.deleteFramebuffer(rasterStore[id].fbo);
+                delete rasterStore[id];
+                if (typeof window.__sketchUndoPurge === 'function') window.__sketchUndoPurge(id);
+                // let the live collider binding notice its source is gone
+                // (23's refresh sees the missing FBO and auto-unbinds)
+                if (typeof window.__onSketchMutated === 'function') window.__onSketchMutated(id);
+                if (_activeRasterId === id) {
+                    _activeRasterId = null;
+                    sketch = null;
+                    window.sketch = null;
+                    const next = layers.find(l => l.isRaster && l.index !== id && rasterStore[l.index]);
+                    if (next) setActive(next.index);
+                    // else: the next sketch-route dab lazily recreates a default
+                    else if (typeof window.__onActiveRasterChanged === 'function') window.__onActiveRasterChanged(null, null);
+                }
+            }
+            // Per-frame: visible raster layers in composite order (bottom →
+            // top, so below-fluid slots come first), capped at the shader's
+            // 4-slot budget — the TOPMOST extras drop (painting order wins).
+            function collectSlots() {
+                _slots.length = 0;
+                let passedSim = false;
+                for (let i = layerOrder.length - 1; i >= 0; i--) {
+                    const item = layerOrder[i];
+                    if (item.type === 'sim') { passedSim = true; continue; }
+                    const layer = _layerFor(item.id);
+                    if (!layer || !layer.visible) continue;
+                    const f = rasterStore[layer.index];
+                    if (!f) continue;
+                    if (_slots.length >= RASTER_SLOTS) break;
+                    const s = _slotPool[_slots.length];
+                    s.texture = f.texture;
+                    s.opacity = (typeof layer.opacity === 'number') ? layer.opacity : 1;
+                    s.mode = MODE_INT[layer.blendMode] || 0;
+                    s.under = !passedSim;
+                    // D3 clip binding: a Mask's coverage gates this layer
+                    const cf = (layer.clipMaskId != null && window.Masks)
+                        ? window.Masks.getFBO(layer.clipMaskId) : null;
+                    s.clipTex = cf ? cf.texture : null;
+                    s.clipInvert = !!layer.clipInvert;
+                    _slots.push(s);
+                }
+                return _slots;
+            }
+            // Readback → 2D canvas, flipped to top-down and UNPREMULTIPLIED
+            // (the FBO stores premultiplied; PNG wants straight — without
+            // the divide, every save/restore round-trip darkens the edges).
+            function _readbackCanvas(f, outW, outH) {
+                const px = new Uint8Array(f.width * f.height * 4);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
+                gl.readPixels(0, 0, f.width, f.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                const c = document.createElement('canvas');
+                c.width = f.width; c.height = f.height;
+                const ctx = c.getContext('2d');
+                const img = ctx.createImageData(f.width, f.height);
+                for (let y = 0; y < f.height; y++) {
+                    const src = (f.height - 1 - y) * f.width * 4;
+                    const dst = y * f.width * 4;
+                    for (let x = 0; x < f.width * 4; x += 4) {
+                        const a = px[src + x + 3];
+                        const inv = a > 0 ? 255 / a : 0;
+                        img.data[dst + x] = Math.min(255, px[src + x] * inv);
+                        img.data[dst + x + 1] = Math.min(255, px[src + x + 1] * inv);
+                        img.data[dst + x + 2] = Math.min(255, px[src + x + 2] * inv);
+                        img.data[dst + x + 3] = a;
+                    }
+                }
+                ctx.putImageData(img, 0, 0);
+                if (outW && (outW !== f.width || outH !== f.height)) {
+                    const small = document.createElement('canvas');
+                    small.width = outW; small.height = outH;
+                    small.getContext('2d').drawImage(c, 0, 0, outW, outH);
+                    return small;
+                }
+                return c;
+            }
+            // Coalesced panel-thumbnail refresh (stroke-END cadence via
+            // __onRasterMutated, never per dab — same rule as the live
+            // collider readback in 23).
+            function _queueThumb(rid) {
+                _thumbPending[rid] = true;
+                if (_thumbTimer) return;
+                _thumbTimer = setTimeout(function () {
+                    _thumbTimer = null;
+                    Object.keys(_thumbPending).forEach(function (k) {
+                        delete _thumbPending[k];
+                        const id = parseInt(k, 10);
+                        const layer = _layerFor(id);
+                        const f = rasterStore[id];
+                        if (!layer || !f) return;
+                        const th = Math.max(1, Math.round(96 * f.height / f.width));
+                        layer.data = _readbackCanvas(f, 96, th).toDataURL();
+                        const thumbEl = document.querySelector('.layer-item[data-layer-index="' + id + '"] .layer-thumbnail');
+                        if (thumbEl) thumbEl.style.backgroundImage = 'url(' + layer.data + ')';
+                    });
+                }, 200);
+            }
+            window.__onRasterMutated = function (rid) { if (rid != null) _queueThumb(rid); };
+            // Full-res layer.data refresh — called by save (12) right before
+            // serializing so raster pixels round-trip through presets.
+            function syncData() {
+                layers.forEach(function (layer) {
+                    if (!layer.isRaster) return;
+                    const f = rasterStore[layer.index];
+                    if (f) layer.data = _readbackCanvas(f).toDataURL('image/png');
+                });
+            }
+            // (Re)create a restored layer's FBO and upload its saved pixels.
+            function restoreFromData(layer) {
+                if (!rasterStore[layer.index]) rasterStore[layer.index] = _newFBO();
+                if (!layer.data) return;
+                const img = new Image();
+                img.onload = function () {
+                    const f = rasterStore[layer.index];
+                    if (!f) return; // deleted while the image decoded
+                    const c = document.createElement('canvas');
+                    c.width = f.width; c.height = f.height;
+                    c.getContext('2d').drawImage(img, 0, 0, f.width, f.height);
+                    gl.bindTexture(gl.TEXTURE_2D, f.texture);
+                    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+                    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, c);
+                    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+                    gl.bindTexture(gl.TEXTURE_2D, null);
+                    _queueThumb(layer.index);
+                };
+                img.src = layer.data;
+            }
+            // After a preset load rebuilt layers[]: free orphaned FBOs,
+            // create+refill FBOs for restored raster layers, re-point the
+            // active alias.
+            function reconcile() {
+                Object.keys(rasterStore).forEach(function (k) {
+                    const id = parseInt(k, 10);
+                    if (!_layerFor(id)) {
+                        gl.deleteTexture(rasterStore[id].texture);
+                        gl.deleteFramebuffer(rasterStore[id].fbo);
+                        delete rasterStore[id];
+                        if (typeof window.__sketchUndoPurge === 'function') window.__sketchUndoPurge(id);
+                    }
+                });
+                layers.forEach(function (layer) {
+                    if (layer.isRaster && !rasterStore[layer.index]) restoreFromData(layer);
+                });
+                if (_activeRasterId == null || !_layerFor(_activeRasterId) || !rasterStore[_activeRasterId]) {
+                    _activeRasterId = null;
+                    sketch = null;
+                    window.sketch = null;
+                    const first = layers.find(function (l) { return l.isRaster && rasterStore[l.index]; });
+                    if (first) setActive(first.index);
+                }
+            }
+            window.rasterLayers = {
+                create: create,
+                ensureDefault: ensureDefault,
+                setActive: setActive,
+                activeId: function () { return _activeRasterId; },
+                getFBO: function (id) { return rasterStore[id] || null; },
+                list: function () { return layers.filter(function (l) { return l.isRaster; }); },
+                collectSlots: collectSlots,
+                restoreFromData: restoreFromData,
+                reconcile: reconcile,
+                syncData: syncData,
+                _onDeleted: _onDeleted
+            };
+            // Boot: create the default Sketch layer once the whole chain is
+            // up (renderLayers/applyLayerMask live in later chunks — poll,
+            // the same pattern 23-depth-collision uses for deleteLayer).
+            (function boot() {
+                if (window.__scriptsReady) { ensureDefault(); }
+                else setTimeout(boot, 120);
+            })();
+        })();

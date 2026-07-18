@@ -11,8 +11,14 @@ export const MATCHMAKE_THROTTLE_MS = 3_000;
 export const MAX_MESSAGE_BYTES = 16 * 1024;
 
 // Authenticates the play-room -> lobby "vacate" call so a browser client cannot
-// forge directory updates. Server-only (never shipped to the client bundle).
-export const INTERNAL_SECRET = "fluid-mp-internal-7Q3M2K-no-ship";
+// forge directory updates. The value lives in a PartyKit environment variable
+// (`npx partykit env add INTERNAL_SECRET`) — NEVER hardcode it here: this repo
+// is public, so a committed value is a published value. The dev fallback only
+// matters for `partykit dev`, where both parties share the same fallback.
+export function internalSecret(env: Record<string, unknown> | undefined): string {
+  const v = env ? env["INTERNAL_SECRET"] : undefined;
+  return typeof v === "string" && v.length > 0 ? v : "dev-only-local";
+}
 
 export type RoomKind = "public" | "private" | "system";
 

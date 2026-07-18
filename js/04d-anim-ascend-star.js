@@ -474,7 +474,7 @@
 
                 if (typeof window.applyMultiSplatWith === 'function') {
 
-                    window.applyMultiSplatWith(nx, ny, dx, dy, tailColor, 1, headRadius);
+                    window.applyMultiSplatWith(nx, ny, dx, dy, tailColor, 1, headRadius, true);
 
                 } else {
 

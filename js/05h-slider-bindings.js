@@ -57,9 +57,35 @@
                 }
             }
         }
+        // Gate = no overflows, ever. Two clamps, no automatic motion:
+        // (1) splat shader locks new dye at the stroke's own color, so
+        //     repeated paint in one spot can't stack into white;
+        // (2) advection shader caps the dominant channel at 3.0 (hue-
+        //     preserving), so a user-set density above 1.0 blooms into the
+        //     vibrant HDR zone and saturates there instead of whiting out.
+        // Density dissipation itself stays entirely under user control.
+        function applyGateState(on) {
+            config.COLOR_GATE = on;
+            config.BLOOM_CEILING = on ? (typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3.0) : 0;
+        }
+        window.applyGateState = applyGateState;
+        const colorGateCheckbox = document.getElementById('colorGate');
+        if (colorGateCheckbox) {
+            colorGateCheckbox.addEventListener('change', (e) => {
+                applyGateState(e.target.checked);
+                if (window.Settings && typeof window.Settings.saveCheckbox === 'function') {
+                    window.Settings.saveCheckbox('colorGate', e.target.checked);
+                }
+            });
+            if (window.Settings && typeof window.Settings.loadCheckbox === 'function') {
+                const savedGate = window.Settings.loadCheckbox('colorGate', false);
+                colorGateCheckbox.checked = savedGate;
+                applyGateState(savedGate);
+            }
+        }
         // Resolution dropdowns (absolute resolution, independent of display canvas size)
         // Set a resolution <select> to a value, INJECTING it as an option if it isn't
-        // one of the presets. Battery profiles / the FPS-adaptive tier use non-standard
+        // one of the presets. The FPS-adaptive tier may use non-standard
         // resolutions (dye 1536, sim 192); the markup has no 'custom' option or input,
         // so the old code set value='custom' and left the dropdown BLANK ("not
         // initializing properly"). Injecting keeps the dropdown showing the real value.
@@ -85,7 +111,6 @@
         if (visualResSel) {
             window.setResolutionDropdown(visualResSel, config.DYE_RESOLUTION);
             visualResSel.addEventListener('change', (e) => {
-                if (typeof window.clearActiveProfile === 'function') window.clearActiveProfile();
                 if (e.target.value === 'custom') {
                     if (visualResCustom) {
                         visualResCustom.style.display = 'block';
@@ -120,7 +145,6 @@
         if (physicsResSel) {
             window.setResolutionDropdown(physicsResSel, config.SIM_RESOLUTION);
             physicsResSel.addEventListener('change', (e) => {
-                if (typeof window.clearActiveProfile === 'function') window.clearActiveProfile();
                 if (e.target.value === 'custom') {
                     if (physicsResCustom) {
                         physicsResCustom.style.display = 'block';
@@ -154,11 +178,6 @@
         let lastDensitySnapTime = 0;
         canvasArea.addEventListener('wheel', (e) => {
             e.preventDefault();
-            // Deactivate performance profile for modifier-key scrolls that change sim settings
-            // (not plain scroll which only changes brush size)
-            if ((e.ctrlKey || e.shiftKey || e.altKey) && typeof window.clearActiveProfile === 'function') {
-                window.clearActiveProfile();
-            }
             if (e.ctrlKey && e.shiftKey) {
                 // Ctrl+Shift+Scroll: Adjust Motion Isolation (Velocity Influence)
                 // Uses eased acceleration: faster scroll = bigger jumps
@@ -187,10 +206,11 @@
                     if (velValueSpan) velValueSpan.textContent = newValue.toFixed(3);
                 }
             } else if (e.ctrlKey && e.altKey) {
-                // Ctrl+Alt+Scroll: Adjust Curl
+                // Ctrl+Alt+Scroll: Adjust Curl (raw CURL only — in material mode
+                // the slider is a macro and this shortcut would desync it)
                 const cSlider = document.getElementById('curl');
                 const cSpan = document.getElementById('curlValue');
-                if (cSlider) {
+                if (cSlider && !(window.MaterialModes && window.MaterialModes.active())) {
                     let currentValue = parseFloat(cSlider.value);
                     const minValue = parseFloat(cSlider.min);
                     const maxValue = parseFloat(cSlider.max);
@@ -318,6 +338,13 @@
             const valueSpanId = valueSpanMap[id] || (id + 'Value');
             const valueSpan = document.getElementById(valueSpanId);
             slider.addEventListener('input', (e) => {
+                // 13.5: settings locked by the multiplayer host — swallow local
+                // edits on registry-bound sim sliders (host's snapshot re-syncs
+                // the thumb). Painting controls (brushSize etc.) are unaffected.
+                if (window.__mpSettingsLocked && !window.__mpApplyingRemote) {
+                    e.stopImmediatePropagation();
+                    return;
+                }
                 let val = parseFloat(e.target.value);
                 // Clear active preset and performance profile when manually adjusting sliders
                 // (skip if a profile is currently being applied programmatically)
@@ -325,8 +352,19 @@
                     if (typeof window.clearActivePreset === 'function') {
                         window.clearActivePreset();
                     }
-                    if (typeof window.clearActiveProfile === 'function') {
-                        window.clearActiveProfile();
+                }
+                // Material modes own the curl slider when a material is selected:
+                // the value is a macro amount, not CURL — delegate and skip the
+                // direct config write below. Exception: a profile being applied
+                // writes raw CURL values, so material mode yields to it.
+                if (id === 'curl' && window.MaterialModes && window.MaterialModes.active()) {
+                    if (window._profileApplying) {
+                        window.MaterialModes.yieldToExternal();
+                        // fall through: treat the value as raw CURL again
+                    } else {
+                        window.MaterialModes.onSlider(val);
+                        if (valueSpan) valueSpan.textContent = window.MaterialModes.displayValue();
+                        return;
                     }
                 }
                 // Magnetic snap to 1.0 for density slider
@@ -395,6 +433,8 @@
         // Load saved slider values from Settings
         function loadSavedSliderValues() {
             if (!window.Settings || typeof window.Settings.loadSlider !== 'function') return;
+            // Session/settings restore writes raw sim params — material mode yields
+            if (window.MaterialModes && window.MaterialModes.active()) window.MaterialModes.yieldToExternal();
             // Load main sliders
             Object.entries(sliderConfig).forEach(([id, cfg]) => {
                 const savedValue = window.Settings.loadSlider(id, null);
@@ -493,6 +533,9 @@
         // Expose loadSavedSliderValues globally so save-load.js can call it when needed
         window.loadSavedSliderValues = loadSavedSliderValues;
         function updateSliderValues() {
+            // Preset/profile appliers resync sliders from config (raw CURL etc.)
+            // — material mode yields rather than fight over the curl slider.
+            if (window.MaterialModes && window.MaterialModes.active()) window.MaterialModes.yieldToExternal();
             Object.entries(sliderConfig).forEach(([id, cfg]) => {
                 const val = config[cfg.key];
                 const slider = document.getElementById(id);

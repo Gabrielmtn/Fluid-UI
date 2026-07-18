@@ -57,7 +57,7 @@
         mainArea.appendChild(sidebar);
 
         // Move any remaining dynamic content from .controls to sidebar
-        // (e.g., battery manager UI, component system)
+        // (e.g., component system)
         const remaining = controls.querySelectorAll('.collapsible-section, #component-controls');
         remaining.forEach(function(el) {
             // Convert .collapsible-section to .sidebar-section format
@@ -95,7 +95,11 @@
         const brushDisplay = document.getElementById('mixer-brushValue');
         if (brushSlider && brushDisplay) {
             function syncBrush() {
-                brushDisplay.textContent = parseFloat(brushSlider.value).toFixed(1);
+                // Compare before writing: the 2s fallback interval otherwise
+                // invalidates style/layout every tick even when nothing
+                // changed (UI audit Stage 1 — no-op DOM writes aren't free).
+                var v = parseFloat(brushSlider.value).toFixed(1);
+                if (brushDisplay.textContent !== v) brushDisplay.textContent = v;
             }
             brushSlider.addEventListener('input', syncBrush);
             brushSlider.addEventListener('change', syncBrush);
@@ -255,17 +259,25 @@
         strip.id = 'mixer-strip';
 
         // Channel faders for key controls
-        strip.appendChild(faderChannel('Brush', 'orange', 'brushSize', null, 'mixer-brushValue'));
+        // (renames 2026-07-13: 'Brush'→'Size' and 'Multiply'→'Brush' — the
+        // multiplier channel is where the brush controls live, so it owns
+        // the name; the size fader says what it actually is)
+        strip.appendChild(faderChannel('Size', 'orange', 'brushSize', null, 'mixer-brushValue'));
         strip.appendChild(faderChannel('Curl', 'blue', 'curl', 'curlValue'));
         strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
-        var multiplyChannel = faderChannel('Multiply', 'yellow', 'multiplier', 'multiplierValue');
-        // The multiplier value ("1x") IS the arm-colors trigger — click it to
+        var brushChannel = faderChannel('Brush', 'yellow', 'multiplier', 'multiplierValue');
+        // The multiplier value ("1x") IS the brush-colors trigger — click it to
         // open the per-arm brush color controls (no separate icon button).
         // Query from the (detached) channel: faderChannel already re-parented
         // the value element, so document.getElementById would miss it here.
-        buildArmColorsDropdown(multiplyChannel.querySelector('#multiplierValue'));
-        strip.appendChild(multiplyChannel);
+        buildArmColorsDropdown(brushChannel.querySelector('#multiplierValue'));
+        // The LABEL is the brush-settings trigger (D1): the everyday brush
+        // controls (presets / target / tip / feel) live in a strip dropdown —
+        // too common to bury in the sidebar. The sidebar Brush section keeps
+        // the rarer replay + splat-ramp controls.
+        buildBrushPanel(brushChannel.querySelector('.ch-label'));
+        strip.appendChild(brushChannel);
         strip.appendChild(faderChannel('Time', 'pink', 'timeScale', 'timeScaleValue'));
         strip.appendChild(faderChannel('Density', 'cyan', 'densityDissipation', 'densityValue'));
         strip.appendChild(faderChannel('Velocity', 'cyan', 'velocityDissipation', 'velocityValue'));
@@ -290,11 +302,11 @@
 
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
-        'Brush': 'Brush size for painting fluid',
+        'Size': 'Brush size for painting fluid',
         'Curl': 'Vorticity strength - creates swirling motion',
         'Viscosity': 'Sharpness/detail enhancement',
         'Isolation': 'Motion isolation - how much color follows velocity',
-        'Multiply': 'Kaleidoscope multiplier (1-8x)',
+        'Brush': 'Brush arms (1-8x mirrored strokes) — click BRUSH for brush settings & presets, click the value for arm colors',
         'Time': 'Simulation time scale',
         'Density': 'How fast color fades',
         'Velocity': 'How fast motion fades',
@@ -314,7 +326,20 @@
 
         const lbl = document.createElement('div');
         lbl.className = 'ch-label';
-        lbl.textContent = label;
+        // The Curl channel's label IS the material-mode selector (Curl/Fluid/
+        // Ooze/Clay) — adopt it from the sidebar markup instead of static text.
+        const matSel = (sliderId === 'curl') ? document.getElementById('materialMode') : null;
+        if (matSel) {
+            lbl.appendChild(matSel);
+            // Re-fit the select to its label text in the strip's font — deferred
+            // a tick: this label is still detached here, and computed styles on
+            // a detached node measure with the wrong font.
+            setTimeout(function () {
+                if (window.MaterialModes && window.MaterialModes.resizeLabel) window.MaterialModes.resizeLabel();
+            }, 0);
+        } else {
+            lbl.textContent = label;
+        }
         if (CHANNEL_TOOLTIPS[label]) lbl.title = CHANNEL_TOOLTIPS[label];
         head.appendChild(lbl);
 
@@ -432,6 +457,87 @@
             toggleRow.appendChild(stepBtn);
         }
 
+        // Gate chip (independent of Rnd/Step exclusivity): clamps dye at the
+        // stroke's own color so repeated paint can't overflow into white.
+        var gateEl = document.getElementById('colorGate');
+        if (gateEl) {
+            gateEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+            var gateBtn = document.createElement('button');
+            gateBtn.type = 'button';
+            gateBtn.className = 'ch-text-toggle' + (gateEl.checked ? ' active' : '');
+            gateBtn.textContent = 'Gate';
+            gateBtn.title = 'Lock max to original color — repeated strokes can\'t overflow into white';
+            gateBtn.addEventListener('click', function () {
+                gateEl.checked = !gateEl.checked;
+                gateEl.dispatchEvent(new Event('change', { bubbles: true }));
+                gateBtn.classList.toggle('active', gateEl.checked);
+                gateDensityWrap.style.display = gateEl.checked ? 'flex' : 'none';
+            });
+            gateEl.addEventListener('change', function () {
+                gateBtn.classList.toggle('active', gateEl.checked);
+                gateDensityWrap.style.display = gateEl.checked ? 'flex' : 'none';
+            });
+            ch.appendChild(gateEl);
+            toggleRow.appendChild(gateBtn);
+
+            // Gate max density incrementer (BLOOM_CEILING) — compact ±0.1 stepper
+            var gateDensityWrap = document.createElement('div');
+            gateDensityWrap.className = 'ch-gate-density';
+            gateDensityWrap.style.cssText = 'display:' + (gateEl.checked ? 'flex' : 'none') + ';align-items:center;justify-content:center;gap:2px;height:16px;flex:0 0 auto;box-sizing:border-box;';
+
+            var GATE_MIN = 1.0, GATE_MAX = 6.0, GATE_STEP = 0.1;
+            var gateCurVal = typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3;
+
+            var gateDownBtn = document.createElement('button');
+            gateDownBtn.type = 'button';
+            gateDownBtn.textContent = '−';
+            gateDownBtn.title = 'Decrease max density';
+            gateDownBtn.style.cssText = 'width:16px;height:16px;padding:0;border:1px solid rgba(255,255,255,0.15);border-radius:3px;background:rgba(0,0,0,0.3);color:#c9d1d9;font-size:12px;line-height:1;cursor:pointer;';
+
+            var gateValSpan = document.createElement('span');
+            gateValSpan.className = 'ch-gate-density-val';
+            gateValSpan.style.cssText = 'font-size:10px;font-family:monospace;color:#4fc3f7;min-width:24px;text-align:center;';
+            gateValSpan.textContent = gateCurVal.toFixed(1);
+
+            var gateUpBtn = document.createElement('button');
+            gateUpBtn.type = 'button';
+            gateUpBtn.textContent = '+';
+            gateUpBtn.title = 'Increase max density';
+            gateUpBtn.style.cssText = 'width:16px;height:16px;padding:0;border:1px solid rgba(255,255,255,0.15);border-radius:3px;background:rgba(0,0,0,0.3);color:#c9d1d9;font-size:12px;line-height:1;cursor:pointer;';
+
+            function updateGateDensity(v) {
+                v = Math.round(v * 10) / 10;
+                v = Math.max(GATE_MIN, Math.min(GATE_MAX, v));
+                window.gateMaxDensity = v;
+                gateCurVal = v;
+                gateValSpan.textContent = v.toFixed(1);
+                if (typeof window.applyGateState === 'function' && gateEl.checked) {
+                    window.applyGateState(true);
+                }
+                try { if (window.settingsManager) window.settingsManager.set('gate.maxDensity', v); } catch (_) {}
+            }
+
+            gateDownBtn.addEventListener('click', function () { updateGateDensity((window.gateMaxDensity || gateCurVal) - GATE_STEP); });
+            gateUpBtn.addEventListener('click', function () { updateGateDensity((window.gateMaxDensity || gateCurVal) + GATE_STEP); });
+
+            // Load saved value
+            try {
+                if (window.settingsManager) {
+                    var savedGD = window.settingsManager.get('gate.maxDensity');
+                    if (typeof savedGD === 'number') {
+                        gateCurVal = Math.max(GATE_MIN, Math.min(GATE_MAX, savedGD));
+                        window.gateMaxDensity = gateCurVal;
+                        gateValSpan.textContent = gateCurVal.toFixed(1);
+                    }
+                }
+            } catch (_) {}
+
+            gateDensityWrap.appendChild(gateDownBtn);
+            gateDensityWrap.appendChild(gateValSpan);
+            gateDensityWrap.appendChild(gateUpBtn);
+            toggleRow.appendChild(gateDensityWrap);
+        }
+
         ch.appendChild(toggleRow);
 
         return ch;
@@ -480,13 +586,15 @@
         const wrap = document.createElement('div');
         wrap.className = 'mixer-presets';
 
-        // Move built-in preset buttons and apply inline styles
+        // Move built-in preset buttons; styling lives in 20-mixer-strip.css
+        // (.mixer-preset-btn) — inline cssText here used to beat the .active
+        // class, so applied presets never highlighted.
         const presetsDiv = controls.querySelector('.presets');
         if (presetsDiv) {
             while (presetsDiv.firstChild) {
                 var child = presetsDiv.firstChild;
                 if (child.tagName === 'BUTTON') {
-                    child.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 8px;font-size:9px;border-radius:3px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.1);cursor:pointer;line-height:1.2;font-weight:500;';
+                    child.classList.add('mixer-preset-btn');
                 }
                 wrap.appendChild(child);
             }
@@ -589,20 +697,22 @@
             userWrap.innerHTML = '';
             names.forEach(function(name) {
                 var btn = document.createElement('button');
-                btn.className = 'mixer-user-preset-btn';
+                btn.className = 'mixer-user-preset-btn'; // styled in 20-mixer-strip.css
                 btn.textContent = name;
                 btn.title = 'Load "' + name + '"';
-                btn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 8px;font-size:9px;border-radius:3px;background:rgba(100,200,255,0.12);color:rgba(100,200,255,0.8);border:1px solid rgba(100,200,255,0.2);cursor:pointer;line-height:1.2;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;';
                 btn.addEventListener('click', function() {
                     var snapshot = presets[name];
                     if (snapshot && typeof window.applyPresetSnapshot === 'function') {
                         window.applyPresetSnapshot(snapshot);
                     }
-                    // Highlight
-                    userWrap.querySelectorAll('.mixer-user-preset-btn').forEach(function(b) { b.classList.remove('active'); });
-                    btn.classList.add('active');
-                    // Clear built-in active state
-                    wrap.querySelectorAll('.presets button, button[onclick]').forEach(function(b) { b.classList.remove('active'); });
+                    // Built-in active state clears through the real state owner
+                    // (04b activePreset), not a cosmetic class sweep.
+                    if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
+                    // Highlight this preset in BOTH user-preset surfaces
+                    // (strip + sidebar list render the same presets).
+                    document.querySelectorAll('.mixer-user-preset-btn, .user-preset-btn').forEach(function(b) {
+                        b.classList.toggle('active', b.textContent === name);
+                    });
                 });
                 userWrap.appendChild(btn);
             });
@@ -750,6 +860,7 @@
         const grid = document.createElement('div');
         grid.id = 'mutationGrid';
         grid.className = 'mutation-grid';
+        grid.style.display = 'none';
         body.appendChild(grid);
 
         // ── Diff panel (shows changes for hovered/selected variant) ──
@@ -766,20 +877,21 @@
         body.appendChild(chainWrap);
 
         // ── Wire up logic ──
-        // Pass button references directly to avoid getElementById issues
-        setTimeout(function () { 
-            wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn); 
-        }, 200);
+        // Pass button references directly to avoid getElementById issues.
+        // No arbitrary delay: wireMutationUI already self-retries every
+        // 100ms until its dependencies (mutation engine + snapshot fns)
+        // exist — the old flat 200ms just added dead air (UI audit Stage 2).
+        wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn);
 
         return sec;
     }
 
     function wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn) {
+        // Self-retry until ALL dependencies exist (engine + snapshot fns) —
+        // the engine check used to warn-and-die, silently leaving the panel
+        // dead if load order ever shifted; now every path converges.
         var engine = window.mutationEngine;
-        if (!engine) { console.warn('[Mutation] Engine not loaded'); return; }
-        
-        // Wait for snapshot functions to be available (exposed by save-load.js)
-        if (!window.capturePresetSnapshot || !window.applyPresetSnapshot) {
+        if (!engine || !window.capturePresetSnapshot || !window.applyPresetSnapshot) {
             setTimeout(function() { wireMutationUI(mutBtn, undoBtn, redoBtn, resetBtn); }, 100);
             return;
         }
@@ -796,7 +908,7 @@
                       'kaleido.mode', 'kaleido.segments', 'kaleido.angle', 'kaleido.twist', 'kaleido.zoom', 'kaleido.blend'],
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
                          'pressureIteration', 'curl', 'sharpness', 'multiplier', 'timeScale',
-                         'velocityInfluence', 'turbulenceMode', 'brushSize', 'brushRefreshRate'],
+                         'velocityInfluence', 'brushSize', 'brushRefreshRate'],
             effects: ['enableLighting', 'enableLightShift', 'microDetailToggle', 'sunraysToggle',
                       'lightIntensity', 'lightAmbient', 'lightSpeed', 'clarity', 'vibrance',
                       'sunraysWeight', 'shadingIntensity', 'displayShadingToggle',
@@ -858,9 +970,11 @@
             grid.innerHTML = '';
 
             if (_variants.length === 0) {
-                grid.innerHTML = '<div class="mutation-empty">Press Mutate to generate variants</div>';
+                grid.style.display = 'none';
+                grid.innerHTML = '';
                 return;
             }
+            grid.style.display = '';
 
             _variants.forEach(function (variant, idx) {
                 var card = document.createElement('div');
@@ -1122,11 +1236,10 @@
         // Close menu on outside click
         document.addEventListener('click', function () { collisionMenu.style.display = 'none'; });
 
-        const chevron = header.querySelector('.section-chevron');
-        header.insertBefore(actions, chevron);
-
-        // Prevent action button clicks from toggling section collapse
-        actions.addEventListener('click', function(e) { e.stopPropagation(); });
+        // 7.2: action buttons belong in the section BODY, not the header —
+        // the header stays title-only (matches the per-layer-item fix in 05k).
+        actions.classList.add('layers-toolbar');
+        body.appendChild(actions);
 
         moveEl('layersPanel', body);
 
@@ -1236,13 +1349,24 @@
         moveControlGroup('fpsCap', body);
         moveControlGroup('pressureDissipation', body);
         moveControlGroup('pressureIteration', body);
-        moveCheckboxGroup('turbulenceMode', body);
+        moveControlGroup('velocityCap', body);
+        moveCheckboxGroup('macCormackToggle', body);
+        moveCheckboxGroup('multigridToggle', body);
+        // Multigrid tuning panel — same toggle+panel pattern as
+        // microDetailPanel/sunraysPanel in the Effects section
+        const multigridPanel = document.getElementById('multigridPanel');
+        if (multigridPanel) body.appendChild(multigridPanel);
 
         return sec;
     }
 
     function buildEffectsSection(controls) {
         const { sec, body } = makeSection('💡 Effects', 'yellow', true);
+
+        // Curl-noise micro-swirl (dye advection wisps)
+        moveControlGroup('swirl', body);
+        // Sharpen kernel scale (coarse emboss at high values)
+        moveControlGroup('ridges', body);
 
         // Surface shading (Pavel-style pseudo-normal lighting)
         moveCheckboxGroup('displayShadingToggle', body);
@@ -1322,7 +1446,10 @@
     }
 
     function buildBrushSection() {
-        const { sec, body } = makeSection('🖌️ Brush', 'orange', true);
+        // Everyday brush controls (target/tip/feel/presets) moved to the strip's
+        // Brush dropdown (buildBrushPanel) 2026-07-16 — this section keeps the
+        // rarer stroke-replay + splat-ramp machinery.
+        const { sec, body } = makeSection('🖌️ Stroke & Replay', 'orange', true);
 
         // --- Replay Mode ---
         var modeLabel = document.createElement('label');
@@ -1379,7 +1506,50 @@
         timeGroup.appendChild(timeInputWrap);
         body.appendChild(timeGroup);
 
-        // --- Brush Refresh Rate ---
+        // --- Replay Speed ---
+        var speedGroup = document.createElement('div');
+        speedGroup.className = 'control-group';
+
+        var speedLbl = document.createElement('label');
+        speedLbl.setAttribute('for', 'replaySpeed');
+        speedLbl.innerHTML = 'Replay Speed <span class="value-display" id="replaySpeedValue">1.0×</span>';
+
+        var speedSlider = document.createElement('input');
+        speedSlider.type = 'range';
+        speedSlider.id = 'replaySpeed';
+        speedSlider.min = '0.25';
+        speedSlider.max = '4';
+        speedSlider.value = '1';
+        speedSlider.step = '0.25';
+
+        speedGroup.appendChild(speedLbl);
+        speedGroup.appendChild(speedSlider);
+        body.appendChild(speedGroup);
+
+        // 1.1 Live colors: replay repaints with the CURRENT brush color
+        // instead of the recorded one (faithful replay stays the default)
+        var liveColGroup = document.createElement('div');
+        liveColGroup.className = 'control-group';
+        var liveColLabel = document.createElement('label');
+        liveColLabel.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;';
+        var liveColCb = document.createElement('input');
+        liveColCb.type = 'checkbox';
+        liveColCb.id = 'replayLiveColors';
+        var liveColText = document.createElement('span');
+        liveColText.textContent = 'Replay uses current color';
+        liveColLabel.title = 'Off = faithful replay (the colors you painted with). On = the stroke repaints with whatever color the brush has NOW.';
+        liveColLabel.appendChild(liveColCb);
+        liveColLabel.appendChild(liveColText);
+        liveColGroup.appendChild(liveColLabel);
+        body.appendChild(liveColGroup);
+        liveColCb.addEventListener('change', function () {
+            window.replayLiveColors = liveColCb.checked;
+            try { if (window.settingsManager) window.settingsManager.set('brush.replayLiveColors', liveColCb.checked); } catch (_) {}
+        });
+        try {
+            var savedLiveCol = window.settingsManager && window.settingsManager.get('brush.replayLiveColors');
+            if (savedLiveCol) { liveColCb.checked = true; window.replayLiveColors = true; }
+        } catch (_) {}
         var rateGroup = document.createElement('div');
         rateGroup.className = 'control-group';
 
@@ -1510,6 +1680,17 @@
             } catch (_) {}
         });
 
+        // --- Wire replay speed ---
+        var speedDisplay = speedLbl.querySelector('.value-display');
+        speedSlider.addEventListener('input', function () {
+            var v = parseFloat(speedSlider.value);
+            window.replaySpeed = v;
+            if (speedDisplay) speedDisplay.textContent = v.toFixed(2).replace(/\.?0+$/, '') + '×';
+            try {
+                if (window.settingsManager) window.settingsManager.set('brush.replaySpeed', v);
+            } catch (_) {}
+        });
+
         // --- Wire refresh rate ---
         var rateDisplay = rateLbl.querySelector('.value-display');
         rateSlider.addEventListener('input', function () {
@@ -1531,6 +1712,13 @@
                 if (typeof savedPeriod === 'number' && savedPeriod >= 1) {
                     timeInput.value = savedPeriod;
                     window.replayTimePeriod = savedPeriod;
+                }
+
+                var savedSpeed = window.settingsManager.get('brush.replaySpeed');
+                if (typeof savedSpeed === 'number') {
+                    speedSlider.value = savedSpeed;
+                    window.replaySpeed = savedSpeed;
+                    if (speedDisplay) speedDisplay.textContent = savedSpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
                 }
 
                 var savedRate = window.settingsManager.get('brush.refreshRate');
@@ -1578,282 +1766,591 @@
         return sec;
     }
 
-    function buildBrandingSection_OLD_UNUSED() {
-        const { sec, body } = makeSection('\ud83c\udfa8 Branding', 'pink', true);
+    // ─── BRUSH PANEL (D1) ────────────────────────────────────────────
+    // The everyday brush controls in a dropdown off the strip's Brush
+    // channel LABEL (the value stays the arm-colors trigger). Built
+    // eagerly so saved settings restore at startup, shown on demand.
+    // Controls keep their legacy element ids + 'brush.*' settings keys,
+    // so values saved when they lived in the sidebar migrate untouched.
+    function buildBrushPanel(trigger) {
+        if (!trigger) return;
+        trigger.classList.add('brush-trigger');
+        var chev = document.createElement('span');
+        chev.className = 'brush-trigger-chev';
+        chev.textContent = '▾';
+        trigger.appendChild(chev);
 
-        // --- Add Text Overlay ---
-        var textLabel = document.createElement('label');
-        textLabel.className = 'brush-section-label';
-        textLabel.textContent = 'Text Overlay';
-        body.appendChild(textLabel);
+        var panel = document.createElement('div');
+        panel.className = 'arm-colors-panel brush-settings-panel';
+        panel.style.display = 'none';
+        panel.style.position = 'fixed';
+        document.body.appendChild(panel);
 
-        var textRow = document.createElement('div');
-        textRow.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
-        var textInput = document.createElement('input');
-        textInput.type = 'text';
-        textInput.id = 'brandingTextInput';
-        textInput.placeholder = '@yourhandle';
-        textInput.style.cssText = 'flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;padding:4px 6px;border-radius:3px;font-size:11px;';
-        var textAddBtn = document.createElement('button');
-        textAddBtn.type = 'button';
-        textAddBtn.textContent = '+ Add';
-        textAddBtn.style.cssText = 'padding:4px 8px;font-size:10px;border-radius:3px;background:rgba(255,130,170,0.2);border:1px solid rgba(255,130,170,0.3);color:white;cursor:pointer;';
-        textRow.appendChild(textInput);
-        textRow.appendChild(textAddBtn);
-        body.appendChild(textRow);
+        var PANEL_W = 252;
+        function positionPanel() {
+            // Zoomed via --ui-scale: compute in screen px, divide by zoom
+            // (same math as the arm-colors panel).
+            var z = window.UIScale ? window.UIScale.get() : 1;
+            var rect = trigger.getBoundingClientRect();
+            var left = rect.left + rect.width / 2 - (PANEL_W * z) / 2;
+            left = Math.max(4, Math.min(left, window.innerWidth - PANEL_W * z - 4));
+            panel.style.left = (left / z) + 'px';
+            panel.style.top = ((rect.bottom + 6) / z) + 'px';
+            panel.style.width = PANEL_W + 'px';
+        }
 
-        // Text options row
-        var textOptsRow = document.createElement('div');
-        textOptsRow.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:8px;';
+        var header = document.createElement('div');
+        header.className = 'arm-colors-header';
+        header.textContent = 'Brush';
+        panel.appendChild(header);
 
-        var colorPick = document.createElement('input');
-        colorPick.type = 'color';
-        colorPick.value = '#ffffff';
-        colorPick.id = 'brandingTextColor';
-        colorPick.style.cssText = 'width:28px;height:24px;border:none;padding:0;cursor:pointer;background:transparent;';
+        function num(v, d) { return typeof v === 'number' ? v : d; }
+        function pct(v) { return Math.round(v * 100) + '%'; }
 
-        var posSelect = document.createElement('select');
-        posSelect.id = 'brandingTextPos';
-        posSelect.style.cssText = 'flex:1;height:24px;font-size:10px;';
-        var posOpts = [
-            ['BL', '\u2199 Bottom-Left'], ['BC', '\u2b07 Bottom-Center'], ['BR', '\u2198 Bottom-Right'],
-            ['TL', '\u2196 Top-Left'], ['TC', '\u2b06 Top-Center'], ['TR', '\u2197 Top-Right'],
-            ['ML', '\u2b05 Mid-Left'], ['MC', '\u2b24 Center'], ['MR', '\u27a1 Mid-Right']
-        ];
-        posOpts.forEach(function (p) {
-            var opt = document.createElement('option');
-            opt.value = p[0];
-            opt.textContent = p[1];
-            posSelect.appendChild(opt);
-        });
-
-        var sizeInput = document.createElement('input');
-        sizeInput.type = 'number';
-        sizeInput.id = 'brandingTextSize';
-        sizeInput.value = '20';
-        sizeInput.min = '8';
-        sizeInput.max = '72';
-        sizeInput.style.cssText = 'width:40px;height:24px;font-size:10px;text-align:center;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:3px;';
-
-        textOptsRow.appendChild(colorPick);
-        textOptsRow.appendChild(posSelect);
-        textOptsRow.appendChild(sizeInput);
-        body.appendChild(textOptsRow);
-
-        // --- Quick Text Presets ---
-        var quickRow = document.createElement('div');
-        quickRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;';
-        var presets = ['\ud83d\udd34 LIVE', 'Follow me!', 'Link in bio', '\u2764\ufe0f + \ud83d\udc4d'];
-        presets.forEach(function (text) {
-            var btn = document.createElement('button');
-            btn.type = 'button';
-            btn.textContent = text;
-            btn.style.cssText = 'padding:2px 6px;font-size:9px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);cursor:pointer;';
-            btn.addEventListener('click', function () {
-                textInput.value = text;
-            });
-            quickRow.appendChild(btn);
-        });
-        body.appendChild(quickRow);
-
-        // --- Image Overlay ---
-        var imgLabel = document.createElement('label');
-        imgLabel.className = 'brush-section-label';
-        imgLabel.textContent = 'Logo / Image';
-        body.appendChild(imgLabel);
-
-        var imgRow = document.createElement('div');
-        imgRow.style.cssText = 'display:flex;gap:4px;margin-bottom:8px;';
-
-        var imgUploadBtn = document.createElement('button');
-        imgUploadBtn.type = 'button';
-        imgUploadBtn.textContent = '\ud83d\udcce Upload Logo';
-        imgUploadBtn.style.cssText = 'flex:1;padding:5px 8px;font-size:10px;border-radius:3px;background:rgba(255,200,100,0.15);border:1px solid rgba(255,200,100,0.2);color:white;cursor:pointer;';
-
-        var imgFileInput = document.createElement('input');
-        imgFileInput.type = 'file';
-        imgFileInput.accept = 'image/png,image/svg+xml,image/jpeg';
-        imgFileInput.style.display = 'none';
-
-        var imgPosSelect = document.createElement('select');
-        imgPosSelect.style.cssText = 'width:80px;height:28px;font-size:10px;';
-        posOpts.forEach(function (p) {
-            var opt = document.createElement('option');
-            opt.value = p[0];
-            opt.textContent = p[1];
-            if (p[0] === 'BR') opt.selected = true;
-            imgPosSelect.appendChild(opt);
-        });
-
-        imgRow.appendChild(imgUploadBtn);
-        imgRow.appendChild(imgPosSelect);
-        body.appendChild(imgRow);
-
-        // --- QR Code ---
-        var qrLabel = document.createElement('label');
-        qrLabel.className = 'brush-section-label';
-        qrLabel.textContent = 'QR Code';
-        body.appendChild(qrLabel);
-
-        var qrRow = document.createElement('div');
-        qrRow.style.cssText = 'display:flex;gap:4px;margin-bottom:8px;';
-        var qrInput = document.createElement('input');
-        qrInput.type = 'text';
-        qrInput.placeholder = 'https://tiktok.com/@handle';
-        qrInput.style.cssText = 'flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;padding:4px 6px;border-radius:3px;font-size:10px;';
-        var qrAddBtn = document.createElement('button');
-        qrAddBtn.type = 'button';
-        qrAddBtn.textContent = '+ QR';
-        qrAddBtn.style.cssText = 'padding:4px 8px;font-size:10px;border-radius:3px;background:rgba(180,130,255,0.2);border:1px solid rgba(180,130,255,0.3);color:white;cursor:pointer;';
-        qrRow.appendChild(qrInput);
-        qrRow.appendChild(qrAddBtn);
-        body.appendChild(qrRow);
-
-        // --- Active Overlays List ---
-        var listLabel = document.createElement('label');
-        listLabel.className = 'brush-section-label';
-        listLabel.textContent = 'Active Overlays';
-        listLabel.style.marginTop = '8px';
-        body.appendChild(listLabel);
-
-        var overlayList = document.createElement('div');
-        overlayList.id = 'brandingOverlayList';
-        overlayList.style.cssText = 'max-height:120px;overflow-y:auto;';
-        body.appendChild(overlayList);
-
-        // Clear all button
-        var clearBtn = document.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.textContent = '\ud83d\uddd1 Clear All';
-        clearBtn.style.cssText = 'width:100%;margin-top:6px;padding:4px;font-size:10px;border-radius:3px;background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.2);color:rgba(255,255,255,0.6);cursor:pointer;';
-        body.appendChild(clearBtn);
-
-        // --- Render overlay list ---
-        function refreshList() {
-            overlayList.innerHTML = '';
-            if (!window.brandingOverlays) return;
-            var all = window.brandingOverlays.getAll();
-            if (all.length === 0) {
-                overlayList.innerHTML = '<div style="font-size:9px;color:rgba(255,255,255,0.3);text-align:center;padding:8px;">No overlays yet</div>';
-                return;
-            }
-            all.forEach(function (ov) {
-                var row = document.createElement('div');
-                row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);';
-
-                var icon = ov.type === 'text' ? '\u2709' : ov.type === 'image' ? '\ud83d\uddbc' : '\ud83d\udcf1';
-                var desc = ov.type === 'text' ? ov.content : ov.type === 'image' ? 'Logo' : ov.url;
-
-                var label = document.createElement('span');
-                label.style.cssText = 'flex:1;font-size:10px;color:rgba(255,255,255,0.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-                label.textContent = icon + ' ' + desc;
-
-                var toggleBtn = document.createElement('button');
-                toggleBtn.type = 'button';
-                toggleBtn.textContent = ov.visible ? '\ud83d\udc41' : '\ud83d\ude48';
-                toggleBtn.style.cssText = 'padding:1px 4px;font-size:11px;background:none;border:none;cursor:pointer;color:white;';
-                toggleBtn.title = 'Toggle visibility';
-                toggleBtn.addEventListener('click', function () {
-                    window.brandingOverlays.toggle(ov.id);
-                    refreshList();
-                });
-
-                var rmBtn = document.createElement('button');
-                rmBtn.type = 'button';
-                rmBtn.textContent = '\u00d7';
-                rmBtn.style.cssText = 'padding:1px 5px;font-size:13px;background:none;border:none;cursor:pointer;color:rgba(255,80,80,0.7);font-weight:bold;';
-                rmBtn.title = 'Remove';
-                rmBtn.addEventListener('click', function () {
-                    window.brandingOverlays.remove(ov.id);
-                    refreshList();
-                });
-
-                row.appendChild(label);
-                row.appendChild(toggleBtn);
-                row.appendChild(rmBtn);
-                overlayList.appendChild(row);
+        // Manual tweaks diverge from the applied preset → clear the chip
+        // highlight. Preset apply drives the same handlers, so it flags
+        // itself to keep its own highlight.
+        var applyingPreset = false;
+        function markDirty() {
+            if (applyingPreset) return;
+            panel.querySelectorAll('.brush-preset-btn.active').forEach(function (b) {
+                b.classList.remove('active');
             });
         }
 
-        // Hook for external refresh
-        window._brandingOverlayListChanged = refreshList;
+        // Setter registry: preset apply drives every control through the
+        // same commit path as user input (config + persist + display).
+        var SETTERS = {};
 
-        // --- Wire events ---
-        textAddBtn.addEventListener('click', function () {
-            var text = textInput.value.trim();
-            if (!text) { textInput.focus(); return; }
-            if (window.brandingOverlays) {
-                window.brandingOverlays.addText({
-                    content: text,
-                    position: posSelect.value,
-                    color: colorPick.value,
-                    fontSize: parseInt(sizeInput.value, 10) || 20
-                });
-                refreshList();
+        function sLabel(text) {
+            var l = document.createElement('label');
+            l.className = 'brush-section-label';
+            l.textContent = text;
+            panel.appendChild(l);
+        }
+
+        function pSlider(id, label, min, max, step, key, fmt, presetKey) {
+            var group = document.createElement('div');
+            group.className = 'control-group';
+            var lbl = document.createElement('label');
+            lbl.setAttribute('for', id);
+            lbl.innerHTML = label + ' <span class="value-display" id="' + id + 'Value"></span>';
+            var slider = document.createElement('input');
+            slider.type = 'range'; slider.id = id;
+            slider.min = String(min); slider.max = String(max); slider.step = String(step);
+            var cur = (window.config && typeof window.config[key] === 'number') ? window.config[key] : min;
+            try {
+                var saved = window.settingsManager && window.settingsManager.get('brush.' + id);
+                if (typeof saved === 'number') { cur = saved; if (window.config) window.config[key] = saved; }
+            } catch (_) {}
+            slider.value = String(cur);
+            var disp = lbl.querySelector('.value-display');
+            disp.textContent = fmt(cur);
+            function commit(v) {
+                if (window.config) window.config[key] = v;
+                disp.textContent = fmt(v);
+                try { if (window.settingsManager) window.settingsManager.set('brush.' + id, v); } catch (_) {}
             }
-        });
-
-        textInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') textAddBtn.click();
-            e.stopPropagation(); // prevent hotkeys while typing
-        });
-
-        imgUploadBtn.addEventListener('click', function () { imgFileInput.click(); });
-        imgFileInput.addEventListener('change', function (e) {
-            var file = e.target.files && e.target.files[0];
-            if (!file) return;
-            var reader = new FileReader();
-            reader.onload = function (ev) {
-                if (window.brandingOverlays) {
-                    window.brandingOverlays.addImage({
-                        src: ev.target.result,
-                        position: imgPosSelect.value
-                    });
-                    refreshList();
-                }
+            slider.addEventListener('input', function () {
+                commit(parseFloat(slider.value));
+                markDirty();
+            });
+            if (presetKey) SETTERS[presetKey] = function (v) {
+                if (typeof v !== 'number') return;
+                v = Math.max(min, Math.min(max, v));
+                slider.value = String(v);
+                commit(v);
             };
-            reader.readAsDataURL(file);
-            imgFileInput.value = '';
-        });
+            group.appendChild(lbl); group.appendChild(slider);
+            panel.appendChild(group);
+            return group;
+        }
 
-        qrAddBtn.addEventListener('click', function () {
-            var url = qrInput.value.trim();
-            if (!url) { qrInput.focus(); return; }
-            if (window.brandingOverlays) {
-                window.brandingOverlays.addQR({ url: url });
-                refreshList();
+        function pCheckbox(id, label, key, presetKey) {
+            var row = document.createElement('div');
+            row.className = 'control-group checkbox-group';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.id = id;
+            var on = !!(window.config && window.config[key]);
+            try {
+                var saved = window.settingsManager && window.settingsManager.get('brush.' + id);
+                if (typeof saved === 'boolean') { on = saved; if (window.config) window.config[key] = saved; }
+            } catch (_) {}
+            cb.checked = on;
+            var lbl = document.createElement('label');
+            lbl.setAttribute('for', id);
+            lbl.style.margin = '0';
+            lbl.textContent = label;
+            function commit(v) {
+                cb.checked = v;
+                if (window.config) window.config[key] = v;
+                try { if (window.settingsManager) window.settingsManager.set('brush.' + id, v); } catch (_) {}
             }
-        });
+            cb.addEventListener('change', function () { commit(cb.checked); markDirty(); });
+            if (presetKey) SETTERS[presetKey] = function (v) { if (typeof v === 'boolean') commit(v); };
+            row.appendChild(cb); row.appendChild(lbl);
+            panel.appendChild(row);
+            return row;
+        }
 
-        qrInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') qrAddBtn.click();
-            e.stopPropagation();
-        });
+        // ── Presets: named brush states, quick-switch chips ──
+        var chipsWrap = document.createElement('div');
+        chipsWrap.className = 'brush-presets-chips';
+        panel.appendChild(chipsWrap);
 
-        clearBtn.addEventListener('click', function () {
-            if (window.brandingOverlays) {
-                window.brandingOverlays.clearAll();
-                refreshList();
-            }
-        });
+        var saveRow = document.createElement('div');
+        saveRow.className = 'brush-presets-save-row';
+        var saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'mixer-preset-save';
+        saveBtn.textContent = '+';
+        saveBtn.title = 'Save the current brush as a preset';
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'mixer-preset-name-input';
+        nameInput.placeholder = 'Brush name...';
+        nameInput.maxLength = 24;
+        nameInput.spellcheck = false;
+        nameInput.autocomplete = 'off';
+        nameInput.style.display = 'none';
+        saveRow.appendChild(saveBtn);
+        saveRow.appendChild(nameInput);
+        panel.appendChild(saveRow);
 
-        // Initial list render - wait for brandingOverlays API
-        function initBrandingList() {
-            if (!window.brandingOverlays) {
-                setTimeout(initBrandingList, 100);
+        function loadBrushPresets() {
+            try {
+                var arr = window.settingsManager && window.settingsManager.get('brush.presets');
+                return Array.isArray(arr) ? arr : [];
+            } catch (_) { return []; }
+        }
+        function storeBrushPresets(list) {
+            try { if (window.settingsManager) window.settingsManager.set('brush.presets', list); } catch (_) {}
+        }
+        function captureBrushPreset(name) {
+            var c = window.config || {};
+            var sizeSlider = document.getElementById('brushSize');
+            return {
+                name: name,
+                size: sizeSlider ? parseFloat(sizeSlider.value) : num(c.SPLAT_RADIUS, 0.011) * 1000,
+                target: (c.BRUSH_TARGET === 'sketch' || c.BRUSH_TARGET === 'mask') ? c.BRUSH_TARGET : 'fluid',
+                eraser: !!c.BRUSH_ERASER,
+                tip: c.BRUSH_TIP | 0,
+                tipTexture: num(c.BRUSH_TIP_TEXTURE, 0.7),
+                flow: num(c.BRUSH_FLOW, 1),
+                hardness: num(c.BRUSH_HARDNESS, 0.8),
+                stabilizer: num(c.BRUSH_STABILIZER, 0),
+                spacing: num(c.BRUSH_SPACING, 0.35),
+                jitter: num(c.BRUSH_JITTER, 0),
+                pressureSize: !!c.BRUSH_PRESSURE_SIZE,
+                pressureFlow: !!c.BRUSH_PRESSURE_FLOW,
+                pressureCurve: num(c.BRUSH_PRESSURE_CURVE, 0.7)
+            };
+        }
+        function applyBrushPreset(p) {
+            applyingPreset = true;
+            try {
+                if (typeof p.size === 'number') {
+                    // The Size fader owns SPLAT_RADIUS — drive it like a user
+                    // drag so 05h's binding and the strip display both update.
+                    var s = document.getElementById('brushSize');
+                    if (s) {
+                        var v = Math.max(parseFloat(s.min), Math.min(parseFloat(s.max), p.size));
+                        s.value = v;
+                        s.style.setProperty('--val', s.value);
+                        s.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+                if (SETTERS.target) SETTERS.target(p.target);
+                if (SETTERS.tip) SETTERS.tip(p.tip | 0);
+                ['tipTexture', 'flow', 'hardness', 'stabilizer', 'spacing', 'jitter',
+                 'pressureSize', 'pressureFlow', 'pressureCurve', 'eraser'
+                ].forEach(function (k) {
+                    if (SETTERS[k] && p[k] !== undefined) SETTERS[k](p[k]);
+                });
+            } finally { applyingPreset = false; }
+        }
+        function renderPresetChips() {
+            chipsWrap.innerHTML = '';
+            var list = loadBrushPresets();
+            if (!list.length) {
+                var hint = document.createElement('div');
+                hint.className = 'arm-colors-hint';
+                hint.textContent = 'No brush presets yet — dial in a brush and hit +';
+                chipsWrap.appendChild(hint);
                 return;
             }
-            refreshList();
-            console.log('[Branding] UI wired successfully');
+            list.forEach(function (p) {
+                var chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'brush-preset-btn' + (p.eraser ? ' eraser' : '');
+                chip.textContent = p.name;
+                chip.title = 'Load brush "' + p.name + '"' + (p.eraser ? ' (eraser)' : '');
+                var del = document.createElement('span');
+                del.className = 'brush-preset-del';
+                del.textContent = '×';
+                del.title = 'Delete "' + p.name + '"';
+                del.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    storeBrushPresets(loadBrushPresets().filter(function (q) { return q.name !== p.name; }));
+                    renderPresetChips();
+                });
+                chip.appendChild(del);
+                chip.addEventListener('click', function () {
+                    applyBrushPreset(p);
+                    chipsWrap.querySelectorAll('.brush-preset-btn').forEach(function (b) {
+                        b.classList.toggle('active', b === chip);
+                    });
+                });
+                chipsWrap.appendChild(chip);
+            });
         }
-        setTimeout(initBrandingList, 200);
+        function cancelPresetSave() {
+            nameInput.style.display = 'none';
+            nameInput.value = '';
+            saveBtn.textContent = '+';
+        }
+        function doSaveBrushPreset() {
+            var name = (nameInput.value || '').trim();
+            if (!name) { cancelPresetSave(); return; }
+            // Same name = overwrite (a brush you re-dial is the same brush)
+            var list = loadBrushPresets().filter(function (q) { return q.name !== name; });
+            list.unshift(captureBrushPreset(name));
+            if (list.length > 24) list.length = 24;
+            storeBrushPresets(list);
+            cancelPresetSave();
+            renderPresetChips();
+        }
+        saveBtn.addEventListener('click', function () {
+            if (nameInput.style.display === 'none') {
+                nameInput.style.display = '';
+                nameInput.value = '';
+                nameInput.focus();
+                saveBtn.textContent = '✓';
+            } else {
+                doSaveBrushPreset();
+            }
+        });
+        nameInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); doSaveBrushPreset(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancelPresetSave(); }
+        });
 
-        return sec;
+        // ── Paint target: fluid splats vs raster paint layer vs mask ──
+        sLabel('Paint Into');
+        var targetRow = document.createElement('div');
+        targetRow.className = 'brush-mode-row';
+        var fluidBtn = document.createElement('button');
+        fluidBtn.type = 'button'; fluidBtn.className = 'brush-mode-btn active'; fluidBtn.textContent = 'Fluid';
+        fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
+        var sketchBtn = document.createElement('button');
+        sketchBtn.type = 'button'; sketchBtn.className = 'brush-mode-btn'; sketchBtn.textContent = 'Sketch';
+        sketchBtn.title = 'Strokes paint the active paint layer — normal-control drawing that never decays or flows (backgrounds, guides, colliders)';
+        var maskBtn = document.createElement('button');
+        maskBtn.type = 'button'; maskBtn.className = 'brush-mode-btn'; maskBtn.textContent = 'Mask';
+        maskBtn.title = 'Strokes paint coverage into the active Mask (shown as a red film) — bind it as a collider or clip (D3)';
+        targetRow.appendChild(fluidBtn); targetRow.appendChild(sketchBtn); targetRow.appendChild(maskBtn);
+        panel.appendChild(targetRow);
+        var VALID_TARGETS = { fluid: 1, sketch: 1, mask: 1 };
+        function setBrushTarget(t) {
+            if (!VALID_TARGETS[t]) t = 'fluid';
+            if (window.config) window.config.BRUSH_TARGET = t;
+            fluidBtn.classList.toggle('active', t === 'fluid');
+            sketchBtn.classList.toggle('active', t === 'sketch');
+            maskBtn.classList.toggle('active', t === 'mask');
+            try { if (window.settingsManager) window.settingsManager.set('brush.target', t); } catch (_) {}
+        }
+        SETTERS.target = setBrushTarget;
+        fluidBtn.addEventListener('click', function () { setBrushTarget('fluid'); markDirty(); });
+        sketchBtn.addEventListener('click', function () { setBrushTarget('sketch'); markDirty(); });
+        maskBtn.addEventListener('click', function () { setBrushTarget('mask'); markDirty(); });
+        try {
+            var savedTarget = window.settingsManager && window.settingsManager.get('brush.target');
+            setBrushTarget(savedTarget);
+        } catch (_) { setBrushTarget('fluid'); }
+
+        // ── Tip: the splat-shader stamp shapes as brush tips (D1) ──
+        sLabel('Tip');
+        var tipRow = document.createElement('div');
+        tipRow.className = 'brush-tip-row';
+        var TIPS = [
+            { v: 0, glyph: '◌', name: 'Soft',   title: 'Soft — the classic gaussian dab' },
+            { v: 1, glyph: '⬤', name: 'Blob',   title: 'Blob — noise-notched round stamp' },
+            { v: 2, glyph: '■', name: 'Chisel', title: 'Chisel — squared press' },
+            { v: 3, glyph: '▬', name: 'Streak', title: 'Streak — elongated smear' },
+            { v: 4, glyph: '◯', name: 'Ring',   title: 'Ring — thin dye band, hollow center' }
+        ];
+        var tipBtns = [];
+        function setBrushTip(v) {
+            v = v | 0;
+            if (v < 0 || v > 4) v = 0;
+            if (window.config) window.config.BRUSH_TIP = v;
+            tipBtns.forEach(function (b) {
+                b.classList.toggle('active', parseInt(b.dataset.tip, 10) === v);
+            });
+            syncTexState();
+            try { if (window.settingsManager) window.settingsManager.set('brush.tip', v); } catch (_) {}
+        }
+        SETTERS.tip = setBrushTip;
+        TIPS.forEach(function (t) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'brush-tip-btn';
+            b.dataset.tip = String(t.v);
+            b.textContent = t.glyph;
+            b.title = t.title;
+            b.addEventListener('click', function () { setBrushTip(t.v); markDirty(); });
+            tipBtns.push(b);
+            tipRow.appendChild(b);
+        });
+        panel.appendChild(tipRow);
+        var texGroup = pSlider('brushTipTexture', 'Texture', 0, 1, 0.01, 'BRUSH_TIP_TEXTURE', pct, 'tipTexture');
+        function syncTexState() {
+            // Texture (stamp grain/blend) only shapes blob/chisel/streak
+            var t = ((window.config && window.config.BRUSH_TIP) | 0);
+            var on = t >= 1 && t <= 3;
+            texGroup.style.opacity = on ? '1' : '0.4';
+            var sl = texGroup.querySelector('input');
+            if (sl) sl.disabled = !on;
+        }
+        (function restoreTip() {
+            var saved = null;
+            try { saved = window.settingsManager && window.settingsManager.get('brush.tip'); } catch (_) {}
+            setBrushTip(typeof saved === 'number' ? saved : ((window.config && window.config.BRUSH_TIP) | 0));
+        })();
+
+        // ── Flow + stroke feel ──
+        pSlider('brushFlow', 'Flow', 0.05, 1, 0.01, 'BRUSH_FLOW', pct, 'flow');
+        sLabel('Stroke');
+        pSlider('brushStabilizer', 'Stabilizer', 0, 1, 0.01, 'BRUSH_STABILIZER', pct, 'stabilizer');
+        pSlider('brushSpacing', 'Spacing', 0.01, 1, 0.01, 'BRUSH_SPACING', pct, 'spacing');
+        pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
+
+        // ── Pen pressure ──
+        sLabel('Pen Pressure');
+        pCheckbox('brushPressureSize', 'Pressure → Size', 'BRUSH_PRESSURE_SIZE', 'pressureSize');
+        pCheckbox('brushPressureFlow', 'Pressure → Flow', 'BRUSH_PRESSURE_FLOW', 'pressureFlow');
+        pSlider('brushPressureCurve', 'Curve', 0.25, 2.5, 0.05, 'BRUSH_PRESSURE_CURVE',
+            function (v) { return v < 1 ? 'soft ' + v.toFixed(2) : (v > 1 ? 'hard ' + v.toFixed(2) : 'linear'); },
+            'pressureCurve');
+
+        // ── Sketch layer ──
+        sLabel('Sketch Layer');
+        // D2: which raster layer the Sketch route paints into + quick-add.
+        // Layers are managed in the sidebar Layers panel (🖌️ per row).
+        var activeLayerRow = document.createElement('div');
+        activeLayerRow.className = 'brush-mode-row';
+        var activeLayerLabel = document.createElement('div');
+        activeLayerLabel.className = 'arm-colors-hint';
+        activeLayerLabel.style.flex = '1';
+        activeLayerLabel.style.alignSelf = 'center';
+        function syncActiveRasterLabel() {
+            var nm = '—';
+            try {
+                if (window.rasterLayers) {
+                    var rid = window.rasterLayers.activeId();
+                    var rl = (window.layers || []).find(function (x) { return x.index === rid; });
+                    if (rl) nm = rl.title;
+                }
+            } catch (_) {}
+            activeLayerLabel.textContent = 'Paints into: ' + nm;
+        }
+        window.__onActiveRasterChanged = function () { syncActiveRasterLabel(); };
+        syncActiveRasterLabel();
+        var newLayerBtn = document.createElement('button');
+        newLayerBtn.type = 'button'; newLayerBtn.className = 'brush-mode-btn';
+        newLayerBtn.textContent = '+ Layer';
+        newLayerBtn.title = 'Add a new paint layer and make it the brush target (reorder it in the Layers panel — above or below the fluid)';
+        newLayerBtn.addEventListener('click', function () {
+            if (window.rasterLayers) { window.rasterLayers.create(); syncActiveRasterLabel(); }
+        });
+        activeLayerRow.appendChild(activeLayerLabel);
+        activeLayerRow.appendChild(newLayerBtn);
+        panel.appendChild(activeLayerRow);
+        pCheckbox('brushEraser', 'Eraser (Sketch/Mask)', 'BRUSH_ERASER', 'eraser');
+        pSlider('brushHardness', 'Hardness', 0, 1, 0.01, 'BRUSH_HARDNESS', pct, 'hardness');
+        pCheckbox('sketchVisible', 'Show Paint Layers', 'SKETCH_VISIBLE');
+        var sketchBtnRow = document.createElement('div');
+        sketchBtnRow.className = 'brush-mode-row';
+        var clearSketchBtn = document.createElement('button');
+        clearSketchBtn.type = 'button'; clearSketchBtn.className = 'brush-mode-btn';
+        clearSketchBtn.textContent = 'Clear Sketch';
+        clearSketchBtn.addEventListener('click', function () {
+            if (typeof window.__clearSketch === 'function') window.__clearSketch();
+        });
+        var sketchColliderBtn = document.createElement('button');
+        sketchColliderBtn.type = 'button'; sketchColliderBtn.className = 'brush-mode-btn';
+        sketchColliderBtn.textContent = '→ Collider';
+        sketchColliderBtn.title = 'Turn the sketch layer into a collision layer — the fluid flows around what you drew';
+        sketchColliderBtn.addEventListener('click', function () {
+            if (window.collisionLayers && typeof window.collisionLayers.createFromSketch === 'function') {
+                window.collisionLayers.createFromSketch();
+            }
+        });
+        // D3/D4: live binding — the collider tracks the sketch as you draw
+        var liveColliderBtn = document.createElement('button');
+        liveColliderBtn.type = 'button'; liveColliderBtn.className = 'brush-mode-btn';
+        liveColliderBtn.textContent = '⟳ Live';
+        liveColliderBtn.title = 'Live collider: the collision layer keeps tracking the sketch — draw, erase, or undo and the fluid reacts after every stroke';
+        liveColliderBtn.addEventListener('click', function () {
+            if (!window.collisionLayers || typeof window.collisionLayers.setSketchLive !== 'function') return;
+            window.collisionLayers.setSketchLive(!window.collisionLayers.isSketchLive());
+        });
+        // Reflect state changes from either direction (click or auto-disable
+        // when the bound source gets deleted). One live-binding slot exists;
+        // src says whether it currently tracks a paint layer or a mask.
+        window.__onSketchLiveChanged = function (on, src) {
+            var isMask = !!(src && src.kind === 'mask');
+            liveColliderBtn.classList.toggle('active', !!on && !isMask);
+            if (window.__maskLiveBtn) window.__maskLiveBtn.classList.toggle('active', !!on && isMask);
+        };
+        sketchBtnRow.appendChild(clearSketchBtn);
+        sketchBtnRow.appendChild(sketchColliderBtn);
+        sketchBtnRow.appendChild(liveColliderBtn);
+        panel.appendChild(sketchBtnRow);
+
+        // D2 bridges: sketch ↔ fluid
+        var bridgeRow = document.createElement('div');
+        bridgeRow.className = 'brush-mode-row';
+        var igniteBtn = document.createElement('button');
+        igniteBtn.type = 'button'; igniteBtn.className = 'brush-mode-btn';
+        igniteBtn.textContent = '🔥 Ignite';
+        igniteBtn.title = 'Pour the sketch into the fluid as dye — the sim takes it from there (sketch is untouched)';
+        igniteBtn.addEventListener('click', function () {
+            if (typeof window.__igniteSketch === 'function') window.__igniteSketch(1);
+        });
+        var captureBtn = document.createElement('button');
+        captureBtn.type = 'button'; captureBtn.className = 'brush-mode-btn';
+        captureBtn.textContent = '❄ Capture';
+        captureBtn.title = 'Freeze the current fluid dye into the sketch layer (composited over what\'s there; undoable)';
+        captureBtn.addEventListener('click', function () {
+            if (typeof window.__captureToSketch === 'function') window.__captureToSketch();
+        });
+        bridgeRow.appendChild(igniteBtn);
+        bridgeRow.appendChild(captureBtn);
+        panel.appendChild(bridgeRow);
+
+        // D6: sketch stroke undo/redo (also Ctrl+Z / Ctrl+Shift+Z in Sketch mode)
+        var undoRow = document.createElement('div');
+        undoRow.className = 'brush-mode-row';
+        var undoBtn = document.createElement('button');
+        undoBtn.type = 'button'; undoBtn.className = 'brush-mode-btn';
+        undoBtn.textContent = '↶ Undo';
+        undoBtn.title = 'Undo the last sketch stroke / Clear / Capture (Ctrl+Z while painting into Sketch)';
+        undoBtn.addEventListener('click', function () {
+            if (typeof window.__sketchUndo === 'function') window.__sketchUndo();
+        });
+        var redoBtn = document.createElement('button');
+        redoBtn.type = 'button'; redoBtn.className = 'brush-mode-btn';
+        redoBtn.textContent = '↷ Redo';
+        redoBtn.title = 'Redo (Ctrl+Shift+Z or Ctrl+Y while painting into Sketch)';
+        redoBtn.addEventListener('click', function () {
+            if (typeof window.__sketchRedo === 'function') window.__sketchRedo();
+        });
+        undoRow.appendChild(undoBtn);
+        undoRow.appendChild(redoBtn);
+        panel.appendChild(undoRow);
+
+        // ── D3: Masks — paint coverage, bind it as a collider ──
+        sLabel('Mask');
+        var maskInfoRow = document.createElement('div');
+        maskInfoRow.className = 'brush-mode-row';
+        var maskInfoLabel = document.createElement('div');
+        maskInfoLabel.className = 'arm-colors-hint';
+        maskInfoLabel.style.flex = '1';
+        maskInfoLabel.style.alignSelf = 'center';
+        function syncActiveMaskLabel() {
+            var nm = '—';
+            try {
+                if (window.Masks) {
+                    var mid = window.Masks.activeId();
+                    var m = window.Masks.list().find(function (x) { return x.id === mid; });
+                    if (m) nm = m.name;
+                }
+            } catch (_) {}
+            maskInfoLabel.textContent = 'Active mask: ' + nm;
+        }
+        window.__onActiveMaskChanged = function () { syncActiveMaskLabel(); };
+        syncActiveMaskLabel();
+        var newMaskBtn = document.createElement('button');
+        newMaskBtn.type = 'button'; newMaskBtn.className = 'brush-mode-btn';
+        newMaskBtn.textContent = '+ Mask';
+        newMaskBtn.title = 'Create a new mask and make it the paint target';
+        newMaskBtn.addEventListener('click', function () {
+            if (window.Masks) { window.Masks.create(); setBrushTarget('mask'); syncActiveMaskLabel(); }
+        });
+        maskInfoRow.appendChild(maskInfoLabel);
+        maskInfoRow.appendChild(newMaskBtn);
+        panel.appendChild(maskInfoRow);
+        pCheckbox('maskOverlayVisible', 'Show Mask Film', 'MASK_OVERLAY');
+        var maskBtnRow = document.createElement('div');
+        maskBtnRow.className = 'brush-mode-row';
+        var clearMaskBtn = document.createElement('button');
+        clearMaskBtn.type = 'button'; clearMaskBtn.className = 'brush-mode-btn';
+        clearMaskBtn.textContent = 'Clear Mask';
+        clearMaskBtn.title = 'Erase the active mask\'s coverage (undoable)';
+        clearMaskBtn.addEventListener('click', function () {
+            if (window.Masks) window.Masks.clear();
+        });
+        var maskColliderBtn = document.createElement('button');
+        maskColliderBtn.type = 'button'; maskColliderBtn.className = 'brush-mode-btn';
+        maskColliderBtn.textContent = '→ Collider';
+        maskColliderBtn.title = 'Turn the active mask into a collision layer — the fluid flows around the painted coverage';
+        maskColliderBtn.addEventListener('click', function () {
+            if (window.collisionLayers && typeof window.collisionLayers.createFromMask === 'function') {
+                window.collisionLayers.createFromMask();
+            }
+        });
+        var maskLiveBtn = document.createElement('button');
+        maskLiveBtn.type = 'button'; maskLiveBtn.className = 'brush-mode-btn';
+        maskLiveBtn.textContent = '⟳ Live';
+        maskLiveBtn.title = 'Live collider: the collision layer keeps tracking the active mask — paint, erase, or undo and the fluid reacts after every stroke';
+        maskLiveBtn.addEventListener('click', function () {
+            if (!window.collisionLayers || typeof window.collisionLayers.setMaskLive !== 'function') return;
+            var src = window.collisionLayers.boundColliderSource && window.collisionLayers.boundColliderSource();
+            var onAsMask = window.collisionLayers.isSketchLive() && src && src.kind === 'mask';
+            window.collisionLayers.setMaskLive(!onAsMask);
+        });
+        window.__maskLiveBtn = maskLiveBtn;
+        maskBtnRow.appendChild(clearMaskBtn);
+        maskBtnRow.appendChild(maskColliderBtn);
+        maskBtnRow.appendChild(maskLiveBtn);
+        panel.appendChild(maskBtnRow);
+
+        // Size fader tweaks also diverge from an applied preset
+        var sizeFader = document.getElementById('brushSize');
+        if (sizeFader) sizeFader.addEventListener('input', markDirty);
+
+        // ── Open / close ──
+        trigger.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var open = panel.style.display !== 'none';
+            if (open) {
+                panel.style.display = 'none';
+                trigger.classList.remove('active');
+            } else {
+                panel.style.display = 'block';
+                trigger.classList.add('active');
+                positionPanel();
+                renderPresetChips();
+            }
+        });
+        document.addEventListener('click', function (e) {
+            if (panel.style.display !== 'none' && !panel.contains(e.target)
+                && e.target !== trigger && !trigger.contains(e.target)) {
+                panel.style.display = 'none';
+                trigger.classList.remove('active');
+            }
+        });
+        panel.addEventListener('click', function (e) { e.stopPropagation(); });
+        window.addEventListener('resize', function () {
+            if (panel.style.display !== 'none') positionPanel();
+        });
     }
+
 
     // \u2500\u2500 Branding panel (redesigned): create overlays + arrange (select/drag/
     //    resize/rotate) via window.brandingOverlays. Replaces the old preset-only
-    //    panel (buildBrandingSection_OLD_UNUSED below, kept temporarily). \u2500\u2500
+    //    panel (buildBrandingSection_OLD_UNUSED deleted 2026-07-09; git history has it). \u2500\u2500
     function buildBrandingSection() {
         const { sec, body } = makeSection('\ud83c\udfa8 Branding', 'pink', true);
 
@@ -2094,10 +2591,27 @@
         modeLbl.textContent = 'Audio Mode';
         var modeSel = document.createElement('select');
         modeSel.id = 'audioMode';
-        modeSel.innerHTML = '<option value="off" selected>Off</option><option value="min">Minimized</option><option value="full">Full</option>';
+        // off → three fire-and-forget scenes (30-audio-scenes.js) → min → full
+        modeSel.innerHTML =
+            '<option value="off" selected>Off</option>' +
+            '<option value="tunnel">🌀 Tunnel</option>' +
+            '<option value="ferro">🧲 Ferrofluid</option>' +
+            '<option value="min">Minimized</option>' +
+            '<option value="full">Full</option>';
         modeGroup.appendChild(modeLbl);
         modeGroup.appendChild(modeSel);
         body.appendChild(modeGroup);
+
+        // Scene widget: hosts the shared enable row + the active scene's
+        // quick controls. Shown only while a scene mode is selected.
+        var sceneBox = document.createElement('div');
+        sceneBox.id = 'audioSceneBox';
+        sceneBox.className = 'audio-mini';
+        sceneBox.style.display = 'none';
+        var sceneCtlHost = document.createElement('div');
+        sceneCtlHost.id = 'audioSceneControls';
+        sceneBox.appendChild(sceneCtlHost);
+        body.appendChild(sceneBox);
 
         // Minimized widget: enable + source + small segments timeline + Full button
         var mini = document.createElement('div');
@@ -2125,6 +2639,11 @@
 
         var enableCb = mini.querySelector('#audioReactToggle');
         var srcSel = mini.querySelector('#audioReactSource');
+        // The enable row (checkbox + source) is SHARED between the mini widget
+        // and the full drawer: the same DOM nodes are relocated on mode change
+        // so there's exactly one control and zero state-sync problems. Without
+        // this, Full mode had no enable control at all (the mini is hidden).
+        var enableRow = mini.querySelector('.audio-mini-row');
         function enableFromSource() {
             if (!window.audioReactive) return;
             var src = srcSel.value;
@@ -2151,13 +2670,42 @@
             modeSel.dispatchEvent(new Event('change'));
         });
 
-        function applyAudioMode(mode) {
+        function applyAudioMode(mode, userInitiated) {
+            var isScene = !!(window.AudioScenes && window.AudioScenes.isScene(mode));
+            // Park the shared enable row where the active mode can reach it
+            var enableHost = document.getElementById('audioDrawerEnableHost');
+            if (mode === 'full' && enableHost && enableRow) {
+                enableHost.appendChild(enableRow);
+            } else if (isScene && enableRow) {
+                sceneBox.insertBefore(enableRow, sceneBox.firstChild);
+            } else if (enableRow && enableRow.parentElement !== mini) {
+                mini.insertBefore(enableRow, mini.firstChild);
+            }
+            // Scene lifecycle: activate on scene modes, tear down otherwise
+            if (window.AudioScenes) {
+                if (isScene) window.AudioScenes.activate(mode);
+                else window.AudioScenes.deactivate();
+            }
+            if (!isScene) sceneBox.style.display = 'none';
             if (mode === 'off') {
                 mini.style.display = 'none';
                 if (window.audioReactive) window.audioReactive.disable();
                 if (enableCb) enableCb.checked = false;
                 if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
                 stopAudioMiniLoop();
+            } else if (isScene) {
+                mini.style.display = 'none';
+                sceneBox.style.display = '';
+                if (window.AudioScenes) window.AudioScenes.buildControls(mode, sceneCtlHost);
+                if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
+                stopAudioMiniLoop();
+                // Fire-and-forget: a user picking a scene wants sound NOW — start
+                // the engine from the selected source. Restored sessions (synthetic
+                // change events) skip this so page load never pops a mic prompt.
+                if (userInitiated && window.audioReactive && !window.audioReactive.isEnabled()) {
+                    enableCb.checked = true;
+                    enableFromSource();
+                }
             } else if (mode === 'min') {
                 mini.style.display = '';
                 if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
@@ -2169,7 +2717,7 @@
                 stopAudioMiniLoop();
             }
         }
-        modeSel.addEventListener('change', function (e) { applyAudioMode(e.target.value); });
+        modeSel.addEventListener('change', function (e) { applyAudioMode(e.target.value, e.isTrusted); });
 
         // Build the drawer controls + composer up front (into the hidden panel) so
         // their element IDs always exist for save/load, mutation locks, and the
@@ -2192,7 +2740,18 @@
     // \u2500\u2500 Mini segments timeline (overlapping active areas) \u2500\u2500
     function startAudioMiniLoop() {
         if (audioMiniRaf) return;
-        var draw = function () { drawAudioMiniTimeline(); audioMiniRaf = requestAnimationFrame(draw); };
+        // rAF is uncapped in Electron — throttle to ~30 Hz and skip while the
+        // mini is hidden (a timeline preview needs no more)
+        var lastDraw = 0;
+        var draw = function () {
+            audioMiniRaf = requestAnimationFrame(draw);
+            var now = performance.now();
+            if (now - lastDraw < 33) return;
+            var cv = document.getElementById('audioMiniTimeline');
+            if (!cv || cv.offsetParent === null) return;
+            lastDraw = now;
+            drawAudioMiniTimeline();
+        };
         audioMiniRaf = requestAnimationFrame(draw);
     }
     function stopAudioMiniLoop() {
@@ -2255,6 +2814,14 @@
     function buildAudioDrawerControls(container) {
         container.innerHTML = '';
         var body = container;
+
+        // Host for the shared enable row (checkbox + source select). The row's
+        // DOM nodes live in the sidebar mini widget and are moved here whenever
+        // Audio Mode is 'full' — see applyAudioMode.
+        var enableHost = document.createElement('div');
+        enableHost.id = 'audioDrawerEnableHost';
+        enableHost.className = 'audio-drawer-enable';
+        body.appendChild(enableHost);
 
         // Visualizer canvas
         var vizWrap = document.createElement('div');
@@ -2825,7 +3392,7 @@
 
         var comfyLabel = document.createElement('label');
         comfyLabel.style.cssText = 'display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:rgba(255,255,255,0.5); margin-bottom:6px;';
-        comfyLabel.textContent = 'ComfyUI Bridge (Ctrl+Enter)';
+        comfyLabel.textContent = 'Set Save To Folder (Ctrl+Enter)';
         comfySection.appendChild(comfyLabel);
 
         var comfyRow = document.createElement('div');
@@ -2869,6 +3436,45 @@
         comfyRow.appendChild(comfyFolderBtn);
 
         comfySection.appendChild(comfyRow);
+
+        // Capture resolution row (fixed output size for consistency)
+        var capRow = document.createElement('div');
+        capRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px;';
+        var capLbl = document.createElement('span');
+        capLbl.textContent = 'Capture';
+        capLbl.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.5);min-width:48px;';
+        var capW = document.createElement('input');
+        capW.type = 'number';
+        capW.placeholder = 'W';
+        capW.min = '0';
+        capW.style.cssText = 'width:60px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 6px;color:#c9d1d9;font-size:11px;';
+        var capH = document.createElement('input');
+        capH.type = 'number';
+        capH.placeholder = 'H';
+        capH.min = '0';
+        capH.style.cssText = 'width:60px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 6px;color:#c9d1d9;font-size:11px;';
+        var capHint = document.createElement('span');
+        capHint.textContent = '0=auto';
+        capHint.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.35);';
+        // Load saved values
+        if (window.comfyuiBridge) {
+            var capCfg = window.comfyuiBridge.getConfig();
+            if (capCfg.captureWidth) capW.value = capCfg.captureWidth;
+            if (capCfg.captureHeight) capH.value = capCfg.captureHeight;
+        }
+        function saveCapRes() {
+            if (!window.comfyuiBridge) return;
+            window.comfyuiBridge.setConfig('captureWidth', parseInt(capW.value, 10) || 0);
+            window.comfyuiBridge.setConfig('captureHeight', parseInt(capH.value, 10) || 0);
+        }
+        capW.addEventListener('change', saveCapRes);
+        capH.addEventListener('change', saveCapRes);
+        capRow.appendChild(capLbl);
+        capRow.appendChild(capW);
+        capRow.appendChild(capH);
+        capRow.appendChild(capHint);
+        comfySection.appendChild(capRow);
+
         // ComfyUI writes canvas frames to a local watched folder (Electron/filesystem
         // only) — it cannot work in a browser, so only show the control in the desktop
         // app. window.comfyuiBridge exists ONLY in Electron (comfyui-bridge.js guards on
@@ -2985,7 +3591,7 @@
 
         var header = document.createElement('div');
         header.className = 'arm-colors-header';
-        header.textContent = 'Arm Colors';
+        header.textContent = 'Brush Colors';
         panel.appendChild(header);
 
         var rowsWrap = document.createElement('div');
@@ -3007,6 +3613,8 @@
                 return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0 };
             }));
         }
+        // Exposed for the picker→arm-0 sync in 05g (two-way brush color sync)
+        window.persistArmColors = persistArmColors;
 
         // Restore persisted arm colors once the sim script (which declares
         // `var multiArmColors`) has loaded — mutate the array in place so the
@@ -3024,17 +3632,30 @@
             if (panel.style.display !== 'none') rebuildRows();
         })();
 
+        // Two-way sync, panel → main picker: arm 0 IS the brush, so giving it
+        // a fixed color should be the same act as picking a color in the
+        // sidebar picker (dispatching 'input' also unchecks random/step and
+        // applies pointer.color via 05g's listener). The reverse direction
+        // (picker → arm 0) lives in 05g's colorPicker input handler.
+        function syncMainPickerFromArm0() {
+            var cfg = (window.multiArmColors || [])[0];
+            if (!cfg || cfg.mode !== 'fixed' || !cfg.color) return;
+            var cp = document.getElementById('colorPicker');
+            if (cp && cp.value !== cfg.color) {
+                cp.value = cfg.color;
+                cp.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+
         function rebuildRows() {
             rowsWrap.innerHTML = '';
             var slider = document.getElementById('multiplier');
             var count = slider ? parseInt(slider.value, 10) || 1 : 1;
-            if (count < 2) {
-                var hint = document.createElement('div');
-                hint.className = 'arm-colors-hint';
-                hint.textContent = 'Set multiplier to 2+ to configure arm colors';
-                rowsWrap.appendChild(hint);
-                return;
-            }
+            // Brush controls exist at EVERY arm count (2026-07-13) — at 1x the
+            // single row IS the brush's color mode (follow/fixed/rainbow/
+            // random/step). The old "set multiplier to 2+" hint gated the
+            // whole panel behind multi-arm mode.
+            count = Math.max(1, count);
             ensureArmConfig(count);
             var arr = window.multiArmColors;
 
@@ -3096,6 +3717,7 @@
                             picker.disabled = m.key !== 'fixed';
                             picker.style.opacity = m.key === 'fixed' ? '1' : '0.35';
                             persistArmColors();
+                            if (idx === 0) syncMainPickerFromArm0();
                         });
                         btns.push(btn);
                         modeWrap.appendChild(btn);
@@ -3116,6 +3738,7 @@
                             picker.style.opacity = '1';
                         }
                         persistArmColors();
+                        if (idx === 0) syncMainPickerFromArm0();
                     });
 
                     row.appendChild(picker);
@@ -3194,6 +3817,15 @@
         header.className = 'section-header';
         header.addEventListener('click', function() {
             this.parentElement.classList.toggle('collapsed');
+            // Persist collapsed states
+            try {
+                var sections = {};
+                document.querySelectorAll('#sidebar-right .sidebar-section').forEach(function(sec) {
+                    var titleEl = sec.querySelector('.section-title');
+                    if (titleEl) sections[titleEl.textContent.trim()] = sec.classList.contains('collapsed');
+                });
+                if (window.settingsManager) window.settingsManager.set('sidebar.sections', sections);
+            } catch(_) {}
         });
         header.innerHTML =
             '<span class="section-title">' + title + '</span>' +

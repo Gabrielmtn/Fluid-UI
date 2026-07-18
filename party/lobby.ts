@@ -3,7 +3,7 @@ import {
   generateRoomCode,
   WAIT_TTL_MS,
   MATCHMAKE_THROTTLE_MS,
-  INTERNAL_SECRET,
+  internalSecret,
 } from "./shared";
 
 // Singleton matchmaking coordinator, always addressed with the constant id
@@ -94,7 +94,7 @@ export default class LobbyServer implements Party.Server {
   // a stale waiting pointer immediately rather than waiting for the alarm.
   async onRequest(req: Party.Request) {
     const url = new URL(req.url);
-    if (url.searchParams.get("s") !== INTERNAL_SECRET) {
+    if (url.searchParams.get("s") !== internalSecret(this.room.env)) {
       return new Response("Forbidden", { status: 403 });
     }
     if (url.pathname.split("/").pop() === "vacate") {

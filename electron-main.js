@@ -10,8 +10,14 @@ app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('enable-accelerated-2d-canvas'); // Hardware-accelerated 2D canvas
 app.commandLine.appendSwitch('enable-gpu-memory-buffer-compositor-resources'); // Faster compositing
-app.commandLine.appendSwitch('disable-gpu-vsync'); // Uncap FPS
-app.commandLine.appendSwitch('disable-frame-rate-limit'); // CRITICAL: Remove FPS cap
+// REMOVED 2026-07-09: disable-gpu-vsync + disable-frame-rate-limit.
+// These were pinning a 144Hz panel to EXACTLY 60fps: with GPU vsync
+// disabled, Chromium's frame scheduler stops following the display and
+// falls back to a software timer whose default interval is 1/60s — the
+// "uncap" flags WERE the cap (measured: rAF gap median 16.7ms dead-on
+// while Windows reported 144Hz). Without them, modern Chromium (Electron
+// 39) drives rAF at the display's real refresh rate; the in-app FPS Limit
+// select still caps below that when wanted.
 app.commandLine.appendSwitch('enable-webgl2-compute-context');
 
 // ⚡ NUCLEAR: Force disable ALL frame limiting
@@ -29,11 +35,15 @@ app.commandLine.appendSwitch('js-flags', '--expose-gc --max-semi-space-size=128'
 // ⚡ Additional GPU flags
 app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
+// On dual-GPU machines Chromium can land on the integrated GPU (observed:
+// UHD 770 pegged at 100% while the GeForce idles). Ask for the discrete
+// adapter explicitly; the canvas already requests powerPreference
+// 'high-performance', but the process-level hint is what Windows honors.
+app.commandLine.appendSwitch('force_high_performance_gpu');
 app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,CanvasOopRasterization'); // Out-of-process rasterization
 
 console.log('🚀 Electron performance flags applied');
-console.log('   - GPU VSync: DISABLED');
-console.log('   - Frame rate limit: DISABLED');
+console.log('   - GPU VSync: display-native (flags removed — they pinned 60Hz, see above)');
 console.log('   - GPU workarounds: DISABLED');
 console.log('   - Renderer throttling: DISABLED');
 

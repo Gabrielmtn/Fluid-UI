@@ -252,8 +252,14 @@ class DepthEstimator {
     // Collision state
     var collisionEnabled = false;
     var obstacleCanvas = null;   // offscreen canvas for rasterizing masks
+    var _obsBlurCanvas = null, _obsBlurCtx = null; // sim-scale edge smoothing (D0.5 rev 3)
     var obstacleCtx = null;
     var webcamStreams = {};       // layerIndex → { stream, video, intervalId }
+    // Procedural obstacle source: a draw(ctx, simW, simH) callback composited
+    // over the layer-based obstacles on every recomposite (incl. resize), so
+    // code-drawn colliders (e.g. audio-scene EQ lane walls) survive FBO
+    // rebuilds without needing a fake collision layer.
+    var proceduralDraw = null;
 
     // Expose collision API
     window.collisionLayers = {
@@ -265,6 +271,12 @@ class DepthEstimator {
         createFromWebcam: createCollisionFromWebcam,
         createFromSnapshot: createCollisionFromSnapshot,
         createFromLayerMask: createCollisionFromLayerMask,
+        createFromSketch: createFromSketch,
+        createFromMask: createFromMask, // D3: active Mask → collider
+        setSketchLive: setSketchLive,   // D3/D4: live source → collider binding
+        setMaskLive: setMaskLive,       // D3/D4: bind the active Mask live
+        isSketchLive: isSketchLive,
+        boundColliderSource: boundColliderSource,
 
         // Refresh depth estimation for a layer
         refreshDepth: refreshLayerDepth,
@@ -274,7 +286,30 @@ class DepthEstimator {
 
         // Recomposite all collision layers into the obstacle texture
         updateObstacleFromLayers: updateObstacleFromLayers,
+
+        // Install/remove a procedural obstacle source (draw(ctx, simW, simH)).
+        // Pass null to remove; collision auto-disables if no layer obstacles
+        // remain either.
+        setProcedural: setProcedural,
     };
+
+    function setProcedural(fn) {
+        proceduralDraw = (typeof fn === 'function') ? fn : null;
+        if (proceduralDraw) {
+            collisionEnabled = true;
+            updateObstacleFromLayers();
+        } else {
+            var hasLayers = !!(window.layers && window.layers.some(function (l) { return l.isCollision; }));
+            if (hasLayers) {
+                updateObstacleFromLayers();
+            } else {
+                // Clear synchronously: the rAF recomposite would early-return
+                // once collisionEnabled is false and leave the walls burned in.
+                collisionEnabled = false;
+                clearObstacle();
+            }
+        }
+    }
 
     // Create a collision layer from an existing image layer's mask and/or
     // threshold setting.  Three modes:
@@ -604,6 +639,11 @@ class DepthEstimator {
     // from the source layer so the collision lines up with it on screen.
     function addCollisionLayer(depth, thumbnailUrl, name, opts) {
         opts = opts || {};
+        var sourceFBO = _resolveSourceFBO(opts.source);
+        if (!depth && sourceFBO) {
+            depth = { width: 1, height: 1, data: new Uint8Array(1) };
+        }
+        if (!depth) return null;
         // Use the existing layer capture mechanism
         if (typeof window.layers === 'undefined' || typeof window.renderLayers !== 'function') {
             console.warn('⚠️ Layer system not available');
@@ -675,7 +715,12 @@ class DepthEstimator {
             rotation: opts.rotation || 0,
             isCollision: true,
             collisionMode: 'block',   // block | slow | deflect
-            collisionStrength: 0.7,
+            // 1.0 = fully rigid (2026-07-15): the strength response is now a
+            // full-range cubic — the old curve saturated at 0.5, so the old
+            // 0.7 default meant "solid". New layers start solid; the slider's
+            // lower range is graded permeability (leaky/porous walls).
+            collisionStrength: 1.0,
+            collisionSource: opts.source ? { kind: opts.source.kind, id: opts.source.id } : null,
             mask: {
                 enabled: true,
                 mode: 'show',
@@ -771,6 +816,239 @@ class DepthEstimator {
         _shapeBufH = th;
     }
 
+    // ── D2 bridge: Sketch → Collider ──────────────────────────────────
+    // "Sketch little colliders as easily as importing them" (the Phase
+    // 1.75 vibe): read the sketch layer's alpha coverage, downsample to
+    // ≤512, and add it as a standard depth-mask collision layer — the
+    // whole D0.5 edge pipeline (adaptive cut, blur, coverage solidity)
+    // applies from there. One-shot readback (button click / live refresh).
+    // Returns {depth, previewUrl, any} or null; allowEmpty=true returns a
+    // zeroed mask for an empty sketch (live mode: erasing everything must
+    // CLEAR the bound collider, not freeze its last state).
+    function buildSketchDepth(allowEmpty) {
+        // D3/D4: read the BOUND source's buffer (raster layer OR mask;
+        // falls back to the active paint layer) — switching the active
+        // surface must not silently re-target an existing live binding.
+        var sk = _resolveBoundFBO();
+        var canvasEl = document.getElementById('canvas');
+        if (!sk || !sk.texture || !canvasEl || typeof gl === 'undefined') {
+            console.warn('Sketch layer not available');
+            return null;
+        }
+        var sw = sk.width, sh = sk.height;
+        var px = new Uint8Array(sw * sh * 4);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, sk.fbo);
+        gl.readPixels(0, 0, sw, sh, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        // Downsample alpha to a resolution-proportional long-side cap (box filter), flipping Y:
+        // GL rows are bottom-up, depth-mask data is stored top-down.
+        var maxSketchSide = Math.min(2048, Math.max(512, Math.round(Math.max(sw, sh) * 0.75)));
+        var scale = Math.min(1, maxSketchSide / Math.max(sw, sh));
+        var tw = Math.max(1, Math.round(sw * scale));
+        var th = Math.max(1, Math.round(sh * scale));
+        var depthData = new Uint8Array(tw * th);
+        var any = 0;
+        for (var y = 0; y < th; y++) {
+            var sy0 = Math.floor(y * sh / th), sy1 = Math.max(sy0 + 1, Math.floor((y + 1) * sh / th));
+            for (var x = 0; x < tw; x++) {
+                var sx0 = Math.floor(x * sw / tw), sx1 = Math.max(sx0 + 1, Math.floor((x + 1) * sw / tw));
+                var sum = 0, n = 0;
+                for (var yy = sy0; yy < sy1; yy++) {
+                    var rowBase = ((sh - 1 - yy) * sw) << 2; // flip Y
+                    for (var xx = sx0; xx < sx1; xx++) { sum += px[rowBase + (xx << 2) + 3]; n++; }
+                }
+                var v = n ? Math.round(sum / n) : 0;
+                depthData[y * tw + x] = v;
+                if (v > 12) any++;
+            }
+        }
+        if (!any && !allowEmpty) return null;
+        // Grayscale preview PNG for the layer div
+        var pc = document.createElement('canvas');
+        pc.width = tw; pc.height = th;
+        var pctx = pc.getContext('2d');
+        var img = pctx.createImageData(tw, th);
+        for (var i = 0, m = tw * th; i < m; i++) {
+            var dv = depthData[i], idx = i << 2;
+            img.data[idx] = dv; img.data[idx + 1] = dv; img.data[idx + 2] = dv;
+            img.data[idx + 3] = dv;
+        }
+        pctx.putImageData(img, 0, 0);
+        return { depth: { width: tw, height: th, data: depthData }, previewUrl: pc.toDataURL('image/png'), any: any };
+    }
+
+    // D3/D4: the binding source — {kind:'raster'|'mask', id} or null
+    // (null = whatever paint layer is active right now).
+    var _boundSrc = null;
+    function _resolveBoundFBO() {
+        if (_boundSrc) {
+            if (_boundSrc.kind === 'mask') return (window.Masks && window.Masks.getFBO(_boundSrc.id)) || null;
+            return (window.rasterLayers && window.rasterLayers.getFBO(_boundSrc.id)) || null;
+        }
+        return window.sketch;
+    }
+    function _resolveSourceFBO(source) {
+        if (!source) return null;
+        if (source.kind === 'mask') return (window.Masks && window.Masks.getFBO(source.id)) || null;
+        return (window.rasterLayers && window.rasterLayers.getFBO(source.id)) || null;
+    }
+    function _bindActiveSource(kind) {
+        if (kind === 'mask' && window.Masks) {
+            _boundSrc = { kind: 'mask', id: window.Masks.ensureDefault() };
+        } else if (window.rasterLayers) {
+            _boundSrc = { kind: 'raster', id: window.rasterLayers.activeId() };
+        } else {
+            _boundSrc = null;
+        }
+    }
+    function _createColliderFromSource(kind, title) {
+        // One-shot → Collider binds to the CURRENTLY active surface (also
+        // re-targets the live binding, matching the pre-D2 behavior where
+        // the newest sketch collider became the live target).
+        _bindActiveSource(kind);
+        var sourceFBO = _resolveBoundFBO();
+        if (sourceFBO) {
+            var gpuIdx = addCollisionLayer(null, null, title,
+                { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, source: _boundSrc });
+            if (gpuIdx != null) _sketchColliderIndex = gpuIdx;
+            return gpuIdx;
+        }
+        var built = buildSketchDepth(false);
+        if (!built) { console.warn((kind === 'mask' ? 'Mask' : 'Sketch') + ' is empty — nothing to turn into a collider'); return; }
+        var idx = addCollisionLayer(built.depth, built.previewUrl, title,
+            { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
+        // The newest collider is the live-binding target (D4: collision =
+        // a mask binding; the sketch/mask is the mask source).
+        if (idx != null) _sketchColliderIndex = idx;
+        return idx;
+    }
+    function createFromSketch() { return _createColliderFromSource('raster', 'Sketch Collision'); }
+    function createFromMask() { return _createColliderFromSource('mask', 'Mask Collision'); }
+
+    // ── D3/D4 slice: LIVE sketch → collider binding ───────────────────
+    // While live, every sketch mutation (stroke end / eraser / Clear /
+    // Capture / undo / redo — 05i fires window.__onSketchMutated) refreshes
+    // the bound collision layer in place through updateLayerDepthMask, so
+    // the fluid flows around the drawing AS you draw it. Coalesced to one
+    // readback per 120 ms; refresh runs on stroke END, never per dab.
+    var _sketchLive = false;
+    var _sketchColliderIndex = null;
+    var _sketchRefreshPending = false;
+
+    function _sketchColliderLayer() {
+        if (_sketchColliderIndex == null || !window.layers) return null;
+        return window.layers.find(function (l) { return l.index === _sketchColliderIndex; }) || null;
+    }
+
+    function refreshSketchCollider() {
+        var layer = _sketchColliderLayer();
+        if (!layer) { setSketchLive(false); _sketchColliderIndex = null; return; }
+        // D3/D4: bound source deleted → the binding has nothing to track
+        if (_boundSrc && !_resolveBoundFBO()) {
+            setSketchLive(false);
+            _boundSrc = null;
+            return;
+        }
+        if (_boundSrc && _resolveBoundFBO()) {
+            layer.collisionSource = { kind: _boundSrc.kind, id: _boundSrc.id };
+            updateObstacleFromLayers();
+            return;
+        }
+        var built = buildSketchDepth(true); // empty sketch → zeroed collider
+        if (!built) return;
+        updateLayerDepthMask(_sketchColliderIndex, built.depth);
+        // Keep every visible surface in sync with what now collides, using
+        // the SAME opaque-grayscale convention addCollisionLayer uses for
+        // layer.data (the transparent alpha=coverage preview went blank on
+        // dark thumbnails — the painted shape never showed in the Layers
+        // panel, and full renderLayers() re-renders showed nothing at all).
+        var opaqueUrl = _depthToOpaqueUrl(built.depth);
+        layer.data = opaqueUrl;              // panel thumbnail source
+        layer.originalData = built.previewUrl; // alpha-coverage mask (data)
+        var layerDiv = document.getElementById('layer' + _sketchColliderIndex);
+        if (layerDiv) layerDiv.style.backgroundImage = 'url(' + opaqueUrl + ')';
+        // Update the Layers-panel thumbnail IN PLACE (no full re-render per
+        // stroke — renderLayers rebuilds the whole panel and would fight
+        // scroll position / drag state at painting cadence).
+        var thumb = document.querySelector('.layer-item[data-layer-index="' + _sketchColliderIndex + '"] .layer-thumbnail');
+        if (thumb) thumb.style.backgroundImage = 'url(' + opaqueUrl + ')';
+        else if (typeof window.renderLayers === 'function') window.renderLayers();
+    }
+
+    // Opaque grayscale data-URL from a depth map — matches the conversion
+    // addCollisionLayer performs internally for layer.data.
+    function _depthToOpaqueUrl(depth) {
+        var pc = document.createElement('canvas');
+        pc.width = depth.width; pc.height = depth.height;
+        var ctx = pc.getContext('2d');
+        var img = ctx.createImageData(depth.width, depth.height);
+        for (var i = 0, m = depth.width * depth.height; i < m; i++) {
+            var v = depth.data[i], o = i << 2;
+            img.data[o] = v; img.data[o + 1] = v; img.data[o + 2] = v;
+            img.data[o + 3] = 255;
+        }
+        ctx.putImageData(img, 0, 0);
+        return pc.toDataURL('image/png');
+    }
+
+    function scheduleSketchRefresh(kind, id) {
+        if (!_sketchLive || _sketchRefreshPending) return;
+        // D3/D4: mutations on surfaces other than the bound one are ignored
+        if (_boundSrc && id != null && (kind !== _boundSrc.kind || id !== _boundSrc.id)) return;
+        _sketchRefreshPending = true;
+        setTimeout(function () {
+            _sketchRefreshPending = false;
+            if (_sketchLive) refreshSketchCollider();
+        }, 120);
+    }
+    // 05i fires these on every paint-surface mutation; cheap no-ops unless live.
+    window.__onSketchMutated = function (rid) { scheduleSketchRefresh('raster', rid); };
+    window.__onMaskMutated = function (mid) { scheduleSketchRefresh('mask', mid); };
+
+    // Live binding: the collider keeps tracking its source surface.
+    // kind (optional) = 'raster' | 'mask': which ACTIVE surface a fresh
+    // binding should read; re-enabling with no kind keeps the old source.
+    function setSketchLive(on, kind) {
+        on = !!on;
+        if (on === _sketchLive && (!on || !kind || (_boundSrc && _boundSrc.kind === kind))) return _sketchLive;
+        if (on) {
+            if (!_boundSrc || (kind && _boundSrc.kind !== kind)) {
+                _bindActiveSource(kind || 'raster');
+            }
+            // Bind (or create) the target collider. Empty source is fine —
+            // the layer starts zeroed and lights up as you draw.
+            if (!_sketchColliderLayer()) {
+                var sourceFBO = _resolveBoundFBO();
+                var idx;
+                if (sourceFBO) {
+                    idx = addCollisionLayer(null, null,
+                        ((_boundSrc && _boundSrc.kind === 'mask') ? 'Mask' : 'Sketch') + ' Collision (live)',
+                        { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, source: _boundSrc });
+                } else {
+                    var built = buildSketchDepth(true);
+                    if (!built) return false; // GL/source unavailable
+                    idx = addCollisionLayer(built.depth, built.previewUrl,
+                        ((_boundSrc && _boundSrc.kind === 'mask') ? 'Mask' : 'Sketch') + ' Collision (live)',
+                        { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
+                }
+                if (idx == null) return false;
+                _sketchColliderIndex = idx;
+            } else if (_boundSrc) {
+                _sketchColliderLayer().collisionSource = { kind: _boundSrc.kind, id: _boundSrc.id };
+            }
+            _sketchLive = true;
+            refreshSketchCollider();
+        } else {
+            _sketchLive = false; // binding stays; the collider just stops tracking
+        }
+        if (typeof window.__onSketchLiveChanged === 'function') window.__onSketchLiveChanged(_sketchLive, _boundSrc);
+        return _sketchLive;
+    }
+    function setMaskLive(on) { return setSketchLive(on, 'mask'); }
+
+    function isSketchLive() { return _sketchLive; }
+    function boundColliderSource() { return _boundSrc ? { kind: _boundSrc.kind, id: _boundSrc.id } : null; }
+
     // Throttled entry point — coalesces multiple calls into one rAF
     function updateObstacleFromLayers() {
         if (_obsDirty) return; // already scheduled
@@ -780,11 +1058,12 @@ class DepthEstimator {
 
     function _doUpdateObstacle() {
         _obsDirty = false;
-        if (!window.layers) return;
+        if (!window.layers && !proceduralDraw) return;
 
         // Auto-enable collision if any collision layers exist (e.g. after preset restore)
         if (!collisionEnabled) {
-            var hasCollision = window.layers.some(function (l) { return l.isCollision; });
+            var hasCollision = !!proceduralDraw ||
+                (window.layers && window.layers.some(function (l) { return l.isCollision; }));
             if (!hasCollision) return;
             collisionEnabled = true;
         }
@@ -794,21 +1073,77 @@ class DepthEstimator {
 
         var simW = window.simTexWidth || 128;
         var simH = window.simTexHeight || 128;
+        var gpuEntries = [];
+        var gpuOnly = !proceduralDraw;
+        var gpuStrengthMax = proceduralDraw ? 1.0 : 0.0;
+        (window.layers || []).forEach(function (layer) {
+            if (!layer.isCollision || !layer.mask || !layer.mask.enabled) return;
+            var source = layer.collisionSource ? _resolveSourceFBO(layer.collisionSource) : null;
+            if (layer.collisionSource && source) {
+                gpuEntries.push({ layer: layer, source: source });
+                var sourceStrength = typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7;
+                if (sourceStrength > gpuStrengthMax) gpuStrengthMax = sourceStrength;
+            } else {
+                gpuOnly = false;
+            }
+        });
+        if (gpuEntries.length && gpuOnly && typeof window.beginObstacleTexture === 'function'
+            && typeof window.compositeObstacleSource === 'function') {
+            var gpuWrap = document.getElementById('canvas-wrapper');
+            var gpuCssW = (gpuWrap && gpuWrap.clientWidth) || canvasEl.clientWidth || canvasEl.width || 1;
+            var gpuCssH = (gpuWrap && gpuWrap.clientHeight) || canvasEl.clientHeight || canvasEl.height || 1;
+            window.__obsStrengthMax = gpuStrengthMax > 0 ? gpuStrengthMax : 0.7;
+            window.beginObstacleTexture();
+            gpuEntries.forEach(function (entry) {
+                var layer = entry.layer;
+                window.compositeObstacleSource(entry.source, {
+                    x: (layer.x || 0) / gpuCssW,
+                    y: (layer.y || 0) / gpuCssH,
+                    scaleX: layer.scaleX || 1,
+                    scaleY: layer.scaleY || 1,
+                    rotation: (layer.rotation || 0) * Math.PI / 180,
+                    strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
+                });
+            });
+            // D0.5 edge quality on the GPU path too: without this the single
+            // bilinear tap of a dye-res mask yields sub-texel (hard) collider
+            // edges — measured 0-texel 0.9→0.1 transition, the jagged feel
+            // the whole D0.5 effort exists to prevent. One 1-sim-texel blur
+            // bounds every edge ramp ~1.5 texels, same as the CPU compositor.
+            if (typeof window.finishObstacleComposite === 'function') window.finishObstacleComposite();
+            return;
+        }
+
+        // D0.5 edge quality: compose the obstacle at 2x sim resolution — the
+        // existing drawImage in updateObstacleTexture box-filters it back
+        // down to sim res, turning stair-steps into fractional coverage the
+        // cut-cell projection already consumes correctly (solidity is a
+        // smoothstep over fractions; the MG pyramid restricts fractions).
+        // Capped so the compose canvas never exceeds 2048 on a side.
+        var ss = (simW * 2 <= 2048 && simH * 2 <= 2048) ? 2 : 1;
+        var obsW = simW * ss;
+        var obsH = simH * ss;
 
         // Reuse obstacle canvas
-        if (!obstacleCanvas || obstacleCanvas.width !== simW || obstacleCanvas.height !== simH) {
+        if (!obstacleCanvas || obstacleCanvas.width !== obsW || obstacleCanvas.height !== obsH) {
             obstacleCanvas = document.createElement('canvas');
-            obstacleCanvas.width = simW;
-            obstacleCanvas.height = simH;
+            obstacleCanvas.width = obsW;
+            obstacleCanvas.height = obsH;
             obstacleCtx = obstacleCanvas.getContext('2d', { willReadFrequently: true });
         }
 
-        obstacleCtx.clearRect(0, 0, simW, simH);
+        obstacleCtx.clearRect(0, 0, obsW, obsH);
 
         var hasAny = false;
-        window.layers.forEach(function (layer) {
+        // Max strength among composited sources — the shaders divide it back
+        // out to recover per-texel COVERAGE (see obstacleSolidityGLSL in 05b)
+        var strengthMax = gpuStrengthMax;
+        (window.layers || []).forEach(function (layer) {
             if (!layer.isCollision) return;
             if (!layer.mask || !layer.mask.enabled) return;
+            if (layer.collisionSource) return;
+            var st = (layer.collisionStrength !== undefined) ? layer.collisionStrength : 0.7;
+            if (st > strengthMax) strengthMax = st;
 
             layer.mask.shapes.forEach(function (shape) {
                 if (shape.type !== 'depth-mask') return;
@@ -826,18 +1161,41 @@ class DepthEstimator {
                 var invert = !!shape.invert;
                 var alphaVal = Math.round((layer.collisionStrength !== undefined ? layer.collisionStrength : 0.7) * 255);
 
+                // D0.5 edge quality, rev 2 (2026-07-14): fwidth-style ADAPTIVE
+                // soft cut. The band scales with the LOCAL depth gradient, so
+                // steep edges get ~0.75px of antialiasing (sub-texel collider
+                // edges) while flat midtone regions get a hard cut. The first
+                // rev's FIXED ±band turned every flat region hovering near the
+                // threshold — common in real photo/webcam depth — into a huge
+                // porous half-solidity field, and the converged MG solve read
+                // it as a noisy sponge: whole-canvas velocity fuzz that got
+                // worse with collisionStrength. config.DEPTH_EDGE_BAND is now
+                // the CAP on the band (0.5 ≈ fully hard everywhere).
+                var bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+                    ? window.config.DEPTH_EDGE_BAND : 12;
+                if (bandCap < 0.5) bandCap = 0.5;
+                var dd = shape.depthData;
                 // Composite in screen space (top-down). GL orientation is
                 // handled by a single vertical flip in updateObstacleTexture,
                 // so transforms here behave exactly like the CSS transform
                 // on the layer div.
                 for (var i = 0, n = tw * th; i < n; i++) {
-                    var dv = shape.depthData[i] || 0;
-                    var isObs = invert ? (dv < threshold) : (dv >= threshold);
+                    var dv = dd[i] || 0;
+                    var xI = i - ((i / tw) | 0) * tw; // i % tw without modulo
+                    var gx = Math.abs((dd[i + (xI < tw - 1 ? 1 : 0)] || 0) - (dd[i - (xI > 0 ? 1 : 0)] || 0)) * 0.5;
+                    var gy = Math.abs((dd[i + (i < n - tw ? tw : 0)] || 0) - (dd[i - (i >= tw ? tw : 0)] || 0)) * 0.5;
+                    var band = (gx > gy ? gx : gy) * 0.75;
+                    if (band < 0.5) band = 0.5;
+                    if (band > bandCap) band = bandCap;
+                    var t = (dv - (threshold - band)) / (band * 2);
+                    if (t < 0) t = 0; else if (t > 1) t = 1;
+                    var cov = t * t * (3 - 2 * t);
+                    if (invert) cov = 1 - cov;
                     var idx = i << 2; // *4 via shift
                     d[idx] = 255;
                     d[idx + 1] = 255;
                     d[idx + 2] = 255;
-                    d[idx + 3] = isObs ? alphaVal : 0;
+                    d[idx + 3] = (cov * alphaVal + 0.5) | 0;
                 }
 
                 _shapeCtx.putImageData(_shapeImgData, 0, 0);
@@ -850,15 +1208,15 @@ class DepthEstimator {
                 var cssH = (wrap && wrap.clientHeight) || canvasEl.clientHeight || canvasEl.height || 1;
                 var bufW = canvasEl.width || 1;
                 var bufH = canvasEl.height || 1;
-                var lx = (layer.x || 0) * (simW / cssW);
-                var ly = (layer.y || 0) * (simH / cssH);
-                var sx = simW / bufW;
-                var sy = simH / bufH;
+                var lx = (layer.x || 0) * (obsW / cssW);
+                var ly = (layer.y || 0) * (obsH / cssH);
+                var sx = obsW / bufW;
+                var sy = obsH / bufH;
                 var lScaleX = layer.scaleX || 1;
                 var lScaleY = layer.scaleY || 1;
                 var lRot = (layer.rotation || 0) * Math.PI / 180;
-                var cx = simW * 0.5;
-                var cy = simH * 0.5;
+                var cx = obsW * 0.5;
+                var cy = obsH * 0.5;
 
                 obstacleCtx.save();
                 obstacleCtx.globalCompositeOperation = 'lighter';
@@ -878,9 +1236,53 @@ class DepthEstimator {
             });
         });
 
+        // Composite the procedural source (e.g. EQ lane walls) over the layers
+        if (proceduralDraw) {
+            hasAny = true;
+            obstacleCtx.save();
+            obstacleCtx.globalCompositeOperation = 'lighter';
+            try { proceduralDraw(obstacleCtx, obsW, obsH); } catch (_) {}
+            obstacleCtx.restore();
+        }
+
+        window.__obsStrengthMax = strengthMax > 0 ? strengthMax : 0.7;
         if (hasAny && typeof window.updateObstacleTexture === 'function') {
-            window.updateObstacleTexture(obstacleCanvas);
-        } else if (!hasAny && typeof window.clearObstacleTexture === 'function') {
+            // D0.5 rev 3: constant-width smoothing at SIM scale before upload.
+            // Bounds every coverage ramp to ~1.5 sim texels regardless of the
+            // depth map's local gradient: hard "coastlines" through flat
+            // near-threshold regions stop reading as ragged binary walls (the
+            // whole-canvas velocity fuzz the converged MG solve produced at
+            // high collisionStrength), while wide mushy aprons stay impossible
+            // (the blur radius, not the depth data, caps the ramp). GPU blur
+            // via canvas filter — no pixel loops.
+            if (!_obsBlurCanvas || _obsBlurCanvas.width !== obsW || _obsBlurCanvas.height !== obsH) {
+                _obsBlurCanvas = document.createElement('canvas');
+                _obsBlurCanvas.width = obsW;
+                _obsBlurCanvas.height = obsH;
+                _obsBlurCtx = _obsBlurCanvas.getContext('2d');
+            }
+            _obsBlurCtx.clearRect(0, 0, obsW, obsH);
+            _obsBlurCtx.filter = 'blur(' + (ss * 0.5) + 'px)';
+            _obsBlurCtx.drawImage(obstacleCanvas, 0, 0);
+            _obsBlurCtx.filter = 'none';
+            window.updateObstacleTexture(_obsBlurCanvas);
+            if (gpuEntries.length && typeof window.compositeObstacleSource === 'function') {
+                var mixedWrap = document.getElementById('canvas-wrapper');
+                var mixedCssW = (mixedWrap && mixedWrap.clientWidth) || canvasEl.clientWidth || canvasEl.width || 1;
+                var mixedCssH = (mixedWrap && mixedWrap.clientHeight) || canvasEl.clientHeight || canvasEl.height || 1;
+                gpuEntries.forEach(function (entry) {
+                    var layer = entry.layer;
+                    window.compositeObstacleSource(entry.source, {
+                        x: (layer.x || 0) / mixedCssW,
+                        y: (layer.y || 0) / mixedCssH,
+                        scaleX: layer.scaleX || 1,
+                        scaleY: layer.scaleY || 1,
+                        rotation: (layer.rotation || 0) * Math.PI / 180,
+                        strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
+                    });
+                });
+            }
+        } else if (!hasAny && !gpuEntries.length && typeof window.clearObstacleTexture === 'function') {
             window.clearObstacleTexture();
         }
     }
@@ -891,15 +1293,33 @@ class DepthEstimator {
         }
     }
 
-    // Listen for layer deletion to clean up webcam streams
-    var origDeleteLayer = window.deleteLayer;
-    if (typeof origDeleteLayer === 'function') {
+    // Listen for layer deletion to clean up webcam streams + live binding.
+    // MUST poll: this file is a <script type="module"> (deferred) while
+    // window.deleteLayer comes from 05l in the dynamic async chain — the
+    // eval order is a RACE, and when the module won, the old eval-time
+    // `if (typeof deleteLayer === 'function')` wrap silently never
+    // installed. Symptom: deleting a collision layer left its wall in the
+    // sim (no updateObstacleFromLayers), webcams kept streaming, and the
+    // ⟳ Live binding stayed lit against a dead layer.
+    (function installDeleteHook() {
+        var origDeleteLayer = window.deleteLayer;
+        if (typeof origDeleteLayer !== 'function') {
+            setTimeout(installDeleteHook, 250);
+            return;
+        }
         window.deleteLayer = function (index) {
             removeWebcam(index);
+            // Deleting the live-bound sketch collider unbinds IMMEDIATELY
+            // (the ⟳ Live button follows via __onSketchLiveChanged) — the
+            // next-mutation auto-disable stays as the fallback.
+            if (_sketchColliderIndex != null && index === _sketchColliderIndex) {
+                setSketchLive(false);
+                _sketchColliderIndex = null;
+            }
             origDeleteLayer(index);
             updateObstacleFromLayers();
         };
-    }
+    })();
 
     console.log('🧱 Depth Collision system loaded');
 })();

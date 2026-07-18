@@ -10,11 +10,14 @@
     let controls = getControls(); // initial ref, updated after layout
     let tapTimeout = null;
     let isMobileMode = false;
+    let savedVibrance = null;
+    let savedClarity = null;
 
     // Detect if device is mobile/tablet
     function isMobileDevice() {
-        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
-            || (window.innerWidth <= 768);
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            || (window.innerWidth <= 768)
+            || (window.innerHeight <= 500 && window.innerWidth <= 1200);
     }
 
     // Enable mobile mode
@@ -31,6 +34,26 @@
         if (mobileMenuToggle) {
             mobileMenuToggle.classList.add('show');
         }
+
+        // Boost color vibrance/clarity for mobile displays (often washed out)
+        try {
+            if (window.config) {
+                savedVibrance = config.VIBRANCE;
+                savedClarity = config.CLARITY;
+                // Only boost if values are low — respect user settings if already high
+                if (config.VIBRANCE < 0.4) config.VIBRANCE = 0.4;
+                if (config.CLARITY < 0.3) config.CLARITY = 0.3;
+                // Sync UI sliders if they exist
+                var vSlider = document.getElementById('vibrance');
+                var cSlider = document.getElementById('clarity');
+                if (vSlider) vSlider.value = config.VIBRANCE;
+                if (cSlider) cSlider.value = config.CLARITY;
+                var vVal = document.getElementById('vibranceValue');
+                var cVal = document.getElementById('clarityValue');
+                if (vVal) vVal.textContent = config.VIBRANCE.toFixed(2);
+                if (cVal) cVal.textContent = config.CLARITY.toFixed(2);
+            }
+        } catch(_) {}
         
         console.log('Mobile mode enabled');
     }
@@ -47,6 +70,24 @@
         if (mobileMenuToggle) {
             mobileMenuToggle.classList.remove('show');
         }
+
+        // Restore original vibrance/clarity values
+        try {
+            if (window.config && savedVibrance !== null) {
+                config.VIBRANCE = savedVibrance;
+                config.CLARITY = savedClarity;
+                var vSlider = document.getElementById('vibrance');
+                var cSlider = document.getElementById('clarity');
+                if (vSlider) vSlider.value = savedVibrance;
+                if (cSlider) cSlider.value = savedClarity;
+                var vVal = document.getElementById('vibranceValue');
+                var cVal = document.getElementById('clarityValue');
+                if (vVal) vVal.textContent = savedVibrance.toFixed(2);
+                if (cVal) cVal.textContent = savedClarity.toFixed(2);
+                savedVibrance = null;
+                savedClarity = null;
+            }
+        } catch(_) {}
 
         restoreMixerStrip();
         console.log('Mobile mode disabled');

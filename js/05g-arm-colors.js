@@ -11,12 +11,12 @@
         var multiArmColors = [];
         window.multiArmColors = multiArmColors;
         function resolveArmColor(armIndex, fallbackColor) {
-            // Per-arm colors only apply with 2+ arms ("multi brush"). At multiplier 1
-            // the single splat must follow the pointer / solo #colorPicker, even if
-            // arm 0 was left on a non-'main' mode from a prior multi session — the
-            // arm-colors panel can't edit arm 0 below 2 arms, so it never resets it,
-            // which otherwise hijacks the solo picker. (Mirrors multiSplat's loop bound.)
-            if (animationMultiplier < 2) return fallbackColor;
+            // Arm 0's color mode applies at EVERY multiplier (2026-07-13): the
+            // brush-colors panel now renders arm 0 at 1x, and two-way sync with
+            // the main #colorPicker keeps the solo brush coherent (the old
+            // hijack this gate prevented — a stale non-'main' arm 0 from a
+            // multi session overriding the picker — can't happen when the
+            // panel and picker mirror each other).
             var cfg = multiArmColors[armIndex];
             if (!cfg || cfg.mode === 'main') return fallbackColor;
             if (cfg.mode === 'fixed') {
@@ -77,7 +77,19 @@
             }
         }
         window.advanceArmColors = advanceArmColors;
-        function multiSplat(x, y, dx, dy, color, shouldBroadcast) {
+        // exactColor: programmatic splat sources (path layers, audio scenes,
+        // animations) pass true so their configured color is deposited as-is on
+        // every arm. Pointer strokes, stroke replay, and remote-peer strokes
+        // leave it false — they ARE user strokes, so arm color modes apply.
+        function multiSplat(x, y, dx, dy, color, shouldBroadcast, exactColor) {
+            // Brush tip (D1) rides the exactColor split: user strokes (live
+            // pointer, replay, remote peers — exactColor falsy) stamp with the
+            // configured BRUSH_TIP; programmatic sources (path layers, audio
+            // scenes, animations) stay classic gaussian. splat() reads the
+            // flag; cleared in finally so direct splat() callers never
+            // inherit it.
+            window.__brushTipOn = !exactColor;
+            try {
             // Kaleidoscope behavior
             const centerX = canvas.width * 0.5;
             const centerY = canvas.height * 0.5;
@@ -91,7 +103,7 @@
                 const finalY = rotatedY + centerY;
                 const rotatedDx = dx * Math.cos(angle) - dy * Math.sin(angle);
                 const rotatedDy = dx * Math.sin(angle) + dy * Math.cos(angle);
-                const armColor = resolveArmColor(i, color);
+                const armColor = exactColor ? color : resolveArmColor(i, color);
                 splat(finalX, finalY, rotatedDx, rotatedDy, armColor);
             }
             if (shouldBroadcast && typeof broadcastSplat === 'function') {
@@ -105,14 +117,15 @@
                     config.SPLAT_RADIUS
                 );
             }
+            } finally { window.__brushTipOn = false; }
         }
         // Helper to apply a multiSplat with specific multiplier and radius, restoring after
-        window.applyMultiSplatWith = function(x, y, dx, dy, color, mult, radius) {
+        window.applyMultiSplatWith = function(x, y, dx, dy, color, mult, radius, exactColor) {
             const prevM = (typeof animationMultiplier === 'number') ? animationMultiplier : 1;
             const prevR = config.SPLAT_RADIUS;
             animationMultiplier = Math.max(1, Math.round(mult || 1));
             config.SPLAT_RADIUS = (typeof radius === 'number') ? radius : prevR;
-            try { multiSplat(x, y, dx, dy, color, false); } finally {
+            try { multiSplat(x, y, dx, dy, color, false, exactColor); } finally {
                 animationMultiplier = prevM;
                 config.SPLAT_RADIUS = prevR;
             }
@@ -159,6 +172,17 @@
                 if (stepEl) stepEl.checked = false;
                 applyPickerColor();
                 updatePaletteStepIndicator();
+                // Two-way sync, picker → arm 0: if the brush's arm 0 holds a
+                // fixed color, an explicit pick IS that color changing (panel →
+                // picker direction lives in the brush-colors panel, 20-mixer).
+                var arm0 = (window.multiArmColors || [])[0];
+                if (arm0 && arm0.mode === 'fixed' && arm0.color !== colorPickerEl.value) {
+                    arm0.color = colorPickerEl.value;
+                    // refresh the panel's swatch if it's open
+                    var armPicker = document.querySelector('.arm-colors-panel .arm-row .arm-picker');
+                    if (armPicker) armPicker.value = colorPickerEl.value;
+                    if (typeof window.persistArmColors === 'function') window.persistArmColors();
+                }
             });
         }
         const randomColorCheckboxEl = document.getElementById('randomColor');
@@ -183,24 +207,34 @@
                 updatePaletteStepIndicator();
             });
         }
-        // Generate vibrant random color (avoids washed out/pale colors)
+        // Generate vibrant random color (avoids washed out/pale/gloomy colors)
         function generateVibrantColor() {
             // Use HSL to control saturation and lightness
             const hue = Math.random() * 360; // Full spectrum
-            const sat = 0.7 + Math.random() * 0.3; // 70-100% saturation (vibrant)
-            const light = 0.45 + Math.random() * 0.2; // 45-65% lightness (not too bright/dark)
-            // Convert HSL to RGB
-            const c = (1 - Math.abs(2 * light - 1)) * sat;
-            const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
-            const m = light - c / 2;
-            let r, g, b;
-            if (hue < 60) { r = c; g = x; b = 0; }
-            else if (hue < 120) { r = x; g = c; b = 0; }
-            else if (hue < 180) { r = 0; g = c; b = x; }
-            else if (hue < 240) { r = 0; g = x; b = c; }
-            else if (hue < 300) { r = x; g = 0; b = c; }
-            else { r = c; g = 0; b = x; }
-            return [r + m, g + m, b + m];
+            const sat = 0.85 + Math.random() * 0.15; // 85-100% saturation (sharp, clear hues)
+            let light = 0.5 + Math.random() * 0.15; // 50-65% lightness (luminous, never muddy)
+            function hslToRgb(h, s, l) {
+                const c = (1 - Math.abs(2 * l - 1)) * s;
+                const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+                const m = l - c / 2;
+                let r, g, b;
+                if (h < 60) { r = c; g = x; b = 0; }
+                else if (h < 120) { r = x; g = c; b = 0; }
+                else if (h < 180) { r = 0; g = c; b = x; }
+                else if (h < 240) { r = 0; g = x; b = c; }
+                else if (h < 300) { r = x; g = 0; b = c; }
+                else { r = c; g = 0; b = x; }
+                return [r + m, g + m, b + m];
+            }
+            let rgb = hslToRgb(hue, sat, light);
+            // Equal HSL lightness is not equal perceived brightness: a deep blue at
+            // L 0.5 reads near-black on the dark canvas while a yellow glows. Lift
+            // lightness until the color clears a luma floor so every hue lands legible.
+            while ((0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) < 0.22 && light < 0.78) {
+                light += 0.04;
+                rgb = hslToRgb(hue, sat, light);
+            }
+            return rgb;
         }
         function rgbToHex(r, g, b) {
             var hr = Math.round(r * 255).toString(16).padStart(2, '0');
@@ -213,7 +247,18 @@
             if (cp) cp.value = rgbToHex(r, g, b);
         }
         // Read whatever the picker currently shows into pointer.color
+        var firstPaintColorFreshened = false;
         function applyPickerColor() {
+            // The session's first stroke would otherwise paint whatever the picker
+            // was left holding (palette preseed / restored state) — a color that
+            // never went through generateVibrantColor, since advanceColor only runs
+            // on mouseup. In random mode, advance once up front so the vibrancy
+            // guarantee covers the very first paint too.
+            if (!firstPaintColorFreshened) {
+                firstPaintColorFreshened = true;
+                const rndEl = document.getElementById('randomColor');
+                if (rndEl && rndEl.checked) advanceColor();
+            }
             const hex = document.getElementById('colorPicker').value;
             const r = parseInt(hex.slice(1, 3), 16) / 255;
             const g = parseInt(hex.slice(3, 5), 16) / 255;

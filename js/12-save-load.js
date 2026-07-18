@@ -31,7 +31,7 @@
     var SLIDER_IDS = [
         // Simulation
         'densityDissipation','velocityDissipation','pressureDissipation','pressureIteration',
-        'velocityInfluence','curl','sharpness','brushSize','multiplier','timeScale','canvasOpacity','captureDimming',
+        'velocityInfluence','curl','sharpness','swirl','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming',
         // Kaleidoscope
         'kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments',
         // Light Source
@@ -67,7 +67,7 @@
         'enableLighting','enableLightShift','microDetailToggle',
         'sunraysToggle',
         // Simulation
-        'turbulenceMode',
+        'macCormackToggle','multigridToggle',
         // Animations
         'ascendToggle','ascendRandomness','shootingStarToggle',
         // Layers
@@ -94,7 +94,7 @@
         // Recording
         'recMode','recPlaybackSpeed',
         // Audio Reactive
-        'audioReactSource','audioAutoSplatMode',
+        'audioMode','audioReactSource','audioAutoSplatMode',
         // Brush
         'splatInMode','splatOutMode'
     ];
@@ -352,6 +352,32 @@
             }
         } catch(_){}
 
+        // ── 10. Sidebar section collapsed states ──
+        // 5.2 timing: sections are MOVED into #sidebar-right by
+        // initMixerLayout ~800ms after load — at loadSettings time the
+        // container is empty and an immediate pass is a no-op. Poll until
+        // they exist (the 23-depth-collision deleteLayer-hook pattern).
+        try {
+            var savedSections = sm.get('sidebar.sections');
+            if (savedSections && typeof savedSections === 'object') {
+                (function applySections(tries) {
+                    var sections = document.querySelectorAll('#sidebar-right .sidebar-section');
+                    if (!sections.length) {
+                        if (tries < 60) setTimeout(function () { applySections(tries + 1); }, 250);
+                        return;
+                    }
+                    sections.forEach(function (sec) {
+                        var titleEl = sec.querySelector('.section-title');
+                        if (!titleEl) return;
+                        var title = titleEl.textContent.trim();
+                        if (title in savedSections) {
+                            sec.classList.toggle('collapsed', !!savedSections[title]);
+                        }
+                    });
+                })(0);
+            }
+        } catch(_){}
+
         console.log('Settings loaded:', sliderCount, 'sliders restored');
     }
 
@@ -516,11 +542,14 @@
         var brushState = {
             replayMode: window.replayMode || 'stroke',
             replayTimePeriod: window.replayTimePeriod || 5,
+            replaySpeed: typeof window.replaySpeed === 'number' ? window.replaySpeed : 1,
+            replayLiveColors: !!window.replayLiveColors,
             refreshRate: window.brushRefreshRate || 0,
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
             splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
-            splatOutDist: typeof window.splatOutDist === 'number' ? window.splatOutDist : 0.15
+            splatOutDist: typeof window.splatOutDist === 'number' ? window.splatOutDist : 0.15,
+            gateMaxDensity: typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3
         };
 
         // ── Shooting star origin ──
@@ -574,6 +603,11 @@
         // ── Layers (data URLs, position, masks, collision) ──
         var layersData = null;
         try {
+            // D2: refresh raster layers' layer.data to full-res dataURLs so
+            // painted pixels round-trip (thumbnails overwrite it in between)
+            if (window.rasterLayers && window.rasterLayers.syncData) window.rasterLayers.syncData();
+        } catch(_){}
+        try {
             var ls = window.layers;
             if (ls && ls.length > 0) {
                 layersData = ls.map(function(layer) {
@@ -592,7 +626,12 @@
                         rotation: layer.rotation || 0,
                         isCollision: !!layer.isCollision,
                         collisionMode: layer.collisionMode || 'block',
-                        collisionStrength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
+                        collisionStrength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7,
+                        isRaster: !!layer.isRaster,
+                        opacity: typeof layer.opacity === 'number' ? layer.opacity : 1,
+                        blendMode: layer.blendMode || 'normal',
+                        clipMaskId: (typeof layer.clipMaskId === 'number') ? layer.clipMaskId : null,
+                        clipInvert: !!layer.clipInvert
                     };
                     // Mask data — encode collision depthData as base64 for exact restoration
                     if (layer.mask) {
@@ -627,6 +666,15 @@
         try {
             if (window.layerOrder) {
                 layerOrderData = JSON.parse(JSON.stringify(window.layerOrder));
+            }
+        } catch(_){}
+
+        // ── D3 masks (coverage PNGs + names) ──
+        var masksData = null;
+        try {
+            if (window.Masks && window.Masks.serialize) {
+                var ms = window.Masks.serialize();
+                if (ms.length > 0) masksData = ms;
             }
         } catch(_){}
 
@@ -707,6 +755,7 @@
             sidebarSections: sidebarSections,
             layers: layersData,
             layerOrder: layerOrderData,
+            masks: masksData,
             branding: brandingData,
             recordedLayers: recordedLayers,
             cosOscillator: cosState,
@@ -717,8 +766,17 @@
 
     function applyPresetSnapshot(snapshot) {
         if (!snapshot) return;
+        // 13.5: look settings locked by the multiplayer host — local snapshot
+        // applies (user presets, autoload) are gated; the host's lock snapshot
+        // itself arrives under __mpApplyingRemote and passes through.
+        if (window.__mpSettingsLocked && !window.__mpApplyingRemote) return;
         var reg = window.ParamRegistry;
-        if (window.QualityGovernor) window.QualityGovernor.reset();
+        // Soft reset: keep the governor's quality tier across snapshot loads —
+        // a hard reset snapped to full quality and stuttered for seconds while
+        // the 1 Hz evaluator re-degraded (see 08a-quality-governor.js)
+        if (window.QualityGovernor) {
+            (window.QualityGovernor.softReset || window.QualityGovernor.reset)();
+        }
 
         // ── Sliders ── (clamped through the param registry; unknown ids warn + skip)
         try {
@@ -907,6 +965,18 @@
                     var tInput = document.getElementById('replayTimePeriod');
                     if (tInput) tInput.value = bs.replayTimePeriod;
                 }
+                if (typeof bs.replaySpeed === 'number') {
+                    window.replaySpeed = bs.replaySpeed;
+                    var spSlider = document.getElementById('replaySpeed');
+                    if (spSlider) spSlider.value = bs.replaySpeed;
+                    var spVal = document.getElementById('replaySpeedValue');
+                    if (spVal) spVal.textContent = bs.replaySpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
+                }
+                if (typeof bs.replayLiveColors === 'boolean') {
+                    window.replayLiveColors = bs.replayLiveColors;
+                    var lcCb = document.getElementById('replayLiveColors');
+                    if (lcCb) lcCb.checked = bs.replayLiveColors;
+                }
                 if (typeof bs.refreshRate === 'number') window.brushRefreshRate = bs.refreshRate;
                 if (bs.splatInMode) {
                     window.splatInMode = bs.splatInMode;
@@ -927,6 +997,15 @@
                     window.splatOutDist = bs.splatOutDist;
                     var soD = document.getElementById('splatOutDist');
                     if (soD) { soD.value = bs.splatOutDist; soD.dispatchEvent(new Event('input', { bubbles: true })); }
+                }
+                if (typeof bs.gateMaxDensity === 'number') {
+                    window.gateMaxDensity = bs.gateMaxDensity;
+                    var gdVal = document.querySelector('.ch-gate-density-val');
+                    if (gdVal) gdVal.textContent = bs.gateMaxDensity.toFixed(1);
+                    if (typeof window.applyGateState === 'function') {
+                        var gateChk = document.getElementById('colorGate');
+                        if (gateChk && gateChk.checked) window.applyGateState(true);
+                    }
                 }
             }
         } catch(_){}
@@ -1026,7 +1105,12 @@
                     if (!ld.data) return;
 
                     var layerDiv;
-                    if (ld.isCollision) {
+                    if (ld.isRaster) {
+                        // D2 raster layers are GPU-composited — no div;
+                        // rasterLayers.reconcile() below recreates the FBO
+                        // and uploads ld.data into it
+                        layerDiv = null;
+                    } else if (ld.isCollision) {
                         // Collision layers REUSE the static layerN div like regular
                         // layers — a duplicate id is unreachable via getElementById,
                         // leaving an unhideable/undeletable ghost preview on screen.
@@ -1069,7 +1153,12 @@
                         rotation: ld.rotation || 0,
                         isCollision: !!ld.isCollision,
                         collisionMode: ld.collisionMode || 'block',
-                        collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7
+                        collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7,
+                        isRaster: !!ld.isRaster,
+                        opacity: typeof ld.opacity === 'number' ? ld.opacity : 1,
+                        blendMode: ld.blendMode || 'normal',
+                        clipMaskId: (typeof ld.clipMaskId === 'number') ? ld.clipMaskId : null,
+                        clipInvert: !!ld.clipInvert
                     };
 
                     // Restore mask metadata and decode collision depthData from base64
@@ -1119,7 +1208,49 @@
                     });
                 }
 
+                // Step 3.5: reconcile screen ↔ panel. renderLayers() only walks
+                // layerOrder, but the restore above set a DOM div for every
+                // snapshot.layers entry. If a snapshot's layerOrder omits a layer
+                // it still lists in .layers (corrupt/cross-version presets, or a
+                // pre-existing ghost that capturePresetSnapshot baked in), that
+                // layer would render on screen yet never appear in the panel — an
+                // unmanageable ghost that can't be hidden or deleted from the UI.
+                // Enforce the invariant "a layer is visible IFF it's in the panel":
+                // drop any layer not referenced by the final layerOrder and clear
+                // its backing div / GPU buffer. Mutate arrays in place — 05k/05l
+                // hold the same references (reassigning would desync them).
+                var _orderedIds = {};
+                window.layerOrder.forEach(function(it) { if (it.type === 'layer') _orderedIds[it.id] = true; });
+                for (var _li = window.layers.length - 1; _li >= 0; _li--) {
+                    var _orphan = window.layers[_li];
+                    if (_orderedIds[_orphan.index]) continue;
+                    if (_orphan.isRaster && window.rasterLayers && window.rasterLayers._onDeleted) {
+                        window.rasterLayers._onDeleted(_orphan.index);
+                    }
+                    var _od = document.getElementById('layer' + _orphan.index);
+                    if (_od) {
+                        _od.style.backgroundImage = '';
+                        _od.style.display = 'none';
+                        _od.style.zIndex = '';
+                        _od.classList.remove('active');
+                    }
+                    window.layers.splice(_li, 1);
+                }
+                // Prune any layerOrder entry whose layer no longer exists (reverse
+                // mismatch: renderLayers silently skips these, but a dangling entry
+                // would re-propagate through the next capturePresetSnapshot).
+                for (var _oi = window.layerOrder.length - 1; _oi >= 0; _oi--) {
+                    var _it = window.layerOrder[_oi];
+                    if (_it.type === 'layer' && !window.layers.some(function(l) { return l.index === _it.id; })) {
+                        window.layerOrder.splice(_oi, 1);
+                    }
+                }
+
                 if (typeof window.renderLayers === 'function') window.renderLayers();
+
+                // D2: rebuild raster-layer GPU buffers from the restored
+                // layer.data (also frees FBOs whose layers the load wiped)
+                if (window.rasterLayers && window.rasterLayers.reconcile) window.rasterLayers.reconcile();
 
                 // Step 4: Upload collision obstacle data immediately for layers with restored depthData
                 if (window.collisionLayers && window.collisionLayers.updateObstacleFromLayers) {
@@ -1136,6 +1267,13 @@
                 }
             }
         } catch(e) { console.warn('Preset: layer restore failed', e); }
+
+        // ── D3 masks ──
+        try {
+            if (window.Masks && window.Masks.restore && snapshot.masks !== undefined) {
+                window.Masks.restore(snapshot.masks);
+            }
+        } catch(e) { console.warn('Preset: mask restore failed', e); }
 
         // ── Branding overlays ──
         try {
@@ -1267,9 +1405,13 @@
                 var snapshot = presets[name];
                 applyPresetSnapshot(snapshot);
                 showPresetStatus('Loaded: ' + name, '#3fb950');
-                // Highlight active
-                list.querySelectorAll('.user-preset-btn').forEach(function(b) { b.classList.remove('active'); });
-                btn.classList.add('active');
+                // A user preset supersedes any built-in active state (via the
+                // real state owner in 04b), and highlights on BOTH user-preset
+                // surfaces (this sidebar list + the mixer strip's).
+                if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
+                document.querySelectorAll('.user-preset-btn, .mixer-user-preset-btn').forEach(function(b) {
+                    b.classList.toggle('active', b.textContent === name);
+                });
             });
 
             var overwriteBtn = document.createElement('button');

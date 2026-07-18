@@ -7,6 +7,10 @@
         html {
             /* Allow Electron's transparent window to show desktop behind the page */
             background: transparent;
+            /* Dark UA chrome (native select popups, scrollbars): pairs with the
+               color-scheme meta in index.html — some Chromium builds honor the
+               CSS property, some the meta. */
+            color-scheme: dark;
         }
         
         /* Custom Title Bar */
@@ -667,6 +671,26 @@
             background: rgba(100, 200, 255, 0.2);
             border: 2px solid rgba(100, 200, 255, 0.6);
         }
+
+        /* D2 raster paint layers: the brush's current target */
+        .layer-item.raster-active {
+            background: rgba(140, 220, 160, 0.14);
+            border: 1px solid rgba(140, 220, 160, 0.55);
+        }
+
+        .layer-btn.raster-paint-btn.active {
+            background: rgba(140, 220, 160, 0.35);
+            border-color: rgba(140, 220, 160, 0.8);
+        }
+
+        .layer-item[data-raster="1"] .layer-thumbnail {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            background-color: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.35);
+        }
         
         .layer-item-header {
             display: flex;
@@ -676,14 +700,24 @@
         
         
         .layer-item.drag-over {
-            border-top: 3px solid rgba(100, 200, 255, 0.8);
+            border-top: 3px solid rgba(100, 200, 255, 0.95);
             margin-top: 8px;
+            background: rgba(100, 200, 255, 0.08);
         }
-        
+
         .layer-item.dragging {
             opacity: 0.5;
         }
-        
+
+        /* 7.5: while dragging, every OTHER layer item collapses to its
+           header so the list is scannable and drop targets stay dense */
+        #layersPanel.layers-dragging .layer-item-collapsible:not(.dragging) {
+            grid-template-rows: auto 0fr;
+        }
+        #layersPanel.layers-dragging .layer-item-collapsible:not(.dragging) .layer-item-body {
+            visibility: hidden;
+        }
+
         .drop-zone {
             height: 40px;
             border: 2px dashed rgba(100, 200, 255, 0.3);
@@ -696,9 +730,23 @@
             color: rgba(255, 255, 255, 0.4);
             background: rgba(100, 200, 255, 0.05);
         }
-        
+
         .drop-zone:hover, .drop-zone.drag-over {
             height: 50px;
+        }
+
+        /* 7.5: drop zones light up as soon as a drag starts... */
+        #layersPanel.layers-dragging .drop-zone {
+            border-color: rgba(100, 200, 255, 0.55);
+            background: rgba(100, 200, 255, 0.10);
+            color: rgba(255, 255, 255, 0.75);
+        }
+        /* ...and go bright when they're the active target */
+        .drop-zone.drag-over {
+            border-color: rgba(100, 200, 255, 0.95);
+            border-style: solid;
+            background: rgba(100, 200, 255, 0.20);
+            color: #fff;
         }
         
         .layer-thumbnail {
@@ -759,10 +807,11 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 6px;
             overflow: hidden;
-            /* Grid-based collapse: scales to any content height */
+            /* Grid-based collapse: scales to any content height.
+               Not transitioned — animated grid rows re-layout everything
+               below on every frame (see 21-sidebar.css .sidebar-section) */
             display: grid;
             grid-template-rows: auto 1fr;
-            transition: grid-template-rows 0.3s ease;
         }
         .collapsible-section.collapsed {
             grid-template-rows: auto 0fr;
@@ -977,6 +1026,58 @@
         .rec-mini-actions { margin-top: 8px; }
         .rec-layer-status { min-width: 60px; height: 60px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: linear-gradient(#1f2733, #151b24); color: #e6edf3; border: 1px solid rgba(255,255,255,0.14); font-weight: 700; font-size: 14px; }
         @media (max-width: 420px) { .rec-mini-grid { grid-template-columns: 1fr; } }
+
+        /* ── Recording color-mode dropdown (1.3 rework) ── */
+        /* Styled select replacing the raw native control ("looks bad"). Scoped
+           to out-specify `.rec-drawer select` (full panel) and
+           `#sidebar-right select` (mini) which otherwise win. Dark fill, soft
+           border, custom chevron drawn as an inline-SVG background. */
+        .rec-drawer .rec-color-mode,
+        #sidebar-right .rec-color-mode,
+        .rec-mini .rec-color-mode {
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            width: 100%; box-sizing: border-box;
+            background-color: #1a222e;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238aa2c0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+            background-repeat: no-repeat; background-position: right 10px center;
+            color: #dce7f3;
+            border: 1px solid rgba(140,170,200,0.25);
+            border-radius: 8px;
+            padding: 6px 26px 6px 10px;
+            font-size: 12px; font-weight: 600;
+            cursor: pointer; outline: none;
+            transition: border-color 0.15s, background-color 0.15s;
+        }
+        .rec-drawer .rec-color-mode:hover,
+        #sidebar-right .rec-color-mode:hover,
+        .rec-mini .rec-color-mode:hover { border-color: rgba(100,200,255,0.45); }
+        .rec-drawer .rec-color-mode:focus,
+        #sidebar-right .rec-color-mode:focus,
+        .rec-mini .rec-color-mode:focus { border-color: rgba(100,200,255,0.7); background-color: #1f2836; }
+        .rec-drawer .rec-color-mode:disabled,
+        #sidebar-right .rec-color-mode:disabled,
+        .rec-mini .rec-color-mode:disabled { opacity: 0.4; cursor: not-allowed; }
+        .rec-drawer .rec-color-mode option,
+        #sidebar-right .rec-color-mode option,
+        .rec-mini .rec-color-mode option { background: #161b22; color: #e6edf3; }
+        /* Full-panel row: label + select on one line */
+        .rec-drawer .layer-colormode-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .rec-drawer .layer-colormode-row > label { font-size: 11px; opacity: 0.85; flex: 0 0 auto; }
+        .rec-drawer .layer-colormode-row .rec-color-mode { flex: 1; }
+        /* Minimized panel: 3-row layers square (mode / prev-status-next / add),
+           the mode select sized to match the big touch buttons */
+        #sidebar-right .rec-square-content.rec-square-layers,
+        .rec-mini .rec-square-content.rec-square-layers { grid-template-rows: auto 1fr auto; }
+        #sidebar-right .rec-color-mode-mini,
+        .rec-mini .rec-color-mode-mini {
+            height: 46px; border-radius: 14px; font-size: 13px;
+            padding: 0 30px 0 14px;
+            background-color: #1f2733;
+            background-position: right 12px center;
+            border-color: rgba(255,255,255,0.14);
+            box-shadow: inset 0 1px rgba(255,255,255,0.08), 0 1px 2px rgba(0,0,0,0.45);
+        }
+        .rec-mini .row.layer-mode { margin-bottom: 2px; }
 
         /* ── Global recording/playback visual feedback ── */
         /* PERF: Removed box-shadow on canvas-area - causes compositor overhead */

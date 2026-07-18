@@ -137,6 +137,115 @@ function toggleLock() {
     partySocket.send(JSON.stringify({ type: 'lock', locked: !roomLocked }));
 }
 
+// ── 13.5 host settings lock ─────────────────────────────────────────
+// Lock = visual parity: locked guests mirror the host's look-affecting
+// settings (sliders/checkboxes/selects/arm colors via a filtered preset
+// snapshot — the relay caps messages at 16KB so layers/masks/recordings
+// never ride along). Performance-tier controls stay LOCAL on every
+// client. Guests' local edits are gated at the slider-binding/preset
+// choke points via window.__mpSettingsLocked.
+var settingsLockOn = false;        // host's intent (host side only)
+var settingsLockDebounce = null;
+var hostMirrorInstalled = false;
+window.__mpSettingsLocked = false; // guest-side gate (read by 05h/04b/12)
+window.__mpApplyingRemote = false; // lets the host's snapshot through the gate
+
+// Perf-tier + local-workflow controls that never ride the lock snapshot:
+// resolution/governor/fps stay local (the governor's look-preserving
+// ladder is the precedent), recording/stats/autoload are per-user UI.
+var MP_PERF_LOCAL_KEYS = [
+    'visualResolution', 'physicsResolution', 'fpsCap',
+    'recMode', 'recPlaybackSpeed', 'statsToggle', 'autoloadSettings'
+];
+
+function captureLookSnapshot() {
+    if (typeof window.capturePresetSnapshot !== 'function') return null;
+    var full;
+    try { full = window.capturePresetSnapshot(); } catch (_) { return null; }
+    if (!full) return null;
+    var snap = {
+        version: full.version,
+        sliders: full.sliders || {},
+        checkboxes: {},
+        selects: {},
+        armColors: full.armColors || null
+    };
+    Object.keys(full.selects || {}).forEach(function (k) {
+        if (MP_PERF_LOCAL_KEYS.indexOf(k) === -1) snap.selects[k] = full.selects[k];
+    });
+    Object.keys(full.checkboxes || {}).forEach(function (k) {
+        if (MP_PERF_LOCAL_KEYS.indexOf(k) === -1) snap.checkboxes[k] = full.checkboxes[k];
+    });
+    return snap;
+}
+
+function broadcastSettingsLock() {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    var msg = { type: 'settings-lock', locked: settingsLockOn, timestamp: Date.now() };
+    if (settingsLockOn) msg.snapshot = captureLookSnapshot();
+    partySocket.send(JSON.stringify(msg));
+}
+
+// While locked, the host's live edits re-broadcast (debounced) so
+// locked guests track them — "mirror every look-affecting setting"
+function hostLockMirrorHandler() {
+    if (!settingsLockOn) return;
+    if (settingsLockDebounce) clearTimeout(settingsLockDebounce);
+    settingsLockDebounce = setTimeout(broadcastSettingsLock, 400);
+}
+function installHostLockMirror() {
+    if (hostMirrorInstalled) return;
+    document.addEventListener('input', hostLockMirrorHandler, true);
+    document.addEventListener('change', hostLockMirrorHandler, true);
+    hostMirrorInstalled = true;
+}
+function removeHostLockMirror() {
+    if (!hostMirrorInstalled) return;
+    document.removeEventListener('input', hostLockMirrorHandler, true);
+    document.removeEventListener('change', hostLockMirrorHandler, true);
+    hostMirrorInstalled = false;
+    if (settingsLockDebounce) { clearTimeout(settingsLockDebounce); settingsLockDebounce = null; }
+}
+
+function toggleSettingsLock() {
+    settingsLockOn = !settingsLockOn;
+    broadcastSettingsLock();
+    if (settingsLockOn) installHostLockMirror(); else removeHostLockMirror();
+    updateConnectedView();
+}
+
+// Guest side: enter/leave the locked state (banner + gate + mirror apply)
+function setSettingsLockedByHost(locked, snapshot) {
+    window.__mpSettingsLocked = !!locked;
+    var banner = document.getElementById('mpSettingsLockBanner');
+    if (locked) {
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'mpSettingsLockBanner';
+            banner.textContent = '🔒 Settings locked by host';
+            banner.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10002;' +
+                'padding:6px 14px;border-radius:8px;background:rgba(15,20,27,0.92);border:1px solid rgba(255,178,71,0.5);' +
+                'color:#ffb347;font-size:12px;font-weight:600;pointer-events:none;';
+            document.body.appendChild(banner);
+        }
+        if (snapshot && typeof window.applyPresetSnapshot === 'function') {
+            isProcessingRemoteEvent = true;
+            window.__mpApplyingRemote = true;
+            try { window.applyPresetSnapshot(snapshot); }
+            catch (e) { console.warn('settings-lock: snapshot apply failed', e); }
+            finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
+        }
+    } else if (banner) {
+        banner.remove();
+    }
+}
+
+function resetSettingsLock() {
+    settingsLockOn = false;
+    removeHostLockMirror();
+    setSettingsLockedByHost(false, null);
+}
+
 // Core connect logic
 function connectToRoom(roomCode) {
     // Tear down any existing socket (OPEN *or* still CONNECTING) so we never leak one.
@@ -148,6 +257,7 @@ function connectToRoom(roomCode) {
     reconnectAttempts = 0;
     myRole = 'guest';
     roomLocked = false;
+    resetSettingsLock();
 
     // Stranger rooms are ephemeral — keep them out of the shareable URL hash;
     // private/code rooms stay in the hash so a #CODE deep-link auto-joins.
@@ -207,6 +317,7 @@ function disconnectMultiplayer() {
     currentRoom = null;
     myRole = 'guest';
     roomLocked = false;
+    resetSettingsLock();
     if (partySocket) {
         partySocket.close();
         partySocket = null;
@@ -257,6 +368,8 @@ function onMultiplayerMessage(event) {
 
             case 'host-changed':
                 myRole = (data.hostId === DEVICE_UID) ? 'host' : 'guest';
+                // Promotion to host frees this client from any settings lock
+                if (myRole === 'host') resetSettingsLock();
                 updateConnectedView();
                 break;
 
@@ -273,6 +386,13 @@ function onMultiplayerMessage(event) {
                     if (typeof window.scheduleStrokeReplay === 'function') {
                         window.scheduleStrokeReplay(data.data.events);
                     }
+                }
+                break;
+
+            case 'stroke-chunk':
+                // Large stroke split under the relay's 16KB message cap
+                if (data.clientId !== clientId) {
+                    handleStrokeChunk(data);
                 }
                 break;
 
@@ -302,8 +422,17 @@ function onMultiplayerMessage(event) {
                 // it as a remote event so broadcastPreset() skips the re-send.
                 if (data.clientId !== clientId && typeof applyPreset === 'function') {
                     isProcessingRemoteEvent = true;
+                    window.__mpApplyingRemote = true;
                     try { applyPreset(data.data.preset); }
-                    finally { isProcessingRemoteEvent = false; }
+                    finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
+                }
+                break;
+
+            case 'settings-lock':
+                // Host locked/unlocked look settings (13.5). Hosts never
+                // gate themselves — only guests enter the locked state.
+                if (data.clientId !== clientId && myRole !== 'host') {
+                    setSettingsLockedByHost(!!data.locked, data.snapshot || null);
                 }
                 break;
         }
@@ -363,9 +492,16 @@ function broadcastSplat(x, y, dx, dy, color, mult, radius) {
         return;
     }
 
+    // 2.3 brush-size sync: broadcast the EFFECTIVE painted radius (splat-in
+    // ramp / pressure), not the base config value the callers pass — the paint
+    // path publishes it to __lastPaintRadius. Peers then see the size you
+    // actually painted, matching the recording/replay fix.
+    const effRadius = (typeof window.__lastPaintRadius === 'number' && window.__lastPaintRadius > 0)
+        ? window.__lastPaintRadius : radius;
+
     partySocket.send(JSON.stringify({
         type: 'splat',
-        data: { x, y, dx, dy, color, mult, radius },
+        data: { x, y, dx, dy, color, mult, radius: effRadius },
         timestamp: now
     }));
     broadcastSplat.lastSent = now;
@@ -441,34 +577,37 @@ function handleRemoteSplat(data) {
         isProcessingRemoteEvent = true;
         try {
             const lastPos = remoteLastPositions.get(data.clientId);
-            
+            // Gap-fill between network messages at ~12px spacing (matching how
+            // densely local mousemove events deposit dabs), splitting the
+            // message's velocity across all dabs so total injected momentum
+            // equals what the sender's stroke put in. The old loop splatted
+            // every 2px (up to 30 dabs) EACH with full velocity — one message
+            // injected ~30x the sender's energy and blew the velocity field
+            // into fp16 static around remote strokes.
+            let steps = 0;
+            let distX = 0, distY = 0;
             if (lastPos && lastPos.x !== undefined && lastPos.y !== undefined) {
-                const distX = canvasX - lastPos.x;
-                const distY = canvasY - lastPos.y;
+                distX = canvasX - lastPos.x;
+                distY = canvasY - lastPos.y;
                 const distance = Math.sqrt(distX * distX + distY * distY);
-                
-                if (distance > 1) {
-                    const steps = Math.min(Math.floor(distance / 2), 30);
-                    
-                    for (let i = 1; i <= steps; i++) {
-                        const t = i / (steps + 1);
-                        const interpX = lastPos.x + distX * t;
-                        const interpY = lastPos.y + distY * t;
-                        
-                        if (typeof window.applyMultiSplatWith === 'function') {
-                            window.applyMultiSplatWith(interpX, interpY, canvasDx, canvasDy, color || [1,0,0], mult || 1, normalizedRadius);
-                        } else {
-                            splat(interpX, interpY, canvasDx, canvasDy, color || [1,0,0]);
-                        }
-                    }
+                if (distance > 12) {
+                    steps = Math.min(Math.floor(distance / 12), 8);
                 }
             }
-            
-            if (typeof window.applyMultiSplatWith === 'function') {
-                window.applyMultiSplatWith(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0], mult || 1, normalizedRadius);
-            } else {
-                splat(canvasX, canvasY, canvasDx, canvasDy, color || [1,0,0]);
+            const stepDx = canvasDx / (steps + 1);
+            const stepDy = canvasDy / (steps + 1);
+            const applyOne = (px, py) => {
+                if (typeof window.applyMultiSplatWith === 'function') {
+                    window.applyMultiSplatWith(px, py, stepDx, stepDy, color || [1,0,0], mult || 1, normalizedRadius);
+                } else {
+                    splat(px, py, stepDx, stepDy, color || [1,0,0]);
+                }
+            };
+            for (let i = 1; i <= steps; i++) {
+                const t = i / (steps + 1);
+                applyOne(lastPos.x + distX * t, lastPos.y + distY * t);
             }
+            applyOne(canvasX, canvasY);
             
             remoteLastPositions.set(data.clientId, { x: canvasX, y: canvasY });
         } finally {
@@ -477,16 +616,65 @@ function handleRemoteSplat(data) {
     }
 }
 
-// Broadcast a full stroke (array of normalized events)
+// Broadcast a full stroke (array of normalized events).
+// The party server silently DROPS messages over MAX_MESSAGE_BYTES (16KB,
+// party/shared.ts) — which is why replay never reached peers: any decent
+// stroke's JSON blows the cap. Quantize the numbers (≈halves the bytes)
+// and chunk under the limit; the receiver reassembles by sid/seq (2026-07-13).
+const STROKE_CHUNK_EVENTS = 80; // ~90 quantized bytes/event → ~7KB/chunk, wide margin
 function broadcastReplayStroke(events) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
         return;
     }
-    partySocket.send(JSON.stringify({
-        type: 'stroke',
-        data: { events },
-        timestamp: Date.now()
+    const q = (events || []).map(ev => ({
+        t: Math.round(ev.t || 0),
+        x: +(+ev.x || 0).toFixed(4),
+        y: +(+ev.y || 0).toFixed(4),
+        dx: +(+ev.dx || 0).toFixed(4),
+        dy: +(+ev.dy || 0).toFixed(4),
+        color: (ev.color || [1, 1, 1]).map(c => +(+c).toFixed(3)),
+        mult: ev.mult || 1,
+        radius: +(+ev.radius || 0.01).toFixed(5)
     }));
+    if (q.length <= STROKE_CHUNK_EVENTS) {
+        partySocket.send(JSON.stringify({ type: 'stroke', data: { events: q }, timestamp: Date.now() }));
+        return;
+    }
+    const sid = Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+    const total = Math.ceil(q.length / STROKE_CHUNK_EVENTS);
+    for (let i = 0; i < total; i++) {
+        partySocket.send(JSON.stringify({
+            type: 'stroke-chunk',
+            data: { sid, seq: i, total, events: q.slice(i * STROKE_CHUNK_EVENTS, (i + 1) * STROKE_CHUNK_EVENTS) },
+            timestamp: Date.now()
+        }));
+    }
+}
+
+// Reassembly of chunked stroke replays (see broadcastReplayStroke)
+const strokeChunkBuffers = new Map(); // clientId|sid → { chunks, received, total, at }
+function handleStrokeChunk(data) {
+    const d = data.data || {};
+    if (typeof d.seq !== 'number' || typeof d.total !== 'number' || !Array.isArray(d.events)) return;
+    if (d.total < 1 || d.total > 64 || d.seq < 0 || d.seq >= d.total) return;
+    const key = data.clientId + '|' + d.sid;
+    let buf = strokeChunkBuffers.get(key);
+    if (!buf) {
+        buf = { chunks: new Array(d.total), received: 0, total: d.total, at: Date.now() };
+        strokeChunkBuffers.set(key, buf);
+    }
+    if (!buf.chunks[d.seq]) {
+        buf.chunks[d.seq] = d.events;
+        buf.received++;
+    }
+    if (buf.received === buf.total) {
+        strokeChunkBuffers.delete(key);
+        const all = [].concat.apply([], buf.chunks);
+        if (typeof window.scheduleStrokeReplay === 'function') window.scheduleStrokeReplay(all);
+    }
+    // GC stale partial buffers (peer left mid-stroke)
+    const now = Date.now();
+    strokeChunkBuffers.forEach((b, k) => { if (now - b.at > 15000) strokeChunkBuffers.delete(k); });
 }
 
 function handleRemoteCursor(data) {
@@ -525,6 +713,9 @@ function updateRemoteCursors() {
     for (const [id, cursor] of remoteCursors.entries()) {
         if (now - cursor.timestamp > 5000) {
             remoteCursors.delete(id);
+            // A peer that vanished mid-drag never sends pointer-up, so their
+            // last-position entry would otherwise outlive them forever.
+            remoteLastPositions.delete(id);
         }
     }
 
@@ -633,6 +824,13 @@ function updateConnectedView() {
         lockBtn.style.display = canLock ? '' : 'none';
         lockBtn.textContent = roomLocked ? '🔓 Unlock room' : '🔒 Lock room';
     }
+    // Settings lock (13.5): any host can lock look settings (incl. stranger rooms).
+    var sLockBtn = document.getElementById('settingsLockBtn');
+    if (sLockBtn) {
+        sLockBtn.style.display = isHost ? '' : 'none';
+        sLockBtn.textContent = settingsLockOn ? '🎛 Unlock settings' : '🎛 Lock settings';
+        sLockBtn.classList.toggle('active', settingsLockOn);
+    }
     // Locked badge: non-host members see why no one else can join.
     setShown('lockBadge', !stranger && roomLocked && !isHost);
 
@@ -729,6 +927,9 @@ function initMultiplayerUI() {
 
     var lockBtn = document.getElementById('lockRoomBtn');
     if (lockBtn) lockBtn.addEventListener('click', toggleLock);
+
+    var sLockBtn = document.getElementById('settingsLockBtn');
+    if (sLockBtn) sLockBtn.addEventListener('click', toggleSettingsLock);
 
     // Auto-join if URL has room hash
     var hashRoom = getRoomFromHash();

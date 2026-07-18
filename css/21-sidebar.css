@@ -46,10 +46,15 @@
 /* ── SIDEBAR SECTIONS ── */
 .sidebar-section {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    /* Grid-based collapse: scales to any content height */
+    /* Grid-based collapse: scales to any content height.
+       NOT transitioned: animating grid-template-rows re-lays-out the
+       section and everything below it EVERY FRAME for the duration —
+       measured as the app's worst jank source (Event Timing 2026-07-09:
+       presentation delays up to 1.2s on section toggles, proc=0).
+       Collapse now snaps in one layout; the body opacity fade below
+       (compositor-only) carries the motion feel. */
     display: grid;
     grid-template-rows: auto 1fr;
-    transition: grid-template-rows 0.3s ease;
 }
 .sidebar-section.collapsed {
     grid-template-rows: auto 0fr;
@@ -96,7 +101,9 @@
     overflow: hidden;
     min-height: 0; /* Required for grid 0fr collapse */
     opacity: 1;
-    transition: padding 0.2s ease, opacity 0.2s ease;
+    /* opacity ONLY — padding was animated too, which is a per-frame
+       layout just like the grid rows (see .sidebar-section note) */
+    transition: opacity 0.15s ease;
 }
 
 .sidebar-section.collapsed .section-body {
@@ -136,6 +143,50 @@
     text-transform: none;
     opacity: 1;
     font-weight: 600;
+}
+/* Material mode: the Curl label is a <select> that swaps the slider's role.
+   Must out-specify the generic #sidebar-right select block below. */
+#sidebar-right .control-group label select.material-mode-select,
+.mixer-channel .ch-label select.material-mode-select {
+    width: auto;
+    height: auto;
+    margin: 0;
+    /* 15px gap between label text and the 8px arrow glyph; JS sizes the
+       element to the selected option so the arrow always hugs the text */
+    padding: 0 23px 0 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font-size: inherit;
+    font-family: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5'><path d='M0 0l4 5 4-5z' fill='%238899aa'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right center;
+    /* Native dropdown popup inherits the control's color-scheme: without
+       this Chromium frames the option list in light-theme white. */
+    color-scheme: dark;
+}
+#sidebar-right .control-group label select.material-mode-select:hover,
+.mixer-channel .ch-label select.material-mode-select:hover {
+    color: #e6edf3;
+}
+#sidebar-right .control-group label select.material-mode-select:focus,
+.mixer-channel .ch-label select.material-mode-select:focus,
+#sidebar-right .control-group label select.material-mode-select:focus-visible,
+.mixer-channel .ch-label select.material-mode-select:focus-visible {
+    outline: none;
+}
+#sidebar-right .control-group label select.material-mode-select option,
+.mixer-channel .ch-label select.material-mode-select option {
+    background: #10141a;
+    color: #e6edf3;
+    text-transform: none;
 }
 #sidebar-right select {
     width: 100%;
@@ -243,7 +294,8 @@
 .anim-settings {
     display: grid;
     grid-template-rows: 0fr;
-    transition: grid-template-rows 0.25s ease, opacity 0.2s ease;
+    /* opacity only — same per-frame-layout trap as .sidebar-section */
+    transition: opacity 0.15s ease;
     opacity: 0;
     border-radius: 0 0 6px 6px;
 }
@@ -255,7 +307,7 @@
     overflow: hidden;
     min-height: 0;
     padding: 0 10px;
-    transition: padding 0.2s ease;
+    /* not transitioned — padding animates layout per frame */
 }
 .anim-settings.open .anim-settings-inner {
     padding: 6px 10px 10px;
@@ -346,6 +398,15 @@
     display: flex;
     gap: 4px;
 }
+/* 7.2: the Layers action buttons live in the section body as a toolbar
+   above the list — not crammed into the (title-only) section header. */
+.section-header-actions.layers-toolbar {
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 0 0 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
 .section-header-actions button {
     padding: 2px 6px;
     font-size: 11px;
@@ -407,6 +468,30 @@
     }
     #canvas-wrapper {
         max-width: calc(100vw - 250px) !important;
+    }
+}
+
+/* Prevent sidebar flash on mobile before JS adds .mobile-mode:
+   hide off-screen by default on phone-sized screens (portrait + landscape).
+   body.mobile-mode rules below take over once JS runs. */
+@media (max-width: 768px), (max-height: 500px) and (max-width: 1200px) {
+    #sidebar-right {
+        position: fixed;
+        right: 0;
+        top: 0;
+        height: 100vh;
+        height: 100dvh;
+        transform: translateX(100%);
+        z-index: 1000;
+    }
+    #sidebar-right.visible {
+        transform: translateX(0);
+    }
+    #main-area {
+        flex-direction: column;
+    }
+    #mixer-strip {
+        display: none;
     }
 }
 
@@ -1077,6 +1162,8 @@ body.rec-open #sidebar-right {
     box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
 }
 .audio-mini-row { display: flex; align-items: center; gap: 8px; }
+.audio-drawer-enable { margin: 6px 0 2px; }
+.audio-drawer-enable .audio-mini-src { flex: 0 0 auto; min-width: 110px; }
 .audio-mini-enable {
     display: flex; align-items: center; gap: 6px;
     margin: 0; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
@@ -1096,3 +1183,55 @@ body.rec-open #sidebar-right {
     box-shadow: inset 0 1px rgba(255, 255, 255, 0.10), 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 .audio-mini-full:hover { border-color: rgba(120, 170, 255, 0.6); color: #fff; }
+
+/* Audio scene quick controls (Tunnel / EQ Bars / Ferrofluid) */
+#audioSceneControls { display: flex; flex-direction: column; gap: 6px; }
+.audio-scene-ctl {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0; padding: 0;
+}
+.audio-scene-ctl label {
+    flex: 0 0 auto; min-width: 76px; margin: 0;
+    font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.75);
+}
+.audio-scene-ctl input[type="range"] { flex: 1; min-width: 0; }
+.audio-scene-ctl input[type="checkbox"] { margin: 0; cursor: pointer; }
+.audio-scene-cycle {
+    flex: 1; padding: 6px 8px; border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    background: rgba(180, 130, 255, 0.12); color: #e6edf3;
+    border: 1px solid rgba(180, 130, 255, 0.35);
+}
+.audio-scene-cycle:hover { border-color: rgba(180, 130, 255, 0.6); color: #fff; }
+.audio-gate-meter {
+    flex: 1; min-width: 0; height: 30px; display: block;
+    border-radius: 6px; background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: ew-resize; touch-action: none;
+}
+/* Spectral gate editor: draw boxes on the live log spectrum */
+.audio-gates-row { flex-direction: column; align-items: stretch; }
+.audio-gates-row label { min-width: 0; }
+.audio-gates-editor {
+    width: 100%; height: 96px; display: block;
+    border-radius: 6px; background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: crosshair; touch-action: none;
+}
+
+/* ── Compositor isolation (UI audit Stage 2, 2026-07-09) ──────────────
+   The sidebar was not layer-promoted, so every native hover repaint
+   (cursor swaps, button hover opacity) invalidated raster tiles shared
+   with the rest of the page while the GPU was already saturated by the
+   sim — measured 72 dropped frames from a sidebar hover pass with ZERO
+   long tasks (JankMonitor), i.e. pure compositor contention.
+   translateZ(0) promotes the sidebar to its own layer on all engines;
+   contain bounds style/layout invalidation to the section that changed.
+   (contain: paint deliberately NOT used — it clips overflowing children.) */
+#sidebar-right {
+    transform: translateZ(0);
+    contain: layout style;
+}
+.sidebar-section {
+    contain: layout style;
+}

@@ -123,6 +123,10 @@
                 } else {
                     var layer = (window.layers || []).find(function (l) { return l.index === item.id; });
                     if (!layer || !layer.visible) continue;
+                    // D2 raster layers are composited inside the GL canvas —
+                    // they're already baked into simSnap; drawing them again
+                    // here would double-composite
+                    if (layer.isRaster) continue;
                     var layerDiv = document.getElementById('layer' + layer.index);
                     if (!layerDiv || layerDiv.style.display === 'none') continue;
                     var bg = layerDiv.style.backgroundImage;

@@ -90,7 +90,12 @@
         function pushStrokeEvent(x, y, dx, dy, color) {
             if (isReplayActive) return; // Don't record during replay
             const t = Date.now() - strokeStartTime;
-            strokeEvents.push({ t, x, y, dx, dy, color: color.slice(), mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1), radius: config.SPLAT_RADIUS });
+            // Store the EFFECTIVE painted size (splat-in ramp / pressure), not the
+            // base — so stroke replay (local AND multiplayer 2.1) reproduces the
+            // actual brush size. The paint path publishes it to __lastPaintRadius.
+            const effR = (typeof window.__lastPaintRadius === 'number' && window.__lastPaintRadius > 0)
+                ? window.__lastPaintRadius : config.SPLAT_RADIUS;
+            strokeEvents.push({ t, x, y, dx, dy, color: color.slice(), mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1), radius: effR });
         }
         function deepCopyEvent(ev) {
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(), mult: ev.mult, radius: ev.radius };
@@ -213,6 +218,18 @@
                     savedVal = window.Settings.loadSelect('fpsCap', '60');
                 }
             } catch (_) {}
+            // Uncapped modes do not survive a boot. The sim's visual character
+            // was tuned at ~60 Hz stepping: advection bilinear-refilters the
+            // whole dye texture every sim step, so at 300+ fps strokes take 5×
+            // more resample blur per second and smear out soft and lifeless
+            // (dissipation is decayDt-batched and immune, but refiltering is
+            // per-step by nature). Historically the boot profile rewrote the
+            // cap to 30/60 on every launch, so the app's whole tuned look
+            // implicitly assumes it. 'Native' stays selectable in-session.
+            if (savedVal === 'native' || savedVal === '0') {
+                console.log('[FPS Cap] persisted uncapped mode reset to 60 at boot (sim feel is tuned for 60 Hz stepping)');
+                savedVal = '60';
+            }
             fpsCapSel.value = savedVal;
             // If the saved value doesn't match any option, fall back to '60'
             if (fpsCapSel.value !== savedVal) {
@@ -223,8 +240,6 @@
             fpsCapSel.addEventListener('change', (e) => {
                 const val = e.target.value;
                 applyFpsCap(val);
-                // Deactivate performance profile — user is overriding the cap
-                if (typeof window.clearActiveProfile === 'function') window.clearActiveProfile();
                 try {
                     if (window.Settings && typeof window.Settings.saveSelect === 'function') {
                         window.Settings.saveSelect('fpsCap', val);
@@ -254,13 +269,27 @@
             var events = window._activeReplayEvents;
             if (!events || !events.length) { isReplayActive = false; return; }
             try {
-                const elapsed = Date.now() - replayStartTime;
+                var speed = (typeof window.replaySpeed === 'number') ? window.replaySpeed : 1;
+                const elapsed = (Date.now() - replayStartTime) * speed;
                 while (replayIndex < events.length && events[replayIndex].t <= elapsed) {
                     const ev = events[replayIndex++];
-                    // Use current live settings (brush size, multiplier) so changes
-                    // during replay are reflected immediately. Position, velocity,
-                    // timing and color come from the recording.
-                    multiSplat(ev.x, ev.y, ev.dx, ev.dy, ev.color, false);
+                    // Faithful reproduction (2026-07-13): replay uses the brush
+                    // size and arm count RECORDED with each event. The old
+                    // "use current live settings" behavior meant a stroke
+                    // painted small replayed at whatever the slider says now —
+                    // and remote strokes replayed at the RECEIVER's brush size.
+                    // 1.1 Live colors (opt-in): repaint the stroke with the
+                    // CURRENT brush color instead of the recorded one — the
+                    // faithful-replay default stays (recorded color, arm modes
+                    // still resolve on top either way).
+                    var repCol = (window.replayLiveColors && window.pointer && window.pointer.color)
+                        ? window.pointer.color.slice() : ev.color;
+                    if (typeof window.applyMultiSplatWith === 'function') {
+                        window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, repCol,
+                            ev.mult || 1, (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS);
+                    } else {
+                        multiSplat(ev.x, ev.y, ev.dx, ev.dy, repCol, false);
+                    }
                     if (typeof recRecordInteraction === 'function' && recEnabled) {
                         try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}
                     }
@@ -333,13 +362,26 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
-            // Begin stroke recording and include initial splat
-            startStroke(pointer.x, pointer.y);
-            pushStrokeEvent(pointer.x, pointer.y, 0, 0, pointer.color);
-            if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
-            const inMult = getSplatInMult();
-            multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
-            if (typeof broadcastSplat === 'function') {
+            // D2 routing: sketch strokes are plain raster paint — no fluid
+            // replay events, no recording timelines, no multiplayer
+            // broadcast (local-only until D7's unified schema)
+            const _sketchTarget = config.BRUSH_TARGET === 'sketch';
+            if (_sketchTarget) {
+                if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
+            } else {
+                // Begin stroke recording and include initial splat
+                startStroke(pointer.x, pointer.y);
+                pushStrokeEvent(pointer.x, pointer.y, 0, 0, pointer.color);
+                const inMult = getSplatInMult();
+                window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
+                multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+            }
+            // D1 brush engine: stroke movement is emitted as spaced dabs by
+            // the engine (fed from the pointermove listener below, drained in
+            // 05j). The immediate press stamp above stays for latency.
+            if (window.BrushEngine) window.BrushEngine.begin(coords.x, coords.y, 1);
+            if (!_sketchTarget && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
                     coords.y / canvas.height,
@@ -351,6 +393,33 @@
                 );
             }
         });
+        // D1 brush engine sample feed: PointerEvents deliver coalesced
+        // sub-frame samples plus pen pressure (mouse/touch fire compatibility
+        // pointer events too, so this covers every device). The legacy
+        // mouse/touch listeners keep every side job (replay, broadcast,
+        // recording, splat-out state) — this listener ONLY feeds the engine.
+        // NOTE: the Splat Rate throttle deliberately does not apply here —
+        // dab density is governed by BRUSH_SPACING now.
+        canvas.addEventListener('pointermove', (e) => {
+            if (!window.BrushEngine || !window.BrushEngine.isActive()) return;
+            if (isPaused || isReplayActive) return;
+            // Touch feeds the engine from touchmove (pointermove for touch is
+            // unreliable without touch-action:none) — skip to avoid double-feed
+            if (e.pointerType === 'touch') return;
+            // Pressure only means something from a pen (mouse reports 0.5
+            // while a button is down per spec — that would shrink the brush)
+            const isPen = e.pointerType === 'pen';
+            const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
+            if (evs && evs.length) {
+                for (let i = 0; i < evs.length; i++) {
+                    const c = getCanvasCoordinates(evs[i]);
+                    window.BrushEngine.move(c.x, c.y, isPen ? evs[i].pressure : 1);
+                }
+            } else {
+                const c = getCanvasCoordinates(e);
+                window.BrushEngine.move(c.x, c.y, isPen ? e.pressure : 1);
+            }
+        });
         canvas.addEventListener('mousemove', (e) => {
             if (isPaused || isReplayActive) return;
             const coords = getCanvasCoordinates(e);
@@ -358,10 +427,6 @@
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
-            // Notify battery manager of pointer interaction for burst mode
-            if (typeof window.batteryHandleInput === 'function') {
-                window.batteryHandleInput();
-            }
             if (typeof broadcastCursor === 'function') {
                 broadcastCursor(coords.x / canvas.width, coords.y / canvas.height);
             }
@@ -379,8 +444,9 @@
                     lastSplatTime = now;
                 }
                 pointer.moved = true;
-                if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
-                if (typeof broadcastSplat === 'function') {
+                const _skT = config.BRUSH_TARGET === 'sketch';
+                if (!_skT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                if (!_skT && typeof broadcastSplat === 'function') {
                     if (!canvas._lastBroadcast || Date.now() - canvas._lastBroadcast > 33) {
                         broadcastSplat(
                             coords.x / canvas.width,
@@ -437,7 +503,7 @@
                 if (wasDown && typeof broadcastPointerUp === 'function') {
                     broadcastPointerUp();
                 }
-                if (wasDown && window.splatOutMode !== 'instant') {
+                if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
                     splatUpTime = Date.now();
                     splatOutActive = true;
                     splatTailDist = 0;
@@ -451,6 +517,9 @@
                 pointer.down = false;
                 pointer.moved = false;
                 if (wasDown) {
+                    // Finish the engine stroke: the stabilizer's lagged tail
+                    // catches up to the release point (dabs drain in 05j)
+                    if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
                     archiveCurrentStroke();
                     advanceColor();
                     // Defer arm color advance until splatOut easing finishes
@@ -478,6 +547,7 @@
             isReplayActive = false;
             window._activeReplayEvents = null;
             window._pausedPointerState = null;
+            if (window.BrushEngine) window.BrushEngine.abort();
             if (pointer.down) {
                 pointer.down = false;
                 pointer.moved = false;
@@ -487,9 +557,99 @@
         window.addEventListener('blur', abortPointerStroke);
         window.addEventListener('dragstart', abortPointerStroke);
         window.addEventListener('pointercancel', abortPointerStroke);
+        // ── Mobile gesture layer (13.1-13.3) ─────────────────────────
+        // Two-finger gestures on the canvas: pinch = brush size (drives
+        // the #brushSize slider like the wheel path in 05h), two-finger
+        // vertical drag = replay period. The role locks on the dominant
+        // axis once movement passes a threshold; painting is suppressed
+        // from the moment a second finger lands until ALL fingers lift.
+        const TouchGestures = (() => {
+            let active = false;    // 2-finger gesture in progress
+            let suppress = false;  // no painting until all fingers lift
+            let role = null;       // 'pinch' | 'vdrag' | null (undecided)
+            let dist0 = 0, cy0 = 0;
+            let size0 = 0, period0 = 5;
+            let toastEl = null, toastTimer = null;
+
+            function metrics(e) {
+                const a = e.touches[0], b = e.touches[1];
+                return {
+                    dist: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY),
+                    cy: (a.clientY + b.clientY) / 2
+                };
+            }
+            // On-canvas indicator (13.3): display toggling only — no
+            // opacity transitions (Electron CSS constraint)
+            function toast(text) {
+                if (!toastEl) {
+                    toastEl = document.createElement('div');
+                    toastEl.id = 'gestureIndicator';
+                    toastEl.style.cssText = 'position:fixed;left:50%;top:20%;transform:translateX(-50%);' +
+                        'z-index:10001;padding:10px 18px;border-radius:10px;background:rgba(15,20,27,0.9);' +
+                        'border:1px solid rgba(100,200,255,0.4);color:#fff;font-size:20px;font-weight:600;' +
+                        'pointer-events:none;display:none;';
+                    document.body.appendChild(toastEl);
+                }
+                toastEl.textContent = text;
+                toastEl.style.display = 'block';
+                if (toastTimer) clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => { toastEl.style.display = 'none'; }, 900);
+            }
+            function begin(e) {
+                abortPointerStroke(); // second finger cancels the paint stroke
+                active = true; suppress = true; role = null;
+                const m = metrics(e);
+                dist0 = m.dist; cy0 = m.cy;
+                const s = document.getElementById('brushSize');
+                size0 = s ? parseFloat(s.value) : config.SPLAT_RADIUS * 1000;
+                period0 = window.replayTimePeriod || 5;
+            }
+            function move(e) {
+                if (!active || e.touches.length < 2) return;
+                const m = metrics(e);
+                if (!role) {
+                    const pinchD = Math.abs(m.dist - dist0);
+                    const vertD = Math.abs(m.cy - cy0);
+                    if (pinchD < 18 && vertD < 18) return; // undecided yet
+                    role = pinchD >= vertD ? 'pinch' : 'vdrag';
+                }
+                if (role === 'pinch') {
+                    const s = document.getElementById('brushSize');
+                    if (!s) return;
+                    let v = size0 * (m.dist / Math.max(1, dist0));
+                    v = Math.max(parseFloat(s.min), Math.min(parseFloat(s.max), Math.round(v * 10) / 10));
+                    s.value = v;
+                    s.style.setProperty('--val', v);
+                    config.SPLAT_RADIUS = v / 1000; // same drive as the 05h wheel path
+                    toast('🖌 Brush ' + v.toFixed(1));
+                } else {
+                    let v = Math.round(period0 + (cy0 - m.cy) / 25); // drag up = longer
+                    v = Math.max(1, Math.min(60, v));
+                    if (v !== window.replayTimePeriod) {
+                        window.replayTimePeriod = v;
+                        const inp = document.getElementById('replayTimePeriod');
+                        if (inp) inp.value = v;
+                        try { if (window.settingsManager) window.settingsManager.set('brush.replayTimePeriod', v); } catch (_) {}
+                    }
+                    toast('⏱ Replay ' + v + 's');
+                }
+            }
+            function end(e) {
+                if (e.touches.length >= 2) return; // still gesturing
+                active = false; role = null;
+                if (e.touches.length === 0) suppress = false;
+            }
+            return { begin, move, end, isActive: () => active, isSuppressed: () => suppress };
+        })();
+        window.__touchGestures = TouchGestures; // harness/testing access
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (isPaused) return;
+            if (e.touches.length >= 2) {
+                if (!TouchGestures.isActive()) TouchGestures.begin(e);
+                return;
+            }
+            if (TouchGestures.isSuppressed()) return;
             const touch = e.touches[0];
             const coords = getCanvasCoordinates(touch);
             pointer.down = true;
@@ -502,10 +662,21 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
-            if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
-            const inMult = getSplatInMult();
-            multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
-            if (typeof broadcastSplat === 'function') {
+            const _sketchTargetT = config.BRUSH_TARGET === 'sketch';
+            if (_sketchTargetT) {
+                if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
+            } else {
+                const inMult = getSplatInMult();
+                window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
+                multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+            }
+            // D1 brush engine (see mousedown note); touch force where present
+            if (window.BrushEngine) {
+                window.BrushEngine.begin(coords.x, coords.y,
+                    (typeof touch.force === 'number' && touch.force > 0) ? touch.force : 1);
+            }
+            if (!_sketchTargetT && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
                     coords.y / canvas.height,
@@ -520,15 +691,19 @@
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
             if (isPaused) return;
+            if (TouchGestures.isActive()) { TouchGestures.move(e); return; }
+            if (TouchGestures.isSuppressed()) return;
             const touch = e.touches[0];
             const coords = getCanvasCoordinates(touch);
             pointer.dx = (coords.x - pointer.x) * 10.0;
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
-            // Notify battery manager of pointer interaction for burst mode
-            if (typeof window.batteryHandleInput === 'function') {
-                window.batteryHandleInput();
+            // D1 engine feed for touch (see pointermove note); spacing governs
+            // density, so this bypasses the Splat Rate throttle below
+            if (pointer.down && window.BrushEngine && window.BrushEngine.isActive() && !isReplayActive) {
+                window.BrushEngine.move(coords.x, coords.y,
+                    (typeof touch.force === 'number' && touch.force > 0) ? touch.force : 1);
             }
             if (pointer.down) {
                 // Brush refresh rate throttle (same as mousemove)
@@ -539,8 +714,9 @@
                     lastSplatTime = now;
                 }
                 pointer.moved = true;
-                if (recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
-                if (typeof broadcastSplat === 'function') {
+                const _skTT = config.BRUSH_TARGET === 'sketch';
+                if (!_skTT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                if (!_skTT && typeof broadcastSplat === 'function') {
                     const now = Date.now();
                     if (!canvas._lastTouchBroadcast || now - canvas._lastTouchBroadcast > 50) {
                         broadcastSplat(
@@ -557,9 +733,10 @@
                 }
             }
         }, { passive: false });
-        window.addEventListener('touchend', () => {
+        window.addEventListener('touchend', (e) => {
+            TouchGestures.end(e);
             if (pointer.down) {
-                if (window.splatOutMode !== 'instant') {
+                if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
                     splatUpTime = Date.now();
                     splatOutActive = true;
                     splatTailDist = 0;
@@ -572,6 +749,7 @@
                 }
                 pointer.down = false;
                 pointer.moved = false;
+                if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
                 archiveCurrentStroke();
                 advanceColor();
                 if (splatOutActive) {
@@ -584,10 +762,12 @@
                 }
             }
         });
-        window.addEventListener('touchcancel', () => {
+        window.addEventListener('touchcancel', (e) => {
+            TouchGestures.end(e);
             if (pointer.down) {
                 pointer.down = false;
                 pointer.moved = false;
+                if (window.BrushEngine) window.BrushEngine.abort();
                 if (typeof broadcastPointerUp === 'function') {
                     broadcastPointerUp();
                 }

@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <!-- Dark UA chrome: native select popups, scrollbars, form controls.
+         Without this Chromium frames dropdown option lists in light-theme white. -->
+    <meta name="color-scheme" content="dark">
     <title>Fluid UI</title>
     <link rel="stylesheet" href="css/00-tokens.css">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/slider-styles.css">
-    <link rel="stylesheet" href="css/battery-styles.css">
     <link rel="stylesheet" href="css/mask-editor.css">
     <link rel="stylesheet" href="css/light-source.css">
     <link rel="stylesheet" href="css/20-mixer-strip.css">
@@ -94,6 +96,7 @@
                             <div class="stat-row"><span class="stat-label">Display:</span> <span id="stat-displayhz">--</span></div>
                             <div class="stat-row"><label class="stat-label" for="governorToggle">Adaptive Quality:</label> <input type="checkbox" id="governorToggle"></div>
                             <div class="stat-row"><label class="stat-label" for="governorAllowRes">&nbsp;&nbsp;Resolution Tiers:</label> <input type="checkbox" id="governorAllowRes"></div>
+                            <div class="stat-row"><label class="stat-label" for="governorAllowFx" title="Allow the governor's last rung to disable sharpen/micro-detail/sunrays/Crisp Advection under extreme load — changes the look, so it's opt-in">&nbsp;&nbsp;Effect Shedding:</label> <input type="checkbox" id="governorAllowFx"></div>
                             <div class="stat-row"><span class="stat-label">Adaptive State:</span> <span id="stat-governor">--</span></div>
                         </div>
                         <div class="stats-section">
@@ -146,6 +149,10 @@
                 <input type="checkbox" id="randomColor" checked>
                 <label for="randomColor" style="margin: 0">Random Colors</label>
             </div>
+            <div class="control-group checkbox-group" style="margin-top: 8px;">
+                <input type="checkbox" id="colorGate">
+                <label for="colorGate" style="margin: 0" title="Lock max to original color — repeated strokes can't overflow into white">Gate</label>
+            </div>
             <div style="margin-top: 10px;">
                 <label>Palette <span id="paletteImportStatus" class="import-status"></span></label>
                 <div class="palette-carousel" id="paletteCarousel"></div>
@@ -186,9 +193,9 @@
             <label for="visualResolution">Visual Quality</label>
             <select id="visualResolution">
                 <option value="4096">Cinematic (4K)</option>
-                <option value="2048">Ultra (2K)</option>
+                <option value="2048" selected>Ultra (2K)</option>
                 <option value="1536">Very High (1.5K)</option>
-                <option value="1024" selected>High (1K) - Recommended</option>
+                <option value="1024">High (1K)</option>
                 <option value="512">Medium (512)</option>
                 <option value="256">Low (256)</option>
             </select>
@@ -197,8 +204,8 @@
             <label for="physicsResolution">Physics Detail</label>
             <select id="physicsResolution">
                 <option value="1024">Extreme (1K)</option>
-                <option value="512">Ultra (512)</option>
-                <option value="384" selected>High (384) - Recommended</option>
+                <option value="512" selected>Ultra (512)</option>
+                <option value="384">High (384)</option>
                 <option value="256">Standard (256)</option>
                 <option value="192">Balanced (192)</option>
                 <option value="128">Medium (128)</option>
@@ -235,20 +242,65 @@
             <input type="range" id="pressureIteration" min="1" max="50" value="32" step="1">
         </div>
         <div class="control-group">
+            <label for="velocityCap" title="Speed ceiling in canvas-widths/sec (soft limit). Growth presets (velocity > 1) settle at this ceiling inside closed mask pockets — lower = calmer bounded swirls, higher = wilder motion. Also the fp16 overflow guard.">Max Speed <span id="velocityCapValue" class="value-display">30</span></label>
+            <input type="range" id="velocityCap" min="5" max="60" value="30" step="1">
+        </div>
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="macCormackToggle" checked>
+            <label for="macCormackToggle" style="margin: 0" title="MacCormack error-corrected dye advection — sharper strokes, less smearing (2 extra GPU passes)">Crisp Advection</label>
+        </div>
+        <div class="control-group checkbox-group">
+            <input type="checkbox" id="multigridToggle" checked>
+            <label for="multigridToggle" style="margin: 0" title="Multigrid pressure solve — much better incompressibility (crisper vortices, less mushy expansion) at lower GPU cost than high iteration counts">Multigrid Pressure</label>
+        </div>
+        <div id="multigridPanel">
+            <div class="control-group">
+                <label for="mgCycles" title="Full V-cycles per frame — each adds accuracy at ~10-15 Jacobi iterations of GPU cost. Minimum 2: a single cycle is unstable around colliders (the second cycle cleans up the first's overcorrection)">V-Cycles <span id="mgCyclesValue" class="value-display">2</span></label>
+                <input type="range" id="mgCycles" min="2" max="4" value="2" step="1">
+            </div>
+            <div class="control-group">
+                <label for="mgPre" title="Smoother sweeps before pushing the residual down to the next-coarser level">Pre-Smooth <span id="mgPreValue" class="value-display">2</span></label>
+                <input type="range" id="mgPre" min="0" max="8" value="2" step="1">
+            </div>
+            <div class="control-group">
+                <label for="mgPost" title="Smoother sweeps after the coarse correction is interpolated back up">Post-Smooth <span id="mgPostValue" class="value-display">2</span></label>
+                <input type="range" id="mgPost" min="0" max="8" value="2" step="1">
+            </div>
+            <div class="control-group">
+                <label for="mgCoarse" title="Jacobi sweeps standing in for an exact solve on the coarsest (tiny) level">Coarse Solve <span id="mgCoarseValue" class="value-display">8</span></label>
+                <input type="range" id="mgCoarse" min="2" max="32" value="8" step="1">
+            </div>
+            <div class="control-group">
+                <label for="mgRelax" title="Smoother damping ω — 1.0 is the classic behavior; lower values are the textbook damped-Jacobi smoother, exposed for experiments">Relaxation <span id="mgRelaxValue" class="value-display">1.00</span></label>
+                <input type="range" id="mgRelax" min="0.5" max="1" value="1" step="0.01">
+            </div>
+        </div>
+        <div class="control-group">
             <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">2.500</span></label>
             <input type="range" id="velocityInfluence" min="1" max="5" value="2.5" step="0.001">
         </div>
-        <div class="control-group checkbox-group">
-            <input type="checkbox" id="turbulenceMode">
-            <label for="turbulenceMode" style="margin: 0">☁️ Billowing Clouds (Turbulence)</label>
-        </div>
         <div class="control-group">
-            <label for="curl">Curl <span id="curlValue" class="value-display">25</span></label>
+            <label>
+                <select id="materialMode" class="material-mode-select" title="Material — swaps what this slider controls">
+                    <option value="fluid" selected>Fluid</option>
+                    <option value="acrylic">Acrylic-thin</option>
+                    <option value="clay">Acrylic</option>
+                </select>
+                <span id="curlValue" class="value-display">25</span>
+            </label>
             <input type="range" id="curl" min="0" max="60" value="25" step="1">
         </div>
         <div class="control-group">
             <label for="sharpness">Viscosity <span id="sharpnessValue" class="value-display">0.8</span></label>
             <input type="range" id="sharpness" min="0" max="2" value="0.8" step="0.1">
+        </div>
+        <div class="control-group">
+            <label for="swirl" title="Curl-noise micro-swirl — painterly fine-grain wisps on moving paint">Swirl <span id="swirlValue" class="value-display">0.00</span></label>
+            <input type="range" id="swirl" min="0" max="1" value="0" step="0.01">
+        </div>
+        <div class="control-group">
+            <label for="ridges" title="Sharpen kernel scale — 0 = off (smooth), 1 = classic unsharp look, higher values carve coarse embossed ridges into moving dye">Ridges <span id="ridgesValue" class="value-display">0.0</span></label>
+            <input type="range" id="ridges" min="0" max="6" value="0" step="0.1">
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="microDetailToggle">
@@ -429,13 +481,13 @@
             </div>
             <div class="control-group" style="margin-bottom: 8px;">
                 <label style="font-size: 12px; margin-bottom: 4px;">Blend Mode</label>
-                <select id="lightShiftMode" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,150,100,0.3); color: white; border-radius: 4px;">
-                    <option value="replace">Replace</option>
-                    <option value="tint">Tint</option>
-                    <option value="overlay">Overlay</option>
-                    <option value="multiply">Multiply</option>
-                    <option value="screen">Screen</option>
-                    <option value="add">Additive</option>
+                <select id="lightShiftMode" title="How the shift color is applied to overblown/white areas" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,150,100,0.3); color: white; border-radius: 4px;">
+                    <option value="replace" title="Replaces overblown/white areas with the shift color.">Replace</option>
+                    <option value="tint" title="Tints bright areas with the color while keeping their brightness.">Tint</option>
+                    <option value="overlay" title="Contrast-blends the color into bright areas (Photoshop Overlay).">Overlay</option>
+                    <option value="multiply" title="Darkens bright areas toward the color.">Multiply</option>
+                    <option value="screen" title="Lightens bright areas toward the color — good for glows.">Screen</option>
+                    <option value="add" title="Adds the color to bright areas for a glowing bloom.">Additive</option>
                 </select>
             </div>
             <div class="control-group">
@@ -539,6 +591,7 @@
                     <button id="disconnectBtn" class="mp-btn-disconnect">Disconnect</button>
                 </div>
                 <button id="lockRoomBtn" class="mp-btn-lock" style="display:none">🔒 Lock room</button>
+                <button id="settingsLockBtn" class="mp-btn-lock" style="display:none" title="Lock look settings so guests mirror yours (their performance controls stay local)">🎛 Lock settings</button>
                 <div id="connectedUsers" class="mp-users">1 user</div>
             </div>
         </div>
@@ -662,7 +715,10 @@
                     </div>
                 </div>
                 <div class="rec-square" id="recMiniSquareLayers">
-                    <div class="rec-square-content">
+                    <div class="rec-square-content rec-square-layers">
+                        <div class="row layer-mode">
+                            <select id="recMiniColorMode" class="full rec-color-mode rec-color-mode-mini" title="Replay color mode for the active layer"></select>
+                        </div>
                         <div class="row layer-top">
                             <button id="recMiniPrevLayerBtn" class="action-prev">◀</button>
                             <div id="recMiniLayerStatus" class="rec-layer-status">0/0</div>
@@ -863,6 +919,7 @@
             'js/05a-shader-core.js',
             'js/05b-shader-sim.js',
             'js/05c-programs-framebuffers.js',
+            'js/05d0-brush-engine.js',
             'js/05d-input-replay.js',
             'js/05e-effect-controls.js',
             'js/05f-kaleido-controls.js',
@@ -874,8 +931,10 @@
             'js/05l-layers-transform.js',
             'js/05m-layer-masks.js',
             'js/05n-hotkeys-init.js',
+            'js/05o-masks.js',
             'js/06-slider-updater.js',
-            'js/06-multiplayer.js'
+            'js/06-multiplayer.js',
+            'js/29-material-modes.js'
         ];
         var splash = document.getElementById('splash-screen');
         var progressBar = document.getElementById('splash-progress-bar');
@@ -921,13 +980,13 @@
     <script src="js/10-draggable.js"></script>
     <script src="js/08-stats-panel.js"></script>
     <script src="js/08a-quality-governor.js"></script>
+    <script src="js/08b-jank-monitor.js"></script>
     <script src="js/12-save-load.js"></script>
     <script src="js/13-light-source.js"></script>
     <script src="js/14-light-shift.js"></script>
     <script src="js/17-hotkey-reminder.js"></script>
     <script src="js/13-drag-scroll.js"></script>
     <script src="js/13-mobile-mode.js"></script>
-    <script src="js/14-battery-manager.js"></script>
     <script src="js/15-layer-masking.js"></script>
     <!-- SAM Integration (Transformers.js bundles its own ONNX Runtime) -->
     <script type="module" src="js/16-sam-integration.js"></script>
@@ -943,6 +1002,7 @@
     <script src="js/24-path-layers.js"></script>
     <script src="js/26-layer-transform.js"></script>
     <script src="js/27-audio-composer.js"></script>
+    <script src="js/30-audio-scenes.js"></script>
     <script src="js/20-mixer-layout.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">

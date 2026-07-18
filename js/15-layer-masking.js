@@ -876,7 +876,8 @@
             const imageData = tempCtx.createImageData(maskWidth, maskHeight);
             const data = imageData.data;
             
-            // Fill with semi-transparent green for masked pixels
+            // Fill with semi-transparent green for masked pixels (soft
+            // coverage masks scale the preview alpha by coverage)
             let previewNonZero = 0;
             for (let i = 0; i < mask.data.length; i++) {
                 const idx = i * 4;
@@ -885,7 +886,7 @@
                     data[idx] = 100;     // R
                     data[idx + 1] = 200; // G
                     data[idx + 2] = 100; // B
-                    data[idx + 3] = 120; // A (semi-transparent)
+                    data[idx + 3] = mask.soft ? ((120 * mask.data[i] / 255) + 0.5) | 0 : 120;
                 }
             }
             
@@ -970,19 +971,35 @@
                 if (match) { r = parseInt(match[1]); g = parseInt(match[2]); b = parseInt(match[3]); a = match[4] ? parseFloat(match[4]) : 1.0; }
             }
 
+            // D0.5 rev 2: fwidth-style adaptive band matching the obstacle
+            // compositor — the editor preview edge must agree with the
+            // collider edge (AA at edges, hard cut on flat midtones).
+            let bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+                ? window.config.DEPTH_EDGE_BAND : 12;
+            if (bandCap < 0.5) bandCap = 0.5;
+            const ddp = shape.depthData;
+            const dpw = shape.depthWidth;
             // No flip: depth data is stored top-down, same as this canvas
             // (matches drawMaskShape in 05m and the obstacle compositor)
             for (let i = 0, n = shape.depthWidth * shape.depthHeight; i < n; i++) {
-                const dv = shape.depthData[i] || 0;
-                const isObstacle = invert ? (dv < threshold) : (dv >= threshold);
+                const dv = ddp[i] || 0;
+                const xI = i - ((i / dpw) | 0) * dpw;
+                const gx = Math.abs((ddp[i + (xI < dpw - 1 ? 1 : 0)] || 0) - (ddp[i - (xI > 0 ? 1 : 0)] || 0)) * 0.5;
+                const gy = Math.abs((ddp[i + (i < n - dpw ? dpw : 0)] || 0) - (ddp[i - (i >= dpw ? dpw : 0)] || 0)) * 0.5;
+                let band = (gx > gy ? gx : gy) * 0.75;
+                if (band < 0.5) band = 0.5;
+                if (band > bandCap) band = bandCap;
+                let t = (dv - (threshold - band)) / (band * 2);
+                if (t < 0) t = 0; else if (t > 1) t = 1;
+                let cov = t * t * (3 - 2 * t);
+                if (invert) cov = 1 - cov;
                 const idx = i * 4;
-                if (isObstacle) {
-                    data[idx] = r; data[idx + 1] = g; data[idx + 2] = b;
-                    data[idx + 3] = Math.floor(a * 255);
-                } else {
-                    data[idx] = dv; data[idx + 1] = dv; data[idx + 2] = dv;
-                    data[idx + 3] = 40;
-                }
+                // Blend obstacle tint ↔ grayscale by coverage so the soft
+                // edge reads as a gradient instead of a hard rim
+                data[idx] = (r * cov + dv * (1 - cov) + 0.5) | 0;
+                data[idx + 1] = (g * cov + dv * (1 - cov) + 0.5) | 0;
+                data[idx + 2] = (b * cov + dv * (1 - cov) + 0.5) | 0;
+                data[idx + 3] = (a * 255 * cov + 40 * (1 - cov) + 0.5) | 0;
             }
 
             tempCtx.putImageData(imageData, 0, 0);
@@ -1414,7 +1431,10 @@
                 rotation: 0,
                 samMask: croppedMask, // Store cropped mask (relative to bbox)
                 samMaskWidth: bbox.width, // Cropped dimensions
-                samMaskHeight: bbox.height
+                samMaskHeight: bbox.height,
+                // D0.5: soft masks carry 0-255 coverage (antialiased edges);
+                // legacy masks are 0/1 and consumers keep them hard
+                samSoft: !!maskResult.soft
             };
             
             maskState.shapes.push(shape);
@@ -1499,9 +1519,11 @@
             if (relX < 0 || relY < 0 || relX >= shape.samMaskWidth || relY >= shape.samMaskHeight) {
                 return false;
             }
-            // Check the actual pixel in the mask
+            // Check the actual pixel in the mask. Soft masks (0-255 coverage)
+            // gate at half-coverage so the boolean edge sits mid-ramp —
+            // matching where the visual/collider edge reads ~50%.
             const pixelIndex = Math.floor(relY) * shape.samMaskWidth + Math.floor(relX);
-            return shape.samMask[pixelIndex] > 0;
+            return shape.samSoft ? (shape.samMask[pixelIndex] >= 128) : (shape.samMask[pixelIndex] > 0);
         }
         
         // Fallback to geometric shapes
