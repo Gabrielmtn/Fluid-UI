@@ -285,9 +285,10 @@
 - **Fix approach:** Increase touch target size, add larger handle, ensure touch events work smoothly
 
 ### 13.7 Disable horizontal layout on mobile
-- [ ] **Force vertical layout on mobile — disable any horizontal layout mode**
-- Mobile should always use vertical/portrait layout
-- Check `js/13-mobile-mode.js` and CSS responsive rules
+- [x] **Force vertical layout on mobile — disable any horizontal layout mode** — CLOSED BY MEASUREMENT 2026-07-18. There is no horizontal layout mode to disable: `body { flex-direction: column }` is the only arrangement, and both orientations already collapse to a fullscreen canvas + off-screen drawers. Measured computed layout:
+  - **Portrait 390×844:** canvas-wrapper fullscreen (390×844, left 0); `#sidebar-right` off-screen at left 390 (drawer); `#mixer-strip` off-screen at left 391, wrapped tall (h 412) inside its panel.
+  - **Landscape 820×400:** the existing `(max-height:500px) and (max-width:1200px)` query hides `#mixer-strip` (display:none) and slides `#sidebar-right` off-screen (left 820); canvas goes fullscreen.
+  - No side-by-side (canvas | sidebar) horizontal path exists on mobile. If a specific device still shows a horizontal arrangement, reopen with the device + screenshot.
 
 ### 13.8 Improve mobile color vibrance
 - [x] **Improve color vibrance/contrast/brightness on mobile displays**
