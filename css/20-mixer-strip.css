@@ -6,6 +6,56 @@
    MIXER LAYOUT - Audio mixer-inspired UI
    ================================================================ */
 
+/* ── UX-9.1: quality underbar — always-visible top-right quick access ──
+   (Visual Quality + Physics Detail; top/right pinned in JS, appearance here) */
+#quality-underbar {
+    position: fixed;
+    top: 8px;
+    right: 14px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 7px 11px;
+    background: linear-gradient(180deg, #171b23, #0e1219);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+    color: #fff;
+}
+#quality-underbar .control-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+}
+#quality-underbar label {
+    font-size: 9.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.6;
+    margin: 0;
+    white-space: nowrap;
+}
+#quality-underbar select {
+    font-size: 11px;
+    padding: 2px 4px;
+    min-width: 104px;
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    cursor: pointer;
+}
+/* Mobile: strip + sidebar are drawers — keep the canvas clean */
+@media (max-width: 768px), (max-height: 500px) and (max-width: 1200px) {
+    #quality-underbar { display: none; }
+}
+
 /* ── BODY LAYOUT: column instead of row ── */
 body {
     flex-direction: column !important;

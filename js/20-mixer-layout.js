@@ -750,7 +750,43 @@
         sidebar.appendChild(buildMultiArtistSection());
         sidebar.appendChild(buildSettingsSection(controls));
 
+        buildQualityUnderbar();
+
         return sidebar;
+    }
+
+    // UX-9.1 — quality underbar: a slim always-visible cluster pinned to the
+    // top-right corner surfacing the two knobs users reach for most (Visual
+    // Quality + Physics Detail), without opening the Simulation panel. v1 per
+    // Gabriel: these two controls, top-right; de-band etc. stay in the panel.
+    function buildQualityUnderbar() {
+        if (document.getElementById('quality-underbar')) return;
+        const bar = document.createElement('div');
+        bar.id = 'quality-underbar';
+        bar.title = 'Rendering quality — Visual Quality (display resolution) and Physics Detail (sim resolution)';
+        moveControlGroup('visualResolution', bar);
+        moveControlGroup('physicsResolution', bar);
+        document.body.appendChild(bar);
+        // Pin to the top-right of the canvas: below the (scrolling) mixer strip
+        // and left of the docked sidebar, so it never overlaps either. Recompute
+        // on resize; CSS hides it on mobile where both are drawers.
+        const place = function () {
+            const strip = document.getElementById('mixer-strip');
+            const sb = document.getElementById('sidebar-right');
+            const top = strip ? Math.round(strip.getBoundingClientRect().bottom) + 8 : 8;
+            let right = 14;
+            if (sb) {
+                const r = sb.getBoundingClientRect();
+                if (r.left < window.innerWidth - 5) right = Math.round(window.innerWidth - r.left) + 12;
+            }
+            bar.style.top = top + 'px';
+            bar.style.right = right + 'px';
+        };
+        // Defer until the strip/sidebar have laid out (a synchronous call during
+        // init reads a 0-height strip and pins to the top, overlapping it).
+        requestAnimationFrame(place);
+        setTimeout(place, 300);
+        window.addEventListener('resize', place);
     }
 
     // --- Section builders ---
@@ -1344,8 +1380,8 @@
     function buildSimulationSection() {
         const { sec, body } = makeSection('⚙️ Simulation', 'blue', true);
 
-        moveControlGroup('visualResolution', body);
-        moveControlGroup('physicsResolution', body);
+        // UX-9.1: Visual Quality + Physics Detail live in the top-right quality
+        // underbar (buildQualityUnderbar) for always-visible quick access.
         moveControlGroup('fpsCap', body);
         moveControlGroup('pressureDissipation', body);
         moveControlGroup('pressureIteration', body);
