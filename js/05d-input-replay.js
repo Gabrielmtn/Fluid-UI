@@ -90,7 +90,12 @@
         function pushStrokeEvent(x, y, dx, dy, color) {
             if (isReplayActive) return; // Don't record during replay
             const t = Date.now() - strokeStartTime;
-            strokeEvents.push({ t, x, y, dx, dy, color: color.slice(), mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1), radius: config.SPLAT_RADIUS });
+            // Store the EFFECTIVE painted size (splat-in ramp / pressure), not the
+            // base — so stroke replay (local AND multiplayer 2.1) reproduces the
+            // actual brush size. The paint path publishes it to __lastPaintRadius.
+            const effR = (typeof window.__lastPaintRadius === 'number' && window.__lastPaintRadius > 0)
+                ? window.__lastPaintRadius : config.SPLAT_RADIUS;
+            strokeEvents.push({ t, x, y, dx, dy, color: color.slice(), mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1), radius: effR });
         }
         function deepCopyEvent(ev) {
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(), mult: ev.mult, radius: ev.radius };

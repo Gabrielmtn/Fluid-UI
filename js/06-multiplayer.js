@@ -492,9 +492,16 @@ function broadcastSplat(x, y, dx, dy, color, mult, radius) {
         return;
     }
 
+    // 2.3 brush-size sync: broadcast the EFFECTIVE painted radius (splat-in
+    // ramp / pressure), not the base config value the callers pass — the paint
+    // path publishes it to __lastPaintRadius. Peers then see the size you
+    // actually painted, matching the recording/replay fix.
+    const effRadius = (typeof window.__lastPaintRadius === 'number' && window.__lastPaintRadius > 0)
+        ? window.__lastPaintRadius : radius;
+
     partySocket.send(JSON.stringify({
         type: 'splat',
-        data: { x, y, dx, dy, color, mult, radius },
+        data: { x, y, dx, dy, color, mult, radius: effRadius },
         timestamp: now
     }));
     broadcastSplat.lastSent = now;

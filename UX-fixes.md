@@ -30,7 +30,7 @@
 ## 2. Multiplayer
 
 ### 2.1 Multiplayer doesn't respect replay
-- [ ] **Ensure replay strokes are properly synchronized in multiplayer**
+- [x] **Ensure replay strokes are properly synchronized in multiplayer**
 - `broadcastReplayStroke()` in `js/06-multiplayer.js` sends replay events with `x`, `y`, `dx`, `dy`, `color`, `mult`, `radius`
 - `scheduleStrokeReplay()` receives and reconstructs these
 - Brush size (radius) IS broadcast — verify it's being applied correctly on the receiving end
@@ -44,7 +44,7 @@
 - **Fix approach:** Broadcast path layer splats as replay strokes or direct splats with `exactColor` flag
 
 ### 2.3 Multiplayer brush size sync
-- [ ] **Verify brush size is synced across peers during live painting**
+- [x] **Verify brush size is synced across peers during live painting**
 - `broadcastSplat()` includes `radius` in the message
 - Receiving end should apply `radius` — verify this works for live (non-replay) strokes too
 
