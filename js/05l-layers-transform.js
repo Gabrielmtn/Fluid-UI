@@ -31,6 +31,9 @@
                 layerDiv.style.display = 'none';
                 layerDiv.style.zIndex = '';
                 layerDiv.classList.remove('active');
+                // D3-3: clear the CSS clip so it can't bleed onto a reused slot
+                layerDiv.style.webkitMaskImage = '';
+                layerDiv.style.maskImage = '';
             }
             // Remove from layers array
             layers = layers.filter(l => l.index !== index);

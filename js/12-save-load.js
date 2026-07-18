@@ -1089,6 +1089,9 @@
                         resetDiv.style.transform = '';
                         resetDiv.style.opacity = '';
                         resetDiv.classList.remove('active');
+                        // D3-3: clear any stale CSS clip mask on the reused slot
+                        resetDiv.style.webkitMaskImage = '';
+                        resetDiv.style.maskImage = '';
                     }
                 }
                 // Clear arrays
@@ -1233,6 +1236,8 @@
                         _od.style.display = 'none';
                         _od.style.zIndex = '';
                         _od.classList.remove('active');
+                        _od.style.webkitMaskImage = ''; // D3-3: drop stale CSS clip
+                        _od.style.maskImage = '';
                     }
                     window.layers.splice(_li, 1);
                 }
@@ -1272,6 +1277,13 @@
         try {
             if (window.Masks && window.Masks.restore && snapshot.masks !== undefined) {
                 window.Masks.restore(snapshot.masks);
+                // D3-3: do NOT reapply clips synchronously here — Masks.restore
+                // loads coverage ASYNC (Image.onload), so the FBOs are blank at
+                // this instant and a read would bake a transparent mask that HIDES
+                // clipped layers. Each mask fires __onMaskMutated on load, which
+                // the image-clip refresh chain (05m) catches to apply the real
+                // clip; until then the layer shows unclipped (graceful degrade,
+                // and a mask that fails to decode simply stays unclipped, visible).
             }
         } catch(e) { console.warn('Preset: mask restore failed', e); }
 

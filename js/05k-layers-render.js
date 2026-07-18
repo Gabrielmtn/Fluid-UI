@@ -208,6 +208,18 @@
                             <span class="layer-slider-value">${layer.threshold}%</span>
                         </div>
                         ${!layer.isCollision ? `
+                        <div class="collision-row" style="margin-top:4px;">
+                            <label class="collision-label">Clip</label>
+                            <select class="img-clip-select">
+                                <option value="">None</option>
+                                ${(window.Masks ? window.Masks.list() : []).map(m =>
+                                    `<option value="${m.id}" ${layer.clipMaskId === m.id ? 'selected' : ''}>${m.name}</option>`
+                                ).join('')}
+                            </select>
+                            <label class="collision-toggle"><input type="checkbox" class="img-clip-invert" ${layer.clipInvert ? 'checked' : ''}> Inv</label>
+                        </div>
+                        ` : ''}
+                        ${!layer.isCollision ? `
                         <div style="margin-bottom:6px;">
                             <button class="mask-control-btn" onclick="collisionFromMask(${layer.index})" title="Generate collision layer from current mask or threshold" style="width:100%;background:rgba(255,160,60,0.13);border-color:rgba(255,160,60,0.35);text-align:center;">🧱 Generate Collision Layer</button>
                         </div>
@@ -259,6 +271,26 @@
                         const enable = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; if (itemEl) delete itemEl.dataset.sliderActive; };
                         ['pointerdown','mousedown','touchstart'].forEach(evt => slider.addEventListener(evt, disable, { passive: true }));
                         ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => slider.addEventListener(evt, enable, { passive: true }));
+                    }
+                    // D3-3: image-layer Clip dropdown + Inv (mirrors the raster clip wiring).
+                    // stopPropagation on pointer/mouse events so the layer drag guards don't eat them.
+                    const clipSel = element.querySelector('.img-clip-select');
+                    if (clipSel) {
+                        clipSel.addEventListener('change', (e) => {
+                            e.stopPropagation();
+                            layer.clipMaskId = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                            if (typeof window.applyLayerClip === 'function') window.applyLayerClip(layer.index);
+                        });
+                        clipSel.addEventListener('mousedown', (e) => e.stopPropagation());
+                    }
+                    const clipInv = element.querySelector('.img-clip-invert');
+                    if (clipInv) {
+                        const stopP = (ev) => ev.stopPropagation();
+                        ['click','mousedown','pointerdown','touchstart'].forEach(evt => clipInv.addEventListener(evt, stopP));
+                        clipInv.addEventListener('change', () => {
+                            layer.clipInvert = clipInv.checked;
+                            if (typeof window.applyLayerClip === 'function') window.applyLayerClip(layer.index);
+                        });
                     }
                     // Wire collision controls if present
                     if (layer.isCollision) {
@@ -602,6 +634,9 @@
                                 } else {
                                     applyLayerMask(layer.index);
                                 }
+                                // D3-3: refresh the Mask clip alongside the re-bake
+                                // (cheap no-op when the layer has no clip binding).
+                                if (typeof window.applyLayerClip === 'function') window.applyLayerClip(layer.index);
                                 layer.__maskDirty = false;
                             }
                         }
