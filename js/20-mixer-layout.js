@@ -773,21 +773,26 @@
             if (sel) bar.appendChild(makeQubDropdown(sel, pair[1]));
         });
         document.body.appendChild(bar);
-        // Full-width bottom bar: CSS hugs bottom + left; JS trims the right edge
-        // so the bar stops at the nav (sidebar) instead of running under it.
-        // Deferred (init reads an unlaid-out sidebar) + re-run on resize.
+        // Trim the right edge to #canvas-area's right — the drawing region's
+        // edge, i.e. where the nav begins. canvas-area is left:0, so only its
+        // WIDTH changes (sidebar resize / window / sim-res) and a ResizeObserver
+        // on it catches every case; no fragile position tracking.
         const place = function () {
-            const sb = document.getElementById('sidebar-right');
+            const ca = document.getElementById('canvas-area');
             let right = 0;
-            if (sb) {
-                const r = sb.getBoundingClientRect();
-                if (r.width > 0 && r.left < window.innerWidth - 5) right = Math.round(window.innerWidth - r.left);
+            if (ca) {
+                const r = ca.getBoundingClientRect();
+                if (r.right > 1 && r.right < window.innerWidth - 1) right = Math.round(window.innerWidth - r.right);
             }
             bar.style.right = right + 'px';
         };
         requestAnimationFrame(place);
-        setTimeout(place, 300);
+        setTimeout(place, 400);
         window.addEventListener('resize', place);
+        if (window.ResizeObserver) {
+            const ca = document.getElementById('canvas-area');
+            if (ca) { try { new ResizeObserver(place).observe(ca); } catch (e) {} }
+        }
     }
 
     // Custom themeable dropdown that drives a hidden native <select> (so all

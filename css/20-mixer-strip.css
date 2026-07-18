@@ -13,9 +13,11 @@
 #quality-underbar {
     position: fixed;
     left: 0;
-    right: 0; /* JS trims the right edge to the nav/sidebar */
+    right: 0; /* JS trims to #canvas-area's right (the drawing-region / nav edge) */
     bottom: 0;
-    z-index: 200;
+    /* Above the sim canvas (z-index up to 1000 via updateLayerZIndices) so the
+       drawing area can't overpaint the bar or steal its clicks — UI wins. */
+    z-index: 1200;
     display: flex;
     flex-direction: row;
     align-items: center;
