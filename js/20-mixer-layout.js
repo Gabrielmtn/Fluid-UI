@@ -763,24 +763,85 @@
         if (document.getElementById('quality-underbar')) return;
         const bar = document.createElement('div');
         bar.id = 'quality-underbar';
-        // Minimalist (After Effects): no external labels — just the compact
-        // dropdowns; context comes from the value + hover title, and from an
-        // <optgroup> label that sits ABOVE the options when the list opens
-        // (Chromium flips the list upward here since we're at the bottom edge).
+        // Minimalist (After Effects): no external labels — each control is a
+        // custom dropdown showing just its value; the label sits ABOVE the
+        // options as a themeable list header on open (the native <optgroup>
+        // popup can't be dark-themed in this build — white OS frame — so we
+        // drive a hidden native <select> from a custom list instead).
         [['visualResolution', 'Visual Quality'], ['physicsResolution', 'Physics Detail']].forEach(function (pair) {
             const sel = document.getElementById(pair[0]);
-            if (!sel) return;
-            if (!sel.querySelector('optgroup')) {
-                const og = document.createElement('optgroup');
-                og.label = pair[1];
-                while (sel.firstChild) og.appendChild(sel.firstChild);
-                sel.appendChild(og);
-            }
-            sel.title = pair[1];
-            bar.appendChild(sel); // move just the <select>, drop its external <label>
+            if (sel) bar.appendChild(makeQubDropdown(sel, pair[1]));
         });
         // Docked bottom-left via CSS (fixed) — no JS positioning needed.
         document.body.appendChild(bar);
+    }
+
+    // Custom themeable dropdown that drives a hidden native <select> (so all
+    // existing change bindings + save/load keep working by id). Opens UPWARD
+    // with a label header on top — the fix for the unstylable native popup.
+    function makeQubDropdown(sel, labelText) {
+        sel.classList.add('qub-native-hidden');
+        const wrap = document.createElement('div');
+        wrap.className = 'qub-dd';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'qub-dd-btn';
+        btn.title = labelText;
+        const val = document.createElement('span');
+        val.className = 'qub-dd-val';
+        btn.appendChild(val);
+        btn.insertAdjacentHTML('beforeend', '<span class="qub-dd-chev">▾</span>');
+        const list = document.createElement('div');
+        list.className = 'qub-dd-list';
+        const hdr = document.createElement('div');
+        hdr.className = 'qub-dd-hdr';
+        hdr.textContent = labelText;
+        list.appendChild(hdr);
+
+        const syncVal = function () {
+            const o = sel.options[sel.selectedIndex];
+            val.textContent = o ? o.text : '';
+        };
+        const rebuild = function () {
+            Array.prototype.slice.call(list.querySelectorAll('.qub-dd-opt')).forEach(function (o) { o.remove(); });
+            Array.prototype.forEach.call(sel.options, function (opt) {
+                const o = document.createElement('div');
+                o.className = 'qub-dd-opt' + (opt.selected ? ' sel' : '');
+                o.textContent = opt.text;
+                o.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    if (sel.value !== opt.value) {
+                        sel.value = opt.value;
+                        sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    syncVal();
+                    close();
+                });
+                list.appendChild(o);
+            });
+        };
+        const onDoc = function (e) { if (!wrap.contains(e.target)) close(); };
+        const close = function () {
+            wrap.classList.remove('open');
+            document.removeEventListener('mousedown', onDoc);
+        };
+        const open = function () {
+            rebuild();
+            wrap.classList.add('open');
+            setTimeout(function () { document.addEventListener('mousedown', onDoc); }, 0);
+        };
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            wrap.classList.contains('open') ? close() : open();
+        });
+        // Keep the button in sync if the select is driven from elsewhere.
+        sel.addEventListener('change', syncVal);
+
+        wrap.appendChild(btn);
+        wrap.appendChild(list);
+        wrap.appendChild(sel); // hidden state-holder stays in the DOM
+        syncVal();
+        return wrap;
     }
 
     // --- Section builders ---
