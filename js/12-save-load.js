@@ -1548,6 +1548,67 @@
         window.capturePresetSnapshot = capturePresetSnapshot;
         window.saveUserPreset = saveUserPreset;
 
+        // ── D7-1: versioned .fluid PROJECT file (export / import) ──────────
+        // Wrap the full capturePresetSnapshot() stack (layers, masks, bindings,
+        // colors, path/recorded layers…) plus brush presets in a versioned
+        // envelope so a whole project round-trips as one downloadable file.
+        var PROJECT_FORMAT = 'fluid-project';
+        var PROJECT_FORMAT_VERSION = 1;
+        function migrateProjectEnvelope(env) {
+            if (!env || typeof env !== 'object') return null;
+            // Accept a bare snapshot (raw preset JSON, no envelope) and wrap it —
+            // migration path for older / hand-exported saves.
+            if (!env.format && (env.sliders || env.layers || typeof env.version === 'number')) {
+                env = { format: PROJECT_FORMAT, formatVersion: 1, snapshot: env };
+            }
+            if (env.format !== PROJECT_FORMAT || !env.snapshot) return null;
+            // Future envelope upgrades gate on env.formatVersion here.
+            return env;
+        }
+        function exportProjectFile(name) {
+            try {
+                name = (name && String(name).trim()) || 'fluid-project';
+                var snap = capturePresetSnapshot();
+                if (!snap) { console.warn('[Project] nothing to export'); return false; }
+                var brushPresets = null;
+                try { brushPresets = window.settingsManager ? window.settingsManager.get('brush.presets') : null; } catch (_) {}
+                var env = {
+                    format: PROJECT_FORMAT, formatVersion: PROJECT_FORMAT_VERSION, app: 'Fluid-UI',
+                    name: name, created: Date.now(), snapshot: snap
+                };
+                if (brushPresets) env.brushPresets = brushPresets;
+                var blob = new Blob([JSON.stringify(env)], { type: 'application/json' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url; a.download = name.replace(/\s+/g, '-').toLowerCase() + '.fluid';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                return true;
+            } catch (e) { console.warn('[Project] export failed', e); return false; }
+        }
+        function importProjectFile(file, cb) {
+            if (!file) { if (cb) cb(new Error('No file')); return; }
+            var reader = new FileReader();
+            reader.onload = function () {
+                try {
+                    var env = migrateProjectEnvelope(JSON.parse(String(reader.result)));
+                    if (!env) throw new Error('Not a valid .fluid project file');
+                    applyPresetSnapshot(env.snapshot);
+                    if (env.brushPresets && window.settingsManager) {
+                        try {
+                            window.settingsManager.set('brush.presets', env.brushPresets);
+                            if (typeof window.__refreshBrushPresets === 'function') window.__refreshBrushPresets();
+                        } catch (_) {}
+                    }
+                    if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
+                    if (cb) cb(null, env);
+                } catch (err) { if (cb) cb(err); else console.warn('[Project] import failed', err); }
+            };
+            reader.onerror = function () { if (cb) cb(reader.error || new Error('read failed')); };
+            reader.readAsText(file);
+        }
+        window.projectFile = { export: exportProjectFile, import: importProjectFile, migrate: migrateProjectEnvelope };
+
         // Global helper: refresh ALL preset list UIs across the app (debounced to single frame)
         var _presetRefreshPending = 0;
         window.refreshAllPresetLists = function() {

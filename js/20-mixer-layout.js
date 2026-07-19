@@ -2079,6 +2079,8 @@
                 });
             } finally { applyingPreset = false; }
         }
+        // D7-1: let a .fluid project import refresh the brush-preset chips.
+        window.__refreshBrushPresets = function () { try { renderPresetChips(); } catch (_) {} };
         function renderPresetChips() {
             chipsWrap.innerHTML = '';
             var list = loadBrushPresets();
@@ -3212,6 +3214,43 @@
         statusDiv.id = 'exportStatus';
         statusDiv.style.cssText = 'display:none;font-size:11px;padding:6px;background:rgba(0,0,0,0.3);border-radius:4px;margin-bottom:8px;text-align:center;color:#58a6ff;';
         body.appendChild(statusDiv);
+
+        // ── D7-1: Project file (.fluid) — save/load the whole stack ──
+        var projLabel = document.createElement('label');
+        projLabel.className = 'brush-section-label';
+        projLabel.textContent = 'Project (.fluid)';
+        body.appendChild(projLabel);
+        var projGrid = document.createElement('div');
+        projGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;';
+        var saveProjBtn = document.createElement('button');
+        saveProjBtn.textContent = '💾 Save Project';
+        saveProjBtn.title = 'Download the whole project (layers, masks, bindings, brush presets, colors…) as a .fluid file';
+        saveProjBtn.style.cssText = 'padding:8px;background:rgba(180,130,255,0.15);border:1px solid rgba(180,130,255,0.35);color:#c8a2ff;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        saveProjBtn.addEventListener('click', function () {
+            var nm = window.prompt ? window.prompt('Project name', 'fluid-project') : 'fluid-project';
+            if (nm === null) return; // cancelled
+            if (window.projectFile) window.projectFile.export(nm);
+        });
+        projGrid.appendChild(saveProjBtn);
+        var loadProjBtn = document.createElement('button');
+        loadProjBtn.textContent = '📂 Load Project';
+        loadProjBtn.title = 'Load a .fluid project file (replaces the current stack)';
+        loadProjBtn.style.cssText = 'padding:8px;background:rgba(180,130,255,0.08);border:1px solid rgba(180,130,255,0.25);color:#c8a2ff;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        var projInput = document.createElement('input');
+        projInput.type = 'file';
+        projInput.accept = '.fluid,application/json';
+        projInput.style.display = 'none';
+        loadProjBtn.addEventListener('click', function () { projInput.click(); });
+        projInput.addEventListener('change', function (e) {
+            var f = e.target.files && e.target.files[0];
+            if (f && window.projectFile) window.projectFile.import(f, function (err) {
+                if (err) alert('Project load failed: ' + err.message);
+            });
+            projInput.value = '';
+        });
+        projGrid.appendChild(loadProjBtn);
+        body.appendChild(projGrid);
+        body.appendChild(projInput);
 
         // Progress bar
         var progressWrap = document.createElement('div');
