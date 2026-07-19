@@ -417,11 +417,24 @@
         // Clear saved settings
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
+                // GUARDRAIL: this used to call settingsManager.clear(), which wiped
+                // the ENTIRE fluidUI namespace — including every saved preset — with
+                // no confirmation (root cause of the 2026-07 preset loss). Now it
+                // confirms and PRESERVES presets (clearExceptPresets); the on-disk
+                // Preset Vault is untouched either way.
+                if (!window.confirm('Reset saved settings to defaults?\n\nYour presets are kept. This only clears window/layout, colors, and other UI settings.')) {
+                    return;
+                }
                 try {
-                    window.settingsManager?.clear();
+                    if (window.settingsManager?.clearExceptPresets) {
+                        window.settingsManager.clearExceptPresets();
+                    } else {
+                        window.settingsManager?.clear();
+                    }
                     if (typeof window.restoreDefaultPalettes === 'function') {
                         window.restoreDefaultPalettes();
                     }
+                    if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
                     clearBtn.textContent = '🧹 Cleared';
                     setTimeout(() => clearBtn.textContent = '🧹 Clear', 1500);
                 } catch (err) {
@@ -1608,6 +1621,98 @@
             reader.readAsText(file);
         }
         window.projectFile = { export: exportProjectFile, import: importProjectFile, migrate: migrateProjectEnvelope };
+
+        // ── Bulk preset library: Export All / Import (portable .fluidpresets) ──
+        // Backs up the whole user-preset library as one versioned file so it can
+        // survive a storage wipe and move between origins (the Electron `file://`
+        // build and the web build keep SEPARATE localStorage; this bridges them).
+        var PRESETS_FORMAT = 'fluid-presets';
+        var PRESETS_FORMAT_VERSION = 1;
+        function exportAllPresets() {
+            try {
+                var presets = getUserPresets();              // { name: snapshot, … }
+                var names = Object.keys(presets);
+                if (!names.length) { showPresetStatus('No saved presets to export', '#ffa500'); return false; }
+                var brushPresets = null;
+                try { brushPresets = window.settingsManager ? window.settingsManager.get('brush.presets') : null; } catch (_) {}
+                var env = {
+                    format: PRESETS_FORMAT, formatVersion: PRESETS_FORMAT_VERSION, app: 'Fluid-UI',
+                    created: Date.now(), count: names.length, presets: presets
+                };
+                if (brushPresets) env.brushPresets = brushPresets;
+                var blob = new Blob([JSON.stringify(env)], { type: 'application/json' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                var stamp = new Date().toISOString().slice(0, 10);
+                a.href = url; a.download = 'fluid-presets-' + stamp + '.fluidpresets';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                showPresetStatus('Exported ' + names.length + ' preset' + (names.length === 1 ? '' : 's'), '#3fb950');
+                return true;
+            } catch (e) {
+                console.warn('[Presets] export failed', e);
+                showPresetStatus('Export failed', '#ff6b6b');
+                return false;
+            }
+        }
+        function importPresetsFile(file, cb) {
+            if (!file) { if (cb) cb(new Error('No file')); return; }
+            var reader = new FileReader();
+            reader.onload = function () {
+                try {
+                    var data = JSON.parse(String(reader.result));
+                    var presets = null;
+                    if (data && data.presets && typeof data.presets === 'object') {
+                        presets = data.presets;                      // envelope (our format, lenient on version)
+                    } else if (data && typeof data === 'object' && !data.format && !data.snapshot && !data.sliders) {
+                        presets = data;                              // bare { name: snapshot } map
+                    }
+                    if (!presets || typeof presets !== 'object') throw new Error('Not a valid presets file');
+                    var names = Object.keys(presets);
+                    if (!names.length) throw new Error('No presets in file');
+                    var imported = 0, degraded = 0, failed = 0;
+                    names.forEach(function (name) {
+                        var snap = presets[name];
+                        if (!snap || typeof snap !== 'object') { failed++; return; }
+                        // saveUserPreset runs the quota-fallback chain, so oversized
+                        // presets degrade gracefully on the smaller web localStorage.
+                        var ok = saveUserPreset(name, snap);
+                        if (ok) { imported++; if (window._lastPresetSaveWarning) degraded++; }
+                        else failed++;
+                    });
+                    if (data.brushPresets && window.settingsManager) {
+                        try {
+                            window.settingsManager.set('brush.presets', data.brushPresets);
+                            if (typeof window.__refreshBrushPresets === 'function') window.__refreshBrushPresets();
+                        } catch (_) {}
+                    }
+                    if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
+                    if (cb) cb(null, { imported: imported, degraded: degraded, failed: failed, total: names.length });
+                } catch (err) { if (cb) cb(err); else console.warn('[Presets] import failed', err); }
+            };
+            reader.onerror = function () { if (cb) cb(reader.error || new Error('read failed')); };
+            reader.readAsText(file);
+        }
+        window.presetLibrary = { exportAll: exportAllPresets, import: importPresetsFile };
+
+        var exportAllBtn = $('exportAllPresetsBtn');
+        var importBtn = $('importPresetsBtn');
+        var importInput = $('importPresetsInput');
+        if (exportAllBtn) exportAllBtn.addEventListener('click', exportAllPresets);
+        if (importBtn && importInput) {
+            importBtn.addEventListener('click', function () { importInput.value = ''; importInput.click(); });
+            importInput.addEventListener('change', function () {
+                var f = importInput.files && importInput.files[0];
+                if (!f) return;
+                importPresetsFile(f, function (err, res) {
+                    if (err) { showPresetStatus('Import failed: ' + err.message, '#ff6b6b'); return; }
+                    var msg = 'Imported ' + res.imported + '/' + res.total;
+                    if (res.degraded) msg += ' — ' + res.degraded + ' shed layer data (storage limit)';
+                    if (res.failed) msg += ', ' + res.failed + ' failed';
+                    showPresetStatus(msg, (res.degraded || res.failed) ? '#ffa500' : '#3fb950');
+                });
+            });
+        }
 
         // Global helper: refresh ALL preset list UIs across the app (debounced to single frame)
         var _presetRefreshPending = 0;

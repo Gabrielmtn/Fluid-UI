@@ -113,7 +113,21 @@ function createWindow() {
             });
         }
         // Ctrl+Shift+D = Nuclear reset (clear everything including localStorage)
+        // GUARDRAIL: this wipes localStorage (presets included). Confirm first.
+        // The on-disk Preset Vault survives and re-seeds presets on next launch,
+        // but an unconfirmed keystroke wiping everything is still a footgun.
         if (input.control && input.shift && input.key === 'D') {
+            const { dialog } = require('electron');
+            const choice = dialog.showMessageBoxSync(mainWindow, {
+                type: 'warning',
+                buttons: ['Cancel', 'Reset everything'],
+                defaultId: 0,
+                cancelId: 0,
+                title: 'Nuclear reset',
+                message: 'Clear ALL local data (localStorage, cache)?',
+                detail: 'This wipes settings and the in-app preset list. Presets saved to your Preset Vault folder survive and reload automatically, but anything not in the vault is lost.'
+            });
+            if (choice !== 1) return;
             mainWindow.webContents.session.clearCache().then(() => {
                 mainWindow.webContents.session.clearStorageData({
                     storages: ['cookies', 'cachestorage', 'localstorage', 'serviceworkers']
