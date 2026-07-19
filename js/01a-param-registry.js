@@ -127,8 +127,8 @@
         displayShadingToggle: {def: false, mutScope: "extended"}
     };
     var SELECTS = {
-        visualResolution: {options: ["4096", "2048", "1024", "512", "256"], def: "4096", mut: null},
-        physicsResolution: {options: ["1024", "512", "384", "256", "128", "64"], def: "1024", mut: null},
+        visualResolution: {options: ["4096", "2048", "1536", "1024", "512", "256"], def: "2048", mut: null},
+        physicsResolution: {options: ["1024", "512", "384", "256", "192", "128", "64", "32"], def: "512", mut: null},
         kaleidoMode: {options: ["1", "2", "3", "4", "5", "0"], def: "1", mut: {options: ["0", "1", "2", "3", "4", "5"], scope: "basic"}},
         fpsCap: {options: ["30", "60", "120", "144", "165", "240", "native", "0"], def: "30", mut: null},
         lightMode: {options: ["manual", "random"], def: "manual", mut: {options: null, scope: "extended"}},
