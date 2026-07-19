@@ -125,6 +125,9 @@
                     if (isFinite(v)) {
                         config.DYE_RESOLUTION = v;
                         window.needsFramebufferReinit = true;
+                        // WYSIWYG: an explicit pick runs at exactly this res (end
+                        // boot ramp + drop any ladder scaling — see pinResolution)
+                        if (window.QualityGovernor && window.QualityGovernor.pinResolution) window.QualityGovernor.pinResolution();
                     }
                 }
             });
@@ -134,6 +137,7 @@
                     if (isFinite(v) && v >= 64) {
                         config.DYE_RESOLUTION = v;
                         window.needsFramebufferReinit = true;
+                        if (window.QualityGovernor && window.QualityGovernor.pinResolution) window.QualityGovernor.pinResolution();
                         // Save to session storage
                         window.settingsManager?.setSession('temp.visualResolutionCustom', v);
                     }
@@ -159,6 +163,9 @@
                     if (isFinite(v)) {
                         config.SIM_RESOLUTION = v;
                         window.needsFramebufferReinit = true;
+                        // WYSIWYG: an explicit pick runs at exactly this res (end
+                        // boot ramp + drop any ladder scaling — see pinResolution)
+                        if (window.QualityGovernor && window.QualityGovernor.pinResolution) window.QualityGovernor.pinResolution();
                     }
                 }
             });
@@ -168,6 +175,7 @@
                     if (isFinite(v) && v >= 16) {
                         config.SIM_RESOLUTION = v;
                         window.needsFramebufferReinit = true;
+                        if (window.QualityGovernor && window.QualityGovernor.pinResolution) window.QualityGovernor.pinResolution();
                         // Save to session storage
                         window.settingsManager?.setSession('temp.physicsResolutionCustom', v);
                     }
