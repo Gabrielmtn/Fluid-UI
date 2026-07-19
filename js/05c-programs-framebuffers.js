@@ -27,6 +27,8 @@
         const obstacleDampProg = new Program(baseVert, obstacleDampFrag);
         const obstacleCompositeProg = new Program(baseVert, obstacleCompositeFrag);
         const hfFloorProg = new Program(baseVert, hfFloorFrag); // M2 spectral floor
+        const wetnessAdvectProg = new Program(baseVert, wetnessAdvectFrag); // P15-1 wetness advect+dry
+        const wetSplatProg = new Program(baseVert, wetSplatFrag);           // P15-1 wetness deposit
         const rasterStampProg = new Program(baseVert, rasterStampFrag);
         const igniteProg = new Program(baseVert, igniteFrag);   // D2 bridge: sketch → dye
         const captureProg = new Program(baseVert, captureFrag); // D2 bridge: dye → sketch
@@ -43,6 +45,7 @@
             window.density = density;
             window.velocity = velocity;
             window.pressure = pressure;
+            window.wetness = wetness; // P15-1 (debug/inspection)
             window.sketch = sketch;
             window.divergence = divergence;
             window.curl = curl;
@@ -73,6 +76,7 @@
             };
         }
         let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, obstacle, obstacleScratch;
+        let wetness; // P15-1: R16F sim-res double-FBO, 0 dry … 1 wet
         // D2 raster paint layers: layer index -> single RGBA8 dye-res FBO,
         // persistent (no decay/advection). Entries are created/owned by
         // window.rasterLayers (05l); declared here so initFramebuffers can
@@ -103,6 +107,10 @@
             const _prevDensity = (typeof density !== 'undefined' && density && density.read) ? density : null;
             const _prevVelocity = (typeof velocity !== 'undefined' && velocity && velocity.read) ? velocity : null;
             const _prevPressure = (typeof pressure !== 'undefined' && pressure && pressure.read) ? pressure : null;
+            // P15-1: wetness carries the paper's dampness — preserve it across
+            // resize/governor reinits like the other physics fields, or a
+            // resolution change would suddenly re-dry (freeze) all wet paint.
+            const _prevWetness = (typeof wetness !== 'undefined' && wetness && wetness.read) ? wetness : null;
             // D2: stash every raster paint layer's FBO for preserve-and-copy
             const _prevRaster = {};
             Object.keys(rasterStore).forEach(function (rid) {
@@ -183,6 +191,9 @@
             lit = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Physics buffers at simulation resolution
             velocity = createDoubleFBO(simTexWidth, simTexHeight, rg.internalFormat, rg.format, texType, filter);
+            // P15-1 wetness map: sim-res R16F, LINEAR (advected by semi-Lagrangian
+            // backtrace like the dye). Starts cleared to 0 = bone dry.
+            wetness = createDoubleFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, filter);
             divergence = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             curl = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             pressure = createDoubleFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
@@ -285,7 +296,7 @@
             }
             const _rasterIds = Object.keys(_prevRaster);
             const _maskIds = Object.keys(_prevMask);
-            if (_prevDensity || _prevVelocity || _prevPressure || _rasterIds.length || _maskIds.length) {
+            if (_prevDensity || _prevVelocity || _prevPressure || _prevWetness || _rasterIds.length || _maskIds.length) {
                 gl.disable(gl.BLEND);
                 clearProg.bind();
                 gl.uniform1i(clearProg.uniforms.uTexture, 0);
@@ -297,6 +308,9 @@
                 if (_prevDensity) _copyPreserved(_prevDensity, density, dyeTexWidth, dyeTexHeight, 1.0);
                 if (_prevVelocity) _copyPreserved(_prevVelocity, velocity, simTexWidth, simTexHeight, _velScale);
                 if (_prevPressure) _copyPreserved(_prevPressure, pressure, simTexWidth, simTexHeight, 1.0);
+                // Wetness is a normalized 0..1 field (not velocity), so no
+                // grid-rescale — straight passthrough at the new sim res.
+                if (_prevWetness) _copyPreserved(_prevWetness, wetness, simTexWidth, simTexHeight, 1.0);
                 // Raster layers are SINGLE fbos (not doubles) — copy + free
                 // by hand. Losing one on a governor/resize reinit would erase
                 // the user's drawing, so this is load-bearing.

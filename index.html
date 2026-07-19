@@ -299,6 +299,14 @@
             <input type="range" id="swirl" min="0" max="1" value="0" step="0.01">
         </div>
         <div class="control-group">
+            <label for="wetInfluence" title="Wetness — wet paint flows, dry paint holds in place. 0 = off (pure fluid). Higher = dry regions set harder, more paint-like.">Wetness <span id="wetInfluenceValue" class="value-display">0.00</span></label>
+            <input type="range" id="wetInfluence" min="0" max="1" value="0" step="0.01">
+        </div>
+        <div class="control-group">
+            <label for="wetDrying" title="Drying speed — half-life in seconds for wet paint to set. Lower = paint dries and holds faster.">Dry Time <span id="wetDryingValue" class="value-display">3.0</span>s</label>
+            <input type="range" id="wetDrying" min="0.5" max="20" value="3" step="0.5">
+        </div>
+        <div class="control-group">
             <label for="ridges" title="Sharpen kernel scale — 0 = off (smooth), 1 = classic unsharp look, higher values carve coarse embossed ridges into moving dye">Ridges <span id="ridgesValue" class="value-display">0.0</span></label>
             <input type="range" id="ridges" min="0" max="6" value="0" step="0.1">
         </div>

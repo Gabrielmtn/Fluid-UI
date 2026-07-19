@@ -396,6 +396,12 @@
                                       // Painterly sub-grid wisps on moving paint; dies with
                                       // motion so settled artwork stays bit-stable
 
+            WET_INFLUENCE: 0,         // P15-1 wetness→mobility coupling (0 = feature off,
+                                      // bit-identical to no wetness). 1 = bone-dry paint
+                                      // fully freezes in place; wet paint always flows.
+            WET_DRYING: 3.0,          // P15-1 wetness half-life in seconds: time for a wet
+                                      // region to dry halfway. Lower = paint sets faster.
+
             RIDGES: 0,                // Sharpen kernel radius in 2048-reference texels.
                                       // 0 = sharpen OFF (default — the smooth look; the
                                       // pass is skipped entirely), 1 = classic unsharp

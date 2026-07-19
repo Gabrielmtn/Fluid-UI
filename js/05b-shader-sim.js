@@ -293,6 +293,33 @@
                 return min(0.995, obsStrengthResponse() * smoothstep(0.35, 0.85, cov));
             }
         `;
+        // ─── Wetness → dye mobility (P15-1) ─────────────────────────────
+        // Wet paint FLOWS, dry paint HOLDS. A single R16F wetness field
+        // (0 = bone dry, 1 = fully wet) scales the dye backtrace
+        // displacement: dry regions barely advect (paint sets in place),
+        // wet regions transport at full velocity. Interpolated INTO the
+        // shared rk2Backtrace snippet below, so MacCormack forward/correct/
+        // main compute bit-identical displacements — the correction only
+        // stays coherent if every dye pass carries the same
+        // (uWetness, wetInfluence) uniforms and the exact same code.
+        //
+        // wetInfluence <= 0 returns EXACTLY 1.0 — no sample, no arithmetic —
+        // so the velocity self-advection pass (which sets wetInfluence=0)
+        // and the feature-off default (WET_INFLUENCE 0) stay bit-for-bit
+        // identical to the pre-wetness sim. At rest disp is already 0, so
+        // the at-rest bit-stability / settle-banding guarantee is untouched
+        // regardless of what mobility returns.
+        const mobilityGLSL = `
+            uniform sampler2D uWetness;  // R16F, sim res: 0 dry … 1 wet
+            uniform float wetInfluence;  // 0 = feature off (exact no-op)
+            float dyeMobility(vec2 uv) {
+                if (wetInfluence <= 0.0) return 1.0;
+                float w = clamp(texture(uWetness, uv).r, 0.0, 1.0);
+                // wet (w=1) → 1.0 full flow; bone dry (w=0) → (1 - wetInfluence)
+                // held. wetInfluence=1 fully freezes dry paint in place.
+                return mix(1.0 - wetInfluence, 1.0, w);
+            }
+        `;
         const rk2Backtrace = `
                 vec2 vHalf = texture(uVelocity, vUv).xy;
                 vec2 midUv = clamp(vUv - 0.5 * dt * vHalf, 0.0, 1.0);
@@ -335,6 +362,13 @@
                     if (solidity(clamp(vUv - disp * 0.5, 0.0, 1.0)) > 0.5) disp *= 0.25;
                     else if (solidity(clamp(vUv - disp, 0.0, 1.0)) > 0.5) disp *= 0.5;
                 }
+                // P15-1 wetness: dry paint holds, wet paint flows. Scales the
+                // final displacement (swirl offset included) so dry regions set
+                // in place. dyeMobility is EXACTLY 1.0 when wetInfluence<=0
+                // (velocity pass + feature off) — bit-identical no-op — and disp
+                // is already 0 at rest, so the settle/bit-stability guarantee is
+                // untouched. Shared here so all three dye passes displace alike.
+                disp *= dyeMobility(vUv);
         `;
         const advectionFrag = `#version 300 es
             precision ${PRECISION} float;
@@ -360,6 +394,7 @@
                                  // and apply only the decay/drain logic below.
             ${swirlGLSL}
             ${obstacleSolidityGLSL}
+            ${mobilityGLSL}
             void main() {
                 ${rk2Backtrace}
                 vec2 coord = (macMode == 1) ? vUv : clamp(vUv - disp, 0.0, 1.0);
@@ -598,6 +633,7 @@
             uniform int hasObstacle;
             ${swirlGLSL}
             ${obstacleSolidityGLSL}
+            ${mobilityGLSL}
             void main() {
                 ${rk2Backtrace}
                 fragColor = texture(uSource, clamp(vUv - disp, 0.0, 1.0));
@@ -627,6 +663,7 @@
             uniform float deband;        // 0 = off (bit-exact); >0 softens fast-moving dye cliffs
             ${swirlGLSL}
             ${obstacleSolidityGLSL}
+            ${mobilityGLSL}
             void main() {
                 ${rk2Backtrace}
                 vec4 fwd = texture(uForward, vUv);
@@ -687,6 +724,63 @@
                     corrected = mix(corrected, fwd, db);
                 }
                 fragColor = mix(corrected, fwd, revert);
+            }
+        `;
+        // ─── Wetness field: advect + dry (P15-1) ────────────────────────
+        // The wetness map is carried by the flow (semi-Lagrangian, the SAME
+        // shared rk2Backtrace as the dye — swirl=0 and wetInfluence=0 so the
+        // field itself transports at full mobility) and dries via a batched
+        // half-life decay. dryMul is accumulated CPU-side exactly like the
+        // dye's decayDt so the multiply survives fp16 rounding at tiny
+        // timesteps; dryMul==1.0 on a skip frame is an exact no-op. Single
+        // channel (R16F, sim res). Because wetInfluence=0 here, dyeMobility
+        // never samples uWetness — no read-while-writing hazard.
+        const wetnessAdvectFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity, uSource;
+            uniform sampler2D uObstacle;   // shared backtrace probes
+            uniform vec2 texelSize;        // sim-grid texel (velocity)
+            uniform vec2 srcTexelSize;     // wetness-grid texel (== sim res)
+            uniform float dt;
+            uniform float dryMul;          // batched half-life factor (1.0 = no-op)
+            uniform int hasObstacle;
+            ${swirlGLSL}
+            ${obstacleSolidityGLSL}
+            ${mobilityGLSL}
+            void main() {
+                ${rk2Backtrace}
+                float w = texture(uSource, clamp(vUv - disp, 0.0, 1.0)).r;
+                w *= dryMul;
+                // Guaranteed-zero floor: a pure multiply stalls at a dim fp16
+                // residue, which would leave the field permanently damp. Ramp
+                // the last sliver to exactly 0 so dried regions read bone dry.
+                w = (w < 0.002) ? 0.0 : w;
+                fragColor = vec4(w, 0.0, 0.0, 1.0);
+            }
+        `;
+        // ─── Wetness deposit (P15-1) ────────────────────────────────────
+        // A stroke wets the paper. Saturating gaussian dab: w = max(src, g)
+        // so overlapping dabs pool toward fully wet (1.0) without exceeding
+        // it (additive would blow past 1 and never dry). Same gaussian form
+        // and aspect correction as splatFrag, so the wet footprint lines up
+        // with the dye dab. Sim res, single channel.
+        const wetSplatFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTarget;     // current wetness
+            uniform float aspectRatio;
+            uniform vec2 point;            // splat center (uv)
+            uniform float radius;          // gaussian width² (p-space, == dye dab)
+            uniform float amount;          // peak deposit (0..1)
+            void main() {
+                float src = texture(uTarget, vUv).r;
+                vec2 p = vUv - point;
+                p.x *= aspectRatio;
+                float g = exp(-dot(p, p) / radius) * amount;
+                fragColor = vec4(clamp(max(src, g), 0.0, 1.0), 0.0, 0.0, 1.0);
             }
         `;
         // Obstacle-aware projection (divergence/pressure/gradient below):
