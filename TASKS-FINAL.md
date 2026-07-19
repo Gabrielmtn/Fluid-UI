@@ -59,7 +59,7 @@
 
 | ID | Task | Size | Status | Prio |
 |----|------|:----:|:------:|:----:|
-| D7-1 | **Versioned `.fluid` project save/load** carrying the full stack (layers, masks, bindings, brush presets) + migration from current saves. **Gabriel: important.** | L | open | |
+| D7-1 | **Versioned `.fluid` project save/load** — ✅ **DONE** (`pre-usertest`): `window.projectFile` export/import + Save/Load Project UI; versioned envelope wraps `capturePresetSnapshot` (full stack) + brush presets; migration accepts bare snapshots, rejects garbage. Verified round-trip. | L | done | |
 | D7-2 | **Multiplayer:** stroke events carry brush-engine params; decide raster-layer sync scope (or fluid-only v1). Absorbs UX-2.2 (path-layer sync). | L | open | |
 | D7-3 | **Video export composites the full stack**; perf budget via JankMonitor (stamp-to-photon < ~30ms). | M | open | |
 
