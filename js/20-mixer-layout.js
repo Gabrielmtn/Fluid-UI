@@ -1475,6 +1475,9 @@
 
         // Curl-noise micro-swirl (dye advection wisps)
         moveControlGroup('swirl', body);
+        // P15-1 wetness: dry paint holds, wet paint flows (+ dry-time half-life)
+        moveControlGroup('wetInfluence', body);
+        moveControlGroup('wetDrying', body);
         // Sharpen kernel scale (coarse emboss at high values)
         moveControlGroup('ridges', body);
 
