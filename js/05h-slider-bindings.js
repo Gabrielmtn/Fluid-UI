@@ -120,7 +120,6 @@
                 }
                 return hi;
             }
-            const CEIL_LIFT = 0.25;   // Gate ceiling headroom at full ignite
             const RESTORE_RATE = 4.0; // e-folds/s toward remembered strength
                                       // (~98% of the way over a 1s hold)
             const ATTACK_MS = 120;
@@ -156,17 +155,28 @@
                 dissipation: function (base) {
                     const lvl = this.level();
                     if (lvl === 0) return base;
+                    // The growth push needs the Gate cap to land against. With
+                    // Gate off nothing bounds it: measured, a 5s locked Ignite
+                    // took dye to 22.0, which Reinhard maps to 0.96 — white.
+                    // Uncapped, the memory restore below is the whole effect,
+                    // and it stops at the strength the stroke was painted at,
+                    // which is the honest ceiling when the user has not set one.
+                    if (!(config.BLOOM_CEILING > 0)) return base;
                     // Ramp from the user's own value toward the top of the
                     // scale, so a base already at the top simply stays put.
                     const target = Math.max(base, topOfScale());
                     return base + (target - base) * lvl;
                 },
-                ceiling: function (base) {
-                    const lvl = this.level();
-                    // Gate off means base 0 (uncapped), which stays 0.
-                    if (lvl <= 0 || base <= 0) return base;
-                    return base * (1 + CEIL_LIFT * lvl);
-                },
+                // NOTE: Ignite deliberately does NOT lift the Gate ceiling.
+                // It used to (25% headroom), and that was the pale-green bug:
+                // display tone-maps per-channel Reinhard, c/(1+c), so pushing
+                // magnitude past the cap walks every channel up the curve
+                // together. Measured on a saturated green, dye 1.0 -> 1.25
+                // took the screen from 33,128,66 to 37,144,76 — value +12%,
+                // saturation flat at 0.74. Brighter at equal saturation IS a
+                // pastel. Vibrance is what reads as "lit up", and that lives
+                // in the display pass (igniteVibrance in displayFrag) where it
+                // is bounded and non-destructive; the cap stays the cap.
                 // Fraction of the way to the remembered strength to travel THIS
                 // frame. Exponential approach so the pull is framerate-
                 // independent — a fixed per-frame fraction would restore twice
@@ -176,10 +186,11 @@
                     if (lvl <= 0) return 0;
                     return lvl * (1 - Math.exp(-Math.max(dt, 0) * RESTORE_RATE));
                 },
-                // Overshoot past the remembered strength, matched to the
-                // ceiling lift so the restore and the cap agree on the target
-                // instead of the clamp quietly eating the last of the boost.
-                restoreGain: function () { return 1 + CEIL_LIFT; }
+                // Restore to exactly the remembered strength — no overshoot.
+                // Overshooting only lightened (see the ceiling note above),
+                // and with Gate on the cap ate it anyway. Recovering the
+                // faded stroke is the point; looking "lit" is vibrance's job.
+                restoreGain: function () { return 1.0; }
             };
         })();
         const colorGateCheckbox = document.getElementById('colorGate');

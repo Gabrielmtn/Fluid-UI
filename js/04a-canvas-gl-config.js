@@ -335,6 +335,17 @@
                                       // them). 0 = off / bit-exact. ~0.3-0.6 = organic. See
                                       // macCorrectFrag in 05b. Console-tunable; slider TBD.
 
+            IGNITE_VIBRANCE: 0.22,    // Saturation Ignite adds at full hold (2026-07-20).
+                                      // Ignite enriches instead of brightening: raising dye
+                                      // magnitude past the Gate cap walks every channel up
+                                      // the Reinhard curve together, which lightens at
+                                      // constant saturation — the "pale light green" bug.
+                                      // Applied post-tone-map in displayFrag, so it never
+                                      // touches stored dye and a locked Ignite holds steady
+                                      // instead of ratcheting. Measured on a green: 0.45 took
+                                      // saturation 0.742 -> 0.958 (neon); 0.22 is the "turned
+                                      // up, still your colour" setting. 0 = off.
+
             DYE_MEMORY_DISS: 0.9995,  // Pigment memory half-life (2026-07-20): dye alpha
                                       // remembers the strength a stroke was PAINTED at, so
                                       // Ignite restores the original colour instead of just

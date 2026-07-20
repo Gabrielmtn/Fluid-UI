@@ -627,9 +627,9 @@
                 const _dyeDiss = window.DyeNudge
                     ? window.DyeNudge.dissipation(config.DENSITY_DISSIPATION)
                     : config.DENSITY_DISSIPATION;
-                const _dyeCeil = window.DyeNudge
-                    ? window.DyeNudge.ceiling(config.BLOOM_CEILING || 0.0)
-                    : (config.BLOOM_CEILING || 0.0);
+                // The Gate cap is the cap, Ignite included — it enriches via
+                // display-stage vibrance instead of buying headroom here.
+                const _dyeCeil = config.BLOOM_CEILING || 0.0;
                 gl.uniform1f(advectionProg.uniforms.dissipation, _dyeDiss);
                 gl.uniform1f(advectionProg.uniforms.bloomCeiling, _dyeCeil);
                 // Pigment memory + Ignite restore (see advectionFrag). memDiss
@@ -818,6 +818,14 @@
             gl.uniform1f(displayProg.uniforms.displayShading, window.displayShading || 0.0);
             gl.uniform1f(displayProg.uniforms.shadeInvert, window.displayShadingInvert || 0.0);
             gl.uniform1f(displayProg.uniforms.gateVibrance, (config.BLOOM_CEILING > 0) ? 1.0 : 0.0);
+            // Saturation added at full Ignite. 0.45 was measured at sat
+            // 0.742 -> 0.958 on a green: unmistakably lit, but nearer neon
+            // than "the original colour turned up". Console-tunable.
+            gl.uniform1f(displayProg.uniforms.igniteVibrance,
+                window.DyeNudge
+                    ? window.DyeNudge.level() *
+                      ((typeof config.IGNITE_VIBRANCE === 'number') ? config.IGNITE_VIBRANCE : 0.22)
+                    : 0.0);
             // Light Shift (unified 2026-07-18): one pass, here on the displayed
             // color. Recolors overblown/white fluid; identical with lighting on/off.
             const lightShiftOn = window.lightShift && window.lightShift.enabled && window.lightShift.colorPath && window.lightShift.colorPath.length > 0;

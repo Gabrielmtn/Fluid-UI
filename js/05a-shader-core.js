@@ -137,6 +137,7 @@
             uniform float displayShading; // 0=off, >0 = shading intensity
             uniform float shadeInvert;    // 1 = flip relief normals (clay chiaroscuro: strokes read as carved dents)
             uniform float gateVibrance;   // 1 = Gate on: re-add the saturation the Reinhard tone-map strips from HDR dye
+            uniform float igniteVibrance; // 0-1 Ignite envelope: enrich rather than lighten (see below)
             uniform vec2 texelSize;
             // â”€â”€ Light Shift (unified, 2026-07-18) â”€â”€
             // ONE implementation, run here at the END of display â€” on the
@@ -294,8 +295,19 @@
                 // HDR the dye sits (the richness the pre-Gate blowout showed in
                 // transit, but bounded â€” dye can't pass the ceiling, so neither
                 // can the boost).
-                if (gateVibrance > 0.0) {
-                    float satW = smoothstep(0.8, 2.5, hdrMax) * 0.35 * gateVibrance;
+                float satW = 0.0;
+                if (gateVibrance > 0.0) satW += smoothstep(0.8, 2.5, hdrMax) * 0.35 * gateVibrance;
+                // Ignite is VIBRANCE, not brightness. Raising dye magnitude
+                // past the cap walks every channel up the Reinhard curve
+                // together, which lightens at constant saturation — a pastel,
+                // the "pale light green" this replaced. Widening the channel
+                // spread instead reads as the original colour turned up, and
+                // it costs the cap nothing: this runs after the tone-map, is
+                // clamped to displayable range, and touches no stored state,
+                // so a locked Ignite holds a steady richer colour instead of
+                // ratcheting toward neon.
+                satW += clamp(igniteVibrance, 0.0, 1.5);
+                if (satW > 0.0) {
                     vec3 lw = vec3(0.299, 0.587, 0.114);
                     float gv = dot(color.rgb, lw);
                     color.rgb = clamp(mix(vec3(gv), color.rgb, 1.0 + satW), 0.0, 1.0);
