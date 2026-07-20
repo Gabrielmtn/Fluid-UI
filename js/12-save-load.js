@@ -561,8 +561,7 @@
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
             splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
-            splatOutDist: typeof window.splatOutDist === 'number' ? window.splatOutDist : 0.15,
-            gateMaxDensity: typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3
+            splatOutDist: typeof window.splatOutDist === 'number' ? window.splatOutDist : 0.15
         };
 
         // ── Shooting star origin ──
@@ -1011,15 +1010,9 @@
                     var soD = document.getElementById('splatOutDist');
                     if (soD) { soD.value = bs.splatOutDist; soD.dispatchEvent(new Event('input', { bubbles: true })); }
                 }
-                if (typeof bs.gateMaxDensity === 'number') {
-                    window.gateMaxDensity = bs.gateMaxDensity;
-                    var gdVal = document.querySelector('.ch-gate-density-val');
-                    if (gdVal) gdVal.textContent = bs.gateMaxDensity.toFixed(1);
-                    if (typeof window.applyGateState === 'function') {
-                        var gateChk = document.getElementById('colorGate');
-                        if (gateChk && gateChk.checked) window.applyGateState(true);
-                    }
-                }
+                // bs.gateMaxDensity (older snapshots): the Gate ceiling is a
+                // fixed constant now, so the stored level is intentionally
+                // ignored rather than migrated.
             }
         } catch(_){}
 

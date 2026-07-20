@@ -60,15 +60,128 @@
         // Gate = no overflows, ever. Two clamps, no automatic motion:
         // (1) splat shader locks new dye at the stroke's own color, so
         //     repeated paint in one spot can't stack into white;
-        // (2) advection shader caps the dominant channel at 3.0 (hue-
-        //     preserving), so a user-set density above 1.0 blooms into the
-        //     vibrant HDR zone and saturates there instead of whiting out.
+        // (2) advection shader scales the whole color down when its dominant
+        //     channel passes the ceiling (hue-preserving), so dye saturates
+        //     at the Gate level instead of whiting out.
         // Density dissipation itself stays entirely under user control.
+        // The ceiling is fixed at the paint's own full value: dye is 0-1 per
+        // channel (applyPickerColor), so 1.0 means "the color you chose, never
+        // beyond". A user-facing level was tried and removed — anything below
+        // 1.0 just reads as a dimmer on your own strokes, and anything above
+        // is inert for ordinary painting (measured: ceilings 1.0 / 3.0 / 19.0
+        // all left a white stroke at dye 0.954). Transient excursions past the
+        // cap belong to Ignite, not to a standing level.
+        const GATE_CEILING = 1.0;
         function applyGateState(on) {
             config.COLOR_GATE = on;
-            config.BLOOM_CEILING = on ? (typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3.0) : 0;
+            config.BLOOM_CEILING = on ? GATE_CEILING : 0;
         }
         window.applyGateState = applyGateState;
+        // ── Ignite: momentary density nudge ─────────────────────────────
+        // Never writes config.DENSITY_DISSIPATION — the decay rate is the
+        // user's setting and stays theirs. Instead the update loop asks for
+        // an EFFECTIVE dissipation each frame, derived from whatever the
+        // slider currently says, so the nudge rides on top of ANY rate and
+        // lands back on it exactly when released. That matters because the
+        // point of this is someone parked at Density 1.0 (no decay) who wants
+        // a momentary lift without giving up the lock.
+        //   Ignite does three things at once: pulls dye back toward the
+        //   strength it was PAINTED at (pigment memory in the dye's alpha —
+        //   see advectionFrag), interpolates the rate up past 1.0 so it
+        //   keeps climbing, and lifts the Gate ceiling to make room — the
+        //   one sanctioned excursion past "the color you picked, never
+        //   beyond". The memory pull is what makes this ignite the ORIGINAL
+        //   colour rather than merely brighten a washed-out remnant. Release
+        //   eases the ceiling back, which scales the swollen dye home.
+        // Click = a 1s pulse; hold = sustained; drag onto the slide-out lock
+        // = sustained until explicitly released (see the Colour channel UI).
+        //
+        // A companion "Cool" was removed 2026-07-20: the Density Sustain
+        // scale is wildly asymmetric in EFFECT, since decay compounds 60x a
+        // second. pow(0.85, 60) is 6e-5, so a one-second hold anywhere near
+        // the floor took dye 1.0 -> 0.62 -> 0.07 -> 0 in under half a second.
+        // Every setting gentle enough not to erase was too weak to read as a
+        // deliberate act. There is no useful window; do not re-add it as a
+        // rate nudge.
+        window.DyeNudge = (function () {
+            // Ignite drives the rate to the TOP of the Density Sustain
+            // slider's own scale, read from the control so the two never
+            // drift apart; release returns to whatever the user had set.
+            const FALLBACK_HI = 1.005;
+            let hi = FALLBACK_HI, boundsRead = false;
+            function topOfScale() {
+                if (!boundsRead) {
+                    const el = document.getElementById('densityDissipation');
+                    if (el) {
+                        const b = parseFloat(el.max);
+                        if (isFinite(b)) hi = b;
+                        boundsRead = true;
+                    }
+                }
+                return hi;
+            }
+            const CEIL_LIFT = 0.25;   // Gate ceiling headroom at full ignite
+            const RESTORE_RATE = 4.0; // e-folds/s toward remembered strength
+                                      // (~98% of the way over a 1s hold)
+            const ATTACK_MS = 120;
+            const RELEASE_MS = 300;
+            const MIN_MS = 1000;      // a click still gets a full second
+            let on = false;
+            let startMs = 0;
+            let releaseAt = Infinity; // sustain until this, then ramp out
+            function envelope() {
+                if (!on) return 0;
+                const now = performance.now();
+                if (now < releaseAt) return Math.min(1, (now - startMs) / ATTACK_MS);
+                const t = (now - releaseAt) / RELEASE_MS;
+                if (t >= 1) { on = false; return 0; }
+                return 1 - t;
+            }
+            return {
+                press: function () {
+                    // Re-pressing mid-release restarts cleanly.
+                    on = true;
+                    startMs = performance.now();
+                    releaseAt = Infinity;
+                },
+                release: function () {
+                    if (!on || releaseAt !== Infinity) return;
+                    releaseAt = Math.max(performance.now(), startMs + MIN_MS);
+                },
+                // 0..1, for UI state as much as for the sim.
+                level: function () { return envelope(); },
+                active: function () { return on; },
+                // Every derivation is continuous at level 0, so an idle nudge
+                // is bit-identical to no nudge at all.
+                dissipation: function (base) {
+                    const lvl = this.level();
+                    if (lvl === 0) return base;
+                    // Ramp from the user's own value toward the top of the
+                    // scale, so a base already at the top simply stays put.
+                    const target = Math.max(base, topOfScale());
+                    return base + (target - base) * lvl;
+                },
+                ceiling: function (base) {
+                    const lvl = this.level();
+                    // Gate off means base 0 (uncapped), which stays 0.
+                    if (lvl <= 0 || base <= 0) return base;
+                    return base * (1 + CEIL_LIFT * lvl);
+                },
+                // Fraction of the way to the remembered strength to travel THIS
+                // frame. Exponential approach so the pull is framerate-
+                // independent — a fixed per-frame fraction would restore twice
+                // as fast at 120fps as at 60.
+                restore: function (dt) {
+                    const lvl = this.level();
+                    if (lvl <= 0) return 0;
+                    return lvl * (1 - Math.exp(-Math.max(dt, 0) * RESTORE_RATE));
+                },
+                // Overshoot past the remembered strength, matched to the
+                // ceiling lift so the restore and the cap agree on the target
+                // instead of the clamp quietly eating the last of the boost.
+                restoreGain: function () { return 1 + CEIL_LIFT; }
+            };
+        })();
         const colorGateCheckbox = document.getElementById('colorGate');
         if (colorGateCheckbox) {
             colorGateCheckbox.addEventListener('change', (e) => {

@@ -150,6 +150,14 @@
                         shape = mix(shape, stamp, stampNoise);
                     }
                     vec3 result;
+                    // Pigment memory: what strength was this dye laid down at?
+                    // Tracked the same way the colour itself is, so the two
+                    // never disagree — Gate CONVERGES it (paint covers, so a
+                    // dim stroke over a bright one must be remembered dim, or
+                    // Ignite would resurrect the colour underneath), additive
+                    // keeps the running peak.
+                    float baseMem = texture(uTarget, vUv).w;
+                    float newMem;
                     if (gateColor == 1) {
                         // Gate: paint COVERS — dye converges to the stroke's own
                         // color instead of accumulating. A per-channel clamp was
@@ -161,10 +169,12 @@
                         // dye, while soft gaussian edges still blend.
                         float w = clamp(shape, 0.0, 1.0) * obsBlock;
                         result = mix(base, color, w);
+                        newMem = mix(baseMem, max(color.r, max(color.g, color.b)), w);
                     } else {
                         result = base + shape * color * obsBlock;
+                        newMem = max(baseMem, max(result.r, max(result.g, result.b)));
                     }
-                    fragColor = vec4(result, 1.0);
+                    fragColor = vec4(result, newMem);
                 }
             }
         `;
@@ -386,6 +396,19 @@
             uniform float hfFloorDye; // M2: dye Nyquist-removal strength (0 = off)
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
+            // ── Pigment memory (dye alpha) ──────────────────────────────
+            // Dye alpha used to be a vestigial copy of the decay — written
+            // 1.0 by every splat, then multiplied down alongside rgb, and
+            // read by nothing that needed it. It now carries the strength
+            // this dye was PAINTED at, which is the one thing multiplicative
+            // decay destroys: decay scales all channels alike, so hue
+            // survives but magnitude is gone, and a faded bright red is
+            // indistinguishable from a fresh dark red. Ignite needs that
+            // distinction to restore the original color rather than merely
+            // amplify a remnant.
+            uniform float memDiss;      // memory's own (much slower) decay base
+            uniform float uRestore;     // 0..1: how far toward remembered strength this frame
+            uniform float uRestoreGain; // overshoot past it — the "and brighter"
             uniform float edgeAbsorb; // >0: absorbing borders — fluid vents off-canvas instead of bouncing
             uniform int isDensity;
             uniform int hasObstacle;
@@ -471,6 +494,15 @@
                         effectiveDecay *= max(1.0 - boostRate, 0.95);
                     }
                     color = effectiveDecay * source;
+                    // Memory rides its own clock. Everything above reassigns
+                    // the whole vec4 from source, so this must come AFTER the
+                    // last such write or the slow decay gets clobbered by the
+                    // fast one. Still batched on decayDt, so it inherits the
+                    // same fp16-rounding protection and stays an exact no-op
+                    // on skip frames. The drains further down (obstacle,
+                    // cleanup, edge) DO apply to alpha on purpose: memory of
+                    // dye that is being removed should go with it.
+                    color.a = source.a * pow(memDiss, decayDt * 60.0);
                     // M2 dye spectral floor: remove a fraction of the dye's
                     // Laplacian (Nyquist) component where the fluid is MOVING.
                     // Bilinear transport physically cannot sustain per-texel
@@ -497,8 +529,29 @@
                         float transportTexels = length(disp / srcTexelSize);
                         float mGate = smoothstep(0.03, 0.3, transportTexels);
                         float kD = min(hfFloorDye * mGate * (dt * 60.0), 0.85);
-                        color -= hfc * kD;
-                        color = max(color, 0.0);
+                        // RGB only: subtracting a Laplacian from the memory
+                        // channel would carve contrast into it, and memory has
+                        // no visible speckle to remove — it is a scalar the
+                        // dye carries, not something the eye ever sees.
+                        color.rgb -= hfc.rgb * kD;
+                        color.rgb = max(color.rgb, 0.0);
+                    }
+                    // ── Ignite: restore the color it was PAINTED at ────────
+                    // The multiplier is memory/current, so it is exactly 1.0
+                    // on fresh paint (a true no-op — you cannot over-ignite a
+                    // full-strength stroke) and grows as dye fades. That is
+                    // the whole point: scaling up a faded remnant just makes a
+                    // dim colour brighter-dim, whereas this lands back on the
+                    // original and uRestoreGain carries it past.
+                    if (uRestore > 0.0) {
+                        float mxNow = max(color.r, max(color.g, color.b));
+                        float want = color.a * uRestoreGain;
+                        // 1e-5 guard: fully-drained dye has no ratios left to
+                        // renormalize, and reviving it would resurrect texels
+                        // the cleanup below deliberately zeroed.
+                        if (mxNow > 1e-5 && want > mxNow) {
+                            color.rgb *= mix(1.0, want / mxNow, uRestore);
+                        }
                     }
                     // Bloom ceiling (Gate breathing): the up-phase (dissipation
                     // > 1) grows dye into HDR; without a cap it eventually
@@ -983,7 +1036,11 @@
                 // Semi-Lagrangian gather: sample from the OUTWARD side so dye
                 // creeps toward the magnet. Pure resample — bounded, no energy.
                 vec2 src = clamp(vUv - transport * dt, 0.0, 1.0);
-                fragColor = vec4(texture(uDensity, src).rgb, 1.0);
+                // Carry alpha through the gather: it is pigment memory now, and
+                // writing a constant here would erase it everywhere the
+                // ferrofluid field runs (and read as full-strength memory over
+                // the whole canvas, so Ignite would blow the pool out).
+                fragColor = texture(uDensity, src);
             }
         `;
         // M2 spectral floor (2026-07-17): the sim's small-scale energy sink.
@@ -1345,9 +1402,15 @@
             uniform sampler2D uSketch;
             uniform float gain;
             void main() {
-                vec3 dye = texture(uDye, vUv).rgb;
+                vec4 dye = texture(uDye, vUv);
                 vec4 s = texture(uSketch, vUv);
-                fragColor = vec4(dye + s.rgb * gain, 1.0);
+                vec3 lit = dye.rgb + s.rgb * gain;
+                // Poured-in sketch is new paint, so it gets remembered at the
+                // strength it lands at — otherwise Ignite Sketch would deposit
+                // dye with no memory and the Colour channel's Ignite could
+                // never revive it. Preserves existing memory underneath.
+                float mem = max(dye.a, max(lit.r, max(lit.g, lit.b)));
+                fragColor = vec4(lit, mem);
             }
         `;
         // ─── D2 bridge: Capture — freeze the fluid dye into the sketch ──

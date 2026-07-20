@@ -621,15 +621,37 @@
                 gl.uniform1i(advectionProg.uniforms.uObstacle, 2);
                 gl.uniform1i(advectionProg.uniforms.uWetness, 4);              // P15-1
                 gl.uniform1f(advectionProg.uniforms.wetInfluence, _wetInfluence);
-                gl.uniform1f(advectionProg.uniforms.dissipation, config.DENSITY_DISSIPATION);
-                gl.uniform1f(advectionProg.uniforms.bloomCeiling, config.BLOOM_CEILING || 0.0);
+                // Ignite rides on top of the user's rate and ceiling
+                // without ever writing them (see window.DyeNudge in 05h).
+                // Idle returns the base values unchanged — exact no-op.
+                const _dyeDiss = window.DyeNudge
+                    ? window.DyeNudge.dissipation(config.DENSITY_DISSIPATION)
+                    : config.DENSITY_DISSIPATION;
+                const _dyeCeil = window.DyeNudge
+                    ? window.DyeNudge.ceiling(config.BLOOM_CEILING || 0.0)
+                    : (config.BLOOM_CEILING || 0.0);
+                gl.uniform1f(advectionProg.uniforms.dissipation, _dyeDiss);
+                gl.uniform1f(advectionProg.uniforms.bloomCeiling, _dyeCeil);
+                // Pigment memory + Ignite restore (see advectionFrag). memDiss
+                // 1.0 would make memory immortal; the default half-life lets
+                // work you deliberately let go stay gone.
+                gl.uniform1f(advectionProg.uniforms.memDiss,
+                    (typeof config.DYE_MEMORY_DISS === 'number') ? config.DYE_MEMORY_DISS : 0.9995);
+                gl.uniform1f(advectionProg.uniforms.uRestore,
+                    window.DyeNudge ? window.DyeNudge.restore(dt) : 0.0);
+                gl.uniform1f(advectionProg.uniforms.uRestoreGain,
+                    window.DyeNudge ? window.DyeNudge.restoreGain() : 1.0);
                 // M2 dye floor (motion-gated Nyquist removal — see 05b)
                 gl.uniform1f(advectionProg.uniforms.hfFloorDye, config.HF_FLOOR_DYE || 0.0);
+                // Reset the decay-debt accumulator on SLIDER changes only: the
+                // nudge ramps the effective rate every frame, and resetting on
+                // that would zero the debt before it ever clears the fp16
+                // threshold, so slow presets would stop decaying mid-nudge.
                 if (config.DENSITY_DISSIPATION !== lastDyeDiss) {
                     lastDyeDiss = config.DENSITY_DISSIPATION;
                     dyeDecayAccum = 0;
                 }
-                const _dyeDecay = computeDecayDt(config.DENSITY_DISSIPATION, dyeDecayAccum, dt);
+                const _dyeDecay = computeDecayDt(_dyeDiss, dyeDecayAccum, dt);
                 dyeDecayAccum = _dyeDecay.accum;
                 gl.uniform1f(advectionProg.uniforms.decayDt, _dyeDecay.decayDt);
                 // Explicit freeze flag: the shader must distinguish freeze mode

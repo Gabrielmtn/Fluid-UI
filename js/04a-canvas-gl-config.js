@@ -335,6 +335,17 @@
                                       // them). 0 = off / bit-exact. ~0.3-0.6 = organic. See
                                       // macCorrectFrag in 05b. Console-tunable; slider TBD.
 
+            DYE_MEMORY_DISS: 0.9995,  // Pigment memory half-life (2026-07-20): dye alpha
+                                      // remembers the strength a stroke was PAINTED at, so
+                                      // Ignite restores the original colour instead of just
+                                      // amplifying a faded remnant (multiplicative decay
+                                      // keeps hue but destroys magnitude). Decays on its own
+                                      // slow clock: 0.9995 ≈ a 23s half-life, so recent work
+                                      // can be re-ignited while anything you deliberately let
+                                      // fade stays gone. 1.0 = memory never expires. Memory is
+                                      // still drained in step with the dye by the obstacle,
+                                      // cleanup and edge drains. See advectionFrag in 05b.
+
             VEL_SOURCE_GATE: true,    // M1 (2026-07-17): taper the energy SOURCES (growth
                                       // amplification + vorticity confinement) to neutral as
                                       // speed approaches VELOCITY_CAP, so pockets settle below

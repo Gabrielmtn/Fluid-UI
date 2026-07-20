@@ -471,74 +471,114 @@
                 gateEl.checked = !gateEl.checked;
                 gateEl.dispatchEvent(new Event('change', { bubbles: true }));
                 gateBtn.classList.toggle('active', gateEl.checked);
-                gateDensityWrap.style.display = gateEl.checked ? 'flex' : 'none';
             });
             gateEl.addEventListener('change', function () {
                 gateBtn.classList.toggle('active', gateEl.checked);
-                gateDensityWrap.style.display = gateEl.checked ? 'flex' : 'none';
             });
             ch.appendChild(gateEl);
             toggleRow.appendChild(gateBtn);
-
-            // Gate max density incrementer (BLOOM_CEILING) — compact ±0.1 stepper
-            var gateDensityWrap = document.createElement('div');
-            gateDensityWrap.className = 'ch-gate-density';
-            gateDensityWrap.style.cssText = 'display:' + (gateEl.checked ? 'flex' : 'none') + ';align-items:center;justify-content:center;gap:2px;height:16px;flex:0 0 auto;box-sizing:border-box;';
-
-            var GATE_MIN = 1.0, GATE_MAX = 6.0, GATE_STEP = 0.1;
-            var gateCurVal = typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3;
-
-            var gateDownBtn = document.createElement('button');
-            gateDownBtn.type = 'button';
-            gateDownBtn.textContent = '−';
-            gateDownBtn.title = 'Decrease max density';
-            gateDownBtn.style.cssText = 'width:16px;height:16px;padding:0;border:1px solid rgba(255,255,255,0.15);border-radius:3px;background:rgba(0,0,0,0.3);color:#c9d1d9;font-size:12px;line-height:1;cursor:pointer;';
-
-            var gateValSpan = document.createElement('span');
-            gateValSpan.className = 'ch-gate-density-val';
-            gateValSpan.style.cssText = 'font-size:10px;font-family:monospace;color:#4fc3f7;min-width:24px;text-align:center;';
-            gateValSpan.textContent = gateCurVal.toFixed(1);
-
-            var gateUpBtn = document.createElement('button');
-            gateUpBtn.type = 'button';
-            gateUpBtn.textContent = '+';
-            gateUpBtn.title = 'Increase max density';
-            gateUpBtn.style.cssText = 'width:16px;height:16px;padding:0;border:1px solid rgba(255,255,255,0.15);border-radius:3px;background:rgba(0,0,0,0.3);color:#c9d1d9;font-size:12px;line-height:1;cursor:pointer;';
-
-            function updateGateDensity(v) {
-                v = Math.round(v * 10) / 10;
-                v = Math.max(GATE_MIN, Math.min(GATE_MAX, v));
-                window.gateMaxDensity = v;
-                gateCurVal = v;
-                gateValSpan.textContent = v.toFixed(1);
-                if (typeof window.applyGateState === 'function' && gateEl.checked) {
-                    window.applyGateState(true);
-                }
-                try { if (window.settingsManager) window.settingsManager.set('gate.maxDensity', v); } catch (_) {}
-            }
-
-            gateDownBtn.addEventListener('click', function () { updateGateDensity((window.gateMaxDensity || gateCurVal) - GATE_STEP); });
-            gateUpBtn.addEventListener('click', function () { updateGateDensity((window.gateMaxDensity || gateCurVal) + GATE_STEP); });
-
-            // Load saved value
-            try {
-                if (window.settingsManager) {
-                    var savedGD = window.settingsManager.get('gate.maxDensity');
-                    if (typeof savedGD === 'number') {
-                        gateCurVal = Math.max(GATE_MIN, Math.min(GATE_MAX, savedGD));
-                        window.gateMaxDensity = gateCurVal;
-                        gateValSpan.textContent = gateCurVal.toFixed(1);
-                    }
-                }
-            } catch (_) {}
-
-            gateDensityWrap.appendChild(gateDownBtn);
-            gateDensityWrap.appendChild(gateValSpan);
-            gateDensityWrap.appendChild(gateUpBtn);
-            toggleRow.appendChild(gateDensityWrap);
         }
 
         ch.appendChild(toggleRow);
+
+        // Ignite — momentary density nudge (window.DyeNudge, 05h). Not gated
+        // on the Gate toggle: its reason to exist is someone parked at
+        // Density 1.0 who wants a lift without touching the decay rate, and
+        // that is true with or without the cap on.
+        //
+        // Hold-to-lock, the voice-memo gesture: pressing slides a padlock out
+        // to the right, and releasing ON it latches Ignite on instead of
+        // ending the hold. Releasing anywhere else is a normal release. The
+        // long boosts this control is for are exactly the ones you do not
+        // want to hold a mouse button down through.
+        var nudgeRow = document.createElement('div');
+        nudgeRow.className = 'ch-toggle-row ch-nudge-row';
+
+        var igniteBtnColor = document.createElement('button');
+        igniteBtnColor.type = 'button';
+        igniteBtnColor.className = 'ch-text-toggle ch-nudge-btn';
+        igniteBtnColor.textContent = '🔥 Ignite';
+        igniteBtnColor.title = 'Hold to perk the fluid up — faded dye is pulled back to the colour it was '
+            + 'painted at, and past the Gate cap. Slide right onto the lock to keep it on. '
+            + 'Your density decay setting is untouched.';
+
+        var igniteLock = document.createElement('div');
+        igniteLock.className = 'ch-ignite-lock';
+        igniteLock.textContent = '🔒';
+        igniteLock.title = 'Release here to lock Ignite on';
+
+        var igniteLocked = false, lockArmed = false, ignitePid = null;
+
+        function igniteEngage() {
+            if (window.DyeNudge) window.DyeNudge.press();
+            igniteBtnColor.classList.add('active');
+        }
+        function igniteStop() {
+            igniteLocked = false;
+            if (window.DyeNudge) window.DyeNudge.release();
+            igniteBtnColor.classList.remove('active', 'locked');
+            nudgeRow.classList.remove('holding', 'armed');
+            igniteLock.classList.remove('armed');
+        }
+        function setArmed(v) {
+            if (v === lockArmed) return;
+            lockArmed = v;
+            igniteLock.classList.toggle('armed', v);
+            nudgeRow.classList.toggle('armed', v);
+        }
+
+        igniteBtnColor.addEventListener('pointerdown', function (e) {
+            // While locked, a press is the way out — no new hold begins.
+            if (igniteLocked) { igniteStop(); return; }
+            e.preventDefault();
+            ignitePid = e.pointerId;
+            // Capture so the drag keeps reporting after the pointer leaves the
+            // button; without it the lock target is unreachable by drag.
+            try { igniteBtnColor.setPointerCapture(ignitePid); } catch (_) {}
+            setArmed(false);
+            nudgeRow.classList.add('holding');
+            igniteEngage();
+        });
+
+        igniteBtnColor.addEventListener('pointermove', function (e) {
+            if (ignitePid === null || igniteLocked) return;
+            var r = igniteLock.getBoundingClientRect();
+            // Generous vertical slop: the row is 16px tall and the gesture is
+            // horizontal, so drifting off the top or bottom mid-slide should
+            // not disarm.
+            setArmed(e.clientX >= r.left && e.clientX <= r.right + 12
+                  && e.clientY >= r.top - 14 && e.clientY <= r.bottom + 14);
+        });
+
+        function igniteRelease() {
+            if (ignitePid === null) return;
+            try { igniteBtnColor.releasePointerCapture(ignitePid); } catch (_) {}
+            ignitePid = null;
+            if (lockArmed) {
+                // Latch: DyeNudge sustains for as long as release() is never
+                // called, so locking is simply declining to release.
+                igniteLocked = true;
+                setArmed(false);
+                igniteBtnColor.classList.add('locked');
+                nudgeRow.classList.add('holding');
+                return;
+            }
+            igniteStop();
+        }
+        igniteBtnColor.addEventListener('pointerup', igniteRelease);
+        igniteBtnColor.addEventListener('pointercancel', igniteRelease);
+        // The padlock is also a click target once latched, so the way out is
+        // wherever the eye already is.
+        igniteLock.addEventListener('pointerdown', function (e) {
+            if (!igniteLocked) return;
+            e.preventDefault();
+            e.stopPropagation();
+            igniteStop();
+        });
+
+        nudgeRow.appendChild(igniteBtnColor);
+        nudgeRow.appendChild(igniteLock);
+        ch.appendChild(nudgeRow);
 
         return ch;
     }
@@ -2328,7 +2368,10 @@
         bridgeRow.className = 'brush-mode-row';
         var igniteBtn = document.createElement('button');
         igniteBtn.type = 'button'; igniteBtn.className = 'brush-mode-btn';
-        igniteBtn.textContent = '🔥 Ignite';
+        // "Ignite Sketch", not "Ignite": the Color channel's Ignite is a
+        // momentary density nudge on existing dye. This one is the D2 raster
+        // bridge and does nothing at all when the sketch layer is empty.
+        igniteBtn.textContent = '🔥 Ignite Sketch';
         igniteBtn.title = 'Pour the sketch into the fluid as dye — the sim takes it from there (sketch is untouched)';
         igniteBtn.addEventListener('click', function () {
             if (typeof window.__igniteSketch === 'function') window.__igniteSketch(1);

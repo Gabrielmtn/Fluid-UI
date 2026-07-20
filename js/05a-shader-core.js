@@ -461,7 +461,12 @@
                     float alpha = mix(1.0, max(intensity, skA), backgroundTransparency);
                     fragColor = vec4(color.rgb, alpha);
                 } else {
-                    fragColor = color;
+                    // Opaque, explicitly. Passing the sampled color straight
+                    // through leaked the dye texture's alpha to the canvas —
+                    // harmless while that was a decayed 1.0, but it is pigment
+                    // memory now and would punch semi-transparent holes into
+                    // stills, video export and transparent mode.
+                    fragColor = vec4(color.rgb, 1.0);
                 }
             }
         `;
@@ -620,7 +625,13 @@
             void main() {
                 vec4 color = texture(uTexture, vUv);
                 vec2 vel = texture(uVelocity, vUv).xy;
-                if (color.a < 0.01) {
+                // Skip lighting where there is nothing lit. This used to test
+                // color.a, which tracked the dye's decay closely enough to
+                // stand in for "empty" — but alpha is pigment memory now and
+                // outlives the visible dye by design, so the test would stop
+                // firing on faded areas and light near-black texels. The
+                // brightness it actually meant to check is in rgb.
+                if (max(color.r, max(color.g, color.b)) < 0.01) {
                     fragColor = color;
                     return;
                 }
