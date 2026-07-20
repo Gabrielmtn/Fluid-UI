@@ -715,11 +715,17 @@ class DepthEstimator {
             rotation: opts.rotation || 0,
             isCollision: true,
             collisionMode: 'block',   // block | slow | deflect
-            // 1.0 = fully rigid (2026-07-15): the strength response is now a
-            // full-range cubic — the old curve saturated at 0.5, so the old
-            // 0.7 default meant "solid". New layers start solid; the slider's
-            // lower range is graded permeability (leaky/porous walls).
-            collisionStrength: 1.0,
+            // 0.9, not 1.0 (2026-07-20). The strength response is a full-range
+            // cubic, so 1.0 is "as rigid as the solver allows" — and at that
+            // rigidity MULTIPLE colliders resonate: energy builds between them,
+            // releases, and rebuilds on a cycle, shredding dye into black
+            // fractal voids around each one. Backing off one notch leaves walls
+            // that still read as solid but bleed enough to break the cavity.
+            // This is a MITIGATION, not the fix: the underlying wall-noise
+            // injection is SIM-M2b (colliders inject ~3-4x grid-scale velocity
+            // noise on both solvers, and MG scales it per V-cycle). Raising
+            // this back to 1.0 will bring the resonance back.
+            collisionStrength: 0.9,
             collisionSource: opts.source ? { kind: opts.source.kind, id: opts.source.id } : null,
             mask: {
                 enabled: true,
