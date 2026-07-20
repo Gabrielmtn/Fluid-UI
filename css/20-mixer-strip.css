@@ -325,6 +325,80 @@ body > .controls {
     height: 16px;
 }
 
+/* Ignite: momentary, so it reads warm while held rather than borrowing the
+   cyan "this setting is on" glow of the toggles above. The padlock slides
+   out from under the button's right edge on press (voice-memo gesture) —
+   absolutely positioned so appearing costs the button no width and the row
+   never reflows mid-gesture. */
+.ch-nudge-row {
+    margin-top: 3px;
+    position: relative;
+}
+.ch-nudge-btn {
+    letter-spacing: 0.3px;
+    touch-action: none;   /* hold-to-nudge must not turn into a scroll gesture */
+    transition: padding-right 0.16s ease;
+}
+.ch-nudge-btn.active {
+    color: #ffb066;
+    text-shadow: 0 0 6px rgba(255, 150, 60, 0.55), 0 0 14px rgba(255, 150, 60, 0.25);
+    background: rgba(255, 150, 60, 0.1);
+    border-color: rgba(255, 150, 60, 0.28);
+}
+/* Latched: steady rather than pulsing, so "still on" is unmistakable */
+.ch-nudge-btn.locked {
+    color: #ffd08a;
+    border-color: rgba(255, 180, 90, 0.55);
+    background: rgba(255, 150, 60, 0.18);
+}
+
+.ch-ignite-lock {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 16px;
+    width: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    line-height: 1;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.45);
+    /* Tucked under the button's right edge until the hold starts */
+    transform: translateX(-6px) scale(0.8);
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    transition: transform 0.16s ease, opacity 0.16s ease,
+                background 0.12s, border-color 0.12s;
+}
+.ch-nudge-row.holding .ch-ignite-lock {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+}
+/* Only clickable once latched — mid-drag the button holds pointer capture */
+.ch-nudge-btn.locked ~ .ch-ignite-lock {
+    pointer-events: auto;
+    cursor: pointer;
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    border-color: rgba(255, 180, 90, 0.5);
+    background: rgba(255, 150, 60, 0.22);
+}
+/* Drag has reached the lock: releasing now latches */
+.ch-ignite-lock.armed {
+    background: rgba(255, 150, 60, 0.85);
+    border-color: rgba(255, 200, 140, 0.9);
+    box-shadow: 0 0 8px rgba(255, 150, 60, 0.55);
+    transform: translateX(0) scale(1.15);
+}
+/* Keep the label clear of the padlock while it is out */
+.ch-nudge-row.holding .ch-nudge-btn {
+    padding-right: 24px;
+}
+
 /* Text-only toggle button (lights up when active) */
 .ch-text-toggle {
     all: unset;

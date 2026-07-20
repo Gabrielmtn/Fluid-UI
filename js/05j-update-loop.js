@@ -19,6 +19,8 @@
         // fade-to-zero path and batching it would change preset feel.
         let dyeDecayAccum = 0, velDecayAccum = 0;
         let lastDyeDiss = -1, lastVelDiss = -1;
+        // P15-1 wetness drying accumulator (batched like the decay debt below).
+        let wetDryAccum = 0, lastWetDrying = -1;
         // Reusable upload buffer for the attractor forcing field (6.2):
         // 12 attractors × vec4, zero-alloc per frame.
         const attractorFieldScratch = new Float32Array(48);
@@ -33,6 +35,17 @@
             const cand = Math.pow(dissipation, accum * 60.0);
             if (1.0 - cand >= 0.002 || accum >= 1.0) return { decayDt: accum, accum: 0 };
             return { decayDt: 0, accum };
+        }
+        // P15-1 wetness half-life drying, batched the same way: a per-frame
+        // pow(0.5, dt/halfLife) multiply rounds back to 1.0 in fp16 at tiny dt,
+        // so accumulate the debt and hand over a real multiplier only once it
+        // clears the ~0.002 fp16 threshold. dryMul==1.0 is an exact no-op frame.
+        function computeDryMul(halfLifeSec, accum, dt) {
+            if (!(halfLifeSec > 0)) return { dryMul: 1.0, accum: 0 };
+            accum = Math.min(accum + dt, 1.0);
+            const cand = Math.pow(0.5, accum / halfLifeSec);
+            if (1.0 - cand >= 0.002 || accum >= 1.0) return { dryMul: cand, accum: 0 };
+            return { dryMul: 1.0, accum };
         }
         function update() {
             const nowMs = performance.now();
@@ -433,6 +446,10 @@
                 // output IS the velocity texture, so any offset here would
                 // be written back and compound (dye-only by design).
                 gl.uniform1f(advectionProg.uniforms.swirl, 0.0);
+                // P15-1: wetness never scales velocity self-advection — 0 makes
+                // dyeMobility() return an exact 1.0, so this pass is bit-identical
+                // to the pre-wetness sim (and uWetness is never sampled here).
+                gl.uniform1f(advectionProg.uniforms.wetInfluence, 0.0);
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
                 gl.uniform1i(advectionProg.uniforms.uSource, 0);
                 gl.uniform1f(advectionProg.uniforms.dissipation, config.VELOCITY_DISSIPATION);
@@ -472,6 +489,45 @@
                     blit(velocity.write.fbo);
                     velocity.swap();
                 }
+                // 7c. P15-1 wetness advect + dry. The wetness map rides the
+                // just-projected velocity (semi-Lagrangian, full mobility) and
+                // dries by a batched half-life. Skipped ENTIRELY when the
+                // feature is off (WET_INFLUENCE<=0) → zero cost; the dye passes
+                // then set wetInfluence=0 so dyeMobility() is a bit-exact 1.0.
+                const _wetInfluence = (typeof config.WET_INFLUENCE === 'number' && config.WET_INFLUENCE > 0)
+                    ? Math.min(config.WET_INFLUENCE, 1.0) : 0.0;
+                if (_wetInfluence > 0) {
+                    const _halfLife = (typeof config.WET_DRYING === 'number' && config.WET_DRYING > 0) ? config.WET_DRYING : 3.0;
+                    if (_halfLife !== lastWetDrying) { lastWetDrying = _halfLife; wetDryAccum = 0; }
+                    const _dry = computeDryMul(_halfLife, wetDryAccum, dt);
+                    wetDryAccum = _dry.accum;
+                    wetnessAdvectProg.bind();
+                    gl.viewport(0, 0, simTexWidth, simTexHeight);
+                    gl.uniform2f(wetnessAdvectProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                    gl.uniform2f(wetnessAdvectProg.uniforms.srcTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
+                    gl.uniform1f(wetnessAdvectProg.uniforms.dt, dt);
+                    gl.uniform1f(wetnessAdvectProg.uniforms.dryMul, _dry.dryMul);
+                    // The field itself rides the raw flow: swirl off, and
+                    // wetInfluence=0 so dyeMobility()==1 (no wetness self-read).
+                    gl.uniform1f(wetnessAdvectProg.uniforms.swirl, 0.0);
+                    gl.uniform1f(wetnessAdvectProg.uniforms.swirlTime, 0.0);
+                    gl.uniform1f(wetnessAdvectProg.uniforms.wetInfluence, 0.0);
+                    gl.uniform1i(wetnessAdvectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                    gl.uniform1f(wetnessAdvectProg.uniforms.uObsMax, _obsMax);
+                    gl.uniform1i(wetnessAdvectProg.uniforms.uVelocity, 0);
+                    gl.uniform1i(wetnessAdvectProg.uniforms.uSource, 1);
+                    gl.uniform1i(wetnessAdvectProg.uniforms.uObstacle, 2);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, wetness.read.texture);
+                    if (obsActive) {
+                        gl.activeTexture(gl.TEXTURE2);
+                        gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    }
+                    blit(wetness.write.fbo);
+                    wetness.swap();
+                }
                 // 8. Advect density (dye) using the projected velocity
                 // (obsActive computed above, before the projection)
                 // [MacCormack] Two extra dye-res passes before the main
@@ -493,6 +549,13 @@
                 const _swirl = config.SWIRL || 0.0;
                 const _swirlT = (nowMs % 3600000) / 1000;
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                // P15-1: bind the (freshly advected) wetness field to unit 4 for
+                // all three dye passes. Bound unconditionally — dyeMobility()
+                // statically references uWetness, so WebGL wants a complete
+                // texture there at draw time even though wetInfluence=0 skips the
+                // sample when the feature is off. The wetness FBO always exists.
+                gl.activeTexture(gl.TEXTURE4);
+                gl.bindTexture(gl.TEXTURE_2D, wetness.read.texture);
                 if (macActive) {
                     macAdvectProg.bind();
                     gl.uniform2f(macAdvectProg.uniforms.texelSize, 1.0, 1.0);
@@ -507,6 +570,8 @@
                     gl.uniform1i(macAdvectProg.uniforms.uObstacle, 2);
                     gl.uniform1i(macAdvectProg.uniforms.uVelocity, 0);
                     gl.uniform1i(macAdvectProg.uniforms.uSource, 1);
+                    gl.uniform1i(macAdvectProg.uniforms.uWetness, 4);          // P15-1
+                    gl.uniform1f(macAdvectProg.uniforms.wetInfluence, _wetInfluence);
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                     gl.activeTexture(gl.TEXTURE1);
@@ -528,6 +593,8 @@
                     gl.uniform1i(macCorrectProg.uniforms.uSource, 1);
                     gl.uniform1i(macCorrectProg.uniforms.uForward, 2);
                     gl.uniform1i(macCorrectProg.uniforms.uObstacle, 3);
+                    gl.uniform1i(macCorrectProg.uniforms.uWetness, 4);         // P15-1
+                    gl.uniform1f(macCorrectProg.uniforms.wetInfluence, _wetInfluence);
                     // De-band taper (organic no-curl fix — see macCorrectFrag)
                     gl.uniform1f(macCorrectProg.uniforms.deband, config.DEBAND || 0.0);
                     gl.activeTexture(gl.TEXTURE2);
@@ -552,15 +619,39 @@
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
                 gl.uniform1i(advectionProg.uniforms.uSource, 1);
                 gl.uniform1i(advectionProg.uniforms.uObstacle, 2);
-                gl.uniform1f(advectionProg.uniforms.dissipation, config.DENSITY_DISSIPATION);
-                gl.uniform1f(advectionProg.uniforms.bloomCeiling, config.BLOOM_CEILING || 0.0);
+                gl.uniform1i(advectionProg.uniforms.uWetness, 4);              // P15-1
+                gl.uniform1f(advectionProg.uniforms.wetInfluence, _wetInfluence);
+                // Ignite rides on top of the user's rate and ceiling
+                // without ever writing them (see window.DyeNudge in 05h).
+                // Idle returns the base values unchanged — exact no-op.
+                const _dyeDiss = window.DyeNudge
+                    ? window.DyeNudge.dissipation(config.DENSITY_DISSIPATION)
+                    : config.DENSITY_DISSIPATION;
+                // The Gate cap is the cap, Ignite included — it enriches via
+                // display-stage vibrance instead of buying headroom here.
+                const _dyeCeil = config.BLOOM_CEILING || 0.0;
+                gl.uniform1f(advectionProg.uniforms.dissipation, _dyeDiss);
+                gl.uniform1f(advectionProg.uniforms.bloomCeiling, _dyeCeil);
+                // Pigment memory + Ignite restore (see advectionFrag). memDiss
+                // 1.0 would make memory immortal; the default half-life lets
+                // work you deliberately let go stay gone.
+                gl.uniform1f(advectionProg.uniforms.memDiss,
+                    (typeof config.DYE_MEMORY_DISS === 'number') ? config.DYE_MEMORY_DISS : 0.9995);
+                gl.uniform1f(advectionProg.uniforms.uRestore,
+                    window.DyeNudge ? window.DyeNudge.restore(dt) : 0.0);
+                gl.uniform1f(advectionProg.uniforms.uRestoreGain,
+                    window.DyeNudge ? window.DyeNudge.restoreGain() : 1.0);
                 // M2 dye floor (motion-gated Nyquist removal — see 05b)
                 gl.uniform1f(advectionProg.uniforms.hfFloorDye, config.HF_FLOOR_DYE || 0.0);
+                // Reset the decay-debt accumulator on SLIDER changes only: the
+                // nudge ramps the effective rate every frame, and resetting on
+                // that would zero the debt before it ever clears the fp16
+                // threshold, so slow presets would stop decaying mid-nudge.
                 if (config.DENSITY_DISSIPATION !== lastDyeDiss) {
                     lastDyeDiss = config.DENSITY_DISSIPATION;
                     dyeDecayAccum = 0;
                 }
-                const _dyeDecay = computeDecayDt(config.DENSITY_DISSIPATION, dyeDecayAccum, dt);
+                const _dyeDecay = computeDecayDt(_dyeDiss, dyeDecayAccum, dt);
                 dyeDecayAccum = _dyeDecay.accum;
                 gl.uniform1f(advectionProg.uniforms.decayDt, _dyeDecay.decayDt);
                 // Explicit freeze flag: the shader must distinguish freeze mode
@@ -727,6 +818,14 @@
             gl.uniform1f(displayProg.uniforms.displayShading, window.displayShading || 0.0);
             gl.uniform1f(displayProg.uniforms.shadeInvert, window.displayShadingInvert || 0.0);
             gl.uniform1f(displayProg.uniforms.gateVibrance, (config.BLOOM_CEILING > 0) ? 1.0 : 0.0);
+            // Saturation added at full Ignite. 0.45 was measured at sat
+            // 0.742 -> 0.958 on a green: unmistakably lit, but nearer neon
+            // than "the original colour turned up". Console-tunable.
+            gl.uniform1f(displayProg.uniforms.igniteVibrance,
+                window.DyeNudge
+                    ? window.DyeNudge.level() *
+                      ((typeof config.IGNITE_VIBRANCE === 'number') ? config.IGNITE_VIBRANCE : 0.22)
+                    : 0.0);
             // Light Shift (unified 2026-07-18): one pass, here on the displayed
             // color. Recolors overblown/white fluid; identical with lighting on/off.
             const lightShiftOn = window.lightShift && window.lightShift.enabled && window.lightShift.colorPath && window.lightShift.colorPath.length > 0;

@@ -261,7 +261,29 @@ class SettingsManager {
         keysToRemove.forEach(key => localStorage.removeItem(key));
         this.cache.clear();
     }
-    
+
+    /**
+     * Clear settings but PRESERVE saved presets (preset.* keys). Used by the
+     * "Clear" button so a settings reset never destroys the user's preset
+     * library. (The on-disk Preset Vault is immune regardless, but this keeps
+     * the in-session localStorage mirror intact too.)
+     */
+    clearExceptPresets() {
+        const prefix = `${this.namespace}:`;
+        const presetPrefix = `${this.namespace}:preset.`;
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(prefix) && !key.startsWith(presetPrefix)) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        // Rebuild cache from what survived on disk.
+        this.cache.clear();
+        this.loadAll();
+    }
+
     /**
      * Get all settings as an object
      * @returns {object} All settings

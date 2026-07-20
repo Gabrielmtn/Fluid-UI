@@ -203,6 +203,8 @@
         <div class="control-group">
             <label for="physicsResolution">Physics Detail</label>
             <select id="physicsResolution">
+                <option value="2048">Ultra Extreme (2K)</option>
+                <option value="1536">Extreme+ (1.5K)</option>
                 <option value="1024">Extreme (1K)</option>
                 <option value="512" selected>Ultra (512)</option>
                 <option value="384">High (384)</option>
@@ -210,6 +212,7 @@
                 <option value="192">Balanced (192)</option>
                 <option value="128">Medium (128)</option>
                 <option value="64">Low (64)</option>
+                <option value="32">Minimum (32)</option>
             </select>
         </div>
         <div class="control-group">
@@ -297,6 +300,14 @@
         <div class="control-group">
             <label for="swirl" title="Curl-noise micro-swirl — painterly fine-grain wisps on moving paint">Swirl <span id="swirlValue" class="value-display">0.00</span></label>
             <input type="range" id="swirl" min="0" max="1" value="0" step="0.01">
+        </div>
+        <div class="control-group">
+            <label for="wetInfluence" title="Wetness — wet paint flows, dry paint holds in place. 0 = off (pure fluid). Higher = dry regions set harder, more paint-like.">Wetness <span id="wetInfluenceValue" class="value-display">0.00</span></label>
+            <input type="range" id="wetInfluence" min="0" max="1" value="0" step="0.01">
+        </div>
+        <div class="control-group">
+            <label for="wetDrying" title="Drying speed — half-life in seconds for wet paint to set. Lower = paint dries and holds faster.">Dry Time <span id="wetDryingValue" class="value-display">3.0</span>s</label>
+            <input type="range" id="wetDrying" min="0.5" max="20" value="3" step="0.5">
         </div>
         <div class="control-group">
             <label for="ridges" title="Sharpen kernel scale — 0 = off (smooth), 1 = classic unsharp look, higher values carve coarse embossed ridges into moving dye">Ridges <span id="ridgesValue" class="value-display">0.0</span></label>
@@ -558,6 +569,12 @@
                 <button id="userPresetCancelBtn" style="padding: 6px 10px; background: rgba(255,100,100,0.2); border: 1px solid rgba(255,100,100,0.3);">Cancel</button>
             </div>
             <div id="userPresetStatus" style="display: none; font-size: 10px; margin-top: 4px; color: #3fb950; text-align: center;"></div>
+            <div id="userPresetBulkRow" style="display: flex; gap: 6px; margin-top: 6px;">
+                <button id="exportAllPresetsBtn" style="flex: 1; font-size: 10px; padding: 6px;" title="Download every saved preset as a portable .fluidpresets file (backup / move between the desktop and web builds)">⤓ Export Presets</button>
+                <button id="importPresetsBtn" style="flex: 1; font-size: 10px; padding: 6px;" title="Import presets from a .fluidpresets file — merges into your library">⤒ Import Presets</button>
+                <input type="file" id="importPresetsInput" accept=".fluidpresets,.json,application/json" style="display: none">
+            </div>
+            <button id="openPresetsFolderBtn" style="display: none; width: 100%; font-size: 10px; padding: 6px; margin-top: 6px;" title="Open your presets folder in File Explorer">📁 Open Presets Folder</button>
         </div>
         <input type="checkbox" id="multiplayerToggle" style="display:none">
         <div id="multiArtistPanel">
@@ -982,6 +999,7 @@
     <script src="js/08a-quality-governor.js"></script>
     <script src="js/08b-jank-monitor.js"></script>
     <script src="js/12-save-load.js"></script>
+    <script src="js/12b-preset-vault.js"></script>
     <script src="js/13-light-source.js"></script>
     <script src="js/14-light-shift.js"></script>
     <script src="js/17-hotkey-reminder.js"></script>

@@ -48,7 +48,7 @@
 
 | ID | Task | Size | Status | Prio |
 |----|------|:----:|:------:|:----:|
-| P15-1 | **Wetness/drying map** — one fp16 channel scaling dye advection/dissipation/swirl; dry holds, wet flows/re-wets. THE paint-vs-smoke feature. (Prior attempt reverted for live-server churn — land atomically.) | L | open | |
+| P15-1 | **Wetness/drying map** — ✅ **core SHIPPED** (`p15-1-wetness`, off by default): R16F sim-res wetness field scales dye advection via `dyeMobility` inside the shared rk2Backtrace (MacCormack-coherent, feature-off bit-identical — 0 diffs verified). Deposit/advect/dry + Wetness & Dry Time sliders (Effects), preset/`.fluid` persistence. Landed atomically in one commit. **Remaining:** Gabriel feel-test (mobility curve + 3s half-life default), merge to `pre-usertest`; later route through D1 brush props + tie to P15-2/3/5. | L | feel | |
 | P15-2 | **Edge darkening + granulation** — darken dye ∝ \|∇density\| (watercolor pooling) + static paper-noise modulation (pigment settling). | M | open | |
 | P15-3 | **Pigment-space color mixing** — Kubelka-Munk at splat time via spectral.js (MIT). Blue+yellow=green, write-time only. | M | open | |
 | P15-5 | **Thick-paint material mode** — high vel dissipation + low dt, pressure intact ("paint is a barely-moving fluid"); fits the Material dropdown. | M | open | |

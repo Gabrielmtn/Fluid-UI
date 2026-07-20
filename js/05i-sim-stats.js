@@ -78,6 +78,23 @@
             blit(density.write.fbo);
             density.swap();
             if (brushTip === 4) gl.uniform1f(splatProg.uniforms.ringRadius, 0); // no leak into the next caller
+            // P15-1: a stroke wets the paper. Deposit a saturating gaussian of
+            // wetness at the dye dab's footprint (sim res), feature-gated so it
+            // is exactly free when off. baseRadius (not the possibly-narrowed
+            // ring/tip radius) keeps the wet footprint aligned with the paint.
+            if ((config.WET_INFLUENCE || 0) > 0 && typeof wetness !== 'undefined' && wetness) {
+                wetSplatProg.bind();
+                gl.viewport(0, 0, simTexWidth, simTexHeight);
+                gl.uniform1f(wetSplatProg.uniforms.aspectRatio, aspectRatio);
+                gl.uniform2f(wetSplatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
+                gl.uniform1f(wetSplatProg.uniforms.radius, baseRadius);
+                gl.uniform1f(wetSplatProg.uniforms.amount, 1.0);
+                gl.uniform1i(wetSplatProg.uniforms.uTarget, 0);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, wetness.read.texture);
+                blit(wetness.write.fbo);
+                wetness.swap();
+            }
         }
         // Ring-band splat: paints a thin elliptical band of dye and pushes it
         // radially in ONE velocity+dye pass (vs stamping dozens of dots along

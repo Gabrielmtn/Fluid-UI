@@ -457,6 +457,26 @@
             fastFreezeUntil = 0;
             updateStatusLine();
         },
+        // WYSIWYG on an explicit Visual/Physics resolution pick: the user chose
+        // a tier to SEE it, so honor it EXACTLY on this reinit. End the boot
+        // quality ascent (which otherwise loads at 0.5x and climbs to target)
+        // and drop any resolution-scaling ladder level, so config maps 1:1 to
+        // the grid — no silent 0.5x/0.75x between the number picked and what
+        // runs. The ladder may still ease back down LATER under sustained low
+        // fps (unless Adaptive Resolution is off), but never below the pick on
+        // the frame it lands; a short hold keeps it visible before the 1 Hz
+        // evaluator can act again. The caller still flags its own reinit.
+        pinResolution: function () {
+            bootDone = true;
+            bootStage = BOOT_STAGES.length - 1;
+            if (level !== 0 && scalesDiffer(level, 0)) window.needsFramebufferReinit = true;
+            level = 0;
+            lowStreak = 0;
+            highStreak = 0;
+            fastFreezeUntil = 0;
+            freezeUntilMs = performance.now() + 3000;
+            updateStatusLine();
+        },
         setEnabled: function (b) {
             b = !!b;
             if (b === enabled) return;
