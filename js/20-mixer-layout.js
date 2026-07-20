@@ -471,74 +471,114 @@
                 gateEl.checked = !gateEl.checked;
                 gateEl.dispatchEvent(new Event('change', { bubbles: true }));
                 gateBtn.classList.toggle('active', gateEl.checked);
-                gateDensityWrap.style.display = gateEl.checked ? 'flex' : 'none';
             });
             gateEl.addEventListener('change', function () {
                 gateBtn.classList.toggle('active', gateEl.checked);
-                gateDensityWrap.style.display = gateEl.checked ? 'flex' : 'none';
             });
             ch.appendChild(gateEl);
             toggleRow.appendChild(gateBtn);
-
-            // Gate max density incrementer (BLOOM_CEILING) — compact ±0.1 stepper
-            var gateDensityWrap = document.createElement('div');
-            gateDensityWrap.className = 'ch-gate-density';
-            gateDensityWrap.style.cssText = 'display:' + (gateEl.checked ? 'flex' : 'none') + ';align-items:center;justify-content:center;gap:2px;height:16px;flex:0 0 auto;box-sizing:border-box;';
-
-            var GATE_MIN = 1.0, GATE_MAX = 6.0, GATE_STEP = 0.1;
-            var gateCurVal = typeof window.gateMaxDensity === 'number' ? window.gateMaxDensity : 3;
-
-            var gateDownBtn = document.createElement('button');
-            gateDownBtn.type = 'button';
-            gateDownBtn.textContent = '−';
-            gateDownBtn.title = 'Decrease max density';
-            gateDownBtn.style.cssText = 'width:16px;height:16px;padding:0;border:1px solid rgba(255,255,255,0.15);border-radius:3px;background:rgba(0,0,0,0.3);color:#c9d1d9;font-size:12px;line-height:1;cursor:pointer;';
-
-            var gateValSpan = document.createElement('span');
-            gateValSpan.className = 'ch-gate-density-val';
-            gateValSpan.style.cssText = 'font-size:10px;font-family:monospace;color:#4fc3f7;min-width:24px;text-align:center;';
-            gateValSpan.textContent = gateCurVal.toFixed(1);
-
-            var gateUpBtn = document.createElement('button');
-            gateUpBtn.type = 'button';
-            gateUpBtn.textContent = '+';
-            gateUpBtn.title = 'Increase max density';
-            gateUpBtn.style.cssText = 'width:16px;height:16px;padding:0;border:1px solid rgba(255,255,255,0.15);border-radius:3px;background:rgba(0,0,0,0.3);color:#c9d1d9;font-size:12px;line-height:1;cursor:pointer;';
-
-            function updateGateDensity(v) {
-                v = Math.round(v * 10) / 10;
-                v = Math.max(GATE_MIN, Math.min(GATE_MAX, v));
-                window.gateMaxDensity = v;
-                gateCurVal = v;
-                gateValSpan.textContent = v.toFixed(1);
-                if (typeof window.applyGateState === 'function' && gateEl.checked) {
-                    window.applyGateState(true);
-                }
-                try { if (window.settingsManager) window.settingsManager.set('gate.maxDensity', v); } catch (_) {}
-            }
-
-            gateDownBtn.addEventListener('click', function () { updateGateDensity((window.gateMaxDensity || gateCurVal) - GATE_STEP); });
-            gateUpBtn.addEventListener('click', function () { updateGateDensity((window.gateMaxDensity || gateCurVal) + GATE_STEP); });
-
-            // Load saved value
-            try {
-                if (window.settingsManager) {
-                    var savedGD = window.settingsManager.get('gate.maxDensity');
-                    if (typeof savedGD === 'number') {
-                        gateCurVal = Math.max(GATE_MIN, Math.min(GATE_MAX, savedGD));
-                        window.gateMaxDensity = gateCurVal;
-                        gateValSpan.textContent = gateCurVal.toFixed(1);
-                    }
-                }
-            } catch (_) {}
-
-            gateDensityWrap.appendChild(gateDownBtn);
-            gateDensityWrap.appendChild(gateValSpan);
-            gateDensityWrap.appendChild(gateUpBtn);
-            toggleRow.appendChild(gateDensityWrap);
         }
 
         ch.appendChild(toggleRow);
+
+        // Ignite — momentary density nudge (window.DyeNudge, 05h). Not gated
+        // on the Gate toggle: its reason to exist is someone parked at
+        // Density 1.0 who wants a lift without touching the decay rate, and
+        // that is true with or without the cap on.
+        //
+        // Hold-to-lock, the voice-memo gesture: pressing slides a padlock out
+        // to the right, and releasing ON it latches Ignite on instead of
+        // ending the hold. Releasing anywhere else is a normal release. The
+        // long boosts this control is for are exactly the ones you do not
+        // want to hold a mouse button down through.
+        var nudgeRow = document.createElement('div');
+        nudgeRow.className = 'ch-toggle-row ch-nudge-row';
+
+        var igniteBtnColor = document.createElement('button');
+        igniteBtnColor.type = 'button';
+        igniteBtnColor.className = 'ch-text-toggle ch-nudge-btn';
+        igniteBtnColor.textContent = '🔥 Ignite';
+        igniteBtnColor.title = 'Hold to perk the fluid up — faded dye is pulled back to the colour it was '
+            + 'painted at, and past the Gate cap. Slide right onto the lock to keep it on. '
+            + 'Your density decay setting is untouched.';
+
+        var igniteLock = document.createElement('div');
+        igniteLock.className = 'ch-ignite-lock';
+        igniteLock.textContent = '🔒';
+        igniteLock.title = 'Release here to lock Ignite on';
+
+        var igniteLocked = false, lockArmed = false, ignitePid = null;
+
+        function igniteEngage() {
+            if (window.DyeNudge) window.DyeNudge.press();
+            igniteBtnColor.classList.add('active');
+        }
+        function igniteStop() {
+            igniteLocked = false;
+            if (window.DyeNudge) window.DyeNudge.release();
+            igniteBtnColor.classList.remove('active', 'locked');
+            nudgeRow.classList.remove('holding', 'armed');
+            igniteLock.classList.remove('armed');
+        }
+        function setArmed(v) {
+            if (v === lockArmed) return;
+            lockArmed = v;
+            igniteLock.classList.toggle('armed', v);
+            nudgeRow.classList.toggle('armed', v);
+        }
+
+        igniteBtnColor.addEventListener('pointerdown', function (e) {
+            // While locked, a press is the way out — no new hold begins.
+            if (igniteLocked) { igniteStop(); return; }
+            e.preventDefault();
+            ignitePid = e.pointerId;
+            // Capture so the drag keeps reporting after the pointer leaves the
+            // button; without it the lock target is unreachable by drag.
+            try { igniteBtnColor.setPointerCapture(ignitePid); } catch (_) {}
+            setArmed(false);
+            nudgeRow.classList.add('holding');
+            igniteEngage();
+        });
+
+        igniteBtnColor.addEventListener('pointermove', function (e) {
+            if (ignitePid === null || igniteLocked) return;
+            var r = igniteLock.getBoundingClientRect();
+            // Generous vertical slop: the row is 16px tall and the gesture is
+            // horizontal, so drifting off the top or bottom mid-slide should
+            // not disarm.
+            setArmed(e.clientX >= r.left && e.clientX <= r.right + 12
+                  && e.clientY >= r.top - 14 && e.clientY <= r.bottom + 14);
+        });
+
+        function igniteRelease() {
+            if (ignitePid === null) return;
+            try { igniteBtnColor.releasePointerCapture(ignitePid); } catch (_) {}
+            ignitePid = null;
+            if (lockArmed) {
+                // Latch: DyeNudge sustains for as long as release() is never
+                // called, so locking is simply declining to release.
+                igniteLocked = true;
+                setArmed(false);
+                igniteBtnColor.classList.add('locked');
+                nudgeRow.classList.add('holding');
+                return;
+            }
+            igniteStop();
+        }
+        igniteBtnColor.addEventListener('pointerup', igniteRelease);
+        igniteBtnColor.addEventListener('pointercancel', igniteRelease);
+        // The padlock is also a click target once latched, so the way out is
+        // wherever the eye already is.
+        igniteLock.addEventListener('pointerdown', function (e) {
+            if (!igniteLocked) return;
+            e.preventDefault();
+            e.stopPropagation();
+            igniteStop();
+        });
+
+        nudgeRow.appendChild(igniteBtnColor);
+        nudgeRow.appendChild(igniteLock);
+        ch.appendChild(nudgeRow);
 
         return ch;
     }
@@ -750,7 +790,117 @@
         sidebar.appendChild(buildMultiArtistSection());
         sidebar.appendChild(buildSettingsSection(controls));
 
+        buildQualityUnderbar();
+
         return sidebar;
+    }
+
+    // UX-9.1 — quality underbar: a slim always-visible cluster pinned to the
+    // top-right corner surfacing the two knobs users reach for most (Visual
+    // Quality + Physics Detail), without opening the Simulation panel. v1 per
+    // Gabriel: these two controls, top-right; de-band etc. stay in the panel.
+    function buildQualityUnderbar() {
+        if (document.getElementById('quality-underbar')) return;
+        const bar = document.createElement('div');
+        bar.id = 'quality-underbar';
+        // Minimalist (After Effects): no external labels — each control is a
+        // custom dropdown showing just its value; the label sits ABOVE the
+        // options as a themeable list header on open (the native <optgroup>
+        // popup can't be dark-themed in this build — white OS frame — so we
+        // drive a hidden native <select> from a custom list instead).
+        [['visualResolution', 'Visual Quality'], ['physicsResolution', 'Physics Detail']].forEach(function (pair) {
+            const sel = document.getElementById(pair[0]);
+            if (sel) bar.appendChild(makeQubDropdown(sel, pair[1]));
+        });
+        document.body.appendChild(bar);
+        // Trim the right edge to #canvas-area's right — the drawing region's
+        // edge, i.e. where the nav begins. canvas-area is left:0, so only its
+        // WIDTH changes (sidebar resize / window / sim-res) and a ResizeObserver
+        // on it catches every case; no fragile position tracking.
+        const place = function () {
+            const ca = document.getElementById('canvas-area');
+            let right = 0;
+            if (ca) {
+                const r = ca.getBoundingClientRect();
+                if (r.right > 1 && r.right < window.innerWidth - 1) right = Math.round(window.innerWidth - r.right);
+            }
+            bar.style.right = right + 'px';
+        };
+        requestAnimationFrame(place);
+        setTimeout(place, 400);
+        window.addEventListener('resize', place);
+        if (window.ResizeObserver) {
+            const ca = document.getElementById('canvas-area');
+            if (ca) { try { new ResizeObserver(place).observe(ca); } catch (e) {} }
+        }
+    }
+
+    // Custom themeable dropdown that drives a hidden native <select> (so all
+    // existing change bindings + save/load keep working by id). Opens UPWARD
+    // with a label header on top — the fix for the unstylable native popup.
+    function makeQubDropdown(sel, labelText) {
+        sel.classList.add('qub-native-hidden');
+        const wrap = document.createElement('div');
+        wrap.className = 'qub-dd';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'qub-dd-btn';
+        btn.title = labelText;
+        const val = document.createElement('span');
+        val.className = 'qub-dd-val';
+        btn.appendChild(val);
+        btn.insertAdjacentHTML('beforeend', '<span class="qub-dd-chev">▾</span>');
+        const list = document.createElement('div');
+        list.className = 'qub-dd-list';
+        const hdr = document.createElement('div');
+        hdr.className = 'qub-dd-hdr';
+        hdr.textContent = labelText;
+        list.appendChild(hdr);
+
+        const syncVal = function () {
+            const o = sel.options[sel.selectedIndex];
+            val.textContent = o ? o.text : '';
+        };
+        const rebuild = function () {
+            Array.prototype.slice.call(list.querySelectorAll('.qub-dd-opt')).forEach(function (o) { o.remove(); });
+            Array.prototype.forEach.call(sel.options, function (opt) {
+                const o = document.createElement('div');
+                o.className = 'qub-dd-opt' + (opt.selected ? ' sel' : '');
+                o.textContent = opt.text;
+                o.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    if (sel.value !== opt.value) {
+                        sel.value = opt.value;
+                        sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    syncVal();
+                    close();
+                });
+                list.appendChild(o);
+            });
+        };
+        const onDoc = function (e) { if (!wrap.contains(e.target)) close(); };
+        const close = function () {
+            wrap.classList.remove('open');
+            document.removeEventListener('mousedown', onDoc);
+        };
+        const open = function () {
+            rebuild();
+            wrap.classList.add('open');
+            setTimeout(function () { document.addEventListener('mousedown', onDoc); }, 0);
+        };
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            wrap.classList.contains('open') ? close() : open();
+        });
+        // Keep the button in sync if the select is driven from elsewhere.
+        sel.addEventListener('change', syncVal);
+
+        wrap.appendChild(btn);
+        wrap.appendChild(list);
+        wrap.appendChild(sel); // hidden state-holder stays in the DOM
+        syncVal();
+        return wrap;
     }
 
     // --- Section builders ---
@@ -1344,8 +1494,8 @@
     function buildSimulationSection() {
         const { sec, body } = makeSection('⚙️ Simulation', 'blue', true);
 
-        moveControlGroup('visualResolution', body);
-        moveControlGroup('physicsResolution', body);
+        // UX-9.1: Visual Quality + Physics Detail live in the top-right quality
+        // underbar (buildQualityUnderbar) for always-visible quick access.
         moveControlGroup('fpsCap', body);
         moveControlGroup('pressureDissipation', body);
         moveControlGroup('pressureIteration', body);
@@ -1365,6 +1515,9 @@
 
         // Curl-noise micro-swirl (dye advection wisps)
         moveControlGroup('swirl', body);
+        // P15-1 wetness: dry paint holds, wet paint flows (+ dry-time half-life)
+        moveControlGroup('wetInfluence', body);
+        moveControlGroup('wetDrying', body);
         // Sharpen kernel scale (coarse emboss at high values)
         moveControlGroup('ridges', body);
 
@@ -1969,6 +2122,8 @@
                 });
             } finally { applyingPreset = false; }
         }
+        // D7-1: let a .fluid project import refresh the brush-preset chips.
+        window.__refreshBrushPresets = function () { try { renderPresetChips(); } catch (_) {} };
         function renderPresetChips() {
             chipsWrap.innerHTML = '';
             var list = loadBrushPresets();
@@ -2213,7 +2368,10 @@
         bridgeRow.className = 'brush-mode-row';
         var igniteBtn = document.createElement('button');
         igniteBtn.type = 'button'; igniteBtn.className = 'brush-mode-btn';
-        igniteBtn.textContent = '🔥 Ignite';
+        // "Ignite Sketch", not "Ignite": the Color channel's Ignite is a
+        // momentary density nudge on existing dye. This one is the D2 raster
+        // bridge and does nothing at all when the sketch layer is empty.
+        igniteBtn.textContent = '🔥 Ignite Sketch';
         igniteBtn.title = 'Pour the sketch into the fluid as dye — the sim takes it from there (sketch is untouched)';
         igniteBtn.addEventListener('click', function () {
             if (typeof window.__igniteSketch === 'function') window.__igniteSketch(1);
@@ -3102,6 +3260,43 @@
         statusDiv.id = 'exportStatus';
         statusDiv.style.cssText = 'display:none;font-size:11px;padding:6px;background:rgba(0,0,0,0.3);border-radius:4px;margin-bottom:8px;text-align:center;color:#58a6ff;';
         body.appendChild(statusDiv);
+
+        // ── D7-1: Project file (.fluid) — save/load the whole stack ──
+        var projLabel = document.createElement('label');
+        projLabel.className = 'brush-section-label';
+        projLabel.textContent = 'Project (.fluid)';
+        body.appendChild(projLabel);
+        var projGrid = document.createElement('div');
+        projGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;';
+        var saveProjBtn = document.createElement('button');
+        saveProjBtn.textContent = '💾 Save Project';
+        saveProjBtn.title = 'Download the whole project (layers, masks, bindings, brush presets, colors…) as a .fluid file';
+        saveProjBtn.style.cssText = 'padding:8px;background:rgba(180,130,255,0.15);border:1px solid rgba(180,130,255,0.35);color:#c8a2ff;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        saveProjBtn.addEventListener('click', function () {
+            var nm = window.prompt ? window.prompt('Project name', 'fluid-project') : 'fluid-project';
+            if (nm === null) return; // cancelled
+            if (window.projectFile) window.projectFile.export(nm);
+        });
+        projGrid.appendChild(saveProjBtn);
+        var loadProjBtn = document.createElement('button');
+        loadProjBtn.textContent = '📂 Load Project';
+        loadProjBtn.title = 'Load a .fluid project file (replaces the current stack)';
+        loadProjBtn.style.cssText = 'padding:8px;background:rgba(180,130,255,0.08);border:1px solid rgba(180,130,255,0.25);color:#c8a2ff;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        var projInput = document.createElement('input');
+        projInput.type = 'file';
+        projInput.accept = '.fluid,application/json';
+        projInput.style.display = 'none';
+        loadProjBtn.addEventListener('click', function () { projInput.click(); });
+        projInput.addEventListener('change', function (e) {
+            var f = e.target.files && e.target.files[0];
+            if (f && window.projectFile) window.projectFile.import(f, function (err) {
+                if (err) alert('Project load failed: ' + err.message);
+            });
+            projInput.value = '';
+        });
+        projGrid.appendChild(loadProjBtn);
+        body.appendChild(projGrid);
+        body.appendChild(projInput);
 
         // Progress bar
         var progressWrap = document.createElement('div');

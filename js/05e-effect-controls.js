@@ -92,6 +92,24 @@
                 if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
             });
         }
+        // Wetness slider (P15-1: dry paint holds, wet paint flows)
+        const wetInfluenceSlider = document.getElementById('wetInfluence');
+        if (wetInfluenceSlider) {
+            wetInfluenceSlider.addEventListener('input', (e) => {
+                config.WET_INFLUENCE = parseFloat(e.target.value);
+                const sp = document.getElementById('wetInfluenceValue');
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
+            });
+        }
+        // Dry Time slider (P15-1: wetness half-life in seconds)
+        const wetDryingSlider = document.getElementById('wetDrying');
+        if (wetDryingSlider) {
+            wetDryingSlider.addEventListener('input', (e) => {
+                config.WET_DRYING = parseFloat(e.target.value);
+                const sp = document.getElementById('wetDryingValue');
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(1);
+            });
+        }
         // Max Speed slider (velocity ceiling, canvas-widths/s — soft knee)
         const velocityCapSlider = document.getElementById('velocityCap');
         if (velocityCapSlider) {

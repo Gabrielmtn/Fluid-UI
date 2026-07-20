@@ -328,6 +328,35 @@
                                       // Straight dye edges have zero Laplacian — moving
                                       // fronts keep their crispness. 0 = off.
 
+            DEBAND: 0.0,              // De-band / "organic" taper (2026-07-18): softens the
+                                      // MacCormack anti-diffusion where dye is BOTH hard-edged
+                                      // and moving fast (the terrace cliffs of no-curl acrylic
+                                      // flow — with curl the turbulence revert already blurs
+                                      // them). 0 = off / bit-exact. ~0.3-0.6 = organic. See
+                                      // macCorrectFrag in 05b. Console-tunable; slider TBD.
+
+            IGNITE_VIBRANCE: 0.22,    // Saturation Ignite adds at full hold (2026-07-20).
+                                      // Ignite enriches instead of brightening: raising dye
+                                      // magnitude past the Gate cap walks every channel up
+                                      // the Reinhard curve together, which lightens at
+                                      // constant saturation — the "pale light green" bug.
+                                      // Applied post-tone-map in displayFrag, so it never
+                                      // touches stored dye and a locked Ignite holds steady
+                                      // instead of ratcheting. Measured on a green: 0.45 took
+                                      // saturation 0.742 -> 0.958 (neon); 0.22 is the "turned
+                                      // up, still your colour" setting. 0 = off.
+
+            DYE_MEMORY_DISS: 0.9995,  // Pigment memory half-life (2026-07-20): dye alpha
+                                      // remembers the strength a stroke was PAINTED at, so
+                                      // Ignite restores the original colour instead of just
+                                      // amplifying a faded remnant (multiplicative decay
+                                      // keeps hue but destroys magnitude). Decays on its own
+                                      // slow clock: 0.9995 ≈ a 23s half-life, so recent work
+                                      // can be re-ignited while anything you deliberately let
+                                      // fade stays gone. 1.0 = memory never expires. Memory is
+                                      // still drained in step with the dye by the obstacle,
+                                      // cleanup and edge drains. See advectionFrag in 05b.
+
             VEL_SOURCE_GATE: true,    // M1 (2026-07-17): taper the energy SOURCES (growth
                                       // amplification + vorticity confinement) to neutral as
                                       // speed approaches VELOCITY_CAP, so pockets settle below
@@ -388,6 +417,12 @@
             SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
                                       // Painterly sub-grid wisps on moving paint; dies with
                                       // motion so settled artwork stays bit-stable
+
+            WET_INFLUENCE: 0,         // P15-1 wetness→mobility coupling (0 = feature off,
+                                      // bit-identical to no wetness). 1 = bone-dry paint
+                                      // fully freezes in place; wet paint always flows.
+            WET_DRYING: 3.0,          // P15-1 wetness half-life in seconds: time for a wet
+                                      // region to dry halfway. Lower = paint sets faster.
 
             RIDGES: 0,                // Sharpen kernel radius in 2048-reference texels.
                                       // 0 = sharpen OFF (default — the smooth look; the

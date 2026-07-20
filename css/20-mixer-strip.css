@@ -6,6 +6,117 @@
    MIXER LAYOUT - Audio mixer-inspired UI
    ================================================================ */
 
+/* ── UX-9.1: quality underbar — minimalist AE-style dock, bottom-left ──
+   No labels: just the compact dropdowns (context from the value + the
+   <optgroup> header that shows above the list on open). Slim flat bar docked
+   to the bottom-left corner. Room to keep adding compact controls. */
+#quality-underbar {
+    position: fixed;
+    left: 0;
+    right: 0; /* JS trims to #canvas-area's right (the drawing-region / nav edge) */
+    bottom: 0;
+    /* Above the sim canvas (z-index up to 1000 via updateLayerZIndices) so the
+       drawing area can't overpaint the bar or steal its clicks — UI wins. */
+    z-index: 1200;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px; /* content height + ~10px breathing */
+    background: linear-gradient(180deg, #2c2f34, #1b1e23);
+    border-top: 1px solid rgba(0, 0, 0, 0.55);
+    border-right: 1px solid rgba(0, 0, 0, 0.55);
+    box-shadow: 0 -3px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    user-select: none;
+}
+/* Native <select> stays as the hidden state-holder (drives all bindings). */
+#quality-underbar .qub-native-hidden {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+/* Custom themeable dropdown (fixes the unstylable native option popup) */
+#quality-underbar .qub-dd {
+    position: relative;
+    display: inline-block;
+}
+#quality-underbar .qub-dd-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 116px;
+    height: 22px;
+    padding: 1px 7px;
+    font-size: 11px;
+    background: linear-gradient(180deg, #3a3d43, #24272c);
+    color: #e6e8ea;
+    border: 1px solid rgba(0, 0, 0, 0.55);
+    border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    cursor: pointer;
+}
+#quality-underbar .qub-dd-btn:hover,
+#quality-underbar .qub-dd.open .qub-dd-btn {
+    border-color: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+#quality-underbar .qub-dd-chev {
+    font-size: 9px;
+    opacity: 0.55;
+}
+#quality-underbar .qub-dd-list {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px); /* opens UPWARD — we're at the screen bottom */
+    left: 0;
+    min-width: 100%;
+    padding: 4px;
+    background: #23262b;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 7px;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.55);
+    z-index: 10;
+    max-height: 62vh;
+    overflow-y: auto;
+}
+#quality-underbar .qub-dd.open .qub-dd-list {
+    display: block;
+}
+#quality-underbar .qub-dd-hdr {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #8b93a0;
+    padding: 3px 8px 6px;
+    margin-bottom: 3px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+#quality-underbar .qub-dd-opt {
+    font-size: 11px;
+    color: #d8dbdf;
+    padding: 5px 9px;
+    border-radius: 4px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+#quality-underbar .qub-dd-opt:hover {
+    background: rgba(74, 168, 255, 0.22);
+    color: #fff;
+}
+#quality-underbar .qub-dd-opt.sel {
+    background: rgba(74, 168, 255, 0.32);
+    color: #fff;
+}
+/* Mobile: strip + sidebar are drawers — keep the canvas clean */
+@media (max-width: 768px), (max-height: 500px) and (max-width: 1200px) {
+    #quality-underbar { display: none; }
+}
+
 /* ── BODY LAYOUT: column instead of row ── */
 body {
     flex-direction: column !important;
@@ -212,6 +323,80 @@ body > .controls {
     flex: 1;
     min-width: 0;
     height: 16px;
+}
+
+/* Ignite: momentary, so it reads warm while held rather than borrowing the
+   cyan "this setting is on" glow of the toggles above. The padlock slides
+   out from under the button's right edge on press (voice-memo gesture) —
+   absolutely positioned so appearing costs the button no width and the row
+   never reflows mid-gesture. */
+.ch-nudge-row {
+    margin-top: 3px;
+    position: relative;
+}
+.ch-nudge-btn {
+    letter-spacing: 0.3px;
+    touch-action: none;   /* hold-to-nudge must not turn into a scroll gesture */
+    transition: padding-right 0.16s ease;
+}
+.ch-nudge-btn.active {
+    color: #ffb066;
+    text-shadow: 0 0 6px rgba(255, 150, 60, 0.55), 0 0 14px rgba(255, 150, 60, 0.25);
+    background: rgba(255, 150, 60, 0.1);
+    border-color: rgba(255, 150, 60, 0.28);
+}
+/* Latched: steady rather than pulsing, so "still on" is unmistakable */
+.ch-nudge-btn.locked {
+    color: #ffd08a;
+    border-color: rgba(255, 180, 90, 0.55);
+    background: rgba(255, 150, 60, 0.18);
+}
+
+.ch-ignite-lock {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 16px;
+    width: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    line-height: 1;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.45);
+    /* Tucked under the button's right edge until the hold starts */
+    transform: translateX(-6px) scale(0.8);
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    transition: transform 0.16s ease, opacity 0.16s ease,
+                background 0.12s, border-color 0.12s;
+}
+.ch-nudge-row.holding .ch-ignite-lock {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+}
+/* Only clickable once latched — mid-drag the button holds pointer capture */
+.ch-nudge-btn.locked ~ .ch-ignite-lock {
+    pointer-events: auto;
+    cursor: pointer;
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    border-color: rgba(255, 180, 90, 0.5);
+    background: rgba(255, 150, 60, 0.22);
+}
+/* Drag has reached the lock: releasing now latches */
+.ch-ignite-lock.armed {
+    background: rgba(255, 150, 60, 0.85);
+    border-color: rgba(255, 200, 140, 0.9);
+    box-shadow: 0 0 8px rgba(255, 150, 60, 0.55);
+    transform: translateX(0) scale(1.15);
+}
+/* Keep the label clear of the padlock while it is out */
+.ch-nudge-row.holding .ch-nudge-btn {
+    padding-right: 24px;
 }
 
 /* Text-only toggle button (lights up when active) */

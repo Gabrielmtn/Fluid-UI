@@ -57,12 +57,14 @@
         _recorder = null;
         _busy = false;
         _abort = false;
+        window.__exporting = false; // D3-4: re-allow the mask film after export
         updateUI('idle', 0);
     }
 
     function guard() {
         if (_busy) { toast('Export already in progress', 'warn'); return false; }
         _busy = true; _abort = false;
+        window.__exporting = true; // D3-4: suppress the red mask film in captures
         return true;
     }
 

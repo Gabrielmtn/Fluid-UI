@@ -78,6 +78,23 @@
             blit(density.write.fbo);
             density.swap();
             if (brushTip === 4) gl.uniform1f(splatProg.uniforms.ringRadius, 0); // no leak into the next caller
+            // P15-1: a stroke wets the paper. Deposit a saturating gaussian of
+            // wetness at the dye dab's footprint (sim res), feature-gated so it
+            // is exactly free when off. baseRadius (not the possibly-narrowed
+            // ring/tip radius) keeps the wet footprint aligned with the paint.
+            if ((config.WET_INFLUENCE || 0) > 0 && typeof wetness !== 'undefined' && wetness) {
+                wetSplatProg.bind();
+                gl.viewport(0, 0, simTexWidth, simTexHeight);
+                gl.uniform1f(wetSplatProg.uniforms.aspectRatio, aspectRatio);
+                gl.uniform2f(wetSplatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
+                gl.uniform1f(wetSplatProg.uniforms.radius, baseRadius);
+                gl.uniform1f(wetSplatProg.uniforms.amount, 1.0);
+                gl.uniform1i(wetSplatProg.uniforms.uTarget, 0);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, wetness.read.texture);
+                blit(wetness.write.fbo);
+                wetness.swap();
+            }
         }
         // Ring-band splat: paints a thin elliptical band of dye and pushes it
         // radially in ONE velocity+dye pass (vs stamping dozens of dots along
@@ -333,7 +350,10 @@
         // tagged {kind:'raster'|'mask', id}; undo restores whichever surface
         // the mutation happened on.
         function _pushEntry(kind, id, srcFbo) {
-            sketchUndoStack.push({ snap: takeSketchSnapshot(srcFbo), kind: kind, id: id });
+            // D6: stamp a global monotonic seq so the unified UndoManager can
+            // undo the most-recent action across sketch / UI / layer histories.
+            const seq = (window.__undoSeq = (window.__undoSeq | 0) + 1);
+            sketchUndoStack.push({ snap: takeSketchSnapshot(srcFbo), kind: kind, id: id, seq: seq });
             if (sketchUndoStack.length > SKETCH_UNDO_DEPTH) sketchSnapPool.push(sketchUndoStack.shift().snap);
             while (sketchRedoStack.length) sketchSnapPool.push(sketchRedoStack.pop().snap);
         }
@@ -353,7 +373,7 @@
                 const entry = fromStack.pop();
                 const target = _targetFboFor(entry.kind, entry.id);
                 if (!target) { sketchSnapPool.push(entry.snap); continue; } // surface deleted — skip entry
-                toStack.push({ snap: takeSketchSnapshot(target), kind: entry.kind, id: entry.id });
+                toStack.push({ snap: takeSketchSnapshot(target), kind: entry.kind, id: entry.id, seq: entry.seq });
                 copySketchTex(entry.snap.texture, target.fbo, dyeTexWidth, dyeTexHeight);
                 sketchSnapPool.push(entry.snap);
                 if (entry.kind === 'mask') notifyMaskMutated(entry.id);
@@ -376,6 +396,15 @@
         };
         window.__sketchUndoDepths = function () {
             return { undo: sketchUndoStack.length, redo: sketchRedoStack.length, pool: sketchSnapPool.length };
+        };
+        // D6: provider for the unified UndoManager (recency-ordered by seq).
+        window.__sketchUndoProvider = {
+            canUndo: function () { return sketchUndoStack.length > 0; },
+            canRedo: function () { return sketchRedoStack.length > 0; },
+            topUndoSeq: function () { return sketchUndoStack.length ? sketchUndoStack[sketchUndoStack.length - 1].seq : -Infinity; },
+            topRedoSeq: function () { return sketchRedoStack.length ? sketchRedoStack[sketchRedoStack.length - 1].seq : Infinity; },
+            undo: function () { window.__sketchUndo(); },
+            redo: function () { window.__sketchRedo(); }
         };
         let lastTime = performance.now();
         let lastDrawTimeMs = 0;

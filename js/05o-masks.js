@@ -84,7 +84,7 @@
     // ── persistence (12-save-load) ──────────────────────────────────
     // Coverage → grayscale PNG (alpha carries coverage; rgb white for a
     // legible preview if the file is ever inspected).
-    function _readbackDataURL(f) {
+    function _readbackDataURL(f, invert) {
         const px = new Uint8Array(f.width * f.height * 4);
         gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
         gl.readPixels(0, 0, f.width, f.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
@@ -97,7 +97,8 @@
             const src = (f.height - 1 - y) * f.width * 4; // flip Y
             const dst = y * f.width * 4;
             for (let x = 0; x < f.width * 4; x += 4) {
-                const a = px[src + x + 3];
+                // CSS has no mask invert — bake it into alpha here.
+                const a = invert ? (255 - px[src + x + 3]) : px[src + x + 3];
                 img.data[dst + x] = 255;
                 img.data[dst + x + 1] = 255;
                 img.data[dst + x + 2] = 255;
@@ -106,6 +107,12 @@
         }
         ctx.putImageData(img, 0, 0);
         return c.toDataURL('image/png');
+    }
+    // D3-3: per-mask coverage as a top-down white/alpha PNG data-URL, ready to
+    // drop into CSS -webkit-mask-image on a DOM image layer (invert bakes 255-a).
+    function coverageDataURL(id, invert) {
+        const f = maskStore[id];
+        return f ? _readbackDataURL(f, !!invert) : null;
     }
     function serialize() {
         return list().map(function (m) {
@@ -206,6 +213,7 @@
         setActive: setActive,
         activeId: function () { return _activeMaskId; },
         getFBO: function (id) { return maskStore[id] || null; },
+        coverageDataURL: coverageDataURL,
         list: list,
         rename: rename,
         clear: clear,

@@ -6,6 +6,96 @@
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
 // ═══════════════════════════════════════════════════════════════════
+        // ── D3-3: clip a DOM image layer by a unified Mask object ──────────
+        // Image layers are browser-composited .background-layer divs, not GL
+        // textures, so (unlike GPU raster layers, which sample a Mask coverage
+        // FBO in-shader) they clip via CSS mask-image: read the coverage back to
+        // a top-down white/alpha PNG and set it as the div's CSS mask. clipMaskId
+        // / clipInvert mirror the raster clip binding (persistence is already
+        // type-agnostic). The CSS mask is orthogonal to the legacy shape-mask
+        // (which only writes backgroundImage), so the two compose by intersection.
+        window.applyLayerClip = function applyLayerClip(index, _cache) {
+            const layer = (window.layers || []).find(l => l.index === index);
+            if (!layer) return;
+            const div = document.getElementById(`layer${index}`);
+            if (!div) return;
+            const mid = (typeof layer.clipMaskId === 'number') ? layer.clipMaskId : null;
+            let url = null;
+            if (mid != null && window.Masks && window.Masks.getFBO(mid) && window.Masks.coverageDataURL) {
+                // Read each (mask,invert) coverage back only ONCE per reapply pass.
+                const _k = mid + (layer.clipInvert ? ':i' : ':n');
+                if (_cache && _k in _cache) url = _cache[_k];
+                else { url = window.Masks.coverageDataURL(mid, !!layer.clipInvert); if (_cache) _cache[_k] = url; }
+            }
+            if (!url) {
+                div.style.webkitMaskImage = '';
+                div.style.maskImage = '';
+                return;
+            }
+            const css = `url(${url})`;
+            div.style.webkitMaskImage = css;
+            div.style.maskImage = css;
+            // Mirror .background-layer's background-size:100% 100% so the mask
+            // registers with the (possibly shape-baked) background image.
+            div.style.webkitMaskSize = '100% 100%';
+            div.style.maskSize = '100% 100%';
+            div.style.webkitMaskRepeat = 'no-repeat';
+            div.style.maskRepeat = 'no-repeat';
+            div.style.webkitMaskPosition = '0 0';
+            div.style.maskPosition = '0 0';
+        };
+        // Clear a layer div's CSS clip (used on div recycle: delete / reset).
+        window.clearLayerClip = function clearLayerClip(index) {
+            const div = document.getElementById(`layer${index}`);
+            if (div) { div.style.webkitMaskImage = ''; div.style.maskImage = ''; }
+        };
+        // Re-apply the clip for every image layer bound to a given mask id (or
+        // all, if id omitted). The CSS mask is a static snapshot, so this repaints
+        // it when the bound mask is edited/restored.
+        window.reapplyImageLayerClips = function reapplyImageLayerClips(mid) {
+            const cache = {}; // dedupe FBO readbacks for layers sharing a mask
+            (window.layers || []).forEach(function (l) {
+                if (l.isRaster || l.isCollision) return;
+                if (mid == null || l.clipMaskId === mid) window.applyLayerClip(l.index, cache);
+            });
+        };
+        // Live refresh: __onMaskMutated is a single-slot hook already OWNED by
+        // 23-depth-collision (live collider). CHAIN it (never clobber) and install
+        // only after __scriptsReady so we wrap the final owner. readPixels+toDataURL
+        // is a GPU stall, but mask mutations fire at stroke-END, so a light debounce
+        // coalesces bursts (undo/redo, restore's per-mask async loads).
+        (function installImageClipRefresh() {
+            let _t = null;
+            const _pending = new Set();
+            function schedule(mid) {
+                _pending.add(mid);
+                if (_t) return;
+                _t = setTimeout(function () {
+                    _t = null;
+                    const ids = Array.from(_pending); _pending.clear();
+                    // Several distinct masks in one window (preset restore fires
+                    // __onMaskMutated per mask on async load) → reapply ALL, not
+                    // just the last id (last-writer-wins would strand the rest).
+                    if (ids.length !== 1 || ids[0] == null) window.reapplyImageLayerClips();
+                    else window.reapplyImageLayerClips(ids[0]);
+                }, 140);
+            }
+            function install() {
+                if (window.__imgClipRefreshInstalled) return;
+                window.__imgClipRefreshInstalled = true;
+                const prev = window.__onMaskMutated;
+                window.__onMaskMutated = function (mid) {
+                    if (typeof prev === 'function') { try { prev(mid); } catch (e) {} }
+                    schedule(mid);
+                };
+            }
+            if (window.__scriptsReady) { install(); return; }
+            let tries = 0;
+            const poll = setInterval(function () {
+                if (window.__scriptsReady || ++tries > 200) { clearInterval(poll); install(); }
+            }, 50);
+        })();
+
         // Apply mask to a layer
         window.applyLayerMask = function applyLayerMask(index) {
             const layer = layers.find(l => l.index === index);

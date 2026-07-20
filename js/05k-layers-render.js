@@ -208,6 +208,18 @@
                             <span class="layer-slider-value">${layer.threshold}%</span>
                         </div>
                         ${!layer.isCollision ? `
+                        <div class="collision-row" style="margin-top:4px;">
+                            <label class="collision-label">Clip</label>
+                            <select class="img-clip-select">
+                                <option value="">None</option>
+                                ${(window.Masks ? window.Masks.list() : []).map(m =>
+                                    `<option value="${m.id}" ${layer.clipMaskId === m.id ? 'selected' : ''}>${m.name}</option>`
+                                ).join('')}
+                            </select>
+                            <label class="collision-toggle"><input type="checkbox" class="img-clip-invert" ${layer.clipInvert ? 'checked' : ''}> Inv</label>
+                        </div>
+                        ` : ''}
+                        ${!layer.isCollision ? `
                         <div style="margin-bottom:6px;">
                             <button class="mask-control-btn" onclick="collisionFromMask(${layer.index})" title="Generate collision layer from current mask or threshold" style="width:100%;background:rgba(255,160,60,0.13);border-color:rgba(255,160,60,0.35);text-align:center;">🧱 Generate Collision Layer</button>
                         </div>
@@ -259,6 +271,26 @@
                         const enable = () => { isLayerSliderActive = false; if (headerEl) headerEl.draggable = true; if (itemEl) delete itemEl.dataset.sliderActive; };
                         ['pointerdown','mousedown','touchstart'].forEach(evt => slider.addEventListener(evt, disable, { passive: true }));
                         ['pointerup','pointercancel','mouseup','touchend','touchcancel'].forEach(evt => slider.addEventListener(evt, enable, { passive: true }));
+                    }
+                    // D3-3: image-layer Clip dropdown + Inv (mirrors the raster clip wiring).
+                    // stopPropagation on pointer/mouse events so the layer drag guards don't eat them.
+                    const clipSel = element.querySelector('.img-clip-select');
+                    if (clipSel) {
+                        clipSel.addEventListener('change', (e) => {
+                            e.stopPropagation();
+                            layer.clipMaskId = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                            if (typeof window.applyLayerClip === 'function') window.applyLayerClip(layer.index);
+                        });
+                        clipSel.addEventListener('mousedown', (e) => e.stopPropagation());
+                    }
+                    const clipInv = element.querySelector('.img-clip-invert');
+                    if (clipInv) {
+                        const stopP = (ev) => ev.stopPropagation();
+                        ['click','mousedown','pointerdown','touchstart'].forEach(evt => clipInv.addEventListener(evt, stopP));
+                        clipInv.addEventListener('change', () => {
+                            layer.clipInvert = clipInv.checked;
+                            if (typeof window.applyLayerClip === 'function') window.applyLayerClip(layer.index);
+                        });
                     }
                     // Wire collision controls if present
                     if (layer.isCollision) {
@@ -485,6 +517,23 @@
             const target = e.target.closest('.layer-item');
             if (target) target.classList.remove('drag-over');
         }
+        // D6: reorder undo — restore the whole layerOrder in place.
+        function _applyLayerOrder(arr) {
+            layerOrder.length = 0;
+            arr.forEach(function (it) { layerOrder.push(it); });
+            window.layerOrder = layerOrder;
+            renderLayers();
+        }
+        function _recordReorderUndo(before) {
+            if (!window.__layerHistory || window.__layerHistory.isApplying()) return;
+            const after = layerOrder.slice();
+            if (JSON.stringify(before) === JSON.stringify(after)) return; // no-op
+            window.__layerHistory.push({
+                label: 'reorder layers',
+                undo: function () { _applyLayerOrder(before); },
+                redo: function () { _applyLayerOrder(after); }
+            });
+        }
         function handleDrop(e) {
             if (e.stopPropagation) e.stopPropagation();
             e.preventDefault();
@@ -495,11 +544,13 @@
             }
             const draggedOrderIndex = parseInt(draggedElement.dataset.orderIndex);
             const targetOrderIndex = parseInt(target.dataset.orderIndex);
+            const _before = layerOrder.slice(); // D6
             // Simple reordering: remove from old position, insert at target position
             const [draggedItem] = layerOrder.splice(draggedOrderIndex, 1);
             layerOrder.splice(targetOrderIndex, 0, draggedItem);
             endDragUX(); // dragend may not fire on the detached source node
             renderLayers();
+            _recordReorderUndo(_before); // D6
             target.classList.remove('drag-over');
             return false;
         }
@@ -524,6 +575,7 @@
             e.preventDefault();
             const dropPosition = this.dataset.dropPosition;
             const draggedOrderIndex = parseInt(draggedElement.dataset.orderIndex);
+            const _before = layerOrder.slice(); // D6
             // Remove from current position
             const [draggedItem] = layerOrder.splice(draggedOrderIndex, 1);
             if (dropPosition === 'top') {
@@ -535,6 +587,7 @@
             }
             endDragUX(); // dragend may not fire on the detached source node
             renderLayers();
+            _recordReorderUndo(_before); // D6
             this.classList.remove('drag-over');
             return false;
         }
@@ -602,6 +655,9 @@
                                 } else {
                                     applyLayerMask(layer.index);
                                 }
+                                // D3-3: refresh the Mask clip alongside the re-bake
+                                // (cheap no-op when the layer has no clip binding).
+                                if (typeof window.applyLayerClip === 'function') window.applyLayerClip(layer.index);
                                 layer.__maskDirty = false;
                             }
                         }
