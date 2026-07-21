@@ -83,7 +83,9 @@
         brushJitter: {configKey: "BRUSH_JITTER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushPressureCurve: {configKey: "BRUSH_PRESSURE_CURVE", ui: null, hard: {min: 0.25, max: 2.5}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushTipTexture: {configKey: "BRUSH_TIP_TEXTURE", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
-        shadingIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.1, scope: "extended"}}
+        shadingIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.1, scope: "extended"}},
+        shadeRelief: {configKey: "SHADE_RELIEF", ui: {min: 0, max: 2, step: 0.05}, hard: {min: 0, max: 3}, def: 1.0, decimals: 2, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.05, scope: "extended"}},
+        shadeGloss: {configKey: "SHADE_GLOSS", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1.5}, def: 0.35, decimals: 2, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}}
     };
     var CHECKBOXES = {
         cursorToggle: {def: true, mutScope: null},
@@ -101,6 +103,10 @@
         sketchVisible: {def: true, mutScope: null},
         randomColor: {def: true, mutScope: "basic"},
         stepPalette: {def: false, mutScope: "basic"},
+        // Color Gate ("recover faded strokes") — a brush/colour behaviour, not a
+        // style variant, so no mutScope. Registered here so presets and session
+        // save/load round-trip it (capture derives its id list from this map).
+        colorGate: {def: false, mutScope: null},
         kaleidoToggle: {def: false, mutScope: "basic"},
         kAnimateRot: {def: false, mutScope: "basic"},
         enableLighting: {def: false, mutScope: "extended"},

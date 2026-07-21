@@ -27,77 +27,40 @@
         return arr;
     }
 
-    // All slider IDs to save/load
-    var SLIDER_IDS = [
-        // Simulation
-        'densityDissipation','velocityDissipation','pressureDissipation','pressureIteration',
-        'velocityInfluence','curl','sharpness','swirl','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming',
-        // Kaleidoscope
-        'kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments',
-        // Light Source
-        'lightSpeed','lightIntensity','lightAmbient',
-        // Light Shift
-        'lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation',
-        // Micro Detail
-        'clarity','vibrance',
-        // Sunrays
-        'sunraysWeight',
-        // Shooting Star
-        'ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity',
-        // Audio Reactive
-        'audioSensitivity','audioBeatThreshold',
-        // Brush
-        'brushRefreshRate',
-        // Display Shading
-        'shadingIntensity'
-    ];
+    // Persisted control ids — the single source of truth is ParamRegistry, so
+    // capture can NEVER drift out of sync with what apply will accept. Every
+    // control the registry knows about is saved into both session settings and
+    // user presets; adding a new slider/checkbox/select to 01a-param-registry.js
+    // automatically makes it persist here, with no second list to maintain.
+    //
+    // History: these were three hand-curated arrays that fell behind the
+    // registry — the brush stroke-engine sliders (brushFlow/Hardness/Spacing/…),
+    // velocityCap and the multigrid controls were all registered and clamp-ready
+    // but never captured, so saving a preset silently dropped them ("a brush
+    // setting changes after I save"). Deriving the lists removes that whole
+    // class of bug.
+    //
+    // PRESET_SKIP: controls the registry clamps but that must NOT persist. Only
+    // preserveFluidOpacity ("Empty Alpha Locked") — a session-only toggle that
+    // must default to checked on every launch (applyPresetSnapshot ignores it
+    // too, at the checkbox-restore loop below).
+    var PRESET_SKIP = { preserveFluidOpacity: true };
 
-    // All checkbox IDs to save/load
-    var CHECKBOX_IDS = [
-        // Display
-        // (preserveFluidOpacity is deliberately NOT persisted — "Empty Alpha
-        // Locked" must default to checked on every launch; session-only toggle)
-        'cursorToggle','showCanvasHandles','lockCanvasBorders',
-        'statsToggle','transparentMode',
-        // Colors
-        'randomColor','stepPalette',
-        // Kaleidoscope
-        'kaleidoToggle','kAnimateRot',
-        // Effects
-        'enableLighting','enableLightShift','microDetailToggle',
-        'sunraysToggle',
-        // Simulation
-        'macCormackToggle','multigridToggle',
-        // Animations
-        'ascendToggle','ascendRandomness','shootingStarToggle',
-        // Layers
-        'hoverCaptureToggle','detachCaptureToggle',
-        // Audio Reactive
-        'audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor',
-        // Focus
-        'focusModeToggle','streamFormatLock',
-        // Settings
-        'autoloadSettings',
-        // Display Shading
-        'displayShadingToggle'
-    ];
+    function _registryIds(map, skip) {
+        return Object.keys(map).filter(function (id) { return !(skip && skip[id]); });
+    }
 
-    // All select IDs to save/load
-    var SELECT_IDS = [
-        'visualResolution','physicsResolution','kaleidoMode',
-        // Simulation
-        'fpsCap',
-        // Light Source
-        'lightMode',
-        // Light Shift
-        'lightShiftMode',
-        // Recording
-        'recMode','recPlaybackSpeed',
-        // Audio Reactive
-        'audioMode','audioReactSource','audioAutoSplatMode',
-        // Brush
-        'splatInMode','splatOutMode'
-    ];
+    // Frozen fallbacks — used ONLY if ParamRegistry failed to load (in which
+    // case apply-side clamping is broken anyway). Mirrors pre-registry coverage.
+    var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','swirl','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','clarity','vibrance','sunraysWeight','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','brushRefreshRate','shadingIntensity'];
+    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','sunraysToggle','macCormackToggle','multigridToggle','ascendToggle','ascendRandomness','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
+    var FALLBACK_SELECT_IDS = ['visualResolution','physicsResolution','kaleidoMode','fpsCap','lightMode','lightShiftMode','recMode','recPlaybackSpeed','audioMode','audioReactSource','audioAutoSplatMode','splatInMode','splatOutMode'];
+
+    var _PR = window.ParamRegistry;
+    if (!_PR || !_PR.SLIDERS) console.warn('[Save/Load] ParamRegistry unavailable — using fallback persist lists (reduced preset coverage)');
+    var SLIDER_IDS   = (_PR && _PR.SLIDERS)    ? _registryIds(_PR.SLIDERS)                : FALLBACK_SLIDER_IDS;
+    var CHECKBOX_IDS = (_PR && _PR.CHECKBOXES) ? _registryIds(_PR.CHECKBOXES, PRESET_SKIP) : FALLBACK_CHECKBOX_IDS;
+    var SELECT_IDS   = (_PR && _PR.SELECTS)    ? _registryIds(_PR.SELECTS)                : FALLBACK_SELECT_IDS;
 
     function getStatsPanelState() {
         const panel = $('statsPanel');

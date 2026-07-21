@@ -194,6 +194,31 @@
                 if (shadingValue) shadingValue.textContent = v.toFixed(1);
             });
         }
+        // Surface Shading — Relief & Gloss (2026-07-21). The two luminance-
+        // preserving shading tunables (config.SHADE_RELIEF / SHADE_GLOSS, read in
+        // 05j) exposed as sliders. They live inside shadingIntensityGroup, so the
+        // Surface Shading checkbox reveals/hides them alongside Intensity. Registry-
+        // backed (01a) for clamp + preset persistence; wired bespoke here like
+        // Intensity because they are display sliders, not simSliders (so the generic
+        // registry→config binding in 05h intentionally skips them).
+        const shadeReliefSlider = document.getElementById('shadeRelief');
+        const shadeReliefValue = document.getElementById('shadeReliefValue');
+        if (shadeReliefSlider) {
+            shadeReliefSlider.addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                config.SHADE_RELIEF = v;
+                if (shadeReliefValue) shadeReliefValue.textContent = v.toFixed(2);
+            });
+        }
+        const shadeGlossSlider = document.getElementById('shadeGloss');
+        const shadeGlossValue = document.getElementById('shadeGlossValue');
+        if (shadeGlossSlider) {
+            shadeGlossSlider.addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                config.SHADE_GLOSS = v;
+                if (shadeGlossValue) shadeGlossValue.textContent = v.toFixed(2);
+            });
+        }
         // Capture dimming slider (controls background transparency)
         window.backgroundTransparency = 0.8; // Default 80%
         const captureDimmingSlider = document.getElementById('captureDimming');

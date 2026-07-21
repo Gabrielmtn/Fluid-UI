@@ -19,6 +19,7 @@
             uniform float stampNoise;  // 0 = classic gaussian splat; >0 blends in the clay stamp
             uniform vec2 stampSeed;    // per-splat offset so consecutive stamps differ
             uniform int stampShape;    // 0 = blob, 1 = chisel (square press), 2 = streak (elongated smear)
+            uniform float stampAngle;  // brush rotation (radians, screen space) for chisel/streak; 0 = upright
             uniform float ringRadius;  // >0: thin ring-band stamp at this radius (aspect-corrected UV); 0 = classic blob
             uniform float ringSquash;  // ring ellipse squash (1 = circle, <1 = flattened vertically)
             uniform float barHalfW;    // >0: crisp bar stamp this half-width wide (aspect-corrected UV); EQ lane slabs
@@ -136,13 +137,22 @@
                         // Noise domain scales with splat size so grain tracks the brush.
                         vec2 q = p / sqrt(radius);
                         float n = sn_noise(q * 3.0 + stampSeed);
+                        // Rotate the metric frame so asymmetric tips can be angled.
+                        // stampAngle is screen-space radians (p-space is aspect-
+                        // corrected + isotropic, so this is a true screen rotation);
+                        // grain stays on unrotated q. Blob (m = r2) is rotation-invariant.
+                        vec2 qr = q;
+                        if (stampAngle != 0.0) {
+                            float ca = cos(stampAngle), sa = sin(stampAngle);
+                            qr = vec2(q.x * ca - q.y * sa, q.x * sa + q.y * ca);
+                        }
                         // Footprint metric per brush shape (r2-compatible units)
                         float m = r2;                                   // 0: round blob
                         if (stampShape == 1) {
-                            float box = max(abs(q.x), abs(q.y));        // 1: chisel — square press
+                            float box = max(abs(qr.x), abs(qr.y));      // 1: chisel — square press
                             m = box * box;
                         } else if (stampShape == 2) {
-                            vec2 qs = q * vec2(0.55, 2.4);              // 2: streak — wide smear
+                            vec2 qs = qr * vec2(0.55, 2.4);            // 2: streak — wide smear
                             m = dot(qs, qs);
                         }
                         float rim = 1.4 * (0.55 + 0.9 * n);
