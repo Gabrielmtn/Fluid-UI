@@ -837,6 +837,12 @@
                 gl.uniform1f(displayProg.uniforms.lightShiftIntensity, window.lightShift.intensity || 0.5);
                 const _lsModeMap = { replace: 0, tint: 1, overlay: 2, multiply: 3, screen: 4, add: 5 };
                 gl.uniform1i(displayProg.uniforms.lightShiftMode, _lsModeMap[window.lightShift.mode] || 0);
+                // Density trigger (2026-07-21): the Gate ceiling (density-key reference,
+                // 0 when Gate off) and how much the pigment-density signal feeds the
+                // overblow test. Lets Color Shift key off actual dye density, which
+                // survives the Gate clamp + Gate/Ignite vibrance the display does not.
+                gl.uniform1f(displayProg.uniforms.lightShiftCeiling, (config.BLOOM_CEILING > 0) ? config.BLOOM_CEILING : 0.0);
+                gl.uniform1f(displayProg.uniforms.lightShiftDensity, (typeof config.LS_DENSITY_MIX === 'number') ? config.LS_DENSITY_MIX : 1.0);
             }
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
             gl.uniform1i(displayProg.uniforms.uSunrays, 1);
