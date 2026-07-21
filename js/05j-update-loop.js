@@ -817,6 +817,8 @@
             gl.uniform2f(displayProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
             gl.uniform1f(displayProg.uniforms.displayShading, window.displayShading || 0.0);
             gl.uniform1f(displayProg.uniforms.shadeInvert, window.displayShadingInvert || 0.0);
+            gl.uniform1f(displayProg.uniforms.shadeRelief, (typeof config.SHADE_RELIEF === 'number') ? config.SHADE_RELIEF : 1.0);
+            gl.uniform1f(displayProg.uniforms.shadeGloss, (typeof config.SHADE_GLOSS === 'number') ? config.SHADE_GLOSS : 0.35);
             gl.uniform1f(displayProg.uniforms.gateVibrance, (config.BLOOM_CEILING > 0) ? 1.0 : 0.0);
             // Saturation added at full Ignite. 0.45 was measured at sat
             // 0.742 -> 0.958 on a green: unmistakably lit, but nearer neon

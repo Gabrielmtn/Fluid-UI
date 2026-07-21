@@ -336,6 +336,14 @@
                 <label for="shadingIntensity">Intensity <span id="shadingIntensityValue" class="value-display">0.8</span></label>
                 <input type="range" id="shadingIntensity" min="0" max="2" value="0.8" step="0.1">
             </div>
+            <div class="control-group">
+                <label for="shadeRelief">Relief <span id="shadeReliefValue" class="value-display">1.00</span></label>
+                <input type="range" id="shadeRelief" min="0" max="2" value="1" step="0.05">
+            </div>
+            <div class="control-group">
+                <label for="shadeGloss">Gloss <span id="shadeGlossValue" class="value-display">0.35</span></label>
+                <input type="range" id="shadeGloss" min="0" max="1" value="0.35" step="0.05">
+            </div>
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="sunraysToggle">
@@ -426,6 +434,18 @@
         <div class="control-group checkbox-group">
             <input type="checkbox" id="cursorToggle" checked>
             <label for="cursorToggle" style="margin: 0">Show Cursor</label>
+        </div>
+        <div class="control-group" style="margin-top: 5px; margin-left: 10px;">
+            <label for="brushCursorColor">Cursor Ring Color</label>
+            <input type="color" id="brushCursorColor" value="#ffffff">
+        </div>
+        <div class="control-group" style="margin-top: 5px; margin-left: 10px;">
+            <label for="brushCursorScale">Cursor Size <span id="brushCursorScaleValue" class="value-display">25%</span></label>
+            <input type="range" id="brushCursorScale" min="5" max="200" value="25" step="5">
+        </div>
+        <div class="control-group" style="margin-top: 5px; margin-left: 10px;">
+            <label for="brushCursorOpacity">Cursor Opacity <span id="brushCursorOpacityValue" class="value-display">50%</span></label>
+            <input type="range" id="brushCursorOpacity" min="0" max="100" value="50" step="5">
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="showCanvasHandles" checked>
@@ -873,6 +893,8 @@
                     <ul>
                         <li>[ / ] — Brush Size − / +</li>
                         <li>Shift+[ / Shift+] — Coarse − / +</li>
+                        <li>Scroll — Brush Size − / +</li>
+                        <li>Shift+Scroll — Rotate Brush (angle)</li>
                     </ul>
                 </div>
                 <div>
@@ -896,6 +918,7 @@
                 <div>
                     <h3>Physics</h3>
                     <ul>
+                        <li>Ctrl+Scroll — Density − / +</li>
                         <li>Ctrl+Shift+Scroll — Motion Isolation (Velocity Influence) − / +</li>
                     </ul>
                 </div>
@@ -1022,6 +1045,7 @@
     <script src="js/27-audio-composer.js"></script>
     <script src="js/30-audio-scenes.js"></script>
     <script src="js/20-mixer-layout.js"></script>
+    <script src="js/31-brush-cursor.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">

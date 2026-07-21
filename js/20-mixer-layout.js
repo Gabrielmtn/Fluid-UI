@@ -2080,6 +2080,7 @@
                 eraser: !!c.BRUSH_ERASER,
                 tip: c.BRUSH_TIP | 0,
                 tipTexture: num(c.BRUSH_TIP_TEXTURE, 0.7),
+                angle: num(c.BRUSH_ANGLE, 0),
                 flow: num(c.BRUSH_FLOW, 1),
                 hardness: num(c.BRUSH_HARDNESS, 0.8),
                 stabilizer: num(c.BRUSH_STABILIZER, 0),
@@ -2106,7 +2107,7 @@
                 }
                 if (SETTERS.target) SETTERS.target(p.target);
                 if (SETTERS.tip) SETTERS.tip(p.tip | 0);
-                ['tipTexture', 'flow', 'hardness', 'stabilizer', 'spacing', 'jitter',
+                ['tipTexture', 'angle', 'flow', 'hardness', 'stabilizer', 'spacing', 'jitter',
                  'pressureSize', 'pressureFlow', 'pressureCurve', 'eraser'
                 ].forEach(function (k) {
                     if (SETTERS[k] && p[k] !== undefined) SETTERS[k](p[k]);
@@ -2263,6 +2264,13 @@
             try { saved = window.settingsManager && window.settingsManager.get('brush.tip'); } catch (_) {}
             setBrushTip(typeof saved === 'number' ? saved : ((window.config && window.config.BRUSH_TIP) | 0));
         })();
+
+        // Angle: rotates the asymmetric stamp shapes (chisel/streak). The
+        // brush-ring cursor's bisecting line always shows this angle, so it
+        // stays enabled for every tip even though round tips don't visibly turn.
+        var angleGroup = pSlider('brushAngle', 'Angle', 0, 360, 1, 'BRUSH_ANGLE',
+            function (v) { return Math.round(v) + '°'; }, 'angle');
+        angleGroup.title = 'Rotate the brush tip (chisel/streak). The cursor line shows the angle.';
 
         // ── Flow + stroke feel ──
         pSlider('brushFlow', 'Flow', 0.05, 1, 0.01, 'BRUSH_FLOW', pct, 'flow');

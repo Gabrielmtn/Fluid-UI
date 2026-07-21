@@ -346,6 +346,17 @@
                                       // saturation 0.742 -> 0.958 (neon); 0.22 is the "turned
                                       // up, still your colour" setting. 0 = off.
 
+            SHADE_RELIEF: 1.0,        // Surface Shading relief strength (2026-07-21 rebalance).
+                                      // Multiplies the luminance-preserving relief term (the signed
+                                      // N.L-L.z form modulation) on top of the slider. 1 = shipped;
+                                      // raise for deeper sculpting, 0 = flat (gloss only). The pass
+                                      // no longer dims the dye — see displayFrag in 05a.
+
+            SHADE_GLOSS: 0.35,        // Surface Shading specular strength (2026-07-21). The plastic
+                                      // sheen: a tight Blinn-Phong highlight ADDED on top of the
+                                      // preserved hue. 0.35 = shipped; raise for wetter/glossier
+                                      // plastic, 0 = matte relief. Console-tunable, x the slider.
+
             LS_DENSITY_MIX: 1.0,      // Color Shift density trigger (2026-07-21): how much the
                                       // pigment-memory / raw-density overblow signal feeds Light
                                       // Shift's trigger, alongside the displayed-whiteness key.
@@ -424,6 +435,10 @@
                                       // 0 = gaussian, 1 = blob, 2 = chisel, 3 = streak, 4 = ring
             BRUSH_TIP_TEXTURE: 0.7,   // Stamp grain/blend for blob/chisel/streak tips
                                       // (splatFrag stampNoise; ring ignores it)
+            BRUSH_ANGLE: 0,           // D1 brush rotation in degrees (0-360). Rotates the
+                                      // asymmetric stamp shapes (chisel/streak) in the splat
+                                      // shader; the brush-ring cursor's line shows this angle.
+                                      // Round tips (soft/blob/ring) are rotation-invariant.
 
             SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
                                       // Painterly sub-grid wisps on moving paint; dies with

@@ -43,6 +43,9 @@
                 gl.uniform1i(splatProg.uniforms.stampShape, config.STAMP_SHAPE || 0);
             }
             gl.uniform2f(splatProg.uniforms.stampSeed, Math.random() * 19.7, Math.random() * 23.3);
+            // Brush rotation: degrees → radians for chisel/streak stamps (inert on
+            // round shapes and when stampNoise is 0, so it never fights other splats).
+            gl.uniform1f(splatProg.uniforms.stampAngle, (config.BRUSH_ANGLE || 0) * Math.PI / 180);
             gl.uniform1f(splatProg.uniforms.ringRadius, 0); // classic blob — never inherit a stale ring stamp
             gl.uniform1f(splatProg.uniforms.barHalfW, 0);   // ...or a stale bar stamp
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
@@ -120,6 +123,7 @@
                 1.0 / Math.max(1, config.VELOCITY_REFERENCE_RESOLUTION || 512));
             gl.uniform1f(splatProg.uniforms.stampNoise, 0);
             gl.uniform1i(splatProg.uniforms.stampShape, 0);
+            gl.uniform1f(splatProg.uniforms.stampAngle, 0);
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
             const _ringObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
             gl.uniform1i(splatProg.uniforms.hasObstacle, _ringObsActive ? 1 : 0);

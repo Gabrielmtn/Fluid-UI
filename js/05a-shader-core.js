@@ -136,6 +136,8 @@
             uniform float kBlend; // 0..1
             uniform float displayShading; // 0=off, >0 = shading intensity
             uniform float shadeInvert;    // 1 = flip relief normals (clay chiaroscuro: strokes read as carved dents)
+            uniform float shadeRelief;    // SHADE_RELIEF x slider: relief strength (redistributes light across the form)
+            uniform float shadeGloss;     // SHADE_GLOSS  x slider: specular gloss strength (the plastic sheen)
             uniform float gateVibrance;   // 1 = Gate on: re-add the saturation the Reinhard tone-map strips from HDR dye
             uniform float igniteVibrance; // 0-1 Ignite envelope: enrich rather than lighten (see below)
             uniform vec2 texelSize;
@@ -322,7 +324,9 @@
                     float gv = dot(color.rgb, lw);
                     color.rgb = clamp(mix(vec3(gv), color.rgb, 1.0 + satW), 0.0, 1.0);
                 }
-                // Enhanced display shading: normal-mapped lighting for 3D fabric/clay depth
+                // Surface shading -- luminance-preserving relief + specular gloss.
+                // Sculpts a smooth-plastic surface out of the dye WITHOUT dimming it
+                // (rebalanced 2026-07-21; see the relief/gloss notes below).
                 if (displayShading > 0.0) {
                     vec3 lumaW = vec3(0.299, 0.587, 0.114);
                     float centerLuma = dot(color.rgb, lumaW);
@@ -352,41 +356,42 @@
                     float dy = ((lTL + 2.0 * lT + lTR) - (lBL + 2.0 * lB + lBR)) * 0.0625;
                     float nStr = displayShading * 6.0 * shadeFade * (shadeInvert > 0.5 ? -1.0 : 1.0);
                     vec3 N = normalize(vec3(dx * nStr, dy * nStr, 0.25));
-                    // Key light (upper-left, warm white)
-                    vec3 keyDir = normalize(vec3(-0.5, 0.7, 0.9));
-                    float keyDiff = max(dot(N, keyDir), 0.0);
-                    vec3 warmKey = vec3(1.0, 0.97, 0.92);
-                    // Fill light (lower-right, cool, softer)
-                    vec3 fillDir = normalize(vec3(0.4, -0.5, 0.7));
-                    float fillDiff = max(dot(N, fillDir), 0.0);
+                    // Two fixed studio lights (directions/colours unchanged):
+                    // warm key upper-left, cool fill lower-right.
+                    vec3 keyDir  = normalize(vec3(-0.5,  0.7, 0.9));
+                    vec3 fillDir = normalize(vec3( 0.4, -0.5, 0.7));
+                    vec3 warmKey  = vec3(1.0, 0.97, 0.92);
                     vec3 coolFill = vec3(0.9, 0.94, 1.0);
-                    // Specular highlight (Blinn-Phong, key light)
-                    vec3 V = vec3(0.0, 0.0, 1.0);
-                    vec3 H = normalize(keyDir + V);
-                    float spec = pow(max(dot(N, H), 0.0), 48.0);
-                    // Ambient occlusion from curvature (Laplacian)
-                    float avgN = (lL + lR + lT + lB) * 0.25;
-                    avgN = avgN / (1.0 + avgN); // tone-map for comparison
-                    float ao = smoothstep(-0.08, 0.04, centerLuma - avgN);
-                    ao = mix(1.0, ao, displayShading * 0.6 * shadeFade);
-                    // Combine lighting, normalized against a flat surface:
-                    // without this, raising the intensity tilts normals away
-                    // from the fixed lights and the WHOLE image darkens â€” the
-                    // slider read as a brightness knob, not a relief knob.
-                    // Dividing by the flat-normal lighting keeps flat areas at
-                    // constant brightness at every intensity; only actual
-                    // slopes get brighter/darker relative to it.
-                    vec3 lighting = vec3(0.35) + keyDiff * warmKey * 0.55 + fillDiff * coolFill * 0.2;
-                    vec3 lightFlat = vec3(0.35) + keyDir.z * warmKey * 0.55 + fillDir.z * coolFill * 0.2;
-                    color.rgb = color.rgb * (lighting / lightFlat) * ao + spec * warmKey * 0.2 * centerLuma;
-                    // S-curve contrast, faded at low luminance â€” near black it
-                    // crushes faint dye toward zero and hardens the fade edge
-                    color.rgb = min(color.rgb, vec3(1.0));
-                    vec3 sCurved = color.rgb * color.rgb * (3.0 - 2.0 * color.rgb);
-                    color.rgb = mix(color.rgb, sCurved, shadeFade);
-                    // Saturation boost (fades to neutral at low luminance)
+                    // -- Relief (luminance-PRESERVING) --------------------------
+                    // The old pass lit the dye with max(N.L,0) diffuse + a Laplacian
+                    // AO term; both SUBTRACT light, so flat dye came out ~12% dim and
+                    // away-facing slopes crushed to the ambient floor -- the slider
+                    // read as a dimmer and the hue went muddy. Drive the surface off
+                    // the SIGNED deviation from the flat response (N.L - L.z) instead:
+                    // exactly 0 on flat dye, + toward a light, - away, and symmetric,
+                    // so color *= (1 + relief) sculpts the form (crests brighten,
+                    // troughs darken equally) while leaving flat regions and the
+                    // overall level untouched. No global dim; the hue is preserved.
+                    float dK = dot(N, keyDir)  - keyDir.z;
+                    float dF = dot(N, fillDir) - fillDir.z;
+                    vec3 relief = dK * 0.62 * warmKey + dF * 0.24 * coolFill;
+                    float reliefAmt = displayShading * shadeRelief * shadeFade;
+                    color.rgb *= max(vec3(0.0), 1.0 + relief * reliefAmt);
+                    // -- Saturation lift (luminance-neutral) -------------------
+                    // Keep the hue rich, faded to neutral in faint dye. The old
+                    // global S-curve lived here and was a net midtone darkener --
+                    // it is gone; relief + gloss supply the plastic pop now.
+                    color.rgb = max(color.rgb, vec3(0.0));
                     float gray = dot(color.rgb, lumaW);
-                    color.rgb = mix(vec3(gray), color.rgb, 1.0 + (0.15 + displayShading * 0.35) * shadeFade);
+                    color.rgb = mix(vec3(gray), color.rgb, 1.0 + (0.15 + displayShading * 0.30) * shadeFade);
+                    // -- Specular gloss (the one term that ADDS light) ---------
+                    // A tight Blinn-Phong highlight off the key light, laid on top
+                    // last -- the plastic sheen. Gated to real dye by shadeFade so
+                    // the black ground never sparkles; not scaled by centerLuma, so
+                    // mid-tones read glossy too.
+                    vec3 H = normalize(keyDir + vec3(0.0, 0.0, 1.0));
+                    float spec = pow(max(dot(N, H), 0.0), 48.0);
+                    color.rgb += spec * warmKey * (displayShading * shadeGloss) * shadeFade;
                     color.rgb = max(color.rgb, vec3(0.0));
                 }
                 // Sunrays: multiplicative light/shadow on tone-mapped base
