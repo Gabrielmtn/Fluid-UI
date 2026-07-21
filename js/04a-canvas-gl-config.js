@@ -346,6 +346,17 @@
                                       // saturation 0.742 -> 0.958 (neon); 0.22 is the "turned
                                       // up, still your colour" setting. 0 = off.
 
+            LS_DENSITY_MIX: 1.0,      // Color Shift density trigger (2026-07-21): how much the
+                                      // pigment-memory / raw-density overblow signal feeds Light
+                                      // Shift's trigger, alongside the displayed-whiteness key.
+                                      // Memory (dye alpha) and the pre-tone-map magnitude survive
+                                      // the Gate's rgb clamp AND the Gate/Ignite vibrance boost,
+                                      // so Color Shift keys off ACTUAL overblow instead of a
+                                      // capped, re-saturated display — which is why "replace"
+                                      // stopped landing once Ignite/Gate touched a region.
+                                      // 1 = full hybrid; 0 = old whiteness-only. See displayFrag
+                                      // in 05a. Console-tunable.
+
             DYE_MEMORY_DISS: 0.9995,  // Pigment memory half-life (2026-07-20): dye alpha
                                       // remembers the strength a stroke was PAINTED at, so
                                       // Ignite restores the original colour instead of just

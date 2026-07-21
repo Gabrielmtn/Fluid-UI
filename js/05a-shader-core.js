@@ -150,6 +150,8 @@
             uniform float lightShiftThreshold; // 0-1 on displayed brightness
             uniform float lightShiftIntensity;
             uniform int   lightShiftMode;      // 0=replace,1=tint,2=overlay,3=multiply,4=screen,5=add
+            uniform float lightShiftCeiling;   // Gate ceiling (config.BLOOM_CEILING; 0 = Gate off) — density-key reference
+            uniform float lightShiftDensity;   // 0-1: how much the pigment-density overblow signal feeds the trigger
             const float PI = 3.141592653589793;
             vec3 lsOverlay(vec3 b, vec3 s) {
                 return vec3(
@@ -289,6 +291,14 @@
                 float hdrMax = max(color.r, max(color.g, color.b));
                 // Tone map HDR to displayable range (per-channel Reinhard)
                 color.rgb = color.rgb / (1.0 + color.rgb);
+                // Light Shift keys off THIS â€” the tone-mapped dye before any
+                // re-saturation. Gate/Ignite vibrance (and shading's sat boost)
+                // below pull overblown pixels back off white; keying the
+                // overblow test on the post-vibrance color let them consume the
+                // whiteness signal, so "Replace" quit firing once Ignite/Gate
+                // enriched a region. Detect on the raw overblow, recolor the
+                // displayed pixel â€” the two effects now stack instead of fight.
+                vec3 lsSrc = color.rgb;
                 // Gate vibrance: per-channel Reinhard flattens channel ratios as
                 // dye climbs into HDR â€” the washed-out look near the bloom
                 // ceiling. Re-widen saturation in proportion to how deep into
@@ -389,11 +399,33 @@
                 // (desaturated bright = the real target), so pure white always
                 // maxes the factor and a saturated hue does not read as "white".
                 if (lightShiftEnabled > 0.5) {
-                    float lsMaxC = max(color.r, max(color.g, color.b));
-                    float lsMinC = min(color.r, min(color.g, color.b));
+                    float lsMaxC = max(lsSrc.r, max(lsSrc.g, lsSrc.b));
+                    float lsMinC = min(lsSrc.r, min(lsSrc.g, lsSrc.b));
                     float lsSat = lsMaxC > 0.001 ? (lsMaxC - lsMinC) / lsMaxC : 0.0;
-                    float lsLum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-                    float lsOver = max(lsLum, lsMaxC) * (1.0 - 0.6 * lsSat);
+                    float lsLum = dot(lsSrc, vec3(0.299, 0.587, 0.114));
+                    // (1) Visible-white key: desaturated-bright on the pre-vibrance dye.
+                    float lsWhite = max(lsLum, lsMaxC) * (1.0 - 0.6 * lsSat);
+                    // (2) Density key: pigment memory (color.a) and the raw pre-tone-map
+                    // magnitude (hdrMax) both survive the Gate's rgb clamp AND the
+                    // Gate/Ignite vibrance boost, so they read the overblow the display
+                    // no longer shows. Reinhard recovers the brightness this pile WOULD
+                    // reach uncapped — same 0-1 space as the white key, so the threshold
+                    // keeps meaning what it did (Gate OFF: a would-be-white pile reads
+                    // its true brightness, e.g. an Ignite settling at ~3.8 -> 0.79). With
+                    // the Gate ON both signals sit pinned at the ceiling, so the
+                    // ceiling-relative ramp is what lets those gated peaks reach the
+                    // threshold at all.
+                    float lsDens = max(hdrMax, color.a);
+                    float lsDensWhite = lsDens / (1.0 + lsDens);
+                    float lsCeil = (lightShiftCeiling > 0.0)
+                        ? smoothstep(0.6, 1.0, hdrMax / lightShiftCeiling) : 0.0;
+                    // Memory outlives the visible dye (its own slow clock), so gate the
+                    // density key on live dye actually being here — never recolour a bare
+                    // canvas that merely remembers a stroke.
+                    float lsPresent = smoothstep(0.02, 0.08, lsMaxC);
+                    float lsDensKey = max(lsDensWhite, lsCeil) * lsPresent * lightShiftDensity;
+                    // Hybrid: fire on visible white OR reconstructed density overblow.
+                    float lsOver = max(lsWhite, lsDensKey);
                     if (lsOver > lightShiftThreshold) {
                         float lt = clamp((lsOver - lightShiftThreshold) / (1.0 - lightShiftThreshold + 0.001), 0.0, 1.0);
                         lt = lt * lt * (3.0 - 2.0 * lt);
