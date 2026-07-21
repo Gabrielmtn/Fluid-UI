@@ -404,58 +404,49 @@
             stepEl.checked = false;
         }
 
-        var rndBtn = null;
-        var stepBtn = null;
+        // Rnd / Step / Rainbow are three VIEWS of the active brush's colour mode
+        // (multiArmColors[0].mode). Each chip calls the controller in 05g;
+        // syncBrushColorUI reflects the mode back onto them via data-brush-mode,
+        // and keeps them in step with the Brush Colors panel's arm-0 row.
+        function arm0Mode() {
+            var a0 = (window.multiArmColors || [])[0];
+            return a0 ? a0.mode : 'main';
+        }
+        function makeColorModeChip(labelText, modeKey, dataKey, title, initActive) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ch-text-toggle' + (initActive ? ' active' : '');
+            btn.textContent = labelText;
+            btn.dataset.brushMode = dataKey;
+            if (title) btn.title = title;
+            btn.addEventListener('click', function () {
+                var next = (arm0Mode() === modeKey) ? 'fixed' : modeKey;
+                if (typeof window.setActiveBrushColorMode === 'function') {
+                    window.setActiveBrushColorMode(next);
+                }
+            });
+            toggleRow.appendChild(btn);
+            return btn;
+        }
 
+        // Hidden native checkboxes stay in the DOM as derived reflections
+        // (save/load, palette auto-step, updatePaletteStepIndicator read them).
         if (rnd) {
             rnd.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
-            rndBtn = document.createElement('button');
-            rndBtn.type = 'button';
-            rndBtn.className = 'ch-text-toggle' + (rnd.checked ? ' active' : '');
-            rndBtn.textContent = 'Rnd';
             ch.appendChild(rnd);
+            makeColorModeChip('Rnd', 'random', 'rnd', 'Random — a new colour each stroke',
+                rnd.checked || arm0Mode() === 'random');
         }
-
         if (stepEl) {
             stepEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
-            stepBtn = document.createElement('button');
-            stepBtn.type = 'button';
-            stepBtn.className = 'ch-text-toggle' + (stepEl.checked ? ' active' : '');
-            stepBtn.textContent = 'Step';
             ch.appendChild(stepEl);
+            makeColorModeChip('Step', 'step', 'step', 'Step through the palette each stroke',
+                stepEl.checked || arm0Mode() === 'step');
         }
-
-        // Wire mutual exclusivity
-        function syncToggles() {
-            if (rndBtn) rndBtn.classList.toggle('active', rnd && rnd.checked);
-            if (stepBtn) stepBtn.classList.toggle('active', stepEl && stepEl.checked);
-        }
-
-        if (rndBtn) {
-            rndBtn.addEventListener('click', function () {
-                var willCheck = !rnd.checked;
-                rnd.checked = willCheck;
-                if (willCheck && stepEl) { stepEl.checked = false; }
-                rnd.dispatchEvent(new Event('change', { bubbles: true }));
-                if (stepEl) stepEl.dispatchEvent(new Event('change', { bubbles: true }));
-                syncToggles();
-            });
-            rnd.addEventListener('change', syncToggles);
-            toggleRow.appendChild(rndBtn);
-        }
-
-        if (stepBtn) {
-            stepBtn.addEventListener('click', function () {
-                var willCheck = !stepEl.checked;
-                stepEl.checked = willCheck;
-                if (willCheck && rnd) { rnd.checked = false; }
-                stepEl.dispatchEvent(new Event('change', { bubbles: true }));
-                if (rnd) rnd.dispatchEvent(new Event('change', { bubbles: true }));
-                syncToggles();
-            });
-            stepEl.addEventListener('change', syncToggles);
-            toggleRow.appendChild(stepBtn);
-        }
+        // Rainbow has NO backing checkbox — it lives only in arm0.mode, which
+        // already persists (multiArmColors) and is understood by recording.
+        makeColorModeChip('🌈', 'rainbow', 'rainbow', 'Rainbow — a new colour every splat',
+            arm0Mode() === 'rainbow');
 
         // Gate chip (independent of Rnd/Step exclusivity): clamps dye at the
         // stroke's own color so repeated paint can't overflow into white.
@@ -3817,14 +3808,30 @@
         (function restoreArmColors() {
             if (!window.__scriptsReady) { setTimeout(restoreArmColors, 250); return; }
             var saved = window.settingsManager && window.settingsManager.get('brush.armColors', null);
-            if (!saved || !Array.isArray(saved) || !saved.length) return;
             var arr = window.multiArmColors;
             if (!arr) { arr = []; window.multiArmColors = arr; }
-            arr.length = 0;
-            saved.forEach(function(c) {
-                arr.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
-            });
+            if (saved && Array.isArray(saved) && saved.length) {
+                arr.length = 0;
+                saved.forEach(function(c) {
+                    arr.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                });
+            } else {
+                // No saved per-arm config: import the active brush's mode from the
+                // legacy checkboxes set by preseedPaletteOnLoad / autoload, so the
+                // palette-preseed "auto-step" surfaces in BOTH colour UIs and in
+                // recording. Otherwise arm 0 would stay 'main' and the reconcile
+                // below would wipe the visibly-checked Step/Rnd state.
+                if (!arr[0]) arr[0] = { mode: 'main', color: '#ffffff', stepIndex: 0 };
+                if (arr[0].mode === 'main') {
+                    var rndEl = document.getElementById('randomColor');
+                    var stepC = document.getElementById('stepPalette');
+                    if (stepC && stepC.checked) arr[0].mode = 'step';
+                    else if (rndEl && rndEl.checked) arr[0].mode = 'random';
+                }
+            }
             if (panel.style.display !== 'none') rebuildRows();
+            // Reconcile every colour widget to arm0.mode at startup.
+            if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI({ skipPanel: true });
         })();
 
         // Two-way sync, panel → main picker: arm 0 IS the brush, so giving it
@@ -3833,13 +3840,12 @@
         // applies pointer.color via 05g's listener). The reverse direction
         // (picker → arm 0) lives in 05g's colorPicker input handler.
         function syncMainPickerFromArm0() {
-            var cfg = (window.multiArmColors || [])[0];
-            if (!cfg || cfg.mode !== 'fixed' || !cfg.color) return;
-            var cp = document.getElementById('colorPicker');
-            if (cp && cp.value !== cfg.color) {
-                cp.value = cfg.color;
-                cp.dispatchEvent(new Event('input', { bubbles: true }));
-            }
+            // Superseded by the 05g controller: reflect arm0.mode into the
+            // top-nav colour channel (picker + Rnd/Step/Rainbow chips + hidden
+            // checkboxes) by PROPERTY only. The old version dispatched a picker
+            // 'input', which fed back into the colour handlers — removed. Kept as
+            // a thin alias for any remaining callers.
+            if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI({ skipPanel: true });
         }
 
         function rebuildRows() {
@@ -3912,7 +3918,12 @@
                             picker.disabled = m.key !== 'fixed';
                             picker.style.opacity = m.key === 'fixed' ? '1' : '0.35';
                             persistArmColors();
-                            if (idx === 0) syncMainPickerFromArm0();
+                            // Arm 0 is the active brush: reflect its new mode into
+                            // the top-nav chips + hidden checkboxes (skipPanel — we
+                            // ARE the panel, and the buttons above already updated).
+                            if (idx === 0 && typeof window.syncBrushColorUI === 'function') {
+                                window.syncBrushColorUI({ skipPanel: true });
+                            }
                         });
                         btns.push(btn);
                         modeWrap.appendChild(btn);
@@ -3933,7 +3944,13 @@
                             picker.style.opacity = '1';
                         }
                         persistArmColors();
-                        if (idx === 0) syncMainPickerFromArm0();
+                        // Arm 0 picker = the active brush's fixed swatch: route
+                        // through the controller so pointer.color updates now and
+                        // the top-nav picker/chips reflect it (skipPanel — mid
+                        // colour-input, don't rebuild the row under the cursor).
+                        if (idx === 0 && typeof window.setActiveBrushColorMode === 'function') {
+                            window.setActiveBrushColorMode('fixed', { color: cfg.color, skipPanel: true });
+                        }
                     });
 
                     row.appendChild(picker);

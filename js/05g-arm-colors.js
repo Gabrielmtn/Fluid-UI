@@ -19,6 +19,13 @@
             // panel and picker mirror each other).
             var cfg = multiArmColors[armIndex];
             if (!cfg || cfg.mode === 'main') return fallbackColor;
+            // Arm 0's random/step DEFER to the legacy pointer.color pipeline:
+            // advanceColor drives the single RNG and the picker "next" preview,
+            // so the top-nav toggles and this per-arm path never draw two
+            // different colours for the same stroke. Arms >0 keep their own
+            // cache below. Rainbow can't defer — it changes per splat — so it
+            // stays on the per-arm generateVibrantColor path even for arm 0.
+            if (armIndex === 0 && (cfg.mode === 'random' || cfg.mode === 'step')) return fallbackColor;
             if (cfg.mode === 'fixed') {
                 var hex = cfg.color || '#ffffff';
                 return [
@@ -60,6 +67,10 @@
             for (var i = 0; i < arr.length; i++) {
                 var cfg = arr[i];
                 if (!cfg) continue;
+                // Arm 0's random/step ride the legacy pipeline (see
+                // resolveArmColor) — its cache is never read, so don't advance
+                // it (keeps the RNG draw count deterministic).
+                if (i === 0 && (cfg.mode === 'random' || cfg.mode === 'step')) continue;
                 if (cfg.mode === 'random') {
                     cfg.cachedColor = generateVibrantColor();
                 }
@@ -166,22 +177,29 @@
         const colorPickerEl = document.getElementById('colorPicker');
         if (colorPickerEl) {
             colorPickerEl.addEventListener('input', () => {
-                const rnd = document.getElementById('randomColor');
-                if (rnd) rnd.checked = false;
-                const stepEl = document.getElementById('stepPalette');
-                if (stepEl) stepEl.checked = false;
-                applyPickerColor();
-                updatePaletteStepIndicator();
-                // Two-way sync, picker → arm 0: if the brush's arm 0 holds a
-                // fixed color, an explicit pick IS that color changing (panel →
-                // picker direction lives in the brush-colors panel, 20-mixer).
-                var arm0 = (window.multiArmColors || [])[0];
-                if (arm0 && arm0.mode === 'fixed' && arm0.color !== colorPickerEl.value) {
-                    arm0.color = colorPickerEl.value;
-                    // refresh the panel's swatch if it's open
-                    var armPicker = document.querySelector('.arm-colors-panel .arm-row .arm-picker');
-                    if (armPicker) armPicker.value = colorPickerEl.value;
-                    if (typeof window.persistArmColors === 'function') window.persistArmColors();
+                // The reflector is writing the value — don't re-enter.
+                if (window.__brushColorSyncing) return;
+                // Programmatic restore (save/load) writes color.brush directly;
+                // read it into pointer.color but DON'T hijack arm0.mode — the
+                // canonical armColors restore that follows owns the mode.
+                if (window.__brushColorRestoring) {
+                    applyPickerColor();
+                    updatePaletteStepIndicator();
+                    return;
+                }
+                // A user pick IS the active brush's new prevailing colour:
+                // switch arm 0 to a fixed swatch (clearing Rnd/Step/Rainbow).
+                // The controller sets arm0.color, applies pointer.color,
+                // persists, and reflects into both colour UIs.
+                if (typeof window.setActiveBrushColorMode === 'function') {
+                    window.setActiveBrushColorMode('fixed', { color: colorPickerEl.value });
+                } else {
+                    const rnd = document.getElementById('randomColor');
+                    if (rnd) rnd.checked = false;
+                    const stepEl = document.getElementById('stepPalette');
+                    if (stepEl) stepEl.checked = false;
+                    applyPickerColor();
+                    updatePaletteStepIndicator();
                 }
             });
         }
@@ -194,6 +212,7 @@
                     advanceColor();
                 }
                 updatePaletteStepIndicator();
+                mirrorCheckboxToArm0('random', e.target.checked);
             });
         }
         const stepPaletteCheckboxEl = document.getElementById('stepPalette');
@@ -205,7 +224,23 @@
                     advanceColor();
                 }
                 updatePaletteStepIndicator();
+                mirrorCheckboxToArm0('step', e.target.checked);
             });
+        }
+        // The single hub every LEGACY colour path funnels through: hotkeys
+        // ('r'/'a' via toggleCheckbox), applyPalette's auto-step, and snapshot
+        // restore all dispatch 'change' on these checkboxes and land here, so
+        // arm0.mode (canonical for painting + recording) stays in step without
+        // each caller knowing about it. Guarded so the reflector's own
+        // property writes and programmatic restore don't re-enter.
+        function mirrorCheckboxToArm0(mode, checked) {
+            if (window.__brushColorSyncing || window.__brushColorRestoring) return;
+            var a0 = ensureArm0();
+            if (checked) a0.mode = mode;
+            else if (a0.mode === mode) a0.mode = 'fixed';
+            a0.cachedColor = null;
+            if (typeof window.persistArmColors === 'function') window.persistArmColors();
+            syncBrushColorUI();
         }
         // Generate vibrant random color (avoids washed out/pale/gloomy colors)
         function generateVibrantColor() {
@@ -301,5 +336,86 @@
             applyPickerColor();
             advanceColor();
         }
+        // ── Active-brush colour: one source of truth (arm 0) ──────────────
+        // The top-nav Color channel and the Brush Colors panel's arm-0 row are
+        // two VIEWS of multiArmColors[0].mode. setActiveBrushColorMode is the
+        // single UI writer of that mode; syncBrushColorUI reflects it back into
+        // every widget by PROPERTY (never dispatches events), so nothing loops.
+        // Recording already treats arm0.mode as canonical (03-recording.js).
+        function ensureArm0() {
+            var arr = window.multiArmColors;
+            if (!arr) { arr = []; window.multiArmColors = arr; }
+            if (!arr[0]) arr[0] = { mode: 'main', color: '#ffffff', stepIndex: 0 };
+            return arr[0];
+        }
+        window.ensureArm0 = ensureArm0;
+        // Reflect arm0.mode into all colour widgets WITHOUT dispatching events.
+        function syncBrushColorUI(opts) {
+            if (window.__brushColorSyncing) return;
+            window.__brushColorSyncing = true;
+            try {
+                opts = opts || {};
+                var a0 = ensureArm0();
+                var m = a0.mode;
+                var rnd = document.getElementById('randomColor');
+                var stepEl = document.getElementById('stepPalette');
+                if (rnd) rnd.checked = (m === 'random');
+                if (stepEl) stepEl.checked = (m === 'step');
+                // Top-nav chips (built in 20-mixer with data-brush-mode).
+                var chips = document.querySelectorAll('[data-brush-mode]');
+                for (var i = 0; i < chips.length; i++) {
+                    var bm = chips[i].getAttribute('data-brush-mode');
+                    var on = (bm === 'rnd' && m === 'random')
+                          || (bm === 'step' && m === 'step')
+                          || (bm === 'rainbow' && m === 'rainbow');
+                    chips[i].classList.toggle('active', on);
+                }
+                // Picker shows the fixed swatch (no 'input' dispatch).
+                if ((m === 'fixed' || m === 'main') && a0.color) {
+                    var cp = document.getElementById('colorPicker');
+                    if (cp && cp.value !== a0.color) cp.value = a0.color;
+                }
+                if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
+                // Panel arm-0 row: rebuild only when open, and not when the
+                // panel itself initiated the change (skipPanel).
+                if (!opts.skipPanel && typeof window.rebuildArmColorRows === 'function') {
+                    var panel = document.querySelector('.arm-colors-panel');
+                    if (panel && panel.style.display !== 'none') window.rebuildArmColorRows();
+                }
+            } finally {
+                window.__brushColorSyncing = false;
+            }
+        }
+        window.syncBrushColorUI = syncBrushColorUI;
+        // The one action. mode ∈ 'fixed' | 'random' | 'step' | 'rainbow'.
+        function setActiveBrushColorMode(mode, opts) {
+            opts = opts || {};
+            if (mode !== 'random' && mode !== 'step' && mode !== 'rainbow') mode = 'fixed';
+            var a0 = ensureArm0();
+            a0.mode = mode;
+            a0.cachedColor = null;
+            if (mode === 'fixed') {
+                // Adopt the given swatch, or whatever the picker currently shows
+                // (so toggling a generative mode OFF keeps the visible colour).
+                if (opts.color) a0.color = opts.color;
+                else {
+                    var cp = document.getElementById('colorPicker');
+                    if (cp && cp.value) a0.color = cp.value;
+                }
+            }
+            if (typeof window.persistArmColors === 'function') window.persistArmColors();
+            syncBrushColorUI(opts.skipPanel ? { skipPanel: true } : undefined);
+            // Side effects AFTER the checkboxes reflect the new mode (advanceColor
+            // reads them): seed the picker "next" preview for random/step, set
+            // pointer.color for fixed. Rainbow needs nothing — resolveArmColor
+            // draws per splat.
+            if (mode === 'random' || mode === 'step') {
+                advanceColor();
+                if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
+            } else if (mode === 'fixed') {
+                applyPickerColor();
+            }
+        }
+        window.setActiveBrushColorMode = setActiveBrushColorMode;
         // Expose globally for other scripts
         window.generateVibrantColor = generateVibrantColor;
