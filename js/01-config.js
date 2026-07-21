@@ -85,6 +85,14 @@
             const cp = document.getElementById('colorPicker');
             if (!cp) return;
             cp.value = hex;
+            // A palette swatch/chip click IS the active brush's new colour:
+            // switch to Solid via the 05g controller (clears Rnd/Step/Rainbow
+            // and reflects into both colour UIs). Fall back to legacy if the
+            // controller isn't present yet.
+            if (typeof window.setActiveBrushColorMode === 'function') {
+                window.setActiveBrushColorMode('fixed', { color: hex });
+                return;
+            }
             const rnd = document.getElementById('randomColor');
             if (rnd) rnd.checked = false;
             const stepEl = document.getElementById('stepPalette');

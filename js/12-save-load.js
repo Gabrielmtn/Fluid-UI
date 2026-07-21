@@ -226,6 +226,11 @@
         var sm = window.settingsManager;
         if (!sm) { console.warn('Load: settingsManager not available'); return; }
 
+        // Hold the colour-restore guard across the load: sections below write
+        // the legacy checkboxes + color.brush programmatically, and the 05g
+        // handlers must not hijack arm0.mode — the reconcile in 6b owns it.
+        window.__brushColorRestoring = true;
+
         // ── 1. Palettes (must happen before other UI that references them) ──
         try {
             // Restore deleted defaults first
@@ -321,6 +326,32 @@
         if (bg) setVal('backgroundColorPicker', bg, 'input');
         var brush = sm.get('color.brush');
         if (brush) setVal('colorPicker', brush, 'input');
+
+        // ── 6b. Active-brush colour mode (canonical) ──
+        // Autoload restores the legacy checkboxes + color.brush but not the
+        // per-arm config; apply brush.armColors here (mirroring the preset path)
+        // so arm0.mode — canonical for painting + recording — matches, or derive
+        // it from the just-restored checkboxes when nothing was saved. Then
+        // release the guard and reflect into every colour widget.
+        try {
+            var savedArm = sm.get('brush.armColors', null);
+            var arm = window.multiArmColors || (window.multiArmColors = []);
+            if (Array.isArray(savedArm) && savedArm.length) {
+                arm.length = 0;
+                savedArm.forEach(function(c) {
+                    arm.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                });
+                if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
+            } else {
+                if (!arm[0]) arm[0] = { mode: 'main', color: '#ffffff', stepIndex: 0 };
+                if (arm[0].mode === 'main') {
+                    if (boolEl('stepPalette')) arm[0].mode = 'step';
+                    else if (boolEl('randomColor')) arm[0].mode = 'random';
+                }
+            }
+        } catch(_) {}
+        window.__brushColorRestoring = false;
+        if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI();
 
         // ── 7. Canvas wrapper rect ──
         var wr = sm.get('canvas.wrapperRect');
@@ -790,6 +821,11 @@
             (window.QualityGovernor.softReset || window.QualityGovernor.reset)();
         }
 
+        // Hold the colour-restore guard: the checkbox + color.brush restores
+        // below dispatch events the 05g handlers listen to; without this they'd
+        // hijack arm0.mode, which the canonical armColors block below owns.
+        window.__brushColorRestoring = true;
+
         // ── Sliders ── (clamped through the param registry; unknown ids warn + skip)
         try {
             if (snapshot.sliders) {
@@ -869,6 +905,11 @@
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             }
         } catch(_){}
+
+        // Canonical arm colours applied — release the guard and reflect
+        // arm0.mode into every colour widget (top-nav chips + checkboxes + picker).
+        window.__brushColorRestoring = false;
+        if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI();
 
         // ── Kaleidoscope runtime ──
         try {

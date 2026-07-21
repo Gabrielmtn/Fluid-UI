@@ -9,13 +9,16 @@
         function splat(x, y, dx, dy, color) {
             const aspectRatio = canvas.width / canvas.height;
             const baseRadius = config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1);
-            // D1 brush tip: only on user strokes (multiSplat sets __brushTipOn
-            // for non-exactColor calls) and never while a material mode owns
-            // the STAMP_* keys (clay's stamp config stays authoritative).
-            // Tips are DYE-ONLY, like the clay stamps — the velocity pass
+            // D1 brush tip: on user strokes only (multiSplat sets __brushTipOn
+            // for non-exactColor calls). A material mode no longer suppresses it
+            // — an explicit brush shape is a user override that must win in every
+            // fluid type (Fluid / Acrylic-thin / Acrylic). BRUSH_TIP 0 (Soft)
+            // stays at 0 here and falls through to the material's own STAMP_*
+            // below, so materials keep their default stamp until the user picks a
+            // shape. Tips are DYE-ONLY, like the clay stamps — the velocity pass
             // stays gaussian or motion reads as glitch.
             let brushTip = 0;
-            if (window.__brushTipOn && !(window.MaterialModes && window.MaterialModes.active())) {
+            if (window.__brushTipOn) {
                 brushTip = config.BRUSH_TIP | 0;
             }
             splatProg.bind();
