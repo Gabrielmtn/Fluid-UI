@@ -90,7 +90,10 @@
                 if (physSel) { physSel.value = String(s.physicsRes); physSel.dispatchEvent(new Event('change')); }
                 if (cursorEl) { cursorEl.checked = !!s.showCursor; cursorEl.dispatchEvent(new Event('change')); }
                 if (handlesEl) {
-                    handlesEl.checked = !!s.showCanvasHandles;
+                    // Default the border/handles ON unless a saved setting
+                    // explicitly turned them off — stale snapshots that omit
+                    // the key must not silently hide the frame on load.
+                    handlesEl.checked = (s.showCanvasHandles !== false);
                     if (typeof applyHandlesVisibility === 'function') applyHandlesVisibility(handlesEl.checked);
                 }
                 if (lockEl) { lockEl.checked = !!s.lockCanvasBorders; bordersLocked = lockEl.checked; }
