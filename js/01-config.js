@@ -717,14 +717,15 @@
             canvasWrapper.style.left = Math.round(left) + 'px';
             canvasWrapper.style.top  = Math.round(top)  + 'px';
 
-            // Sync the canvas AFTER the initial placement actually lands.
-            // The old flow called updateCanvasSize() unconditionally right
-            // after the initial initializeCanvasPosition() — but when the
-            // area wasn't laid out yet (Electron boots small then maximizes),
-            // placement deferred itself via rAF while the canvas synced to
-            // the PRE-retry wrapper size, leaving the sim smaller than the
-            // wrapper border (the "init size bug", 2026-07-09).
-            if (opts.initial) updateCanvasSize();
+            // Sync the canvas (element pixels + framebuffers) to the wrapper we
+            // just sized. Safe for every caller here because we're past the
+            // layout-ready guard at the top — the area IS laid out, so this
+            // can't run against a pre-retry size (the "init size bug",
+            // 2026-07-09, was calling this OUTSIDE while the inside deferred).
+            // Must run for re-fits too (borders toggle, underbar): otherwise the
+            // wrapper resizes but the canvas keeps its old px size, leaving the
+            // sim letterboxed inside a full-bleed wrapper.
+            updateCanvasSize();
         }
 
         // Exposed so the deferred UI can re-fit the canvas after inserting the
