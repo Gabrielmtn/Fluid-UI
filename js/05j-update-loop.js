@@ -173,19 +173,20 @@
                         // splat-in ramp stays distance-based (same accumulator)
                         splatStrokeDist += Math.hypot(d.dx, d.dy) / 10 / Math.max(1, canvas.width);
                         const inMult = getSplatInMult();
-                        const sizeMul = window.BrushEngine.sizeScale(d.p);
-                        // Flow = pressure response × the Flow slider (D1):
-                        // scales deposited dye, baked into the recorded color
-                        // so stroke replay stays faithful.
-                        const flowMul = window.BrushEngine.flowScale(d.p)
-                            * ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1);
-                        const col = flowMul === 1 ? pointer.color
-                            : [pointer.color[0] * flowMul, pointer.color[1] * flowMul, pointer.color[2] * flowMul];
-                        // Publish the true painted radius so recording captures
-                        // the actual (ramp- + pressure-modulated) brush size,
-                        // not the base — see recRecordInteraction.
-                        window.__lastPaintRadius = config.SPLAT_RADIUS * inMult * sizeMul;
+                        // Flow = the Flow slider, scaling deposited dye, baked into
+                        // the recorded color so stroke replay stays faithful.
+                        const flowMul = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
+                        // Flow routing (shared with the press stamp via
+                        // __applyPaintFlow, 05d): Gate scales the convergence
+                        // (gateFlow) with the colour kept TRUE; additive bakes flow
+                        // into the colour value. Keeping press + drag on one helper
+                        // is what stops splat-one and the drag from diverging.
+                        const col = window.__applyPaintFlow(pointer.color, flowMul);
+                        // Publish the true painted radius so recording captures the
+                        // actual (splat-in ramped) brush size, not the base.
+                        window.__lastPaintRadius = config.SPLAT_RADIUS * inMult;
                         multiSplatWithRadius(d.x, d.y, d.dx, d.dy, col, window.__lastPaintRadius);
+                        window.__splatFlow = 1; // reset so programmatic/press splats stay full-flow
                         pushStrokeEvent(d.x, d.y, d.dx, d.dy, col);
                     }
                     pointer.moved = false;
@@ -820,6 +821,15 @@
             gl.uniform1f(displayProg.uniforms.shadeRelief, (typeof config.SHADE_RELIEF === 'number') ? config.SHADE_RELIEF : 1.0);
             gl.uniform1f(displayProg.uniforms.shadeGloss, (typeof config.SHADE_GLOSS === 'number') ? config.SHADE_GLOSS : 0.35);
             gl.uniform1f(displayProg.uniforms.gateVibrance, (config.BLOOM_CEILING > 0) ? 1.0 : 0.0);
+            // Gate tone-map: display already-bounded gated dye through extended
+            // Reinhard with the ceiling as its white point, so the picked colour
+            // reads vivid instead of half-crushed by plain Reinhard. Mult sets how
+            // close to linear: 1.0 = the ceiling maps to full display (max vivid),
+            // higher dims toward the old c/(1+c). 0 (Gate off) = plain Reinhard.
+            gl.uniform1f(displayProg.uniforms.gateWhite,
+                (config.BLOOM_CEILING > 0)
+                    ? config.BLOOM_CEILING * ((typeof config.GATE_WHITE_MULT === 'number') ? config.GATE_WHITE_MULT : 1.25)
+                    : 0.0);
             // Saturation added at full Ignite. 0.45 was measured at sat
             // 0.742 -> 0.958 on a green: unmistakably lit, but nearer neon
             // than "the original colour turned up". Console-tunable.

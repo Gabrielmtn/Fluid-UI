@@ -22,9 +22,6 @@
 //   BRUSH_STABILIZER   0..1   (0 = raw input, no lag)
 //   BRUSH_SPACING      0.02..1 dab spacing as a fraction of brush diameter
 //   BRUSH_JITTER       0..1   per-dab scatter, fraction of brush diameter
-//   BRUSH_PRESSURE_SIZE  bool  pressure → dab radius
-//   BRUSH_PRESSURE_FLOW  bool  pressure → dye intensity
-//   BRUSH_PRESSURE_CURVE 0.25..2.5 response gamma for both pressure maps
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -114,19 +111,19 @@
         // Begin a stroke at raw coords (canvas px). Does NOT emit a press dab —
         // 05d's pointer-down handler fires its immediate press splat for
         // latency; the engine takes over from the first movement.
-        begin: function (x, y, pressure) {
+        begin: function (x, y) {
             active = true;
             sx = x; sy = y;
             lastEmitX = x; lastEmitY = y;
             residual = 0;
-            lastP = (typeof pressure === 'number' && pressure > 0) ? pressure : 1;
+            lastP = 1;
             queue.length = 0;
         },
 
         // Feed one raw sample (call per pointermove AND per coalesced event).
-        move: function (x, y, pressure) {
+        move: function (x, y) {
             if (!active) return;
-            var p = (typeof pressure === 'number' && pressure > 0) ? pressure : lastP;
+            var p = 1;
             // Weighted-lag stabilizer: stabilized point chases the raw input.
             // strength 0 → alpha 1 (raw); strength 1 → alpha 0.08 (heavy lag).
             var stab = Math.min(1, Math.max(0, cfg('BRUSH_STABILIZER', 0)));
@@ -160,19 +157,6 @@
         drain: function (maxDabs) {
             if (!queue.length) return [];
             return queue.splice(0, Math.max(1, maxDabs || 64));
-        },
-
-        // Pressure response curves (used by 05j when applying dabs).
-        // BRUSH_PRESSURE_CURVE is the gamma: <1 lifts the light-touch range
-        // (0.7 = the original hard-coded feel — linear feels dead), >1
-        // demands a heavy hand before the brush opens up.
-        sizeScale: function (p) {
-            if (!window.config || !window.config.BRUSH_PRESSURE_SIZE) return 1;
-            return 0.35 + 0.65 * Math.pow(Math.min(1, Math.max(0.02, p)), cfg('BRUSH_PRESSURE_CURVE', 0.7));
-        },
-        flowScale: function (p) {
-            if (!window.config || !window.config.BRUSH_PRESSURE_FLOW) return 1;
-            return 0.3 + 0.7 * Math.pow(Math.min(1, Math.max(0.02, p)), cfg('BRUSH_PRESSURE_CURVE', 0.7));
         }
     };
 })();

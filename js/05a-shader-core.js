@@ -139,6 +139,7 @@
             uniform float shadeRelief;    // SHADE_RELIEF x slider: relief strength (redistributes light across the form)
             uniform float shadeGloss;     // SHADE_GLOSS  x slider: specular gloss strength (the plastic sheen)
             uniform float gateVibrance;   // 1 = Gate on: re-add the saturation the Reinhard tone-map strips from HDR dye
+            uniform float gateWhite;      // >0 = Gate on: extended-Reinhard white point (ceiling x GATE_WHITE_MULT); 0 = plain Reinhard
             uniform float igniteVibrance; // 0-1 Ignite envelope: enrich rather than lighten (see below)
             uniform vec2 texelSize;
             // â”€â”€ Light Shift (unified, 2026-07-18) â”€â”€
@@ -291,8 +292,22 @@
                 }
                 vec4 color = mix(base, kcol, clamp(kBlend, 0.0, 1.0));
                 float hdrMax = max(color.r, max(color.g, color.b));
-                // Tone map HDR to displayable range (per-channel Reinhard)
-                color.rgb = color.rgb / (1.0 + color.rgb);
+                // Tone map HDR to displayable range (per-channel Reinhard).
+                // Gate on: the dye is already clamped to the gate ceiling (splat
+                // converges to the picked colour; advectionFrag caps the max
+                // channel), so plain Reinhard — built to compress UNBOUNDED HDR —
+                // needlessly halves it: a ceiling-1.0 channel maps 1.0 -> 0.5, the
+                // "dull gate" look. Use extended Reinhard whose white point is the
+                // ceiling, so ceiling-level dye reaches (near-)full display and the
+                // picked colour keeps the vividness it had before Gate stopped it
+                // accumulating into white. gateWhite = ceiling x GATE_WHITE_MULT
+                // (console-tunable); a large mult collapses back to plain Reinhard.
+                if (gateWhite > 0.0) {
+                    float lw2 = gateWhite * gateWhite;
+                    color.rgb = color.rgb * (1.0 + color.rgb / lw2) / (1.0 + color.rgb);
+                } else {
+                    color.rgb = color.rgb / (1.0 + color.rgb);
+                }
                 // Light Shift keys off THIS â€” the tone-mapped dye before any
                 // re-saturation. Gate/Ignite vibrance (and shading's sat boost)
                 // below pull overblown pixels back off white; keying the

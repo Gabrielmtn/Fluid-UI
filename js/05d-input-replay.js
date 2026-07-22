@@ -71,6 +71,28 @@
             multiSplat(x, y, dx, dy, color, false);
             config.SPLAT_RADIUS = saved;
         }
+        // Flow routing, shared by the press stamp AND the drag dabs so they can
+        // never diverge (that divergence was the "splat-one bright, drag dark"
+        // bug). Gate CONVERGES to the colour, so flow must scale the convergence
+        // (the gateFlow uniform, driven by window.__splatFlow) and the colour
+        // stays TRUE; additive bakes flow into the colour value, where scaling
+        // the deposit is correct. Returns the colour to hand to the splat and
+        // sets window.__splatFlow; the CALLER must reset window.__splatFlow = 1
+        // afterwards so programmatic/tail splats stay full-flow.
+        function applyPaintFlow(color, flowMul) {
+            if (config.COLOR_GATE) {
+                window.__splatFlow = flowMul;
+                return color;
+            }
+            window.__splatFlow = 1;
+            return flowMul === 1 ? color
+                : [color[0] * flowMul, color[1] * flowMul, color[2] * flowMul];
+        }
+        window.__applyPaintFlow = applyPaintFlow;
+        // Flow at the press stamp: just the Flow slider (no pen pressure).
+        function pressFlowMul() {
+            return (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
+        }
         let strokeArchived = false;
         function archiveCurrentStroke() {
             if (strokeArchived || strokeEvents.length === 0) return;
@@ -326,13 +348,28 @@
             replayStartTime = Date.now();
             isReplayActive = true;
         };
-        canvas.addEventListener('mousedown', (e) => {
-            // Right-click replay always works, even when paused
+        // ── Painting lifecycle: POINTER events (pen + mouse) with capture ──
+        // Every other interactive surface here (draggables, layer transforms,
+        // audio scenes, path layers, resize handles) drives its down/up lifecycle
+        // through Pointer Events + setPointerCapture. The paint canvas used to be
+        // the lone exception, running its lifecycle off SYNTHESIZED COMPATIBILITY
+        // mouse events (mousedown/mouseup) while only tapping pointermove for the
+        // engine feed. That split is exactly what "doesn't gracefully handle pens":
+        // a pen commonly delivers pointerup / pointercancel with NO matching compat
+        // mouseup, so the stroke never got its graceful end — queued tail dabs
+        // stranded, arm colours never advanced. Under one tip it's easy to miss;
+        // with kaleidoscope mirror arms (the "2nd–8th brush") every stranded end is
+        // multiplied around the canvas and screams. Touch keeps its own touch*
+        // path below (multi-finger gestures need raw TouchList data), so it's
+        // filtered out of these pointer handlers.
+        canvas.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'touch') return; // touchstart owns touch
+            // Right-click / pen-barrel replay always works, even when paused
             if (e.button === 2) {
                 e.preventDefault();
                 isRightMouseDown = true;
                 if (pointer.down) {
-                    // Left mouse is held — enter pause-only mode.
+                    // Left/tip is held — enter pause-only mode.
                     // Snapshot velocity for the fast-brush easter egg on release.
                     // Do NOT fire replayStroke; that would layer replayed splats
                     // on top of the live paint and cause fuzz/static.
@@ -349,8 +386,13 @@
                 }
                 return;
             }
-            // Only process left-clicks that actually target the canvas (not click-throughs from UI)
+            // Only process presses that actually target the canvas (not click-throughs from UI)
             if (isPaused || e.target !== canvas) return;
+            // Capture the pointer so the stroke keeps getting move/up/cancel even
+            // if the pen drifts off-canvas or over an overlay, AND so pointerup /
+            // pointercancel are guaranteed to reach us and end the stroke cleanly.
+            try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+            window.__paintPointerId = e.pointerId;
             const coords = getCanvasCoordinates(e);
             pointer.down = true;
             pointer.moved = false;
@@ -369,18 +411,20 @@
             if (_sketchTarget) {
                 if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
             } else {
-                // Begin stroke recording and include initial splat
+                // Begin stroke recording and include the initial splat.
                 startStroke(pointer.x, pointer.y);
-                pushStrokeEvent(pointer.x, pointer.y, 0, 0, pointer.color);
+                const _pcol = applyPaintFlow(pointer.color, pressFlowMul());
+                pushStrokeEvent(pointer.x, pointer.y, 0, 0, _pcol);
                 const inMult = getSplatInMult();
                 window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
-                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
-                multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, _pcol);
+                multiSplatWithRadius(pointer.x, pointer.y, 0, 0, _pcol, config.SPLAT_RADIUS * inMult);
+                window.__splatFlow = 1; // reset so the engine/tail/programmatic splats stay full-flow
             }
             // D1 brush engine: stroke movement is emitted as spaced dabs by
             // the engine (fed from the pointermove listener below, drained in
             // 05j). The immediate press stamp above stays for latency.
-            if (window.BrushEngine) window.BrushEngine.begin(coords.x, coords.y, 1);
+            if (window.BrushEngine) window.BrushEngine.begin(coords.x, coords.y);
             if (!_sketchTarget && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
@@ -393,35 +437,34 @@
                 );
             }
         });
-        // D1 brush engine sample feed: PointerEvents deliver coalesced
-        // sub-frame samples plus pen pressure (mouse/touch fire compatibility
-        // pointer events too, so this covers every device). The legacy
-        // mouse/touch listeners keep every side job (replay, broadcast,
-        // recording, splat-out state) — this listener ONLY feeds the engine.
-        // NOTE: the Splat Rate throttle deliberately does not apply here —
-        // dab density is governed by BRUSH_SPACING now.
+        // Unified move handler (pen + mouse) — the single source of truth for the
+        // stroke, replacing the old pointermove-feeds-engine / mousemove-does-state
+        // split. Keeping state on the compat 'mousemove' while the engine ran on
+        // 'pointermove' meant the release coordinates could lag the real pen path;
+        // driving BOTH from the same pointer stream keeps them exact. Touch stays
+        // on touchmove (it needs touch-action:none handling + gestures), so it's
+        // filtered out here. With pointer capture (set on pointerdown), these keep
+        // arriving even when the pen drifts off-canvas, so the stroke never freezes.
         canvas.addEventListener('pointermove', (e) => {
-            if (!window.BrushEngine || !window.BrushEngine.isActive()) return;
+            if (e.pointerType === 'touch') return; // touchmove owns touch
             if (isPaused || isReplayActive) return;
-            // Touch feeds the engine from touchmove (pointermove for touch is
-            // unreliable without touch-action:none) — skip to avoid double-feed
-            if (e.pointerType === 'touch') return;
-            // Pressure only means something from a pen (mouse reports 0.5
-            // while a button is down per spec — that would shrink the brush)
-            const isPen = e.pointerType === 'pen';
-            const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
-            if (evs && evs.length) {
-                for (let i = 0; i < evs.length; i++) {
-                    const c = getCanvasCoordinates(evs[i]);
-                    window.BrushEngine.move(c.x, c.y, isPen ? evs[i].pressure : 1);
+            // Engine feed: replay every coalesced sub-frame sample (position)
+            // while a stroke is live. Density is governed by BRUSH_SPACING, so
+            // the Splat Rate throttle doesn't gate this.
+            if (window.BrushEngine && window.BrushEngine.isActive()) {
+                const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
+                if (evs && evs.length) {
+                    for (let i = 0; i < evs.length; i++) {
+                        const c = getCanvasCoordinates(evs[i]);
+                        window.BrushEngine.move(c.x, c.y);
+                    }
+                } else {
+                    const c = getCanvasCoordinates(e);
+                    window.BrushEngine.move(c.x, c.y);
                 }
-            } else {
-                const c = getCanvasCoordinates(e);
-                window.BrushEngine.move(c.x, c.y, isPen ? e.pressure : 1);
             }
-        });
-        canvas.addEventListener('mousemove', (e) => {
-            if (isPaused || isReplayActive) return;
+            // Pointer state (was the old mousemove path): drives the release
+            // velocity/point, the multiplayer cursor, recording and broadcast.
             const coords = getCanvasCoordinates(e);
             pointer.dx = (coords.x - pointer.x) * 10.0;
             pointer.dy = (coords.y - pointer.y) * 10.0;
@@ -431,10 +474,9 @@
                 broadcastCursor(coords.x / canvas.width, coords.y / canvas.height);
             }
             if (pointer.down) {
-                // Skip zero-movement events (browser fires mousemove on mouseup
-                // at the same position — causes visible re-splat artifacts)
+                // Skip near-zero moves (avoids re-splat artifacts + wasted work)
                 if (pointer.dx * pointer.dx + pointer.dy * pointer.dy < 1.0) return;
-                // Brush refresh rate throttle
+                // Brush refresh rate throttle (recording/broadcast only)
                 var rate = window.brushRefreshRate || 0;
                 if (rate > 0) {
                     var now = Date.now();
@@ -462,13 +504,57 @@
                 }
             }
         });
-        window.addEventListener('mouseup', (e) => {
+        // The graceful end of a left/tip stroke — shared by pointerup AND
+        // pointercancel so a pen that ends via cancel (palm rejection, proximity
+        // loss) finalizes exactly like a clean lift instead of dropping its tail.
+        function finishLeftStroke() {
+            var wasDown = pointer.down;
+            if (wasDown && typeof broadcastPointerUp === 'function') {
+                broadcastPointerUp();
+            }
+            if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
+                splatUpTime = Date.now();
+                splatOutActive = true;
+                splatTailDist = 0;
+                splatReleaseInMult = getSplatInMult(); // size at release → no jump
+                splatOutX = pointer.x;
+                splatOutY = pointer.y;
+                splatOutDx = pointer.dx;
+                splatOutDy = pointer.dy;
+                splatOutColor = pointer.color.slice();
+            }
+            pointer.down = false;
+            pointer.moved = false;
+            if (wasDown) {
+                // Finish the engine stroke: the stabilizer's lagged tail
+                // catches up to the release point (dabs drain in 05j)
+                if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
+                archiveCurrentStroke();
+                advanceColor();
+                // Defer arm color advance until splatOut easing finishes
+                // so random/step colors don't change mid-easing
+                if (splatOutActive) {
+                    pendingArmAdvance = true;
+                } else {
+                    advanceArmColors();
+                }
+            }
+        }
+        // Listened on WINDOW so a captured pointer's release is caught wherever it
+        // lifts — including off-canvas. This is the graceful end the old compat
+        // 'mouseup' path kept missing for pens.
+        window.addEventListener('pointerup', (e) => {
+            if (e.pointerType === 'touch') return; // touchend owns touch
+            if (window.__paintPointerId != null) {
+                try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+                window.__paintPointerId = null;
+            }
             if (e.button === 2) {
                 isRightMouseDown = false;
                 isReplayActive = false;
                 window._activeReplayEvents = null;
                 customCursor.style.opacity = '0';
-                // "Fast brush" easter egg: if left was held during the right-click pause,
+                // "Fast brush" easter egg: if the tip was held during the right-click pause,
                 // fire a short burst of splats along the accumulated velocity vector.
                 // Uses the last snapshotted pointer state from trackMouseMovement.
                 if (pointer.down) {
@@ -485,7 +571,7 @@
                         for (var bi = 0; bi < burstSteps; bi++) {
                             (function(step, cx, cy, cdx, cdy) {
                                 setTimeout(function() {
-                                    // Skip if left mouse released in the meantime
+                                    // Skip if the tip released in the meantime
                                     if (!pointer.down) return;
                                     splat(cx + cdx * step * 0.08,
                                           cy + cdy * step * 0.08,
@@ -499,54 +585,25 @@
                     window._pausedPointerState = null;
                 }
             } else if (e.button === 0) {
-                var wasDown = pointer.down;
-                if (wasDown && typeof broadcastPointerUp === 'function') {
-                    broadcastPointerUp();
-                }
-                if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
-                    splatUpTime = Date.now();
-                    splatOutActive = true;
-                    splatTailDist = 0;
-                    splatReleaseInMult = getSplatInMult(); // size at release → no jump
-                    splatOutX = pointer.x;
-                    splatOutY = pointer.y;
-                    splatOutDx = pointer.dx;
-                    splatOutDy = pointer.dy;
-                    splatOutColor = pointer.color.slice();
-                }
-                pointer.down = false;
-                pointer.moved = false;
-                if (wasDown) {
-                    // Finish the engine stroke: the stabilizer's lagged tail
-                    // catches up to the release point (dabs drain in 05j)
-                    if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
-                    archiveCurrentStroke();
-                    advanceColor();
-                    // Defer arm color advance until splatOut easing finishes
-                    // so random/step colors don't change mid-easing
-                    if (splatOutActive) {
-                        pendingArmAdvance = true;
-                    } else {
-                        advanceArmColors();
-                    }
-                }
+                finishLeftStroke();
             }
         });
         canvas.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });
         // ── Pointer-state safety net ──
-        // The window-level mouseup is normally enough to clear pointer.down, but
-        // a few events skip it and would otherwise strand the stroke (so the next
-        // click reads as a continuation — the "mouseup/mousedown out of sync"
-        // bug): a native drag (dragstart fires dragend, not mouseup), releasing
-        // the button outside the window, or the window losing focus mid-press.
-        // Force-end any in-progress stroke on all of those so it can never stick.
+        // pointerup is normally enough to clear pointer.down, but a few events
+        // skip it and would otherwise strand the stroke (so the next press reads
+        // as a continuation — the "up/down out of sync" bug): a native drag
+        // (dragstart fires dragend, not pointerup), or the window losing focus
+        // mid-press. Force-end any in-progress stroke on those so it can never
+        // stick. This is a HARD abort (no catch-up tail) — the user has left.
         function abortPointerStroke() {
             isRightMouseDown = false;
             isReplayActive = false;
             window._activeReplayEvents = null;
             window._pausedPointerState = null;
+            window.__paintPointerId = null;
             if (window.BrushEngine) window.BrushEngine.abort();
             if (pointer.down) {
                 pointer.down = false;
@@ -556,7 +613,25 @@
         }
         window.addEventListener('blur', abortPointerStroke);
         window.addEventListener('dragstart', abortPointerStroke);
-        window.addEventListener('pointercancel', abortPointerStroke);
+        // pointercancel is a NORMAL pen ending on Windows (palm rejection,
+        // proximity loss, the OS claiming the gesture) — not an abandonment. So
+        // finalize GRACEFULLY at the last known point (Krita-style) instead of
+        // hard-aborting: drain the tail, advance arm colours, run splat-out. The
+        // old abort dropped all of that, which is what made pen stroke-ends — and
+        // their mirror-arm copies — look chopped. Touch cancels stay on the touch
+        // path (touchcancel → abortPointerStroke).
+        window.addEventListener('pointercancel', (e) => {
+            if (e && e.pointerType === 'touch') return; // touchcancel owns touch
+            if (window.__paintPointerId != null) {
+                try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+                window.__paintPointerId = null;
+            }
+            isRightMouseDown = false;
+            isReplayActive = false;
+            window._activeReplayEvents = null;
+            window._pausedPointerState = null;
+            finishLeftStroke();
+        });
         // ── Mobile gesture layer (13.1-13.3) ─────────────────────────
         // Two-finger gestures on the canvas: pinch = brush size (drives
         // the #brushSize slider like the wheel path in 05h), two-finger
@@ -668,13 +743,14 @@
             } else {
                 const inMult = getSplatInMult();
                 window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
-                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, pointer.color);
-                multiSplatWithRadius(pointer.x, pointer.y, 0, 0, pointer.color, config.SPLAT_RADIUS * inMult);
+                const _pcolT = applyPaintFlow(pointer.color, pressFlowMul());
+                if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, _pcolT);
+                multiSplatWithRadius(pointer.x, pointer.y, 0, 0, _pcolT, config.SPLAT_RADIUS * inMult);
+                window.__splatFlow = 1; // reset so the engine/tail/programmatic splats stay full-flow
             }
-            // D1 brush engine (see mousedown note); touch force where present
+            // D1 brush engine (see pointerdown note)
             if (window.BrushEngine) {
-                window.BrushEngine.begin(coords.x, coords.y,
-                    (typeof touch.force === 'number' && touch.force > 0) ? touch.force : 1);
+                window.BrushEngine.begin(coords.x, coords.y);
             }
             if (!_sketchTargetT && typeof broadcastSplat === 'function') {
                 broadcastSplat(
@@ -702,8 +778,7 @@
             // D1 engine feed for touch (see pointermove note); spacing governs
             // density, so this bypasses the Splat Rate throttle below
             if (pointer.down && window.BrushEngine && window.BrushEngine.isActive() && !isReplayActive) {
-                window.BrushEngine.move(coords.x, coords.y,
-                    (typeof touch.force === 'number' && touch.force > 0) ? touch.force : 1);
+                window.BrushEngine.move(coords.x, coords.y);
             }
             if (pointer.down) {
                 // Brush refresh rate throttle (same as mousemove)

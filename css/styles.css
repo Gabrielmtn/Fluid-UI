@@ -644,7 +644,8 @@
             overflow-y: auto;
             margin-top: 10px;
             -webkit-overflow-scrolling: touch;
-            overscroll-behavior: contain;
+            /* chain to the sidebar scroll once the list hits its end */
+            overscroll-behavior: auto;
             cursor: grab;
         }
         

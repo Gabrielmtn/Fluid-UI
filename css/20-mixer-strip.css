@@ -215,6 +215,9 @@ body > .controls {
     display: flex;
     align-items: center;
     flex: 0 0 auto;
+    /* nudge the fader down: the accent border + tight header row make the
+       centered cluster read high, leaving a fat band under the slider */
+    transform: translateY(3px);
 }
 
 .ch-fader input[type="range"] {
@@ -666,7 +669,9 @@ body > .controls {
     border-radius: 8px;
     padding: 10px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    /* above the mobile menu sidebar (z 10000) — these popups can be opened
+       from inside it and were rendering underneath */
+    z-index: 10005;
 }
 .arm-colors-header {
     font-size: 11px;

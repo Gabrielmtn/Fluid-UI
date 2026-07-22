@@ -265,7 +265,21 @@
             // Equal HSL lightness is not equal perceived brightness: a deep blue at
             // L 0.5 reads near-black on the dark canvas while a yellow glows. Lift
             // lightness until the color clears a luma floor so every hue lands legible.
-            while ((0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) < 0.22 && light < 0.78) {
+            //   Gate needs a HIGHER floor. Ungated, dye ACCUMULATES (additive) and
+            // washes any hue bright, so a deep blue/red/purple rescues itself — the
+            // 0.22 floor is fine. Gated, the colour is deposited AS PAINTED (the
+            // splat CONVERGES to it, no build-up), so an intrinsically-dark hue
+            // stays dark: measured Gate screen-luma of random hues spanned 53
+            // (blue) … 194 (yellow), so a random stroke on top of a bright area
+            // could HALVE its brightness — "the next ones on top look too dark".
+            // A 0.40 floor lifts the dark end (blue/red/purple ~64→~93 screen-luma)
+            // while barely moving saturation (only the dark hues get lightened;
+            // bright hues already clear it — measured avg sat 0.81→0.76). Both
+            // console-tunable; 0 disables. See [[fluid-ui-roadmap]] Gate notes.
+            var lumaFloor = config.COLOR_GATE
+                ? ((typeof config.RANDOM_LUMA_FLOOR_GATE === 'number') ? config.RANDOM_LUMA_FLOOR_GATE : 0.40)
+                : ((typeof config.RANDOM_LUMA_FLOOR === 'number') ? config.RANDOM_LUMA_FLOOR : 0.22);
+            while ((0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) < lumaFloor && light < 0.82) {
                 light += 0.04;
                 rgb = hslToRgb(hue, sat, light);
             }
