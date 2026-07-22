@@ -804,12 +804,25 @@
             if (sel) bar.appendChild(makeQubDropdown(sel, pair[1]));
         });
         document.body.appendChild(bar);
-        // The bar is position:fixed, so inserting it doesn't resize canvas-area
-        // and the ResizeObserver won't re-fit the canvas — do it explicitly now
-        // that the underbar exists for the bottom-edge clamp to measure.
+        // Publish the bar's real height into --underbar-h so #main-area reserves
+        // exactly that much space and #canvas-area's box ends at the bar's top
+        // edge (0 when the bar is hidden by the small-screen media query). This
+        // is what actually keeps the frame from rendering under the bar — the
+        // area is no longer allocated the space. Shrinking the area fires the
+        // canvas-area ResizeObserver, which re-fits the canvas automatically.
+        const syncUnderbarHeight = function () {
+            const hidden = getComputedStyle(bar).display === 'none';
+            const h = hidden ? 0 : bar.offsetHeight;
+            document.documentElement.style.setProperty('--underbar-h', h + 'px');
+        };
         requestAnimationFrame(function () {
+            syncUnderbarHeight();
             if (typeof window.initializeCanvasPosition === 'function') window.initializeCanvasPosition();
         });
+        window.addEventListener('resize', syncUnderbarHeight);
+        if (window.ResizeObserver) {
+            try { new ResizeObserver(syncUnderbarHeight).observe(bar); } catch (e) {}
+        }
         // Trim the right edge to #canvas-area's right — the drawing region's
         // edge, i.e. where the nav begins. canvas-area is left:0, so only its
         // WIDTH changes (sidebar resize / window / sim-res) and a ResizeObserver

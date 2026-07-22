@@ -9,6 +9,14 @@
     min-height: 0;
     overflow: hidden;
     position: relative;
+    /* Reserve the quality underbar's height so #canvas-area's box ends at the
+       bar's top edge. The underbar is position:fixed OVER the area's bottom, so
+       without this the area is allocated the full height and every sizing path
+       (drag, formats, restore) has to subtract the bar — and any measurement
+       slip lets the frame render underneath. Reserving the space makes the
+       overlap physically impossible. JS sets --underbar-h to the bar's real
+       height (0 when it's hidden). */
+    padding-bottom: var(--underbar-h, 0px);
 }
 
 #canvas-wrapper {
