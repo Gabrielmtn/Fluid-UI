@@ -127,7 +127,13 @@
             Settings.saveCheckboxes(checkboxes);
             Object.entries(colors).forEach(([name, val]) => Settings.saveColor(name, val));
             Object.entries(selects).forEach(([name, val]) => Settings.saveSelect(name, val));
-            if (canvas.width && canvas.height) Settings.saveCanvasSize(canvas.width, canvas.height);
+            // Persist the DISPLAY (CSS) size, not the capped drawing-buffer
+            // size — loadCanvasSize sets the wrapper size on restore, and the
+            // render cap re-derives canvas.width from it. clientWidth is the
+            // laid-out CSS width (the edge-to-edge/wrapper size).
+            const _dispW = canvas.clientWidth || canvas.width;
+            const _dispH = canvas.clientHeight || canvas.height;
+            if (_dispW && _dispH) Settings.saveCanvasSize(_dispW, _dispH);
             if (canvas.wrapperRect) sm.set('canvas.wrapperRect', canvas.wrapperRect);
         }
 

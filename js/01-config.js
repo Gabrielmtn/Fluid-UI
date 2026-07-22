@@ -605,20 +605,49 @@
             refreshPaletteCarousel();
         };
 
+        // Cap the drawing-buffer (render) resolution independently of the CSS
+        // display size. The final display pass is one heavy fullscreen shader
+        // that runs per backing-store pixel, so an uncapped edge-to-edge canvas
+        // makes it dominate the frame on large monitors (measured ~0.45ms per
+        // megapixel). We render at a capped long side and let the compositor
+        // upscale the canvas element to fill the wrapper — the dye field is
+        // already 2048 and filtered on the way to screen, so the softening is
+        // minimal. Displays whose area is already within the cap render 1:1.
+        // config.RENDER_MAX_LONG_SIDE = 0 disables the cap (native resolution).
+        window.computeRenderSize = function (cssW, cssH) {
+            cssW = Math.max(1, Math.round(cssW));
+            cssH = Math.max(1, Math.round(cssH));
+            const cap = (window.config && window.config.RENDER_MAX_LONG_SIDE > 0)
+                ? window.config.RENDER_MAX_LONG_SIDE : 0;
+            const longSide = Math.max(cssW, cssH);
+            if (!cap || longSide <= cap) return { w: cssW, h: cssH };
+            const s = cap / longSide;   // preserve aspect exactly
+            return { w: Math.max(1, Math.round(cssW * s)), h: Math.max(1, Math.round(cssH * s)) };
+        };
+
+        // Console helper for feel-testing the render cap live (e.g.
+        // setRenderCap(1280) to see the effect; setRenderCap(0) for native).
+        window.setRenderCap = function (px) {
+            if (window.config) window.config.RENDER_MAX_LONG_SIDE = Math.max(0, px | 0);
+            updateCanvasSize();
+            return window.config && window.config.RENDER_MAX_LONG_SIDE;
+        };
+
         function updateCanvasSize() {
             const newWidth = canvasWrapper.clientWidth;
             const newHeight = canvasWrapper.clientHeight;
-            
-            // Set canvas resolution (internal pixels)
-            canvas.width = newWidth;
-            canvas.height = newHeight;
-            
-            // Also set CSS size explicitly to match (fixes scaling issues)
+
+            // CSS size fills the wrapper edge-to-edge (display size, in CSS px)…
             canvas.style.width = newWidth + 'px';
             canvas.style.height = newHeight + 'px';
-            
+
+            // …but the drawing buffer (render resolution) is capped independently.
+            const rs = window.computeRenderSize(newWidth, newHeight);
+            canvas.width = rs.w;
+            canvas.height = rs.h;
+
             sizeDisplay.textContent = `${newWidth} × ${newHeight}`;
-            
+
             // Flag to reinitialize framebuffers after WebGL context is set up
             window.needsFramebufferReinit = true;
         }

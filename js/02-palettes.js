@@ -276,9 +276,15 @@
         
         function getCanvasCoordinates(e) {
             const rect = canvas.getBoundingClientRect();
+            // Map CSS pixels → drawing-buffer pixels. With the render-resolution
+            // cap the backing store (canvas.width) is smaller than the on-screen
+            // size (rect.width), so scale by that ratio — downstream code
+            // normalizes with x / canvas.width and must land in 0..1.
+            const sx = canvas.width / Math.max(1, rect.width);
+            const sy = canvas.height / Math.max(1, rect.height);
             return {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
+                x: (e.clientX - rect.left) * sx,
+                y: (e.clientY - rect.top) * sy
             };
         }
         

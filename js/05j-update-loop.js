@@ -82,13 +82,25 @@
             }
             const targetWidth = canvasWrapper.clientWidth;
             const targetHeight = canvasWrapper.clientHeight;
-            const canvasSizeChanged = canvas.width !== targetWidth || canvas.height !== targetHeight;
-            if (canvasSizeChanged) {
+            // Desired backing-store (render) size — capped and decoupled from the
+            // CSS display size. Compare canvas.width/height against THIS, not the
+            // raw wrapper size: otherwise a capped canvas mismatches the wrapper
+            // every frame and re-arms the settle deadline forever (constant FBO
+            // rebuilds — the very thrashing the debounce exists to prevent).
+            const _rs = window.computeRenderSize
+                ? window.computeRenderSize(targetWidth, targetHeight)
+                : { w: targetWidth, h: targetHeight };
+            const cssChanged = canvas.style.width !== targetWidth + 'px' ||
+                               canvas.style.height !== targetHeight + 'px';
+            const canvasSizeChanged = canvas.width !== _rs.w || canvas.height !== _rs.h;
+            if (cssChanged) {
                 // Track the wrapper VISUALLY every frame (cheap style writes;
                 // explicit px matches updateCanvasSize — CSS '100%' causes
                 // compositor differences in Electron's transparent window mode)…
                 canvas.style.width = targetWidth + 'px';
                 canvas.style.height = targetHeight + 'px';
+            }
+            if (canvasSizeChanged) {
                 // …but DEFER the drawing-buffer realloc to the settle below,
                 // alongside the FBO rebuild. Assigning canvas.width reallocates
                 // and clears the buffer — doing that every frame of a UI
@@ -123,14 +135,22 @@
                 _fboSettleAtMs = 0;
                 // One buffer realloc per resize gesture, just before the FBO
                 // rebuild (governor-only reinits arrive with unchanged dims and
-                // must not clear the canvas — see canvasSizeChanged note above)
-                const settleW = canvasWrapper.clientWidth;
-                const settleH = canvasWrapper.clientHeight;
-                if (canvas.width !== settleW || canvas.height !== settleH) {
-                    canvas.width = settleW;
-                    canvas.height = settleH;
-                    canvas.style.width = settleW + 'px';
-                    canvas.style.height = settleH + 'px';
+                // must not clear the canvas — see canvasSizeChanged note above).
+                // CSS fills the wrapper; the drawing buffer uses the capped
+                // render size (window.computeRenderSize) — same split as
+                // updateCanvasSize, so the two paths never fight.
+                const cssW = canvasWrapper.clientWidth;
+                const cssH = canvasWrapper.clientHeight;
+                const _srs = window.computeRenderSize
+                    ? window.computeRenderSize(cssW, cssH)
+                    : { w: cssW, h: cssH };
+                if (canvas.width !== _srs.w || canvas.height !== _srs.h) {
+                    canvas.width = _srs.w;
+                    canvas.height = _srs.h;
+                }
+                if (canvas.style.width !== cssW + 'px' || canvas.style.height !== cssH + 'px') {
+                    canvas.style.width = cssW + 'px';
+                    canvas.style.height = cssH + 'px';
                 }
                 initFramebuffers();
                 exposeSimStats(); // Update stats after resize

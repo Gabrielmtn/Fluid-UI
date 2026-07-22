@@ -259,6 +259,15 @@
 
             SIM_RESOLUTION: 512,      // Ultra physics by default on desktop (mobile overrides below)
 
+            RENDER_MAX_LONG_SIDE: 1600, // Cap the drawing-buffer (canvas.width) long side, decoupled
+                                      // from the on-screen CSS size. The display shader runs per
+                                      // backing-store pixel, so an edge-to-edge canvas makes that pass
+                                      // dominate the frame on large monitors. We render capped and let
+                                      // CSS upscale to fill — dye is 2048 and filtered on the way to
+                                      // screen, so softening is minimal. 0 = uncapped (native). Displays
+                                      // whose area is already ≤ this render 1:1. Console-tunable via
+                                      // window.setRenderCap(px). See window.computeRenderSize (01-config).
+
             VELOCITY_INFLUENCE: 2.5,  // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
 
             MACCORMACK: true,         // Crisp advection: MacCormack error-corrected dye transport

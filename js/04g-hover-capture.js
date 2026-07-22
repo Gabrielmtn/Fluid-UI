@@ -384,13 +384,21 @@
 
 
 
-            const sx = Math.round(region.left - canvasRect.left);
+            // region is in CSS pixels; drawImage samples the SOURCE canvas in
+            // backing-store pixels, which the render cap makes smaller than the
+            // on-screen size — scale the source rect by that ratio.
 
-            const sy = Math.round(region.top - canvasRect.top);
+            const _capSX = canvas.width / Math.max(1, canvasRect.width);
 
-            const sw = Math.round(region.width);
+            const _capSY = canvas.height / Math.max(1, canvasRect.height);
 
-            const sh = Math.round(region.height);
+            const sx = Math.round((region.left - canvasRect.left) * _capSX);
+
+            const sy = Math.round((region.top - canvasRect.top) * _capSY);
+
+            const sw = Math.round(region.width * _capSX);
+
+            const sh = Math.round(region.height * _capSY);
 
             if (sw <= 0 || sh <= 0) return false;
 
