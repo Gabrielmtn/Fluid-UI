@@ -145,8 +145,20 @@
 
         // Calculate size that fits within the available area while maintaining ratio
         var areaRect = canvasArea.getBoundingClientRect();
+        // Usable height stops at the quality underbar's top edge — it is
+        // position:fixed OVER the area's bottom, and this was the remaining
+        // unclamped sizing path (formats initialized under the bar).
+        var areaH = areaRect.height;
+        var underbar = document.getElementById('quality-underbar');
+        if (underbar) {
+            var ubcs = getComputedStyle(underbar);
+            if (ubcs.display !== 'none' && ubcs.visibility !== 'hidden') {
+                var ubTop = underbar.getBoundingClientRect().top - areaRect.top;
+                if (ubTop > 0) areaH = Math.min(areaH, ubTop);
+            }
+        }
         var maxW = areaRect.width - 20;
-        var maxH = areaRect.height - 20;
+        var maxH = areaH - 20;
 
         var w, h;
         if (format.ratio >= 1) {
@@ -176,7 +188,7 @@
 
         // Center the wrapper in the canvas area
         var centerLeft = Math.max(0, (areaRect.width - w) / 2);
-        var centerTop = Math.max(20, (areaRect.height - h) / 2);
+        var centerTop = Math.max(20, (areaH - h) / 2);
         canvasWrapper.style.left = centerLeft + 'px';
         canvasWrapper.style.top = centerTop + 'px';
 
