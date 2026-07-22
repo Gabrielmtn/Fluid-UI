@@ -378,20 +378,12 @@
     font-size: 9px;
 }
 
-/* ── Layers section - always at top, no collapse ── */
-.sidebar-section.section-layers {
-    grid-template-rows: auto 1fr !important; /* Never collapse */
+/* ── Layers section - always at top; collapses like any other section ── */
+.sidebar-section.section-layers:not(.collapsed) {
+    grid-template-rows: auto 1fr; /* fill the sidebar when open */
 }
-.sidebar-section.section-layers .section-header {
-    cursor: default;
-}
-.sidebar-section.section-layers .section-chevron {
-    display: none;
-}
-.sidebar-section.section-layers .section-body {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    padding: 6px 12px 10px !important;
+.sidebar-section.section-layers:not(.collapsed) .section-body {
+    padding: 6px 12px 10px;
 }
 
 .section-header-actions {

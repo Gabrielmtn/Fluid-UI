@@ -25,6 +25,7 @@
             uniform float barHalfW;    // >0: crisp bar stamp this half-width wide (aspect-corrected UV); EQ lane slabs
             uniform float barPoint;    // bar stamp tip lift: 0 = flat slab, >0 = pointed arch (flame tongue)
             uniform int gateColor;     // 1 = clamp dye at the splat's own color (no HDR overflow into white)
+            uniform float gateFlow;    // Gate: 0-1 flow — scales the CONVERGENCE, not the colour, so low flow builds toward the TRUE colour instead of a darkened one
             uniform int isVelocity; // 1 for velocity, 0 for density
             uniform int hasObstacle;
             uniform float uObsMax;  // max collisionStrength (see obstacleSolidityGLSL)
@@ -177,7 +178,14 @@
                         // white. Mixing by splat intensity means heavy strokes
                         // become exactly the picked color over ANY underlying
                         // dye, while soft gaussian edges still blend.
-                        float w = clamp(shape, 0.0, 1.0) * obsBlock;
+                        // Flow scales this CONVERGENCE, never the colour: low flow
+                        // lays each dab down partially, so overlapping dabs still
+                        // climb toward the TRUE picked colour (a soft, translucent
+                        // build-up) instead of converging to a darkened colour*flow
+                        // that can never reach full. (The old JS baked flow into the
+                        // colour value — fine for the additive branch below, but
+                        // under Gate that made every low-flow stroke a dark hue.)
+                        float w = clamp(shape, 0.0, 1.0) * obsBlock * gateFlow;
                         result = mix(base, color, w);
                         newMem = mix(baseMem, max(color.r, max(color.g, color.b)), w);
                     } else {
@@ -756,7 +764,16 @@
                 float velocityRelativeHF = velocityHF / max(length(velocityC), 0.01);
                 float transportGate = smoothstep(1.0, 8.0, length(disp / srcTexelSize));
                 float noisyTransport = smoothstep(0.15, 0.6, velocityRelativeHF) * transportGate;
-                if (noisyTransport > 0.35) revert = 1.0;
+                // SMOOTH revert (was a hard "noisyTransport > 0.35 -> revert = 1.0"
+                // cliff). velocityRelativeHF is curl-driven, so at MID curl it sat
+                // right on the 0.35 line and this flag flipped 0/1 patchily across
+                // space AND frame-to-frame as the dye decayed -- the "terraces only
+                // at half curl" artifact (CURL 0 stayed below the line = full
+                // MacCormack, CURL 60 stayed above = full diffusive, both stable and
+                // fine). A smoothstep keeps those two extremes but ramps the
+                // borderline, so the MacCormack/semi-Lagrangian blend shifts
+                // gradually instead of snapping -- decay stays clean at every curl.
+                revert = max(revert, smoothstep(0.2, 0.55, noisyTransport));
                 vec4 phiN  = texture(uSource, vUv);
                 vec4 backN = texture(uForward, clamp(backCoord, 0.0, 1.0));
                 vec4 corrected = fwd + 0.5 * (phiN - backN);

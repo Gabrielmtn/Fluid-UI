@@ -764,22 +764,22 @@
         // Mobile close button (keep at top)
         moveEl('mobileMenuClose', sidebar);
 
-        sidebar.appendChild(buildFocusSection());
+        sidebar.appendChild(buildMultiArtistSection());
+        sidebar.appendChild(buildColorsSection(controls));
+        sidebar.appendChild(buildSimulationSection());
         sidebar.appendChild(buildMutationSection());
         sidebar.appendChild(buildAudioSection());
-        sidebar.appendChild(buildBrandingSection());
         sidebar.appendChild(buildLayersSection(controls));
         sidebar.appendChild(buildAnimationsSection(controls));
-        sidebar.appendChild(buildBrushSection());
-        sidebar.appendChild(buildKaleidoscopeSection(controls));
-        sidebar.appendChild(buildSimulationSection());
         sidebar.appendChild(buildEffectsSection(controls));
-        sidebar.appendChild(buildColorsSection(controls));
+        sidebar.appendChild(buildKaleidoscopeSection(controls));
+        sidebar.appendChild(buildBrushSection());
+        sidebar.appendChild(buildFocusSection());
         sidebar.appendChild(buildDisplaySection(controls));
         sidebar.appendChild(buildRecordingSection());
         sidebar.appendChild(buildExportSection());
-        sidebar.appendChild(buildMultiArtistSection());
         sidebar.appendChild(buildSettingsSection(controls));
+        sidebar.appendChild(buildBrandingSection());
 
         buildQualityUnderbar();
 
@@ -804,6 +804,12 @@
             if (sel) bar.appendChild(makeQubDropdown(sel, pair[1]));
         });
         document.body.appendChild(bar);
+        // The bar is position:fixed, so inserting it doesn't resize canvas-area
+        // and the ResizeObserver won't re-fit the canvas — do it explicitly now
+        // that the underbar exists for the bottom-edge clamp to measure.
+        requestAnimationFrame(function () {
+            if (typeof window.initializeCanvasPosition === 'function') window.initializeCanvasPosition();
+        });
         // Trim the right edge to #canvas-area's right — the drawing region's
         // edge, i.e. where the nav begins. canvas-area is left:0, so only its
         // WIDTH changes (sidebar resize / window / sim-res) and a ResizeObserver
@@ -897,7 +903,7 @@
     // --- Section builders ---
 
     function buildMutationSection() {
-        const { sec, body } = makeSection('🧬 Mutate Shader', 'purple', false);
+        const { sec, body } = makeSection('🧬 Mutate Shader', 'purple', true);
         sec.id = 'mutation-section';
 
         // ── Controls row ──
@@ -1297,7 +1303,7 @@
     }
 
     function buildLayersSection(controls) {
-        const { sec, body, header } = makeSection('📑 Layers', 'cyan', false);
+        const { sec, body, header } = makeSection('📑 Layers', 'cyan', true);
         sec.classList.add('section-layers');
 
         // Action buttons in header
@@ -2085,10 +2091,7 @@
                 hardness: num(c.BRUSH_HARDNESS, 0.8),
                 stabilizer: num(c.BRUSH_STABILIZER, 0),
                 spacing: num(c.BRUSH_SPACING, 0.35),
-                jitter: num(c.BRUSH_JITTER, 0),
-                pressureSize: !!c.BRUSH_PRESSURE_SIZE,
-                pressureFlow: !!c.BRUSH_PRESSURE_FLOW,
-                pressureCurve: num(c.BRUSH_PRESSURE_CURVE, 0.7)
+                jitter: num(c.BRUSH_JITTER, 0)
             };
         }
         function applyBrushPreset(p) {
@@ -2108,7 +2111,7 @@
                 if (SETTERS.target) SETTERS.target(p.target);
                 if (SETTERS.tip) SETTERS.tip(p.tip | 0);
                 ['tipTexture', 'angle', 'flow', 'hardness', 'stabilizer', 'spacing', 'jitter',
-                 'pressureSize', 'pressureFlow', 'pressureCurve', 'eraser'
+                 'eraser'
                 ].forEach(function (k) {
                     if (SETTERS[k] && p[k] !== undefined) SETTERS[k](p[k]);
                 });
@@ -2278,14 +2281,6 @@
         pSlider('brushStabilizer', 'Stabilizer', 0, 1, 0.01, 'BRUSH_STABILIZER', pct, 'stabilizer');
         pSlider('brushSpacing', 'Spacing', 0.01, 1, 0.01, 'BRUSH_SPACING', pct, 'spacing');
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
-
-        // ── Pen pressure ──
-        sLabel('Pen Pressure');
-        pCheckbox('brushPressureSize', 'Pressure → Size', 'BRUSH_PRESSURE_SIZE', 'pressureSize');
-        pCheckbox('brushPressureFlow', 'Pressure → Flow', 'BRUSH_PRESSURE_FLOW', 'pressureFlow');
-        pSlider('brushPressureCurve', 'Curve', 0.25, 2.5, 0.05, 'BRUSH_PRESSURE_CURVE',
-            function (v) { return v < 1 ? 'soft ' + v.toFixed(2) : (v > 1 ? 'hard ' + v.toFixed(2) : 'linear'); },
-            'pressureCurve');
 
         // ── Sketch layer ──
         sLabel('Sketch Layer');
@@ -2738,7 +2733,7 @@
     var audioMiniRaf = null;
 
     function buildAudioSection() {
-        const { sec, body } = makeSection('\ud83c\udfb5 Audio', 'purple', false);
+        const { sec, body } = makeSection('\ud83c\udfb5 Audio', 'purple', true);
 
         // Mode select (Off / Minimized / Full) \u2014 mirrors recMode
         var modeGroup = document.createElement('div');
@@ -3156,7 +3151,7 @@
     }
 
     function buildFocusSection() {
-        const { sec, body } = makeSection('🎯 Focus', 'cyan', false);
+        const { sec, body } = makeSection('🎯 Focus', 'cyan', true);
 
         // Focus Mode toggle
         var focusGroup = document.createElement('div');
@@ -3252,7 +3247,7 @@
     }
 
     function buildExportSection() {
-        const { sec, body } = makeSection('📤 Export', 'green', false);
+        const { sec, body } = makeSection('📤 Export', 'green', true);
 
         // Export status display
         var statusDiv = document.createElement('div');
@@ -3525,8 +3520,8 @@
     }
 
     function buildMultiArtistSection() {
-        // Expanded by default so multiplayer is discoverable (it was buried collapsed).
-        const { sec, body } = makeSection('🌐 Multi Artist', 'blue', false);
+        // Collapsed by default like the rest of the sidebar (UI starts fully collapsed).
+        const { sec, body } = makeSection('🌐 Multi Artist', 'blue', true);
 
         // Move the new multi artist panel
         var panel = document.getElementById('multiArtistPanel');

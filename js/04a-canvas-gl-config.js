@@ -407,11 +407,6 @@
                                       // distance-parameterized stroke density (speed-
                                       // independent; kills the 1-dab-per-frame gaps)
 
-            BRUSH_PRESSURE_SIZE: true,  // Pen pressure → dab size (gamma-0.7 curve;
-                                        // mouse/touch always report pressure 1)
-            BRUSH_PRESSURE_FLOW: false, // Pen pressure → dye intensity (off by default —
-                                        // additive dye reads strong already)
-
             BRUSH_TARGET: 'fluid',    // D2/D3 stroke routing: 'fluid' (splats), 'sketch'
                                       // (the active raster paint layer — normal-control
                                       // drawing; local-only, no replay/broadcast until
@@ -427,9 +422,6 @@
                                       // sketch: scales stamp alpha). 1 = legacy full flow.
             BRUSH_JITTER: 0,          // D1 per-dab scatter, fraction of brush diameter
                                       // (0 = clean line; spray/charcoal territory above ~0.3)
-            BRUSH_PRESSURE_CURVE: 0.7,// D1 pressure response gamma for size/flow: <1 lifts
-                                      // the light-touch range (0.7 = legacy feel), 1 = linear,
-                                      // >1 demands a heavy hand
             BRUSH_TIP: 0,             // D1 brush tip on USER strokes (fluid dye only; velocity
                                       // stays gaussian, programmatic splats unaffected):
                                       // 0 = gaussian, 1 = blob, 2 = chisel, 3 = streak, 4 = ring

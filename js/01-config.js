@@ -652,8 +652,22 @@
                 return;
             }
 
+            // The bottom nav (quality underbar) is position:fixed OVER the bottom
+            // of the canvas area — measure the usable height up to its top edge,
+            // matching the drag clamp in 02-palettes.js, so the frame never
+            // initializes or re-fits underneath it.
+            let areaH = areaRect.height;
+            const _underbar = document.getElementById('quality-underbar');
+            if (_underbar) {
+                const _ubcs = getComputedStyle(_underbar);
+                if (_ubcs.display !== 'none' && _ubcs.visibility !== 'hidden') {
+                    const _ubTop = _underbar.getBoundingClientRect().top - areaRect.top;
+                    if (_ubTop > 0) areaH = Math.min(areaH, _ubTop);
+                }
+            }
+
             const maxW = Math.max(CANVAS_MIN, areaRect.width  - CANVAS_MARGIN * 2);
-            const maxH = Math.max(CANVAS_MIN, areaRect.height - CANVAS_MARGIN * 2);
+            const maxH = Math.max(CANVAS_MIN, areaH - CANVAS_MARGIN * 2);
 
             // Stream format owns the wrapper dimensions — only re-center it.
             const hasStreamFormat = window.focusMode &&
@@ -688,7 +702,7 @@
             // Center, then clamp the position so the box stays fully inside the
             // area with at least CANVAS_MARGIN on every edge.
             const left = Math.max(CANVAS_MARGIN, Math.min((areaRect.width  - w) / 2, areaRect.width  - w - CANVAS_MARGIN));
-            const top  = Math.max(CANVAS_MARGIN, Math.min((areaRect.height - h) / 2, areaRect.height - h - CANVAS_MARGIN));
+            const top  = Math.max(CANVAS_MARGIN, Math.min((areaH - h) / 2, areaH - h - CANVAS_MARGIN));
             canvasWrapper.style.left = Math.round(left) + 'px';
             canvasWrapper.style.top  = Math.round(top)  + 'px';
 
@@ -701,6 +715,13 @@
             // wrapper border (the "init size bug", 2026-07-09).
             if (opts.initial) updateCanvasSize();
         }
+
+        // Exposed so the deferred UI can re-fit the canvas after inserting the
+        // quality underbar — the initial placement above may run before the bar
+        // exists, and its position:fixed insertion never fires the canvas-area
+        // ResizeObserver, so the underbar clamp would silently never apply
+        // (seen in Electron, whose boot order builds the UI late).
+        window.initializeCanvasPosition = initializeCanvasPosition;
 
         initializeCanvasPosition({ initial: true });
         

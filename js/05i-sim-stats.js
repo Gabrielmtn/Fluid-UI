@@ -49,6 +49,12 @@
             gl.uniform1f(splatProg.uniforms.ringRadius, 0); // classic blob — never inherit a stale ring stamp
             gl.uniform1f(splatProg.uniforms.barHalfW, 0);   // ...or a stale bar stamp
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
+            // Gate flow: scales the convergence (see splatFrag). window.__splatFlow
+            // is set per-dab by the paint loop and defaults to 1 (full) for every
+            // programmatic/press splat that doesn't set it, so this is inert unless
+            // a Gate stroke explicitly asks for partial flow.
+            gl.uniform1f(splatProg.uniforms.gateFlow,
+                (typeof window.__splatFlow === 'number') ? Math.max(0.0, Math.min(1.0, window.__splatFlow)) : 1.0);
             // Block injection inside collision masks (prevents burned-in dye)
             const _splatObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
             gl.uniform1i(splatProg.uniforms.hasObstacle, _splatObsActive ? 1 : 0);
@@ -169,18 +175,14 @@
                 _strokeKind = 'raster';
             }
             const aspectRatio = canvas.width / canvas.height;
-            const p = (typeof pressure === 'number' && pressure > 0) ? pressure : 1;
-            const sizeMul = window.BrushEngine ? window.BrushEngine.sizeScale(p) : 1;
-            // Pressure response × the Flow slider (matches the fluid route)
-            const flowMul = (window.BrushEngine ? window.BrushEngine.flowScale(p) : 1)
-                * ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1);
+            const flowMul = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
             rasterStampProg.bind();
             gl.uniform2f(rasterStampProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
             // 0.5× the fluid footprint: the sketch disc edge sits where the
             // fluid gaussian's visible core ends, so both brushes read as
             // the same Size fader setting.
             gl.uniform1f(rasterStampProg.uniforms.radius,
-                config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1) * 0.5 * sizeMul * sizeMul);
+                config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1) * 0.5);
             gl.uniform1f(rasterStampProg.uniforms.aspectRatio, aspectRatio);
             const c = (window.pointer && window.pointer.color) ? window.pointer.color : [1, 1, 1];
             gl.uniform3f(rasterStampProg.uniforms.color, c[0], c[1], c[2]);
@@ -214,14 +216,11 @@
                 _strokeKind = 'mask';
             }
             const aspectRatio = canvas.width / canvas.height;
-            const p = (typeof pressure === 'number' && pressure > 0) ? pressure : 1;
-            const sizeMul = window.BrushEngine ? window.BrushEngine.sizeScale(p) : 1;
-            const flowMul = (window.BrushEngine ? window.BrushEngine.flowScale(p) : 1)
-                * ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1);
+            const flowMul = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
             rasterStampProg.bind();
             gl.uniform2f(rasterStampProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
             gl.uniform1f(rasterStampProg.uniforms.radius,
-                config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1) * 0.5 * sizeMul * sizeMul);
+                config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1) * 0.5);
             gl.uniform1f(rasterStampProg.uniforms.aspectRatio, aspectRatio);
             gl.uniform3f(rasterStampProg.uniforms.color, 1, 1, 1); // coverage is the alpha
             gl.uniform1f(rasterStampProg.uniforms.flow, flowMul);
