@@ -197,19 +197,7 @@
             // Constrain to window bounds (Electron fix)
             const areaRect = canvasArea.getBoundingClientRect();
             const maxRight = areaRect.width - 20;
-            let maxBottom = areaRect.height - 20;
-            // The bottom nav (quality underbar) is position:fixed OVER the bottom
-            // of the canvas area, so the plain area-height clamp lets the frame's
-            // bottom border slide underneath it. Stop the border at the underbar's
-            // TOP edge instead — it can reach the nav but never flow past it.
-            const _underbar = document.getElementById('quality-underbar');
-            if (_underbar) {
-                const _ubcs = getComputedStyle(_underbar);
-                if (_ubcs.display !== 'none' && _ubcs.visibility !== 'hidden') {
-                    const _ubTop = _underbar.getBoundingClientRect().top - areaRect.top;
-                    if (_ubTop > 0) maxBottom = Math.min(maxBottom, _ubTop);
-                }
-            }
+            const maxBottom = areaRect.height - 20;
             
             // Ensure canvas stays within bounds
             if (newLeft + newWidth > maxRight) {

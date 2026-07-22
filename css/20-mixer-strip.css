@@ -22,8 +22,7 @@
     flex-direction: row;
     align-items: center;
     gap: 8px;
-    padding: 0 14px; /* slim: no vertical padding, so a frame border that
-                        clips under the bar (Electron clamp bug) barely hides */
+    padding: 8px 14px; /* content height + ~10px breathing */
     background: linear-gradient(180deg, #2c2f34, #1b1e23);
     border-top: 1px solid rgba(0, 0, 0, 0.55);
     border-right: 1px solid rgba(0, 0, 0, 0.55);
