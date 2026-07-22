@@ -723,6 +723,47 @@
         // (seen in Electron, whose boot order builds the UI late).
         window.initializeCanvasPosition = initializeCanvasPosition;
 
+        // ── Airtight bottom-edge clamp ──
+        // Too many independent writers size/position the wrapper (drag resize,
+        // focus formats, undo restore, presets, hotkeys) and each grew its own
+        // partial clamp. This watchdog fires on EVERY style write (microtask,
+        // before paint) and pulls the bottom edge back above the quality
+        // underbar / area bottom, whoever wrote it.
+        (function () {
+            let clamping = false;
+            function clampWrapperBottom() {
+                if (clamping) return;
+                const areaRect = canvasArea.getBoundingClientRect();
+                if (areaRect.height < CANVAS_MIN) return;
+                let usableBottom = areaRect.bottom;
+                const ub = document.getElementById('quality-underbar');
+                if (ub) {
+                    const cs = getComputedStyle(ub);
+                    if (cs.display !== 'none' && cs.visibility !== 'hidden') {
+                        const t = ub.getBoundingClientRect().top;
+                        if (t > areaRect.top) usableBottom = Math.min(usableBottom, t);
+                    }
+                }
+                const wr = canvasWrapper.getBoundingClientRect();
+                const overflow = wr.bottom - usableBottom;
+                if (overflow <= 0.5) return;
+                clamping = true;
+                const newH = Math.max(CANVAS_MIN, wr.height - overflow);
+                canvasWrapper.style.height = newH + 'px';
+                // Hit min height and still overflowing: pull the top up too.
+                const stillOver = (wr.top + newH) - usableBottom;
+                if (stillOver > 0.5) {
+                    canvasWrapper.style.top = Math.max(0, wr.top - areaRect.top - stillOver) + 'px';
+                }
+                updateCanvasSize();
+                clamping = false;
+            }
+            new MutationObserver(clampWrapperBottom)
+                .observe(canvasWrapper, { attributes: true, attributeFilter: ['style'] });
+            window.addEventListener('resize', clampWrapperBottom);
+            window.clampWrapperBottom = clampWrapperBottom;
+        })();
+
         initializeCanvasPosition({ initial: true });
         
         // Force a micro-resize cycle to lock in canvas/framebuffer sync.
