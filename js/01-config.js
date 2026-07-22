@@ -716,6 +716,13 @@
             if (opts.initial) updateCanvasSize();
         }
 
+        // Exposed so the deferred UI can re-fit the canvas after inserting the
+        // quality underbar — the initial placement above may run before the bar
+        // exists, and its position:fixed insertion never fires the canvas-area
+        // ResizeObserver, so the underbar clamp would silently never apply
+        // (seen in Electron, whose boot order builds the UI late).
+        window.initializeCanvasPosition = initializeCanvasPosition;
+
         initializeCanvasPosition({ initial: true });
         
         // Force a micro-resize cycle to lock in canvas/framebuffer sync.

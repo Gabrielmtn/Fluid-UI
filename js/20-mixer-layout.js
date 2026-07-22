@@ -804,6 +804,12 @@
             if (sel) bar.appendChild(makeQubDropdown(sel, pair[1]));
         });
         document.body.appendChild(bar);
+        // The bar is position:fixed, so inserting it doesn't resize canvas-area
+        // and the ResizeObserver won't re-fit the canvas — do it explicitly now
+        // that the underbar exists for the bottom-edge clamp to measure.
+        requestAnimationFrame(function () {
+            if (typeof window.initializeCanvasPosition === 'function') window.initializeCanvasPosition();
+        });
         // Trim the right edge to #canvas-area's right — the drawing region's
         // edge, i.e. where the nav begins. canvas-area is left:0, so only its
         // WIDTH changes (sidebar resize / window / sim-res) and a ResizeObserver
