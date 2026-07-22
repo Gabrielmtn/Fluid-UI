@@ -88,7 +88,7 @@
     };
     var CHECKBOXES = {
         cursorToggle: {def: true, mutScope: null},
-        showCanvasHandles: {def: true, mutScope: null},
+        showCanvasHandles: {def: false, mutScope: null},
         lockCanvasBorders: {def: false, mutScope: null},
         // Display plumbing, not an aesthetic param: never mutate. A mutation
         // flipping this off makes splats erase the canvas alpha ("layer
