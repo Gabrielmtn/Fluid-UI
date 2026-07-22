@@ -19,10 +19,10 @@
     padding-bottom: var(--underbar-h, 0px);
 }
 
-#canvas-wrapper {
-    max-width: calc(100vw - 290px) !important;
-    max-height: calc(100vh - 150px) !important;
-}
+/* #canvas-wrapper is bounded by #canvas-area (flex) and clamped by JS, so the
+   old viewport-based max-width/height caps (100vw-290 / 100vh-150) are stale —
+   they measured the whole window, not the drawing region, and blocked
+   edge-to-edge fill. Removed. */
 
 #canvas-area {
     flex: 1;

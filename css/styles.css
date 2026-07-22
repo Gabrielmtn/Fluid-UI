@@ -247,8 +247,10 @@
             position: absolute;
             width: 608px;  /* slightly smaller than 640px (~5% reduction) */
             height: 456px; /* slightly smaller than 480px (~5% reduction) */
-            max-width: calc(100vw - 360px); /* Leave room for controls sidebar */
-            max-height: calc(100vh - 80px);  /* Leave room for margins */
+            /* No viewport-based max — #canvas-area (flex) already bounds the
+               wrapper, and JS clamps the size to the area. The old
+               calc(100vw - 360px)/calc(100vh - 80px) caps fought edge-to-edge
+               fill, leaving a gap on the right/bottom. */
             min-width: 200px;
             min-height: 200px;
             /* Will be positioned by JavaScript on load */

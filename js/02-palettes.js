@@ -23,6 +23,11 @@
             applyHandlesVisibility(showCanvasHandles.checked);
             showCanvasHandles.addEventListener('change', (e) => {
                 applyHandlesVisibility(e.target.checked);
+                // Re-fit: borders off → fill edge to edge; borders on → re-clamp
+                // the current size to the margin so the handles get room.
+                if (typeof window.initializeCanvasPosition === 'function') {
+                    window.initializeCanvasPosition();
+                }
             });
         }
 

@@ -234,10 +234,10 @@
     zoom: var(--ui-scale);
 }
 
-/* Canvas wrapper accounts for zoomed sidebar width */
-#canvas-wrapper {
-    max-width: calc(100vw - var(--sidebar-width) * var(--ui-scale) - 10px) !important;
-}
+/* #canvas-wrapper needs no viewport-based max-width — #canvas-area (flex)
+   already sits left of the sidebar and bounds the wrapper. The old
+   calc(100vw - sidebar) cap left a ~10px gap at the right, blocking
+   edge-to-edge fill. */
 
 /* ── PANEL RESIZE FOUNDATION ── */
 #sidebar-right {

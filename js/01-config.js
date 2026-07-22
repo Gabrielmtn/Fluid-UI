@@ -666,8 +666,15 @@
                 }
             }
 
-            const maxW = Math.max(CANVAS_MIN, areaRect.width  - CANVAS_MARGIN * 2);
-            const maxH = Math.max(CANVAS_MIN, areaH - CANVAS_MARGIN * 2);
+            // Margin only exists to give the resize handles room to stick out.
+            // With borders off (the default) the canvas fills the area edge to
+            // edge — no frame, no reason for a gap.
+            const _handles = document.getElementById('showCanvasHandles');
+            const bordersOn = !!(_handles && _handles.checked);
+            const margin = bordersOn ? CANVAS_MARGIN : 0;
+
+            const maxW = Math.max(CANVAS_MIN, areaRect.width  - margin * 2);
+            const maxH = Math.max(CANVAS_MIN, areaH - margin * 2);
 
             // Stream format owns the wrapper dimensions — only re-center it.
             const hasStreamFormat = window.focusMode &&
@@ -678,7 +685,11 @@
             let h = canvasWrapper.offsetHeight;
 
             if (!hasStreamFormat) {
-                if (opts.initial) {
+                if (!bordersOn) {
+                    // Edge to edge — a pinned size only applies when the user can
+                    // actually resize (which needs the borders on).
+                    w = maxW; h = maxH;
+                } else if (opts.initial) {
                     // Launch: restore a pinned size if present, else fill the area.
                     let saved = null;
                     if (window.Settings && typeof window.Settings.loadCanvasSize === 'function') {
@@ -700,9 +711,9 @@
             }
 
             // Center, then clamp the position so the box stays fully inside the
-            // area with at least CANVAS_MARGIN on every edge.
-            const left = Math.max(CANVAS_MARGIN, Math.min((areaRect.width  - w) / 2, areaRect.width  - w - CANVAS_MARGIN));
-            const top  = Math.max(CANVAS_MARGIN, Math.min((areaH - h) / 2, areaH - h - CANVAS_MARGIN));
+            // area with at least `margin` on every edge (0 when borders are off).
+            const left = Math.max(margin, Math.min((areaRect.width  - w) / 2, areaRect.width  - w - margin));
+            const top  = Math.max(margin, Math.min((areaH - h) / 2, areaH - h - margin));
             canvasWrapper.style.left = Math.round(left) + 'px';
             canvasWrapper.style.top  = Math.round(top)  + 'px';
 
