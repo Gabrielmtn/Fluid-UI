@@ -185,7 +185,20 @@
         return { panels, sliders, checkboxes, colors, selects, canvas };
     }
 
+    // Re-entrancy guard. applyFromSettings() calls setCheck() for every
+    // CHECKBOX_ID, and setCheck() dispatches a 'change' event. The
+    // 'autoloadSettings' checkbox IS one of those ids AND its own change handler
+    // calls applyFromSettings() again → unbounded recursion (RangeError: Maximum
+    // call stack size exceeded, on load when autoload is enabled). The guard makes
+    // any re-entrant call a no-op.
+    var _applyingSettings = false;
     function applyFromSettings() {
+        if (_applyingSettings) return;
+        _applyingSettings = true;
+        try { _applyFromSettingsInner(); }
+        finally { _applyingSettings = false; }
+    }
+    function _applyFromSettingsInner() {
         var sm = window.settingsManager;
         if (!sm) { console.warn('Load: settingsManager not available'); return; }
 
@@ -317,8 +330,15 @@
         if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI();
 
         // ── 7. Canvas wrapper rect ──
+        // A pinned rect only applies when the user can actually resize — i.e. the
+        // canvas borders (resize handles) are ON. With borders OFF (the default)
+        // the canvas fills the drawing area edge to edge, so restoring an old
+        // pinned rect (saved back when borders were on) would wrongly shrink it and
+        // leave a gap on the right/bottom. So restore the rect only with borders
+        // on; otherwise re-fit to fill (which also syncs the canvas + framebuffers).
+        var _bordersOn = !!($('showCanvasHandles') && $('showCanvasHandles').checked);
         var wr = sm.get('canvas.wrapperRect');
-        if (wr) {
+        if (wr && _bordersOn) {
             var wrap = $('canvas-wrapper');
             if (wrap) {
                 wrap.style.left = wr.left + 'px';
@@ -329,6 +349,8 @@
                     window.updateCanvasSize();
                 }
             }
+        } else if (typeof window.initializeCanvasPosition === 'function') {
+            window.initializeCanvasPosition({ fill: true });
         }
 
         // ── 8. Kaleidoscope runtime ──
