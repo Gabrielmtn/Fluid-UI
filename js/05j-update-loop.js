@@ -542,6 +542,22 @@
                 // written+consumed strictly inside the same-frame post-FX
                 // chain below, so borrowing them during the sim step adds
                 // zero VRAM. If the post-FX pass order ever changes, revisit.
+                // Pigment-memory refresh (splat-scissor companion, 05b/05i):
+                // scissored additive dabs queue this ONE fullscreen pass to
+                // reproduce the global memory-peak side effect that legacy
+                // fullscreen dabs applied per dab — run before advection
+                // (incl. the MacCormack passes) ever samples the dye, so the
+                // frame sees exactly the state the per-dab refresh produced.
+                if (window.__memRefreshPending) {
+                    window.__memRefreshPending = false;
+                    memRefreshProg.bind();
+                    gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                    gl.uniform1i(memRefreshProg.uniforms.uDye, 0);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    blit(density.write.fbo);
+                    density.swap();
+                }
                 const macActive = !!config.MACCORMACK &&
                     (window.QualityGovernor ? window.QualityGovernor.fxOn() : true);
                 // Swirl clock + strength, identical across all three dye

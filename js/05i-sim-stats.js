@@ -138,8 +138,14 @@
                 gl.uniform1f(splatProg.uniforms.ringSquash, 1);
             }
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
-            splatPass(density, dyeTexWidth, dyeTexHeight,
-                _scOn ? splatScissorRect(_u, _v, _dHalf, aspectRatio, dyeTexWidth, dyeTexHeight) : 'full');
+            const _dyeRect = _scOn ? splatScissorRect(_u, _v, _dHalf, aspectRatio, dyeTexWidth, dyeTexHeight) : 'full';
+            splatPass(density, dyeTexWidth, dyeTexHeight, _dyeRect);
+            // Additive dabs maintain pigment memory as a GLOBAL running peak
+            // (newMem has no shape factor — see splatFrag). A fullscreen dab
+            // refreshed it everywhere as a side effect; a scissored/skipped
+            // dab must queue the equivalent whole-texture refresh, run once
+            // per frame in 05j (bit-identical by max-monotonicity — 05b).
+            if (!config.COLOR_GATE && _dyeRect !== 'full') window.__memRefreshPending = true;
             if (brushTip === 4) gl.uniform1f(splatProg.uniforms.ringRadius, 0); // no leak into the next caller
             // P15-1: a stroke wets the paper. Deposit a saturating gaussian of
             // wetness at the dye dab's footprint (sim res), feature-gated so it

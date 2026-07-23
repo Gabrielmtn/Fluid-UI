@@ -11,6 +11,7 @@
         const microDetailProg = new Program(baseVert, microDetailFrag);
         const lightingProg = new Program(baseVert, lightingFrag);
         const splatProg = new Program(baseVert, splatFrag);
+        const memRefreshProg = new Program(baseVert, memRefreshFrag); // splat-scissor memory companion (05b)
         const advectionProg = new Program(baseVert, advectionFrag);
         const macAdvectProg = new Program(baseVert, macAdvectFrag);
         const macCorrectProg = new Program(baseVert, macCorrectFrag);
