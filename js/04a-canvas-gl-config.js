@@ -246,6 +246,12 @@
 
             SPLAT_RADIUS: 0.011,
 
+            SPLAT_SCISSOR: true,      // Clip each splat pass to the dab's bounding box (bit-identical
+                                      // to fullscreen — see 05i splatScissorRect); false = old fullscreen passes
+            SPLAT_SCISSOR_K: 6.0,     // Bounding half-width in units of √SPLAT_RADIUS; 6 keeps the clipped
+                                      // gaussian tail below fp16's smallest subnormal with margin — measured
+                                      // dye bit-identical, velocity ≤1-ulp on a handful of texels (console-tunable)
+
             SHARPNESS: 0.8,           // Adaptive sharpness (0.0 = off, 1.0 = moderate, 2.0 = aggressive)
 
             CLARITY: 0,               // Local contrast enhancement (0 = off, 1.0 = max)
