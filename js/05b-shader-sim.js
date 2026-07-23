@@ -196,6 +196,27 @@
                 }
             }
         `;
+        // ─── Pigment-memory refresh (splat-scissor companion) ───────────
+        // The additive splat branch maintains memory as a GLOBAL running
+        // peak: newMem = max(baseMem, maxRGB) with NO shape factor, so every
+        // legacy fullscreen dab refreshed memory across the whole texture.
+        // Scissored dabs only refresh their rect, which leaves rect-shaped
+        // steps in the memory channel (visible through Ignite / Light Shift
+        // keying as hatching). Because additive dye only GROWS within a
+        // frame's dab train, max over the intermediate states equals max
+        // over the final state -- so ONE fullscreen refresh per frame (run
+        // in 05j before dye advection, only on frames that had additive
+        // scissored dabs) reproduces the per-dab legacy result bit-exactly.
+        const memRefreshFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uDye;
+            void main() {
+                vec4 d = texture(uDye, vUv);
+                fragColor = vec4(d.rgb, max(d.a, max(d.r, max(d.g, d.b))));
+            }
+        `;
         // ─── Shared backtrace: RK2 (midpoint) + settle ease-out ─────────
         // Interpolated into the main advection pass AND both MacCormack
         // passes below. MUST stay a single shared string: the MacCormack

@@ -542,6 +542,22 @@
                 // written+consumed strictly inside the same-frame post-FX
                 // chain below, so borrowing them during the sim step adds
                 // zero VRAM. If the post-FX pass order ever changes, revisit.
+                // Pigment-memory refresh (splat-scissor companion, 05b/05i):
+                // scissored additive dabs queue this ONE fullscreen pass to
+                // reproduce the global memory-peak side effect that legacy
+                // fullscreen dabs applied per dab — run before advection
+                // (incl. the MacCormack passes) ever samples the dye, so the
+                // frame sees exactly the state the per-dab refresh produced.
+                if (window.__memRefreshPending) {
+                    window.__memRefreshPending = false;
+                    memRefreshProg.bind();
+                    gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                    gl.uniform1i(memRefreshProg.uniforms.uDye, 0);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    blit(density.write.fbo);
+                    density.swap();
+                }
                 const macActive = !!config.MACCORMACK &&
                     (window.QualityGovernor ? window.QualityGovernor.fxOn() : true);
                 // Swirl clock + strength, identical across all three dye
@@ -605,8 +621,23 @@
                         gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
                     }
                     blit(detailed.fbo); // corrected+limited φⁿ⁺¹ (pre-decay)
-                    advectionProg.bind();
                 }
+                // Bind UNCONDITIONALLY. The plain (macMode 0) path used to rely
+                // on advectionProg still being bound from the velocity advection
+                // above — an invariant the M2 hf-floor pass (and now the memory
+                // refresh) silently broke by binding their own programs in
+                // between: every uniform write below then hit the WRONG program
+                // (INVALID_OPERATION) and the dye pass drew with that stale
+                // program — rendering the velocity field into the dye ("crisp
+                // advection off completely falls apart", 2026-07-17..23).
+                advectionProg.bind();
+                // Same lesson for the samplers: unit 0 (uVelocity) was only
+                // ever bound by the mac branch — the plain path inherited
+                // whatever the last pass left there (the memory refresh leaves
+                // dye on unit 0, turning dye values into velocities). Bind it
+                // explicitly; redundant-but-harmless when the mac branch ran.
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 gl.uniform1i(advectionProg.uniforms.macMode, macActive ? 1 : 0);
                 // macMode self-fetches (coord = vUv) so swirl is moot there,
                 // but the plain-SL dye path uses it directly.

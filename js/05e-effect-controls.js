@@ -107,7 +107,7 @@
             wetDryingSlider.addEventListener('input', (e) => {
                 config.WET_DRYING = parseFloat(e.target.value);
                 const sp = document.getElementById('wetDryingValue');
-                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(1);
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(1) + 's';
             });
         }
         // Max Speed slider (velocity ceiling, canvas-widths/s — soft knee)

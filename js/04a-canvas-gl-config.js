@@ -213,6 +213,26 @@
 
         window.gl = gl;
 
+        // GPU adapter check (2026-07-23): Windows assigns GPUs per-app, and
+        // Chrome landing on an integrated GPU is exactly "high detail tears /
+        // breaks in the browser but not Electron" (found on Gabriel's
+        // 4090+13900K box: Chrome AND the Claude pane were both on the Intel
+        // UHD 770). powerPreference:'high-performance' above only REQUESTS
+        // the discrete adapter — the Windows per-app Graphics setting wins.
+        // Log the adapter at boot and warn loudly on integrated so user-test
+        // perf reports can be triaged without guessing.
+        try {
+            const _dbgExt = gl.getExtension('WEBGL_debug_renderer_info');
+            const _renderer = _dbgExt ? gl.getParameter(_dbgExt.UNMASKED_RENDERER_WEBGL) : 'unavailable';
+            window.__gpuRenderer = _renderer;
+            console.log('[GPU]', _renderer);
+            if (/Intel|UHD|Iris|integrated/i.test(_renderer) && !/NVIDIA|Radeon RX|GeForce/i.test(_renderer)) {
+                console.warn('[GPU] Running on an INTEGRATED GPU — high detail/resolution will struggle. ' +
+                    'On Windows: Settings > System > Display > Graphics > add this browser > High performance, ' +
+                    'then fully quit and relaunch it.');
+            }
+        } catch (_) {}
+
         
 
         gl.getExtension('EXT_color_buffer_float');
@@ -245,6 +265,12 @@
             CURL: 25,                 // Strong vortices for visually interesting fluid on first load
 
             SPLAT_RADIUS: 0.011,
+
+            SPLAT_SCISSOR: true,      // Clip each splat pass to the dab's bounding box (bit-identical
+                                      // to fullscreen — see 05i splatScissorRect); false = old fullscreen passes
+            SPLAT_SCISSOR_K: 6.0,     // Bounding half-width in units of √SPLAT_RADIUS; 6 keeps the clipped
+                                      // gaussian tail below fp16's smallest subnormal with margin — measured
+                                      // dye bit-identical, velocity ≤1-ulp on a handful of texels (console-tunable)
 
             SHARPNESS: 0.8,           // Adaptive sharpness (0.0 = off, 1.0 = moderate, 2.0 = aggressive)
 

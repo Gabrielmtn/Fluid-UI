@@ -6,9 +6,60 @@
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
 // ═══════════════════════════════════════════════════════════════════
+        // ── Splat scissor ─────────────────────────────────────────────────
+        // blit() fills the WHOLE target, but a dab's true support is tiny:
+        // every stamp shape in splatFrag lives inside ~2.6·√radius of p-space,
+        // and the gaussian tail is below half of fp16's smallest subnormal
+        // beyond ~4.5·√radius — the discarded contribution rounds to zero in
+        // the fullscreen path anyway, so clipping at K=6 is bit-identical
+        // (measured: dye exact after 50 sim frames; velocity ≤1 fp16 ulp).
+        // Without this, every dab repaints all of the dye texture (4.2M px at
+        // 2048), and the D1 dab train × kaleido arms multiplies it — the
+        // "painting slows the fluid" cost. Scissor the draw to the dab's
+        // bounding box and region-copy write→read instead of swapping, so
+        // per-dab cost scales with brush size, not texture size.
+        // Console: config.SPLAT_SCISSOR=false reverts to fullscreen passes.
+        function splatScissorRect(u, v, dHalf, aspectRatio, W, H) {
+            const hx = dHalf / Math.max(aspectRatio, 1e-6); // p.x carries the aspect scale
+            const x0 = Math.max(0, Math.floor((u - hx) * W) - 2);
+            const x1 = Math.min(W, Math.ceil((u + hx) * W) + 2);
+            const y0 = Math.max(0, Math.floor((v - dHalf) * H) - 2);
+            const y1 = Math.min(H, Math.ceil((v + dHalf) * H) + 2);
+            if (x1 <= x0 || y1 <= y0) return null;            // fully off-target
+            // Above ~half the texture the scissored draw + region copy costs
+            // more than one classic fullscreen pass — fall back to it.
+            if ((x1 - x0) * (y1 - y0) >= 0.5 * W * H) return 'full';
+            return [x0, y0, x1 - x0, y1 - y0];
+        }
+        // One splat pass against a double-FBO: scissored draw into .write,
+        // then blitFramebuffer the rect back into .read (NO swap — .read stays
+        // the canonical texture, and the untouched area never needs copying).
+        // rect 'full' falls back to the classic fullscreen blit+swap; rect
+        // null skips the pass (an off-target dab contributes nothing).
+        function splatPass(pair, W, H, rect) {
+            if (rect === null) return;
+            if (rect === 'full') { blit(pair.write.fbo); pair.swap(); return; }
+            gl.enable(gl.SCISSOR_TEST);
+            gl.scissor(rect[0], rect[1], rect[2], rect[3]);
+            blit(pair.write.fbo);
+            gl.bindFramebuffer(gl.READ_FRAMEBUFFER, pair.write.fbo);
+            gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, pair.read.fbo);
+            gl.blitFramebuffer(rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3],
+                               rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3],
+                               gl.COLOR_BUFFER_BIT, gl.NEAREST);
+            gl.disable(gl.SCISSOR_TEST);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        }
         function splat(x, y, dx, dy, color) {
             const aspectRatio = canvas.width / canvas.height;
             const baseRadius = config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1);
+            // Dab bounding half-width in p-space (canvas-height-normalized).
+            // Covers every splatFrag branch: gaussian tail, clay/chisel/streak
+            // rims (≤2.6·√r), and the ring tip (ringRadius + band ≤ 2.2·√r).
+            const _scK = (typeof config.SPLAT_SCISSOR_K === 'number') ? config.SPLAT_SCISSOR_K : 5.0;
+            const _scOn = (config.SPLAT_SCISSOR !== false) && _scK > 0;
+            const _u = x / canvas.width, _v = 1.0 - y / canvas.height;
+            const _dHalf = _scK * Math.sqrt(Math.max(baseRadius, 0));
             // D1 brush tip: on user strokes only (multiSplat sets __brushTipOn
             // for non-exactColor calls). A material mode no longer suppresses it
             // — an explicit brush shape is a user override that must win in every
@@ -71,8 +122,8 @@
             gl.uniform3f(splatProg.uniforms.color, dx, -dy, 1.0);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
-            blit(velocity.write.fbo);
-            velocity.swap();
+            splatPass(velocity, simTexWidth, simTexHeight,
+                _scOn ? splatScissorRect(_u, _v, _dHalf, aspectRatio, simTexWidth, simTexHeight) : 'full');
             // Write density at dye resolution (full radius for visual quality)
             gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
             gl.uniform1i(splatProg.uniforms.isVelocity, 0); // Density pass
@@ -87,8 +138,14 @@
                 gl.uniform1f(splatProg.uniforms.ringSquash, 1);
             }
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
-            blit(density.write.fbo);
-            density.swap();
+            const _dyeRect = _scOn ? splatScissorRect(_u, _v, _dHalf, aspectRatio, dyeTexWidth, dyeTexHeight) : 'full';
+            splatPass(density, dyeTexWidth, dyeTexHeight, _dyeRect);
+            // Additive dabs maintain pigment memory as a GLOBAL running peak
+            // (newMem has no shape factor — see splatFrag). A fullscreen dab
+            // refreshed it everywhere as a side effect; a scissored/skipped
+            // dab must queue the equivalent whole-texture refresh, run once
+            // per frame in 05j (bit-identical by max-monotonicity — 05b).
+            if (!config.COLOR_GATE && _dyeRect !== 'full') window.__memRefreshPending = true;
             if (brushTip === 4) gl.uniform1f(splatProg.uniforms.ringRadius, 0); // no leak into the next caller
             // P15-1: a stroke wets the paper. Deposit a saturating gaussian of
             // wetness at the dye dab's footprint (sim res), feature-gated so it

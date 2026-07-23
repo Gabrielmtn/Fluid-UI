@@ -824,3 +824,51 @@
 
         
 
+
+        // ── Chimera (2026-07-23) ──────────────────────────────────────────
+        // Born as the splat-scissor harness verification choreography: three
+        // sine-wiggle strokes with splat-in-style radius ramps, mirrored
+        // through 8 kaleidoscope arms. Colors ride the live arm-color
+        // pipeline (multiSplat resolves per-arm, exactColor false), so it
+        // paints with whatever palette the user has active - the harness
+        // fixed warm base is only the arm-0 fallback.
+        let chimeraTimer = null;
+        window.playChimeraAnimation = () => {
+            if (chimeraTimer) { clearTimeout(chimeraTimer); chimeraTimer = null; }
+            const originalMultiplier = animationMultiplier;
+            animationMultiplier = 8;
+            if (typeof multiplierSlider !== 'undefined' && multiplierSlider) {
+                multiplierSlider.value = 8;
+                multiplierValue.textContent = '8x';
+            }
+            const baseColor = (window.pointer && pointer.color && pointer.color.length >= 3)
+                ? pointer.color.slice(0, 3) : [0.9, 0.3, 0.1];
+            const strokes = [   // [startX, startY, stepX, wiggle]
+                [0.20, 0.50,  9,  2.5],
+                [0.60, 0.35, -7,  3.0],
+                [0.45, 0.70,  8, -2.0]
+            ];
+            let s = 0, i = 0, cx = 0, cy = 0;
+            const step = () => {
+                if (s >= strokes.length) {
+                    animationMultiplier = originalMultiplier;
+                    if (typeof multiplierSlider !== 'undefined' && multiplierSlider) {
+                        multiplierSlider.value = originalMultiplier;
+                        multiplierValue.textContent = originalMultiplier + 'x';
+                    }
+                    chimeraTimer = null;
+                    return;
+                }
+                if (i === 0) { cx = canvas.width * strokes[s][0]; cy = canvas.height * strokes[s][1]; }
+                const r = 0.011 * Math.min(1, (i + 1) / 18); // tapered calligraphic entry
+                cx += strokes[s][2];
+                cy += strokes[s][3] * Math.sin(i * 0.3);
+                // momentum = 10x the step (the momentum-per-distance rule):
+                // each dab injects velocity along the path so the fluid keeps
+                // carving after the stroke ends
+                multiSplatWithRadius(cx, cy, strokes[s][2] * 10, strokes[s][3] * 10, baseColor, r);
+                if (++i >= 40) { i = 0; s++; }
+                chimeraTimer = setTimeout(step, 33);
+            };
+            step();
+        };

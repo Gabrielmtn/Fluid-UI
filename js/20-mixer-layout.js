@@ -1456,6 +1456,7 @@
 
         moveEl('vortexBtn', grid);
         moveEl('portalBtn', grid);
+        moveEl('chimeraBtn', grid);
 
         body.appendChild(grid);
 
@@ -1491,6 +1492,11 @@
         moveControlGroup('pressureDissipation', body);
         moveControlGroup('pressureIteration', body);
         moveControlGroup('velocityCap', body);
+        // P15-1 wetness: dry paint holds, wet paint flows (+ dry-time
+        // half-life) — sim-behavior sliders, so they live here (moved out
+        // of Effects per Gabriel 2026-07-23)
+        moveControlGroup('wetInfluence', body);
+        moveControlGroup('wetDrying', body);
         moveCheckboxGroup('macCormackToggle', body);
         moveCheckboxGroup('multigridToggle', body);
         // Multigrid tuning panel — same toggle+panel pattern as
@@ -1506,9 +1512,6 @@
 
         // Curl-noise micro-swirl (dye advection wisps)
         moveControlGroup('swirl', body);
-        // P15-1 wetness: dry paint holds, wet paint flows (+ dry-time half-life)
-        moveControlGroup('wetInfluence', body);
-        moveControlGroup('wetDrying', body);
         // Sharpen kernel scale (coarse emboss at high values)
         moveControlGroup('ridges', body);
 
