@@ -1456,6 +1456,7 @@
 
         moveEl('vortexBtn', grid);
         moveEl('portalBtn', grid);
+        moveEl('chimeraBtn', grid);
 
         body.appendChild(grid);
 
