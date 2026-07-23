@@ -621,8 +621,23 @@
                         gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
                     }
                     blit(detailed.fbo); // corrected+limited φⁿ⁺¹ (pre-decay)
-                    advectionProg.bind();
                 }
+                // Bind UNCONDITIONALLY. The plain (macMode 0) path used to rely
+                // on advectionProg still being bound from the velocity advection
+                // above — an invariant the M2 hf-floor pass (and now the memory
+                // refresh) silently broke by binding their own programs in
+                // between: every uniform write below then hit the WRONG program
+                // (INVALID_OPERATION) and the dye pass drew with that stale
+                // program — rendering the velocity field into the dye ("crisp
+                // advection off completely falls apart", 2026-07-17..23).
+                advectionProg.bind();
+                // Same lesson for the samplers: unit 0 (uVelocity) was only
+                // ever bound by the mac branch — the plain path inherited
+                // whatever the last pass left there (the memory refresh leaves
+                // dye on unit 0, turning dye values into velocities). Bind it
+                // explicitly; redundant-but-harmless when the mac branch ran.
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 gl.uniform1i(advectionProg.uniforms.macMode, macActive ? 1 : 0);
                 // macMode self-fetches (coord = vUv) so swirl is moot there,
                 // but the plain-SL dye path uses it directly.
