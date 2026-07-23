@@ -213,6 +213,26 @@
 
         window.gl = gl;
 
+        // GPU adapter check (2026-07-23): Windows assigns GPUs per-app, and
+        // Chrome landing on an integrated GPU is exactly "high detail tears /
+        // breaks in the browser but not Electron" (found on Gabriel's
+        // 4090+13900K box: Chrome AND the Claude pane were both on the Intel
+        // UHD 770). powerPreference:'high-performance' above only REQUESTS
+        // the discrete adapter — the Windows per-app Graphics setting wins.
+        // Log the adapter at boot and warn loudly on integrated so user-test
+        // perf reports can be triaged without guessing.
+        try {
+            const _dbgExt = gl.getExtension('WEBGL_debug_renderer_info');
+            const _renderer = _dbgExt ? gl.getParameter(_dbgExt.UNMASKED_RENDERER_WEBGL) : 'unavailable';
+            window.__gpuRenderer = _renderer;
+            console.log('[GPU]', _renderer);
+            if (/Intel|UHD|Iris|integrated/i.test(_renderer) && !/NVIDIA|Radeon RX|GeForce/i.test(_renderer)) {
+                console.warn('[GPU] Running on an INTEGRATED GPU — high detail/resolution will struggle. ' +
+                    'On Windows: Settings > System > Display > Graphics > add this browser > High performance, ' +
+                    'then fully quit and relaunch it.');
+            }
+        } catch (_) {}
+
         
 
         gl.getExtension('EXT_color_buffer_float');
