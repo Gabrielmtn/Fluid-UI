@@ -2,6 +2,7 @@
   "name": "fluid-ui-multiplayer",
   "version": "1.0.0",
   "description": "Fluid simulation with multiplayer support via PartyKit",
+  "author": "Gabrielmtn",
   "main": "electron-main.js",
   "scripts": {
     "dev": "partykit dev --serve .",
@@ -30,7 +31,12 @@
       "output": "dist",
       "buildResources": "build"
     },
+    "copyright": "Copyright (c) 2024-2026 Gabriel (Gabrielmtn)",
     "asar": false,
+    "extraFiles": [
+      { "from": "LICENSE", "to": "LICENSE.txt" },
+      { "from": "THIRD-PARTY-NOTICES.txt", "to": "THIRD-PARTY-NOTICES.txt" }
+    ],
     "files": [
       "**/*",
       "!zig/**",

@@ -99,6 +99,7 @@
             // scenes, animations) stay classic gaussian. splat() reads the
             // flag; cleared in finally so direct splat() callers never
             // inherit it.
+            window.__unsavedWork = true; // every dye source funnels through here
             window.__brushTipOn = !exactColor;
             try {
             // Kaleidoscope behavior

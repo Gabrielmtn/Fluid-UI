@@ -237,6 +237,12 @@
 
             } catch(_) {}
 
+            // Every later chunk will now throw on the uninitialized bindings
+            // this file never created — suppress the error-card cascade so the
+            // friendly screen above stays the only thing the user sees.
+
+            window.__fatalGpu = true;
+
             throw new Error('WebGL2 unavailable — cannot initialize');
 
         }

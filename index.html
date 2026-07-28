@@ -21,6 +21,9 @@
 
         var reported = 0;
         function showErrorCard(title, message, detail) {
+            // Fatal-GPU screen up (04a) — the ReferenceError cascade from the
+            // aborted boot is noise on top of the friendly fallback.
+            if (window.__fatalGpu) return;
             if (!document.body) {
                 document.addEventListener('DOMContentLoaded', function () { showErrorCard(title, message, detail); });
                 return;
@@ -48,13 +51,21 @@
                     'border-radius:4px;padding:3px 10px;font:11px "Segoe UI",sans-serif;cursor:pointer';
             });
             copyBtn.onclick = function () {
-                try { navigator.clipboard.writeText(report); copyBtn.textContent = 'Copied ✓'; }
-                catch (e) {
+                // writeText rejects async (e.g. NotAllowedError when the window
+                // isn't focused) — a sync try/catch can't see that, so handle
+                // the promise and fall back to execCommand on rejection.
+                var fallback = function () {
                     var ta = document.createElement('textarea');
                     ta.value = report; document.body.appendChild(ta); ta.select();
                     try { document.execCommand('copy'); copyBtn.textContent = 'Copied ✓'; } catch (e2) {}
                     ta.remove();
-                }
+                };
+                try {
+                    navigator.clipboard.writeText(report).then(
+                        function () { copyBtn.textContent = 'Copied ✓'; },
+                        fallback
+                    );
+                } catch (e) { fallback(); }
             };
             dismissBtn.onclick = function () { card.remove(); };
             card.appendChild(msg); card.appendChild(copyBtn); card.appendChild(dismissBtn);

@@ -41,7 +41,8 @@ const PARTYKIT_HOST = (function() {
     // without a client patch (set from the console:
     //   localStorage.fluidMultiplayerHost = 'new-relay.example.com'
     // remove the key to return to the default). Raw localStorage on purpose:
-    // this module loads before 09-settings-manager.
+    // the override must be settable before any settingsManager namespace
+    // exists and must survive a settings clear.
     try {
         const o = localStorage.getItem('fluidMultiplayerHost');
         if (o && /^[\w.-]+(:\d+)?$/.test(o.trim())) return o.trim();

@@ -44,7 +44,11 @@
     // preserveFluidOpacity ("Empty Alpha Locked") — a session-only toggle that
     // must default to checked on every launch (applyPresetSnapshot ignores it
     // too, at the checkbox-restore loop below).
-    var PRESET_SKIP = { preserveFluidOpacity: true };
+    // autoloadSettings: with the default now ON, letting it into snapshots
+    // means applying any preset dispatches its change handler, which
+    // re-entrantly runs applyFromSettings() mid-apply and clobbers the
+    // preset's sliders — and silently rewrites the user's autoload choice.
+    var PRESET_SKIP = { preserveFluidOpacity: true, autoloadSettings: true };
 
     function _registryIds(map, skip) {
         return Object.keys(map).filter(function (id) { return !(skip && skip[id]); });
@@ -264,7 +268,10 @@
         // ── 5. Selects ──
         SELECT_IDS.forEach(function(id) {
             var v = sm.get('select.' + id);
-            if (v === undefined) return;
+            // get() returns null (not undefined) for a missing key — without
+            // the null check every unsaved select is forced to options[0]
+            // (fpsCap→30, recPlaybackSpeed→0.25) on a fresh install.
+            if (v === undefined || v === null) return;
             var el = $(id);
             if (!el) return;
             var hasOption = Array.from(el.options).some(function(opt) { return opt.value === String(v); });
@@ -837,8 +844,12 @@
             if (snapshot.checkboxes) {
                 Object.keys(snapshot.checkboxes).forEach(function(id) {
                     // "Empty Alpha Locked" is session-only: it must stay at its
-                    // checked default, so old presets that captured it are ignored
-                    if (id === 'preserveFluidOpacity') return;
+                    // checked default, so old presets that captured it are ignored.
+                    // autoloadSettings: applying it dispatches its change handler,
+                    // which re-entrantly runs applyFromSettings() mid-apply and
+                    // clobbers the preset's sliders (also guards old snapshots
+                    // saved before PRESET_SKIP excluded it at capture time).
+                    if (id === 'preserveFluidOpacity' || id === 'autoloadSettings') return;
                     if (reg && reg.coerceCheckbox(id, snapshot.checkboxes[id]) === null) {
                         console.warn('[Preset] skipping unknown checkbox', id); return;
                     }
@@ -1420,6 +1431,33 @@
         return ok !== false;
     }
 
+    // Quota-degrading write for one-shot snapshot keys (context-loss recovery,
+    // 04f). Same ladder as saveUserPreset above, but against a settingsManager
+    // key: full → no recorded interactions → no depth b64 → no layer images →
+    // no layers. Returns false only if even the bare envelope won't fit.
+    function setSnapshotWithQuotaFallback(key, envelope) {
+        if (!window.settingsManager || !envelope || !envelope.snapshot) return false;
+        var ok = window.settingsManager.set(key, envelope);
+        if (ok !== false) return true;
+        var lite = JSON.parse(JSON.stringify(envelope));
+        var s = lite.snapshot;
+        lite.degraded = true;
+        if (s.recordedLayers) s.recordedLayers.forEach(function(rl) { if (rl.timeline) rl.timeline.interactions = []; });
+        if (s.layers) s.layers.forEach(function(l) {
+            if (l.mask && l.mask.shapes) l.mask.shapes.forEach(function(sh) {
+                if (sh._depthDataB64) { sh._hadDepthData = true; delete sh._depthDataB64; }
+            });
+        });
+        ok = window.settingsManager.set(key, lite);
+        if (ok !== false) return true;
+        if (s.layers) s.layers.forEach(function(l) { delete l.data; delete l.originalData; });
+        ok = window.settingsManager.set(key, lite);
+        if (ok !== false) return true;
+        delete s.layers; delete s.layerOrder; delete s.recordedLayers;
+        return window.settingsManager.set(key, lite) !== false;
+    }
+    window.__setSnapshotWithQuotaFallback = setSnapshotWithQuotaFallback;
+
     function deleteUserPreset(name) {
         if (!window.Settings || !name) return;
         window.Settings.deletePreset(name);
@@ -1619,6 +1657,10 @@
                 a.href = url; a.download = name.replace(/\s+/g, '-').toLowerCase() + '.fluid';
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                // Optimistic: a.click() only STARTS the download; a failed write
+                // leaves the flag cleared. Acceptable until the Steam-plan S6-1
+                // native save dialog (fs.writeFileSync + real error) replaces
+                // this path in Electron.
                 try { window.__unsavedWork = false; } catch (_) {}
                 return true;
             } catch (e) { console.warn('[Project] export failed', e); return false; }

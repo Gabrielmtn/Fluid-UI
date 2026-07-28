@@ -184,7 +184,27 @@
 
                             const snap = window.capturePresetSnapshot();
 
-                            if (snap) window.settingsManager.set('app.contextLossSnapshot', { at: Date.now(), snapshot: snap });
+                            // set() returns false on QuotaExceeded — a heavy
+                            // multi-layer session (the TDR-prone profile) can
+                            // blow the ~5MB origin quota with full-res layer
+                            // dataURLs. Degrade via the shared saveUserPreset
+                            // ladder: drop the big payloads, keep params/brush.
+
+                            if (snap) {
+
+                                const env = { at: Date.now(), snapshot: snap };
+
+                                if (typeof window.__setSnapshotWithQuotaFallback === 'function') {
+
+                                    window.__setSnapshotWithQuotaFallback('app.contextLossSnapshot', env);
+
+                                } else {
+
+                                    window.settingsManager.set('app.contextLossSnapshot', env);
+
+                                }
+
+                            }
 
                         }
 
@@ -452,23 +472,25 @@
                     if (window.IS_ELECTRON) {
                         // Chromium shows no native beforeunload dialog for
                         // win.close() under file:// — ask via a real dialog.
+                        // Wording is unload-neutral: this same prompt guards
+                        // quit AND dev reloads (F5 etc. in --dev builds).
                         try {
                             const { dialog } = require('@electron/remote');
                             const choice = dialog.showMessageBoxSync({
                                 type: 'question',
-                                buttons: ['Quit', 'Keep painting'],
+                                buttons: ['Discard and continue', 'Keep painting'],
                                 defaultId: 1,
                                 cancelId: 1,
                                 title: 'Unsaved work',
-                                message: 'Quit Fluid Simulation?',
+                                message: 'Discard unsaved work?',
                                 detail: 'The canvas has unsaved work. Save a project (.fluid) or export first if you want to keep it.'
                             });
                             if (choice === 0) { window.__unsavedWork = false; return undefined; }
                             e.returnValue = false;
                             return false;
-                        } catch (err) { return undefined; }
+                        } catch (err) { /* remote unavailable — fall through to the generic prompt (fail closed) */ }
                     }
-                    // Web: standard browser confirm
+                    // Web (and Electron fallback): standard browser confirm
                     e.preventDefault();
                     e.returnValue = '';
                     return '';

@@ -626,6 +626,10 @@
             // (the FBO stores premultiplied; PNG wants straight — without
             // the divide, every save/restore round-trip darkens the edges).
             function _readbackCanvas(f, outW, outH) {
+                // Lost context ⇒ readPixels is a silent no-op ⇒ all-zero pixels.
+                // Return null so callers keep the last good data instead of
+                // overwriting it with a blank (context-loss snapshot path).
+                if (gl.isContextLost && gl.isContextLost()) return null;
                 const px = new Uint8Array(f.width * f.height * 4);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
                 gl.readPixels(0, 0, f.width, f.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
@@ -670,20 +674,27 @@
                         const f = rasterStore[id];
                         if (!layer || !f) return;
                         const th = Math.max(1, Math.round(96 * f.height / f.width));
-                        layer.data = _readbackCanvas(f, 96, th).toDataURL();
+                        const rc = _readbackCanvas(f, 96, th);
+                        if (!rc) return;
+                        layer.data = rc.toDataURL();
                         const thumbEl = document.querySelector('.layer-item[data-layer-index="' + id + '"] .layer-thumbnail');
                         if (thumbEl) thumbEl.style.backgroundImage = 'url(' + layer.data + ')';
                     });
                 }, 200);
             }
-            window.__onRasterMutated = function (rid) { if (rid != null) _queueThumb(rid); };
+            window.__onRasterMutated = function (rid) {
+                window.__unsavedWork = true; // every sketch/paint mutation funnels through here
+                if (rid != null) _queueThumb(rid);
+            };
             // Full-res layer.data refresh — called by save (12) right before
             // serializing so raster pixels round-trip through presets.
             function syncData() {
                 layers.forEach(function (layer) {
                     if (!layer.isRaster) return;
                     const f = rasterStore[layer.index];
-                    if (f) layer.data = _readbackCanvas(f).toDataURL('image/png');
+                    if (!f) return;
+                    const rc = _readbackCanvas(f);
+                    if (rc) layer.data = rc.toDataURL('image/png');
                 });
             }
             // (Re)create a restored layer's FBO and upload its saved pixels.

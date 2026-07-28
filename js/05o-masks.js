@@ -85,6 +85,8 @@
     // Coverage → grayscale PNG (alpha carries coverage; rgb white for a
     // legible preview if the file is ever inspected).
     function _readbackDataURL(f, invert) {
+        // Lost context ⇒ readPixels no-ops ⇒ blank mask; null keeps prior data.
+        if (gl.isContextLost && gl.isContextLost()) return null;
         const px = new Uint8Array(f.width * f.height * 4);
         gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
         gl.readPixels(0, 0, f.width, f.height, gl.RGBA, gl.UNSIGNED_BYTE, px);

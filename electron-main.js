@@ -1,5 +1,5 @@
 // Electron Main Process
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, Menu } = require('electron');
 const path = require('path');
 
 // Dev affordances (F5 reload, cache clears, nuclear reset) only exist outside
@@ -57,8 +57,10 @@ let mainWindow = null;
 
 // Single instance: a second launch (e.g. double-clicking in Steam) focuses
 // the existing window instead of spawning a second app fighting over the GPU
-// and the Preset Vault on disk.
-if (!app.requestSingleInstanceLock()) {
+// and the Preset Vault on disk. gotLock also gates window creation below —
+// the losing process must never reach createWindow().
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
     app.quit();
 } else {
     app.on('second-instance', () => {
@@ -123,6 +125,14 @@ function createWindow() {
     // A dead renderer used to be a silent white window — surface it instead.
     mainWindow.webContents.on('render-process-gone', (event, details) => {
         if (details.reason === 'clean-exit') return;
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        // Deliberate kill from the unresponsive-recovery path below — reload
+        // silently instead of stacking a crash dialog on top.
+        if (mainWindow.__expectRendererKill) {
+            mainWindow.__expectRendererKill = false;
+            mainWindow.webContents.reload();
+            return;
+        }
         const choice = dialog.showMessageBoxSync(mainWindow, {
             type: 'error',
             buttons: ['Reload', 'Quit'],
@@ -144,7 +154,13 @@ function createWindow() {
             message: 'Fluid Simulation is not responding.',
             detail: 'A heavy export or a very large canvas can take a while. You can keep waiting or reload (unsaved work is lost on reload).'
         });
-        if (choice === 1) mainWindow.webContents.reload();
+        if (choice === 1) {
+            // webContents.reload() waits on beforeunload in a renderer that is
+            // by definition not responding — kill it and reload via the
+            // render-process-gone handler above instead.
+            mainWindow.__expectRendererKill = true;
+            mainWindow.webContents.forcefullyCrashRenderer();
+        }
     });
 
     // Development shortcuts — packaged builds get none of these (F5 wiping an
@@ -205,6 +221,13 @@ app.on('child-process-gone', (event, details) => {
 });
 
 app.whenReady().then(() => {
+    if (!gotLock) return; // losing process of the single-instance race
+
+    // setMenuBarVisibility(false) only hides the bar — the default menu's
+    // accelerators (Ctrl+R reload, Ctrl+Shift+I devtools) stay registered.
+    // A packaged build must not ship a hidden Ctrl+R that wipes a painting.
+    if (!isDev) Menu.setApplicationMenu(null);
+
     createWindow();
 
     app.on('activate', () => {
