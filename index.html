@@ -6,7 +6,85 @@
     <!-- Dark UA chrome: native select popups, scrollbars, form controls.
          Without this Chromium frames dropdown option lists in light-theme white. -->
     <meta name="color-scheme" content="dark">
-    <title>Fluid UI</title>
+    <title>Fluid Simulation</title>
+    <link rel="icon" type="image/png" href="assets/icon.png">
+    <script>
+    // Boot-time globals + global error surface. Runs before every other script
+    // so even an early load failure is visible instead of a silent half-boot.
+    (function () {
+        window.IS_ELECTRON = !!(typeof process !== 'undefined' && process.versions && process.versions.electron);
+        try {
+            window.__appVersion = window.IS_ELECTRON
+                ? require('@electron/remote').app.getVersion()
+                : 'web';
+        } catch (e) { window.__appVersion = 'unknown'; }
+
+        var reported = 0;
+        function showErrorCard(title, message, detail) {
+            if (!document.body) {
+                document.addEventListener('DOMContentLoaded', function () { showErrorCard(title, message, detail); });
+                return;
+            }
+            reported++;
+            if (reported > 3) return; // don't stack endlessly on error loops
+            var report = title + ': ' + message +
+                '\nversion: ' + window.__appVersion +
+                '\ngpu: ' + (window.__gpuRenderer || 'unknown') +
+                (detail ? '\n' + detail : '');
+            var card = document.createElement('div');
+            card.className = 'boot-error-card';
+            card.style.cssText = 'position:fixed;right:12px;bottom:' + (12 + (reported - 1) * 96) + 'px;z-index:2147483647;' +
+                'max-width:420px;background:#1a1f27;color:#e6edf3;border:1px solid #f8514966;border-radius:8px;' +
+                'padding:10px 12px;font:12px/1.45 "Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+            var msg = document.createElement('div');
+            msg.textContent = '⚠ ' + title + ': ' + message;
+            msg.style.cssText = 'margin-bottom:8px;word-break:break-word;max-height:80px;overflow:hidden';
+            var copyBtn = document.createElement('button');
+            copyBtn.textContent = 'Copy report';
+            var dismissBtn = document.createElement('button');
+            dismissBtn.textContent = 'Dismiss';
+            [copyBtn, dismissBtn].forEach(function (b) {
+                b.style.cssText = 'margin-right:8px;background:#2d333b;color:#e6edf3;border:1px solid #444c56;' +
+                    'border-radius:4px;padding:3px 10px;font:11px "Segoe UI",sans-serif;cursor:pointer';
+            });
+            copyBtn.onclick = function () {
+                try { navigator.clipboard.writeText(report); copyBtn.textContent = 'Copied ✓'; }
+                catch (e) {
+                    var ta = document.createElement('textarea');
+                    ta.value = report; document.body.appendChild(ta); ta.select();
+                    try { document.execCommand('copy'); copyBtn.textContent = 'Copied ✓'; } catch (e2) {}
+                    ta.remove();
+                }
+            };
+            dismissBtn.onclick = function () { card.remove(); };
+            card.appendChild(msg); card.appendChild(copyBtn); card.appendChild(dismissBtn);
+            document.body.appendChild(card);
+        }
+        window.__reportError = showErrorCard;
+        window.onerror = function (msg, src, line, col, err) {
+            showErrorCard('Error', String(msg),
+                (src || '') + ':' + line + ':' + col + (err && err.stack ? '\n' + err.stack : ''));
+        };
+        window.addEventListener('unhandledrejection', function (e) {
+            var r = e.reason;
+            showErrorCard('Unhandled rejection', r && r.message ? r.message : String(r), r && r.stack ? r.stack : '');
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var label = window.__appVersion === 'web' ? 'web' : 'v' + window.__appVersion;
+            var v = document.getElementById('app-version');
+            if (v) v.textContent = label;
+            var sv = document.querySelector('.splash-version');
+            if (sv) sv.textContent = label;
+            // GPU string arrives once GL boots (04a sets window.__gpuRenderer)
+            var tries = 0, gi = document.getElementById('app-gpu-info');
+            var poll = setInterval(function () {
+                if (window.__gpuRenderer && gi) { gi.textContent = window.__gpuRenderer; clearInterval(poll); }
+                else if (++tries > 40) { if (gi) gi.textContent = 'unknown'; clearInterval(poll); }
+            }, 500);
+        });
+    })();
+    </script>
     <link rel="stylesheet" href="css/00-tokens.css">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/slider-styles.css">
@@ -20,8 +98,9 @@
 <body>
     <!-- Splash Screen -->
     <div id="splash-screen">
-        <div class="splash-title">Fluid UI</div>
+        <div class="splash-title">Fluid Simulation</div>
         <div class="splash-subtitle">Creative Simulation Engine</div>
+        <div class="splash-version" style="position:absolute;right:14px;bottom:10px;font-size:11px;opacity:.45"></div>
         <div class="splash-progress">
             <div class="splash-progress-bar" id="splash-progress-bar"></div>
         </div>
@@ -29,7 +108,7 @@
     <!-- Custom Title Bar for Frameless Window -->
     <div id="custom-titlebar" class="ui-enter">
         <div class="titlebar-drag-region">
-            <span class="titlebar-title">Fluid UI</span>
+            <span class="titlebar-title">Fluid Simulation</span>
         </div>
         <div class="window-controls">
             <button id="min-button" class="titlebar-button" title="Minimize">
@@ -941,6 +1020,10 @@
                     </ul>
                 </div>
             </div>
+            <div class="hotkey-footer" style="padding:8px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;opacity:.55;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                <span>Fluid Simulation <span id="app-version"></span> · GPU: <span id="app-gpu-info">detecting…</span></span>
+                <span>Fluid sim after Pavel Dobryakov (MIT) · AI imports: Transformers.js (Apache-2.0) · Built on Electron</span>
+            </div>
         </div>
     </div>
     <script src="js/00-window-controls.js"></script>
@@ -1009,8 +1092,14 @@
                 loadNext();
             };
             s.onerror = function() {
+                // Surface the failure — a missing chunk means a half-initialized
+                // app; silent continue was hiding corrupt/incomplete installs.
+                if (window.__reportError) {
+                    window.__reportError('Startup', 'Failed to load ' + scripts[loaded],
+                        'Some features will be unavailable. Try restarting; if this persists, reinstall or verify game files.');
+                }
                 loaded++;
-                loadNext(); // Continue even on error
+                loadNext(); // Continue so the rest of the app still boots
             };
             document.body.appendChild(s);
         }

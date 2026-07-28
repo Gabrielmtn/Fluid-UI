@@ -1,6 +1,10 @@
 // Electron Main Process
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const path = require('path');
+
+// Dev affordances (F5 reload, cache clears, nuclear reset) only exist outside
+// packaged builds, or when explicitly asked for with --dev.
+const isDev = !app.isPackaged || process.argv.includes('--dev');
 
 // Enable remote module
 require('@electron/remote/main').initialize();
@@ -18,7 +22,12 @@ app.commandLine.appendSwitch('enable-gpu-memory-buffer-compositor-resources'); /
 // while Windows reported 144Hz). Without them, modern Chromium (Electron
 // 39) drives rAF at the display's real refresh rate; the in-app FPS Limit
 // select still caps below that when wanted.
-app.commandLine.appendSwitch('enable-webgl2-compute-context');
+// REMOVED 2026-07-28 (Steam prep): enable-webgl2-compute-context (flag no
+// longer exists in modern Chromium), disable-software-rasterizer +
+// disable-gpu-driver-bug-workarounds + ignore-gpu-blocklist (on the hardware
+// spread Steam implies, these turn "slow but working" into a black screen —
+// known-bad drivers lose their only fallback path), and VaapiVideoDecoder
+// (Linux-only, a no-op on Windows).
 
 // ⚡ NUCLEAR: Force disable ALL frame limiting
 app.commandLine.appendSwitch('max-gum-fps', '1000'); // Remove media FPS cap
@@ -26,28 +35,39 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding'); // Keep renderin
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows'); // No throttling when covered
 // NOTE: Do NOT use --use-angle=gl on Windows — OpenGL backend locks vsync to 60Hz.
 // Default D3D11 backend handles high-refresh monitors correctly.
-app.commandLine.appendSwitch('disable-software-rasterizer'); // Force hardware rendering
 
 // ⚡ Memory and Performance Flags
 app.commandLine.appendSwitch('max-old-space-size', '4096'); // 4GB heap
 app.commandLine.appendSwitch('js-flags', '--expose-gc --max-semi-space-size=128'); // Manual GC + larger young gen
 
-// ⚡ Additional GPU flags
-app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
 // On dual-GPU machines Chromium can land on the integrated GPU (observed:
 // UHD 770 pegged at 100% while the GeForce idles). Ask for the discrete
 // adapter explicitly; the canvas already requests powerPreference
 // 'high-performance', but the process-level hint is what Windows honors.
 app.commandLine.appendSwitch('force_high_performance_gpu');
-app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,CanvasOopRasterization'); // Out-of-process rasterization
+app.commandLine.appendSwitch('enable-features', 'CanvasOopRasterization'); // Out-of-process rasterization
 
 console.log('🚀 Electron performance flags applied');
 console.log('   - GPU VSync: display-native (flags removed — they pinned 60Hz, see above)');
-console.log('   - GPU workarounds: DISABLED');
+console.log('   - GPU blocklist/workarounds: default (fallbacks kept for Steam hardware spread)');
 console.log('   - Renderer throttling: DISABLED');
+console.log('   - Version:', app.getVersion(), isDev ? '(dev)' : '(packaged)');
 
 let mainWindow = null;
+
+// Single instance: a second launch (e.g. double-clicking in Steam) focuses
+// the existing window instead of spawning a second app fighting over the GPU
+// and the Preset Vault on disk.
+if (!app.requestSingleInstanceLock()) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+}
 
 function createWindow() {
     // ⚠️ PERFORMANCE NOTE: transparent: true causes GPU compositor overhead.
@@ -100,8 +120,37 @@ function createWindow() {
     // Open DevTools in development (optional)
     // mainWindow.webContents.openDevTools();
     
-    // Development shortcuts
-    mainWindow.webContents.on('before-input-event', (event, input) => {
+    // A dead renderer used to be a silent white window — surface it instead.
+    mainWindow.webContents.on('render-process-gone', (event, details) => {
+        if (details.reason === 'clean-exit') return;
+        const choice = dialog.showMessageBoxSync(mainWindow, {
+            type: 'error',
+            buttons: ['Reload', 'Quit'],
+            defaultId: 0,
+            title: 'Fluid Simulation crashed',
+            message: `The app's renderer crashed (${details.reason}).`,
+            detail: 'Unsaved work on the canvas is lost. If this keeps happening, update your GPU drivers.'
+        });
+        if (choice === 0) mainWindow.webContents.reload();
+        else app.quit();
+    });
+    mainWindow.on('unresponsive', () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        const choice = dialog.showMessageBoxSync(mainWindow, {
+            type: 'warning',
+            buttons: ['Keep waiting', 'Reload'],
+            defaultId: 0,
+            title: 'Not responding',
+            message: 'Fluid Simulation is not responding.',
+            detail: 'A heavy export or a very large canvas can take a while. You can keep waiting or reload (unsaved work is lost on reload).'
+        });
+        if (choice === 1) mainWindow.webContents.reload();
+    });
+
+    // Development shortcuts — packaged builds get none of these (F5 wiping an
+    // unsaved painting is a support ticket, not a feature). Run with --dev to
+    // re-enable in a packaged build.
+    if (isDev) mainWindow.webContents.on('before-input-event', (event, input) => {
         // F5 = Reload (preserves settings)
         if (input.key === 'F5' && !input.control && !input.shift) {
             mainWindow.webContents.reload();
@@ -146,6 +195,14 @@ function createWindow() {
         mainWindow = null;
     });
 }
+
+// GPU process death is recovered by Chromium (the renderer's context-loss
+// path handles the user-facing part) — log the reason for bug reports.
+app.on('child-process-gone', (event, details) => {
+    if (details.type === 'GPU' && details.reason !== 'clean-exit') {
+        console.error('[GPU] process gone:', details.reason);
+    }
+});
 
 app.whenReady().then(() => {
     createWindow();

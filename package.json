@@ -24,11 +24,13 @@
     "partykit": "^0.0.115"
   },
   "build": {
-    "appId": "com.fluidsim.app",
+    "appId": "com.gabrielmtn.fluidsimulation",
     "productName": "Fluid Simulation",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
+    "asar": false,
     "files": [
       "**/*",
       "!zig/**",
@@ -42,13 +44,28 @@
       "!.claude/**",
       "!tmp-*",
       "!**/*.md",
-      "!partykit.json"
+      "!partykit.json",
+      "!.partykit/**",
+      "!comfyui-node/**",
+      "!docs/**",
+      "!sam-test.*",
+      "!reset-pressure.html",
+      "!server-relay.js",
+      "!restart-electron*",
+      "!build-version.txt",
+      "!package-lock.json",
+      "!**/*.lnk",
+      "!**/*.bat",
+      "!index.html.bak.cachebust",
+      "!js/07-cos-oscillator.js",
+      "!js/14-radial-slider.js",
+      "!steam_appid.txt"
     ],
     "win": {
       "target": [
-        "dir",
-        "portable"
-      ]
+        "dir"
+      ],
+      "icon": "build/icon.ico"
     }
   }
 }
