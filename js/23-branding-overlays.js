@@ -122,7 +122,7 @@
         var overlay = {
             id: nextId++,
             type: 'qr',
-            url: opts.url || 'https://tiktok.com',
+            url: opts.url || 'https://example.com',
             x: xy.x, y: xy.y, rotation: opts.rotation || 0,
             size: opts.size || 100,
             opacity: opts.opacity !== undefined ? opts.opacity : 0.75,

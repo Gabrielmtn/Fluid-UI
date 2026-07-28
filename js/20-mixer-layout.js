@@ -2600,7 +2600,7 @@
         qrRow.style.cssText = 'display:flex;gap:4px;margin-bottom:10px;';
         var qrInput = document.createElement('input');
         qrInput.type = 'text';
-        qrInput.placeholder = 'https://tiktok.com/@handle';
+        qrInput.placeholder = 'https://your-link.example';
         qrInput.style.cssText = 'flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;padding:4px 6px;border-radius:3px;font-size:10px;';
         var qrAddBtn = document.createElement('button');
         qrAddBtn.type = 'button';

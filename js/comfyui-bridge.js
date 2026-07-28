@@ -169,7 +169,7 @@
     async function sendToComfyUI() {
         if (sending) return;
         if (!config.outputFolder) {
-            showToast('⚠️ Set ComfyUI watch folder first (Settings → ComfyUI)', 'warn');
+            showToast('⚠️ Set a save folder first (Export → Set Save To Folder)', 'warn');
             return;
         }
 
@@ -240,7 +240,7 @@
     function pickOutputFolder() {
         const { dialog } = require('@electron/remote');
         dialog.showOpenDialog({
-            title: 'Select ComfyUI Watch Folder',
+            title: 'Select Save Folder',
             properties: ['openDirectory']
         }).then((result) => {
             if (!result.canceled && result.filePaths.length > 0) {

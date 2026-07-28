@@ -37,6 +37,15 @@ function isStrangerRoom() { return !!currentRoom && currentRoom.indexOf('pub-') 
 // or set to 'localhost:1999' for local relay dev.
 const PARTYKIT_HOST = (function() {
     if (window.PARTYKIT_HOST && typeof window.PARTYKIT_HOST === 'string') return window.PARTYKIT_HOST;
+    // Persisted override — lets a relay migration reach shipped desktop builds
+    // without a client patch (set from the console:
+    //   localStorage.fluidMultiplayerHost = 'new-relay.example.com'
+    // remove the key to return to the default). Raw localStorage on purpose:
+    // this module loads before 09-settings-manager.
+    try {
+        const o = localStorage.getItem('fluidMultiplayerHost');
+        if (o && /^[\w.-]+(:\d+)?$/.test(o.trim())) return o.trim();
+    } catch (_) {}
     const host = window.location.host;
     if (/\.partykit\.dev$/.test(host)) return host;
     return 'fluid-ui-multiplayer.gabrielmtn.partykit.dev';
