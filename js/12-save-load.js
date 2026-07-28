@@ -439,9 +439,12 @@
             });
         }
 
-        // Autoload handling
+        // Autoload handling. Absent → ON (a paid desktop app is expected to
+        // restore the previous session); only an explicit saved false disables
+        // — same absent-vs-false pattern as the showCanvasHandles autoload fix.
         if (autoloadChk && window.settingsManager) {
-            const auto = !!window.settingsManager.get('settings.autoload');
+            const stored = window.settingsManager.get('settings.autoload');
+            const auto = stored !== false;
             autoloadChk.checked = auto;
             autoloadChk.addEventListener('change', (e) => {
                 const val = !!e.target.checked;
@@ -461,6 +464,29 @@
                 } catch (err) { console.error('Autoload startup error:', err); }
             }
         }
+
+        // Context-loss recovery offer: 04f snapshots the session when the GPU
+        // resets, then reloads. Offer that snapshot back once the deferred
+        // scripts (layers/brush) are up; either way the key is consumed so a
+        // stale snapshot can't reappear on later launches.
+        try {
+            const rec = window.settingsManager ? window.settingsManager.get('app.contextLossSnapshot') : null;
+            if (rec && rec.snapshot && (Date.now() - (rec.at || 0)) < 10 * 60 * 1000) {
+                const offerRestore = () => {
+                    try {
+                        if (window.confirm('The graphics driver reset during the last session.\n\nRestore your settings, layers, and brush state from just before the reset?')) {
+                            applyPresetSnapshot(rec.snapshot);
+                        }
+                    } catch (err) { console.warn('[ContextLoss] restore failed', err); }
+                    finally { try { window.settingsManager.remove('app.contextLossSnapshot'); } catch (_) {} }
+                };
+                const poll = setInterval(() => {
+                    if (window.__scriptsReady) { clearInterval(poll); setTimeout(offerRestore, 300); }
+                }, 250);
+            } else if (rec) {
+                try { window.settingsManager.remove('app.contextLossSnapshot'); } catch (_) {}
+            }
+        } catch (_) {}
 
         console.log('Save/Load (scan+persist) initialized');
     }
@@ -1593,6 +1619,7 @@
                 a.href = url; a.download = name.replace(/\s+/g, '-').toLowerCase() + '.fluid';
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                try { window.__unsavedWork = false; } catch (_) {}
                 return true;
             } catch (e) { console.warn('[Project] export failed', e); return false; }
         }
@@ -1603,7 +1630,15 @@
                 try {
                     var env = migrateProjectEnvelope(JSON.parse(String(reader.result)));
                     if (!env) throw new Error('Not a valid .fluid project file');
+                    // Loading replaces the whole stack — confirm when there's
+                    // unsaved work on the canvas (prompt only for valid files).
+                    if (window.__unsavedWork &&
+                        !window.confirm('Load "' + (env.name || file.name) + '"?\n\nThis replaces your current canvas, layers, and settings. Unsaved work will be lost.')) {
+                        if (cb) cb(null, null);
+                        return;
+                    }
                     applyPresetSnapshot(env.snapshot);
+                    try { window.__unsavedWork = false; } catch (_) {}
                     if (env.brushPresets && window.settingsManager) {
                         try {
                             window.settingsManager.set('brush.presets', env.brushPresets);

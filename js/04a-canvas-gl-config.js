@@ -209,6 +209,40 @@
 
         
 
+        // No WebGL2 = nothing below can run. Replace the silent dead canvas
+        // with an actionable message (Steam's hardware spread includes GPUs,
+        // VMs, and remote desktops where WebGL2 is blocklisted or broken).
+
+        if (!gl) {
+
+            try {
+
+                var _noGl = document.createElement('div');
+
+                _noGl.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:#0d1117;color:#e6edf3;' +
+                    'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;' +
+                    'font:14px/1.6 "Segoe UI",sans-serif;padding:40px';
+
+                _noGl.innerHTML = '<div style="font-size:40px;margin-bottom:12px">🎨</div>' +
+                    '<div style="font-size:20px;font-weight:600;margin-bottom:10px">This GPU can&#39;t run Fluid Simulation</div>' +
+                    '<div style="max-width:520px;opacity:.8">WebGL2 is unavailable &mdash; usually an outdated or broken ' +
+                    'graphics driver, or a virtual machine without GPU acceleration.<br><br>' +
+                    'Try updating your GPU drivers, then relaunch.</div>';
+
+                (document.body || document.documentElement).appendChild(_noGl);
+
+                var _splash = document.getElementById('splash-screen');
+
+                if (_splash) _splash.style.display = 'none';
+
+            } catch(_) {}
+
+            throw new Error('WebGL2 unavailable — cannot initialize');
+
+        }
+
+
+
         // Expose for stats panel
 
         window.gl = gl;
@@ -230,6 +264,33 @@
                 console.warn('[GPU] Running on an INTEGRATED GPU — high detail/resolution will struggle. ' +
                     'On Windows: Settings > System > Display > Graphics > add this browser > High performance, ' +
                     'then fully quit and relaunch it.');
+                // Steam prep S2-5: the console is invisible to a customer — the
+                // laptop buyer whose app landed on the iGPU is exactly the person
+                // who needs this. Dismiss remembers the adapter, so a hardware
+                // change re-warns.
+                try {
+                    if (localStorage.getItem('fluidIgpuBannerDismissed') !== _renderer) {
+                        var _appName = window.IS_ELECTRON ? 'Fluid Simulation' : 'this browser';
+                        var _banner = document.createElement('div');
+                        _banner.style.cssText = 'position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:2147483645;' +
+                            'max-width:560px;background:#2b2311;color:#f0d47a;border:1px solid #b8860b88;border-radius:8px;' +
+                            'padding:10px 14px;font:12px/1.5 "Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+                        var _txt = document.createElement('div');
+                        _txt.textContent = '⚡ Running on the integrated GPU (' + _renderer + ') — painting will feel slow. ' +
+                            'Fix: Windows Settings → System → Display → Graphics → add ' + _appName + ' → High performance, then relaunch.';
+                        var _dis = document.createElement('button');
+                        _dis.textContent = 'Got it';
+                        _dis.style.cssText = 'margin-top:8px;background:#3a3016;color:#f0d47a;border:1px solid #b8860b66;' +
+                            'border-radius:4px;padding:3px 12px;font:11px "Segoe UI",sans-serif;cursor:pointer';
+                        _dis.onclick = function () {
+                            try { localStorage.setItem('fluidIgpuBannerDismissed', _renderer); } catch(_) {}
+                            _banner.remove();
+                        };
+                        _banner.appendChild(_txt); _banner.appendChild(_dis);
+                        var _mount = function () { (document.body || document.documentElement).appendChild(_banner); };
+                        if (document.body) _mount(); else document.addEventListener('DOMContentLoaded', _mount);
+                    }
+                } catch (_) {}
             }
         } catch (_) {}
 

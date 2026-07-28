@@ -126,7 +126,7 @@
         arMapColor: {def: null, mutScope: null},
         focusModeToggle: {def: null, mutScope: null},
         streamFormatLock: {def: null, mutScope: null},
-        autoloadSettings: {def: false, mutScope: null},
+        autoloadSettings: {def: true, mutScope: null},
         displayShadingToggle: {def: false, mutScope: "extended"}
     };
     var SELECTS = {
