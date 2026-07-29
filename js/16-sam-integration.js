@@ -36,8 +36,11 @@ class SAMSegmenter {
                 }
             }
 
-            // Load Transformers.js (it bundles its own ONNX Runtime for the browser)
-            this.transformers = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+            // Load the VENDORED Transformers.js (js/vendor/transformers/ — it
+            // bundles its own ONNX Runtime for the browser). A paid desktop
+            // app must not execute runtime code from a CDN and must work
+            // offline; the web build serves the same local copy.
+            this.transformers = await import('./vendor/transformers/transformers.min.js');
         } finally {
             // Restore process after import so the rest of the app still has it
             if (hadProcess) {
@@ -54,22 +57,11 @@ class SAMSegmenter {
                 platform: typeof process !== 'undefined' ? process.platform : 'browser'
             });
 
-            // Minimal, documented configuration
-            env.allowRemoteModels = true;
-            env.allowLocalModels = false;
-            env.useBrowserCache = true;
-
-            // Use local cache directory in Electron renderer
-            if (typeof process !== 'undefined' && process.versions && process.versions.electron) {
-                try {
-                    const path = require('path');
-                    const os = require('os');
-                    env.cacheDir = path.join(os.homedir(), '.cache', 'fluid-ui-models');
-                    console.log('📁 Using Electron cache directory for models:', env.cacheDir);
-                } catch (e) {
-                    console.warn('⚠️ Could not set cache directory:', e.message);
-                }
-            }
+            // All env wiring (wasm paths, web-remote vs Electron-bundled
+            // model weights) lives in the shared glue module — 23-depth uses
+            // the same call, keep them in lockstep.
+            const { configureTransformersEnv } = await import('./vendor/transformers/fluid-env.js');
+            configureTransformersEnv(env);
 
             console.log('✅ Transformers.js loaded successfully');
             console.log('📦 env configuration:', {

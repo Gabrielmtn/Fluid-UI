@@ -36,7 +36,8 @@ class DepthEstimator {
                     console.warn('⚠️ Could not temporarily override globalThis.process:', e.message);
                 }
             }
-            this.transformers = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+            // Vendored copy — same rationale and glue as 16-sam-integration.
+            this.transformers = await import('./vendor/transformers/transformers.min.js');
         } finally {
             if (hadProcess) {
                 globalThis.process = originalProcess;
@@ -44,18 +45,8 @@ class DepthEstimator {
         }
 
         const { env } = this.transformers;
-        env.allowRemoteModels = true;
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
-
-        // Electron cache directory
-        if (typeof process !== 'undefined' && process.versions && process.versions.electron) {
-            try {
-                const path = require('path');
-                const os = require('os');
-                env.cacheDir = path.join(os.homedir(), '.cache', 'fluid-ui-models');
-            } catch (e) {}
-        }
+        const { configureTransformersEnv } = await import('./vendor/transformers/fluid-env.js');
+        configureTransformersEnv(env);
 
         // Share back to SAM if it hasn't loaded yet
         if (window.samSegmenter && !window.samSegmenter.transformers) {
