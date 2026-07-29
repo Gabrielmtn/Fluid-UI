@@ -52,12 +52,42 @@
     }
 
     // ── Helpers ─────────────────────────────────────────────────────
+    // Per-export decoded-image cache (dataURL → Promise<Image|null>). Layer
+    // and clip-mask dataURLs are stable across an export, so decoding them
+    // once instead of per frame removes the main per-frame GC churn.
+    var _imgCache = new Map();
+    function getCachedImage(src) {
+        var hit = _imgCache.get(src);
+        if (hit) return hit;
+        var p = new Promise(function (res) {
+            var img = new Image();
+            img.onload = function () { res(img); };
+            img.onerror = function () { res(null); };
+            img.src = src;
+        });
+        _imgCache.set(src, p);
+        return p;
+    }
+
+    // Composite-cost stats for the export perf budget (D7-3): logged at
+    // finish(); a >30ms average means the compositor itself is eating the
+    // frame budget and export fps promises are fiction.
+    var _compStats = { frames: 0, totalMs: 0, worstMs: 0 };
+
     function finish() {
         if (_stream) { _stream.getTracks().forEach(function (t) { t.stop(); }); _stream = null; }
         _recorder = null;
         _busy = false;
         _abort = false;
         window.__exporting = false; // D3-4: re-allow the mask film after export
+        _imgCache.clear();
+        if (_compStats.frames > 0) {
+            var avg = _compStats.totalMs / _compStats.frames;
+            console.log('[Export] composite cost: avg ' + avg.toFixed(1) + 'ms, worst ' +
+                _compStats.worstMs.toFixed(1) + 'ms over ' + _compStats.frames + ' frames');
+            if (avg > 30) console.warn('[Export] composite avg exceeds the 30ms budget — expect dropped export frames');
+        }
+        _compStats = { frames: 0, totalMs: 0, worstMs: 0 };
         updateUI('idle', 0);
     }
 
@@ -135,9 +165,14 @@
                     if (!bg || bg === 'none' || bg === '') continue;
                     var m = bg.match(/url\(["']?(.+?)["']?\)/);
                     if (!m) continue;
+                    // D3-3 clip masks live in CSS mask-image on the layer div —
+                    // without replaying them, clipped layers export UNclipped.
+                    var maskCss = layerDiv.style.webkitMaskImage || layerDiv.style.maskImage || '';
+                    var mm = maskCss.match(/url\(["']?(.+?)["']?\)/);
                     var divOp = parseFloat(layerDiv.style.opacity);
                     drawList.push({
                         type: 'layer', src: m[1],
+                        maskSrc: mm ? mm[1] : null,
                         x: (layer.x || 0) * sx, y: (layer.y || 0) * sy,
                         scaleX: layer.scaleX || 1, scaleY: layer.scaleY || 1,
                         rotation: layer.rotation || 0,
@@ -146,40 +181,79 @@
                 }
             }
 
-            // Load layer images in parallel
+            var t0 = performance.now();
+
+            // Decode layer + mask images through the per-export cache
             Promise.all(drawList.map(function (task) {
                 if (task.type === 'sim') return Promise.resolve(null);
-                return new Promise(function (res) {
-                    var img = new Image();
-                    img.onload = function () { res(img); };
-                    img.onerror = function () { res(null); };
-                    img.src = task.src;
-                });
+                if (!task.maskSrc) return getCachedImage(task.src);
+                return Promise.all([getCachedImage(task.src), getCachedImage(task.maskSrc)]);
             })).then(function (images) {
                 var comp = document.createElement('canvas');
                 comp.width = w; comp.height = h;
                 var ctx = comp.getContext('2d');
+                var scratch = null; // lazy, shared by all masked layers this frame
 
                 drawList.forEach(function (task, idx) {
                     ctx.globalAlpha = task.opacity;
                     if (task.type === 'sim') {
                         ctx.drawImage(simSnap, 0, 0);
                     } else {
-                        var img = images[idx];
+                        var img = task.maskSrc ? images[idx][0] : images[idx];
+                        var maskImg = task.maskSrc ? images[idx][1] : null;
                         if (!img) return;
+                        var source = img;
+                        if (maskImg) {
+                            // CSS mask-image applies in the element's local box
+                            // BEFORE its transform (mask-size:100% 100%), so
+                            // mask in untransformed space, then transform the
+                            // already-clipped result.
+                            if (!scratch) {
+                                scratch = document.createElement('canvas');
+                                scratch.width = w; scratch.height = h;
+                            }
+                            var sctx = scratch.getContext('2d');
+                            sctx.globalCompositeOperation = 'source-over';
+                            sctx.clearRect(0, 0, w, h);
+                            sctx.drawImage(img, 0, 0, w, h);
+                            sctx.globalCompositeOperation = 'destination-in';
+                            sctx.drawImage(maskImg, 0, 0, w, h);
+                            source = scratch;
+                        }
                         ctx.save();
                         ctx.translate(w / 2 + task.x, h / 2 + task.y);
                         ctx.rotate(task.rotation * Math.PI / 180);
                         ctx.scale(task.scaleX, task.scaleY);
-                        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+                        ctx.drawImage(source, -w / 2, -h / 2, w, h);
                         ctx.restore();
                     }
                     ctx.globalAlpha = 1;
                 });
 
                 if (cfg.compositeOverlays && window.brandingOverlays && window.brandingOverlays.compositeOntoCanvas) {
-                    window.brandingOverlays.compositeOntoCanvas(ctx, { width: w, height: h });
+                    // Overlay x/y are fractions of #canvas-area; the export
+                    // frame is the wrapper. Pass the area→wrapper mapping so
+                    // overlays land where the user sees them (in wrapper px;
+                    // buffer px == wrapper CSS px, see 05j updateCanvasSize).
+                    var opts = { width: w, height: h };
+                    var area = document.getElementById('canvas-area');
+                    var wrap = document.getElementById('canvas-wrapper');
+                    if (area && wrap) {
+                        var aRect = area.getBoundingClientRect();
+                        var wRect = wrap.getBoundingClientRect();
+                        opts.areaWidth = aRect.width;
+                        opts.areaHeight = aRect.height;
+                        opts.offsetX = wRect.left - aRect.left;
+                        opts.offsetY = wRect.top - aRect.top;
+                    }
+                    window.brandingOverlays.compositeOntoCanvas(ctx, opts);
                 }
+
+                var dt = performance.now() - t0;
+                _compStats.frames++;
+                _compStats.totalMs += dt;
+                if (dt > _compStats.worstMs) _compStats.worstMs = dt;
+
                 resolve(comp);
             }).catch(reject);
         });
@@ -378,18 +452,43 @@
                     mimeType = 'video/webm';
             }
 
+            // Electron + MP4 + output folder → stream chunks to disk as they
+            // arrive instead of accumulating the whole recording in RAM (a
+            // long 4K capture used to OOM). MP4 needs no post-processing, so
+            // nothing ever requires the full file in memory. WebM keeps the
+            // in-RAM path (the cue fixer needs the whole file).
             var chunks = [];
+            var streamPath = null, writeChain = null;
+            if (isElectron && cfg.outputFolder && fs && ext === 'mp4') {
+                try {
+                    streamPath = path.join(cfg.outputFolder, cfg.filenamePrefix + Date.now() + '.mp4');
+                    fs.writeFileSync(streamPath, Buffer.alloc(0));
+                    writeChain = Promise.resolve();
+                } catch (e) {
+                    console.warn('[Export] disk streaming unavailable, buffering in RAM:', e.message);
+                    streamPath = null;
+                }
+            }
             _recorder = new MediaRecorder(_stream, {
                 mimeType: mimeType,
                 videoBitsPerSecond: cfg.videoBitrate
             });
             _recorder.ondataavailable = function (e) {
-                if (e.data && e.data.size > 0) chunks.push(e.data);
+                if (!(e.data && e.data.size > 0)) return;
+                if (streamPath) {
+                    // Chain keeps chunk order; appendFileSync keeps it simple
+                    writeChain = writeChain
+                        .then(function () { return e.data.arrayBuffer(); })
+                        .then(function (ab) { fs.appendFileSync(streamPath, Buffer.from(ab)); })
+                        .catch(function (err) { console.warn('[Export] chunk write failed:', err.message); });
+                } else {
+                    chunks.push(e.data);
+                }
             };
 
             // Wrap onstop in a Promise so we can await it
             var blobReady = new Promise(function (resolve, reject) {
-                _recorder.onstop  = function () { resolve(new Blob(chunks, { type: mimeType })); };
+                _recorder.onstop  = function () { resolve(streamPath ? null : new Blob(chunks, { type: mimeType })); };
                 _recorder.onerror = function (e) { reject(e.error || new Error('Recording failed')); };
             });
 
@@ -427,19 +526,28 @@
 
             // Stop the recorder (fires onstop → resolves blobReady)
             if (_recorder && _recorder.state === 'recording') _recorder.stop();
-            if (_abort) { toast('Export cancelled', 'info'); return; }
 
-            var blob = await blobReady;
+            var blob = await blobReady;           // null when disk-streaming
+            if (streamPath) await writeChain;      // last chunk flushed
 
-            // WebM needs post-processing for proper seeking; MP4 is fine as-is
-            if (ext === 'webm') {
-                updateUI('rendering', 95);
-                blob = await fixWebmForSeeking(blob, duration);
+            if (_abort) {
+                if (streamPath) { try { fs.unlinkSync(streamPath); } catch (_) {} }
+                toast('Export cancelled', 'info');
+                return;
             }
 
-            var name = cfg.filenamePrefix + Date.now() + '.' + ext;
-            await saveBlob(blob, name);
-            toast('Video exported! (' + ext.toUpperCase() + ')', 'success');
+            if (streamPath) {
+                toast('Video exported! (MP4)', 'success');
+            } else {
+                // WebM needs post-processing for seeking; MP4 is fine as-is
+                if (ext === 'webm') {
+                    updateUI('rendering', 95);
+                    blob = await fixWebmForSeeking(blob, duration);
+                }
+                var name = cfg.filenamePrefix + Date.now() + '.' + ext;
+                await saveBlob(blob, name);
+                toast('Video exported! (' + ext.toUpperCase() + ')', 'success');
+            }
 
         } catch (err) {
             console.error('[Export] Video:', err);
@@ -649,13 +757,33 @@
         return indexed;
     }
 
+    // Growable typed-array writer. The previous boxed `[]`-push writers cost
+    // ~8 bytes of heap per output BYTE (a 10MB GIF ballooned past 100MB of
+    // transient heap); this keeps it at ~1x with doubling growth.
+    function ByteWriter(initial) {
+        var arr = new Uint8Array(initial || (1 << 16));
+        var len = 0;
+        function ensure(n) {
+            if (len + n <= arr.length) return;
+            var next = new Uint8Array(Math.max(arr.length * 2, len + n));
+            next.set(arr.subarray(0, len));
+            arr = next;
+        }
+        return {
+            w8: function (v) { ensure(1); arr[len++] = v & 0xFF; },
+            w16: function (v) { ensure(2); arr[len++] = v & 0xFF; arr[len++] = (v >> 8) & 0xFF; },
+            wStr: function (s) { ensure(s.length); for (var i = 0; i < s.length; i++) arr[len++] = s.charCodeAt(i) & 0xFF; },
+            wBytes: function (src, start, end) { var n = end - start; ensure(n); arr.set(src.subarray(start, end), len); len += n; },
+            size: function () { return len; },
+            toUint8Array: function () { return arr.subarray(0, len); }
+        };
+    }
+
     // ── Inline GIF89a Encoder with LZW ─────────────────────────────
     // Produces valid animated GIF89a. No external libraries.
     async function encodeGIF(width, height, frames, onProgress) {
-        var buf = [];
-        var w8  = function (v) { buf.push(v & 0xFF); };
-        var w16 = function (v) { buf.push(v & 0xFF, (v >> 8) & 0xFF); };
-        var wStr = function (s) { for (var i = 0; i < s.length; i++) buf.push(s.charCodeAt(i)); };
+        var bw = ByteWriter(1 << 20);
+        var w8 = bw.w8, w16 = bw.w16, wStr = bw.wStr;
 
         // Build adaptive 256-colour palette from actual frame data
         var palette = buildAdaptivePalette(frames, width, height);
@@ -716,7 +844,8 @@
             while (pos < lzw.length) {
                 var sz = Math.min(255, lzw.length - pos);
                 w8(sz);
-                for (var si = 0; si < sz; si++) w8(lzw[pos++]);
+                bw.wBytes(lzw, pos, pos + sz);
+                pos += sz;
             }
             w8(0x00); // sub-block terminator
 
@@ -729,7 +858,7 @@
         // ── Trailer ──
         w8(0x3B);
 
-        return new Uint8Array(buf);
+        return bw.toUint8Array();
     }
 
     // Standard GIF LZW compressor
@@ -746,15 +875,15 @@
             codeSize = minCodeSize + 1;       // 9
         }
 
-        // Bit-packing output
-        var output = [];
+        // Bit-packing output (typed writer — see ByteWriter note)
+        var out = ByteWriter(pixels.length >> 1);
         var bits = 0, bitCount = 0;
 
         function emit(code) {
             bits |= code << bitCount;
             bitCount += codeSize;
             while (bitCount >= 8) {
-                output.push(bits & 0xFF);
+                out.w8(bits & 0xFF);
                 bits >>>= 8;
                 bitCount -= 8;
             }
@@ -792,9 +921,9 @@
         emit(eoiCode);
 
         // Flush remaining bits
-        if (bitCount > 0) output.push(bits & 0xFF);
+        if (bitCount > 0) out.w8(bits & 0xFF);
 
-        return output;
+        return out.toUint8Array();
     }
 
     // ── Still Image Export ──────────────────────────────────────────
@@ -943,8 +1072,23 @@
             var ext  = format === 'jpg' ? '.jpg' : '.png';
             var qual = format === 'jpg' ? cfg.imageQuality : undefined;
 
-            // Phase 1: capture frames as PNG/JPG blobs (0 → 70%)
-            var files = [];
+            // Electron + output folder → stream each frame straight to disk in
+            // its own subfolder (no ZIP, no accumulation — 150 full-res PNGs
+            // used to sit in RAM until the end). Web keeps blob-accumulate+ZIP
+            // (a browser download has nowhere to stream).
+            var seqDir = null;
+            if (isElectron && cfg.outputFolder && fs) {
+                try {
+                    seqDir = path.join(cfg.outputFolder, cfg.filenamePrefix + 'sequence_' + Date.now());
+                    fs.mkdirSync(seqDir, { recursive: true });
+                } catch (e) {
+                    console.warn('[Export] sequence folder failed, falling back to ZIP:', e.message);
+                    seqDir = null;
+                }
+            }
+
+            // Phase 1: capture frames (0 → 70%)
+            var files = seqDir ? null : [];
             for (var i = 0; i < frameCount; i++) {
                 if (_abort) { toast('Export cancelled', 'info'); return; }
 
@@ -959,29 +1103,37 @@
 
                 var arrBuf = await blob.arrayBuffer();
                 var num = String(i).padStart(5, '0');
-                files.push({ name: 'frame_' + num + ext, data: new Uint8Array(arrBuf) });
+                if (seqDir) {
+                    fs.writeFileSync(path.join(seqDir, 'frame_' + num + ext), Buffer.from(arrBuf));
+                } else {
+                    files.push({ name: 'frame_' + num + ext, data: new Uint8Array(arrBuf) });
+                }
 
-                updateUI('rendering', ((i + 1) / frameCount) * 70);
+                updateUI('rendering', ((i + 1) / frameCount) * (seqDir ? 95 : 70));
 
                 if (i < frameCount - 1) await sleep(interval);
             }
 
             if (_abort) { toast('Export cancelled', 'info'); return; }
 
-            // Phase 2: build ZIP (70 → 95%)
-            toast('Building ZIP...', 'info');
-            updateUI('rendering', 75);
-            await sleep(0); // yield to UI
+            if (seqDir) {
+                toast('Sequence exported: ' + frameCount + ' frames → ' + seqDir, 'success');
+            } else {
+                // Phase 2: build ZIP (70 → 95%)
+                toast('Building ZIP...', 'info');
+                updateUI('rendering', 75);
+                await sleep(0); // yield to UI
 
-            var zipBlob = buildZIP(files);
-            files = null; // free frame memory
+                var zipBlob = buildZIP(files);
+                files = null; // free frame memory
 
-            updateUI('rendering', 95);
+                updateUI('rendering', 95);
 
-            // Phase 3: save
-            var name = cfg.filenamePrefix + 'sequence_' + Date.now() + '.zip';
-            await saveBlob(zipBlob, name);
-            toast('Sequence exported: ' + frameCount + ' frames (ZIP)', 'success');
+                // Phase 3: save
+                var name = cfg.filenamePrefix + 'sequence_' + Date.now() + '.zip';
+                await saveBlob(zipBlob, name);
+                toast('Sequence exported: ' + frameCount + ' frames (ZIP)', 'success');
+            }
 
         } catch (err) {
             console.error('[Export] Sequence:', err);
