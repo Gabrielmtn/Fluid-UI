@@ -17,7 +17,8 @@
     "publish:steam": "steamcmd +login YOUR_STEAM_BUILDER +run_app_build \"%CD%\\steam\\app_build.vdf\" +quit"
   },
   "dependencies": {
-    "@electron/remote": "^2.1.3"
+    "@electron/remote": "^2.1.3",
+    "steamworks.js": "^0.4.0"
   },
   "devDependencies": {
     "electron": "^39.1.2",
@@ -34,8 +35,18 @@
     "copyright": "Copyright (c) 2024-2026 Gabriel (Gabrielmtn)",
     "asar": false,
     "extraFiles": [
-      { "from": "LICENSE", "to": "LICENSE.txt" },
-      { "from": "THIRD-PARTY-NOTICES.txt", "to": "THIRD-PARTY-NOTICES.txt" }
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "THIRD-PARTY-NOTICES.txt",
+        "to": "THIRD-PARTY-NOTICES.txt"
+      },
+      {
+        "from": "node_modules/steamworks.js/dist/win64/steam_api64.dll",
+        "to": "steam_api64.dll"
+      }
     ],
     "files": [
       "**/*",

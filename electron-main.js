@@ -6,6 +6,37 @@ const path = require('path');
 // packaged builds, or when explicitly asked for with --dev.
 const isDev = !app.isPackaged || process.argv.includes('--dev');
 
+// ── Steamworks (Steam plan S5-1) ───────────────────────────────────────────
+// Fill in when Steamworks issues the App ID; 0 = skip init entirely.
+// Dev testing: drop a steam_appid.txt next to package.json (gitignored and
+// excluded from the depot) and init() reads it with no argument.
+const STEAM_APP_ID = 0;
+let steamClient = null;
+try {
+    const hasDevAppId = require('fs').existsSync(path.join(__dirname, 'steam_appid.txt'));
+    if (STEAM_APP_ID || hasDevAppId) {
+        const steamworks = require('steamworks.js');
+        steamClient = STEAM_APP_ID ? steamworks.init(STEAM_APP_ID) : steamworks.init();
+        console.log('[Steam] initialized as', steamClient.localplayer.getName());
+    } else {
+        console.log('[Steam] no App ID configured — running without Steamworks');
+    }
+} catch (e) {
+    // Steam not running / app not owned / dll missing — the app must stay
+    // fully functional DRM-free (this same artifact ships to itch and web).
+    console.log('[Steam] init failed — running DRM-free:', e.message);
+}
+// Deliberately NOT called:
+// - restartAppIfNecessary(): the identical win-unpacked folder ships to
+//   itch — a courtesy relaunch into Steam would break itch copies.
+//   Ownership enforcement is none by design (the web version is free).
+// - electronEnableSteamOverlay(): needs in-process-gpu (+ disable-direct-
+//   composition) — a GPU/driver crash then kills the whole app instead of
+//   a recoverable lost context (this app has context-loss history), and
+//   Electron ≥35 has an unfixed overlay regression (electron#47662).
+//   v1 ships without overlay; revisit as an experimental second launch
+//   option post-launch (see the Steam plan, S5-2).
+
 // Enable remote module
 require('@electron/remote/main').initialize();
 
