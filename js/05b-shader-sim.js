@@ -131,7 +131,11 @@
                         float dy2 = p.y - cy;
                         shape = bx * exp(-(dy2 * dy2) / radius);
                     }
-                    if (stampNoise > 0.0) {
+                    // Clay stamp never applies to the analytic ring/bar shapes —
+                    // they define their own alpha and a stamp overwrite paints
+                    // a blob/square inside the ring's hollow center (JS also
+                    // zeroes stampNoise for tip 4; this is defense-in-depth).
+                    if (stampNoise > 0.0 && ringRadius <= 0.0 && barHalfW <= 0.0) {
                         // Clay stamp: hard-edged footprint with a noise-notched rim
                         // and surface grain instead of the gaussian bloom. Dye only —
                         // the velocity pass stays gaussian, or motion reads as glitch.

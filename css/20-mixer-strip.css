@@ -509,120 +509,200 @@ body > .controls {
     font-size: 12px;
 }
 
-/* Preset buttons in mixer strip */
-.mixer-presets {
+/* ── Presets: select-style trigger in the strip + popup list ──
+   (redesigned 2026-07-29: the flex-wrap chip area hid the save button
+   under its own scroll fold once presets multiplied. Now one trigger
+   opens a vertical scrolling list with a sticky "+ New Preset" footer.) */
+.mixer-presets-channel {
     display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    padding: 2px 10px;
     align-items: center;
-    align-content: flex-start;
-    /* Flex into whatever space the channels leave over so wide screens
-       don't end up with a dead gap before the preset chips — but NEVER
-       set the strip's height: on narrow windows the chips wrap into many
-       rows, so cap the block and scroll internally instead of letting it
-       balloon the whole strip. */
-    flex: 1 1 220px;
-    min-width: 180px;
-    max-width: none;
+    padding: 2px 10px;
     align-self: center;
-    max-height: 64px;
-    overflow-y: auto;
+    flex-shrink: 0;
 }
-.mixer-presets::-webkit-scrollbar {
+.mixer-presets-trigger {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+    max-width: 150px;
+}
+.mixer-presets-trigger:hover,
+.mixer-presets-trigger.active {
+    background: rgba(100, 200, 255, 0.12);
+    border-color: rgba(100, 200, 255, 0.35);
+    color: white;
+}
+.mixer-presets-trigger-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mixer-presets-trigger-label.has-preset {
+    color: rgba(100, 200, 255, 0.95);
+}
+.mixer-presets-trigger-chev {
+    font-size: 8px;
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+.mixer-presets-panel {
+    flex-direction: column; /* JS toggles display none↔flex */
+    max-height: calc(100vh - 140px);
+}
+.mixer-presets-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin: 6px 0;
+}
+.mixer-presets-list::-webkit-scrollbar {
     width: 4px;
 }
-.mixer-presets::-webkit-scrollbar-thumb {
+.mixer-presets-list::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.12);
     border-radius: 2px;
+}
+.mixer-presets-footer {
+    flex-shrink: 0;
+    display: flex;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 /* (legacy `.mixer-presets button { all: unset !important; ... }` block
    removed 2026-07-13 — it was one side of a three-way specificity war
    with the JS inline styles (also removed) and made .active states
    unrenderable on every button in the presets channel. All preset-button
    styling now lives in the class rules below.) */
-/* Separator between built-in and user presets */
-.preset-sep {
-    width: 1px;
-    height: 18px;
+/* Separator between built-in and user presets (horizontal in the list) */
+.mixer-presets-list .preset-sep {
+    width: auto;
+    height: 1px;
     background: rgba(255,255,255,0.15);
-    margin: 0 3px;
+    margin: 4px 0;
     flex-shrink: 0;
 }
-/* Built-in preset buttons in mixer strip (styles moved out of JS inline
-   cssText 2026-07-13 — inline styles beat any class, which is why .active
-   never rendered on these) */
-#mixer-strip .mixer-preset-btn {
+/* Built-in preset rows in the popup list (04b updatePresetButtons still
+   drives .active via the .mixer-preset-btn class) */
+.mixer-presets-panel .mixer-preset-btn {
     all: unset;
     box-sizing: border-box;
-    padding: 4px 8px;
-    font-size: 9px;
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 11px;
     border-radius: 3px;
-    background: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.7);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.75);
+    border: 1px solid rgba(255,255,255,0.08);
     cursor: pointer;
     line-height: 1.2;
     font-weight: 500;
 }
-#mixer-strip .mixer-preset-btn:hover {
-    opacity: 0.8;
+.mixer-presets-panel .mixer-preset-btn:hover {
+    background: rgba(255,255,255,0.1);
 }
-#mixer-strip .mixer-preset-btn.active {
+.mixer-presets-panel .mixer-preset-btn.active {
     background: rgba(100,200,255,0.28);
     border-color: rgba(100,200,255,0.55);
     color: white;
     font-weight: 600;
 }
-/* User preset buttons in mixer strip */
+/* User preset rows: load button + delete */
 .mixer-user-presets {
     display: contents;
 }
-#mixer-strip .mixer-user-preset-btn {
+.mixer-user-preset-row {
+    display: flex;
+    gap: 4px;
+    align-items: stretch;
+}
+.mixer-presets-panel .mixer-user-preset-btn {
     all: unset;
     box-sizing: border-box;
-    padding: 4px 8px;
-    font-size: 9px;
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 11px;
     border-radius: 3px;
-    /* no !important — it existed to beat the JS inline styles (now gone)
-       and collaterally defeated the .active rule below */
-    background: rgba(100,200,255,0.12);
-    color: rgba(100,200,255,0.8);
-    border: 1px solid rgba(100,200,255,0.2);
+    background: rgba(100,200,255,0.1);
+    color: rgba(100,200,255,0.85);
+    border: 1px solid rgba(100,200,255,0.18);
     cursor: pointer;
     line-height: 1.2;
-    max-width: 80px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: 500;
 }
-#mixer-strip .mixer-user-preset-btn:hover {
-    opacity: 0.8;
+.mixer-presets-panel .mixer-user-preset-btn:hover {
+    background: rgba(100,200,255,0.18);
 }
-#mixer-strip .mixer-user-preset-btn.active {
+.mixer-presets-panel .mixer-user-preset-btn.active {
     background: rgba(100,200,255,0.3);
     border-color: rgba(100,200,255,0.5);
     color: white;
     font-weight: 600;
 }
-/* Save button */
-#mixer-strip .mixer-preset-save {
+.mixer-user-preset-delete {
     all: unset;
     box-sizing: border-box;
-    padding: 4px 8px;
+    flex-shrink: 0;
+    width: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    border-radius: 3px;
+    color: rgba(255,120,120,0.6);
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+.mixer-user-preset-delete:hover {
+    color: rgba(255,120,120,1);
+    background: rgba(255,120,120,0.12);
+    border-color: rgba(255,120,120,0.3);
+}
+/* Sticky-footer save button */
+.mixer-presets-footer .mixer-preset-save {
+    all: unset;
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    text-align: center;
+    padding: 6px 8px;
     font-size: 11px;
     font-weight: 700;
     border-radius: 3px;
-    background: rgba(63,185,80,0.15) !important;
-    color: rgba(63,185,80,0.9) !important;
-    border: 1px solid rgba(63,185,80,0.25) !important;
+    background: rgba(63,185,80,0.15);
+    color: rgba(63,185,80,0.9);
+    border: 1px solid rgba(63,185,80,0.25);
     cursor: pointer;
     line-height: 1;
-    flex-shrink: 0;
 }
-#mixer-strip .mixer-preset-save:hover {
-    opacity: 0.8;
+.mixer-presets-footer .mixer-preset-save:hover {
+    background: rgba(63,185,80,0.25);
+}
+.mixer-presets-footer .mixer-preset-name-input {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 /* Inline name input */
 .mixer-preset-name-input {
@@ -721,7 +801,7 @@ body > .controls {
 }
 
 
-/* ── Brush settings panel (D1): dropdown off the Brush channel label ── */
+/* ── Brush settings panel (D1): left slide-in off the Brush Size label ── */
 #mixer-strip .ch-label.brush-trigger {
     cursor: pointer;
     user-select: none;
@@ -739,6 +819,21 @@ body > .controls {
     max-height: calc(100vh - 120px);
     overflow-y: auto;
     overscroll-behavior: contain;
+}
+/* Drawer variant: pinned to the left edge, slides in/out. visibility flips
+   after the slide-out so the close animation stays visible (same pattern as
+   the mobile sidebar in 21-sidebar.css). */
+.brush-settings-panel.slide-left {
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
+    border-radius: 0 10px 10px 0;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.5);
+}
+.brush-settings-panel.slide-left.visible {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.25s ease, visibility 0s linear 0s;
 }
 .brush-settings-panel .brush-section-label {
     margin-top: 10px;

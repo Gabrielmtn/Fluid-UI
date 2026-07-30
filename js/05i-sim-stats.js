@@ -136,6 +136,11 @@
                 gl.uniform1f(splatProg.uniforms.radius, baseRadius * 0.08); // band width²
                 gl.uniform1f(splatProg.uniforms.ringRadius, 0.75 * Math.sqrt(baseRadius));
                 gl.uniform1f(splatProg.uniforms.ringSquash, 1);
+                // Ring is its own analytic shape: never blend the material's
+                // clay stamp on top. Without this, Paint-Thick's STAMP_NOISE
+                // (0.7, shape often Chisel) reaches the shader's stamp block,
+                // which overwrites the hollow center with a square press.
+                gl.uniform1f(splatProg.uniforms.stampNoise, 0);
             }
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
             const _dyeRect = _scOn ? splatScissorRect(_u, _v, _dHalf, aspectRatio, dyeTexWidth, dyeTexHeight) : 'full';
