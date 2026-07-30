@@ -2140,7 +2140,7 @@
         var saveBtn = document.createElement('button');
         saveBtn.type = 'button';
         saveBtn.className = 'mixer-preset-save';
-        saveBtn.textContent = '+';
+        saveBtn.textContent = 'Brush Preset +';
         saveBtn.title = 'Save the current brush as a preset';
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
@@ -2209,13 +2209,9 @@
         function renderPresetChips() {
             chipsWrap.innerHTML = '';
             var list = loadBrushPresets();
-            if (!list.length) {
-                var hint = document.createElement('div');
-                hint.className = 'arm-colors-hint';
-                hint.textContent = 'No brush presets yet — dial in a brush and hit +';
-                chipsWrap.appendChild(hint);
-                return;
-            }
+            // (empty state intentionally renders nothing — the helper text
+            // added a scrollbar's worth of height for most screens)
+            if (!list.length) return;
             list.forEach(function (p) {
                 var chip = document.createElement('button');
                 chip.type = 'button';
@@ -2244,7 +2240,7 @@
         function cancelPresetSave() {
             nameInput.style.display = 'none';
             nameInput.value = '';
-            saveBtn.textContent = '+';
+            saveBtn.textContent = 'Brush Preset +';
         }
         function doSaveBrushPreset() {
             var name = (nameInput.value || '').trim();
@@ -2262,7 +2258,7 @@
                 nameInput.style.display = '';
                 nameInput.value = '';
                 nameInput.focus();
-                saveBtn.textContent = '✓';
+                saveBtn.textContent = 'Save ✓';
             } else {
                 doSaveBrushPreset();
             }
@@ -2365,7 +2361,9 @@
         // ── Flow + stroke feel ──
         pSlider('brushFlow', 'Flow', 0.05, 1, 0.01, 'BRUSH_FLOW', pct, 'flow');
         sLabel('Stroke');
-        pSlider('brushStabilizer', 'Stabilizer', 0, 1, 0.01, 'BRUSH_STABILIZER', pct, 'stabilizer');
+        // Stabilizer slider removed 2026-07-30 (Gabriel): panel-length trim.
+        // config.BRUSH_STABILIZER stays at its default; brush presets that
+        // captured a stabilizer value simply no longer apply that key.
         pSlider('brushSpacing', 'Spacing', 0.01, 1, 0.01, 'BRUSH_SPACING', pct, 'spacing');
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
 
