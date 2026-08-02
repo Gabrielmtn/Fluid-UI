@@ -478,10 +478,20 @@
         // stale snapshot can't reappear on later launches.
         try {
             const rec = window.settingsManager ? window.settingsManager.get('app.contextLossSnapshot') : null;
-            if (rec && rec.snapshot && (Date.now() - (rec.at || 0)) < 10 * 60 * 1000) {
+            // 24h, not 10min: a driver reset often takes the whole machine with
+            // it, and the customer relaunches after a reboot — well past any
+            // ten-minute window. The key is consumed either way.
+            if (rec && rec.snapshot && (Date.now() - (rec.at || 0)) < 24 * 60 * 60 * 1000) {
                 const offerRestore = () => {
                     try {
-                        if (window.confirm('The graphics driver reset during the last session.\n\nRestore your settings, layers, and brush state from just before the reset?')) {
+                        // Be honest about the limit: pixels can't be read back
+                        // from a lost GL context, so painted layers are only as
+                        // fresh as the last save. Settings/brush/layout are exact.
+                        const painted = !!(rec.snapshot.layers || []).some(function (l) { return l && l.isRaster; });
+                        const caveat = painted
+                            ? '\n\nSettings, brush and layer setup will be exact. Painted pixels can only come back as far as your last save — anything painted after it was lost with the driver reset.'
+                            : '';
+                        if (window.confirm('The graphics driver reset during the last session.\n\nRestore your settings, layers, and brush state from just before the reset?' + caveat)) {
                             applyPresetSnapshot(rec.snapshot);
                         }
                     } catch (err) { console.warn('[ContextLoss] restore failed', err); }
@@ -1205,6 +1215,12 @@
                         collisionMode: ld.collisionMode || 'block',
                         collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7,
                         isRaster: !!ld.isRaster,
+                        // Force a pixel upload even when an FBO already exists at
+                        // this index. reconcile() otherwise only restores MISSING
+                        // buffers, so a saved layer landing on the boot layer's
+                        // index (both 100) kept the empty boot FBO — the panel
+                        // thumbnail showed the artwork while the canvas stayed blank.
+                        __needsRestore: !!ld.isRaster && !!ld.data,
                         opacity: typeof ld.opacity === 'number' ? ld.opacity : 1,
                         blendMode: ld.blendMode || 'normal',
                         clipMaskId: (typeof ld.clipMaskId === 'number') ? ld.clipMaskId : null,

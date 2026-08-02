@@ -386,6 +386,12 @@
                 }
                 return;
             }
+            // Primary button only (pen TIP reports 0; middle=1, back/forward=3/4,
+            // pen ERASER=5). pointerup only finalizes buttons 0 and 2, so any
+            // other button used to start a stroke that could never end — leaving
+            // pointer.down stuck true and painting a permanent line under the
+            // cursor until the app was restarted.
+            if (e.button !== 0) return;
             // Only process presses that actually target the canvas (not click-throughs from UI)
             if (isPaused || e.target !== canvas) return;
             // Capture the pointer so the stroke keeps getting move/up/cancel even

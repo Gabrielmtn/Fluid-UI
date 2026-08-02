@@ -458,7 +458,7 @@
             // nothing ever requires the full file in memory. WebM keeps the
             // in-RAM path (the cue fixer needs the whole file).
             var chunks = [];
-            var streamPath = null, writeChain = null;
+            var streamPath = null, writeChain = null, streamWriteError = null;
             if (isElectron && cfg.outputFolder && fs && ext === 'mp4') {
                 try {
                     streamPath = path.join(cfg.outputFolder, cfg.filenamePrefix + Date.now() + '.mp4');
@@ -476,11 +476,17 @@
             _recorder.ondataavailable = function (e) {
                 if (!(e.data && e.data.size > 0)) return;
                 if (streamPath) {
-                    // Chain keeps chunk order; appendFileSync keeps it simple
+                    // Chain keeps chunk order; appendFileSync keeps it simple.
+                    // A failed append means the file has a HOLE — record it so
+                    // the export reports failure instead of a success toast over
+                    // a truncated video (disk full, drive ejected mid-record).
                     writeChain = writeChain
                         .then(function () { return e.data.arrayBuffer(); })
                         .then(function (ab) { fs.appendFileSync(streamPath, Buffer.from(ab)); })
-                        .catch(function (err) { console.warn('[Export] chunk write failed:', err.message); });
+                        .catch(function (err) {
+                            streamWriteError = streamWriteError || err;
+                            console.warn('[Export] chunk write failed:', err.message);
+                        });
                 } else {
                     chunks.push(e.data);
                 }
@@ -516,7 +522,12 @@
                 // Composite all visible layers onto the recording canvas
                 var comp = await captureCompositeFrame();
                 recCtx.clearRect(0, 0, recCanvas.width, recCanvas.height);
-                recCtx.drawImage(comp, 0, 0);
+                // Scale into the FIXED recording size: the canvas buffer can be
+                // reallocated mid-export (window resize, drawer collapse), and an
+                // unsized drawImage then cropped or black-banded every remaining
+                // frame. MediaRecorder can't change track size mid-stream, so
+                // fitting to the original size is the only correct answer.
+                recCtx.drawImage(comp, 0, 0, recCanvas.width, recCanvas.height);
 
                 // Push the frame to the encoder
                 if (track.requestFrame) track.requestFrame();
@@ -537,6 +548,10 @@
             }
 
             if (streamPath) {
+                if (streamWriteError) {
+                    throw new Error('could not finish writing the video (' +
+                        streamWriteError.message + ') — the file at ' + streamPath + ' is incomplete');
+                }
                 toast('Video exported! (MP4)', 'success');
             } else {
                 // WebM needs post-processing for seeking; MP4 is fine as-is

@@ -3844,7 +3844,10 @@
         }
 
         var panel = document.createElement('div');
-        panel.className = 'arm-colors-panel';
+        // arm-colors-rows marks THE arm-colors popup: the brush drawer and the
+        // presets popup share the .arm-colors-panel skin, so 05g needs a class
+        // that only this one carries to decide whether a rebuild is visible.
+        panel.className = 'arm-colors-panel arm-colors-rows';
         panel.style.display = 'none';
         panel.style.position = 'fixed';
         document.body.appendChild(panel);

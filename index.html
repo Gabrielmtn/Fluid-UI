@@ -13,6 +13,24 @@
     // so even an early load failure is visible instead of a silent half-boot.
     (function () {
         window.IS_ELECTRON = !!(typeof process !== 'undefined' && process.versions && process.versions.electron);
+
+        // HTML-escape for any untrusted string interpolated into innerHTML.
+        // Project files (.fluid), preset files and multiplayer messages all
+        // carry names/data that reach innerHTML templates in the layer,
+        // recording and path panels — without this a shared file can inject
+        // markup, and in Electron (nodeIntegration) that is code execution.
+        // Defined in the boot IIFE so every later chunk can rely on it.
+        window.escHtml = function (v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+        // Only ever emit data:image URLs into style/background — anything else
+        // (javascript:, a quote-break, a stray url()) is dropped.
+        window.safeImageUrl = function (v) {
+            var s = String(v == null ? '' : v);
+            return /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=\s]*$/.test(s) ? s : '';
+        };
         try {
             window.__appVersion = window.IS_ELECTRON
                 ? require('@electron/remote').app.getVersion()
@@ -28,14 +46,23 @@
                 document.addEventListener('DOMContentLoaded', function () { showErrorCard(title, message, detail); });
                 return;
             }
-            reported++;
-            if (reported > 3) return; // don't stack endlessly on error loops
+            // Cap CONCURRENT cards, not lifetime errors: a counter that only
+            // ever increments meant three transient boot errors permanently
+            // silenced every later failure. Dedupe identical messages too, so
+            // a per-frame throw can't paper the screen.
+            var live = document.querySelectorAll('.boot-error-card');
+            if (live.length >= 3) return;
+            for (var li = 0; li < live.length; li++) {
+                if (live[li].dataset.errKey === title + '|' + message) return;
+            }
+            reported = live.length;
             var report = title + ': ' + message +
                 '\nversion: ' + window.__appVersion +
                 '\ngpu: ' + (window.__gpuRenderer || 'unknown') +
                 (detail ? '\n' + detail : '');
             var card = document.createElement('div');
             card.className = 'boot-error-card';
+            card.dataset.errKey = title + '|' + message;
             card.style.cssText = 'position:fixed;right:12px;bottom:' + (12 + (reported - 1) * 96) + 'px;z-index:2147483647;' +
                 'max-width:420px;background:#1a1f27;color:#e6edf3;border:1px solid #f8514966;border-radius:8px;' +
                 'padding:10px 12px;font:12px/1.45 "Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)';
@@ -968,11 +995,10 @@
                 <div>
                     <h3>Canvas/Display</h3>
                     <ul>
-                        <li>T — Toggle Trail</li>
                         <li>C — Toggle Cursor</li>
                         <li>H — Toggle Border & Handles</li>
                         <li>L — Lock/Unlock Borders</li>
-                        <li>S — Focus Mode</li>
+                        <li>F — Focus Mode</li>
                     </ul>
                 </div>
                 <div>

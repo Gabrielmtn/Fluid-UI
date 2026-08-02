@@ -153,6 +153,15 @@ function createWindow() {
     // Open DevTools in development (optional)
     // mainWindow.webContents.openDevTools();
     
+    // A file dropped anywhere outside a drop zone would otherwise make Chromium
+    // NAVIGATE the window to that file (the app is replaced by an image viewer
+    // with no way back). Block navigation and new windows outright — the app is
+    // a single local page and never legitimately navigates.
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        if (url !== mainWindow.webContents.getURL()) event.preventDefault();
+    });
+    mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
     // A dead renderer used to be a silent white window — surface it instead.
     mainWindow.webContents.on('render-process-gone', (event, details) => {
         if (details.reason === 'clean-exit') return;

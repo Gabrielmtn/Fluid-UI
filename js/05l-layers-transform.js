@@ -676,9 +676,15 @@
                         const th = Math.max(1, Math.round(96 * f.height / f.width));
                         const rc = _readbackCanvas(f, 96, th);
                         if (!rc) return;
-                        layer.data = rc.toDataURL();
+                        // Panel preview ONLY — must not land in layer.data, which
+                        // is the persistence field. It used to, so any snapshot
+                        // taken without a syncData() first (notably the
+                        // context-loss recovery snapshot, where readback is a
+                        // no-op) serialized 96-px thumbnails as the artwork and
+                        // "restored" the painting as an upscaled blur.
+                        layer.thumb = rc.toDataURL();
                         const thumbEl = document.querySelector('.layer-item[data-layer-index="' + id + '"] .layer-thumbnail');
-                        if (thumbEl) thumbEl.style.backgroundImage = 'url(' + layer.data + ')';
+                        if (thumbEl) thumbEl.style.backgroundImage = 'url(' + layer.thumb + ')';
                     });
                 }, 200);
             }
@@ -733,7 +739,14 @@
                     }
                 });
                 layers.forEach(function (layer) {
-                    if (layer.isRaster && !rasterStore[layer.index]) restoreFromData(layer);
+                    // __needsRestore: set by a project/preset load so saved pixels
+                    // overwrite an FBO that already exists at this index (see
+                    // 12-save-load.js) — without it, loading a project onto the
+                    // boot sketch layer silently kept the empty buffer.
+                    if (layer.isRaster && (!rasterStore[layer.index] || layer.__needsRestore)) {
+                        delete layer.__needsRestore;
+                        restoreFromData(layer);
+                    }
                 });
                 if (_activeRasterId == null || !_layerFor(_activeRasterId) || !rasterStore[_activeRasterId]) {
                     _activeRasterId = null;

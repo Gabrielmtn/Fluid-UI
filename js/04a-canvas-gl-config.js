@@ -266,7 +266,10 @@
             const _renderer = _dbgExt ? gl.getParameter(_dbgExt.UNMASKED_RENDERER_WEBGL) : 'unavailable';
             window.__gpuRenderer = _renderer;
             console.log('[GPU]', _renderer);
-            if (/Intel|UHD|Iris|integrated/i.test(_renderer) && !/NVIDIA|Radeon RX|GeForce/i.test(_renderer)) {
+            // Intel Arc (A3xx/A5xx/A7xx/B5xx) is DISCRETE and reports "Intel" —
+            // excluded, or its owners get told to fix a problem they don't have.
+            if (/Intel|UHD|Iris|integrated/i.test(_renderer)
+                && !/NVIDIA|Radeon RX|GeForce|\bArc\b|\bA[3-7][0-9]{2}\b|\bB[5-9][0-9]{2}\b/i.test(_renderer)) {
                 console.warn('[GPU] Running on an INTEGRATED GPU — high detail/resolution will struggle. ' +
                     'On Windows: Settings > System > Display > Graphics > add this browser > High performance, ' +
                     'then fully quit and relaunch it.');

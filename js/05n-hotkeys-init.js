@@ -325,7 +325,9 @@
             }
             // Toggles
             if (!ctrlOrMeta && !e.altKey) {
-                if (lower === 't') { toggleCheckbox('trailToggle'); return; }
+                // 't' was bound to a 'trailToggle' element that does not exist
+                // anywhere (removed long ago) — the key silently did nothing and
+                // the help surfaces advertised it. Left unbound deliberately.
                 if (lower === 'c') { toggleCheckbox('cursorToggle'); return; }
                 if (lower === 'h') { toggleCheckbox('showCanvasHandles'); return; }
                 if (lower === 'l') { toggleCheckbox('lockCanvasBorders'); return; }

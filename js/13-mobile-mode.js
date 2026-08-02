@@ -211,6 +211,11 @@
             var t = e.target;
             if (c.contains(t)) return;                                    // inside the menu
             if (mobileMenuToggle && mobileMenuToggle.contains(t)) return; // the toggle
+            // Strip popups (brush drawer, presets list, arm colors) are <body>
+            // children, so they are NOT inside the relocated menu — without this
+            // the first tap on a preset was eaten as a dismiss and the list
+            // closed instead of loading anything.
+            if (t.closest && t.closest('.arm-colors-panel, .brush-settings-panel, .mixer-presets-panel')) return;
             c.classList.remove('visible');
             e.stopPropagation();   // don't also paint this dismiss tap
             e.preventDefault();

@@ -224,6 +224,33 @@ function toggleSettingsLock() {
     updateConnectedView();
 }
 
+// A settings-lock snapshot arrives from an untrusted peer (the relay forwards
+// unrecognized messages verbatim and only gates type:"lock" on host). The
+// feature only needs the LOOK — sliders/checkboxes/selects/colors — so strip
+// everything that carries file data or names, which would otherwise reach the
+// layer/mask/recording/path panels and their innerHTML templates.
+var LOCK_SNAPSHOT_ALLOW = ['sliders', 'checkboxes', 'selects', 'colors', 'savedColors',
+    'paletteIndex', 'armColors', 'brush', 'lightSource', 'lightShift', 'kaleido'];
+function sanitizeLockSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return null;
+    var out = {};
+    LOCK_SNAPSHOT_ALLOW.forEach(function (k) {
+        if (!(k in snapshot)) return;
+        var v = snapshot[k];
+        if (v === null || typeof v !== 'object') { out[k] = v; return; }
+        // one level deep, primitives only — no nested objects/dataURL blobs
+        var clean = Array.isArray(v) ? [] : {};
+        Object.keys(v).forEach(function (kk) {
+            var vv = v[kk];
+            var t = typeof vv;
+            if (t === 'number' || t === 'boolean') clean[kk] = vv;
+            else if (t === 'string' && vv.length <= 64 && !/^data:/i.test(vv)) clean[kk] = vv;
+        });
+        out[k] = clean;
+    });
+    return out;
+}
+
 // Guest side: enter/leave the locked state (banner + gate + mirror apply)
 function setSettingsLockedByHost(locked, snapshot) {
     window.__mpSettingsLocked = !!locked;
@@ -238,10 +265,11 @@ function setSettingsLockedByHost(locked, snapshot) {
                 'color:#ffb347;font-size:12px;font-weight:600;pointer-events:none;';
             document.body.appendChild(banner);
         }
-        if (snapshot && typeof window.applyPresetSnapshot === 'function') {
+        var safeSnap = sanitizeLockSnapshot(snapshot);
+        if (safeSnap && typeof window.applyPresetSnapshot === 'function') {
             isProcessingRemoteEvent = true;
             window.__mpApplyingRemote = true;
-            try { window.applyPresetSnapshot(snapshot); }
+            try { window.applyPresetSnapshot(safeSnap); }
             catch (e) { console.warn('settings-lock: snapshot apply failed', e); }
             finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
         }
@@ -419,9 +447,15 @@ function onMultiplayerMessage(event) {
                 break;
 
             case 'clear':
-                // Another client cleared the canvas
+                // Another client cleared the canvas. clearCanvas() itself calls
+                // broadcastClear(), so without this guard every received clear
+                // re-broadcasts and the wipe ping-pongs between clients forever
+                // (same class of bug as the preset loop below).
                 if (data.clientId !== clientId && typeof clearCanvas === 'function') {
-                    clearCanvas();
+                    isProcessingRemoteEvent = true;
+                    window.__mpApplyingRemote = true;
+                    try { clearCanvas(); }
+                    finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
                 }
                 break;
 
@@ -546,7 +580,9 @@ function broadcastPointerUp() {
 
 // Send clear event
 function broadcastClear() {
-    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
+    // isProcessingRemoteEvent: never echo a clear we are applying on behalf of
+    // a peer (matches broadcastSplat/broadcastPreset — this one was missing it).
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
         return;
     }
 
