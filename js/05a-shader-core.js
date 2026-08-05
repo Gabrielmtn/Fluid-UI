@@ -92,7 +92,8 @@
             in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uTexture;
-            uniform sampler2D uSunrays;
+            uniform sampler2D uGlow;      // Glow (HDR bloom): mip-chain halo of the overbright dye
+            uniform float glowEnabled;
             // D2 raster layer stack: up to 4 visible raster paint layers
             // (premultiplied RGBA8), composited around the fluid. Per-slot
             // params: x=enabled, y=opacity, z=blend mode (0 normal /
@@ -124,7 +125,6 @@
             uniform vec4 uRasterC3;
             uniform sampler2D uShadeForm; // quarter-res blurred frame: the shading height field
             uniform vec2 shadeTexelSize;
-            uniform float sunraysEnabled;
             uniform float preserveOpacity;
             uniform float backgroundTransparency;
             uniform float kaleidoEnabled;
@@ -267,6 +267,7 @@
             void main() {
                 vec4 base = texture(uTexture, vUv);
                 vec4 kcol = base;
+                vec2 kUv = vUv; // kaleido-remapped UV, kept for glow so the halo warps with the image
                 bool doK = (kMode != 0) && (kaleidoEnabled > 0.5);
                 if (doK) {
                     vec2 uv2;
@@ -289,6 +290,7 @@
                         uv2 = vUv;
                     }
                     kcol = texture(uTexture, uv2);
+                    kUv = uv2;
                 }
                 vec4 color = mix(base, kcol, clamp(kBlend, 0.0, 1.0));
                 float hdrMax = max(color.r, max(color.g, color.b));
@@ -409,10 +411,36 @@
                     color.rgb += spec * warmKey * (displayShading * shadeGloss) * shadeFade;
                     color.rgb = max(color.rgb, vec3(0.0));
                 }
-                // Sunrays: multiplicative light/shadow on tone-mapped base
-                if (sunraysEnabled > 0.5) {
-                    float sr = texture(uSunrays, vUv).r;
-                    color.rgb *= sr;
+                // Glow (HDR bloom): add the mip-chain halo of the overbright
+                // dye ON TOP of the tone-mapped image — additive light, so hot
+                // cores bleed outward instead of just sitting bright. Sampled
+                // at both raw and kaleido UVs so the halo follows the warped
+                // image; gamma-lifted (1/2.2) so the faint outer halo stays
+                // visible — the classic wide-soft falloff. Runs BEFORE Light
+                // Shift (which recolors the final displayed pixel) and before
+                // raster compositing (sketch layers never glow).
+                if (glowEnabled > 0.5) {
+                    vec3 glowC = mix(texture(uGlow, vUv).rgb, texture(uGlow, kUv).rgb,
+                                     doK ? clamp(kBlend, 0.0, 1.0) : 0.0);
+                    glowC = pow(max(glowC, vec3(0.0)), vec3(1.0 / 2.2));
+                    vec3 gsum = color.rgb + glowC;
+                    if (gateWhite > 0.0) {
+                        // Gate on: the ceiling's whole promise is "never blow
+                        // out to white", so the halo must not undo it. Soft-
+                        // limit the SUM hue-preservingly: compress the max
+                        // channel into a shoulder→1.0 asymptote with channel
+                        // RATIOS (the picked colour's chroma) intact — hot
+                        // cores read lit-from-within at full vividness, never
+                        // clipped white. Gate off keeps the raw additive
+                        // white-out: that IS the classic luminous look.
+                        float gm = max(gsum.r, max(gsum.g, gsum.b));
+                        float gsh = 0.85;
+                        if (gm > gsh) {
+                            float gt = (gm - gsh) / (1.0 - gsh);
+                            gsum *= (gsh + (1.0 - gsh) * gt / (1.0 + gt)) / gm;
+                        }
+                    }
+                    color.rgb = gsum;
                 }
                 // â”€â”€ Light Shift â”€â”€ recolor overblown/white areas of the fluid.
                 // Keyed on the DISPLAYED color: brightness weighted by whiteness
@@ -468,7 +496,7 @@
                     }
                 }
                 // D2 raster layer stack: paint layers composited around the
-                // fluid, AFTER tone-map/shading/sunrays (fluid effects never
+                // fluid, AFTER tone-map/shading/glow (fluid effects never
                 // touch them) and sampled at RAW vUv (kaleido never warps
                 // them â€” a sketch stays where you drew it). Unrolled Ã—4:
                 // GLSL ES 3.0 forbids dynamically-indexed sampler arrays.

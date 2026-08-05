@@ -64,7 +64,8 @@
         lightShiftSaturation: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 1, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
         clarity: {configKey: "CLARITY", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
         vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
-        sunraysWeight: {configKey: null, ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 3}, def: 0.5, decimals: 2, category: "sunrays", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 3, step: 0.1, scope: "extended"}},
+        glowIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.05}, hard: {min: 0, max: 4}, def: 0.8, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 2, step: 0.05, scope: "extended"}},
+        glowThreshold: {configKey: null, ui: {min: 0, max: 3, step: 0.05}, hard: {min: 0, max: 6}, def: 0.6, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 3, step: 0.05, scope: "extended"}},
         ssFrequency: {configKey: null, ui: {min: 0.2, max: 8, step: 0.1}, hard: {min: 0.2, max: 8}, def: 2, decimals: 1, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.2, max: 8, step: 0.1, scope: "extended"}},
         ssAngle: {configKey: null, ui: {min: 0, max: 360, step: 1}, hard: {min: 0, max: 360}, def: 120, decimals: 0, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0, max: 360, step: 1, scope: "extended"}},
         ssLength: {configKey: null, ui: {min: 0.1, max: 3, step: 0.05}, hard: {min: 0.1, max: 3}, def: 0.4, decimals: 2, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.05, scope: "extended"}},
@@ -113,7 +114,7 @@
         // (a mutation flipping advection quality reads as a perf bug).
         macCormackToggle: {def: true, mutScope: null},
         multigridToggle: {def: true, mutScope: null},
-        sunraysToggle: {def: false, mutScope: "extended"},
+        glowToggle: {def: false, mutScope: "extended"},
         ascendToggle: {def: false, mutScope: "extended"},
         ascendRandomness: {def: false, mutScope: "extended"},
         shootingStarToggle: {def: false, mutScope: "extended"},

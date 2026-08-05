@@ -547,11 +547,19 @@
 
 
 
-            SUNRAYS: false,           // Sunrays post-FX enabled (toggled in Effects)
+            GLOW: false,              // Glow (HDR bloom) post-FX enabled (toggled in Effects)
 
-            SUNRAYS_WEIGHT: 0.5       // MUST be seeded: undefined here uploads NaN to the
-                                      // sunrays shader and blacks out the whole canvas the
-                                      // moment Sunrays is toggled on (slider only writes it on input)
+            GLOW_INTENSITY: 0.8,      // Halo brightness scale (slider). MUST be seeded:
+                                      // undefined here would upload NaN to the shader.
+
+            GLOW_THRESHOLD: 0.6,      // Pre-tone-map brightness where dye starts to glow
+                                      // (slider; HDR scale — dye runs well past 1.0)
+
+            GLOW_KNEE: 0.7,           // Soft-knee width fraction (console-tunable)
+
+            GLOW_RESOLUTION: 256,     // Glow chain base resolution (long side)
+
+            GLOW_ITERATIONS: 8        // Max mip-chain depth (halvings from base res)
 
         };
 

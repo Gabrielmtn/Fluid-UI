@@ -739,7 +739,7 @@
                 }
             }
             // Post-FX passes (sharpen, micro-detail, lighting, light shift,
-            // sunrays) are full-quad rewrites into persistent FBOs — they must
+            // glow) are full-quad rewrites into persistent FBOs — they must
             // OVERWRITE, never alpha-blend. With blending on, any pass whose
             // shader emits the source's faded alpha (lighting/light shift
             // early-exit and pass-through write color.a, and dye alpha decays
@@ -750,7 +750,7 @@
             // passes are off (sharpness 0, or the governor's fx gate) while
             // light shift or lighting is on.
             gl.disable(gl.BLEND);
-            // [GOVERNOR HOOK] post-FX gate (sharpen, micro-detail, sunrays)
+            // [GOVERNOR HOOK] post-FX gate (sharpen, micro-detail, glow)
             const _fxOn = window.QualityGovernor ? window.QualityGovernor.fxOn() : true;
             // Apply sharpness pass if enabled. RIDGES 0 makes the kernel a
             // mathematical no-op (zero-radius offsets → detail = 0), so skip
@@ -822,12 +822,10 @@
                 blit(lit.fbo);
                 displayTexture = lit.texture;
             }
-            // ── Sunrays post-processing ──
-            const _sunraysOn = _fxOn && !!config.SUNRAYS; // [GOVERNOR HOOK]
-            if (_sunraysOn) {
-                applySunrays(displayTexture, sunrays, sunraysTemp);
-                blur(sunrays, sunraysTemp, 1);
-            }
+            // ── Glow (HDR bloom) ── mip-chain halo off the pre-tone-map HDR
+            // frame; display adds it after the tone-map.
+            const _glowOn = _fxOn && !!config.GLOW; // [GOVERNOR HOOK]
+            if (_glowOn) applyGlow(displayTexture);
             gl.disable(gl.BLEND);
             // Shading form field: downsample the frame into the quarter-res
             // shadeForm FBO and blur it — the display shading normals come
@@ -888,7 +886,6 @@
                 gl.uniform1f(displayProg.uniforms.lightShiftDensity, (typeof config.LS_DENSITY_MIX === 'number') ? config.LS_DENSITY_MIX : 1.0);
             }
             gl.uniform1i(displayProg.uniforms.uTexture, 0);
-            gl.uniform1i(displayProg.uniforms.uSunrays, 1);
             gl.uniform1i(displayProg.uniforms.uShadeForm, 2);
             // D2 raster layer stack composite (raw-UV, after fluid effects):
             // up to 4 visible raster layers, pre-sorted bottom→top with
@@ -916,7 +913,8 @@
             if (_shadingOn) {
                 gl.uniform2f(displayProg.uniforms.shadeTexelSize, shadeForm.texelSizeX, shadeForm.texelSizeY);
             }
-            gl.uniform1f(displayProg.uniforms.sunraysEnabled, _sunraysOn ? 1.0 : 0.0);
+            gl.uniform1i(displayProg.uniforms.uGlow, 1);
+            gl.uniform1f(displayProg.uniforms.glowEnabled, _glowOn ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.preserveOpacity, window.preserveFluidOpacity ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.backgroundTransparency, window.backgroundTransparency || 0.0);
             gl.uniform1f(displayProg.uniforms.kaleidoEnabled, window.kaleidoEnabled ? 1.0 : 0.0);
@@ -935,7 +933,7 @@
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, displayTexture);
             gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, _sunraysOn ? sunrays.texture : null);
+            gl.bindTexture(gl.TEXTURE_2D, _glowOn ? glow.texture : null);
             gl.activeTexture(gl.TEXTURE2);
             gl.bindTexture(gl.TEXTURE_2D, _shadingOn ? shadeForm.texture : null);
             for (let ri = 0; ri < 4; ri++) {

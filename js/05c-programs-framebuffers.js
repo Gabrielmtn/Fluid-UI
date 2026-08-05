@@ -34,8 +34,9 @@
         const igniteProg = new Program(baseVert, igniteFrag);   // D2 bridge: sketch → dye
         const captureProg = new Program(baseVert, captureFrag); // D2 bridge: dye → sketch
         const blurProg = new Program(blurVert, blurFrag);
-        const sunraysMaskProg = new Program(baseVert, sunraysMaskFrag);
-        const sunraysProg = new Program(baseVert, sunraysFrag);
+        const glowPrefilterProg = new Program(baseVert, glowPrefilterFrag);
+        const glowBlurProg = new Program(baseVert, glowBlurFrag);
+        const glowFinalProg = new Program(baseVert, glowFinalFrag);
         let dyeTexWidth, dyeTexHeight, simTexWidth, simTexHeight;
         // Expose for stats panel
         function exposeSimStats() {
@@ -88,7 +89,7 @@
         // here for the same reinit-preservation as rasterStore.
         let maskStore = {};
         let sketch; // alias: the ACTIVE raster layer's FBO (assigned by rasterLayers.setActive)
-        let sunrays, sunraysTemp;
+        let glow, glowFramebuffers = []; // HDR bloom: 256-base target + halving mip chain
         let shadeForm, shadeFormTemp;
         // Multigrid pressure pyramid: mgRes0 = level-0 residual scratch;
         // mgLevels[i] = level i+1 {w, h, rhs, res, p(double), obs}. Level 0
@@ -134,7 +135,9 @@
                 if (f.fbo) gl.deleteFramebuffer(f.fbo);
             }
             [sharpened, detailed, lit, divergence, curl, obstacle, obstacleScratch,
-             sunrays, sunraysTemp, shadeForm, shadeFormTemp].forEach(_deleteFBO);
+             glow, shadeForm, shadeFormTemp].forEach(_deleteFBO);
+            glowFramebuffers.forEach(_deleteFBO);
+            glowFramebuffers = [];
             _deleteFBO(mgRes0);
             if (mgLevels) mgLevels.forEach(function (l) {
                 [l.rhs, l.res, l.obs, l.p.read, l.p.write].forEach(_deleteFBO);
@@ -223,24 +226,33 @@
                     });
                 }
             })();
-            // Sunrays FBOs
-            const sunRes = config.SUNRAYS_RESOLUTION || 196;
-            const sunAspect = displayW / Math.max(1, displayH);
-            let sunW, sunH;
+            // Glow (HDR bloom) FBOs: fixed 256-base target (like shadeForm,
+            // NOT tied to dye res — the halo radius must stay constant in
+            // screen space across quality tiers) + a halving mip chain the
+            // blur walks down and additively climbs back up.
+            const glowRes = config.GLOW_RESOLUTION || 256;
+            const glowAspect = displayW / Math.max(1, displayH);
+            let glowW, glowH;
             if (displayW >= displayH) {
-                sunW = Math.min(sunRes, maxTextureSize);
-                sunH = Math.max(1, Math.round(sunRes / sunAspect));
+                glowW = Math.min(glowRes, maxTextureSize);
+                glowH = Math.max(1, Math.round(glowRes / glowAspect));
             } else {
-                sunH = Math.min(sunRes, maxTextureSize);
-                sunW = Math.max(1, Math.round(sunRes * sunAspect));
+                glowH = Math.min(glowRes, maxTextureSize);
+                glowW = Math.max(1, Math.round(glowRes * glowAspect));
             }
-            sunrays = createFBO(sunW, sunH, rgba.internalFormat, rgba.format, texType, filter);
-            sunraysTemp = createFBO(sunW, sunH, rgba.internalFormat, rgba.format, texType, filter);
+            glow = createFBO(glowW, glowH, rgba.internalFormat, rgba.format, texType, filter);
+            const glowIters = config.GLOW_ITERATIONS || 8;
+            for (let gi = 0; gi < glowIters; gi++) {
+                const gw = glowW >> (gi + 1);
+                const gh = glowH >> (gi + 1);
+                if (gw < 2 || gh < 2) break;
+                glowFramebuffers.push(createFBO(gw, gh, rgba.internalFormat, rgba.format, texType, filter));
+            }
             // Shading form field: low-res blurred copy of the frame that
             // the display shading derives its normals from. Paint-engine rule
             // (Krita/ArtRage impasto): light a smoothed height field, never
             // the raw pigment — pixel-scale dye noise must not read as relief.
-            // FIXED resolution (like sunrays), NOT tied to dye resolution:
+            // FIXED resolution (like glow), NOT tied to dye resolution:
             // relief smoothing must stay constant in screen space — a
             // dye-relative form field re-admitted pixel-scale striations the
             // moment the user raised the quality tier. 256 long-side matches
@@ -249,10 +261,10 @@
             let sfW, sfH;
             if (displayW >= displayH) {
                 sfW = Math.min(sfRes, maxTextureSize);
-                sfH = Math.max(1, Math.round(sfRes / sunAspect));
+                sfH = Math.max(1, Math.round(sfRes / glowAspect));
             } else {
                 sfH = Math.min(sfRes, maxTextureSize);
-                sfW = Math.max(1, Math.round(sfRes * sunAspect));
+                sfW = Math.max(1, Math.round(sfRes * glowAspect));
             }
             shadeForm = createFBO(sfW, sfH, rgba.internalFormat, rgba.format, texType, filter);
             shadeFormTemp = createFBO(sfW, sfH, rgba.internalFormat, rgba.format, texType, filter);
@@ -265,9 +277,10 @@
                 divergence, curl,
                 pressure.read, pressure.write,
                 sharpened, detailed, lit, obstacle, obstacleScratch,
-                sunrays, sunraysTemp, shadeForm, shadeFormTemp,
+                glow, shadeForm, shadeFormTemp,
                 mgRes0
             ];
+            glowFramebuffers.forEach(function (g) { allFBOs.push(g); });
             mgLevels.forEach(function (l) {
                 allFBOs.push(l.rhs, l.res, l.obs, l.p.read, l.p.write);
             });

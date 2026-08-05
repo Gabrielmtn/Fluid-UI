@@ -1141,9 +1141,10 @@
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
                          'pressureIteration', 'curl', 'sharpness', 'multiplier', 'timeScale',
                          'velocityInfluence', 'brushSize', 'brushRefreshRate'],
-            effects: ['enableLighting', 'enableLightShift', 'microDetailToggle', 'sunraysToggle',
+            effects: ['enableLighting', 'enableLightShift', 'microDetailToggle',
                       'lightIntensity', 'lightAmbient', 'lightSpeed', 'clarity', 'vibrance',
-                      'sunraysWeight', 'shadingIntensity', 'displayShadingToggle',
+                      'glowToggle', 'glowIntensity', 'glowThreshold',
+                      'shadingIntensity', 'displayShadingToggle',
                       'lightShiftSpeed', 'lightShiftThreshold', 'lightShiftIntensity', 'lightShiftSaturation',
                       'lightPos', 'lightShiftPath'],
             animations: ['ascendToggle', 'ascendRandomness', 'shootingStarToggle',
@@ -1591,7 +1592,7 @@
         moveCheckboxGroup('macCormackToggle', body);
         moveCheckboxGroup('multigridToggle', body);
         // Multigrid tuning panel — same toggle+panel pattern as
-        // microDetailPanel/sunraysPanel in the Effects section
+        // microDetailPanel/glowPanel in the Effects section
         const multigridPanel = document.getElementById('multigridPanel');
         if (multigridPanel) body.appendChild(multigridPanel);
 
@@ -1623,10 +1624,10 @@
         const microDetailPanel = document.getElementById('microDetailPanel');
         if (microDetailPanel) body.appendChild(microDetailPanel);
 
-        // Sunrays toggle + panel
-        moveCheckboxGroup('sunraysToggle', body);
-        const sunraysPanel = document.getElementById('sunraysPanel');
-        if (sunraysPanel) body.appendChild(sunraysPanel);
+        // Glow toggle + panel
+        moveCheckboxGroup('glowToggle', body);
+        const glowPanel = document.getElementById('glowPanel');
+        if (glowPanel) body.appendChild(glowPanel);
 
         return sec;
     }

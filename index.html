@@ -213,7 +213,7 @@
                             <div class="stat-row"><span class="stat-label">Display:</span> <span id="stat-displayhz">--</span></div>
                             <div class="stat-row"><label class="stat-label" for="governorToggle">Adaptive Quality:</label> <input type="checkbox" id="governorToggle"></div>
                             <div class="stat-row"><label class="stat-label" for="governorAllowRes">&nbsp;&nbsp;Resolution Tiers:</label> <input type="checkbox" id="governorAllowRes"></div>
-                            <div class="stat-row"><label class="stat-label" for="governorAllowFx" title="Allow the governor's last rung to disable sharpen/micro-detail/sunrays/Crisp Advection under extreme load — changes the look, so it's opt-in">&nbsp;&nbsp;Effect Shedding:</label> <input type="checkbox" id="governorAllowFx"></div>
+                            <div class="stat-row"><label class="stat-label" for="governorAllowFx" title="Allow the governor's last rung to disable sharpen/micro-detail/glow/Crisp Advection under extreme load — changes the look, so it's opt-in">&nbsp;&nbsp;Effect Shedding:</label> <input type="checkbox" id="governorAllowFx"></div>
                             <div class="stat-row"><span class="stat-label">Adaptive State:</span> <span id="stat-governor">--</span></div>
                         </div>
                         <div class="stats-section">
@@ -463,13 +463,17 @@
             </div>
         </div>
         <div class="control-group checkbox-group">
-            <input type="checkbox" id="sunraysToggle">
-            <label for="sunraysToggle" style="margin: 0">Sunrays</label>
+            <input type="checkbox" id="glowToggle">
+            <label for="glowToggle" style="margin: 0">Glow</label>
         </div>
-        <div id="sunraysPanel" class="collapsible" style="display:none;">
+        <div id="glowPanel" class="collapsible" style="display:none;">
             <div class="control-group">
-                <label for="sunraysWeight">Weight <span id="sunraysWeightValue" class="value-display">0.5</span></label>
-                <input type="range" id="sunraysWeight" min="0" max="1" value="0.5" step="0.05">
+                <label for="glowIntensity">Intensity <span id="glowIntensityValue" class="value-display">0.80</span></label>
+                <input type="range" id="glowIntensity" min="0" max="2" value="0.8" step="0.05">
+            </div>
+            <div class="control-group">
+                <label for="glowThreshold">Threshold <span id="glowThresholdValue" class="value-display">0.60</span></label>
+                <input type="range" id="glowThreshold" min="0" max="3" value="0.6" step="0.05">
             </div>
         </div>
         <div class="control-group">

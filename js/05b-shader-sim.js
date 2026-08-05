@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05b-shader-sim.js — part 2/14 of former 05-fluid-sim.js (lines 654–966)
 // LOAD ORDER: after 05a-shader-core.js, before 05c-programs-framebuffers.js
-// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/sunrays frag sources
+// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow frag sources
 // REQUIRES: PRECISION (05a)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -1481,49 +1481,52 @@
                 fragColor = vec4(c, a);
             }
         `;
-        // ─── Sunrays shaders ────────────────────────────────────────────
-        const sunraysMaskFrag = `#version 300 es
+        // ─── Glow (HDR bloom) shaders ───────────────────────────────────
+        // Classic mip-chain bloom: soft-knee prefilter isolates overbright
+        // dye, a halving blur chain spreads it, additive upsampling stacks
+        // the octaves, and the display pass adds the result on top of the
+        // tone-mapped image — bright cores read as EMITTING light instead
+        // of just being bright paint. Sampled from the PRE-tone-map HDR
+        // frame, so only dye that actually climbed past the threshold
+        // glows; Reinhard never sees (or caps) the halo.
+        const glowPrefilterFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTexture;
+            uniform vec3 curve;      // (threshold - knee, knee*2, 0.25/knee)
+            uniform float threshold;
             void main() {
-                vec4 c = texture(uTexture, vUv);
+                vec3 c = texture(uTexture, vUv).rgb;
                 float br = max(c.r, max(c.g, c.b));
-                // HDR-aware brightness mapping: smooth gradient across full range
-                // br=0 → mapped=0 (alpha=1.0, full light)
-                // br=0.2 → mapped=0.5 (alpha=0.5, partial shadow)
-                // br=1+ → mapped≈0.8+ (alpha=0.2, deep shadow)
-                float mapped = br / (0.2 + br);
-                c.a = 1.0 - min(mapped, 0.8);
-                fragColor = c;
+                // Soft knee: quadratic ramp below the threshold so the glow
+                // fades in instead of popping at a hard brightness cliff.
+                float rq = clamp(br - curve.x, 0.0, curve.y);
+                rq = curve.z * rq * rq;
+                c *= max(rq, br - threshold) / max(br, 0.0001);
+                fragColor = vec4(c, 0.0);
             }
         `;
-        const sunraysFrag = `#version 300 es
+        const glowBlurFrag = `#version 300 es
             precision ${PRECISION} float;
-            in vec2 vUv;
+            in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uTexture;
-            uniform float weight;
-            #define ITERATIONS 16
             void main() {
-                float Density = 0.3;
-                float Decay = 0.95;
-                float Exposure = 0.7;
-                vec2 coord = vUv;
-                vec2 dir = vUv - 0.5;
-                dir *= 1.0 / float(ITERATIONS) * Density;
-                float illuminationDecay = 1.0;
-                float color = 0.0;
-                for (int i = 0; i < ITERATIONS; i++) {
-                    coord -= dir;
-                    float col = texture(uTexture, coord).a;
-                    color += col * illuminationDecay * weight;
-                    illuminationDecay *= Decay;
-                }
-                float result = color * Exposure;
-                // Normalize to [0,1] so sunrays work as light/shadow multiplier
-                result = result / (1.0 + result);
-                fragColor = vec4(vec3(result), 1.0);
+                vec4 sum = texture(uTexture, vL) + texture(uTexture, vR)
+                         + texture(uTexture, vT) + texture(uTexture, vB);
+                fragColor = sum * 0.25;
+            }
+        `;
+        const glowFinalFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR, vT, vB;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform float intensity;
+            void main() {
+                vec4 sum = texture(uTexture, vL) + texture(uTexture, vR)
+                         + texture(uTexture, vT) + texture(uTexture, vB);
+                fragColor = sum * 0.25 * intensity;
             }
         `;
