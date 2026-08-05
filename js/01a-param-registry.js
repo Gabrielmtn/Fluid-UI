@@ -47,8 +47,11 @@
         brushSize: {configKey: null, ui: {min: 0.1, max: 30, step: 0.1}, hard: {min: 0.1, max: 30}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
         timeScale: {configKey: null, ui: {min: 0.01, max: 3, step: 0.01}, hard: {min: 0.01, max: 3}, def: 1, decimals: 2, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 0.01, max: 3, step: 0.01, scope: "extended"}},
-        canvasOpacity: {configKey: null, ui: {min: 0, max: 100, step: 1}, hard: {min: 0, max: 100}, def: 100, decimals: 0, category: "display", perfTier: 0, simSlider: false, mut: {min: 0, max: 100, step: 1, scope: "extended"}},
-        captureDimming: {configKey: null, ui: {min: 0, max: 100, step: 1}, hard: {min: 0, max: 100}, def: 80, decimals: 0, category: "display", perfTier: 0, simSlider: false, mut: {min: 0, max: 100, step: 1, scope: "extended"}},
+        // Fundamental display plumbing, not style variants — deliberately no
+        // `mut` (Gabriel 2026-08-05): a mutated canvasOpacity fades the whole
+        // canvas out and captureDimming is capture-UX, neither is a look.
+        canvasOpacity: {configKey: null, ui: {min: 0, max: 100, step: 1}, hard: {min: 0, max: 100}, def: 100, decimals: 0, category: "display", perfTier: 0, simSlider: false},
+        captureDimming: {configKey: null, ui: {min: 0, max: 100, step: 1}, hard: {min: 0, max: 100}, def: 80, decimals: 0, category: "display", perfTier: 0, simSlider: false},
         kSpinSpeed: {configKey: null, ui: {min: -180, max: 180, step: 1}, hard: {min: -180, max: 180}, def: 30, decimals: 0, category: "kaleidoscope", perfTier: 0, simSlider: false, mut: {min: -180, max: 180, step: 1, scope: "basic"}},
         kTwist: {configKey: null, ui: {min: 0, max: 10, step: 0.1}, hard: {min: 0, max: 10}, def: 0, decimals: 1, category: "kaleidoscope", perfTier: 0, simSlider: false, mut: {min: 0, max: 10, step: 0.1, scope: "basic"}},
         kZoom: {configKey: null, ui: {min: 0.5, max: 2, step: 0.01}, hard: {min: 0.5, max: 2}, def: 1, decimals: 2, category: "kaleidoscope", perfTier: 0, simSlider: false, mut: {min: 0.5, max: 2, step: 0.01, scope: "basic"}},
