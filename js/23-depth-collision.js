@@ -905,7 +905,14 @@ class DepthEstimator {
         _bindActiveSource(kind);
         var sourceFBO = _resolveBoundFBO();
         if (sourceFBO) {
-            var gpuIdx = addCollisionLayer(null, null, title,
+            // One-shot readback of the just-bound source purely for the panel
+            // thumbnail + on-canvas preview: the LIVE collision reads the GPU
+            // source directly and never touches this depth data (the obstacle
+            // compositor skips CPU depth on source-bound layers), but without
+            // it the layer got a 1×1 black dummy — blank thumbnail and a
+            // black stretched preview film.
+            var pre = buildSketchDepth(true);
+            var gpuIdx = addCollisionLayer(pre ? pre.depth : null, pre ? pre.previewUrl : null, title,
                 { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, source: _boundSrc });
             if (gpuIdx != null) _sketchColliderIndex = gpuIdx;
             return gpuIdx;
@@ -1018,7 +1025,10 @@ class DepthEstimator {
                 var sourceFBO = _resolveBoundFBO();
                 var idx;
                 if (sourceFBO) {
-                    idx = addCollisionLayer(null, null,
+                    // One-shot readback for thumbnail/preview (see
+                    // _createColliderFromSource) — collision stays GPU-side.
+                    var pre = buildSketchDepth(true);
+                    idx = addCollisionLayer(pre ? pre.depth : null, pre ? pre.previewUrl : null,
                         ((_boundSrc && _boundSrc.kind === 'mask') ? 'Mask' : 'Sketch') + ' Collision (live)',
                         { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, source: _boundSrc });
                 } else {

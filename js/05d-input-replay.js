@@ -15,7 +15,6 @@
         let replayIndex = 0;
         // History of completed strokes for time-based replay
         let strokeHistory = [];
-        let lastSplatTime = 0; // for brush refresh rate throttle
         // ─── Splat Envelope ───────────────────────────────────────────
         // Controls how splats ramp in (on press) and fade out (on release).
         // Modes: 'instant' (default), 'linear', 'easing'
@@ -455,8 +454,7 @@
             if (e.pointerType === 'touch') return; // touchmove owns touch
             if (isPaused || isReplayActive) return;
             // Engine feed: replay every coalesced sub-frame sample (position)
-            // while a stroke is live. Density is governed by BRUSH_SPACING, so
-            // the Splat Rate throttle doesn't gate this.
+            // while a stroke is live. Density is governed by BRUSH_SPACING.
             if (window.BrushEngine && window.BrushEngine.isActive()) {
                 const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
                 if (evs && evs.length) {
@@ -482,15 +480,6 @@
             if (pointer.down) {
                 // Skip near-zero moves (avoids re-splat artifacts + wasted work)
                 if (pointer.dx * pointer.dx + pointer.dy * pointer.dy < 1.0) return;
-                // Brush refresh rate throttle (recording/broadcast only)
-                var rate = window.brushRefreshRate || 0;
-                if (rate > 0) {
-                    var now = Date.now();
-                    if (now - lastSplatTime < rate) {
-                        return; // pointer.moved stays false → no splat in render loop
-                    }
-                    lastSplatTime = now;
-                }
                 pointer.moved = true;
                 const _skT = config.BRUSH_TARGET === 'sketch';
                 if (!_skT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
@@ -781,19 +770,11 @@
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
-            // D1 engine feed for touch (see pointermove note); spacing governs
-            // density, so this bypasses the Splat Rate throttle below
+            // D1 engine feed for touch (see pointermove note); spacing governs density
             if (pointer.down && window.BrushEngine && window.BrushEngine.isActive() && !isReplayActive) {
                 window.BrushEngine.move(coords.x, coords.y);
             }
             if (pointer.down) {
-                // Brush refresh rate throttle (same as mousemove)
-                var rate = window.brushRefreshRate || 0;
-                if (rate > 0) {
-                    var now = Date.now();
-                    if (now - lastSplatTime < rate) return;
-                    lastSplatTime = now;
-                }
                 pointer.moved = true;
                 const _skTT = config.BRUSH_TARGET === 'sketch';
                 if (!_skTT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);

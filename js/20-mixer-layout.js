@@ -1139,8 +1139,8 @@
                       'kTwist', 'kZoom', 'kBlend', 'kaleidoMode',
                       'kaleido.mode', 'kaleido.segments', 'kaleido.angle', 'kaleido.twist', 'kaleido.zoom', 'kaleido.blend'],
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
-                         'pressureIteration', 'curl', 'sharpness', 'multiplier', 'timeScale',
-                         'velocityInfluence', 'brushSize', 'brushRefreshRate'],
+                         'pressureIteration', 'curl', 'sharpness', 'multiplier',
+                         'velocityInfluence', 'brushSize'],
             effects: ['enableLighting', 'enableLightShift', 'microDetailToggle',
                       'lightIntensity', 'lightAmbient', 'lightSpeed', 'clarity', 'vibrance',
                       'glowToggle', 'glowIntensity', 'glowThreshold',
@@ -1789,25 +1789,6 @@
             var savedLiveCol = window.settingsManager && window.settingsManager.get('brush.replayLiveColors');
             if (savedLiveCol) { liveColCb.checked = true; window.replayLiveColors = true; }
         } catch (_) {}
-        var rateGroup = document.createElement('div');
-        rateGroup.className = 'control-group';
-
-        var rateLbl = document.createElement('label');
-        rateLbl.setAttribute('for', 'brushRefreshRate');
-        rateLbl.innerHTML = 'Splat Rate <span class="value-display" id="brushRefreshRateValue">0</span>';
-
-        var rateSlider = document.createElement('input');
-        rateSlider.type = 'range';
-        rateSlider.id = 'brushRefreshRate';
-        rateSlider.min = '0';
-        rateSlider.max = '100';
-        rateSlider.value = '0';
-        rateSlider.step = '1';
-
-        rateGroup.appendChild(rateLbl);
-        rateGroup.appendChild(rateSlider);
-        body.appendChild(rateGroup);
-
         // --- Splat In ---
         var splatInLabel = document.createElement('label');
         splatInLabel.className = 'brush-section-label';
@@ -1930,17 +1911,6 @@
             } catch (_) {}
         });
 
-        // --- Wire refresh rate ---
-        var rateDisplay = rateLbl.querySelector('.value-display');
-        rateSlider.addEventListener('input', function () {
-            var v = parseInt(rateSlider.value, 10);
-            if (rateDisplay) rateDisplay.textContent = v === 0 ? '0' : v + 'ms';
-            window.brushRefreshRate = v;
-            try {
-                if (window.settingsManager) window.settingsManager.set('brush.refreshRate', v);
-            } catch (_) {}
-        });
-
         // --- Load saved settings ---
         try {
             if (window.settingsManager) {
@@ -1958,13 +1928,6 @@
                     speedSlider.value = savedSpeed;
                     window.replaySpeed = savedSpeed;
                     if (speedDisplay) speedDisplay.textContent = savedSpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
-                }
-
-                var savedRate = window.settingsManager.get('brush.refreshRate');
-                if (typeof savedRate === 'number') {
-                    rateSlider.value = savedRate;
-                    if (rateDisplay) rateDisplay.textContent = savedRate === 0 ? '0' : savedRate + 'ms';
-                    window.brushRefreshRate = savedRate;
                 }
 
                 var savedSplatIn = window.settingsManager.get('brush.splatInMode');
@@ -1998,7 +1961,6 @@
         // Defaults
         if (!window.replayMode) window.replayMode = 'stroke';
         if (!window.replayTimePeriod) window.replayTimePeriod = 5;
-        if (window.brushRefreshRate == null) window.brushRefreshRate = 0;
         if (!window.splatInMode) window.splatInMode = 'instant';
         if (!window.splatOutMode) window.splatOutMode = 'instant';
 

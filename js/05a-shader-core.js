@@ -162,6 +162,14 @@
                     b.g < 0.5 ? 2.0*b.g*s.g : 1.0 - 2.0*(1.0-b.g)*(1.0-s.g),
                     b.b < 0.5 ? 2.0*b.b*s.b : 1.0 - 2.0*(1.0-b.b)*(1.0-s.b));
             }
+            // Mirror-wrap a mapped kaleido UV into [0,1]: out-of-range
+            // samples reflect back into the texture instead of CLAMPing to
+            // the (usually empty) edge — without this, wedge-mode corners
+            // (r > 0.5 maps past 1.0) streak the background across the
+            // pattern at full blend.
+            vec2 kMirrorWrap(vec2 uv) {
+                return 1.0 - abs(mod(uv, 2.0) - 1.0);
+            }
             // Mode 1: Wedge - Facets create angular reflections
             vec2 kaleidoWedge(vec2 uv) {
                 vec2 center = vec2(0.5);
@@ -289,6 +297,7 @@
                     } else {
                         uv2 = vUv;
                     }
+                    uv2 = kMirrorWrap(uv2);
                     kcol = texture(uTexture, uv2);
                     kUv = uv2;
                 }

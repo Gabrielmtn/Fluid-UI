@@ -23,7 +23,7 @@
     'use strict';
 
     // Dynamically-created controls (no static markup; hydrated from DOM at runtime):
-    // ["audioSensitivity","audioBeatThreshold","brushRefreshRate","audioReactToggle","arMapAutoSplat","arMapSize","arMapKaleido","arMapColor","focusModeToggle","streamFormatLock","audioReactSource","audioAutoSplatMode","splatInMode","splatOutMode"]
+    // ["audioSensitivity","audioBeatThreshold","audioReactToggle","arMapAutoSplat","arMapSize","arMapKaleido","arMapColor","focusModeToggle","streamFormatLock","audioReactSource","audioAutoSplatMode","splatInMode","splatOutMode"]
     var SLIDERS = {
         densityDissipation: {configKey: "DENSITY_DISSIPATION", ui: {min: 0.85, max: 1.005, step: 0.0001}, hard: {min: 0.85, max: 1.005}, def: 0.993, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.85, max: 1.005, step: 0.0001, scope: "basic"}},
         velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.5, max: 1.0009}, def: 0.999, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
@@ -46,7 +46,9 @@
         sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "simulation", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
         brushSize: {configKey: null, ui: {min: 0.1, max: 30, step: 0.1}, hard: {min: 0.1, max: 30}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
-        timeScale: {configKey: null, ui: {min: 0.01, max: 3, step: 0.01}, hard: {min: 0.01, max: 3}, def: 1, decimals: 2, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 0.01, max: 3, step: 0.01, scope: "extended"}},
+        // No mut (Gabriel 2026-08-06): a mutated timeScale can slow the whole
+        // sim to near-frozen, which reads as "mutate broke it", not a style.
+        timeScale: {configKey: null, ui: {min: 0.01, max: 3, step: 0.01}, hard: {min: 0.01, max: 3}, def: 1, decimals: 2, category: "simulation", perfTier: 0, simSlider: false},
         // Fundamental display plumbing, not style variants — deliberately no
         // `mut` (Gabriel 2026-08-05): a mutated canvasOpacity fades the whole
         // canvas out and captureDimming is capture-UX, neither is a look.
@@ -77,7 +79,6 @@
         ssGravity: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.1, decimals: 2, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
         audioSensitivity: {configKey: null, ui: null, hard: {min: 0.1, max: 3}, def: null, decimals: 1, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.1, scope: "extended"}},
         audioBeatThreshold: {configKey: null, ui: null, hard: {min: 0.1, max: 1}, def: null, decimals: 2, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 1, step: 0.05, scope: "extended"}},
-        brushRefreshRate: {configKey: null, ui: null, hard: {min: 0, max: 100}, def: null, decimals: 0, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0, max: 100, step: 1, scope: "extended"}},
         // D1 stroke engine (dynamically-created in buildBrushSection; no mut —
         // input-feel params, not style variants)
         brushStabilizer: {configKey: "BRUSH_STABILIZER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},

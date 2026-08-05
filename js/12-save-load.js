@@ -594,7 +594,6 @@
             replayTimePeriod: window.replayTimePeriod || 5,
             replaySpeed: typeof window.replaySpeed === 'number' ? window.replaySpeed : 1,
             replayLiveColors: !!window.replayLiveColors,
-            refreshRate: window.brushRefreshRate || 0,
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
             splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
@@ -1040,7 +1039,10 @@
                     var lcCb = document.getElementById('replayLiveColors');
                     if (lcCb) lcCb.checked = bs.replayLiveColors;
                 }
-                if (typeof bs.refreshRate === 'number') window.brushRefreshRate = bs.refreshRate;
+                // bs.refreshRate (older snapshots): the Splat Rate throttle was
+                // removed 2026-08-06 (replay always honored the recorded rate;
+                // the live-paint throttle was superseded by BRUSH_SPACING) —
+                // the stored value is intentionally ignored.
                 if (bs.splatInMode) {
                     window.splatInMode = bs.splatInMode;
                     var siEl = document.getElementById('splatInMode');
