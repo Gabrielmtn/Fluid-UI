@@ -1149,6 +1149,8 @@
             uniform vec4 sourceTransform;
             uniform float sourceRotation;
             uniform float strength;
+            uniform float covKnee; // alpha at which coverage saturates to
+                                   // fully solid (config.COLLIDER_ALPHA_SOLID)
             void main() {
                 vec2 q = vUv - vec2(0.5) - sourceTransform.xy;
                 float c = cos(sourceRotation);
@@ -1156,7 +1158,20 @@
                 q = vec2(c * q.x + s * q.y, -s * q.x + c * q.y);
                 q /= max(abs(sourceTransform.zw), vec2(0.0001));
                 vec2 sourceUv = clamp(q + vec2(0.5), 0.0, 1.0);
-                float coverage = texture(uSource, sourceUv).a * strength;
+                // Source alpha is SHAPE, not texture (2026-08-05): a painted
+                // or imported mask's "filled" interior often carries mid-alpha
+                // ripple (soft-brush overlap, fabric/knit texture in imported
+                // images). Passed through raw, that ripple lands inside
+                // solidity()'s 0.35-0.85 coverage window and turns the fill
+                // into a lattice of alternating solid/leaky cells — fluid
+                // seeps in and pools at every dip, printing a patchy dot grid
+                // across the collider (skull-mask repro, 2026-08-05). Saturate
+                // instead: anything visibly painted (alpha >= covKnee) is
+                // fully solid; near-transparent stays open; the ramp between
+                // keeps antialiased edges smooth (the finish blur re-bounds
+                // the edge to ~1.5 sim texels either way, per D0.5).
+                float a = texture(uSource, sourceUv).a;
+                float coverage = smoothstep(covKnee * 0.25, covKnee, a) * strength;
                 float previous = texture(uObstacle, vUv).r;
                 fragColor = vec4(min(1.0, previous + coverage), 0.0, 0.0, 1.0);
             }

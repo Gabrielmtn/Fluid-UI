@@ -53,6 +53,9 @@
             window.curl = curl;
             window.mgLevels = mgLevels; // harness introspection (obstacle pyramid probes)
         }
+        // Harness introspection: obstacle swaps with its scratch on every
+        // GPU composite, so expose a getter rather than a snapshot ref.
+        window.__getObstacle = function () { return obstacle; };
         function createFBO(w, h, internalFormat, format, type, filter) {
             const texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -524,6 +527,9 @@
             gl.uniform1f(obstacleCompositeProg.uniforms.sourceRotation, Number(opts.rotation) || 0);
             gl.uniform1f(obstacleCompositeProg.uniforms.strength,
                 Math.max(0, Math.min(1, Number(opts.strength) || 0)));
+            gl.uniform1f(obstacleCompositeProg.uniforms.covKnee,
+                (typeof config !== 'undefined' && typeof config.COLLIDER_ALPHA_SOLID === 'number')
+                    ? config.COLLIDER_ALPHA_SOLID : 0.45);
             gl.viewport(0, 0, obstacle.width, obstacle.height);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, source.texture);

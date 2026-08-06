@@ -845,6 +845,14 @@ class DepthEstimator {
         var th = Math.max(1, Math.round(sh * scale));
         var depthData = new Uint8Array(tw * th);
         var any = 0;
+        // Same alpha→coverage saturation as the GPU compositor
+        // (obstacleCompositeFrag, 05b): source alpha is SHAPE, not texture.
+        // Mid-alpha ripple inside a filled region (soft-brush overlap,
+        // imported-image grain) must read fully solid or the one-shot
+        // collider's fill becomes a patchy solid/leaky lattice, exactly like
+        // the live GPU path did (2026-08-05).
+        var knee = (window.config && typeof window.config.COLLIDER_ALPHA_SOLID === 'number')
+            ? window.config.COLLIDER_ALPHA_SOLID : 0.45;
         for (var y = 0; y < th; y++) {
             var sy0 = Math.floor(y * sh / th), sy1 = Math.max(sy0 + 1, Math.floor((y + 1) * sh / th));
             for (var x = 0; x < tw; x++) {
@@ -855,6 +863,9 @@ class DepthEstimator {
                     for (var xx = sx0; xx < sx1; xx++) { sum += px[rowBase + (xx << 2) + 3]; n++; }
                 }
                 var v = n ? Math.round(sum / n) : 0;
+                var t = (v / 255 - knee * 0.25) / (knee * 0.75);
+                if (t < 0) t = 0; else if (t > 1) t = 1;
+                v = Math.round(t * t * (3 - 2 * t) * 255);
                 depthData[y * tw + x] = v;
                 if (v > 12) any++;
             }

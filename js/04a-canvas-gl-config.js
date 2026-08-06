@@ -382,6 +382,16 @@
                                       // under high strength + multigrid. 0.5 ≈ legacy hard
                                       // cut everywhere. Console-tunable.
 
+            COLLIDER_ALPHA_SOLID: 0.45, // Mask/raster → collider coverage: source alpha at
+                                      // (and above) which the collider reads FULLY solid.
+                                      // Painted/imported fills carry mid-alpha texture
+                                      // (soft-brush overlap, fabric grain); raw alpha put
+                                      // that ripple in solidity()'s coverage window and the
+                                      // fill became a patchy solid/leaky lattice — dye
+                                      // seeped in and pooled at every dip (2026-08-05).
+                                      // Ramp starts at 0.25× this (near-transparent stays
+                                      // open; AA edges stay smooth). Console-tunable.
+
             PRESSURE_SCALE: 1 / 256,  // fp16 headroom rescale of the pressure system.
                                       // 1/64 → 1/256 (2026-07-15): a vortex confined in a
                                       // SEALED strength-1.0 mask pocket generates real
