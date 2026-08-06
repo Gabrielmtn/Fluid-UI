@@ -1176,6 +1176,31 @@
                 fragColor = vec4(min(1.0, previous + coverage), 0.0, 0.0, 1.0);
             }
         `;
+        // Obstacle gap fill — one separable step of grayscale dilate/erode
+        // (5-tap cross => an L1 ball after R passes). R dilates followed by
+        // R erodes = morphological CLOSE: enclosed pockets narrower than ~2R
+        // texels (line-art texture — fish-scale/knit interiors in imported
+        // mask images) seal into solid wall, while larger drawn features
+        // (eye/mouth cutouts) and the outer silhouette stay put — grayscale
+        // close restores every edge farther than R from a sealed feature, so
+        // AA ramps survive. Runs only at obstacle-recomposite time.
+        const morphObstacleFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR, vT, vB;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform int isErode;
+            void main() {
+                float c = texture(uTexture, vUv).r;
+                float l = texture(uTexture, clamp(vL, 0.0, 1.0)).r;
+                float r = texture(uTexture, clamp(vR, 0.0, 1.0)).r;
+                float t = texture(uTexture, clamp(vT, 0.0, 1.0)).r;
+                float b = texture(uTexture, clamp(vB, 0.0, 1.0)).r;
+                float mx = max(c, max(max(l, r), max(t, b)));
+                float mn = min(c, min(min(l, r), min(t, b)));
+                fragColor = vec4(isErode == 1 ? mn : mx, 0.0, 0.0, 1.0);
+            }
+        `;
         // Doubles as the multigrid smoother: hSq = (2^level)² converts the
         // level's RHS — stored in level-0 "continuous" units all the way down
         // the pyramid so fp16 storage never sees compounding 4^L factors —

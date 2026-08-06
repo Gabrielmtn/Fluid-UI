@@ -27,6 +27,7 @@
         const clearProg = new Program(baseVert, clearFrag);
         const obstacleDampProg = new Program(baseVert, obstacleDampFrag);
         const obstacleCompositeProg = new Program(baseVert, obstacleCompositeFrag);
+        const morphObstacleProg = new Program(baseVert, morphObstacleFrag); // collider gap fill (close)
         const hfFloorProg = new Program(baseVert, hfFloorFrag); // M2 spectral floor
         const wetnessAdvectProg = new Program(baseVert, wetnessAdvectFrag); // P15-1 wetness advect+dry
         const wetSplatProg = new Program(baseVert, wetSplatFrag);           // P15-1 wetness deposit
@@ -542,6 +543,37 @@
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             return true;
         };
+        // Collider gap fill: morphological CLOSE on the composited obstacle
+        // (R passes of 5-tap-cross dilate, then R of erode). Seals enclosed
+        // texture-scale pockets (line-art mask images — fish-scale/knit
+        // interiors are TRUE-zero coverage, which no alpha curve can lift)
+        // while larger drawn cutouts (eyes, mouths) and the silhouette stay
+        // put. Radius is config.COLLIDER_GAP_FILL in reference-512 sim
+        // texels, scaled by the actual sim width so the sealed feature size
+        // is resolution-invariant (M3 principle). 0 = exact no-op.
+        function closeObstacleGaps() {
+            var ref = (typeof config !== 'undefined' && typeof config.COLLIDER_GAP_FILL === 'number')
+                ? config.COLLIDER_GAP_FILL : 0;
+            if (!(ref > 0) || !obstacle || !obstacleScratch) return 0;
+            var radius = Math.min(32, Math.round(ref * obstacle.width / 512));
+            if (radius <= 0) return 0;
+            morphObstacleProg.bind();
+            gl.uniform1i(morphObstacleProg.uniforms.uTexture, 0);
+            gl.uniform2f(morphObstacleProg.uniforms.texelSize, obstacle.texelSizeX, obstacle.texelSizeY);
+            gl.viewport(0, 0, obstacle.width, obstacle.height);
+            gl.activeTexture(gl.TEXTURE0);
+            for (var phase = 0; phase < 2; phase++) {
+                gl.uniform1i(morphObstacleProg.uniforms.isErode, phase);
+                for (var i = 0; i < radius; i++) {
+                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    blit(obstacleScratch.fbo);
+                    var prev = obstacle;
+                    obstacle = obstacleScratch;
+                    obstacleScratch = prev;
+                }
+            }
+            return radius;
+        }
         // M4 edge quality: one separable 1-texel blur over the composited
         // obstacle (H into scratch, V back) — the GPU-path equivalent of the
         // D0.5 sim-scale blur the CPU compositor applies. Call after the last
@@ -549,6 +581,7 @@
         window.finishObstacleComposite = function () {
             if (!obstacle || !obstacleScratch || gl.isContextLost()) return;
             gl.disable(gl.BLEND);
+            closeObstacleGaps();
             blurProg.bind();
             gl.uniform1i(blurProg.uniforms.uTexture, 0);
             gl.viewport(0, 0, obstacle.width, obstacle.height);
@@ -583,6 +616,26 @@
                 }
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
                 gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RED, gl.FLOAT, f);
+                // Gap fill applies to the CPU-composited path too (depth-mask
+                // colliders from imported images are the main source of
+                // line-art texture pockets). Follow with the same 1-texel
+                // blur the GPU path gets so seal seams stay antialiased —
+                // gated on the close actually running, so COLLIDER_GAP_FILL 0
+                // keeps this path bit-identical to before.
+                if (closeObstacleGaps() > 0) {
+                    gl.disable(gl.BLEND);
+                    blurProg.bind();
+                    gl.uniform1i(blurProg.uniforms.uTexture, 0);
+                    gl.viewport(0, 0, w, h);
+                    gl.uniform2f(blurProg.uniforms.texelSize, obstacle.texelSizeX, 0.0);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    blit(obstacleScratch.fbo);
+                    gl.uniform2f(blurProg.uniforms.texelSize, 0.0, obstacle.texelSizeY);
+                    gl.bindTexture(gl.TEXTURE_2D, obstacleScratch.texture);
+                    blit(obstacle.fbo);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                }
             } catch (e) {
                 console.warn('⚠️ Obstacle texture upload failed:', e.message);
             }

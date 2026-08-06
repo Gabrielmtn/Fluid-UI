@@ -382,6 +382,21 @@
                                       // under high strength + multigrid. 0.5 ≈ legacy hard
                                       // cut everywhere. Console-tunable.
 
+            COLLIDER_GAP_FILL: 14,    // Collider gap fill: morphological-close radius in
+                                      // reference-512 sim texels (res-scaled). Seals enclosed
+                                      // pockets narrower than ~2R — line-art mask images
+                                      // (fish-scale/knit texture) have TRUE-zero interiors
+                                      // that no alpha curve can lift, so the fill read as a
+                                      // net and dye pooled in every scale (2026-08-05).
+                                      // Larger drawn cutouts and the silhouette stay open —
+                                      // 14 verified on the scale-mesh mask: every scale cell
+                                      // (incl. the larger forehead ones) seals, the eye
+                                      // sockets survive. NOTE: this intentionally overrides
+                                      // the D0.5 "fine channels stay open" behavior for
+                                      // channels narrower than ~2R; set 0 to restore it
+                                      // (bit-identical off). Console-tunable; re-apply live
+                                      // via collisionLayers.updateObstacleFromLayers().
+
             COLLIDER_ALPHA_SOLID: 0.45, // Mask/raster → collider coverage: source alpha at
                                       // (and above) which the collider reads FULLY solid.
                                       // Painted/imported fills carry mid-alpha texture
