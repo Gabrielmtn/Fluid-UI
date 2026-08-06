@@ -33,14 +33,13 @@
                     '<span class="hk-chip hk-sep"></span>' +
                     '<span class="hk-chip"><kbd>[</kbd><kbd>]</kbd> Brush</span>' +
                     '<span class="hk-chip"><kbd>1</kbd>–<kbd>8</kbd> Mult</span>' +
-                    '<span class="hk-chip"><kbd>T</kbd> Trail</span>' +
                     '<span class="hk-chip"><kbd>C</kbd> Cursor</span>' +
                     '<span class="hk-chip"><kbd>H</kbd> Handles</span>' +
                     '<span class="hk-chip"><kbd>L</kbd> Lock</span>' +
                     '<span class="hk-chip"><kbd>R</kbd> Random</span>' +
                     '<span class="hk-chip"><kbd>A</kbd> Step</span>' +
                     '<span class="hk-chip"><kbd>N</kbd> Next Color</span>' +
-                    '<span class="hk-chip"><kbd>S</kbd> Focus</span>' +
+                    '<span class="hk-chip"><kbd>F</kbd> Focus</span>' +
                     '<span class="hk-chip"><kbd>E</kbd> Export</span>' +
                     '<span class="hk-chip"><kbd>M</kbd> Mutate</span>' +
                 '</div>' +

@@ -84,9 +84,9 @@
                         if (isActiveRaster) element.classList.add('raster-active');
                         element.innerHTML = `
                             <div class="layer-item-header">
-                                <div class="layer-thumbnail" style="background-image: url(${layer.data}); background-size: cover;"></div>
+                                <div class="layer-thumbnail" style="background-image: url('${window.safeImageUrl(layer.thumb || layer.data)}'); background-size: cover;"></div>
                                 <div class="layer-info">
-                                    <input type="text" class="layer-title" value="${layer.title}"
+                                    <input type="text" class="layer-title" value="${window.escHtml(layer.title)}"
                                            onchange="updateLayerTitle(${layer.index}, this.value)">
                                 </div>
                                 <div class="layer-controls">
@@ -120,7 +120,7 @@
                                     <select class="raster-clip-select">
                                         <option value="">None</option>
                                         ${(window.Masks ? window.Masks.list() : []).map(m =>
-                                            `<option value="${m.id}" ${layer.clipMaskId === m.id ? 'selected' : ''}>${m.name}</option>`
+                                            `<option value="${m.id}" ${layer.clipMaskId === m.id ? 'selected' : ''}>${window.escHtml(m.name)}</option>`
                                         ).join('')}
                                     </select>
                                     <label class="collision-toggle"><input type="checkbox" class="raster-clip-invert" ${layer.clipInvert ? 'checked' : ''}> Inv</label>
@@ -170,9 +170,9 @@
                     const hasMask = layer.mask?.shapes?.length > 0;
                     element.innerHTML = `
                         <div class="layer-item-header">
-                            <div class="layer-thumbnail" style="background-image: url(${layer.data})"></div>
+                            <div class="layer-thumbnail" style="background-image: url('${window.safeImageUrl(layer.thumb || layer.data)}')"></div>
                             <div class="layer-info">
-                                <input type="text" class="layer-title" value="${layer.title}" 
+                                <input type="text" class="layer-title" value="${window.escHtml(layer.title)}"
                                        onchange="updateLayerTitle(${layer.index}, this.value)">
                             </div>
                             <div class="layer-controls">
@@ -213,7 +213,7 @@
                             <select class="img-clip-select">
                                 <option value="">None</option>
                                 ${(window.Masks ? window.Masks.list() : []).map(m =>
-                                    `<option value="${m.id}" ${layer.clipMaskId === m.id ? 'selected' : ''}>${m.name}</option>`
+                                    `<option value="${m.id}" ${layer.clipMaskId === m.id ? 'selected' : ''}>${window.escHtml(m.name)}</option>`
                                 ).join('')}
                             </select>
                             <label class="collision-toggle"><input type="checkbox" class="img-clip-invert" ${layer.clipInvert ? 'checked' : ''}> Inv</label>

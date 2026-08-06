@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-LOG = "[Fluid UI]"
+LOG = "[A Small Good Thing]"
 
 
 def _find_latest(watch_folder, pattern="fluid_*"):
@@ -52,11 +52,11 @@ except Exception as e:
 # ── Node class ──────────────────────────────────────────────────────
 class FluidUIImageLoader:
     """
-    Loads the most recent image from a Fluid UI watched folder.
+    Loads the most recent image from an A Small Good Thing watched folder.
 
     Install: copy this folder into ComfyUI/custom_nodes/fluid-ui-bridge/
     Usage:
-      1. Set watch_folder to the same path configured in Fluid UI
+      1. Set watch_folder to the same path configured in A Small Good Thing
       2. Toggle watch_enabled ON and set poll_interval
       3. The JS extension polls the folder and clicks Run when a new file appears
     """

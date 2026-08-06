@@ -33,6 +33,65 @@
     var _selectMap = {};
     SELECT_SCHEMA.forEach(function (s) { _selectMap[s.id] = s; });
 
+    // ── Feature Gates ───────────────────────────────────────────────
+    // A param only mutates when its owning feature toggle is ON in the
+    // VARIANT (checkboxes are rolled first, so a variant that flips a
+    // feature on gets its params varied too). Mutating a param whose
+    // feature is off inflates the card's change count while altering
+    // nothing on screen — the "mutate did nothing" complaint. Params
+    // not listed here are always eligible.
+    var FEATURE_GATES = {
+        // sliders
+        kSpinSpeed: ['kaleidoToggle', 'kAnimateRot'],
+        kTwist: ['kaleidoToggle'],
+        kZoom: ['kaleidoToggle'],
+        kBlend: ['kaleidoToggle'],
+        kAngle: ['kaleidoToggle'],
+        kaleidoSegments: ['kaleidoToggle'],
+        lightSpeed: ['enableLighting'],
+        lightIntensity: ['enableLighting'],
+        lightAmbient: ['enableLighting'],
+        lightShiftSpeed: ['enableLightShift'],
+        lightShiftThreshold: ['enableLightShift'],
+        lightShiftIntensity: ['enableLightShift'],
+        lightShiftSaturation: ['enableLightShift'],
+        clarity: ['microDetailToggle'],
+        vibrance: ['microDetailToggle'],
+        glowIntensity: ['glowToggle'],
+        glowThreshold: ['glowToggle'],
+        ssFrequency: ['shootingStarToggle'],
+        ssAngle: ['shootingStarToggle'],
+        ssLength: ['shootingStarToggle'],
+        ssSize: ['shootingStarToggle'],
+        ssVariance: ['shootingStarToggle'],
+        ssGravity: ['shootingStarToggle'],
+        audioSensitivity: ['audioReactToggle'],
+        audioBeatThreshold: ['audioReactToggle'],
+        shadingIntensity: ['displayShadingToggle'],
+        shadeRelief: ['displayShadingToggle'],
+        shadeGloss: ['displayShadingToggle'],
+        // selects
+        kaleidoMode: ['kaleidoToggle'],
+        lightMode: ['enableLighting'],
+        lightShiftMode: ['enableLightShift']
+    };
+
+    // Variant checkbox state; params whose toggle was not captured in the
+    // snapshot fail OPEN (mutate as before) rather than silently vanishing.
+    function _cbOn(out, id) {
+        var v = out.checkboxes ? out.checkboxes[id] : undefined;
+        return v === undefined ? true : !!v;
+    }
+
+    function gateOpen(out, id) {
+        var gates = FEATURE_GATES[id];
+        if (!gates) return true;
+        for (var i = 0; i < gates.length; i++) {
+            if (!_cbOn(out, gates[i])) return false;
+        }
+        return true;
+    }
+
     // ── Utilities ───────────────────────────────────────────────────
 
     // Gaussian random (Box-Muller)
@@ -117,6 +176,45 @@
     function mutate(base, opts) {
         if (!base) return null;
         opts = opts || {};
+        // External deltas are exact instructions — apply once, no retry.
+        if (opts.delta) return mutateOnce(base, opts);
+        // Quantized mean-zero noise can round every slider straight back to
+        // its base value (coarse steps + small ranges at low strength) — the
+        // "mutate did nothing" outcome. Re-roll until the variant actually
+        // differs; as a last resort push one random eligible slider visibly.
+        var out = mutateOnce(base, opts);
+        var tries = 0;
+        while (tries < 4 && diffSummary(base, out).length === 0) {
+            out = mutateOnce(base, opts);
+            tries++;
+        }
+        if (diffSummary(base, out).length === 0) forceNudge(out, opts);
+        return out;
+    }
+
+    // Last-resort guarantee for mutate(): one random unlocked, scope- and
+    // gate-eligible slider gets a visible push (≥1 step, ~10% of range).
+    function forceNudge(out, opts) {
+        var scope = opts.scope || 'basic';
+        var locks = opts.locks || {};
+        var strength = typeof opts.strength === 'number' ? opts.strength : 0.3;
+        var pool = SLIDER_SCHEMA.filter(function (s) {
+            return !locks[s.id]
+                && !(scope === 'basic' && s.scope !== 'basic')
+                && out.sliders && out.sliders[s.id] !== undefined
+                && gateOpen(out, s.id);
+        });
+        if (!pool.length) return;
+        var s = pool[Math.floor(Math.random() * pool.length)];
+        var mag = Math.max(s.step, (s.max - s.min) * 0.1 * Math.max(strength, 0.3));
+        var dir = Math.random() < 0.5 ? -1 : 1;
+        var v = clampToSchema(s, out.sliders[s.id] + dir * mag);
+        // Clamped into no-op at a range edge — push the other way.
+        if (v === out.sliders[s.id]) v = clampToSchema(s, out.sliders[s.id] - dir * mag);
+        out.sliders[s.id] = v;
+    }
+
+    function mutateOnce(base, opts) {
         var strength = typeof opts.strength === 'number' ? opts.strength : 0.3;
         var scope    = opts.scope || 'basic';
         var locks    = opts.locks || {};
@@ -125,25 +223,9 @@
         // Deep copy the base
         var out = JSON.parse(JSON.stringify(base));
 
-        // ── Sliders ──
-        if (out.sliders) {
-            SLIDER_SCHEMA.forEach(function (schema) {
-                if (locks[schema.id]) return;
-                if (scope === 'basic' && schema.scope !== 'basic') return;
-                if (out.sliders[schema.id] === undefined) return;
-
-                if (delta && delta.sliders && delta.sliders[schema.id] !== undefined) {
-                    out.sliders[schema.id] = clampToSchema(schema, delta.sliders[schema.id]);
-                    return;
-                }
-
-                var range = schema.max - schema.min;
-                var noise = gaussRandom() * strength * range * 0.3;
-                out.sliders[schema.id] = clampToSchema(schema, out.sliders[schema.id] + noise);
-            });
-        }
-
-        // ── Checkboxes ──
+        // ── Checkboxes ── (FIRST: feature gates below read the variant's
+        // post-flip toggle state, so a variant that turns a feature on
+        // also gets that feature's params varied)
         if (out.checkboxes) {
             CHECKBOX_SCHEMA.forEach(function (schema) {
                 if (locks[schema.id]) return;
@@ -162,6 +244,25 @@
             });
         }
 
+        // ── Sliders ──
+        if (out.sliders) {
+            SLIDER_SCHEMA.forEach(function (schema) {
+                if (locks[schema.id]) return;
+                if (scope === 'basic' && schema.scope !== 'basic') return;
+                if (out.sliders[schema.id] === undefined) return;
+
+                if (delta && delta.sliders && delta.sliders[schema.id] !== undefined) {
+                    out.sliders[schema.id] = clampToSchema(schema, delta.sliders[schema.id]);
+                    return;
+                }
+                if (!gateOpen(out, schema.id)) return;
+
+                var range = schema.max - schema.min;
+                var noise = gaussRandom() * strength * range * 0.3;
+                out.sliders[schema.id] = clampToSchema(schema, out.sliders[schema.id] + noise);
+            });
+        }
+
         // ── Selects ──
         if (out.selects) {
             SELECT_SCHEMA.forEach(function (schema) {
@@ -173,6 +274,7 @@
                     out.selects[schema.id] = delta.selects[schema.id];
                     return;
                 }
+                if (!gateOpen(out, schema.id)) return;
 
                 var options = schema.options;
                 if (!options) {
@@ -191,13 +293,13 @@
         }
 
         // ── Colors ──
+        // Background is a FUNDAMENTAL DISPLAY SETTING, not a style variant
+        // (Gabriel 2026-08-05): random mutation kept washing black canvases
+        // to grey — mutateColor's 0.05 lightness floor means black can only
+        // get LIGHTER. Only an explicit external delta may set it now.
         if (out.colors && scope !== 'extended_only') {
-            if (!locks['color.background'] && out.colors.background) {
-                if (delta && delta.colors && delta.colors.background) {
-                    out.colors.background = delta.colors.background;
-                } else if (scope === 'basic' || scope === 'all') {
-                    out.colors.background = mutateColor(out.colors.background, strength);
-                }
+            if (out.colors.background && delta && delta.colors && delta.colors.background) {
+                out.colors.background = delta.colors.background;
             }
             if (!locks['color.brush'] && out.colors.brush) {
                 if (delta && delta.colors && delta.colors.brush) {
@@ -209,7 +311,7 @@
         }
 
         // ── Kaleidoscope runtime ──
-        if (out.kaleido && (scope === 'basic' || scope === 'all')) {
+        if (out.kaleido && (scope === 'basic' || scope === 'all') && _cbOn(out, 'kaleidoToggle')) {
             if (!locks['kaleido.mode'] && Math.random() < strength * 0.3) {
                 out.kaleido.mode = Math.floor(Math.random() * 6);
             }
@@ -235,7 +337,7 @@
         }
 
         // ── Light source position ──
-        if (out.lightPos && !locks['lightPos'] && (scope === 'all')) {
+        if (out.lightPos && !locks['lightPos'] && (scope === 'all') && _cbOn(out, 'enableLighting')) {
             if (delta && delta.lightPos) {
                 out.lightPos = delta.lightPos;
             } else {
@@ -247,7 +349,7 @@
         }
 
         // ── Shooting star origin ──
-        if (out.ssOrigin && !locks['ssOrigin'] && (scope === 'all')) {
+        if (out.ssOrigin && !locks['ssOrigin'] && (scope === 'all') && _cbOn(out, 'shootingStarToggle')) {
             if (delta && delta.ssOrigin) {
                 out.ssOrigin = delta.ssOrigin;
             } else {
@@ -278,7 +380,7 @@
         }
 
         // ── Light shift color path (procedural) ──
-        if (!locks['lightShiftPath'] && (scope === 'all')) {
+        if (!locks['lightShiftPath'] && (scope === 'all') && _cbOn(out, 'enableLightShift')) {
             if (delta && delta.lightShiftPath) {
                 out.lightShiftPath = delta.lightShiftPath;
             } else if (Math.random() < strength * 0.4) {
@@ -458,6 +560,17 @@
             ['background', 'brush'].forEach(function (k) {
                 if (base.colors[k] !== variant.colors[k]) {
                     changes.push({ param: 'color.' + k, from: base.colors[k], to: variant.colors[k], type: 'color' });
+                }
+            });
+        }
+
+        // Kaleido runtime (only mutated when kaleidoToggle is on, so these
+        // are real on-screen changes — without them a kaleido-only variant
+        // read as "0 changes" and the retry loop discarded it)
+        if (base.kaleido && variant.kaleido) {
+            ['mode', 'segments', 'angle', 'twist', 'zoom', 'blend'].forEach(function (k) {
+                if (base.kaleido[k] !== variant.kaleido[k]) {
+                    changes.push({ param: 'kaleido.' + k, from: base.kaleido[k], to: variant.kaleido[k], type: 'slider' });
                 }
             });
         }

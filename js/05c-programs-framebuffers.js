@@ -27,6 +27,7 @@
         const clearProg = new Program(baseVert, clearFrag);
         const obstacleDampProg = new Program(baseVert, obstacleDampFrag);
         const obstacleCompositeProg = new Program(baseVert, obstacleCompositeFrag);
+        const morphObstacleProg = new Program(baseVert, morphObstacleFrag); // collider gap fill (close)
         const hfFloorProg = new Program(baseVert, hfFloorFrag); // M2 spectral floor
         const wetnessAdvectProg = new Program(baseVert, wetnessAdvectFrag); // P15-1 wetness advect+dry
         const wetSplatProg = new Program(baseVert, wetSplatFrag);           // P15-1 wetness deposit
@@ -34,8 +35,9 @@
         const igniteProg = new Program(baseVert, igniteFrag);   // D2 bridge: sketch → dye
         const captureProg = new Program(baseVert, captureFrag); // D2 bridge: dye → sketch
         const blurProg = new Program(blurVert, blurFrag);
-        const sunraysMaskProg = new Program(baseVert, sunraysMaskFrag);
-        const sunraysProg = new Program(baseVert, sunraysFrag);
+        const glowPrefilterProg = new Program(baseVert, glowPrefilterFrag);
+        const glowBlurProg = new Program(baseVert, glowBlurFrag);
+        const glowFinalProg = new Program(baseVert, glowFinalFrag);
         let dyeTexWidth, dyeTexHeight, simTexWidth, simTexHeight;
         // Expose for stats panel
         function exposeSimStats() {
@@ -52,6 +54,9 @@
             window.curl = curl;
             window.mgLevels = mgLevels; // harness introspection (obstacle pyramid probes)
         }
+        // Harness introspection: obstacle swaps with its scratch on every
+        // GPU composite, so expose a getter rather than a snapshot ref.
+        window.__getObstacle = function () { return obstacle; };
         function createFBO(w, h, internalFormat, format, type, filter) {
             const texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -88,7 +93,7 @@
         // here for the same reinit-preservation as rasterStore.
         let maskStore = {};
         let sketch; // alias: the ACTIVE raster layer's FBO (assigned by rasterLayers.setActive)
-        let sunrays, sunraysTemp;
+        let glow, glowFramebuffers = []; // HDR bloom: 256-base target + halving mip chain
         let shadeForm, shadeFormTemp;
         // Multigrid pressure pyramid: mgRes0 = level-0 residual scratch;
         // mgLevels[i] = level i+1 {w, h, rhs, res, p(double), obs}. Level 0
@@ -134,7 +139,9 @@
                 if (f.fbo) gl.deleteFramebuffer(f.fbo);
             }
             [sharpened, detailed, lit, divergence, curl, obstacle, obstacleScratch,
-             sunrays, sunraysTemp, shadeForm, shadeFormTemp].forEach(_deleteFBO);
+             glow, shadeForm, shadeFormTemp].forEach(_deleteFBO);
+            glowFramebuffers.forEach(_deleteFBO);
+            glowFramebuffers = [];
             _deleteFBO(mgRes0);
             if (mgLevels) mgLevels.forEach(function (l) {
                 [l.rhs, l.res, l.obs, l.p.read, l.p.write].forEach(_deleteFBO);
@@ -223,24 +230,33 @@
                     });
                 }
             })();
-            // Sunrays FBOs
-            const sunRes = config.SUNRAYS_RESOLUTION || 196;
-            const sunAspect = displayW / Math.max(1, displayH);
-            let sunW, sunH;
+            // Glow (HDR bloom) FBOs: fixed 256-base target (like shadeForm,
+            // NOT tied to dye res — the halo radius must stay constant in
+            // screen space across quality tiers) + a halving mip chain the
+            // blur walks down and additively climbs back up.
+            const glowRes = config.GLOW_RESOLUTION || 256;
+            const glowAspect = displayW / Math.max(1, displayH);
+            let glowW, glowH;
             if (displayW >= displayH) {
-                sunW = Math.min(sunRes, maxTextureSize);
-                sunH = Math.max(1, Math.round(sunRes / sunAspect));
+                glowW = Math.min(glowRes, maxTextureSize);
+                glowH = Math.max(1, Math.round(glowRes / glowAspect));
             } else {
-                sunH = Math.min(sunRes, maxTextureSize);
-                sunW = Math.max(1, Math.round(sunRes * sunAspect));
+                glowH = Math.min(glowRes, maxTextureSize);
+                glowW = Math.max(1, Math.round(glowRes * glowAspect));
             }
-            sunrays = createFBO(sunW, sunH, rgba.internalFormat, rgba.format, texType, filter);
-            sunraysTemp = createFBO(sunW, sunH, rgba.internalFormat, rgba.format, texType, filter);
+            glow = createFBO(glowW, glowH, rgba.internalFormat, rgba.format, texType, filter);
+            const glowIters = config.GLOW_ITERATIONS || 8;
+            for (let gi = 0; gi < glowIters; gi++) {
+                const gw = glowW >> (gi + 1);
+                const gh = glowH >> (gi + 1);
+                if (gw < 2 || gh < 2) break;
+                glowFramebuffers.push(createFBO(gw, gh, rgba.internalFormat, rgba.format, texType, filter));
+            }
             // Shading form field: low-res blurred copy of the frame that
             // the display shading derives its normals from. Paint-engine rule
             // (Krita/ArtRage impasto): light a smoothed height field, never
             // the raw pigment — pixel-scale dye noise must not read as relief.
-            // FIXED resolution (like sunrays), NOT tied to dye resolution:
+            // FIXED resolution (like glow), NOT tied to dye resolution:
             // relief smoothing must stay constant in screen space — a
             // dye-relative form field re-admitted pixel-scale striations the
             // moment the user raised the quality tier. 256 long-side matches
@@ -249,10 +265,10 @@
             let sfW, sfH;
             if (displayW >= displayH) {
                 sfW = Math.min(sfRes, maxTextureSize);
-                sfH = Math.max(1, Math.round(sfRes / sunAspect));
+                sfH = Math.max(1, Math.round(sfRes / glowAspect));
             } else {
                 sfH = Math.min(sfRes, maxTextureSize);
-                sfW = Math.max(1, Math.round(sfRes * sunAspect));
+                sfW = Math.max(1, Math.round(sfRes * glowAspect));
             }
             shadeForm = createFBO(sfW, sfH, rgba.internalFormat, rgba.format, texType, filter);
             shadeFormTemp = createFBO(sfW, sfH, rgba.internalFormat, rgba.format, texType, filter);
@@ -265,9 +281,10 @@
                 divergence, curl,
                 pressure.read, pressure.write,
                 sharpened, detailed, lit, obstacle, obstacleScratch,
-                sunrays, sunraysTemp, shadeForm, shadeFormTemp,
+                glow, shadeForm, shadeFormTemp,
                 mgRes0
             ];
+            glowFramebuffers.forEach(function (g) { allFBOs.push(g); });
             mgLevels.forEach(function (l) {
                 allFBOs.push(l.rhs, l.res, l.obs, l.p.read, l.p.write);
             });
@@ -501,6 +518,13 @@
         window.compositeObstacleSource = function (source, opts) {
             if (!source || !source.texture || !obstacle || !obstacleScratch || gl.isContextLost()) return false;
             opts = opts || {};
+            // The recomposite runs in a rAF callback, so it inherits whatever
+            // blend state the last GL work left. 05i's sketch/mask stamping
+            // uses eraser blending (src factor ZERO) — with that live, this
+            // blit resolves to dst = 0 and the whole collider silently dies
+            // until the next clean recomposite ("changing strength sometimes
+            // makes it stop working", 2026-08-06).
+            gl.disable(gl.BLEND);
             obstacleCompositeProg.bind();
             gl.uniform2f(obstacleCompositeProg.uniforms.texelSize, 1.0 / obstacle.width, 1.0 / obstacle.height);
             gl.uniform1i(obstacleCompositeProg.uniforms.uSource, 0);
@@ -511,6 +535,9 @@
             gl.uniform1f(obstacleCompositeProg.uniforms.sourceRotation, Number(opts.rotation) || 0);
             gl.uniform1f(obstacleCompositeProg.uniforms.strength,
                 Math.max(0, Math.min(1, Number(opts.strength) || 0)));
+            gl.uniform1f(obstacleCompositeProg.uniforms.covKnee,
+                (typeof config !== 'undefined' && typeof config.COLLIDER_ALPHA_SOLID === 'number')
+                    ? config.COLLIDER_ALPHA_SOLID : 0.45);
             gl.viewport(0, 0, obstacle.width, obstacle.height);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, source.texture);
@@ -523,6 +550,38 @@
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             return true;
         };
+        // Collider gap fill: morphological CLOSE on the composited obstacle
+        // (R passes of 5-tap-cross dilate, then R of erode). Seals enclosed
+        // texture-scale pockets (line-art mask images — fish-scale/knit
+        // interiors are TRUE-zero coverage, which no alpha curve can lift)
+        // while larger drawn cutouts (eyes, mouths) and the silhouette stay
+        // put. Radius is config.COLLIDER_GAP_FILL in reference-512 sim
+        // texels, scaled by the actual sim width so the sealed feature size
+        // is resolution-invariant (M3 principle). 0 = exact no-op.
+        function closeObstacleGaps() {
+            var ref = (typeof config !== 'undefined' && typeof config.COLLIDER_GAP_FILL === 'number')
+                ? config.COLLIDER_GAP_FILL : 0;
+            if (!(ref > 0) || !obstacle || !obstacleScratch) return 0;
+            var radius = Math.min(32, Math.round(ref * obstacle.width / 512));
+            if (radius <= 0) return 0;
+            gl.disable(gl.BLEND); // also called standalone from updateObstacleTexture — see compositeObstacleSource
+            morphObstacleProg.bind();
+            gl.uniform1i(morphObstacleProg.uniforms.uTexture, 0);
+            gl.uniform2f(morphObstacleProg.uniforms.texelSize, obstacle.texelSizeX, obstacle.texelSizeY);
+            gl.viewport(0, 0, obstacle.width, obstacle.height);
+            gl.activeTexture(gl.TEXTURE0);
+            for (var phase = 0; phase < 2; phase++) {
+                gl.uniform1i(morphObstacleProg.uniforms.isErode, phase);
+                for (var i = 0; i < radius; i++) {
+                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    blit(obstacleScratch.fbo);
+                    var prev = obstacle;
+                    obstacle = obstacleScratch;
+                    obstacleScratch = prev;
+                }
+            }
+            return radius;
+        }
         // M4 edge quality: one separable 1-texel blur over the composited
         // obstacle (H into scratch, V back) — the GPU-path equivalent of the
         // D0.5 sim-scale blur the CPU compositor applies. Call after the last
@@ -530,6 +589,7 @@
         window.finishObstacleComposite = function () {
             if (!obstacle || !obstacleScratch || gl.isContextLost()) return;
             gl.disable(gl.BLEND);
+            closeObstacleGaps();
             blurProg.bind();
             gl.uniform1i(blurProg.uniforms.uTexture, 0);
             gl.viewport(0, 0, obstacle.width, obstacle.height);
@@ -564,6 +624,26 @@
                 }
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
                 gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RED, gl.FLOAT, f);
+                // Gap fill applies to the CPU-composited path too (depth-mask
+                // colliders from imported images are the main source of
+                // line-art texture pockets). Follow with the same 1-texel
+                // blur the GPU path gets so seal seams stay antialiased —
+                // gated on the close actually running, so COLLIDER_GAP_FILL 0
+                // keeps this path bit-identical to before.
+                if (closeObstacleGaps() > 0) {
+                    gl.disable(gl.BLEND);
+                    blurProg.bind();
+                    gl.uniform1i(blurProg.uniforms.uTexture, 0);
+                    gl.viewport(0, 0, w, h);
+                    gl.uniform2f(blurProg.uniforms.texelSize, obstacle.texelSizeX, 0.0);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    blit(obstacleScratch.fbo);
+                    gl.uniform2f(blurProg.uniforms.texelSize, 0.0, obstacle.texelSizeY);
+                    gl.bindTexture(gl.TEXTURE_2D, obstacleScratch.texture);
+                    blit(obstacle.fbo);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                }
             } catch (e) {
                 console.warn('⚠️ Obstacle texture upload failed:', e.message);
             }

@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05i-sim-stats.js — part 9/14 of former 05-fluid-sim.js (lines 2942–3119)
 // LOAD ORDER: after 05h-slider-bindings.js, before 05j-update-loop.js
-// PROVIDES: splat(), FPS ring buffer, displayHz detection, window.__stats seed, applySunrays, blur
+// PROVIDES: splat(), FPS ring buffer, displayHz detection, window.__stats seed, applyGlow, blur
 // REQUIRES: splatProg/blurProg (05c), gl (04)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -136,6 +136,11 @@
                 gl.uniform1f(splatProg.uniforms.radius, baseRadius * 0.08); // band width²
                 gl.uniform1f(splatProg.uniforms.ringRadius, 0.75 * Math.sqrt(baseRadius));
                 gl.uniform1f(splatProg.uniforms.ringSquash, 1);
+                // Ring is its own analytic shape: never blend the material's
+                // clay stamp on top. Without this, Paint-Thick's STAMP_NOISE
+                // (0.7, shape often Chisel) reaches the shader's stamp block,
+                // which overwrites the hollow center with a square press.
+                gl.uniform1f(splatProg.uniforms.stampNoise, 0);
             }
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
             const _dyeRect = _scOn ? splatScissorRect(_u, _v, _dHalf, aspectRatio, dyeTexWidth, dyeTexHeight) : 'full';
@@ -586,27 +591,6 @@
         // DEFAULT to 60 FPS, not uncapped!
         window.fpsCap = (typeof window.fpsCap === 'number' && window.fpsCap > 0) ? window.fpsCap : 60;
         window.__stats = { fps: 0, frametime: 0, lastCpuMs: 0, targetFps: 60, displayHz: displayHz, budgetPct: 0 };
-        function applySunrays(source, dest, temp) {
-            // Create mask from source
-            gl.disable(gl.BLEND);
-            sunraysMaskProg.bind();
-            gl.uniform1i(sunraysMaskProg.uniforms.uTexture, 0);
-            gl.viewport(0, 0, dest.width, dest.height);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, source);
-            blit(temp.fbo);
-            // Apply radial blur
-            sunraysProg.bind();
-            gl.uniform1i(sunraysProg.uniforms.uTexture, 0);
-            // Guard against an undefined/NaN weight (e.g. a preset that enables
-            // SUNRAYS without a weight): NaN here propagates through the sunrays
-            // texture and displayFrag's `color *= sr`, blacking out the canvas.
-            gl.uniform1f(sunraysProg.uniforms.weight, config.SUNRAYS_WEIGHT != null ? config.SUNRAYS_WEIGHT : 0.5);
-            gl.viewport(0, 0, dest.width, dest.height);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, temp.texture);
-            blit(dest.fbo);
-        }
         function blur(target, temp, iterations) {
             blurProg.bind();
             gl.uniform1i(blurProg.uniforms.uTexture, 0);
@@ -624,4 +608,62 @@
                 gl.bindTexture(gl.TEXTURE_2D, temp.texture);
                 blit(target.fbo);
             }
+        }
+        // Glow (HDR bloom): prefilter the pre-tone-map frame's overbright
+        // regions into the 256-base target, blur DOWN the halving mip chain,
+        // then additively blend back UP it (each octave stacks a wider, softer
+        // halo), and write the intensity-scaled result back into `glow` for
+        // the display pass to sample. All passes tiny (≤256px) — the whole
+        // chain costs a fraction of one dye-res pass.
+        function applyGlow(source) {
+            if (!glow || glowFramebuffers.length < 2) return;
+            gl.disable(gl.BLEND);
+            // Prefilter: soft-knee threshold on max-channel brightness
+            const thr = (config.GLOW_THRESHOLD != null) ? config.GLOW_THRESHOLD : 0.6;
+            const knee = thr * ((config.GLOW_KNEE != null) ? config.GLOW_KNEE : 0.7) + 0.0001;
+            glowPrefilterProg.bind();
+            gl.uniform3f(glowPrefilterProg.uniforms.curve, thr - knee, knee * 2.0, 0.25 / knee);
+            gl.uniform1f(glowPrefilterProg.uniforms.threshold, thr);
+            gl.uniform1i(glowPrefilterProg.uniforms.uTexture, 0);
+            gl.viewport(0, 0, glow.width, glow.height);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, source);
+            blit(glow.fbo);
+            // Downsample chain
+            glowBlurProg.bind();
+            gl.uniform1i(glowBlurProg.uniforms.uTexture, 0);
+            let last = glow;
+            for (let i = 0; i < glowFramebuffers.length; i++) {
+                const dest = glowFramebuffers[i];
+                gl.uniform2f(glowBlurProg.uniforms.texelSize, last.texelSizeX, last.texelSizeY);
+                gl.viewport(0, 0, dest.width, dest.height);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, last.texture);
+                blit(dest.fbo);
+                last = dest;
+            }
+            // Additive upsample: each mip keeps its own blur and gains the
+            // coarser octave's — the classic wide-soft bloom falloff.
+            gl.blendFunc(gl.ONE, gl.ONE);
+            gl.enable(gl.BLEND);
+            for (let i = glowFramebuffers.length - 2; i >= 0; i--) {
+                const dest = glowFramebuffers[i];
+                gl.uniform2f(glowBlurProg.uniforms.texelSize, last.texelSizeX, last.texelSizeY);
+                gl.viewport(0, 0, dest.width, dest.height);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, last.texture);
+                blit(dest.fbo);
+                last = dest;
+            }
+            gl.disable(gl.BLEND);
+            // Final: intensity-scaled write back into the full glow target
+            glowFinalProg.bind();
+            gl.uniform2f(glowFinalProg.uniforms.texelSize, last.texelSizeX, last.texelSizeY);
+            gl.uniform1i(glowFinalProg.uniforms.uTexture, 0);
+            gl.uniform1f(glowFinalProg.uniforms.intensity,
+                (config.GLOW_INTENSITY != null) ? config.GLOW_INTENSITY : 0.8);
+            gl.viewport(0, 0, glow.width, glow.height);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, last.texture);
+            blit(glow.fbo);
         }

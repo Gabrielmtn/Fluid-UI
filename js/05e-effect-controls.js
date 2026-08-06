@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05e-effect-controls.js — part 5/14 of former 05-fluid-sim.js (lines 1741–1965)
 // LOAD ORDER: after 05d-input-replay.js, before 05f-kaleido-controls.js
-// PROVIDES: turbulence/microDetail/sunrays control wiring, background color, canvas opacity, display shading, capture dimming, multiplier, timeScale, setMultiplierHotkey
+// PROVIDES: turbulence/microDetail/glow control wiring, background color, canvas opacity, display shading, capture dimming, multiplier, timeScale, setMultiplierHotkey
 // REQUIRES: config (04)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -73,14 +73,14 @@
                 if (sp) sp.textContent = parseFloat(e.target.value).toFixed(decimals);
             });
         });
-        // Sunrays toggle
-        const sunraysToggle = document.getElementById('sunraysToggle');
-        const sunraysPanel = document.getElementById('sunraysPanel');
-        if (sunraysToggle) {
-            sunraysToggle.addEventListener('change', (e) => {
+        // Glow (HDR bloom) toggle
+        const glowToggle = document.getElementById('glowToggle');
+        const glowPanel = document.getElementById('glowPanel');
+        if (glowToggle) {
+            glowToggle.addEventListener('change', (e) => {
                 const on = e.target.checked;
-                config.SUNRAYS = on;
-                if (sunraysPanel) sunraysPanel.style.display = on ? '' : 'none';
+                config.GLOW = on;
+                if (glowPanel) glowPanel.style.display = on ? '' : 'none';
             });
         }
         // Swirl slider (curl-noise micro-swirl in dye advection)
@@ -128,13 +128,21 @@
                 if (sp) sp.textContent = parseFloat(e.target.value).toFixed(1);
             });
         }
-        // Sunrays slider
-        const sunraysWeightSlider = document.getElementById('sunraysWeight');
-        if (sunraysWeightSlider) {
-            sunraysWeightSlider.addEventListener('input', (e) => {
-                config.SUNRAYS_WEIGHT = parseFloat(e.target.value);
-                const sp = document.getElementById('sunraysWeightValue');
-                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(1);
+        // Glow sliders
+        const glowIntensitySlider = document.getElementById('glowIntensity');
+        if (glowIntensitySlider) {
+            glowIntensitySlider.addEventListener('input', (e) => {
+                config.GLOW_INTENSITY = parseFloat(e.target.value);
+                const sp = document.getElementById('glowIntensityValue');
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
+            });
+        }
+        const glowThresholdSlider = document.getElementById('glowThreshold');
+        if (glowThresholdSlider) {
+            glowThresholdSlider.addEventListener('input', (e) => {
+                config.GLOW_THRESHOLD = parseFloat(e.target.value);
+                const sp = document.getElementById('glowThresholdValue');
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
             });
         }
         // DEBUG: Pointer leave tracking removed for performance

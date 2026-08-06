@@ -15,7 +15,6 @@
         let replayIndex = 0;
         // History of completed strokes for time-based replay
         let strokeHistory = [];
-        let lastSplatTime = 0; // for brush refresh rate throttle
         // ─── Splat Envelope ───────────────────────────────────────────
         // Controls how splats ramp in (on press) and fade out (on release).
         // Modes: 'instant' (default), 'linear', 'easing'
@@ -386,6 +385,12 @@
                 }
                 return;
             }
+            // Primary button only (pen TIP reports 0; middle=1, back/forward=3/4,
+            // pen ERASER=5). pointerup only finalizes buttons 0 and 2, so any
+            // other button used to start a stroke that could never end — leaving
+            // pointer.down stuck true and painting a permanent line under the
+            // cursor until the app was restarted.
+            if (e.button !== 0) return;
             // Only process presses that actually target the canvas (not click-throughs from UI)
             if (isPaused || e.target !== canvas) return;
             // Capture the pointer so the stroke keeps getting move/up/cancel even
@@ -449,8 +454,7 @@
             if (e.pointerType === 'touch') return; // touchmove owns touch
             if (isPaused || isReplayActive) return;
             // Engine feed: replay every coalesced sub-frame sample (position)
-            // while a stroke is live. Density is governed by BRUSH_SPACING, so
-            // the Splat Rate throttle doesn't gate this.
+            // while a stroke is live. Density is governed by BRUSH_SPACING.
             if (window.BrushEngine && window.BrushEngine.isActive()) {
                 const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
                 if (evs && evs.length) {
@@ -476,19 +480,13 @@
             if (pointer.down) {
                 // Skip near-zero moves (avoids re-splat artifacts + wasted work)
                 if (pointer.dx * pointer.dx + pointer.dy * pointer.dy < 1.0) return;
-                // Brush refresh rate throttle (recording/broadcast only)
-                var rate = window.brushRefreshRate || 0;
-                if (rate > 0) {
-                    var now = Date.now();
-                    if (now - lastSplatTime < rate) {
-                        return; // pointer.moved stays false → no splat in render loop
-                    }
-                    lastSplatTime = now;
-                }
                 pointer.moved = true;
                 const _skT = config.BRUSH_TARGET === 'sketch';
                 if (!_skT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
-                if (!_skT && typeof broadcastSplat === 'function') {
+                // 1.3 parity: when the brush engine drives the stroke it
+                // broadcasts its real dab train from 05j (queueDab/flushDabs).
+                // Sampling here too would double-paint every peer.
+                if (!_skT && !window.BrushEngine && typeof broadcastSplat === 'function') {
                     if (!canvas._lastBroadcast || Date.now() - canvas._lastBroadcast > 33) {
                         broadcastSplat(
                             coords.x / canvas.width,
@@ -775,23 +773,15 @@
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
-            // D1 engine feed for touch (see pointermove note); spacing governs
-            // density, so this bypasses the Splat Rate throttle below
+            // D1 engine feed for touch (see pointermove note); spacing governs density
             if (pointer.down && window.BrushEngine && window.BrushEngine.isActive() && !isReplayActive) {
                 window.BrushEngine.move(coords.x, coords.y);
             }
             if (pointer.down) {
-                // Brush refresh rate throttle (same as mousemove)
-                var rate = window.brushRefreshRate || 0;
-                if (rate > 0) {
-                    var now = Date.now();
-                    if (now - lastSplatTime < rate) return;
-                    lastSplatTime = now;
-                }
                 pointer.moved = true;
                 const _skTT = config.BRUSH_TARGET === 'sketch';
                 if (!_skTT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
-                if (!_skTT && typeof broadcastSplat === 'function') {
+                if (!_skTT && !window.BrushEngine && typeof broadcastSplat === 'function') {
                     const now = Date.now();
                     if (!canvas._lastTouchBroadcast || now - canvas._lastTouchBroadcast > 50) {
                         broadcastSplat(

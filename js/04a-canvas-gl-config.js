@@ -209,6 +209,46 @@
 
         
 
+        // No WebGL2 = nothing below can run. Replace the silent dead canvas
+        // with an actionable message (Steam's hardware spread includes GPUs,
+        // VMs, and remote desktops where WebGL2 is blocklisted or broken).
+
+        if (!gl) {
+
+            try {
+
+                var _noGl = document.createElement('div');
+
+                _noGl.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:#0d1117;color:#e6edf3;' +
+                    'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;' +
+                    'font:14px/1.6 "Segoe UI",sans-serif;padding:40px';
+
+                _noGl.innerHTML = '<div style="font-size:40px;margin-bottom:12px">🎨</div>' +
+                    '<div style="font-size:20px;font-weight:600;margin-bottom:10px">This GPU can&#39;t run A Small Good Thing</div>' +
+                    '<div style="max-width:520px;opacity:.8">WebGL2 is unavailable &mdash; usually an outdated or broken ' +
+                    'graphics driver, or a virtual machine without GPU acceleration.<br><br>' +
+                    'Try updating your GPU drivers, then relaunch.</div>';
+
+                (document.body || document.documentElement).appendChild(_noGl);
+
+                var _splash = document.getElementById('splash-screen');
+
+                if (_splash) _splash.style.display = 'none';
+
+            } catch(_) {}
+
+            // Every later chunk will now throw on the uninitialized bindings
+            // this file never created — suppress the error-card cascade so the
+            // friendly screen above stays the only thing the user sees.
+
+            window.__fatalGpu = true;
+
+            throw new Error('WebGL2 unavailable — cannot initialize');
+
+        }
+
+
+
         // Expose for stats panel
 
         window.gl = gl;
@@ -226,10 +266,40 @@
             const _renderer = _dbgExt ? gl.getParameter(_dbgExt.UNMASKED_RENDERER_WEBGL) : 'unavailable';
             window.__gpuRenderer = _renderer;
             console.log('[GPU]', _renderer);
-            if (/Intel|UHD|Iris|integrated/i.test(_renderer) && !/NVIDIA|Radeon RX|GeForce/i.test(_renderer)) {
+            // Intel Arc (A3xx/A5xx/A7xx/B5xx) is DISCRETE and reports "Intel" —
+            // excluded, or its owners get told to fix a problem they don't have.
+            if (/Intel|UHD|Iris|integrated/i.test(_renderer)
+                && !/NVIDIA|Radeon RX|GeForce|\bArc\b|\bA[3-7][0-9]{2}\b|\bB[5-9][0-9]{2}\b/i.test(_renderer)) {
                 console.warn('[GPU] Running on an INTEGRATED GPU — high detail/resolution will struggle. ' +
                     'On Windows: Settings > System > Display > Graphics > add this browser > High performance, ' +
                     'then fully quit and relaunch it.');
+                // Steam prep S2-5: the console is invisible to a customer — the
+                // laptop buyer whose app landed on the iGPU is exactly the person
+                // who needs this. Dismiss remembers the adapter, so a hardware
+                // change re-warns.
+                try {
+                    if (localStorage.getItem('fluidIgpuBannerDismissed') !== _renderer) {
+                        var _appName = window.IS_ELECTRON ? 'A Small Good Thing' : 'this browser';
+                        var _banner = document.createElement('div');
+                        _banner.style.cssText = 'position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:2147483645;' +
+                            'max-width:560px;background:#2b2311;color:#f0d47a;border:1px solid #b8860b88;border-radius:8px;' +
+                            'padding:10px 14px;font:12px/1.5 "Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+                        var _txt = document.createElement('div');
+                        _txt.textContent = '⚡ Running on the integrated GPU (' + _renderer + ') — painting will feel slow. ' +
+                            'Fix: Windows Settings → System → Display → Graphics → add ' + _appName + ' → High performance, then relaunch.';
+                        var _dis = document.createElement('button');
+                        _dis.textContent = 'Got it';
+                        _dis.style.cssText = 'margin-top:8px;background:#3a3016;color:#f0d47a;border:1px solid #b8860b66;' +
+                            'border-radius:4px;padding:3px 12px;font:11px "Segoe UI",sans-serif;cursor:pointer';
+                        _dis.onclick = function () {
+                            try { localStorage.setItem('fluidIgpuBannerDismissed', _renderer); } catch(_) {}
+                            _banner.remove();
+                        };
+                        _banner.appendChild(_txt); _banner.appendChild(_dis);
+                        var _mount = function () { (document.body || document.documentElement).appendChild(_banner); };
+                        if (document.body) _mount(); else document.addEventListener('DOMContentLoaded', _mount);
+                    }
+                } catch (_) {}
             }
         } catch (_) {}
 
@@ -311,6 +381,30 @@
                                       // threshold into porous half-walls — whole-canvas fuzz
                                       // under high strength + multigrid. 0.5 ≈ legacy hard
                                       // cut everywhere. Console-tunable.
+
+            COLLIDER_GAP_FILL: 0,     // OPT-IN collider gap fill: morphological-close radius
+                                      // in reference-512 sim texels (res-scaled, 0 = off,
+                                      // bit-identical). Seals enclosed pockets narrower than
+                                      // ~2R for a "solid slab" collider look. Default OFF
+                                      // (2026-08-05): on line-art masks a radius big enough
+                                      // to seal texture cells also swallows same-width drawn
+                                      // features (brows/mouth measured in the SAME area
+                                      // population as scale cells — no size rule separates
+                                      // them), flattening the collider into a blob. The
+                                      // fidelity fix is the compositor's box-filter
+                                      // downsample (05b), not sealing. Console-tunable;
+                                      // re-apply live via
+                                      // collisionLayers.updateObstacleFromLayers().
+
+            COLLIDER_ALPHA_SOLID: 0.45, // Mask/raster → collider coverage: source alpha at
+                                      // (and above) which the collider reads FULLY solid.
+                                      // Painted/imported fills carry mid-alpha texture
+                                      // (soft-brush overlap, fabric grain); raw alpha put
+                                      // that ripple in solidity()'s coverage window and the
+                                      // fill became a patchy solid/leaky lattice — dye
+                                      // seeped in and pooled at every dip (2026-08-05).
+                                      // Ramp starts at 0.25× this (near-transparent stays
+                                      // open; AA edges stay smooth). Console-tunable.
 
             PRESSURE_SCALE: 1 / 256,  // fp16 headroom rescale of the pressure system.
                                       // 1/64 → 1/256 (2026-07-15): a vortex confined in a
@@ -477,11 +571,19 @@
 
 
 
-            SUNRAYS: false,           // Sunrays post-FX enabled (toggled in Effects)
+            GLOW: false,              // Glow (HDR bloom) post-FX enabled (toggled in Effects)
 
-            SUNRAYS_WEIGHT: 0.5       // MUST be seeded: undefined here uploads NaN to the
-                                      // sunrays shader and blacks out the whole canvas the
-                                      // moment Sunrays is toggled on (slider only writes it on input)
+            GLOW_INTENSITY: 0.8,      // Halo brightness scale (slider). MUST be seeded:
+                                      // undefined here would upload NaN to the shader.
+
+            GLOW_THRESHOLD: 0.6,      // Pre-tone-map brightness where dye starts to glow
+                                      // (slider; HDR scale — dye runs well past 1.0)
+
+            GLOW_KNEE: 0.7,           // Soft-knee width fraction (console-tunable)
+
+            GLOW_RESOLUTION: 256,     // Glow chain base resolution (long side)
+
+            GLOW_ITERATIONS: 8        // Max mip-chain depth (halvings from base res)
 
         };
 

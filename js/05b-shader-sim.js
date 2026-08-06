@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05b-shader-sim.js — part 2/14 of former 05-fluid-sim.js (lines 654–966)
 // LOAD ORDER: after 05a-shader-core.js, before 05c-programs-framebuffers.js
-// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/sunrays frag sources
+// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow frag sources
 // REQUIRES: PRECISION (05a)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -131,7 +131,11 @@
                         float dy2 = p.y - cy;
                         shape = bx * exp(-(dy2 * dy2) / radius);
                     }
-                    if (stampNoise > 0.0) {
+                    // Clay stamp never applies to the analytic ring/bar shapes —
+                    // they define their own alpha and a stamp overwrite paints
+                    // a blob/square inside the ring's hollow center (JS also
+                    // zeroes stampNoise for tip 4; this is defense-in-depth).
+                    if (stampNoise > 0.0 && ringRadius <= 0.0 && barHalfW <= 0.0) {
                         // Clay stamp: hard-edged footprint with a noise-notched rim
                         // and surface grain instead of the gaussian bloom. Dye only —
                         // the velocity pass stays gaussian, or motion reads as glitch.
@@ -1145,6 +1149,9 @@
             uniform vec4 sourceTransform;
             uniform float sourceRotation;
             uniform float strength;
+            uniform vec2 texelSize; // obstacle texel (1/obsW, 1/obsH)
+            uniform float covKnee; // alpha at which coverage saturates to
+                                   // fully solid (config.COLLIDER_ALPHA_SOLID)
             void main() {
                 vec2 q = vUv - vec2(0.5) - sourceTransform.xy;
                 float c = cos(sourceRotation);
@@ -1152,9 +1159,60 @@
                 q = vec2(c * q.x + s * q.y, -s * q.x + c * q.y);
                 q /= max(abs(sourceTransform.zw), vec2(0.0001));
                 vec2 sourceUv = clamp(q + vec2(0.5), 0.0, 1.0);
-                float coverage = texture(uSource, sourceUv).a * strength;
+                // 4x4 box-filter downsample (2026-08-05, M-watch (a) landed):
+                // the old single bilinear tap ALIASED fine mask detail — a
+                // 2-3-sim-texel line wall (scale/knit outlines in imported
+                // line-art) randomly sampled weak along its length, so cells
+                // leaked unevenly and dye pooled as ragged noise instead of
+                // the drawn pattern ("fidelity" complaint). Averaging the
+                // full footprint of this obstacle texel in source space gives
+                // every wall its true area coverage. Offsets ride through the
+                // same rotate/scale as the center tap (the map is affine).
+                float aSum = 0.0;
+                vec2 invScale = 1.0 / max(abs(sourceTransform.zw), vec2(0.0001));
+                for (int iy = 0; iy < 4; iy++) {
+                    for (int ix = 0; ix < 4; ix++) {
+                        vec2 off = vec2((float(ix) - 1.5) * 0.25, (float(iy) - 1.5) * 0.25) * texelSize;
+                        vec2 so = vec2(c * off.x + s * off.y, -s * off.x + c * off.y) * invScale;
+                        aSum += texture(uSource, clamp(sourceUv + so, 0.0, 1.0)).a;
+                    }
+                }
+                // Source alpha is SHAPE, not texture (2026-08-05): mid-alpha
+                // ripple inside a painted fill (soft-brush overlap, image
+                // grain) must read solid, or solidity()'s coverage window
+                // turns the fill into a solid/leaky lattice and dye pools at
+                // every dip. Applied to the box-filtered AREA coverage: a
+                // texel half-covered by a wall line saturates solid (thin
+                // walls hold), while mostly-open texels keep an AA ramp.
+                float a = aSum * (1.0 / 16.0);
+                float coverage = smoothstep(covKnee * 0.25, covKnee, a) * strength;
                 float previous = texture(uObstacle, vUv).r;
                 fragColor = vec4(min(1.0, previous + coverage), 0.0, 0.0, 1.0);
+            }
+        `;
+        // Obstacle gap fill — one separable step of grayscale dilate/erode
+        // (5-tap cross => an L1 ball after R passes). R dilates followed by
+        // R erodes = morphological CLOSE: enclosed pockets narrower than ~2R
+        // texels (line-art texture — fish-scale/knit interiors in imported
+        // mask images) seal into solid wall, while larger drawn features
+        // (eye/mouth cutouts) and the outer silhouette stay put — grayscale
+        // close restores every edge farther than R from a sealed feature, so
+        // AA ramps survive. Runs only at obstacle-recomposite time.
+        const morphObstacleFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR, vT, vB;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform int isErode;
+            void main() {
+                float c = texture(uTexture, vUv).r;
+                float l = texture(uTexture, clamp(vL, 0.0, 1.0)).r;
+                float r = texture(uTexture, clamp(vR, 0.0, 1.0)).r;
+                float t = texture(uTexture, clamp(vT, 0.0, 1.0)).r;
+                float b = texture(uTexture, clamp(vB, 0.0, 1.0)).r;
+                float mx = max(c, max(max(l, r), max(t, b)));
+                float mn = min(c, min(min(l, r), min(t, b)));
+                fragColor = vec4(isErode == 1 ? mn : mx, 0.0, 0.0, 1.0);
             }
         `;
         // Doubles as the multigrid smoother: hSq = (2^level)² converts the
@@ -1477,49 +1535,52 @@
                 fragColor = vec4(c, a);
             }
         `;
-        // ─── Sunrays shaders ────────────────────────────────────────────
-        const sunraysMaskFrag = `#version 300 es
+        // ─── Glow (HDR bloom) shaders ───────────────────────────────────
+        // Classic mip-chain bloom: soft-knee prefilter isolates overbright
+        // dye, a halving blur chain spreads it, additive upsampling stacks
+        // the octaves, and the display pass adds the result on top of the
+        // tone-mapped image — bright cores read as EMITTING light instead
+        // of just being bright paint. Sampled from the PRE-tone-map HDR
+        // frame, so only dye that actually climbed past the threshold
+        // glows; Reinhard never sees (or caps) the halo.
+        const glowPrefilterFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTexture;
+            uniform vec3 curve;      // (threshold - knee, knee*2, 0.25/knee)
+            uniform float threshold;
             void main() {
-                vec4 c = texture(uTexture, vUv);
+                vec3 c = texture(uTexture, vUv).rgb;
                 float br = max(c.r, max(c.g, c.b));
-                // HDR-aware brightness mapping: smooth gradient across full range
-                // br=0 → mapped=0 (alpha=1.0, full light)
-                // br=0.2 → mapped=0.5 (alpha=0.5, partial shadow)
-                // br=1+ → mapped≈0.8+ (alpha=0.2, deep shadow)
-                float mapped = br / (0.2 + br);
-                c.a = 1.0 - min(mapped, 0.8);
-                fragColor = c;
+                // Soft knee: quadratic ramp below the threshold so the glow
+                // fades in instead of popping at a hard brightness cliff.
+                float rq = clamp(br - curve.x, 0.0, curve.y);
+                rq = curve.z * rq * rq;
+                c *= max(rq, br - threshold) / max(br, 0.0001);
+                fragColor = vec4(c, 0.0);
             }
         `;
-        const sunraysFrag = `#version 300 es
+        const glowBlurFrag = `#version 300 es
             precision ${PRECISION} float;
-            in vec2 vUv;
+            in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uTexture;
-            uniform float weight;
-            #define ITERATIONS 16
             void main() {
-                float Density = 0.3;
-                float Decay = 0.95;
-                float Exposure = 0.7;
-                vec2 coord = vUv;
-                vec2 dir = vUv - 0.5;
-                dir *= 1.0 / float(ITERATIONS) * Density;
-                float illuminationDecay = 1.0;
-                float color = 0.0;
-                for (int i = 0; i < ITERATIONS; i++) {
-                    coord -= dir;
-                    float col = texture(uTexture, coord).a;
-                    color += col * illuminationDecay * weight;
-                    illuminationDecay *= Decay;
-                }
-                float result = color * Exposure;
-                // Normalize to [0,1] so sunrays work as light/shadow multiplier
-                result = result / (1.0 + result);
-                fragColor = vec4(vec3(result), 1.0);
+                vec4 sum = texture(uTexture, vL) + texture(uTexture, vR)
+                         + texture(uTexture, vT) + texture(uTexture, vB);
+                fragColor = sum * 0.25;
+            }
+        `;
+        const glowFinalFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR, vT, vB;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform float intensity;
+            void main() {
+                vec4 sum = texture(uTexture, vL) + texture(uTexture, vR)
+                         + texture(uTexture, vT) + texture(uTexture, vB);
+                fragColor = sum * 0.25 * intensity;
             }
         `;

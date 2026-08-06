@@ -37,3 +37,6 @@ tmp-*
 .env
 .env.local
 .env.*.local
+
+# Steamworks dev-only app id (never ship: silently changes launch behavior)
+steam_appid.txt

@@ -122,7 +122,7 @@
         var overlay = {
             id: nextId++,
             type: 'qr',
-            url: opts.url || 'https://tiktok.com',
+            url: opts.url || 'https://example.com',
             x: xy.x, y: xy.y, rotation: opts.rotation || 0,
             size: opts.size || 100,
             opacity: opts.opacity !== undefined ? opts.opacity : 0.75,
@@ -578,15 +578,24 @@
 
     // ─── COMPOSITE INTO CANVAS (for capture) ────────────────────
     // Honours free x/y/rotation for text + image. QR is drawn as a white box.
+    // COORDINATE SPACE: overlay x/y are fractions of #canvas-area (the DOM
+    // container), NOT of the canvas wrapper. Callers exporting the wrapper
+    // must pass the area→target mapping (areaWidth/areaHeight/offsetX/offsetY,
+    // all in target px) or overlays land in the wrong place. Without those
+    // fields the legacy behavior (fractions of the target itself) is kept.
     function compositeOntoCanvas(ctx, canvasRect) {
         if (!ctx) return;
         var W = (canvasRect && canvasRect.width) || ctx.canvas.width || 800;
         var H = (canvasRect && canvasRect.height) || ctx.canvas.height || 600;
+        var areaW = (canvasRect && canvasRect.areaWidth) || W;
+        var areaH = (canvasRect && canvasRect.areaHeight) || H;
+        var offX = (canvasRect && canvasRect.offsetX) || 0;
+        var offY = (canvasRect && canvasRect.offsetY) || 0;
 
         for (var i = 0; i < overlays.length; i++) {
             var ov = overlays[i];
             if (!ov.visible) continue;
-            var cx = ov.x * W, cy = ov.y * H;
+            var cx = ov.x * areaW - offX, cy = ov.y * areaH - offY;
 
             ctx.save();
             ctx.globalAlpha = ov.opacity;

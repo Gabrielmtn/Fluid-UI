@@ -10,7 +10,13 @@ body.focus-mode #sidebar-right,
 body.focus-mode .title-bar,
 body.focus-mode #statsPanel,
 body.focus-mode #hotkeyReminder,
-body.focus-mode #mobileMenuToggle { display: none !important; }
+body.focus-mode #mobileMenuToggle,
+/* The strip popups live on <body>, so hiding the strip does not hide them —
+   without these the brush drawer / presets list / arm colors stayed pinned
+   over the otherwise-empty canvas with no visible trigger to close them. */
+body.focus-mode .arm-colors-panel,
+body.focus-mode .brush-settings-panel,
+body.focus-mode .mixer-presets-panel { display: none !important; }
 
 body.focus-mode #main-area {
     width: 100vw !important;

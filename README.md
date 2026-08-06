@@ -1,6 +1,6 @@
-# Fluid-UI
+# A Small Good Thing
 
-A beautiful, interactive fluid simulation with comprehensive controls and **real-time multiplayer** support via PartyKit.
+A playful painting game for two or more — a beautiful, interactive fluid simulation with comprehensive controls and **real-time multiplayer** support via PartyKit.
 
 ## Features
 
@@ -140,8 +140,12 @@ The codebase has been refactored into modular files for better maintainability:
 
 ## License
 
-Open source - feel free to modify and use!
+Proprietary — see [LICENSE](LICENSE). Third-party components are used under
+their own licenses — see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 ## Credits
 
-Based on an open source fluid simulation, enhanced with extensive UI controls, recording capabilities, and multiplayer support.
+The fluid-dynamics core is derived from [Pavel Dobryakov's WebGL-Fluid-Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation)
+(MIT), extensively reworked and enhanced with a brush engine, layer/mask system,
+recording, audio reactivity, AI-assisted imports (Transformers.js, Apache-2.0),
+and multiplayer support.

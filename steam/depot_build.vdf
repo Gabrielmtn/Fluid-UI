@@ -1,6 +1,6 @@
 "DepotBuildConfig"
 {
-	"DepotID"	"YOUR_STEAM_DEPOT_ID"
+	"DepotID"	"5068941"
 	"contentroot"	"..\dist\win-unpacked"
 	"FileMapping"
 	{
@@ -9,4 +9,7 @@
 		"recursive"	"1"
 	}
 	"FileExclusion"	"*.log"
+	"FileExclusion"	"*.pdb"
+	"FileExclusion"	"*.map"
+	"FileExclusion"	"steam_appid.txt"
 }

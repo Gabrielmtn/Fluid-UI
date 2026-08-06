@@ -547,7 +547,7 @@
                     <div class="layer-item-header">
                         <div class="layer-thumbnail" style="background: linear-gradient(135deg, rgba(100,200,255,0.4), rgba(150,100,255,0.4)); display:flex; align-items:center; justify-content:center; font-size: 18px;">🎬</div>
                         <div class="layer-info">
-                            <input type="text" class="layer-title" value="${layer.name}" data-action="rename" data-id="${layer.id}">
+                            <input type="text" class="layer-title" value="${window.escHtml(layer.name)}" data-action="rename" data-id="${layer.id}">
                         </div>
                         <div class="layer-controls">
                             <button class="layer-btn" data-action="toggle-visibility" data-id="${layer.id}">${layer.visible ? '👁️' : '👁️‍🗨️'}</button>

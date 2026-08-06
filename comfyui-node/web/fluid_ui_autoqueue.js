@@ -41,7 +41,7 @@ async function pollFolder() {
         const changed = data.file !== lastFile || data.mtime > lastMtime;
         if (changed && lastMtime > 0) {
             // Only trigger if we had a previous baseline (skip first poll)
-            console.log(`[Fluid UI] New file: ${data.file} — queuing prompt`);
+            console.log(`[A Small Good Thing] New file: ${data.file} — queuing prompt`);
             app.queuePrompt(0, 1);
         }
 
@@ -55,7 +55,7 @@ async function pollFolder() {
 function startPolling(intervalSec) {
     stopPolling();
     const ms = Math.max(100, intervalSec * 1000);
-    console.log(`[Fluid UI] Polling every ${intervalSec}s`);
+    console.log(`[A Small Good Thing] Polling every ${intervalSec}s`);
     pollTimer = setInterval(pollFolder, ms);
     // Do one immediate poll to seed baseline
     pollFolder();
@@ -76,7 +76,7 @@ app.registerExtension({
             const node = getWatcherNode();
             if (node) {
                 const interval = getWidgetValue(node, "poll_interval", 1.0);
-                console.log("[Fluid UI] Watch node found — starting poller");
+                console.log("[A Small Good Thing] Watch node found — starting poller");
                 startPolling(interval);
             }
         }, 2000);

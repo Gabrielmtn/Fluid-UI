@@ -325,7 +325,9 @@
             }
             // Toggles
             if (!ctrlOrMeta && !e.altKey) {
-                if (lower === 't') { toggleCheckbox('trailToggle'); return; }
+                // 't' was bound to a 'trailToggle' element that does not exist
+                // anywhere (removed long ago) — the key silently did nothing and
+                // the help surfaces advertised it. Left unbound deliberately.
                 if (lower === 'c') { toggleCheckbox('cursorToggle'); return; }
                 if (lower === 'h') { toggleCheckbox('showCanvasHandles'); return; }
                 if (lower === 'l') { toggleCheckbox('lockCanvasBorders'); return; }
@@ -463,3 +465,36 @@
                 if (typeof window.updateCanvasSize === 'function') window.updateCanvasSize();
             });
         }, 500);
+
+        // ── First-run hint (Steam prep S2-8) ────────────────────────────────
+        // There is zero onboarding: a new player gets a maximized window, a
+        // dense mixer strip, and no pointer to "just drag on the canvas".
+        // One-time toast, gone on first paint gesture or after 12s.
+        (function firstRunHint() {
+            try {
+                if (localStorage.getItem('fluidFirstRunDone')) return;
+                var show = function () {
+                    var hint = document.createElement('div');
+                    hint.style.cssText = 'position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:9000;' +
+                        'background:rgba(13,17,23,.92);color:#e6edf3;border:1px solid rgba(255,255,255,.18);' +
+                        'border-radius:10px;padding:12px 22px;font:14px/1.5 "Segoe UI",sans-serif;' +
+                        'box-shadow:0 8px 32px rgba(0,0,0,.55);pointer-events:none;transition:opacity .6s';
+                    hint.textContent = '🖌️ Drag on the canvas to paint · F1 for shortcuts';
+                    document.body.appendChild(hint);
+                    var done = false;
+                    var dismiss = function () {
+                        if (done) return; done = true;
+                        try { localStorage.setItem('fluidFirstRunDone', '1'); } catch (_) {}
+                        hint.style.opacity = '0';
+                        setTimeout(function () { hint.remove(); }, 700);
+                        window.removeEventListener('pointerdown', dismiss, true);
+                    };
+                    window.addEventListener('pointerdown', dismiss, true);
+                    setTimeout(dismiss, 12000);
+                };
+                // Wait for the splash to be gone / scripts ready
+                var poll = setInterval(function () {
+                    if (window.__scriptsReady) { clearInterval(poll); setTimeout(show, 1200); }
+                }, 300);
+            } catch (_) {}
+        })();

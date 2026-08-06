@@ -99,6 +99,7 @@
             // scenes, animations) stay classic gaussian. splat() reads the
             // flag; cleared in finally so direct splat() callers never
             // inherit it.
+            window.__unsavedWork = true; // every dye source funnels through here
             window.__brushTipOn = !exactColor;
             try {
             // Kaleidoscope behavior
@@ -393,7 +394,12 @@
                 // Panel arm-0 row: rebuild only when open, and not when the
                 // panel itself initiated the change (skipPanel).
                 if (!opts.skipPanel && typeof window.rebuildArmColorRows === 'function') {
-                    var panel = document.querySelector('.arm-colors-panel');
+                    // Must match the ARM-COLORS popup specifically: the brush
+                    // drawer and the presets popup also carry .arm-colors-panel
+                    // (shared skin) and the drawer is now built FIRST, so a bare
+                    // '.arm-colors-panel' query hit the drawer and rebuilt every
+                    // arm row on each palette change even with the popup closed.
+                    var panel = document.querySelector('.arm-colors-panel.arm-colors-rows');
                     if (panel && panel.style.display !== 'none') window.rebuildArmColorRows();
                 }
             } finally {

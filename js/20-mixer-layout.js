@@ -259,24 +259,26 @@
         strip.id = 'mixer-strip';
 
         // Channel faders for key controls
-        // (renames 2026-07-13: 'Brush'→'Size' and 'Multiply'→'Brush' — the
-        // multiplier channel is where the brush controls live, so it owns
-        // the name; the size fader says what it actually is)
-        strip.appendChild(faderChannel('Size', 'orange', 'brushSize', null, 'mixer-brushValue'));
+        // (renames 2026-07-29: 'Size'→'Brush Size' and 'Brush'→'Multi-Brush' —
+        // the multiplier channel mirrors strokes across 1-8 arms, so
+        // "Multi-Brush" says what it does; the brush-settings panel moved to
+        // the Brush Size label, sliding in from the left.)
+        var sizeChannel = faderChannel('Brush Size', 'orange', 'brushSize', null, 'mixer-brushValue');
+        // The BRUSH SIZE label is the brush-settings trigger (D1): the everyday
+        // brush controls (presets / target / tip / feel) live in a left slide-in
+        // panel — too common to bury in the sidebar. The sidebar Brush section
+        // keeps the rarer replay + splat-ramp controls.
+        buildBrushPanel(sizeChannel.querySelector('.ch-label'));
+        strip.appendChild(sizeChannel);
         strip.appendChild(faderChannel('Curl', 'blue', 'curl', 'curlValue'));
         strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
-        var brushChannel = faderChannel('Brush', 'yellow', 'multiplier', 'multiplierValue');
+        var brushChannel = faderChannel('Multi-Brush', 'yellow', 'multiplier', 'multiplierValue');
         // The multiplier value ("1x") IS the brush-colors trigger — click it to
         // open the per-arm brush color controls (no separate icon button).
         // Query from the (detached) channel: faderChannel already re-parented
         // the value element, so document.getElementById would miss it here.
         buildArmColorsDropdown(brushChannel.querySelector('#multiplierValue'));
-        // The LABEL is the brush-settings trigger (D1): the everyday brush
-        // controls (presets / target / tip / feel) live in a strip dropdown —
-        // too common to bury in the sidebar. The sidebar Brush section keeps
-        // the rarer replay + splat-ramp controls.
-        buildBrushPanel(brushChannel.querySelector('.ch-label'));
         strip.appendChild(brushChannel);
         strip.appendChild(faderChannel('Time', 'pink', 'timeScale', 'timeScaleValue'));
         strip.appendChild(faderChannel('Density', 'cyan', 'densityDissipation', 'densityValue'));
@@ -302,11 +304,11 @@
 
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
-        'Size': 'Brush size for painting fluid',
+        'Brush Size': 'Brush size for painting fluid — click the label for brush settings & presets',
         'Curl': 'Vorticity strength - creates swirling motion',
         'Viscosity': 'Sharpness/detail enhancement',
         'Isolation': 'Motion isolation - how much color follows velocity',
-        'Brush': 'Brush arms (1-8x mirrored strokes) — click BRUSH for brush settings & presets, click the value for arm colors',
+        'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — click the value for arm colors',
         'Time': 'Simulation time scale',
         'Density': 'How fast color fades',
         'Velocity': 'How fast motion fades',
@@ -613,44 +615,83 @@
         return wrap;
     }
 
+    // Presets as a select-style popup (Gabriel, 2026-07-29): one trigger in
+    // the strip opens a vertical scrolling list of built-in + user presets,
+    // with a sticky "+ New Preset" footer that can never scroll under the
+    // fold (the old flex-wrap chip area hid it once presets multiplied).
     function buildPresetsChannel(controls) {
         const wrap = document.createElement('div');
-        wrap.className = 'mixer-presets';
+        wrap.className = 'mixer-presets-channel';
 
-        // Move built-in preset buttons; styling lives in 20-mixer-strip.css
-        // (.mixer-preset-btn) — inline cssText here used to beat the .active
-        // class, so applied presets never highlighted.
+        // Select-style trigger, shows the active preset name when one is set
+        var trigger = document.createElement('button');
+        trigger.id = 'mixerPresetsTrigger';
+        trigger.className = 'mixer-presets-trigger';
+        trigger.innerHTML = '<span class="mixer-presets-trigger-label">Presets</span><span class="mixer-presets-trigger-chev">▾</span>';
+        trigger.title = 'Load or save presets';
+        wrap.appendChild(trigger);
+        var triggerLabel = trigger.querySelector('.mixer-presets-trigger-label');
+        function setTriggerLabel(name) {
+            triggerLabel.textContent = name || 'Presets';
+            triggerLabel.classList.toggle('has-preset', !!name);
+        }
+
+        // Popup: header + scrollable list + sticky footer (footer is a
+        // non-scrolling sibling of the list, so it is ALWAYS visible).
+        var panel = document.createElement('div');
+        panel.className = 'arm-colors-panel mixer-presets-panel';
+        panel.style.display = 'none';
+        panel.style.position = 'fixed';
+        document.body.appendChild(panel);
+
+        var header = document.createElement('div');
+        header.className = 'arm-colors-header';
+        header.textContent = 'Presets';
+        panel.appendChild(header);
+
+        var list = document.createElement('div');
+        list.className = 'mixer-presets-list';
+        panel.appendChild(list);
+
+        // Move built-in preset buttons into the list; their inline
+        // onclick="applyPreset('…')" IS the load handler, and keeping the
+        // .mixer-preset-btn class keeps 04b updatePresetButtons highlighting.
         const presetsDiv = controls.querySelector('.presets');
         if (presetsDiv) {
             while (presetsDiv.firstChild) {
                 var child = presetsDiv.firstChild;
                 if (child.tagName === 'BUTTON') {
                     child.classList.add('mixer-preset-btn');
+                    child.addEventListener('click', function (e) {
+                        setTriggerLabel(e.currentTarget.textContent.trim());
+                    });
                 }
-                wrap.appendChild(child);
+                list.appendChild(child);
             }
         }
 
         // Separator between built-in and user presets
         var sep = document.createElement('div');
         sep.className = 'preset-sep';
-        wrap.appendChild(sep);
+        list.appendChild(sep);
 
         // Container for dynamically rendered user presets
         var userWrap = document.createElement('div');
         userWrap.id = 'mixerUserPresets';
         userWrap.className = 'mixer-user-presets';
-        wrap.appendChild(userWrap);
+        list.appendChild(userWrap);
 
-        // "+" save button
+        // Sticky footer: "+ New Preset" + inline name input
+        var footer = document.createElement('div');
+        footer.className = 'mixer-presets-footer';
+        panel.appendChild(footer);
+
         var saveBtn = document.createElement('button');
         saveBtn.className = 'mixer-preset-save';
-        saveBtn.textContent = '+';
+        saveBtn.textContent = '+ New Preset';
         saveBtn.title = 'Save current settings as preset';
-        saveBtn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 8px;font-size:11px;font-weight:700;border-radius:3px;background:rgba(63,185,80,0.15);color:rgba(63,185,80,0.9);border:1px solid rgba(63,185,80,0.25);cursor:pointer;line-height:1;';
-        wrap.appendChild(saveBtn);
+        footer.appendChild(saveBtn);
 
-        // Inline name input (hidden by default)
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.id = 'mixerPresetNameInput';
@@ -660,7 +701,37 @@
         nameInput.spellcheck = false;
         nameInput.autocomplete = 'off';
         nameInput.style.display = 'none';
-        wrap.appendChild(nameInput);
+        footer.appendChild(nameInput);
+
+        // Open/close (same idiom as the arm-colors popup)
+        var PANEL_W = 210;
+        function positionPanel() {
+            var z = window.UIScale ? window.UIScale.get() : 1;
+            var rect = trigger.getBoundingClientRect();
+            var left = rect.left + rect.width / 2 - (PANEL_W * z) / 2;
+            left = Math.max(4, Math.min(left, window.innerWidth - PANEL_W * z - 4));
+            panel.style.left = (left / z) + 'px';
+            panel.style.top = ((rect.bottom + 6) / z) + 'px';
+            panel.style.width = PANEL_W + 'px';
+        }
+        trigger.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var open = panel.style.display !== 'none';
+            panel.style.display = open ? 'none' : 'flex';
+            trigger.classList.toggle('active', !open);
+            if (!open) { positionPanel(); renderMixerUserPresets(); }
+        });
+        document.addEventListener('click', function (e) {
+            if (panel.style.display !== 'none' && !panel.contains(e.target)
+                && e.target !== trigger && !trigger.contains(e.target)) {
+                panel.style.display = 'none';
+                trigger.classList.remove('active');
+            }
+        });
+        panel.addEventListener('click', function (e) { e.stopPropagation(); });
+        window.addEventListener('resize', function () {
+            if (panel.style.display !== 'none') positionPanel();
+        });
 
         // Wire save flow
         saveBtn.addEventListener('click', function() {
@@ -668,7 +739,7 @@
                 nameInput.style.display = '';
                 nameInput.value = '';
                 nameInput.focus();
-                saveBtn.textContent = '\u2713';
+                saveBtn.textContent = 'Save \u2713';
             } else {
                 doSave();
             }
@@ -691,7 +762,7 @@
         function cancelSave() {
             nameInput.style.display = 'none';
             nameInput.value = '';
-            saveBtn.textContent = '+';
+            saveBtn.textContent = '+ New Preset';
         }
 
         function doSave() {
@@ -718,7 +789,7 @@
             if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
         }
 
-        // Render user presets into mixer strip
+        // Render user presets into the popup list (rows: load + delete)
         function renderMixerUserPresets() {
             if (!userWrap || !window.Settings) return;
             var presets = window.Settings.getAllPresets();
@@ -727,6 +798,8 @@
             });
             userWrap.innerHTML = '';
             names.forEach(function(name) {
+                var row = document.createElement('div');
+                row.className = 'mixer-user-preset-row';
                 var btn = document.createElement('button');
                 btn.className = 'mixer-user-preset-btn'; // styled in 20-mixer-strip.css
                 btn.textContent = name;
@@ -744,8 +817,22 @@
                     document.querySelectorAll('.mixer-user-preset-btn, .user-preset-btn').forEach(function(b) {
                         b.classList.toggle('active', b.textContent === name);
                     });
+                    setTriggerLabel(name);
                 });
-                userWrap.appendChild(btn);
+                row.appendChild(btn);
+                var del = document.createElement('button');
+                del.className = 'mixer-user-preset-delete';
+                del.textContent = '×';
+                del.title = 'Delete "' + name + '"';
+                del.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    if (!confirm('Delete preset "' + name + '"?')) return;
+                    window.Settings.deletePreset(name);
+                    if (triggerLabel.textContent === name) setTriggerLabel(null);
+                    if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
+                });
+                row.appendChild(del);
+                userWrap.appendChild(row);
             });
         }
 
@@ -764,14 +851,18 @@
         // Mobile close button (keep at top)
         moveEl('mobileMenuClose', sidebar);
 
+        // Simulation + Effects lead the sidebar (Gabriel, 2026-07-29): the two
+        // most-reached-for sections go on top. No saved order exists — only
+        // per-section collapse state is persisted (keyed by title), so
+        // reordering here applies to every user, new and existing.
+        sidebar.appendChild(buildSimulationSection());
+        sidebar.appendChild(buildEffectsSection(controls));
         sidebar.appendChild(buildMultiArtistSection());
         sidebar.appendChild(buildColorsSection(controls));
-        sidebar.appendChild(buildSimulationSection());
         sidebar.appendChild(buildMutationSection());
         sidebar.appendChild(buildAudioSection());
         sidebar.appendChild(buildLayersSection(controls));
         sidebar.appendChild(buildAnimationsSection(controls));
-        sidebar.appendChild(buildEffectsSection(controls));
         sidebar.appendChild(buildKaleidoscopeSection(controls));
         sidebar.appendChild(buildBrushSection());
         sidebar.appendChild(buildFocusSection());
@@ -1048,11 +1139,12 @@
                       'kTwist', 'kZoom', 'kBlend', 'kaleidoMode',
                       'kaleido.mode', 'kaleido.segments', 'kaleido.angle', 'kaleido.twist', 'kaleido.zoom', 'kaleido.blend'],
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
-                         'pressureIteration', 'curl', 'sharpness', 'multiplier', 'timeScale',
-                         'velocityInfluence', 'brushSize', 'brushRefreshRate'],
-            effects: ['enableLighting', 'enableLightShift', 'microDetailToggle', 'sunraysToggle',
+                         'pressureIteration', 'curl', 'sharpness', 'multiplier',
+                         'velocityInfluence', 'brushSize'],
+            effects: ['enableLighting', 'enableLightShift', 'microDetailToggle',
                       'lightIntensity', 'lightAmbient', 'lightSpeed', 'clarity', 'vibrance',
-                      'sunraysWeight', 'shadingIntensity', 'displayShadingToggle',
+                      'glowToggle', 'glowIntensity', 'glowThreshold',
+                      'shadingIntensity', 'displayShadingToggle',
                       'lightShiftSpeed', 'lightShiftThreshold', 'lightShiftIntensity', 'lightShiftSaturation',
                       'lightPos', 'lightShiftPath'],
             animations: ['ascendToggle', 'ascendRandomness', 'shootingStarToggle',
@@ -1500,7 +1592,7 @@
         moveCheckboxGroup('macCormackToggle', body);
         moveCheckboxGroup('multigridToggle', body);
         // Multigrid tuning panel — same toggle+panel pattern as
-        // microDetailPanel/sunraysPanel in the Effects section
+        // microDetailPanel/glowPanel in the Effects section
         const multigridPanel = document.getElementById('multigridPanel');
         if (multigridPanel) body.appendChild(multigridPanel);
 
@@ -1532,10 +1624,10 @@
         const microDetailPanel = document.getElementById('microDetailPanel');
         if (microDetailPanel) body.appendChild(microDetailPanel);
 
-        // Sunrays toggle + panel
-        moveCheckboxGroup('sunraysToggle', body);
-        const sunraysPanel = document.getElementById('sunraysPanel');
-        if (sunraysPanel) body.appendChild(sunraysPanel);
+        // Glow toggle + panel
+        moveCheckboxGroup('glowToggle', body);
+        const glowPanel = document.getElementById('glowPanel');
+        if (glowPanel) body.appendChild(glowPanel);
 
         return sec;
     }
@@ -1697,25 +1789,6 @@
             var savedLiveCol = window.settingsManager && window.settingsManager.get('brush.replayLiveColors');
             if (savedLiveCol) { liveColCb.checked = true; window.replayLiveColors = true; }
         } catch (_) {}
-        var rateGroup = document.createElement('div');
-        rateGroup.className = 'control-group';
-
-        var rateLbl = document.createElement('label');
-        rateLbl.setAttribute('for', 'brushRefreshRate');
-        rateLbl.innerHTML = 'Splat Rate <span class="value-display" id="brushRefreshRateValue">0</span>';
-
-        var rateSlider = document.createElement('input');
-        rateSlider.type = 'range';
-        rateSlider.id = 'brushRefreshRate';
-        rateSlider.min = '0';
-        rateSlider.max = '100';
-        rateSlider.value = '0';
-        rateSlider.step = '1';
-
-        rateGroup.appendChild(rateLbl);
-        rateGroup.appendChild(rateSlider);
-        body.appendChild(rateGroup);
-
         // --- Splat In ---
         var splatInLabel = document.createElement('label');
         splatInLabel.className = 'brush-section-label';
@@ -1838,17 +1911,6 @@
             } catch (_) {}
         });
 
-        // --- Wire refresh rate ---
-        var rateDisplay = rateLbl.querySelector('.value-display');
-        rateSlider.addEventListener('input', function () {
-            var v = parseInt(rateSlider.value, 10);
-            if (rateDisplay) rateDisplay.textContent = v === 0 ? '0' : v + 'ms';
-            window.brushRefreshRate = v;
-            try {
-                if (window.settingsManager) window.settingsManager.set('brush.refreshRate', v);
-            } catch (_) {}
-        });
-
         // --- Load saved settings ---
         try {
             if (window.settingsManager) {
@@ -1866,13 +1928,6 @@
                     speedSlider.value = savedSpeed;
                     window.replaySpeed = savedSpeed;
                     if (speedDisplay) speedDisplay.textContent = savedSpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
-                }
-
-                var savedRate = window.settingsManager.get('brush.refreshRate');
-                if (typeof savedRate === 'number') {
-                    rateSlider.value = savedRate;
-                    if (rateDisplay) rateDisplay.textContent = savedRate === 0 ? '0' : savedRate + 'ms';
-                    window.brushRefreshRate = savedRate;
                 }
 
                 var savedSplatIn = window.settingsManager.get('brush.splatInMode');
@@ -1906,7 +1961,6 @@
         // Defaults
         if (!window.replayMode) window.replayMode = 'stroke';
         if (!window.replayTimePeriod) window.replayTimePeriod = 5;
-        if (window.brushRefreshRate == null) window.brushRefreshRate = 0;
         if (!window.splatInMode) window.splatInMode = 'instant';
         if (!window.splatOutMode) window.splatOutMode = 'instant';
 
@@ -1924,24 +1978,23 @@
         trigger.classList.add('brush-trigger');
         var chev = document.createElement('span');
         chev.className = 'brush-trigger-chev';
-        chev.textContent = '▾';
+        chev.textContent = '▸'; // panel slides in from the left edge
         trigger.appendChild(chev);
 
         var panel = document.createElement('div');
-        panel.className = 'arm-colors-panel brush-settings-panel';
-        panel.style.display = 'none';
+        panel.className = 'arm-colors-panel brush-settings-panel slide-left';
         panel.style.position = 'fixed';
         document.body.appendChild(panel);
 
         var PANEL_W = 252;
         function positionPanel() {
-            // Zoomed via --ui-scale: compute in screen px, divide by zoom
-            // (same math as the arm-colors panel).
+            // Left-edge drawer: pinned to x=0, top aligned under the strip row
+            // the trigger lives in. Zoomed via --ui-scale: compute in screen
+            // px, divide by zoom (same math as the arm-colors panel).
             var z = window.UIScale ? window.UIScale.get() : 1;
-            var rect = trigger.getBoundingClientRect();
-            var left = rect.left + rect.width / 2 - (PANEL_W * z) / 2;
-            left = Math.max(4, Math.min(left, window.innerWidth - PANEL_W * z - 4));
-            panel.style.left = (left / z) + 'px';
+            var strip = document.getElementById('mixer-strip');
+            var rect = (strip || trigger).getBoundingClientRect();
+            panel.style.left = '0px';
             panel.style.top = ((rect.bottom + 6) / z) + 'px';
             panel.style.width = PANEL_W + 'px';
         }
@@ -2050,7 +2103,7 @@
         var saveBtn = document.createElement('button');
         saveBtn.type = 'button';
         saveBtn.className = 'mixer-preset-save';
-        saveBtn.textContent = '+';
+        saveBtn.textContent = 'Brush Preset +';
         saveBtn.title = 'Save the current brush as a preset';
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
@@ -2119,13 +2172,9 @@
         function renderPresetChips() {
             chipsWrap.innerHTML = '';
             var list = loadBrushPresets();
-            if (!list.length) {
-                var hint = document.createElement('div');
-                hint.className = 'arm-colors-hint';
-                hint.textContent = 'No brush presets yet — dial in a brush and hit +';
-                chipsWrap.appendChild(hint);
-                return;
-            }
+            // (empty state intentionally renders nothing — the helper text
+            // added a scrollbar's worth of height for most screens)
+            if (!list.length) return;
             list.forEach(function (p) {
                 var chip = document.createElement('button');
                 chip.type = 'button';
@@ -2154,7 +2203,7 @@
         function cancelPresetSave() {
             nameInput.style.display = 'none';
             nameInput.value = '';
-            saveBtn.textContent = '+';
+            saveBtn.textContent = 'Brush Preset +';
         }
         function doSaveBrushPreset() {
             var name = (nameInput.value || '').trim();
@@ -2172,7 +2221,7 @@
                 nameInput.style.display = '';
                 nameInput.value = '';
                 nameInput.focus();
-                saveBtn.textContent = '✓';
+                saveBtn.textContent = 'Save ✓';
             } else {
                 doSaveBrushPreset();
             }
@@ -2275,7 +2324,9 @@
         // ── Flow + stroke feel ──
         pSlider('brushFlow', 'Flow', 0.05, 1, 0.01, 'BRUSH_FLOW', pct, 'flow');
         sLabel('Stroke');
-        pSlider('brushStabilizer', 'Stabilizer', 0, 1, 0.01, 'BRUSH_STABILIZER', pct, 'stabilizer');
+        // Stabilizer slider removed 2026-07-30 (Gabriel): panel-length trim.
+        // config.BRUSH_STABILIZER stays at its default; brush presets that
+        // captured a stabilizer value simply no longer apply that key.
         pSlider('brushSpacing', 'Spacing', 0.01, 1, 0.01, 'BRUSH_SPACING', pct, 'spacing');
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
 
@@ -2472,27 +2523,27 @@
         // ── Open / close ──
         trigger.addEventListener('click', function (e) {
             e.stopPropagation();
-            var open = panel.style.display !== 'none';
+            var open = panel.classList.contains('visible');
             if (open) {
-                panel.style.display = 'none';
+                panel.classList.remove('visible');
                 trigger.classList.remove('active');
             } else {
-                panel.style.display = 'block';
+                positionPanel(); // position BEFORE the slide-in transition
+                panel.classList.add('visible');
                 trigger.classList.add('active');
-                positionPanel();
                 renderPresetChips();
             }
         });
         document.addEventListener('click', function (e) {
-            if (panel.style.display !== 'none' && !panel.contains(e.target)
+            if (panel.classList.contains('visible') && !panel.contains(e.target)
                 && e.target !== trigger && !trigger.contains(e.target)) {
-                panel.style.display = 'none';
+                panel.classList.remove('visible');
                 trigger.classList.remove('active');
             }
         });
         panel.addEventListener('click', function (e) { e.stopPropagation(); });
         window.addEventListener('resize', function () {
-            if (panel.style.display !== 'none') positionPanel();
+            if (panel.classList.contains('visible')) positionPanel();
         });
     }
 
@@ -2600,7 +2651,7 @@
         qrRow.style.cssText = 'display:flex;gap:4px;margin-bottom:10px;';
         var qrInput = document.createElement('input');
         qrInput.type = 'text';
-        qrInput.placeholder = 'https://tiktok.com/@handle';
+        qrInput.placeholder = 'https://your-link.example';
         qrInput.style.cssText = 'flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;padding:4px 6px;border-radius:3px;font-size:10px;';
         var qrAddBtn = document.createElement('button');
         qrAddBtn.type = 'button';
@@ -3756,7 +3807,10 @@
         }
 
         var panel = document.createElement('div');
-        panel.className = 'arm-colors-panel';
+        // arm-colors-rows marks THE arm-colors popup: the brush drawer and the
+        // presets popup share the .arm-colors-panel skin, so 05g needs a class
+        // that only this one carries to decide whether a rebuild is visible.
+        panel.className = 'arm-colors-panel arm-colors-rows';
         panel.style.display = 'none';
         panel.style.position = 'fixed';
         document.body.appendChild(panel);

@@ -242,7 +242,7 @@
         const header = overlay.querySelector('.mask-editor-header h3');
         if (header) {
             const shapeCount = maskState.shapes.length;
-            header.innerHTML = `✂️ Mask Editor - ${layer.name} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
+            header.innerHTML = `✂️ Mask Editor - ${window.escHtml(layer.name)} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
         }
     }
 
@@ -1639,7 +1639,7 @@
         const header = overlay.querySelector('.mask-editor-header h3');
         if (header) {
             const shapeCount = maskState.shapes.length;
-            header.innerHTML = `✂️ Mask Editor - ${layer.title} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
+            header.innerHTML = `✂️ Mask Editor - ${window.escHtml(layer.title)} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
         }
     }
 

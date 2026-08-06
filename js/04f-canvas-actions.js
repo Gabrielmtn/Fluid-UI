@@ -172,11 +172,52 @@
 
                     try { e.preventDefault(); } catch(_){}
 
+                    // GPU reset (driver TDR/crash). GL resources are gone, but the
+                    // param/layer/brush state is CPU-side — snapshot it NOW so the
+                    // post-reload offer (12-save-load) can restore the session
+                    // instead of silently discarding it. GL-dependent pieces of the
+                    // snapshot may fail mid-loss; keep whatever captures.
+
+                    try {
+
+                        if (window.settingsManager && typeof window.capturePresetSnapshot === 'function') {
+
+                            const snap = window.capturePresetSnapshot();
+
+                            // set() returns false on QuotaExceeded — a heavy
+                            // multi-layer session (the TDR-prone profile) can
+                            // blow the ~5MB origin quota with full-res layer
+                            // dataURLs. Degrade via the shared saveUserPreset
+                            // ladder: drop the big payloads, keep params/brush.
+
+                            if (snap) {
+
+                                const env = { at: Date.now(), snapshot: snap };
+
+                                if (typeof window.__setSnapshotWithQuotaFallback === 'function') {
+
+                                    window.__setSnapshotWithQuotaFallback('app.contextLossSnapshot', env);
+
+                                } else {
+
+                                    window.settingsManager.set('app.contextLossSnapshot', env);
+
+                                }
+
+                            }
+
+                        }
+
+                    } catch(_) {}
+
                 }, false);
 
                 canvas.addEventListener('webglcontextrestored', () => {
 
-                    // Simplest reliable recovery across modules
+                    // Simplest reliable recovery across modules. Bypass the
+                    // unsaved-work prompt — this reload IS the recovery path.
+
+                    try { window.__unsavedWork = false; } catch(_){}
 
                     try { window.location.reload(); } catch(_){}
 
@@ -320,6 +361,34 @@
 
                 const dataUrl = event.target.result;
 
+                // Aspect-fit (2026-08-06): the layer div fills the wrapper and
+                // stretches its background (100% 100%), so any image whose
+                // aspect differs from the canvas used to upload distorted —
+                // and everything derived from it (mask import, collider,
+                // thumbnails) inherited the squash. Bake a contain-fit into
+                // the layer transform instead: every downstream consumer
+                // (renderLayers div transform, obstacle compositors, ⤓ Mask)
+                // already honors scaleX/scaleY, and the user can still resize.
+                const probe = new Image();
+
+                probe.onload = () => {
+
+                const canvasEl = document.getElementById('canvas');
+
+                let fitX = 1, fitY = 1;
+
+                if (canvasEl && probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+
+                    const arImg = probe.naturalWidth / probe.naturalHeight;
+
+                    const arCanvas = (canvasEl.width || 1) / (canvasEl.height || 1);
+
+                    if (arImg < arCanvas) fitX = arImg / arCanvas;
+
+                    else if (arImg > arCanvas) fitY = arCanvas / arImg;
+
+                }
+
                 const layerDiv = document.getElementById(`layer${availableIndex}`);
 
                 layerDiv.style.backgroundImage = `url(${dataUrl})`;
@@ -360,9 +429,9 @@
 
                     y: 0,
 
-                    scaleX: 1,
+                    scaleX: fitX,
 
-                    scaleY: 1,
+                    scaleY: fitY,
 
                     rotation: 0,
 
@@ -397,9 +466,15 @@
 
                 renderLayers();
 
+                };
+
+                probe.onerror = probe.onload; // undecodable probe → keep fit 1:1
+
+                probe.src = dataUrl;
+
             };
 
-            
+
 
             reader.readAsDataURL(file);
 
@@ -413,3 +488,46 @@
 
         
 
+
+        // ── Unsaved-work guard (Steam prep S2-2) ─────────────────────────────
+        // Painting is not autosaved; a stray close/reload used to destroy the
+        // canvas with no warning. Dirty = any paint gesture since launch;
+        // cleared by .fluid save/load (12-save-load). Context-restore reload
+        // above bypasses it deliberately.
+        (function setupUnsavedWorkGuard(){
+            try {
+                window.__unsavedWork = false;
+                if (canvas) canvas.addEventListener('pointerdown', function () {
+                    window.__unsavedWork = true;
+                }, { passive: true });
+
+                window.onbeforeunload = function (e) {
+                    if (!window.__unsavedWork) return undefined;
+                    if (window.IS_ELECTRON) {
+                        // Chromium shows no native beforeunload dialog for
+                        // win.close() under file:// — ask via a real dialog.
+                        // Wording is unload-neutral: this same prompt guards
+                        // quit AND dev reloads (F5 etc. in --dev builds).
+                        try {
+                            const { dialog } = require('@electron/remote');
+                            const choice = dialog.showMessageBoxSync({
+                                type: 'question',
+                                buttons: ['Discard and continue', 'Keep painting'],
+                                defaultId: 1,
+                                cancelId: 1,
+                                title: 'Unsaved work',
+                                message: 'Discard unsaved work?',
+                                detail: 'The canvas has unsaved work. Save a project (.fluid) or export first if you want to keep it.'
+                            });
+                            if (choice === 0) { window.__unsavedWork = false; return undefined; }
+                            e.returnValue = false;
+                            return false;
+                        } catch (err) { /* remote unavailable — fall through to the generic prompt (fail closed) */ }
+                    }
+                    // Web (and Electron fallback): standard browser confirm
+                    e.preventDefault();
+                    e.returnValue = '';
+                    return '';
+                };
+            } catch(_) {}
+        })();

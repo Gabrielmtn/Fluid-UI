@@ -680,7 +680,7 @@
             el.innerHTML = `
                 <div class="path-layer-header" draggable="true">
                     <div class="path-layer-thumb">✏️</div>
-                    <input type="text" class="layer-title" value="${layer.name}" data-action="rename">
+                    <input type="text" class="layer-title" value="${window.escHtml(layer.name)}" data-action="rename">
                     <div class="layer-controls">
                         <button class="layer-btn" data-action="toggle-visibility" title="${layer.visible ? 'Hide' : 'Show'}">${layer.visible ? '👁️' : '👁️‍🗨️'}</button>
                         <button class="layer-btn" data-action="toggle-play" title="${layer.isPlaying ? 'Pause' : 'Play'}" ${!hasPath ? 'disabled' : ''}>${layer.isPlaying ? '⏸' : '▶'}</button>
@@ -689,7 +689,7 @@
                     </div>
                 </div>
                 <div class="path-layer-body">
-                    <div class="path-layer-info">${layer.paths.length}/${MAX_PATHS} paths | ${totalPoints} points | ${layer.playMode}</div>
+                    <div class="path-layer-info">${layer.paths.length}/${MAX_PATHS} paths | ${totalPoints} points | ${window.escHtml(layer.playMode)}</div>
                     <div class="path-layer-controls">
                         <div class="path-control-row">
                             <label>Speed</label>

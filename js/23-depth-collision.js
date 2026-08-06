@@ -36,7 +36,8 @@ class DepthEstimator {
                     console.warn('⚠️ Could not temporarily override globalThis.process:', e.message);
                 }
             }
-            this.transformers = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+            // Vendored copy — same rationale and glue as 16-sam-integration.
+            this.transformers = await import('./vendor/transformers/transformers.min.js');
         } finally {
             if (hadProcess) {
                 globalThis.process = originalProcess;
@@ -44,18 +45,8 @@ class DepthEstimator {
         }
 
         const { env } = this.transformers;
-        env.allowRemoteModels = true;
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
-
-        // Electron cache directory
-        if (typeof process !== 'undefined' && process.versions && process.versions.electron) {
-            try {
-                const path = require('path');
-                const os = require('os');
-                env.cacheDir = path.join(os.homedir(), '.cache', 'fluid-ui-models');
-            } catch (e) {}
-        }
+        const { configureTransformersEnv } = await import('./vendor/transformers/fluid-env.js');
+        configureTransformersEnv(env);
 
         // Share back to SAM if it hasn't loaded yet
         if (window.samSegmenter && !window.samSegmenter.transformers) {
@@ -520,8 +511,20 @@ class DepthEstimator {
                 var depth = await window.depthEstimator.estimateDepth(img);
                 if (!depth) return;
 
+                // Aspect-fit (2026-08-06): the collider layer div stretches to
+                // the canvas, so a non-canvas-aspect image distorted both the
+                // preview and the collision shape. Contain-fit via the layer
+                // transform — the compositors already honor scaleX/scaleY.
+                var canvasEl = document.getElementById('canvas');
+                var fitX = 1, fitY = 1;
+                if (canvasEl && img.naturalWidth > 0 && img.naturalHeight > 0) {
+                    var arImg = img.naturalWidth / img.naturalHeight;
+                    var arCanvas = (canvasEl.width || 1) / (canvasEl.height || 1);
+                    if (arImg < arCanvas) fitX = arImg / arCanvas;
+                    else if (arImg > arCanvas) fitY = arCanvas / arImg;
+                }
                 // Create an image layer using the depth as both visual and mask source
-                addCollisionLayer(depth, img.src, file.name || 'Image');
+                addCollisionLayer(depth, img.src, file.name || 'Image', { scaleX: fitX, scaleY: fitY });
             };
             img.src = ev.target.result;
         };
@@ -854,6 +857,14 @@ class DepthEstimator {
         var th = Math.max(1, Math.round(sh * scale));
         var depthData = new Uint8Array(tw * th);
         var any = 0;
+        // Same alpha→coverage saturation as the GPU compositor
+        // (obstacleCompositeFrag, 05b): source alpha is SHAPE, not texture.
+        // Mid-alpha ripple inside a filled region (soft-brush overlap,
+        // imported-image grain) must read fully solid or the one-shot
+        // collider's fill becomes a patchy solid/leaky lattice, exactly like
+        // the live GPU path did (2026-08-05).
+        var knee = (window.config && typeof window.config.COLLIDER_ALPHA_SOLID === 'number')
+            ? window.config.COLLIDER_ALPHA_SOLID : 0.45;
         for (var y = 0; y < th; y++) {
             var sy0 = Math.floor(y * sh / th), sy1 = Math.max(sy0 + 1, Math.floor((y + 1) * sh / th));
             for (var x = 0; x < tw; x++) {
@@ -864,6 +875,9 @@ class DepthEstimator {
                     for (var xx = sx0; xx < sx1; xx++) { sum += px[rowBase + (xx << 2) + 3]; n++; }
                 }
                 var v = n ? Math.round(sum / n) : 0;
+                var t = (v / 255 - knee * 0.25) / (knee * 0.75);
+                if (t < 0) t = 0; else if (t > 1) t = 1;
+                v = Math.round(t * t * (3 - 2 * t) * 255);
                 depthData[y * tw + x] = v;
                 if (v > 12) any++;
             }
@@ -914,7 +928,14 @@ class DepthEstimator {
         _bindActiveSource(kind);
         var sourceFBO = _resolveBoundFBO();
         if (sourceFBO) {
-            var gpuIdx = addCollisionLayer(null, null, title,
+            // One-shot readback of the just-bound source purely for the panel
+            // thumbnail + on-canvas preview: the LIVE collision reads the GPU
+            // source directly and never touches this depth data (the obstacle
+            // compositor skips CPU depth on source-bound layers), but without
+            // it the layer got a 1×1 black dummy — blank thumbnail and a
+            // black stretched preview film.
+            var pre = buildSketchDepth(true);
+            var gpuIdx = addCollisionLayer(pre ? pre.depth : null, pre ? pre.previewUrl : null, title,
                 { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, source: _boundSrc });
             if (gpuIdx != null) _sketchColliderIndex = gpuIdx;
             return gpuIdx;
@@ -1027,7 +1048,10 @@ class DepthEstimator {
                 var sourceFBO = _resolveBoundFBO();
                 var idx;
                 if (sourceFBO) {
-                    idx = addCollisionLayer(null, null,
+                    // One-shot readback for thumbnail/preview (see
+                    // _createColliderFromSource) — collision stays GPU-side.
+                    var pre = buildSketchDepth(true);
+                    idx = addCollisionLayer(pre ? pre.depth : null, pre ? pre.previewUrl : null,
                         ((_boundSrc && _boundSrc.kind === 'mask') ? 'Mask' : 'Sketch') + ' Collision (live)',
                         { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, source: _boundSrc });
                 } else {
@@ -1136,6 +1160,10 @@ class DepthEstimator {
             obstacleCanvas.width = obsW;
             obstacleCanvas.height = obsH;
             obstacleCtx = obstacleCanvas.getContext('2d', { willReadFrequently: true });
+            // A shrunken collider layer downscales its shape canvas heavily
+            // here; default (bilinear, no mip) sampling skips source texels
+            // and thin walls alias. 'high' engages proper area filtering.
+            obstacleCtx.imageSmoothingQuality = 'high';
         }
 
         obstacleCtx.clearRect(0, 0, obsW, obsH);
@@ -1252,6 +1280,32 @@ class DepthEstimator {
         }
 
         window.__obsStrengthMax = strengthMax > 0 ? strengthMax : 0.7;
+        // Coverage saturation for the CPU path (2026-08-06): the GPU
+        // compositor knees its box-filtered area coverage (05b round 3), but
+        // this path passed drawImage alpha straight through — fine while the
+        // depth data lands 1:1, but RESIZING the collider layer smears binary
+        // walls into mid-alpha during the downscale above, and those mids sit
+        // exactly in solidity()'s noisy 0.35–0.85 window: the patchy lattice
+        // returned on every resize. Same knee, same order as the GPU path
+        // (saturate BEFORE the ss-blur, so the blur still bounds edge ramps).
+        // Alpha here is coverage*strength; the shaders recover coverage as
+        // r/uObsMax, so normalize by strengthMax before the knee and rescale.
+        if (hasAny) {
+            var kneeA = (window.config && typeof window.config.COLLIDER_ALPHA_SOLID === 'number')
+                ? window.config.COLLIDER_ALPHA_SOLID : 0.45;
+            var sNorm = window.__obsStrengthMax;
+            var kImg = obstacleCtx.getImageData(0, 0, obsW, obsH);
+            var kd = kImg.data;
+            var lo = kneeA * 0.25, span = kneeA * 0.75;
+            for (var ki = 3, kn = kd.length; ki < kn; ki += 4) {
+                var kcov = kd[ki] / (255 * sNorm);
+                var kt = (kcov - lo) / span;
+                if (kt <= 0) { kd[ki] = 0; continue; }
+                if (kt > 1) kt = 1;
+                kd[ki] = Math.round(kt * kt * (3 - 2 * kt) * sNorm * 255);
+            }
+            obstacleCtx.putImageData(kImg, 0, 0);
+        }
         if (hasAny && typeof window.updateObstacleTexture === 'function') {
             // D0.5 rev 3: constant-width smoothing at SIM scale before upload.
             // Bounds every coverage ramp to ~1.5 sim texels regardless of the

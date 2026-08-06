@@ -1,6 +1,6 @@
 # Release & Distribution
 
-Fluid Simulation ships in three forms, all from one codebase:
+A Small Good Thing ships in three forms, all from one codebase:
 
 | Target | What it is | How it's published |
 |---|---|---|
@@ -19,10 +19,11 @@ npm run dist:win
 ```
 
 Produces, in `dist/` (gitignored):
-- **`dist/win-unpacked/`** — the unpacked app. **This is the folder both itch and Steam upload.** Its launch exe is `Fluid Simulation.exe`.
-- `Fluid Simulation <version>.exe` — a single portable build, for plain (non-store) downloads.
+- **`dist/win-unpacked/`** — the unpacked app (asar disabled — SteamPipe's 1 MB-chunk delta patching needs loose files; one edited JS inside an asar would force a full redownload). **This is the folder both itch and Steam upload.** Its launch exe is `A Small Good Thing.exe`.
 
-Bump `"version"` in `package.json` before each release so builds are traceable.
+The `portable` target was dropped for Steam prep (self-extracting exes unpack to `%TEMP%`, which AV heuristics flag, and Steam never uses them). For a one-off portable build: `npx electron-builder --win portable`.
+
+Bump `"version"` in `package.json` before each release so builds are traceable — the version now shows in-app (F1 modal footer and splash corner).
 
 ---
 
@@ -47,7 +48,7 @@ butler uploads only changed bytes; the itch app auto-updates players on the `win
 **One-time setup**
 1. Register the app in Steamworks (requires the Steam Direct fee). Steam assigns an **App ID** and a **Depot ID**.
 2. Replace `YOUR_STEAM_APP_ID` / `YOUR_STEAM_DEPOT_ID` in `steam/app_build.vdf` and `steam/depot_build.vdf`.
-3. In the Steamworks dashboard, set the app's **launch executable** to `Fluid Simulation.exe`.
+3. In the Steamworks dashboard, set the app's **launch executable** to `A Small Good Thing.exe`.
 4. Install **steamcmd** and set the `publish:steam` script's `YOUR_STEAM_BUILDER` to your builder login.
 
 **Each release**
@@ -62,6 +63,6 @@ This uploads the depot from `dist/win-unpacked`. The build lands unset (`"setliv
 ---
 
 ## Polish before a public launch (not blockers)
-- **App icon** — add `build/icon.ico` (256×256) and set `"build.win.icon"`; otherwise it ships with the default Electron icon.
-- **Code signing** — unsigned Windows builds trigger SmartScreen. A code-signing cert removes the warning (config under `build.win.certificateFile`/sign).
+- **App icon** — ✅ DONE: `build/icon.ico` (multi-res, wired via `build.win.icon`), `assets/icon.png` (window icon + web favicon), `build/icon-master-1024.png` (master for Steam capsule art).
+- **Code signing** — unsigned Windows builds trigger SmartScreen for direct downloads (Steam's own launch path bypasses SmartScreen; signing still helps against AV false positives — see the Steam plan, decision D8: Azure Trusted Signing).
 - **Mac / Linux** — the Mac build needs a real Mac or a macOS CI runner (can't be produced on Windows); add a GitHub Actions workflow when you want those channels.

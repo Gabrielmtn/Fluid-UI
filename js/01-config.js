@@ -249,16 +249,20 @@
             const list = getPaletteColorsForIndex(i);
             paletteStepIndex = 0;
             const cp = document.getElementById('colorPicker');
-            if (cp) {
+            // During a snapshot/preset/multiplayer-lock restore the brush colour
+            // and step mode come FROM the snapshot and are already applied — the
+            // palette must not overwrite them. Picking a palette by hand still
+            // behaves exactly as before.
+            if (cp && !window.__brushColorRestoring) {
                 cp.value = list[0] || '#FFFFFF';
                 const stepEl = document.getElementById('stepPalette');
-                
+
                 // Auto-enable "Step through palette" when selecting a palette
                 if (stepEl && !stepEl.checked) {
                     stepEl.checked = true;
                     stepEl.dispatchEvent(new Event('change', { bubbles: true }));
                 }
-                
+
                 if (!(stepEl && stepEl.checked) && typeof updateColor === 'function') updateColor();
             }
             currentTrailColorCss = hexToRgbaCss(list[1] || list[0] || '#FFFFFF', 0.5);
@@ -269,7 +273,8 @@
             }
             renderPalettePreview(i);
             refreshPaletteCarousel();
-            localStorage.setItem('curatedPaletteIndex', String(i));
+            // Quota exhaustion here must not abort the rest of the selection.
+            try { localStorage.setItem('curatedPaletteIndex', String(i)); } catch (e) {}
             updatePaletteStepIndicator();
         }
 

@@ -44,7 +44,11 @@
     // preserveFluidOpacity ("Empty Alpha Locked") — a session-only toggle that
     // must default to checked on every launch (applyPresetSnapshot ignores it
     // too, at the checkbox-restore loop below).
-    var PRESET_SKIP = { preserveFluidOpacity: true };
+    // autoloadSettings: with the default now ON, letting it into snapshots
+    // means applying any preset dispatches its change handler, which
+    // re-entrantly runs applyFromSettings() mid-apply and clobbers the
+    // preset's sliders — and silently rewrites the user's autoload choice.
+    var PRESET_SKIP = { preserveFluidOpacity: true, autoloadSettings: true };
 
     function _registryIds(map, skip) {
         return Object.keys(map).filter(function (id) { return !(skip && skip[id]); });
@@ -52,8 +56,8 @@
 
     // Frozen fallbacks — used ONLY if ParamRegistry failed to load (in which
     // case apply-side clamping is broken anyway). Mirrors pre-registry coverage.
-    var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','swirl','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','clarity','vibrance','sunraysWeight','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','brushRefreshRate','shadingIntensity'];
-    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','sunraysToggle','macCormackToggle','multigridToggle','ascendToggle','ascendRandomness','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
+    var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','swirl','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','clarity','vibrance','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','shadingIntensity'];
+    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','macCormackToggle','multigridToggle','ascendToggle','ascendRandomness','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
     var FALLBACK_SELECT_IDS = ['visualResolution','physicsResolution','kaleidoMode','fpsCap','lightMode','lightShiftMode','recMode','recPlaybackSpeed','audioMode','audioReactSource','audioAutoSplatMode','splatInMode','splatOutMode'];
 
     var _PR = window.ParamRegistry;
@@ -264,7 +268,10 @@
         // ── 5. Selects ──
         SELECT_IDS.forEach(function(id) {
             var v = sm.get('select.' + id);
-            if (v === undefined) return;
+            // get() returns null (not undefined) for a missing key — without
+            // the null check every unsaved select is forced to options[0]
+            // (fpsCap→30, recPlaybackSpeed→0.25) on a fresh install.
+            if (v === undefined || v === null) return;
             var el = $(id);
             if (!el) return;
             var hasOption = Array.from(el.options).some(function(opt) { return opt.value === String(v); });
@@ -439,9 +446,12 @@
             });
         }
 
-        // Autoload handling
+        // Autoload handling. Absent → ON (a paid desktop app is expected to
+        // restore the previous session); only an explicit saved false disables
+        // — same absent-vs-false pattern as the showCanvasHandles autoload fix.
         if (autoloadChk && window.settingsManager) {
-            const auto = !!window.settingsManager.get('settings.autoload');
+            const stored = window.settingsManager.get('settings.autoload');
+            const auto = stored !== false;
             autoloadChk.checked = auto;
             autoloadChk.addEventListener('change', (e) => {
                 const val = !!e.target.checked;
@@ -462,12 +472,50 @@
             }
         }
 
+        // Context-loss recovery offer: 04f snapshots the session when the GPU
+        // resets, then reloads. Offer that snapshot back once the deferred
+        // scripts (layers/brush) are up; either way the key is consumed so a
+        // stale snapshot can't reappear on later launches.
+        try {
+            const rec = window.settingsManager ? window.settingsManager.get('app.contextLossSnapshot') : null;
+            // 24h, not 10min: a driver reset often takes the whole machine with
+            // it, and the customer relaunches after a reboot — well past any
+            // ten-minute window. The key is consumed either way.
+            if (rec && rec.snapshot && (Date.now() - (rec.at || 0)) < 24 * 60 * 60 * 1000) {
+                const offerRestore = () => {
+                    try {
+                        // Be honest about the limit: pixels can't be read back
+                        // from a lost GL context, so painted layers are only as
+                        // fresh as the last save. Settings/brush/layout are exact.
+                        const painted = !!(rec.snapshot.layers || []).some(function (l) { return l && l.isRaster; });
+                        const caveat = painted
+                            ? '\n\nSettings, brush and layer setup will be exact. Painted pixels can only come back as far as your last save — anything painted after it was lost with the driver reset.'
+                            : '';
+                        if (window.confirm('The graphics driver reset during the last session.\n\nRestore your settings, layers, and brush state from just before the reset?' + caveat)) {
+                            applyPresetSnapshot(rec.snapshot);
+                        }
+                    } catch (err) { console.warn('[ContextLoss] restore failed', err); }
+                    finally { try { window.settingsManager.remove('app.contextLossSnapshot'); } catch (_) {} }
+                };
+                const poll = setInterval(() => {
+                    if (window.__scriptsReady) { clearInterval(poll); setTimeout(offerRestore, 300); }
+                }, 250);
+            } else if (rec) {
+                try { window.settingsManager.remove('app.contextLossSnapshot'); } catch (_) {}
+            }
+        } catch (_) {}
+
         console.log('Save/Load (scan+persist) initialized');
     }
 
     // ── User Presets System ──
 
-    function capturePresetSnapshot() {
+    // opts.lookOnly (13.5 host settings lock): skip the heavy sections —
+    // layer/mask/branding/recording serialization does full-res GPU readbacks
+    // and dataURL encodes, far too costly for the lock's periodic mirror
+    // broadcasts (and the relay caps messages at 16KB anyway).
+    function capturePresetSnapshot(opts) {
+        var lookOnly = !!(opts && opts.lookOnly);
         var sm = window.settingsManager;
         if (!sm) return null;
 
@@ -551,7 +599,6 @@
             replayTimePeriod: window.replayTimePeriod || 5,
             replaySpeed: typeof window.replaySpeed === 'number' ? window.replaySpeed : 1,
             replayLiveColors: !!window.replayLiveColors,
-            refreshRate: window.brushRefreshRate || 0,
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
             splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
@@ -611,10 +658,10 @@
         try {
             // D2: refresh raster layers' layer.data to full-res dataURLs so
             // painted pixels round-trip (thumbnails overwrite it in between)
-            if (window.rasterLayers && window.rasterLayers.syncData) window.rasterLayers.syncData();
+            if (!lookOnly && window.rasterLayers && window.rasterLayers.syncData) window.rasterLayers.syncData();
         } catch(_){}
         try {
-            var ls = window.layers;
+            var ls = lookOnly ? null : window.layers;
             if (ls && ls.length > 0) {
                 layersData = ls.map(function(layer) {
                     var ld = {
@@ -678,7 +725,7 @@
         // ── D3 masks (coverage PNGs + names) ──
         var masksData = null;
         try {
-            if (window.Masks && window.Masks.serialize) {
+            if (!lookOnly && window.Masks && window.Masks.serialize) {
                 var ms = window.Masks.serialize();
                 if (ms.length > 0) masksData = ms;
             }
@@ -687,7 +734,7 @@
         // ── Branding overlays ──
         var brandingData = null;
         try {
-            if (window.brandingOverlays && window.brandingOverlays.getAll) {
+            if (!lookOnly && window.brandingOverlays && window.brandingOverlays.getAll) {
                 var all = window.brandingOverlays.getAll();
                 if (all.length > 0) {
                     brandingData = all.map(function(ov) {
@@ -709,7 +756,7 @@
         // ── Recorded layers (timeline interactions) ──
         var recordedLayers = null;
         try {
-            if (typeof window.recGetLayersSnapshot === 'function') {
+            if (!lookOnly && typeof window.recGetLayersSnapshot === 'function') {
                 recordedLayers = window.recGetLayersSnapshot();
             }
         } catch(_){}
@@ -725,7 +772,7 @@
         // ── Path layers state ──
         var pathLayersData = null;
         try {
-            if (window.pathLayers && typeof window.pathLayers.getSnapshot === 'function') {
+            if (!lookOnly && window.pathLayers && typeof window.pathLayers.getSnapshot === 'function') {
                 pathLayersData = window.pathLayers.getSnapshot();
             }
         } catch(_){}
@@ -811,8 +858,12 @@
             if (snapshot.checkboxes) {
                 Object.keys(snapshot.checkboxes).forEach(function(id) {
                     // "Empty Alpha Locked" is session-only: it must stay at its
-                    // checked default, so old presets that captured it are ignored
-                    if (id === 'preserveFluidOpacity') return;
+                    // checked default, so old presets that captured it are ignored.
+                    // autoloadSettings: applying it dispatches its change handler,
+                    // which re-entrantly runs applyFromSettings() mid-apply and
+                    // clobbers the preset's sliders (also guards old snapshots
+                    // saved before PRESET_SKIP excluded it at capture time).
+                    if (id === 'preserveFluidOpacity' || id === 'autoloadSettings') return;
                     if (reg && reg.coerceCheckbox(id, snapshot.checkboxes[id]) === null) {
                         console.warn('[Preset] skipping unknown checkbox', id); return;
                     }
@@ -869,10 +920,14 @@
             }
         } catch(_){}
 
-        // Canonical arm colours applied — release the guard and reflect
-        // arm0.mode into every colour widget (top-nav chips + checkboxes + picker).
-        window.__brushColorRestoring = false;
-        if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI();
+        // NOTE: the guard stays HELD past this point. The palette restore below
+        // calls applyPalette(), which for a user-initiated pick auto-enables
+        // "Step through palette" and rewrites the colour picker — that ran AFTER
+        // the colour/arm restore and silently stomped it, so a locked guest kept
+        // its own brush colour (arm0.mode forced to 'step', picker showing the
+        // palette's step colour instead of the host's). It is released once the
+        // palette is in, and syncBrushColorUI then reflects the canonical arm
+        // state into every colour widget exactly once.
 
         // ── Kaleidoscope runtime ──
         try {
@@ -901,6 +956,13 @@
                 }
             }
         } catch(e) { console.warn('[Preset] palette restore failed:', e); }
+
+        // Palette is in — NOW release the colour-restore guard and reflect the
+        // canonical arm colours into every colour widget (chips, checkboxes,
+        // picker). Doing this after the palette is what keeps the snapshot's
+        // brush colour authoritative.
+        window.__brushColorRestoring = false;
+        if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI();
 
         // ── Saved colors ──
         try {
@@ -993,7 +1055,10 @@
                     var lcCb = document.getElementById('replayLiveColors');
                     if (lcCb) lcCb.checked = bs.replayLiveColors;
                 }
-                if (typeof bs.refreshRate === 'number') window.brushRefreshRate = bs.refreshRate;
+                // bs.refreshRate (older snapshots): the Splat Rate throttle was
+                // removed 2026-08-06 (replay always honored the recorded rate;
+                // the live-paint throttle was superseded by BRUSH_SPACING) —
+                // the stored value is intentionally ignored.
                 if (bs.splatInMode) {
                     window.splatInMode = bs.splatInMode;
                     var siEl = document.getElementById('splatInMode');
@@ -1168,6 +1233,12 @@
                         collisionMode: ld.collisionMode || 'block',
                         collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7,
                         isRaster: !!ld.isRaster,
+                        // Force a pixel upload even when an FBO already exists at
+                        // this index. reconcile() otherwise only restores MISSING
+                        // buffers, so a saved layer landing on the boot layer's
+                        // index (both 100) kept the empty boot FBO — the panel
+                        // thumbnail showed the artwork while the canvas stayed blank.
+                        __needsRestore: !!ld.isRaster && !!ld.data,
                         opacity: typeof ld.opacity === 'number' ? ld.opacity : 1,
                         blendMode: ld.blendMode || 'normal',
                         clipMaskId: (typeof ld.clipMaskId === 'number') ? ld.clipMaskId : null,
@@ -1394,6 +1465,33 @@
         return ok !== false;
     }
 
+    // Quota-degrading write for one-shot snapshot keys (context-loss recovery,
+    // 04f). Same ladder as saveUserPreset above, but against a settingsManager
+    // key: full → no recorded interactions → no depth b64 → no layer images →
+    // no layers. Returns false only if even the bare envelope won't fit.
+    function setSnapshotWithQuotaFallback(key, envelope) {
+        if (!window.settingsManager || !envelope || !envelope.snapshot) return false;
+        var ok = window.settingsManager.set(key, envelope);
+        if (ok !== false) return true;
+        var lite = JSON.parse(JSON.stringify(envelope));
+        var s = lite.snapshot;
+        lite.degraded = true;
+        if (s.recordedLayers) s.recordedLayers.forEach(function(rl) { if (rl.timeline) rl.timeline.interactions = []; });
+        if (s.layers) s.layers.forEach(function(l) {
+            if (l.mask && l.mask.shapes) l.mask.shapes.forEach(function(sh) {
+                if (sh._depthDataB64) { sh._hadDepthData = true; delete sh._depthDataB64; }
+            });
+        });
+        ok = window.settingsManager.set(key, lite);
+        if (ok !== false) return true;
+        if (s.layers) s.layers.forEach(function(l) { delete l.data; delete l.originalData; });
+        ok = window.settingsManager.set(key, lite);
+        if (ok !== false) return true;
+        delete s.layers; delete s.layerOrder; delete s.recordedLayers;
+        return window.settingsManager.set(key, lite) !== false;
+    }
+    window.__setSnapshotWithQuotaFallback = setSnapshotWithQuotaFallback;
+
     function deleteUserPreset(name) {
         if (!window.Settings || !name) return;
         window.Settings.deletePreset(name);
@@ -1593,6 +1691,11 @@
                 a.href = url; a.download = name.replace(/\s+/g, '-').toLowerCase() + '.fluid';
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                // Optimistic: a.click() only STARTS the download; a failed write
+                // leaves the flag cleared. Acceptable until the Steam-plan S6-1
+                // native save dialog (fs.writeFileSync + real error) replaces
+                // this path in Electron.
+                try { window.__unsavedWork = false; } catch (_) {}
                 return true;
             } catch (e) { console.warn('[Project] export failed', e); return false; }
         }
@@ -1603,7 +1706,15 @@
                 try {
                     var env = migrateProjectEnvelope(JSON.parse(String(reader.result)));
                     if (!env) throw new Error('Not a valid .fluid project file');
+                    // Loading replaces the whole stack — confirm when there's
+                    // unsaved work on the canvas (prompt only for valid files).
+                    if (window.__unsavedWork &&
+                        !window.confirm('Load "' + (env.name || file.name) + '"?\n\nThis replaces your current canvas, layers, and settings. Unsaved work will be lost.')) {
+                        if (cb) cb(null, null);
+                        return;
+                    }
                     applyPresetSnapshot(env.snapshot);
+                    try { window.__unsavedWork = false; } catch (_) {}
                     if (env.brushPresets && window.settingsManager) {
                         try {
                             window.settingsManager.set('brush.presets', env.brushPresets);

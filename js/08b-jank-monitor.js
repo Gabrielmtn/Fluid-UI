@@ -428,7 +428,7 @@
         swirl: function () { return window.config && window.config.SWIRL; },
         macCormack: function () { return window.config && window.config.MACCORMACK; },
         multigrid: function () { return window.config && window.config.MULTIGRID; },
-        sunrays: function () { return window.config && window.config.SUNRAYS; },
+        glow: function () { return window.config && window.config.GLOW; },
         bloomCeiling: function () { return window.config && window.config.BLOOM_CEILING; },
         velInfluence: function () { return window.config && window.config.VELOCITY_INFLUENCE; },
         // configured vs LIVE resolutions (live catches every FBO reinit,

@@ -6,7 +6,7 @@
 // HOOKS (all in 05-fluid-sim.js, marked // [GOVERNOR HOOK]):
 //   1. pressure Jacobi loop uses effIters(config.PRESSURE_ITERATIONS)
 //   2. initFramebuffers multiplies dye/sim base resolution by dyeScale()/simScale()
-//   3. sharpen / micro-detail / sunrays passes gated by fxOn()
+//   3. sharpen / micro-detail / glow passes gated by fxOn()
 //   4. onFrame(nowMs, cpuMs) called once per rendered frame before RAF re-arm
 //   5. initFramebuffers preserves dye via clearProg copy (also fixes the
 //      long-standing "resolution change wipes artwork" bug)
@@ -35,7 +35,7 @@
     // Effect shedding (the L5 fx:false rung) is OPT-IN, default off.
     // Principle (TODO.md, Gabriel 2026-07-09): quality machinery may trade
     // FPS and fidelity, NEVER the aesthetic. The fx gate turns off sharpen +
-    // micro-detail + sunrays + MacCormack in one stroke — a wholesale look
+    // micro-detail + glow + MacCormack in one stroke — a wholesale look
     // change that used to fire ~15s into a heavy session with no user input
     // (caught by LookWatchdog: governorFx true→false @ L4→L5).
     var allowFx = false;

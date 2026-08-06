@@ -16,8 +16,8 @@ const ROOT = path.resolve(__dirname, "..");
 const OUT = path.join(ROOT, "public");
 
 // Everything the browser loads (relative paths in index.html resolve from here).
-// If you add a runtime asset dir (fonts/, img/, assets/), add it to this list.
-const INCLUDE = ["index.html", "js", "css"];
+// If you add a runtime asset dir (fonts/, img/), add it to this list.
+const INCLUDE = ["index.html", "js", "css", "assets"];
 
 // Empty public/ by clearing its CONTENTS (not removing the dir itself) — on
 // Windows a process serving public/ can hold a lock that makes removing the

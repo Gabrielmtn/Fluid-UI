@@ -11,7 +11,8 @@
  * Web build (no filesystem): PresetVault.available === false and every op is a
  * no-op; presets stay in localStorage and durability is via Export/Import.
  *
- * Layout (default Documents/Fluid Simulation/Presets, configurable):
+ * Layout (default Documents/A Small Good Thing/Presets — legacy
+ * Documents/Fluid Simulation/Presets grandfathered — configurable):
  *   <vault>/<name>.fluidpreset            ← live presets, one file each
  *   <vault>/.history/<name>/<ts>.fluidpreset  ← prior versions on overwrite
  *   <vault>/.trash/<name>-<ts>.fluidpreset    ← deleted presets (recoverable)
@@ -161,7 +162,14 @@
         remote = require('@electron/remote');
         var configured = null;
         try { configured = window.settingsManager && window.settingsManager.get('presetVault.path'); } catch (_) {}
-        vaultDir = configured || path.join(remote.app.getPath('documents'), 'Fluid Simulation', 'Presets');
+        // Rebrand 2026-08-06: default vault moved to the new title. Pre-release
+        // installs (dev machines) may already have the old folder — keep using
+        // it rather than silently splitting presets across two vaults.
+        var _docs = remote.app.getPath('documents');
+        var _newDefault = path.join(_docs, 'A Small Good Thing', 'Presets');
+        var _oldDefault = path.join(_docs, 'Fluid Simulation', 'Presets');
+        vaultDir = configured ||
+            (!fs.existsSync(_newDefault) && fs.existsSync(_oldDefault) ? _oldDefault : _newDefault);
         vfs = createVaultFS(fs, path, vaultDir);
         vfs.ensure();
     } catch (e) {

@@ -23,7 +23,7 @@
     'use strict';
 
     // Dynamically-created controls (no static markup; hydrated from DOM at runtime):
-    // ["audioSensitivity","audioBeatThreshold","brushRefreshRate","audioReactToggle","arMapAutoSplat","arMapSize","arMapKaleido","arMapColor","focusModeToggle","streamFormatLock","audioReactSource","audioAutoSplatMode","splatInMode","splatOutMode"]
+    // ["audioSensitivity","audioBeatThreshold","audioReactToggle","arMapAutoSplat","arMapSize","arMapKaleido","arMapColor","focusModeToggle","streamFormatLock","audioReactSource","audioAutoSplatMode","splatInMode","splatOutMode"]
     var SLIDERS = {
         densityDissipation: {configKey: "DENSITY_DISSIPATION", ui: {min: 0.85, max: 1.005, step: 0.0001}, hard: {min: 0.85, max: 1.005}, def: 0.993, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.85, max: 1.005, step: 0.0001, scope: "basic"}},
         velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.5, max: 1.0009}, def: 0.999, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
@@ -46,9 +46,14 @@
         sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "simulation", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
         brushSize: {configKey: null, ui: {min: 0.1, max: 30, step: 0.1}, hard: {min: 0.1, max: 30}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
-        timeScale: {configKey: null, ui: {min: 0.01, max: 3, step: 0.01}, hard: {min: 0.01, max: 3}, def: 1, decimals: 2, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 0.01, max: 3, step: 0.01, scope: "extended"}},
-        canvasOpacity: {configKey: null, ui: {min: 0, max: 100, step: 1}, hard: {min: 0, max: 100}, def: 100, decimals: 0, category: "display", perfTier: 0, simSlider: false, mut: {min: 0, max: 100, step: 1, scope: "extended"}},
-        captureDimming: {configKey: null, ui: {min: 0, max: 100, step: 1}, hard: {min: 0, max: 100}, def: 80, decimals: 0, category: "display", perfTier: 0, simSlider: false, mut: {min: 0, max: 100, step: 1, scope: "extended"}},
+        // No mut (Gabriel 2026-08-06): a mutated timeScale can slow the whole
+        // sim to near-frozen, which reads as "mutate broke it", not a style.
+        timeScale: {configKey: null, ui: {min: 0.01, max: 3, step: 0.01}, hard: {min: 0.01, max: 3}, def: 1, decimals: 2, category: "simulation", perfTier: 0, simSlider: false},
+        // Fundamental display plumbing, not style variants — deliberately no
+        // `mut` (Gabriel 2026-08-05): a mutated canvasOpacity fades the whole
+        // canvas out and captureDimming is capture-UX, neither is a look.
+        canvasOpacity: {configKey: null, ui: {min: 0, max: 100, step: 1}, hard: {min: 0, max: 100}, def: 100, decimals: 0, category: "display", perfTier: 0, simSlider: false},
+        captureDimming: {configKey: null, ui: {min: 0, max: 100, step: 1}, hard: {min: 0, max: 100}, def: 80, decimals: 0, category: "display", perfTier: 0, simSlider: false},
         kSpinSpeed: {configKey: null, ui: {min: -180, max: 180, step: 1}, hard: {min: -180, max: 180}, def: 30, decimals: 0, category: "kaleidoscope", perfTier: 0, simSlider: false, mut: {min: -180, max: 180, step: 1, scope: "basic"}},
         kTwist: {configKey: null, ui: {min: 0, max: 10, step: 0.1}, hard: {min: 0, max: 10}, def: 0, decimals: 1, category: "kaleidoscope", perfTier: 0, simSlider: false, mut: {min: 0, max: 10, step: 0.1, scope: "basic"}},
         kZoom: {configKey: null, ui: {min: 0.5, max: 2, step: 0.01}, hard: {min: 0.5, max: 2}, def: 1, decimals: 2, category: "kaleidoscope", perfTier: 0, simSlider: false, mut: {min: 0.5, max: 2, step: 0.01, scope: "basic"}},
@@ -64,7 +69,8 @@
         lightShiftSaturation: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 1, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
         clarity: {configKey: "CLARITY", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
         vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
-        sunraysWeight: {configKey: null, ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 3}, def: 0.5, decimals: 2, category: "sunrays", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 3, step: 0.1, scope: "extended"}},
+        glowIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.05}, hard: {min: 0, max: 4}, def: 0.8, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 2, step: 0.05, scope: "extended"}},
+        glowThreshold: {configKey: null, ui: {min: 0, max: 3, step: 0.05}, hard: {min: 0, max: 6}, def: 0.6, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 3, step: 0.05, scope: "extended"}},
         ssFrequency: {configKey: null, ui: {min: 0.2, max: 8, step: 0.1}, hard: {min: 0.2, max: 8}, def: 2, decimals: 1, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.2, max: 8, step: 0.1, scope: "extended"}},
         ssAngle: {configKey: null, ui: {min: 0, max: 360, step: 1}, hard: {min: 0, max: 360}, def: 120, decimals: 0, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0, max: 360, step: 1, scope: "extended"}},
         ssLength: {configKey: null, ui: {min: 0.1, max: 3, step: 0.05}, hard: {min: 0.1, max: 3}, def: 0.4, decimals: 2, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.05, scope: "extended"}},
@@ -73,7 +79,6 @@
         ssGravity: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.1, decimals: 2, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
         audioSensitivity: {configKey: null, ui: null, hard: {min: 0.1, max: 3}, def: null, decimals: 1, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.1, scope: "extended"}},
         audioBeatThreshold: {configKey: null, ui: null, hard: {min: 0.1, max: 1}, def: null, decimals: 2, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 1, step: 0.05, scope: "extended"}},
-        brushRefreshRate: {configKey: null, ui: null, hard: {min: 0, max: 100}, def: null, decimals: 0, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0, max: 100, step: 1, scope: "extended"}},
         // D1 stroke engine (dynamically-created in buildBrushSection; no mut —
         // input-feel params, not style variants)
         brushStabilizer: {configKey: "BRUSH_STABILIZER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
@@ -113,7 +118,7 @@
         // (a mutation flipping advection quality reads as a perf bug).
         macCormackToggle: {def: true, mutScope: null},
         multigridToggle: {def: true, mutScope: null},
-        sunraysToggle: {def: false, mutScope: "extended"},
+        glowToggle: {def: false, mutScope: "extended"},
         ascendToggle: {def: false, mutScope: "extended"},
         ascendRandomness: {def: false, mutScope: "extended"},
         shootingStarToggle: {def: false, mutScope: "extended"},
@@ -126,7 +131,7 @@
         arMapColor: {def: null, mutScope: null},
         focusModeToggle: {def: null, mutScope: null},
         streamFormatLock: {def: null, mutScope: null},
-        autoloadSettings: {def: false, mutScope: null},
+        autoloadSettings: {def: true, mutScope: null},
         displayShadingToggle: {def: false, mutScope: "extended"}
     };
     var SELECTS = {

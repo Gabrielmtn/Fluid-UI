@@ -2,6 +2,7 @@
   "name": "fluid-ui-multiplayer",
   "version": "1.0.0",
   "description": "Fluid simulation with multiplayer support via PartyKit",
+  "author": "Gabrielmtn",
   "main": "electron-main.js",
   "scripts": {
     "dev": "partykit dev --serve .",
@@ -16,7 +17,8 @@
     "publish:steam": "steamcmd +login YOUR_STEAM_BUILDER +run_app_build \"%CD%\\steam\\app_build.vdf\" +quit"
   },
   "dependencies": {
-    "@electron/remote": "^2.1.3"
+    "@electron/remote": "^2.1.3",
+    "steamworks.js": "^0.4.0"
   },
   "devDependencies": {
     "electron": "^39.1.2",
@@ -24,11 +26,28 @@
     "partykit": "^0.0.115"
   },
   "build": {
-    "appId": "com.fluidsim.app",
-    "productName": "Fluid Simulation",
+    "appId": "com.gabrielmtn.fluidsimulation",
+    "productName": "A Small Good Thing",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
+    "copyright": "Copyright (c) 2024-2026 Gabriel (Gabrielmtn)",
+    "asar": false,
+    "extraFiles": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "THIRD-PARTY-NOTICES.txt",
+        "to": "THIRD-PARTY-NOTICES.txt"
+      },
+      {
+        "from": "node_modules/steamworks.js/dist/win64/steam_api64.dll",
+        "to": "steam_api64.dll"
+      }
+    ],
     "files": [
       "**/*",
       "!zig/**",
@@ -42,13 +61,28 @@
       "!.claude/**",
       "!tmp-*",
       "!**/*.md",
-      "!partykit.json"
+      "!partykit.json",
+      "!.partykit/**",
+      "!comfyui-node/**",
+      "!docs/**",
+      "!sam-test.*",
+      "!reset-pressure.html",
+      "!server-relay.js",
+      "!restart-electron*",
+      "!build-version.txt",
+      "!package-lock.json",
+      "!**/*.lnk",
+      "!**/*.bat",
+      "!index.html.bak.cachebust",
+      "!js/07-cos-oscillator.js",
+      "!js/14-radial-slider.js",
+      "!steam_appid.txt"
     ],
     "win": {
       "target": [
-        "dir",
-        "portable"
-      ]
+        "dir"
+      ],
+      "icon": "build/icon.ico"
     }
   }
 }

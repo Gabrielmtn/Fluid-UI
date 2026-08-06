@@ -6,7 +6,123 @@
     <!-- Dark UA chrome: native select popups, scrollbars, form controls.
          Without this Chromium frames dropdown option lists in light-theme white. -->
     <meta name="color-scheme" content="dark">
-    <title>Fluid UI</title>
+    <title>A Small Good Thing</title>
+    <link rel="icon" type="image/png" href="assets/icon.png">
+    <script>
+    // Boot-time globals + global error surface. Runs before every other script
+    // so even an early load failure is visible instead of a silent half-boot.
+    (function () {
+        window.IS_ELECTRON = !!(typeof process !== 'undefined' && process.versions && process.versions.electron);
+
+        // HTML-escape for any untrusted string interpolated into innerHTML.
+        // Project files (.fluid), preset files and multiplayer messages all
+        // carry names/data that reach innerHTML templates in the layer,
+        // recording and path panels — without this a shared file can inject
+        // markup, and in Electron (nodeIntegration) that is code execution.
+        // Defined in the boot IIFE so every later chunk can rely on it.
+        window.escHtml = function (v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+        // Only ever emit data:image URLs into style/background — anything else
+        // (javascript:, a quote-break, a stray url()) is dropped.
+        window.safeImageUrl = function (v) {
+            var s = String(v == null ? '' : v);
+            return /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=\s]*$/.test(s) ? s : '';
+        };
+        try {
+            window.__appVersion = window.IS_ELECTRON
+                ? require('@electron/remote').app.getVersion()
+                : 'web';
+        } catch (e) { window.__appVersion = 'unknown'; }
+
+        var reported = 0;
+        function showErrorCard(title, message, detail) {
+            // Fatal-GPU screen up (04a) — the ReferenceError cascade from the
+            // aborted boot is noise on top of the friendly fallback.
+            if (window.__fatalGpu) return;
+            if (!document.body) {
+                document.addEventListener('DOMContentLoaded', function () { showErrorCard(title, message, detail); });
+                return;
+            }
+            // Cap CONCURRENT cards, not lifetime errors: a counter that only
+            // ever increments meant three transient boot errors permanently
+            // silenced every later failure. Dedupe identical messages too, so
+            // a per-frame throw can't paper the screen.
+            var live = document.querySelectorAll('.boot-error-card');
+            if (live.length >= 3) return;
+            for (var li = 0; li < live.length; li++) {
+                if (live[li].dataset.errKey === title + '|' + message) return;
+            }
+            reported = live.length;
+            var report = title + ': ' + message +
+                '\nversion: ' + window.__appVersion +
+                '\ngpu: ' + (window.__gpuRenderer || 'unknown') +
+                (detail ? '\n' + detail : '');
+            var card = document.createElement('div');
+            card.className = 'boot-error-card';
+            card.dataset.errKey = title + '|' + message;
+            card.style.cssText = 'position:fixed;right:12px;bottom:' + (12 + (reported - 1) * 96) + 'px;z-index:2147483647;' +
+                'max-width:420px;background:#1a1f27;color:#e6edf3;border:1px solid #f8514966;border-radius:8px;' +
+                'padding:10px 12px;font:12px/1.45 "Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+            var msg = document.createElement('div');
+            msg.textContent = '⚠ ' + title + ': ' + message;
+            msg.style.cssText = 'margin-bottom:8px;word-break:break-word;max-height:80px;overflow:hidden';
+            var copyBtn = document.createElement('button');
+            copyBtn.textContent = 'Copy report';
+            var dismissBtn = document.createElement('button');
+            dismissBtn.textContent = 'Dismiss';
+            [copyBtn, dismissBtn].forEach(function (b) {
+                b.style.cssText = 'margin-right:8px;background:#2d333b;color:#e6edf3;border:1px solid #444c56;' +
+                    'border-radius:4px;padding:3px 10px;font:11px "Segoe UI",sans-serif;cursor:pointer';
+            });
+            copyBtn.onclick = function () {
+                // writeText rejects async (e.g. NotAllowedError when the window
+                // isn't focused) — a sync try/catch can't see that, so handle
+                // the promise and fall back to execCommand on rejection.
+                var fallback = function () {
+                    var ta = document.createElement('textarea');
+                    ta.value = report; document.body.appendChild(ta); ta.select();
+                    try { document.execCommand('copy'); copyBtn.textContent = 'Copied ✓'; } catch (e2) {}
+                    ta.remove();
+                };
+                try {
+                    navigator.clipboard.writeText(report).then(
+                        function () { copyBtn.textContent = 'Copied ✓'; },
+                        fallback
+                    );
+                } catch (e) { fallback(); }
+            };
+            dismissBtn.onclick = function () { card.remove(); };
+            card.appendChild(msg); card.appendChild(copyBtn); card.appendChild(dismissBtn);
+            document.body.appendChild(card);
+        }
+        window.__reportError = showErrorCard;
+        window.onerror = function (msg, src, line, col, err) {
+            showErrorCard('Error', String(msg),
+                (src || '') + ':' + line + ':' + col + (err && err.stack ? '\n' + err.stack : ''));
+        };
+        window.addEventListener('unhandledrejection', function (e) {
+            var r = e.reason;
+            showErrorCard('Unhandled rejection', r && r.message ? r.message : String(r), r && r.stack ? r.stack : '');
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var label = window.__appVersion === 'web' ? 'web' : 'v' + window.__appVersion;
+            var v = document.getElementById('app-version');
+            if (v) v.textContent = label;
+            var sv = document.querySelector('.splash-version');
+            if (sv) sv.textContent = label;
+            // GPU string arrives once GL boots (04a sets window.__gpuRenderer)
+            var tries = 0, gi = document.getElementById('app-gpu-info');
+            var poll = setInterval(function () {
+                if (window.__gpuRenderer && gi) { gi.textContent = window.__gpuRenderer; clearInterval(poll); }
+                else if (++tries > 40) { if (gi) gi.textContent = 'unknown'; clearInterval(poll); }
+            }, 500);
+        });
+    })();
+    </script>
     <link rel="stylesheet" href="css/00-tokens.css">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/slider-styles.css">
@@ -20,8 +136,9 @@
 <body>
     <!-- Splash Screen -->
     <div id="splash-screen">
-        <div class="splash-title">Fluid UI</div>
-        <div class="splash-subtitle">Creative Simulation Engine</div>
+        <div class="splash-title">A Small Good Thing</div>
+        <div class="splash-subtitle">A playful painting game for two or more</div>
+        <div class="splash-version" style="position:absolute;right:14px;bottom:10px;font-size:11px;opacity:.45"></div>
         <div class="splash-progress">
             <div class="splash-progress-bar" id="splash-progress-bar"></div>
         </div>
@@ -29,7 +146,7 @@
     <!-- Custom Title Bar for Frameless Window -->
     <div id="custom-titlebar" class="ui-enter">
         <div class="titlebar-drag-region">
-            <span class="titlebar-title">Fluid UI</span>
+            <span class="titlebar-title">A Small Good Thing</span>
         </div>
         <div class="window-controls">
             <button id="min-button" class="titlebar-button" title="Minimize">
@@ -96,7 +213,7 @@
                             <div class="stat-row"><span class="stat-label">Display:</span> <span id="stat-displayhz">--</span></div>
                             <div class="stat-row"><label class="stat-label" for="governorToggle">Adaptive Quality:</label> <input type="checkbox" id="governorToggle"></div>
                             <div class="stat-row"><label class="stat-label" for="governorAllowRes">&nbsp;&nbsp;Resolution Tiers:</label> <input type="checkbox" id="governorAllowRes"></div>
-                            <div class="stat-row"><label class="stat-label" for="governorAllowFx" title="Allow the governor's last rung to disable sharpen/micro-detail/sunrays/Crisp Advection under extreme load — changes the look, so it's opt-in">&nbsp;&nbsp;Effect Shedding:</label> <input type="checkbox" id="governorAllowFx"></div>
+                            <div class="stat-row"><label class="stat-label" for="governorAllowFx" title="Allow the governor's last rung to disable sharpen/micro-detail/glow/Crisp Advection under extreme load — changes the look, so it's opt-in">&nbsp;&nbsp;Effect Shedding:</label> <input type="checkbox" id="governorAllowFx"></div>
                             <div class="stat-row"><span class="stat-label">Adaptive State:</span> <span id="stat-governor">--</span></div>
                         </div>
                         <div class="stats-section">
@@ -286,8 +403,8 @@
             <label>
                 <select id="materialMode" class="material-mode-select" title="Material — swaps what this slider controls">
                     <option value="fluid" selected>Fluid</option>
-                    <option value="acrylic">Acrylic-thin</option>
-                    <option value="clay">Acrylic</option>
+                    <option value="acrylic">Paint-Wet</option>
+                    <option value="clay">Paint-Thick</option>
                 </select>
                 <span id="curlValue" class="value-display">25</span>
             </label>
@@ -346,13 +463,17 @@
             </div>
         </div>
         <div class="control-group checkbox-group">
-            <input type="checkbox" id="sunraysToggle">
-            <label for="sunraysToggle" style="margin: 0">Sunrays</label>
+            <input type="checkbox" id="glowToggle">
+            <label for="glowToggle" style="margin: 0">Glow</label>
         </div>
-        <div id="sunraysPanel" class="collapsible" style="display:none;">
+        <div id="glowPanel" class="collapsible" style="display:none;">
             <div class="control-group">
-                <label for="sunraysWeight">Weight <span id="sunraysWeightValue" class="value-display">0.5</span></label>
-                <input type="range" id="sunraysWeight" min="0" max="1" value="0.5" step="0.05">
+                <label for="glowIntensity">Intensity <span id="glowIntensityValue" class="value-display">0.80</span></label>
+                <input type="range" id="glowIntensity" min="0" max="2" value="0.8" step="0.05">
+            </div>
+            <div class="control-group">
+                <label for="glowThreshold">Threshold <span id="glowThresholdValue" class="value-display">0.60</span></label>
+                <input type="range" id="glowThreshold" min="0" max="3" value="0.6" step="0.05">
             </div>
         </div>
         <div class="control-group">
@@ -878,11 +999,10 @@
                 <div>
                     <h3>Canvas/Display</h3>
                     <ul>
-                        <li>T — Toggle Trail</li>
                         <li>C — Toggle Cursor</li>
                         <li>H — Toggle Border & Handles</li>
                         <li>L — Lock/Unlock Borders</li>
-                        <li>S — Focus Mode</li>
+                        <li>F — Focus Mode</li>
                     </ul>
                 </div>
                 <div>
@@ -940,6 +1060,10 @@
                         <li>Esc — Close / Stop All</li>
                     </ul>
                 </div>
+            </div>
+            <div class="hotkey-footer" style="padding:8px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;opacity:.55;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                <span>A Small Good Thing <span id="app-version"></span> · GPU: <span id="app-gpu-info">detecting…</span></span>
+                <span>Fluid sim after Pavel Dobryakov (MIT) · AI imports: Transformers.js (Apache-2.0) · Built on Electron</span>
             </div>
         </div>
     </div>
@@ -1009,8 +1133,14 @@
                 loadNext();
             };
             s.onerror = function() {
+                // Surface the failure — a missing chunk means a half-initialized
+                // app; silent continue was hiding corrupt/incomplete installs.
+                if (window.__reportError) {
+                    window.__reportError('Startup', 'Failed to load ' + scripts[loaded],
+                        'Some features will be unavailable. Try restarting; if this persists, reinstall or verify game files.');
+                }
                 loaded++;
-                loadNext(); // Continue even on error
+                loadNext(); // Continue so the rest of the app still boots
             };
             document.body.appendChild(s);
         }
