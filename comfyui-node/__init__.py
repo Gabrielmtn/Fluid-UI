@@ -5,7 +5,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "FluidUIImageLoader": "Fluid UI Image Loader",
+    "FluidUIImageLoader": "A Small Good Thing Image Loader",
 }
 
 WEB_DIRECTORY = "./web"

@@ -141,6 +141,57 @@ function closeMatchmaking() {
     }
 }
 
+// ── Stranger keep-alive ──────────────────────────────────────────────
+// A lone seeker sits in its minted pub- room with the lobby socket closed.
+// The lobby drops its waiting pointer after WAIT_TTL_MS, so before this the
+// waiter was stranded: at 60s the pointer expired while they were still in the
+// room, the next seeker minted a DIFFERENT room, and the two never met — both
+// showing "Waiting for a stranger…" forever. Re-announcing inside the TTL keeps
+// the slot alive; the server recognises our uid and refreshes instead of
+// pairing us with ourselves. If it hands back a different room, someone else
+// was already waiting and we go to them.
+var strangerKeepAlive = null;
+var STRANGER_KEEPALIVE_MS = 45000; // comfortably inside the server's 60s TTL
+
+function stopStrangerKeepAlive() {
+    if (strangerKeepAlive) { clearInterval(strangerKeepAlive); strangerKeepAlive = null; }
+}
+
+function startStrangerKeepAlive() {
+    stopStrangerKeepAlive();
+    strangerKeepAlive = setInterval(function () {
+        // Only while genuinely alone in a stranger room.
+        if (!isStrangerRoom() || connectedClients >= 2 || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
+            stopStrangerKeepAlive();
+            return;
+        }
+        var mine = currentRoom;
+        try {
+            var isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
+            var proto = isLocal ? 'ws' : 'wss';
+            var ws = new WebSocket(proto + '://' + PARTYKIT_HOST + '/parties/lobby/main?uid=' + encodeURIComponent(DEVICE_UID));
+            var done = false;
+            var bail = setTimeout(function () { if (!done) { done = true; try { ws.close(); } catch (_) {} } }, 8000);
+            ws.addEventListener('open', function () {
+                ws.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID }));
+            });
+            ws.addEventListener('message', function (ev) {
+                if (done) return;
+                var d; try { d = JSON.parse(ev.data); } catch (_) { return; }
+                if (d.type !== 'matched') return;      // 'One moment…' throttle: just retry next tick
+                done = true; clearTimeout(bail);
+                try { ws.close(); } catch (_) {}
+                // Still alone, and the lobby put someone else's room forward → join them.
+                if (d.roomId && d.roomId !== mine && isStrangerRoom() && connectedClients < 2) {
+                    stopStrangerKeepAlive();
+                    connectToRoom(d.roomId);
+                }
+            });
+            ws.addEventListener('error', function () { done = true; clearTimeout(bail); });
+        } catch (_) { /* transient network — try again next tick */ }
+    }, STRANGER_KEEPALIVE_MS);
+}
+
 // Host-only: toggle the room lock. The server confirms via a 'lock-state' broadcast.
 function toggleLock() {
     if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
@@ -420,6 +471,8 @@ function disconnectMultiplayer() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
     closeMatchmaking();
+    stopStrangerKeepAlive();
+    _dabQueue.length = 0; // never carry one room's dabs into the next
     currentRoom = null;
     myRole = 'guest';
     roomLocked = false;
@@ -619,6 +672,68 @@ function broadcastSplat(x, y, dx, dy, color, mult, radius) {
     broadcastSplat.lastSent = now;
 }
 
+// 1.3 parity fix: broadcast the ACTUAL BrushEngine dab train instead of one
+// sampled splat per 33ms. The old path made the peer reconstruct a stroke it
+// never saw: it gap-filled positions and divided ONE message's velocity across
+// them (stepDx = canvasDx/(steps+1)). Total momentum matched, but vorticity is
+// nonlinear in the velocity gradient — many weak impulses curl far less than
+// the few strong ones the painter actually applied, so the painter saw
+// filaments and the peer saw a diffuse blob.
+//
+// Two invariants make the peer's simulation identical to the painter's:
+//   * position rides normalized (canvases differ in size, the artwork doesn't)
+//   * velocity rides ABSOLUTE and is applied verbatim — splat() injects dx
+//     straight into the velocity field (05i:122), and that field lives on the
+//     sim grid, which is derived from base resolution + aspect, NOT from canvas
+//     pixels. Rescaling by the receiver's width (the old dx * canvas.width) was
+//     what made window size change the physics.
+//
+// Dabs accumulate and flush on a timer — batched, never dropped, so no sample
+// is lost the way the old 33ms throttle lost them.
+var _dabQueue = [];
+var _dabFlushAt = 0;
+var DAB_FLUSH_MS = 33;
+var DAB_MAX_PER_MSG = 96; // ~30 bytes/dab quantized — far under the 16KB relay cap
+
+function queueDab(xNorm, yNorm, dxAbs, dyAbs, radius) {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) return;
+    _dabQueue.push([
+        +xNorm.toFixed(4), +yNorm.toFixed(4),
+        +dxAbs.toFixed(3), +dyAbs.toFixed(3),
+        +(radius || 0).toFixed(5)
+    ]);
+    if (_dabQueue.length >= DAB_MAX_PER_MSG) flushDabs(null, 1, true);
+}
+
+function flushDabs(color, mult, force) {
+    if (!_dabQueue.length) return;
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
+        _dabQueue.length = 0;
+        return;
+    }
+    var now = Date.now();
+    if (!force && now - _dabFlushAt < DAB_FLUSH_MS) return;
+    _dabFlushAt = now;
+    var dabs = _dabQueue.splice(0, DAB_MAX_PER_MSG);
+    var last = dabs[dabs.length - 1];
+    // Legacy fields mirror the final dab in the OLD wire units (normalized
+    // velocity), so a client running the previous build still renders this
+    // stroke through its existing path instead of seeing nothing.
+    partySocket.send(JSON.stringify({
+        type: 'splat',
+        data: {
+            x: last[0], y: last[1],
+            dx: +(last[2] / Math.max(1, canvas.width)).toFixed(5),
+            dy: +(last[3] / Math.max(1, canvas.height)).toFixed(5),
+            color: color || window.__mpLastDabColor || [1, 0, 0],
+            mult: mult || 1,
+            radius: last[4] || undefined,
+            dabs: dabs
+        },
+        timestamp: now
+    }));
+}
+
 function broadcastCursor(x, y) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
         return;
@@ -638,6 +753,9 @@ function broadcastPointerUp() {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
         return;
     }
+    // Push the stroke's tail dabs before the peer is told the stroke ended,
+    // or the last sub-flush-interval dabs would be stranded in the queue.
+    flushDabs(window.__mpLastDabColor, 1, true);
 
     console.log('[Multiplayer] Broadcasting pointer-up');
     partySocket.send(JSON.stringify({
@@ -690,6 +808,29 @@ function handleRemoteSplat(data) {
 
         isProcessingRemoteEvent = true;
         try {
+            // 1.3 parity path: the sender's real dab train. Each dab is applied
+            // with ITS OWN full velocity, verbatim — no gap-fill invention and
+            // no dividing one message's momentum across guessed positions. This
+            // is what makes the peer's curl match the painter's.
+            const dabs = data.data.dabs;
+            if (Array.isArray(dabs) && dabs.length) {
+                for (let i = 0; i < dabs.length; i++) {
+                    const d = dabs[i];
+                    const px = d[0] * canvas.width;
+                    const py = d[1] * canvas.height;
+                    const r = (typeof d[4] === 'number' && d[4] > 0) ? d[4] : normalizedRadius;
+                    if (typeof window.applyMultiSplatWith === 'function') {
+                        window.applyMultiSplatWith(px, py, d[2], d[3], color || [1, 0, 0], mult || 1, r);
+                    } else {
+                        splat(px, py, d[2], d[3], color || [1, 0, 0]);
+                    }
+                }
+                const lastD = dabs[dabs.length - 1];
+                remoteLastPositions.set(data.clientId, { x: lastD[0] * canvas.width, y: lastD[1] * canvas.height });
+                return;
+            }
+
+            // Legacy path — a peer on the previous build, or the press stamp.
             const lastPos = remoteLastPositions.get(data.clientId);
             // Gap-fill between network messages at ~12px spacing (matching how
             // densely local mousemove events deposit dabs), splitting the
@@ -919,8 +1060,13 @@ function updateConnectedView() {
     var isHost = myRole === 'host';
 
     if (stranger) {
-        updateMultiplayerStatus(connectedClients < 2 ? '🎲 Waiting for a stranger…' : '🎨 Painting with a stranger');
+        var alone = connectedClients < 2;
+        updateMultiplayerStatus(alone ? '🎲 Waiting for a stranger…' : '🎨 Painting with a stranger');
+        // Hold our matchmaking slot while alone; drop it the moment we pair.
+        if (alone) { if (!strangerKeepAlive) startStrangerKeepAlive(); }
+        else stopStrangerKeepAlive();
     } else {
+        stopStrangerKeepAlive();
         updateMultiplayerStatus(roomLocked ? '🔒 Room locked' : 'Connected');
     }
 
@@ -1055,6 +1201,8 @@ function initMultiplayerUI() {
 // Expose globals
 window.isProcessingRemoteEvent = function() { return isProcessingRemoteEvent; };
 window.broadcastSplat = broadcastSplat;
+window.queueDab = queueDab;       // 1.3: faithful dab-train broadcast (05j drain)
+window.flushDabs = flushDabs;
 window.broadcastCursor = broadcastCursor;
 window.broadcastPointerUp = broadcastPointerUp;
 window.broadcastClear = broadcastClear;

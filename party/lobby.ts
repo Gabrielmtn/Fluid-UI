@@ -22,17 +22,22 @@ export default class LobbyServer implements Party.Server {
 
   waitingRoomId: string | null = null;
   waitingSince = 0;
+  // Who is holding the waiting room. Without this a second matchmake from the
+  // SAME device is handed its own room with waiting:false — "matched" alone.
+  waitingUid: string | null = null;
   loaded = false;
   ready: Promise<void> | null = null;
   lastSeen: Map<string, number> = new Map(); // uid -> last matchmake ts (best-effort throttle)
 
   async onStart() {
-    const w = await this.room.storage.get<{ id: string; since: number }>("waiting");
+    const w = await this.room.storage.get<{ id: string; since: number; uid?: string }>("waiting");
     if (w && Date.now() - w.since < WAIT_TTL_MS) {
       this.waitingRoomId = w.id;
       this.waitingSince = w.since;
+      this.waitingUid = w.uid || null;
     } else {
       this.waitingRoomId = null;
+      this.waitingUid = null;
     }
     this.loaded = true;
   }
@@ -68,14 +73,27 @@ export default class LobbyServer implements Party.Server {
     // ── Synchronous critical section (no await between read and mutate) ──
     let roomId: string;
     let waiting: boolean;
-    if (this.waitingRoomId && now - this.waitingSince < WAIT_TTL_MS) {
-      roomId = this.waitingRoomId;
+    const pointerLive = !!this.waitingRoomId && now - this.waitingSince < WAIT_TTL_MS;
+    if (pointerLive && this.waitingUid === uid) {
+      // Same seeker still waiting — this is a keep-alive, not a pairing. Refresh
+      // the TTL and hand back the SAME room. Two things depend on this: a lone
+      // waiter can hold the slot past WAIT_TTL_MS (before, the alarm dropped the
+      // pointer at 60s while they sat in the room, so a later seeker minted a
+      // different room and the two never met), and a double-click can no longer
+      // "match" someone with themselves.
+      roomId = this.waitingRoomId as string;
+      this.waitingSince = now;
+      waiting = true;
+    } else if (pointerLive) {
+      roomId = this.waitingRoomId as string;
       this.waitingRoomId = null; // paired — the pair is now full
+      this.waitingUid = null;
       waiting = false;
     } else {
       roomId = "pub-" + generateRoomCode();
       this.waitingRoomId = roomId;
       this.waitingSince = now;
+      this.waitingUid = uid;
       waiting = true;
     }
     // ────────────────────────────────────────────────────────────────────
@@ -101,6 +119,7 @@ export default class LobbyServer implements Party.Server {
       const room = url.searchParams.get("room");
       if (room && this.waitingRoomId === room) {
         this.waitingRoomId = null;
+        this.waitingUid = null;
         await this.persistWaiting();
       }
       return new Response("ok");
@@ -111,7 +130,10 @@ export default class LobbyServer implements Party.Server {
   async onAlarm() {
     const now = Date.now();
     if (this.waitingRoomId && now - this.waitingSince >= WAIT_TTL_MS) {
+      // Only fires if the waiter stopped sending keep-alives (tab closed, went
+      // offline). A live waiter refreshes waitingSince well inside the TTL.
       this.waitingRoomId = null;
+      this.waitingUid = null;
       await this.persistWaiting();
     }
     // Prune stale throttle entries so the map can't grow unbounded.
@@ -122,7 +144,7 @@ export default class LobbyServer implements Party.Server {
 
   persistWaiting() {
     return this.waitingRoomId
-      ? this.room.storage.put("waiting", { id: this.waitingRoomId, since: this.waitingSince })
+      ? this.room.storage.put("waiting", { id: this.waitingRoomId, since: this.waitingSince, uid: this.waitingUid })
       : this.room.storage.delete("waiting");
   }
 }

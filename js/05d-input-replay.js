@@ -483,7 +483,10 @@
                 pointer.moved = true;
                 const _skT = config.BRUSH_TARGET === 'sketch';
                 if (!_skT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
-                if (!_skT && typeof broadcastSplat === 'function') {
+                // 1.3 parity: when the brush engine drives the stroke it
+                // broadcasts its real dab train from 05j (queueDab/flushDabs).
+                // Sampling here too would double-paint every peer.
+                if (!_skT && !window.BrushEngine && typeof broadcastSplat === 'function') {
                     if (!canvas._lastBroadcast || Date.now() - canvas._lastBroadcast > 33) {
                         broadcastSplat(
                             coords.x / canvas.width,
@@ -778,7 +781,7 @@
                 pointer.moved = true;
                 const _skTT = config.BRUSH_TARGET === 'sketch';
                 if (!_skTT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
-                if (!_skTT && typeof broadcastSplat === 'function') {
+                if (!_skTT && !window.BrushEngine && typeof broadcastSplat === 'function') {
                     const now = Date.now();
                     if (!canvas._lastTouchBroadcast || now - canvas._lastTouchBroadcast > 50) {
                         broadcastSplat(

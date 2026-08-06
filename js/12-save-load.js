@@ -56,8 +56,8 @@
 
     // Frozen fallbacks — used ONLY if ParamRegistry failed to load (in which
     // case apply-side clamping is broken anyway). Mirrors pre-registry coverage.
-    var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','swirl','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','clarity','vibrance','sunraysWeight','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','brushRefreshRate','shadingIntensity'];
-    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','sunraysToggle','macCormackToggle','multigridToggle','ascendToggle','ascendRandomness','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
+    var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','swirl','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','clarity','vibrance','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','shadingIntensity'];
+    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','macCormackToggle','multigridToggle','ascendToggle','ascendRandomness','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
     var FALLBACK_SELECT_IDS = ['visualResolution','physicsResolution','kaleidoMode','fpsCap','lightMode','lightShiftMode','recMode','recPlaybackSpeed','audioMode','audioReactSource','audioAutoSplatMode','splatInMode','splatOutMode'];
 
     var _PR = window.ParamRegistry;
@@ -920,10 +920,14 @@
             }
         } catch(_){}
 
-        // Canonical arm colours applied — release the guard and reflect
-        // arm0.mode into every colour widget (top-nav chips + checkboxes + picker).
-        window.__brushColorRestoring = false;
-        if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI();
+        // NOTE: the guard stays HELD past this point. The palette restore below
+        // calls applyPalette(), which for a user-initiated pick auto-enables
+        // "Step through palette" and rewrites the colour picker — that ran AFTER
+        // the colour/arm restore and silently stomped it, so a locked guest kept
+        // its own brush colour (arm0.mode forced to 'step', picker showing the
+        // palette's step colour instead of the host's). It is released once the
+        // palette is in, and syncBrushColorUI then reflects the canonical arm
+        // state into every colour widget exactly once.
 
         // ── Kaleidoscope runtime ──
         try {
@@ -952,6 +956,13 @@
                 }
             }
         } catch(e) { console.warn('[Preset] palette restore failed:', e); }
+
+        // Palette is in — NOW release the colour-restore guard and reflect the
+        // canonical arm colours into every colour widget (chips, checkboxes,
+        // picker). Doing this after the palette is what keeps the snapshot's
+        // brush colour authoritative.
+        window.__brushColorRestoring = false;
+        if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI();
 
         // ── Saved colors ──
         try {

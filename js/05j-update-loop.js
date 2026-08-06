@@ -188,6 +188,17 @@
                         multiSplatWithRadius(d.x, d.y, d.dx, d.dy, col, window.__lastPaintRadius);
                         window.__splatFlow = 1; // reset so programmatic/press splats stay full-flow
                         pushStrokeEvent(d.x, d.y, d.dx, d.dy, col);
+                        // 1.3 parity: queue THIS dab (own velocity, own ramped
+                        // radius) for peers instead of letting them reconstruct
+                        // the stroke from one sampled splat per 33ms.
+                        if (typeof window.queueDab === 'function') {
+                            window.__mpLastDabColor = col;
+                            window.queueDab(d.x / canvas.width, d.y / canvas.height, d.dx, d.dy, window.__lastPaintRadius);
+                        }
+                    }
+                    if (_dabs.length && typeof window.flushDabs === 'function') {
+                        window.flushDabs(window.__mpLastDabColor,
+                            (typeof animationMultiplier === 'number' ? animationMultiplier : 1), false);
                     }
                     pointer.moved = false;
                 } else if (pointer.moved && pointer.down && !isReplayActive) {

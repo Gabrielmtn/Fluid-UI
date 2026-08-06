@@ -1,6 +1,6 @@
-# Fluid-UI
+# A Small Good Thing
 
-A beautiful, interactive fluid simulation with comprehensive controls and **real-time multiplayer** support via PartyKit.
+A playful painting game for two or more — a beautiful, interactive fluid simulation with comprehensive controls and **real-time multiplayer** support via PartyKit.
 
 ## Features
 
