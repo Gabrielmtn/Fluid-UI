@@ -510,7 +510,12 @@
 
     // ── User Presets System ──
 
-    function capturePresetSnapshot() {
+    // opts.lookOnly (13.5 host settings lock): skip the heavy sections —
+    // layer/mask/branding/recording serialization does full-res GPU readbacks
+    // and dataURL encodes, far too costly for the lock's periodic mirror
+    // broadcasts (and the relay caps messages at 16KB anyway).
+    function capturePresetSnapshot(opts) {
+        var lookOnly = !!(opts && opts.lookOnly);
         var sm = window.settingsManager;
         if (!sm) return null;
 
@@ -653,10 +658,10 @@
         try {
             // D2: refresh raster layers' layer.data to full-res dataURLs so
             // painted pixels round-trip (thumbnails overwrite it in between)
-            if (window.rasterLayers && window.rasterLayers.syncData) window.rasterLayers.syncData();
+            if (!lookOnly && window.rasterLayers && window.rasterLayers.syncData) window.rasterLayers.syncData();
         } catch(_){}
         try {
-            var ls = window.layers;
+            var ls = lookOnly ? null : window.layers;
             if (ls && ls.length > 0) {
                 layersData = ls.map(function(layer) {
                     var ld = {
@@ -720,7 +725,7 @@
         // ── D3 masks (coverage PNGs + names) ──
         var masksData = null;
         try {
-            if (window.Masks && window.Masks.serialize) {
+            if (!lookOnly && window.Masks && window.Masks.serialize) {
                 var ms = window.Masks.serialize();
                 if (ms.length > 0) masksData = ms;
             }
@@ -729,7 +734,7 @@
         // ── Branding overlays ──
         var brandingData = null;
         try {
-            if (window.brandingOverlays && window.brandingOverlays.getAll) {
+            if (!lookOnly && window.brandingOverlays && window.brandingOverlays.getAll) {
                 var all = window.brandingOverlays.getAll();
                 if (all.length > 0) {
                     brandingData = all.map(function(ov) {
@@ -751,7 +756,7 @@
         // ── Recorded layers (timeline interactions) ──
         var recordedLayers = null;
         try {
-            if (typeof window.recGetLayersSnapshot === 'function') {
+            if (!lookOnly && typeof window.recGetLayersSnapshot === 'function') {
                 recordedLayers = window.recGetLayersSnapshot();
             }
         } catch(_){}
@@ -767,7 +772,7 @@
         // ── Path layers state ──
         var pathLayersData = null;
         try {
-            if (window.pathLayers && typeof window.pathLayers.getSnapshot === 'function') {
+            if (!lookOnly && window.pathLayers && typeof window.pathLayers.getSnapshot === 'function') {
                 pathLayersData = window.pathLayers.getSnapshot();
             }
         } catch(_){}

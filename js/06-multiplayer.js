@@ -171,15 +171,35 @@ var MP_PERF_LOCAL_KEYS = [
 function captureLookSnapshot() {
     if (typeof window.capturePresetSnapshot !== 'function') return null;
     var full;
-    try { full = window.capturePresetSnapshot(); } catch (_) { return null; }
+    // lookOnly: skips layer/mask/branding/recording serialization — those do
+    // GPU readbacks + dataURL encodes, far too heavy for mirror re-broadcasts
+    try { full = window.capturePresetSnapshot({ lookOnly: true }); } catch (_) { return null; }
     if (!full) return null;
+    // 2026-08-06: the lock used to send ONLY sliders/checkboxes/selects (+arm
+    // colors, which the guest sanitizer then stripped as nested objects) —
+    // background color, palette, kaleidoscope, lighting and stroke dynamics
+    // all silently dropped, so a locked guest looked noticeably different
+    // from the host. Mirror every look section applyPresetSnapshot knows.
     var snap = {
         version: full.version,
-        sliders: full.sliders || {},
+        sliders: {},
         checkboxes: {},
         selects: {},
+        colors: full.colors || null,
+        kaleido: full.kaleido || null,
+        paletteIndex: (typeof full.paletteIndex === 'number') ? full.paletteIndex : null,
+        paletteName: full.paletteName || null,
+        savedColors: full.savedColors || null,
+        userPalettes: full.userPalettes || null,
+        lightPos: full.lightPos || null,
+        lightShiftPath: full.lightShiftPath || null,
+        brushState: full.brushState || null,
+        ssOrigin: full.ssOrigin || null,
         armColors: full.armColors || null
     };
+    Object.keys(full.sliders || {}).forEach(function (k) {
+        if (MP_PERF_LOCAL_KEYS.indexOf(k) === -1) snap.sliders[k] = full.sliders[k];
+    });
     Object.keys(full.selects || {}).forEach(function (k) {
         if (MP_PERF_LOCAL_KEYS.indexOf(k) === -1) snap.selects[k] = full.selects[k];
     });
@@ -189,10 +209,27 @@ function captureLookSnapshot() {
     return snap;
 }
 
+var settingsLockLastSent = ''; // last snapshot JSON the host broadcast (poll diff gate)
 function broadcastSettingsLock() {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
     var msg = { type: 'settings-lock', locked: settingsLockOn, timestamp: Date.now() };
-    if (settingsLockOn) msg.snapshot = captureLookSnapshot();
+    if (settingsLockOn) {
+        var snap = captureLookSnapshot();
+        // Diff gate records the PRE-shed JSON (the poll compares fresh
+        // unshedded captures against this — post-shed it would never match
+        // an oversize snapshot and the poll would re-send every tick).
+        try { settingsLockLastSent = JSON.stringify(snap || null); } catch (_) { settingsLockLastSent = ''; }
+        // Relay caps messages at 16KB — shed bulky optional sections before
+        // sending, or the whole lock update silently never arrives.
+        if (snap) {
+            try {
+                ['userPalettes', 'savedColors', 'lightShiftPath'].forEach(function (k) {
+                    if (JSON.stringify(snap).length > 14000) delete snap[k];
+                });
+            } catch (_) {}
+        }
+        msg.snapshot = snap;
+    }
     partySocket.send(JSON.stringify(msg));
 }
 
@@ -203,10 +240,21 @@ function hostLockMirrorHandler() {
     if (settingsLockDebounce) clearTimeout(settingsLockDebounce);
     settingsLockDebounce = setTimeout(broadcastSettingsLock, 400);
 }
+var settingsLockPoll = null;
 function installHostLockMirror() {
     if (hostMirrorInstalled) return;
     document.addEventListener('input', hostLockMirrorHandler, true);
     document.addEventListener('change', hostLockMirrorHandler, true);
+    // Catch-all poll (2026-08-06): plenty of look changes never fire
+    // input/change — palette swatch clicks, preset loads, light-source
+    // drags, kaleido buttons, Mutate. Diff-gated so a quiet host sends
+    // nothing; captureLookSnapshot is the cheap lookOnly capture.
+    settingsLockPoll = setInterval(function () {
+        if (!settingsLockOn) return;
+        var j;
+        try { j = JSON.stringify(captureLookSnapshot() || null); } catch (_) { return; }
+        if (j !== settingsLockLastSent) hostLockMirrorHandler();
+    }, 2000);
     hostMirrorInstalled = true;
 }
 function removeHostLockMirror() {
@@ -215,6 +263,7 @@ function removeHostLockMirror() {
     document.removeEventListener('change', hostLockMirrorHandler, true);
     hostMirrorInstalled = false;
     if (settingsLockDebounce) { clearTimeout(settingsLockDebounce); settingsLockDebounce = null; }
+    if (settingsLockPoll) { clearInterval(settingsLockPoll); settingsLockPoll = null; }
 }
 
 function toggleSettingsLock() {
@@ -229,25 +278,44 @@ function toggleSettingsLock() {
 // feature only needs the LOOK — sliders/checkboxes/selects/colors — so strip
 // everything that carries file data or names, which would otherwise reach the
 // layer/mask/recording/path panels and their innerHTML templates.
+// Key names must match capturePresetSnapshot's real output (2026-08-06: the
+// old list said 'brush'/'lightSource'/'lightShift', which exist nowhere in
+// the preset — those sections could never arrive even if sent).
 var LOCK_SNAPSHOT_ALLOW = ['sliders', 'checkboxes', 'selects', 'colors', 'savedColors',
-    'paletteIndex', 'armColors', 'brush', 'lightSource', 'lightShift', 'kaleido'];
+    'paletteIndex', 'paletteName', 'armColors', 'brushState', 'lightPos',
+    'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin'];
+// Bounded recursive clean: primitives-only leaves (no data: URLs, strings
+// capped), depth ≤ 3 so armColors [{mode,color}], lightShiftPath waypoints
+// and userPalettes [{name, colors: [...]}] survive — the old one-level rule
+// stripped every array-of-objects section to empty.
+function cleanLockValue(v, depth) {
+    var t = typeof v;
+    if (v === null || t === 'number' || t === 'boolean') return v;
+    if (t === 'string') return (v.length <= 64 && !/^data:/i.test(v)) ? v : undefined;
+    if (t !== 'object' || depth >= 3) return undefined;
+    var clean = Array.isArray(v) ? [] : {};
+    Object.keys(v).forEach(function (kk) {
+        var vv = cleanLockValue(v[kk], depth + 1);
+        if (vv === undefined) return;
+        if (Array.isArray(clean)) clean.push(vv); else clean[kk] = vv;
+    });
+    return clean;
+}
 function sanitizeLockSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') return null;
     var out = {};
     LOCK_SNAPSHOT_ALLOW.forEach(function (k) {
         if (!(k in snapshot)) return;
-        var v = snapshot[k];
-        if (v === null || typeof v !== 'object') { out[k] = v; return; }
-        // one level deep, primitives only — no nested objects/dataURL blobs
-        var clean = Array.isArray(v) ? [] : {};
-        Object.keys(v).forEach(function (kk) {
-            var vv = v[kk];
-            var t = typeof vv;
-            if (t === 'number' || t === 'boolean') clean[kk] = vv;
-            else if (t === 'string' && vv.length <= 64 && !/^data:/i.test(vv)) clean[kk] = vv;
-        });
-        out[k] = clean;
+        var v = cleanLockValue(snapshot[k], 0);
+        if (v !== undefined) out[k] = v;
     });
+    // Relay caps messages at 16KB — shed the bulkiest optional sections
+    // rather than letting the whole snapshot fail to arrive.
+    try {
+        ['userPalettes', 'savedColors', 'lightShiftPath'].forEach(function (k) {
+            if (JSON.stringify(out).length > 14000) delete out[k];
+        });
+    } catch (_) {}
     return out;
 }
 
