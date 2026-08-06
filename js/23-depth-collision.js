@@ -511,8 +511,20 @@ class DepthEstimator {
                 var depth = await window.depthEstimator.estimateDepth(img);
                 if (!depth) return;
 
+                // Aspect-fit (2026-08-06): the collider layer div stretches to
+                // the canvas, so a non-canvas-aspect image distorted both the
+                // preview and the collision shape. Contain-fit via the layer
+                // transform — the compositors already honor scaleX/scaleY.
+                var canvasEl = document.getElementById('canvas');
+                var fitX = 1, fitY = 1;
+                if (canvasEl && img.naturalWidth > 0 && img.naturalHeight > 0) {
+                    var arImg = img.naturalWidth / img.naturalHeight;
+                    var arCanvas = (canvasEl.width || 1) / (canvasEl.height || 1);
+                    if (arImg < arCanvas) fitX = arImg / arCanvas;
+                    else if (arImg > arCanvas) fitY = arCanvas / arImg;
+                }
                 // Create an image layer using the depth as both visual and mask source
-                addCollisionLayer(depth, img.src, file.name || 'Image');
+                addCollisionLayer(depth, img.src, file.name || 'Image', { scaleX: fitX, scaleY: fitY });
             };
             img.src = ev.target.result;
         };
@@ -1148,6 +1160,10 @@ class DepthEstimator {
             obstacleCanvas.width = obsW;
             obstacleCanvas.height = obsH;
             obstacleCtx = obstacleCanvas.getContext('2d', { willReadFrequently: true });
+            // A shrunken collider layer downscales its shape canvas heavily
+            // here; default (bilinear, no mip) sampling skips source texels
+            // and thin walls alias. 'high' engages proper area filtering.
+            obstacleCtx.imageSmoothingQuality = 'high';
         }
 
         obstacleCtx.clearRect(0, 0, obsW, obsH);
@@ -1264,6 +1280,32 @@ class DepthEstimator {
         }
 
         window.__obsStrengthMax = strengthMax > 0 ? strengthMax : 0.7;
+        // Coverage saturation for the CPU path (2026-08-06): the GPU
+        // compositor knees its box-filtered area coverage (05b round 3), but
+        // this path passed drawImage alpha straight through — fine while the
+        // depth data lands 1:1, but RESIZING the collider layer smears binary
+        // walls into mid-alpha during the downscale above, and those mids sit
+        // exactly in solidity()'s noisy 0.35–0.85 window: the patchy lattice
+        // returned on every resize. Same knee, same order as the GPU path
+        // (saturate BEFORE the ss-blur, so the blur still bounds edge ramps).
+        // Alpha here is coverage*strength; the shaders recover coverage as
+        // r/uObsMax, so normalize by strengthMax before the knee and rescale.
+        if (hasAny) {
+            var kneeA = (window.config && typeof window.config.COLLIDER_ALPHA_SOLID === 'number')
+                ? window.config.COLLIDER_ALPHA_SOLID : 0.45;
+            var sNorm = window.__obsStrengthMax;
+            var kImg = obstacleCtx.getImageData(0, 0, obsW, obsH);
+            var kd = kImg.data;
+            var lo = kneeA * 0.25, span = kneeA * 0.75;
+            for (var ki = 3, kn = kd.length; ki < kn; ki += 4) {
+                var kcov = kd[ki] / (255 * sNorm);
+                var kt = (kcov - lo) / span;
+                if (kt <= 0) { kd[ki] = 0; continue; }
+                if (kt > 1) kt = 1;
+                kd[ki] = Math.round(kt * kt * (3 - 2 * kt) * sNorm * 255);
+            }
+            obstacleCtx.putImageData(kImg, 0, 0);
+        }
         if (hasAny && typeof window.updateObstacleTexture === 'function') {
             // D0.5 rev 3: constant-width smoothing at SIM scale before upload.
             // Bounds every coverage ramp to ~1.5 sim texels regardless of the

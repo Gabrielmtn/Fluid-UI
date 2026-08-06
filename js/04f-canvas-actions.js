@@ -361,6 +361,34 @@
 
                 const dataUrl = event.target.result;
 
+                // Aspect-fit (2026-08-06): the layer div fills the wrapper and
+                // stretches its background (100% 100%), so any image whose
+                // aspect differs from the canvas used to upload distorted —
+                // and everything derived from it (mask import, collider,
+                // thumbnails) inherited the squash. Bake a contain-fit into
+                // the layer transform instead: every downstream consumer
+                // (renderLayers div transform, obstacle compositors, ⤓ Mask)
+                // already honors scaleX/scaleY, and the user can still resize.
+                const probe = new Image();
+
+                probe.onload = () => {
+
+                const canvasEl = document.getElementById('canvas');
+
+                let fitX = 1, fitY = 1;
+
+                if (canvasEl && probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+
+                    const arImg = probe.naturalWidth / probe.naturalHeight;
+
+                    const arCanvas = (canvasEl.width || 1) / (canvasEl.height || 1);
+
+                    if (arImg < arCanvas) fitX = arImg / arCanvas;
+
+                    else if (arImg > arCanvas) fitY = arCanvas / arImg;
+
+                }
+
                 const layerDiv = document.getElementById(`layer${availableIndex}`);
 
                 layerDiv.style.backgroundImage = `url(${dataUrl})`;
@@ -401,9 +429,9 @@
 
                     y: 0,
 
-                    scaleX: 1,
+                    scaleX: fitX,
 
-                    scaleY: 1,
+                    scaleY: fitY,
 
                     rotation: 0,
 
@@ -438,9 +466,15 @@
 
                 renderLayers();
 
+                };
+
+                probe.onerror = probe.onload; // undecodable probe → keep fit 1:1
+
+                probe.src = dataUrl;
+
             };
 
-            
+
 
             reader.readAsDataURL(file);
 

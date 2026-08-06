@@ -518,6 +518,13 @@
         window.compositeObstacleSource = function (source, opts) {
             if (!source || !source.texture || !obstacle || !obstacleScratch || gl.isContextLost()) return false;
             opts = opts || {};
+            // The recomposite runs in a rAF callback, so it inherits whatever
+            // blend state the last GL work left. 05i's sketch/mask stamping
+            // uses eraser blending (src factor ZERO) — with that live, this
+            // blit resolves to dst = 0 and the whole collider silently dies
+            // until the next clean recomposite ("changing strength sometimes
+            // makes it stop working", 2026-08-06).
+            gl.disable(gl.BLEND);
             obstacleCompositeProg.bind();
             gl.uniform2f(obstacleCompositeProg.uniforms.texelSize, 1.0 / obstacle.width, 1.0 / obstacle.height);
             gl.uniform1i(obstacleCompositeProg.uniforms.uSource, 0);
@@ -557,6 +564,7 @@
             if (!(ref > 0) || !obstacle || !obstacleScratch) return 0;
             var radius = Math.min(32, Math.round(ref * obstacle.width / 512));
             if (radius <= 0) return 0;
+            gl.disable(gl.BLEND); // also called standalone from updateObstacleTexture — see compositeObstacleSource
             morphObstacleProg.bind();
             gl.uniform1i(morphObstacleProg.uniforms.uTexture, 0);
             gl.uniform2f(morphObstacleProg.uniforms.texelSize, obstacle.texelSizeX, obstacle.texelSizeY);

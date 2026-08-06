@@ -204,6 +204,21 @@
         const ctx = c.getContext('2d');
         // shapes live in canvas-buffer px — map onto the dye-res raster
         ctx.scale(dyeTexWidth / mainCanvas.width, dyeTexHeight / mainCanvas.height);
+        // Apply the layer's on-screen transform (2026-08-06): shapes are
+        // stored untransformed; without this an aspect-fitted / moved /
+        // rotated layer imported a mask that ignored its placement — the
+        // imported coverage must match what the user SEES (same
+        // translate → rotate → scale about center convention as the
+        // obstacle compositor in 23-depth-collision).
+        const wrap = document.getElementById('canvas-wrapper');
+        const cssW = (wrap && wrap.clientWidth) || mainCanvas.clientWidth || mainCanvas.width || 1;
+        const cssH = (wrap && wrap.clientHeight) || mainCanvas.clientHeight || mainCanvas.height || 1;
+        const bcx = mainCanvas.width * 0.5, bcy = mainCanvas.height * 0.5;
+        ctx.translate(bcx + (layer.x || 0) * (mainCanvas.width / cssW),
+                      bcy + (layer.y || 0) * (mainCanvas.height / cssH));
+        ctx.rotate(((layer.rotation || 0) * Math.PI) / 180);
+        ctx.scale(layer.scaleX || 1, layer.scaleY || 1);
+        ctx.translate(-bcx, -bcy);
         layer.mask.shapes.forEach(function (s) { window._drawMaskShape(ctx, s); });
         return importCoverage(c, (layer.title || 'Layer') + ' mask');
     }
