@@ -7,10 +7,10 @@ const path = require('path');
 const isDev = !app.isPackaged || process.argv.includes('--dev');
 
 // ── Steamworks (Steam plan S5-1) ───────────────────────────────────────────
-// Fill in when Steamworks issues the App ID; 0 = skip init entirely.
+// App ID for "A Small Good Thing" (Steamworks app created 2026-08-06).
 // Dev testing: drop a steam_appid.txt next to package.json (gitignored and
 // excluded from the depot) and init() reads it with no argument.
-const STEAM_APP_ID = 0;
+const STEAM_APP_ID = 5068940;
 let steamClient = null;
 try {
     const hasDevAppId = require('fs').existsSync(path.join(__dirname, 'steam_appid.txt'));

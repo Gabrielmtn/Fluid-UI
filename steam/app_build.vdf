@@ -1,6 +1,6 @@
 "appbuild"
 {
-	"appid"	"YOUR_STEAM_APP_ID"
+	"appid"	"5068940"
 	"desc"	"A Small Good Thing Windows build"
 	"buildoutput"	"..\dist\steam-build-output"
 	"contentroot"	"..\dist\win-unpacked"
@@ -8,6 +8,6 @@
 	"preview"	"0"
 	"depots"
 	{
-		"YOUR_STEAM_DEPOT_ID"	"depot_build.vdf"
+		"5068941"	"depot_build.vdf"
 	}
 }
