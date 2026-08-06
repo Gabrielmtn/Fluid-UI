@@ -1149,6 +1149,7 @@
             uniform vec4 sourceTransform;
             uniform float sourceRotation;
             uniform float strength;
+            uniform vec2 texelSize; // obstacle texel (1/obsW, 1/obsH)
             uniform float covKnee; // alpha at which coverage saturates to
                                    // fully solid (config.COLLIDER_ALPHA_SOLID)
             void main() {
@@ -1158,19 +1159,32 @@
                 q = vec2(c * q.x + s * q.y, -s * q.x + c * q.y);
                 q /= max(abs(sourceTransform.zw), vec2(0.0001));
                 vec2 sourceUv = clamp(q + vec2(0.5), 0.0, 1.0);
-                // Source alpha is SHAPE, not texture (2026-08-05): a painted
-                // or imported mask's "filled" interior often carries mid-alpha
-                // ripple (soft-brush overlap, fabric/knit texture in imported
-                // images). Passed through raw, that ripple lands inside
-                // solidity()'s 0.35-0.85 coverage window and turns the fill
-                // into a lattice of alternating solid/leaky cells — fluid
-                // seeps in and pools at every dip, printing a patchy dot grid
-                // across the collider (skull-mask repro, 2026-08-05). Saturate
-                // instead: anything visibly painted (alpha >= covKnee) is
-                // fully solid; near-transparent stays open; the ramp between
-                // keeps antialiased edges smooth (the finish blur re-bounds
-                // the edge to ~1.5 sim texels either way, per D0.5).
-                float a = texture(uSource, sourceUv).a;
+                // 4x4 box-filter downsample (2026-08-05, M-watch (a) landed):
+                // the old single bilinear tap ALIASED fine mask detail — a
+                // 2-3-sim-texel line wall (scale/knit outlines in imported
+                // line-art) randomly sampled weak along its length, so cells
+                // leaked unevenly and dye pooled as ragged noise instead of
+                // the drawn pattern ("fidelity" complaint). Averaging the
+                // full footprint of this obstacle texel in source space gives
+                // every wall its true area coverage. Offsets ride through the
+                // same rotate/scale as the center tap (the map is affine).
+                float aSum = 0.0;
+                vec2 invScale = 1.0 / max(abs(sourceTransform.zw), vec2(0.0001));
+                for (int iy = 0; iy < 4; iy++) {
+                    for (int ix = 0; ix < 4; ix++) {
+                        vec2 off = vec2((float(ix) - 1.5) * 0.25, (float(iy) - 1.5) * 0.25) * texelSize;
+                        vec2 so = vec2(c * off.x + s * off.y, -s * off.x + c * off.y) * invScale;
+                        aSum += texture(uSource, clamp(sourceUv + so, 0.0, 1.0)).a;
+                    }
+                }
+                // Source alpha is SHAPE, not texture (2026-08-05): mid-alpha
+                // ripple inside a painted fill (soft-brush overlap, image
+                // grain) must read solid, or solidity()'s coverage window
+                // turns the fill into a solid/leaky lattice and dye pools at
+                // every dip. Applied to the box-filtered AREA coverage: a
+                // texel half-covered by a wall line saturates solid (thin
+                // walls hold), while mostly-open texels keep an AA ramp.
+                float a = aSum * (1.0 / 16.0);
                 float coverage = smoothstep(covKnee * 0.25, covKnee, a) * strength;
                 float previous = texture(uObstacle, vUv).r;
                 fragColor = vec4(min(1.0, previous + coverage), 0.0, 0.0, 1.0);
