@@ -177,7 +177,7 @@ function createWindow() {
             type: 'error',
             buttons: ['Reload', 'Quit'],
             defaultId: 0,
-            title: 'Fluid Simulation crashed',
+            title: 'A Small Good Thing crashed',
             message: `The app's renderer crashed (${details.reason}).`,
             detail: 'Unsaved work on the canvas is lost. If this keeps happening, update your GPU drivers.'
         });
@@ -191,7 +191,7 @@ function createWindow() {
             buttons: ['Keep waiting', 'Reload'],
             defaultId: 0,
             title: 'Not responding',
-            message: 'Fluid Simulation is not responding.',
+            message: 'A Small Good Thing is not responding.',
             detail: 'A heavy export or a very large canvas can take a while. You can keep waiting or reload (unsaved work is lost on reload).'
         });
         if (choice === 1) {

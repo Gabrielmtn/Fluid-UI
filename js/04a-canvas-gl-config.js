@@ -224,7 +224,7 @@
                     'font:14px/1.6 "Segoe UI",sans-serif;padding:40px';
 
                 _noGl.innerHTML = '<div style="font-size:40px;margin-bottom:12px">🎨</div>' +
-                    '<div style="font-size:20px;font-weight:600;margin-bottom:10px">This GPU can&#39;t run Fluid Simulation</div>' +
+                    '<div style="font-size:20px;font-weight:600;margin-bottom:10px">This GPU can&#39;t run A Small Good Thing</div>' +
                     '<div style="max-width:520px;opacity:.8">WebGL2 is unavailable &mdash; usually an outdated or broken ' +
                     'graphics driver, or a virtual machine without GPU acceleration.<br><br>' +
                     'Try updating your GPU drivers, then relaunch.</div>';
@@ -279,7 +279,7 @@
                 // change re-warns.
                 try {
                     if (localStorage.getItem('fluidIgpuBannerDismissed') !== _renderer) {
-                        var _appName = window.IS_ELECTRON ? 'Fluid Simulation' : 'this browser';
+                        var _appName = window.IS_ELECTRON ? 'A Small Good Thing' : 'this browser';
                         var _banner = document.createElement('div');
                         _banner.style.cssText = 'position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:2147483645;' +
                             'max-width:560px;background:#2b2311;color:#f0d47a;border:1px solid #b8860b88;border-radius:8px;' +

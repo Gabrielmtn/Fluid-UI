@@ -1,4 +1,4 @@
-THIRD-PARTY NOTICES — Fluid Simulation
+THIRD-PARTY NOTICES — A Small Good Thing
 =======================================
 
 This product includes or builds upon the following third-party software.

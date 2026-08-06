@@ -1,7 +1,7 @@
 "appbuild"
 {
 	"appid"	"YOUR_STEAM_APP_ID"
-	"desc"	"Fluid Simulation Windows build"
+	"desc"	"A Small Good Thing Windows build"
 	"buildoutput"	"..\dist\steam-build-output"
 	"contentroot"	"..\dist\win-unpacked"
 	"setlive"	""

@@ -27,7 +27,7 @@
   },
   "build": {
     "appId": "com.gabrielmtn.fluidsimulation",
-    "productName": "Fluid Simulation",
+    "productName": "A Small Good Thing",
     "directories": {
       "output": "dist",
       "buildResources": "build"
