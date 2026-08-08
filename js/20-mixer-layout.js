@@ -526,9 +526,17 @@
 
         ch.appendChild(head);
 
-        // --- Toggle row (Random + Step) ---
+        // --- Toggle row: [Rnd|Step|🌈 segmented switch] + gap + [Gate] ---
+        // Rnd/Step/Rainbow are mutually exclusive -> ONE gapless segmented
+        // switch; Gate is an independent toggle drawn separately with its own
+        // border (design handoff Task 6: touching cells mean pick one,
+        // separated cells mean pick any).
         var toggleRow = document.createElement('div');
         toggleRow.className = 'ch-toggle-row';
+
+        var segWrap = document.createElement('div');
+        segWrap.className = 'ch-seg-switch';
+        toggleRow.appendChild(segWrap);
 
         var rnd = document.getElementById('randomColor');
         var stepEl = document.getElementById('stepPalette');
@@ -559,7 +567,7 @@
                     window.setActiveBrushColorMode(next);
                 }
             });
-            toggleRow.appendChild(btn);
+            segWrap.appendChild(btn);
             return btn;
         }
 
@@ -589,7 +597,7 @@
             gateEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
             var gateBtn = document.createElement('button');
             gateBtn.type = 'button';
-            gateBtn.className = 'ch-text-toggle' + (gateEl.checked ? ' active' : '');
+            gateBtn.className = 'ch-text-toggle ch-gate-toggle' + (gateEl.checked ? ' active' : '');
             gateBtn.textContent = 'Gate';
             gateBtn.title = 'Lock max to original color — repeated strokes can\'t overflow into white';
             gateBtn.addEventListener('click', function () {
@@ -627,10 +635,16 @@
             + 'painted at, and past the Gate cap. Slide right onto the lock to keep it on. '
             + 'Your density decay setting is untouched.';
 
+        // Latch cell (Task 7): permanently visible so the second mode is
+        // discoverable — a small indicator that is hollow when unlatched and
+        // fills white-on-accent when latched. Click toggles the latch; the
+        // old drag-onto-it gesture still arms it mid-hold.
         var igniteLock = document.createElement('div');
         igniteLock.className = 'ch-ignite-lock';
-        igniteLock.textContent = '🔒';
-        igniteLock.title = 'Release here to lock Ignite on';
+        igniteLock.title = 'Ignite latch — click to keep Ignite on hands-free';
+        var igniteDot = document.createElement('span');
+        igniteDot.className = 'ch-ignite-dot';
+        igniteLock.appendChild(igniteDot);
 
         var igniteLocked = false, lockArmed = false, ignitePid = null;
 
@@ -643,7 +657,7 @@
             if (window.DyeNudge) window.DyeNudge.release();
             igniteBtnColor.classList.remove('active', 'locked');
             nudgeRow.classList.remove('holding', 'armed');
-            igniteLock.classList.remove('armed');
+            igniteLock.classList.remove('armed', 'latched');
         }
         function setArmed(v) {
             if (v === lockArmed) return;
@@ -685,6 +699,7 @@
                 igniteLocked = true;
                 setArmed(false);
                 igniteBtnColor.classList.add('locked');
+                igniteLock.classList.add('latched');
                 nudgeRow.classList.add('holding');
                 return;
             }
@@ -692,13 +707,18 @@
         }
         igniteBtnColor.addEventListener('pointerup', igniteRelease);
         igniteBtnColor.addEventListener('pointercancel', igniteRelease);
-        // The padlock is also a click target once latched, so the way out is
-        // wherever the eye already is.
+        // The latch cell toggles: click latches Ignite on from idle (engage
+        // and decline to release), click again unlatches. Mid-hold the button
+        // owns the pointer, so releases there are handled by igniteRelease.
         igniteLock.addEventListener('pointerdown', function (e) {
-            if (!igniteLocked) return;
             e.preventDefault();
             e.stopPropagation();
-            igniteStop();
+            if (igniteLocked) { igniteStop(); return; }
+            if (ignitePid !== null) return;
+            igniteEngage();
+            igniteLocked = true;
+            igniteBtnColor.classList.add('locked');
+            igniteLock.classList.add('latched');
         });
 
         nudgeRow.appendChild(igniteBtnColor);
