@@ -130,7 +130,7 @@
 }
 #sidebar-right .control-group label {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     margin-bottom: 6px;
     font-size: 10px;
@@ -143,6 +143,15 @@
     text-transform: none;
     opacity: 1;
     font-weight: 600;
+    margin-left: auto; /* value right-aligned; hk-cap sits beyond it */
+}
+/* Rows without a value span: the cap alone takes the right margin */
+#sidebar-right .control-group label .hk-cap:first-of-type:last-child,
+#sidebar-right .control-group label > .hk-cap:only-of-type {
+    margin-left: auto;
+}
+#sidebar-right .checkbox-group > .hk-cap {
+    margin-left: auto;
 }
 /* Material mode: the Curl label is a <select> that swaps the slider's role.
    Must out-specify the generic #sidebar-right select block below. */
@@ -322,12 +331,13 @@
     opacity: 0.7;
     margin-bottom: 2px;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
 }
 .anim-settings label .value-display {
     font-size: 11px;
     font-weight: 600;
     opacity: 1;
+    margin-left: auto;
 }
 
 /* ── Shooting Star origin picker ── */

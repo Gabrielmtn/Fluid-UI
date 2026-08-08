@@ -3362,7 +3362,7 @@
         var focusLbl = document.createElement('label');
         focusLbl.setAttribute('for', 'focusModeToggle');
         focusLbl.style.margin = '0';
-        focusLbl.textContent = 'Focus Mode (S)';
+        focusLbl.textContent = 'Focus Mode (F)';
         focusGroup.appendChild(focusCb);
         focusGroup.appendChild(focusLbl);
         body.appendChild(focusGroup);
