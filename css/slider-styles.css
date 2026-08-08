@@ -150,6 +150,10 @@ input[type=range]::-moz-range-thumb {
     flex: 1 1 auto;
     min-width: 0;
 }
+/* The whole row drags (pointer forwarding in 06-slider-updater.js) */
+.control-group:has(.fader-stack) {
+    cursor: ew-resize;
+}
 .fader-stack > input[type=range] {
     display: block;
     width: 100%;
