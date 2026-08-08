@@ -477,17 +477,22 @@
             if (newValueId) val.id = newValueId;
             if (slider) val.textContent = fmtSlider(slider);
         }
+        // Brush Size and the Fluid count get real affordances: a bordered
+        // stepper cell whose caps nudge the value (design handoff Task 5).
+        // The stepper takes its own full-width row so the header label
+        // keeps its room (clipped labels fail the work order's checklist).
+        var stepperRow = null;
         if (val) {
-            // Brush Size and the Fluid count get real affordances: a bordered
-            // stepper cell whose caps nudge the value (design handoff Task 5).
             if (sliderId === 'brushSize' || sliderId === 'curl') {
-                head.appendChild(stepperCell(val, sliderId, 1, 5));
+                stepperRow = stepperCell(val, sliderId, 1, 5);
+                stepperRow.classList.add('ch-stepper-row');
             } else {
                 head.appendChild(val);
             }
         }
 
         ch.appendChild(head);
+        if (stepperRow) ch.appendChild(stepperRow);
 
         if (matSel) ch.appendChild(buildModeSegments(matSel));
 
