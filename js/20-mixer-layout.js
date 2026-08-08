@@ -270,7 +270,7 @@
         // keeps the rarer replay + splat-ramp controls.
         buildBrushPanel(sizeChannel.querySelector('.ch-label'));
         strip.appendChild(sizeChannel);
-        strip.appendChild(faderChannel('Curl', 'blue', 'curl', 'curlValue'));
+        strip.appendChild(faderChannel('Fluid', 'blue', 'curl', 'curlValue'));
         strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
         var brushChannel = faderChannel('Multi-Brush', 'yellow', 'multiplier', 'multiplierValue');
@@ -305,7 +305,7 @@
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
         'Brush Size': 'Brush size for painting fluid — click the label for brush settings & presets',
-        'Curl': 'Vorticity strength - creates swirling motion',
+        'Fluid': 'Material mode (Fluid / Paint-Wet / Paint-Thick) + amount — vorticity in fluid mode',
         'Viscosity': 'Sharpness/detail enhancement',
         'Isolation': 'Motion isolation - how much color follows velocity',
         'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — click the value for arm colors',
@@ -314,6 +314,134 @@
         'Velocity': 'How fast motion fades',
         'Color': 'Current brush color'
     };
+
+    // ── Stepper cell (design handoff 4.4, strip-scaled) ──────────────
+    // Wraps an existing value element as the well of a [–][value][+] cell.
+    // The nudge caps drive the backing slider like a user drag (value +
+    // 'input'), so bindings, displays and the CSS fill all stay in sync.
+    // Click the value well to type a number directly.
+    function stepperCell(valueEl, sliderId, fineStep, coarseStep) {
+        const cell = document.createElement('div');
+        cell.className = 'ch-stepper';
+
+        function decimalsOf(el) {
+            const s = String(el.step || '');
+            const dot = s.indexOf('.');
+            return dot === -1 ? 0 : s.length - dot - 1;
+        }
+        function writeValue(el, v) {
+            const min = parseFloat(el.min) || 0;
+            const max = parseFloat(el.max) || 100;
+            v = Math.max(min, Math.min(max, v));
+            el.value = v.toFixed(decimalsOf(el));
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        function nudge(dir, coarse) {
+            const el = document.getElementById(sliderId);
+            if (!el) return;
+            writeValue(el, (parseFloat(el.value) || 0) + dir * (coarse ? coarseStep : fineStep));
+        }
+        function cap(txt, dir) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ch-step-cap';
+            b.textContent = txt;
+            b.title = (dir < 0 ? 'Decrease' : 'Increase') + ' — hold Shift for coarse steps';
+            let delay = null, repeat = null;
+            function stop() {
+                clearTimeout(delay); clearInterval(repeat);
+                delay = repeat = null;
+            }
+            b.addEventListener('pointerdown', function (e) {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                const coarse = e.shiftKey;
+                nudge(dir, coarse);
+                delay = setTimeout(function () {
+                    repeat = setInterval(function () { nudge(dir, coarse); }, 60);
+                }, 300);
+            });
+            b.addEventListener('pointerup', stop);
+            b.addEventListener('pointerleave', stop);
+            b.addEventListener('pointercancel', stop);
+            return b;
+        }
+
+        // Click the well to type. In clay mode the curl well is the brush-shape
+        // picker (29-material-modes owns that click) — stand down there.
+        valueEl.addEventListener('click', function () {
+            if (sliderId === 'curl' && window.MaterialModes && window.MaterialModes.active()) return;
+            if (cell.querySelector('.ch-step-input')) return;
+            const el = document.getElementById(sliderId);
+            if (!el) return;
+            const inp = document.createElement('input');
+            inp.type = 'number';
+            inp.className = 'ch-step-input';
+            inp.min = el.min; inp.max = el.max; inp.step = el.step;
+            inp.value = el.value;
+            valueEl.style.display = 'none';
+            cell.insertBefore(inp, valueEl);
+            inp.focus();
+            inp.select();
+            let done = false;
+            function commit(apply) {
+                if (done) return;
+                done = true;
+                if (apply) {
+                    const v = parseFloat(inp.value);
+                    if (Number.isFinite(v)) writeValue(el, v);
+                }
+                inp.remove();
+                valueEl.style.display = '';
+            }
+            inp.addEventListener('keydown', function (e) {
+                e.stopPropagation(); // keep global hotkeys out while typing
+                if (e.key === 'Enter') commit(true);
+                else if (e.key === 'Escape') commit(false);
+            });
+            inp.addEventListener('blur', function () { commit(true); });
+        });
+
+        cell.appendChild(cap('–', -1));
+        cell.appendChild(valueEl);
+        cell.appendChild(cap('+', 1));
+        return cell;
+    }
+
+    // ── Segmented material switch (design handoff 4.5 / Task 5) ─────
+    // Replaces the ▼ select popover: all modes visible, one filled. The
+    // native select stays in the DOM (hidden) as the value carrier —
+    // 29-material-modes binds by id and save/load reads it.
+    function buildModeSegments(sel) {
+        const row = document.createElement('div');
+        row.className = 'ch-seg-row';
+        const SHORT = { fluid: 'Fluid', acrylic: 'Wet', clay: 'Thick' };
+        Array.prototype.forEach.call(sel.options, function (opt) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ch-seg';
+            b.dataset.mode = opt.value;
+            b.textContent = SHORT[opt.value] || opt.textContent;
+            b.title = opt.textContent + ' — material mode';
+            b.addEventListener('click', function () {
+                if (sel.value === opt.value) return;
+                sel.value = opt.value;
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+                sync();
+            });
+            row.appendChild(b);
+        });
+        function sync() {
+            for (let i = 0; i < row.children.length; i++) {
+                const b = row.children[i];
+                b.classList.toggle('active', b.dataset.mode === sel.value);
+            }
+        }
+        sel.addEventListener('change', sync);
+        setInterval(sync, 2000); // programmatic sets (preset loads) fire no change
+        sync();
+        return row;
+    }
 
     function faderChannel(label, accent, sliderId, existingValueId, newValueId) {
         const ch = document.createElement('div');
@@ -328,19 +456,13 @@
 
         const lbl = document.createElement('div');
         lbl.className = 'ch-label';
-        // The Curl channel's label IS the material-mode selector (Curl/Fluid/
-        // Ooze/Clay) — adopt it from the sidebar markup instead of static text.
+        lbl.textContent = label;
+        // The Fluid channel's mode select is replaced by a segmented switch
+        // (Task 5): keep the native select hidden as the mode's value carrier.
         const matSel = (sliderId === 'curl') ? document.getElementById('materialMode') : null;
         if (matSel) {
-            lbl.appendChild(matSel);
-            // Re-fit the select to its label text in the strip's font — deferred
-            // a tick: this label is still detached here, and computed styles on
-            // a detached node measure with the wrong font.
-            setTimeout(function () {
-                if (window.MaterialModes && window.MaterialModes.resizeLabel) window.MaterialModes.resizeLabel();
-            }, 0);
-        } else {
-            lbl.textContent = label;
+            matSel.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+            ch.appendChild(matSel);
         }
         if (CHANNEL_TOOLTIPS[label]) lbl.title = CHANNEL_TOOLTIPS[label];
         head.appendChild(lbl);
@@ -355,9 +477,19 @@
             if (newValueId) val.id = newValueId;
             if (slider) val.textContent = fmtSlider(slider);
         }
-        if (val) head.appendChild(val);
+        if (val) {
+            // Brush Size and the Fluid count get real affordances: a bordered
+            // stepper cell whose caps nudge the value (design handoff Task 5).
+            if (sliderId === 'brushSize' || sliderId === 'curl') {
+                head.appendChild(stepperCell(val, sliderId, 1, 5));
+            } else {
+                head.appendChild(val);
+            }
+        }
 
         ch.appendChild(head);
+
+        if (matSel) ch.appendChild(buildModeSegments(matSel));
 
         if (slider) {
             const fader = document.createElement('div');
