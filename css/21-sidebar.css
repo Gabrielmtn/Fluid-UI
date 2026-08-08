@@ -213,8 +213,8 @@
 #sidebar-right input[type="color"] {
     width: 36px;
     height: 36px;
-    border: 2px solid rgba(255, 255, 255, 0.12);
-    border-radius: 50%;
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 0;
     cursor: pointer;
     padding: 0;
     background: transparent;

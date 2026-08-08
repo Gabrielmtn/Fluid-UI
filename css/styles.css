@@ -436,11 +436,13 @@
         
         /* Slider styles moved to slider-styles.css */
         
+        /* Color well (design handoff 4.9): 38px square, flat. The round
+           swatch was the app's only circle and read as decoration. */
         input[type="color"] {
-            width: 40px;
-            height: 40px;
-            border: 2px solid rgba(255, 255, 255, 0.12);
-            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            border: 1px solid var(--ground-500, #2a2e37);
+            border-radius: 0;
             cursor: pointer;
             padding: 0;
             background: transparent;
@@ -448,21 +450,23 @@
             -moz-appearance: none;
             appearance: none;
             outline: none;
-            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4),
-                        inset 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        input[type="color"]:focus-visible {
+            outline: 2px solid var(--accent, #ec3013);
+            outline-offset: 2px;
         }
         input[type="color"]::-webkit-color-swatch-wrapper {
             padding: 0;
-            border-radius: 50%;
+            border-radius: 0;
             overflow: hidden;
         }
         input[type="color"]::-webkit-color-swatch {
             border: none;
-            border-radius: 50%;
+            border-radius: 0;
         }
         input[type="color"]::-moz-color-swatch {
             border: none;
-            border-radius: 50%;
+            border-radius: 0;
         }
         
         .presets {

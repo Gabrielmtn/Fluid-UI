@@ -590,7 +590,7 @@ body.focus-mode #canvas {
     height: 24px;
     padding: 0;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
+    border-radius: 0;
     cursor: pointer;
     background: transparent;
 }
@@ -598,7 +598,7 @@ body.focus-mode #canvas {
     padding: 2px;
 }
 .path-color-picker::-webkit-color-swatch {
-    border-radius: 2px;
+    border-radius: 0;
     border: none;
 }
 .path-use-brush-btn {
