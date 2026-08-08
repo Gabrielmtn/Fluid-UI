@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #0a0b0e; font-family: "Archivo", system-ui, sans-serif; }
+  a { color: #ec3013; }
+  a:hover { color: #ff563c; }
+  ::selection { background: rgba(236,48,19,0.35); }
+  .rk::-webkit-scrollbar { width: 10px; }
+  .rk::-webkit-scrollbar-track { background: #0a0b0e; }
+  .rk::-webkit-scrollbar-thumb { background: #232830; }
+</style>
+</helmet>
+<div style="width:100%;min-width:900px;height:900px;background:#0a0b0e;display:grid;grid-template-columns:minmax(0,1fr) 348px;position:relative;grid-template-rows:110px minmax(0,1fr) 38px;overflow:hidden;user-select:none;touch-action:none">
+
+  <div style="grid-column:1 / -1;display:flex;flex-direction:column;background:#0e0f12;border-bottom:2px solid #0a0b0e;overflow:hidden;min-width:0">
+
+    <div style="height:54px;flex:none;display:flex;border-bottom:2px solid #0a0b0e;min-width:0">
+      <sc-for list="{{ strip }}" as="cell" hint-placeholder-count="5">
+        <div onPointerDown="{{ cell.onDrag }}" style="flex:1 1 0;min-width:0;overflow:hidden;padding:8px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:3px;opacity:{{ cell.dim }};cursor:ew-resize">
+          <div style="font:800 10px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">{{ cell.label }}</div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px">
+            <span style="font:700 19px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5;white-space:nowrap;flex:1 1 auto;min-width:0;overflow:hidden">{{ cell.text }}</span>
+            <span style="font:800 10px/16px Archivo;white-space:nowrap;height:16px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;padding:0 4px;flex:0 1 auto;min-width:0;overflow:hidden;border:1px solid {{ cell.capBorder }};background:{{ cell.capBg }};color:{{ cell.capInk }}">{{ cell.key }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="height:54px;flex:none;display:flex;min-width:0">
+      <div style="width:172px;flex:none;padding:8px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:4px">
+        <span style="font:800 10px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e;white-space:nowrap">Color</span>
+        <div style="display:flex;gap:5px;align-items:center">
+          <span onClick="{{ onOpenPicker }}" style="width:22px;height:22px;background:{{ activeHex }};border:2px solid #ec3013;display:block;cursor:pointer;flex:none"></span>
+          <span style="width:22px;height:22px;background:#f0a626;border:1px solid #2a2e37;display:block;flex:none"></span>
+          <span style="width:22px;height:22px;background:#e0432a;border:1px solid #2a2e37;display:block;flex:none"></span>
+          <span style="width:22px;height:22px;background:#a8324f;border:1px solid #2a2e37;display:block;flex:none"></span>
+          <span onClick="{{ onOpenPicker }}" style="width:22px;height:22px;border:1px dashed #2a2e37;color:#7b828e;font:700 13px Archivo;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none">+</span>
+        </div>
+      </div>
+
+      <div style="width:252px;flex:none;padding:8px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:4px;min-width:0">
+        <span style="font:800 10px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e;white-space:nowrap">Color mode</span>
+        <div style="display:flex;gap:10px;min-width:0">
+          <div style="flex:1 1 0;min-width:0;display:flex;border:1px solid #2a2e37">
+            <sc-for list="{{ colorMode }}" as="m" hint-placeholder-count="3">
+              <span onClick="{{ m.onPick }}" style="flex:1 1 0;min-width:0;height:22px;background:{{ m.bg }};color:{{ m.ink }};border-left:{{ m.edge }};font:800 9px Archivo;letter-spacing:.06em;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;white-space:nowrap">{{ m.label }}</span>
+            </sc-for>
+          </div>
+          <span onClick="{{ onGate }}" style="width:54px;flex:none;height:22px;background:{{ gateBg }};color:{{ gateInk }};border:1px solid {{ gateEdge }};font:800 9px Archivo;letter-spacing:.06em;display:flex;align-items:center;justify-content:center;cursor:pointer">GATE</span>
+        </div>
+      </div>
+      <div style="width:186px;flex:none;padding:8px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:4px;min-width:0">
+        <span style="font:800 10px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e;white-space:nowrap">Ignite — hold or lock</span>
+        <div style="display:flex;gap:4px;min-width:0">
+          <span onPointerDown="{{ onIgniteDown }}" style="flex:1 1 0;min-width:0;height:22px;background:{{ igniteBg }};border:1px solid {{ igniteEdge }};color:{{ igniteInk }};font:800 10px Archivo;letter-spacing:.12em;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;white-space:nowrap">IGNITE</span>
+          <span onClick="{{ onLatch }}" style="width:30px;flex:none;height:22px;border:1px solid {{ latchEdge }};background:{{ latchBg }};display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <span style="width:9px;height:9px;background:{{ latchDot }};border:1px solid {{ latchDotEdge }};display:block"></span>
+          </span>
+        </div>
+      </div>
+
+      <span style="flex:1 1 0;min-width:0;border-right:2px solid #0a0b0e"></span>
+
+      <div style="display:flex;align-items:stretch;flex:none">
+        <span style="width:56px;background:#232830;border-right:2px solid #0a0b0e;display:flex;align-items:center;justify-content:center;color:#f2f3f5;font:700 15px Archivo">❙❙</span>
+        <span style="width:56px;background:#ec3013;display:flex;align-items:center;justify-content:center;color:#fff;font:700 15px Archivo">●</span>
+      </div>
+      <sc-if value="{{ modActive }}" hint-placeholder-val="{{ false }}">
+        <div style="width:112px;flex:none;background:#191c22;border-left:2px solid #0a0b0e;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:0 12px">
+          <span style="font:800 10px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#ec3013;white-space:nowrap">{{ modName }}</span>
+          <span style="font:500 10px Archivo;color:#7b828e">held</span>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{ pickerOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;left:14px;top:116px;width:300px;background:#0e0f12;border:2px solid #0a0b0e;box-shadow:0 18px 48px rgba(0,0,0,0.6);z-index:40">
+      <div onPointerDown="{{ onSV }}" style="height:176px;position:relative;cursor:crosshair;background:linear-gradient(to top,#000,rgba(0,0,0,0)),linear-gradient(to right,#fff,{{ hueHex }})">
+        <span style="position:absolute;left:{{ svLeft }};top:{{ svTop }};width:16px;height:16px;margin:-8px 0 0 -8px;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,0.5);display:block;pointer-events:none"></span>
+      </div>
+      <div style="padding:12px 14px;background:#16181d;border-top:2px solid #0a0b0e;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:26px;height:26px;flex:none;background:#232830;border:1px solid #2a2e37;color:#b9bec7;font:700 12px Archivo;display:flex;align-items:center;justify-content:center;cursor:pointer">⌖</span>
+          <span style="width:26px;height:26px;flex:none;background:{{ activeHex }};border:1px solid #2a2e37;display:block"></span>
+          <div onPointerDown="{{ onHue }}" style="flex:1;min-width:0;height:20px;position:relative;cursor:ew-resize;border:1px solid #2a2e37;background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)">
+            <span style="position:absolute;left:{{ hueLeft }};top:-3px;bottom:-3px;width:12px;transform:translateX(-50%);background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:1px solid #0a0b0e;display:block;pointer-events:none"></span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <sc-for list="{{ rgbCells }}" as="c" hint-placeholder-count="3">
+            <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:4px">
+              <span style="height:30px;background:#232830;border:1px solid #2a2e37;color:#f2f3f5;font:700 14px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center">{{ c.v }}</span>
+              <span style="font:800 10px Archivo;letter-spacing:.14em;text-transform:uppercase;color:#7b828e;text-align:center">{{ c.k }}</span>
+            </span>
+          </sc-for>
+          <span onClick="{{ onClosePicker }}" style="width:56px;flex:none;height:30px;background:#ec3013;color:#fff;font:800 10px Archivo;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;cursor:pointer">Done</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="position:relative;background:#0a0b0e;overflow:hidden">
+    <div onPointerDown="{{ onPath }}" onPointerMove="{{ onCursorMove }}" onPointerLeave="{{ onCursorLeave }}" onWheel="{{ onCursorWheel }}" style="position:absolute;inset:0;cursor:none">
+      <svg viewBox="0 0 1092 788" preserveAspectRatio="none" style="display:block;width:100%;height:100%">
+        <defs>
+          <linearGradient id="pg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#2fb8c8" />
+            <stop offset="0.35" stop-color="#f0a626" />
+            <stop offset="0.7" stop-color="#e0432a" />
+            <stop offset="1" stop-color="#a8324f" />
+          </linearGradient>
+        </defs>
+        <path d="M90 560 C230 130, 400 130, 520 420 C620 660, 780 700, 900 470 C960 356, 980 250, 1010 300" fill="none" stroke="#16181d" stroke-width="46" stroke-linecap="round" />
+        <path d="M90 560 C230 130, 400 130, 520 420 C620 660, 780 700, 900 470 C960 356, 980 250, 1010 300" fill="none" stroke="url(#pg)" stroke-width="5" stroke-linecap="round" opacity="0.75" />
+      </svg>
+      <span style="position:absolute;left:{{ dotLeft }};top:{{ dotTop }};width:26px;height:26px;margin:-13px 0 0 -13px;background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:2px solid #0a0b0e;display:block;pointer-events:none"></span>
+      <span style="position:absolute;left:24px;top:22px;font:800 11px Archivo;letter-spacing:.14em;text-transform:uppercase;color:#2a2e37">Light shift path · drag the cap to scrub · scroll = brush size · shift+scroll = angle</span>
+    </div>
+    <div style="position:absolute;inset:0;pointer-events:none">
+      <span style="position:absolute;left:{{ curX }};top:{{ curY }};width:{{ curD }};height:{{ curD }};transform:translate(-50%,-50%);border:1px solid rgba(242,243,245,0.55);border-radius:50%;display:{{ curShow }};align-items:center;justify-content:center;pointer-events:none">
+        <span style="width:100%;height:2px;background:{{ activeHex }};transform:rotate({{ curAngle }});display:block"></span>
+      </span>
+    </div>
+  </div>
+
+  <div class="rk" style="background:#0e0f12;border-left:2px solid #0a0b0e;display:grid;grid-template-columns:34px 1fr;overflow:hidden">
+    <div style="background:#0a0b0e;display:flex;flex-direction:column;align-items:stretch;overflow:hidden">
+      <sc-for list="{{ rail }}" as="r" hint-placeholder-count="10">
+        <span onClick="{{ r.onPick }}" style="height:{{ r.h }};display:flex;align-items:center;justify-content:center;font:800 10px Archivo;letter-spacing:.1em;color:{{ r.ink }};background:{{ r.bg }};border-bottom:1px solid #16181d;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed;overflow:hidden">{{ r.abbr }}</span>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:10px 12px;background:#191c22;border-bottom:2px solid #0a0b0e;display:flex;flex-direction:column;gap:8px;flex:none">
+        <div style="display:flex;align-items:center;height:32px;background:#232830;border:1px solid #2a2e37;padding:0 10px;gap:8px">
+          <span style="font:800 12px Archivo;color:#7b828e">/</span>
+          <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="Filter controls" style="flex:1;background:transparent;border:0;outline:none;font:700 13px Archivo;color:#f2f3f5;padding:0" />
+          <span style="font:700 11px Archivo;font-variant-numeric:tabular-nums;color:#7b828e;white-space:nowrap">{{ shownCount }}</span>
+        </div>
+      </div>
+
+      <div class="rk" style="flex:1;overflow-y:auto;overflow-x:hidden">
+        <sc-for list="{{ sections }}" as="sec" hint-placeholder-count="4">
+          <div style="border-bottom:2px solid #0a0b0e">
+            <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:#191c22;border-bottom:2px solid #0a0b0e">
+              <span style="width:8px;height:8px;background:#ec3013;display:block;flex:none"></span>
+              <span style="font:800 12px Archivo;letter-spacing:.16em;text-transform:uppercase;color:#f2f3f5;white-space:nowrap">{{ sec.name }}</span>
+              <span style="flex:1"></span>
+              <span style="font:700 11px Archivo;font-variant-numeric:tabular-nums;color:#7b828e">{{ sec.n }}</span>
+            </div>
+            <sc-for list="{{ sec.rows }}" as="row" hint-placeholder-count="6">
+              <div style="padding:12px {{ row.padRight }} 14px {{ row.padLeft }};background:#16181d;border-bottom:2px solid #0a0b0e;opacity:{{ row.dim }}">
+
+                <div onClick="{{ row.onToggle }}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:24px">
+                  <span style="display:flex;align-items:center;gap:12px;min-width:0">
+                    <sc-if value="{{ row.isB }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:20px;height:20px;flex:none;background:{{ row.boxBg }};border:{{ row.boxEdge }};display:block;cursor:pointer"></span>
+                    </sc-if>
+                    <span style="font:800 14px Archivo;letter-spacing:.09em;text-transform:uppercase;color:{{ row.labelInk }};line-height:1.2">{{ row.label }}</span>
+                  </span>
+                  <span style="display:flex;align-items:center;gap:8px;flex:none">
+                    <sc-if value="{{ row.hasKey }}" hint-placeholder-val="{{ false }}">
+                      <span style="font:800 10px/17px Archivo;white-space:nowrap;height:17px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:0 5px;border:1px solid {{ row.capBorder }};background:{{ row.capBg }};color:{{ row.capInk }}">{{ row.key }}</span>
+                    </sc-if>
+                    <sc-if value="{{ row.isVal }}" hint-placeholder-val="{{ true }}">
+                      <span style="font:700 17px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5;white-space:nowrap">{{ row.text }}</span>
+                    </sc-if>
+                  </span>
+                </div>
+
+                <sc-if value="{{ row.isF }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;justify-content:space-between;margin:12px 0 5px">
+                    <span style="font:700 9px Archivo;letter-spacing:.08em;color:#7b828e">{{ row.lo }}</span>
+                    <span style="font:700 9px Archivo;letter-spacing:.08em;color:#7b828e">{{ row.mid }}</span>
+                    <span style="font:700 9px Archivo;letter-spacing:.08em;color:#7b828e">{{ row.hi }}</span>
+                  </div>
+                  <div onPointerDown="{{ row.onDrag }}" style="height:22px;background:#0a0b0e;border:1px solid #2a2e37;position:relative;cursor:ew-resize;padding:5px 0">
+                    <div style="position:absolute;top:5px;bottom:5px;left:1px;width:{{ row.pct }};background:linear-gradient(90deg,#f0a626,#e0432a);pointer-events:none"></div>
+                    <div style="position:absolute;top:-2px;bottom:-2px;left:{{ row.pct }};width:14px;transform:translateX(-50%);background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:1px solid #0a0b0e;pointer-events:none"></div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ row.isSt }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin:10px 0 0;display:flex;border:1px solid #2a2e37">
+                    <span onClick="{{ row.onDec }}" style="width:44px;height:34px;background:linear-gradient(180deg,#2b303a,#1c2027);color:#f2f3f5;font:800 15px Archivo;display:flex;align-items:center;justify-content:center;border-right:1px solid #2a2e37;cursor:pointer">–</span>
+                    <span style="flex:1;height:34px;background:#232830;color:#f2f3f5;font:700 16px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center">{{ row.text }}</span>
+                    <span onClick="{{ row.onInc }}" style="width:44px;height:34px;background:linear-gradient(180deg,#2b303a,#1c2027);color:#f2f3f5;font:800 15px Archivo;display:flex;align-items:center;justify-content:center;border-left:1px solid #2a2e37;cursor:pointer">+</span>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ row.isSg }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin:10px 0 0;display:flex;border:1px solid #2a2e37">
+                    <sc-for list="{{ row.segs }}" as="seg" hint-placeholder-count="3">
+                      <span onClick="{{ seg.onPick }}" style="flex:1;min-width:0;height:34px;background:{{ seg.bg }};color:{{ seg.ink }};font:800 10px Archivo;letter-spacing:.07em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;border-left:{{ seg.edge }};cursor:pointer;overflow:hidden;white-space:nowrap;padding:0 4px">{{ seg.label }}</span>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ row.isSel }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ row.onCycle }}" style="margin:10px 0 0;height:34px;background:#232830;border:1px solid #2a2e37;display:flex;align-items:center;justify-content:space-between;padding:0 12px;cursor:pointer">
+                    <span style="font:700 13px Archivo;color:#f2f3f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ row.text }}</span>
+                    <span style="color:#7b828e;font-size:10px;flex:none;margin-left:8px">▼</span>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ row.isCol }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin:10px 0 0;display:flex;gap:6px">
+                    <sc-for list="{{ row.swatches }}" as="sw" hint-placeholder-count="4">
+                      <span onClick="{{ sw.onPick }}" style="width:36px;height:36px;background:{{ sw.hex }};border:{{ sw.edge }};display:block;cursor:pointer"></span>
+                    </sc-for>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ row.isAct }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin:10px 0 0;height:38px;background:{{ row.actBg }};border:{{ row.actEdge }};color:{{ row.actInk }};font:800 12px Archivo;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;padding:0 14px;cursor:pointer">{{ row.actLabel }}</div>
+                </sc-if>
+
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+        <div style="height:20px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="grid-column:1 / -1;display:flex;align-items:stretch;background:#0e0f12;border-top:2px solid #0a0b0e">
+    <sc-if value="{{ modActive }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:stretch;flex:1">
+        <span style="width:112px;background:#ec3013;color:#fff;font:800 10px Archivo;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;padding:0 12px;flex:none">{{ modName }}</span>
+        <sc-for list="{{ modRow }}" as="m" hint-placeholder-count="3">
+          <span style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:2px solid #0a0b0e"><span style="font:800 10px/16px Archivo;white-space:nowrap;color:#f2f3f5;background:#232830;border:1px solid #2a2e37;padding:2px 6px">{{ m.key }}</span><span style="font:700 12px Archivo;letter-spacing:.04em;color:#b9bec7;white-space:nowrap">{{ m.label }}</span></sc-for>
+        <span style="flex:1"></span>
+        <span style="font:500 10px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#7b828e;padding:0 14px;display:flex;align-items:center;white-space:nowrap">F1 — all hotkeys</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ modIdle }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;flex:1;padding:0 14px;gap:14px">
+        <span style="font:800 10px Archivo;letter-spacing:.14em;text-transform:uppercase;color:#2a2e37;white-space:nowrap">Prototype — simulate a held modifier</span>
+        <sc-for list="{{ modSim }}" as="s" hint-placeholder-count="3">
+          <span onClick="{{ s.onPick }}" style="font:800 10px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#7b828e;border:1px solid #232830;padding:4px 9px;cursor:pointer;white-space:nowrap">{{ s.label }}</span>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const SEGS = [
+  [[90,560],[230,130],[400,130],[520,420]],
+  [[520,420],[620,660],[780,700],[900,470]],
+  [[900,470],[960,356],[980,250],[1010,300]]
+];
+function bez(s, t) {
+  const u = 1 - t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
+  return [a*s[0][0]+b*s[1][0]+c*s[2][0]+d*s[3][0], a*s[0][1]+b*s[1][1]+c*s[2][1]+d*s[3][1]];
+}
+const PATH = (() => {
+  const pts = [], N = 70;
+  SEGS.forEach(s => { for (let i = 0; i <= N; i++) pts.push(bez(s, i / N)); });
+  let len = 0; const cum = [0];
+  for (let i = 1; i < pts.length; i++) { len += Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]); cum.push(len); }
+  return { pts, cum, len };
+})();
+function atT(t) {
+  const target = Math.max(0, Math.min(1, t)) * PATH.len;
+  const { pts, cum } = PATH;
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < target) i++;
+  const span = cum[i] - cum[i-1] || 1, f = (target - cum[i-1]) / span;
+  return [pts[i-1][0] + (pts[i][0]-pts[i-1][0])*f, pts[i-1][1] + (pts[i][1]-pts[i-1][1])*f];
+}
+
+function hsv2rgb(h, s, v) {
+  const c = v * s, hp = (h % 360) / 60, x = c * (1 - Math.abs((hp % 2) - 1));
+  const seg = [[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][Math.floor(hp) % 6];
+  const m = v - c;
+  return seg.map(n => Math.round((n + m) * 255));
+}
+function hex(rgb) { return '#' + rgb.map(n => n.toString(16).padStart(2, '0')).join(''); }
+
+const COLOR_MODES = ['RND', 'STEP', '🌈'];
+
+const f   = (id, label, v, min, max, dec, unit, key, mod) => ({ id, label, type: 'f', v, min, max, dec, unit: unit || '', key, mod });
+const sp  = (id, label, v, min, max, dec, unit, key, mod) => ({ id, label, type: 'sp', v, min, max, dec, unit: unit || '', key, mod });
+const st  = (id, label, v, min, max, step, dec, key) => ({ id, label, type: 'st', v, min, max, step, dec, key });
+const sg  = (id, label, v, opts, key) => ({ id, label, type: 'sg', v, opts, key });
+const sel = (id, label, v, opts) => ({ id, label, type: 'sel', v, opts });
+const bl  = (id, label, v, key) => ({ id, label, type: 'b', v, key });
+const col = (id, label, v, opts) => ({ id, label, type: 'col', v, opts });
+const act = (id, label, w, key) => ({ id, label, type: 'act', w, key });
+
+const SECTIONS = [
+  { id: 'brush', name: 'Brush', abbr: 'BRUSH', rows: [
+    st('brushSize', 'Brush Size', 30, 1, 120, 0.5, 1, '[ ]'),
+    sg('fluidMode', 'Fluid Mode', 0, ['Fluid', 'Paint-Wet', 'Paint-Thick']),
+    st('splats', 'Splat Count', 25, 1, 64, 1, 0),
+    f('viscosity', 'Viscosity', 0.8, 0, 3, 2),
+    sg('multiBrush', 'Multi-Brush', 0, ['1×', '2×', '4×', '6×', '8×'], '1–8'),
+    f('timeScale', 'Time', 1, 0.1, 4, 2, '×'),
+    bl('randomColors', 'Random Colors', true, 'R'),
+    bl('stepPalette', 'Step Through Palette', false, 'A')
+  ] },
+  { id: 'sim', name: 'Simulation', abbr: 'SIM', rows: [
+    sel('fpsLimit', 'FPS Limit', 1, ['30 fps — Battery Saver', '60 fps — Standard', '120 fps', '144 fps', 'Native (Match Display)', 'Uncapped']),
+    Object.assign(sel('visualQuality', 'Visual Quality', 1, ['Cinematic (4K)', 'Ultra (2K)', 'Very High (1.5K)', 'High (1K)', 'Medium (512)', 'Low (256)']), { key: '↑↓', mod: 'alt' }),
+    Object.assign(sel('physicsDetail', 'Physics Detail', 3, ['Ultra Extreme (2K)', 'Extreme+ (1.5K)', 'Extreme (1K)', 'Ultra (512)', 'High (384)', 'Standard (256)']), { key: '↑↓', mod: 'altshift' }),
+    f('densitySustain', 'Density Sustain', 0.993, 0.9, 1, 4),
+    f('velocitySustain', 'Velocity Sustain', 0.999, 0.9, 1, 4),
+    f('pressureDissipation', 'Pressure Dissipation', 0.944, 0, 1, 3),
+    f('pressureIteration', 'Pressure Iteration', 32, 1, 128, 0),
+    f('maxSpeed', 'Max Speed', 30, 1, 200, 0),
+    bl('crispAdvection', 'Crisp Advection', true),
+    bl('multigrid', 'Multigrid Pressure', true),
+    st('vCycles', 'V-Cycles', 2, 1, 8, 1, 0),
+    st('preSmooth', 'Pre-Smooth', 2, 0, 8, 1, 0),
+    st('postSmooth', 'Post-Smooth', 2, 0, 8, 1, 0),
+    f('coarseSolve', 'Coarse Solve', 8, 1, 32, 0),
+    f('relaxation', 'Relaxation', 1, 0.5, 2, 2),
+    f('motionIsolation', 'Motion Isolation', 2.5, 0, 10, 3, '', 'Ctrl+⇕')
+  ] },
+  { id: 'fx', name: 'Effects', abbr: 'FX', rows: [
+    f('swirl', 'Swirl', 0, 0, 30, 2),
+    f('dryWet', 'Dry — Wet', 0, 0, 1, 2),
+    f('dryTime', 'Dry Time', 3, 0.1, 20, 1, 's'),
+    f('ridges', 'Ridges', 0, 0, 5, 1),
+    bl('microDetail', 'Micro Detail', false),
+    f('clarity', 'Clarity', 0, 0, 2, 1),
+    f('vibrance', 'Vibrance', 0, 0, 2, 1),
+    bl('surfaceShading', 'Surface Shading', false),
+    f('shadeIntensity', 'Shading Intensity', 0.8, 0, 2, 2, '', null, null),
+    f('relief', 'Relief', 1, 0, 3, 2),
+    f('gloss', 'Gloss', 0.35, 0, 1, 2),
+    bl('glow', 'Glow', false),
+    f('glowIntensity', 'Glow Intensity', 0.8, 0, 2, 2),
+    f('glowThreshold', 'Glow Threshold', 0.6, 0, 1, 2)
+  ] },
+  { id: 'kaleido', name: 'Kaleidoscope', abbr: 'KAL', rows: [
+    bl('kaleido', 'Kaleido', false),
+    f('segments', 'Segments', 12, 2, 64, 0),
+    sel('kaleidoMode', 'Kaleidoscope Mode', 0, ['Wedge', 'Mirror H', 'Mirror V', 'Mirror Quad', 'Spiral', 'Off']),
+    f('angle', 'Angle', 0, 0, 360, 0, '°'),
+    bl('animateRotation', 'Animate Rotation', false),
+    f('spinSpeed', 'Spin Speed', 30, 0, 720, 0, '°/s'),
+    f('twist', 'Twist', 0, -5, 5, 1),
+    f('zoom', 'Zoom', 1, 0.25, 4, 2),
+    f('blend', 'Blend', 1, 0, 1, 2)
+  ] },
+  { id: 'light', name: 'Light', abbr: 'LIGHT', rows: [
+    bl('lightSource', 'Light Source', false),
+    sg('lightMode', 'Light Mode', 0, ['Manual', 'Random']),
+    f('lightSpeed', 'Light Speed', 0.5, 0, 2, 2),
+    f('lightIntensity', 'Light Intensity', 0.5, 0, 1, 2),
+    f('ambient', 'Ambient', 0.3, 0, 1, 2),
+    bl('lightShift', 'Light Shift', true),
+    sel('blendMode', 'Blend Mode', 0, ['Replace', 'Tint', 'Overlay', 'Multiply', 'Screen', 'Additive']),
+    f('shiftSpeed', 'Shift Speed', 0.5, 0, 2, 2),
+    f('shiftThreshold', 'Threshold', 0.85, 0, 1, 2),
+    f('shiftIntensity', 'Shift Intensity', 0.5, 0, 1, 2),
+    f('saturation', 'Saturation', 1, 0, 2, 2),
+    act('clearPath', 'Clear Path', 'ghost')
+  ] },
+  { id: 'display', name: 'Display', abbr: 'DISP', rows: [
+    col('bgColor', 'Background Color', 0, ['#0a0b0e', '#16181d', '#f2f3f5', '#2fb8c8']),
+    bl('transparentBg', 'Transparent Background', false),
+    f('canvasOpacity', 'Canvas Opacity', 1, 0, 1, 2),
+    bl('emptyAlphaLocked', 'Empty Alpha Locked', true),
+    f('bgTransparency', 'Background Transparency', 0.8, 0, 1, 2),
+    bl('showCursor', 'Show Cursor', true, 'C'),
+    col('cursorRing', 'Cursor Ring Color', 1, ['#f2f3f5', '#ec3013', '#f0a626', '#2fb8c8']),
+    f('cursorSize', 'Cursor Size', 0.25, 0, 1, 2),
+    f('cursorOpacity', 'Cursor Opacity', 0.5, 0, 1, 2),
+    bl('showHandles', 'Show Border & Handles', false, 'H'),
+    bl('lockBorders', 'Lock Canvas Borders', false, 'L'),
+    bl('focusMode', 'Focus Mode', false, 'F'),
+    bl('stats', 'Stats For Nerds', false)
+  ] },
+  { id: 'palettes', name: 'Colors & Palettes', abbr: 'PAL', rows: [
+    col('savedColors', 'Saved Colors', 0, ['#2fb8c8', '#f0a626', '#e0432a', '#a8324f']),
+    act('saveColor', 'Save Color', 'secondary', 'Shift+S'),
+    act('clearColors', 'Clear Colors', 'ghost', 'Shift+X'),
+    sel('palette', 'Palette', 0, ['Mountain Majesty', 'Sunset Dreams', 'Ocean Deep', 'Forest Floor']),
+    bl('gate', 'Gate', false)
+  ] },
+  { id: 'transport', name: 'Recorder', abbr: 'REC', rows: [
+    sg('recordMode', 'Recording Mode', 0, ['Off', 'Minimized', 'Full']),
+    sg('replaySpeed', 'Replay Speed', 2, ['0.25×', '0.5×', '1×', '2×', '4×']),
+    act('record', 'Record', 'primary', 'F9'),
+    act('playAll', 'Play All', 'secondary', 'Shift+Space'),
+    act('newLayer', 'New Layer', 'secondary', 'Ctrl+Shift+N'),
+    act('clearLayer', 'Clear Active Layer', 'ghost', 'Del')
+  ] },
+  { id: 'multi', name: 'Multi Artist', abbr: 'MULTI', rows: [
+    act('createRoom', 'Create Room', 'primary'),
+    act('stranger', 'Paint with a stranger', 'secondary'),
+    bl('lockRoom', 'Lock Room', false),
+    bl('lockSettings', 'Lock Settings', false)
+  ] }
+];
+
+const STRIP = [
+  { id: 'brushSize', label: 'Brush', key: '[ ]', dec: 1 },
+  { id: 'splats', label: 'Splats', key: '', dec: 0 },
+  { id: 'viscosity', label: 'Viscosity', key: '', dec: 2 },
+  { id: 'motionIsolation', label: 'Isolation', key: '', dec: 3 },
+  { id: 'timeScale', label: 'Time', key: '', dec: 2, unit: '×' }
+];
+
+const MODS = {
+  none: { name: '', rows: [] },
+  ctrl: { name: 'Ctrl', rows: [{ key: '← →', label: 'Cycle palette' }, { key: 'Z', label: 'Undo' }, { key: 'Y', label: 'Redo' }] },
+  alt: { name: 'Alt', rows: [{ key: 'E', label: 'Quick export' }, { key: 'M', label: 'Mutate settings' }] },
+  altshift: { name: 'Alt+Shift', rows: [{ key: '↑ ↓', label: 'Physics detail' }] }
+};
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const vals = {};
+    SECTIONS.forEach(s => s.rows.forEach(r => { if (r.v !== undefined) vals[r.id] = r.v; }));
+    this.state = {
+      vals, query: '', pick: 'all', mod: 'none', playT: 0.3, scrubbing: false,
+      colorMode: 0, gate: true,
+      cursor: { x: 0.42, y: 0.55, on: true }, brushAngle: 0,
+      igniteHeld: false, igniteLatched: false,
+      hsv: { h: 222, s: 0.63, v: 0.95 }, pickerOpen: false
+    };
+  }
+
+  componentDidMount() {
+    let last = performance.now();
+    const tick = now => {
+      const dt = (now - last) / 1000; last = now;
+      if (!this.state.scrubbing) this.setState(s => ({ playT: (s.playT + dt * 0.07) % 1 }));
+      this._raf = requestAnimationFrame(tick);
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this._raf); }
+
+  set(id, v) { this.setState(s => ({ vals: { ...s.vals, [id]: v } })); }
+
+  fmt(r, v) {
+    if (r.type === 'sel') return r.opts[v];
+    if (r.type === 'sg') return r.opts[v];
+    const n = Number(v).toFixed(r.dec ?? 2);
+    return n + (r.unit || '');
+  }
+
+  dragTrack(e, r) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const apply = ev => {
+      const frac = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+      const off = Math.abs(ev.clientY - (rect.top + rect.height / 2));
+      const target = r.min + frac * (r.max - r.min);
+      const cur = this.state.vals[r.id];
+      const fine = ev.shiftKey || off > 44;
+      this.set(r.id, fine ? cur + (target - cur) * 0.08 : target);
+    };
+    apply(e);
+    const move = ev => apply(ev);
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    e.preventDefault();
+  }
+
+  dragDelta(e, r) {
+    const start = { x: e.clientX, y: e.clientY, v: this.state.vals[r.id] };
+    const span = r.max - r.min;
+    const move = ev => {
+      const d = (ev.clientX - start.x) - (ev.clientY - start.y);
+      const k = (ev.shiftKey ? 0.0006 : 0.006) * span;
+      this.set(r.id, Math.max(r.min, Math.min(r.max, start.v + d * k)));
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    e.preventDefault();
+  }
+
+  surfaceDrag(e, fn) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const apply = ev => fn(
+      Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width)),
+      Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height))
+    );
+    apply(e);
+    const move = ev => apply(ev);
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    e.preventDefault();
+  }
+
+  litBy(r) {
+    const m = this.state.mod;
+    if (m === 'none') return null;
+    return r.mod === m;
+  }
+
+  renderVals() {
+    const { vals, query, pick, mod } = this.state;
+    const q = query.trim().toLowerCase();
+    const dimUnlit = mod !== 'none';
+
+    const cap = (lit, key) => !key
+      ? { capBg: 'transparent', capInk: 'transparent', capBorder: 'transparent' }
+      : lit
+        ? { capBg: '#ec3013', capInk: '#fff', capBorder: '#ec3013' }
+        : { capBg: 'transparent', capInk: '#7b828e', capBorder: '#2a2e37' };
+
+    const TOTAL = SECTIONS.reduce((n, s) => n + s.rows.length, 0);
+
+    let shown = 0;
+    const sections = SECTIONS.map(sec => {
+      if (pick !== 'all' && pick !== sec.id) return null;
+      const rows = sec.rows.filter(r => !q || r.label.toLowerCase().includes(q));
+      if (!rows.length) return null;
+      shown += rows.length;
+      return {
+        name: sec.name, n: rows.length,
+        rows: rows.map(r => {
+          const v = vals[r.id];
+          const lit = this.litBy(r);
+          const dim = lit === false ? '0.4' : '1';
+          const isF = r.type === 'f', isSp = r.type === 'sp', isSt = r.type === 'st';
+          const isSg = r.type === 'sg', isSel = r.type === 'sel', isB = r.type === 'b';
+          const isCol = r.type === 'col', isAct = r.type === 'act';
+          const o = {
+            label: r.label,
+            key: r.key || '',
+            hasKey: !!r.key,
+            ...cap(lit === true, r.key),
+            dim,
+            labelInk: isB && !v ? '#7b828e' : '#f2f3f5',
+            padLeft: '14px', padRight: '14px',
+            isVal: isF || isSp || isSt,
+            isF, isSp, isSt, isSg, isSel, isCol, isAct,
+            text: (isF || isSp || isSt || isSel || isSg) ? this.fmt(r, v) : ''
+          };
+          if (isF) {
+            const frac = (v - r.min) / (r.max - r.min);
+            o.pct = (Math.max(0, Math.min(1, frac)) * 100).toFixed(2) + '%';
+            o.lo = Number(r.min).toFixed(r.dec);
+            o.mid = Number((r.min + r.max) / 2).toFixed(r.dec);
+            o.hi = Number(r.max).toFixed(r.dec);
+            o.onDrag = e => this.dragTrack(e, r);
+          }
+          if (isSp) o.onDrag = e => this.dragDelta(e, r);
+          if (isSt) {
+            o.onDec = () => this.set(r.id, Math.max(r.min, v - r.step));
+            o.onInc = () => this.set(r.id, Math.min(r.max, v + r.step));
+          }
+          if (isSg) {
+            o.segs = r.opts.map((label, i) => ({
+              label,
+              bg: i === v ? '#ec3013' : '#232830',
+              ink: i === v ? '#fff' : '#b9bec7',
+              edge: i === 0 ? '0' : '1px solid #2a2e37',
+              onPick: () => this.set(r.id, i)
+            }));
+          }
+          if (isSel) o.onCycle = () => this.set(r.id, (v + 1) % r.opts.length);
+          if (isB) {
+            o.isVal = false;
+            o.isB = true;
+            o.boxBg = v ? '#ec3013' : '#0a0b0e';
+            o.boxEdge = v ? '2px solid #7b828e' : '2px solid #2a2e37';
+            o.onToggle = () => this.set(r.id, !v);
+          }
+          if (isCol) {
+            o.swatches = r.opts.map((hex, i) => ({
+              hex,
+              edge: i === v ? '2px solid #ec3013' : '1px solid #2a2e37',
+              onPick: () => this.set(r.id, i)
+            }));
+          }
+          if (isAct) {
+            o.actLabel = r.label;
+            o.actBg = r.w === 'primary' ? '#ec3013' : r.w === 'secondary' ? '#232830' : 'transparent';
+            o.actInk = r.w === 'primary' ? '#fff' : r.w === 'secondary' ? '#f2f3f5' : '#b9bec7';
+            o.actEdge = r.w === 'primary' ? '1px solid #ec3013' : r.w === 'secondary' ? '1px solid #2a2e37' : '2px solid #2a2e37';
+          }
+          return o;
+        })
+      };
+    }).filter(Boolean);
+
+    const hsv = this.state.hsv;
+    const rgb = hsv2rgb(hsv.h, hsv.s, hsv.v);
+    const activeHex = hex(rgb);
+    const latched = this.state.igniteLatched;
+    const igniteOn = latched || this.state.igniteHeld;
+
+    const railItems = [{ id: 'all', abbr: 'ALL' }].concat(SECTIONS.map(s => ({ id: s.id, abbr: s.abbr })));
+    const [px, py] = atT(this.state.playT);
+
+    return {
+      sections,
+      shownCount: shown + ' / ' + TOTAL,
+      query,
+      onQuery: e => this.setState({ query: e.target.value }),
+
+      rail: railItems.map(r => ({
+        abbr: r.abbr,
+        h: r.id === 'all' ? '58px' : 'calc((100% - 58px) / 9)',
+        bg: pick === r.id ? '#ec3013' : '#0a0b0e',
+        ink: pick === r.id ? '#fff' : '#7b828e',
+        onPick: () => this.setState({ pick: r.id })
+      })),
+
+      strip: STRIP.map(c => {
+        const r = SECTIONS.flatMap(s => s.rows).find(x => x.id === c.id);
+        const v = vals[c.id];
+        const lit = mod === 'none' ? null : c.mod === mod;
+        return {
+          label: c.label,
+          key: c.key || '',
+          ...cap(lit === true, c.key),
+          dim: lit === false ? '0.35' : '1',
+          text: Number(v).toFixed(c.dec) + (c.unit || ''),
+          onDrag: e => { if (r && (r.type === 'f' || r.type === 'sp' || r.type === 'st')) this.dragDelta(e, r); }
+        };
+      }),
+
+      modActive: mod !== 'none',
+      modIdle: mod === 'none',
+      modName: MODS[mod].name,
+      modRow: MODS[mod].rows,
+      modSim: [
+        { label: 'Ctrl', onPick: () => this.setState({ mod: 'ctrl' }) },
+        { label: 'Alt', onPick: () => this.setState({ mod: 'alt' }) },
+        { label: 'Alt+Shift', onPick: () => this.setState({ mod: 'altshift' }) }
+      ],
+
+      colorMode: COLOR_MODES.map((label, i) => ({
+        label,
+        bg: i === this.state.colorMode ? '#ec3013' : '#232830',
+        ink: i === this.state.colorMode ? '#fff' : '#7b828e',
+        edge: i === 0 ? '0' : '1px solid #2a2e37',
+        onPick: () => this.setState({ colorMode: i })
+      })),
+      gateBg: this.state.gate ? '#ec3013' : '#232830',
+      gateInk: this.state.gate ? '#fff' : '#7b828e',
+      gateEdge: this.state.gate ? '#ec3013' : '#2a2e37',
+      onGate: () => this.setState(s => ({ gate: !s.gate })),
+
+      curX: (this.state.cursor.x * 100).toFixed(3) + '%',
+      curY: (this.state.cursor.y * 100).toFixed(3) + '%',
+      curD: (20 + vals.brushSize * 1.35).toFixed(1) + 'px',
+      curAngle: this.state.brushAngle.toFixed(2) + 'deg',
+      curShow: this.state.cursor.on ? 'flex' : 'none',
+      onCursorMove: e => {
+        const r = e.currentTarget.getBoundingClientRect();
+        this.setState({ cursor: { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, on: true } });
+      },
+      onCursorLeave: () => this.setState(s => ({ cursor: { ...s.cursor, on: false } })),
+      onCursorWheel: e => {
+        e.preventDefault();
+        if (e.shiftKey) this.setState(s => ({ brushAngle: s.brushAngle - e.deltaY * 0.25 }));
+        else this.set('brushSize', Math.max(1, Math.min(120, vals.brushSize - e.deltaY * 0.03)));
+      },
+
+      igniteBg: igniteOn ? '#ec3013' : '#232830',
+      igniteInk: igniteOn ? '#fff' : '#b9bec7',
+      igniteEdge: igniteOn ? '#ec3013' : '#2a2e37',
+      onIgniteDown: e => {
+        if (this.state.igniteLatched) return;
+        this.setState({ igniteHeld: true });
+        const up = () => { window.removeEventListener('pointerup', up); this.setState({ igniteHeld: false }); };
+        window.addEventListener('pointerup', up);
+        e.preventDefault();
+      },
+      onLatch: () => this.setState(s => ({ igniteLatched: !s.igniteLatched, igniteHeld: false })),
+      latchBg: latched ? '#ec3013' : '#232830',
+      latchEdge: latched ? '#ec3013' : '#2a2e37',
+      latchDot: latched ? '#fff' : 'transparent',
+      latchDotEdge: latched ? '#fff' : '#7b828e',
+
+      pickerOpen: this.state.pickerOpen,
+      onOpenPicker: () => this.setState(s => ({ pickerOpen: !s.pickerOpen })),
+      onClosePicker: () => this.setState({ pickerOpen: false }),
+      activeHex: activeHex,
+      hueHex: hex(hsv2rgb(hsv.h, 1, 1)),
+      svLeft: (hsv.s * 100).toFixed(2) + '%',
+      svTop: ((1 - hsv.v) * 100).toFixed(2) + '%',
+      hueLeft: (hsv.h / 360 * 100).toFixed(2) + '%',
+      rgbCells: [{ k: 'R', v: rgb[0] }, { k: 'G', v: rgb[1] }, { k: 'B', v: rgb[2] }],
+      onSV: e => this.surfaceDrag(e, (x, y) => this.setState(s => ({ hsv: { ...s.hsv, s: x, v: 1 - y } }))),
+      onHue: e => this.surfaceDrag(e, x => this.setState(s => ({ hsv: { ...s.hsv, h: x * 360 } }))),
+
+      dotLeft: (px / 1092 * 100).toFixed(3) + '%',
+      dotTop: (py / 788 * 100).toFixed(3) + '%',
+      onPath: e => {
+        if (mod !== 'none') this.setState({ mod: 'none' });
+        const rect = e.currentTarget.getBoundingClientRect();
+        const seek = ev => {
+          const x = (ev.clientX - rect.left) / rect.width * 1092;
+          const y = (ev.clientY - rect.top) / rect.height * 788;
+          let best = 0, bestD = Infinity;
+          PATH.pts.forEach((p, i) => { const d = (p[0]-x)**2 + (p[1]-y)**2; if (d < bestD) { bestD = d; best = i; } });
+          this.setState({ playT: PATH.cum[best] / PATH.len, scrubbing: true });
+        };
+        seek(e);
+        const move = ev => seek(ev);
+        const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); this.setState({ scrubbing: false }); };
+        window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+        e.preventDefault();
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
