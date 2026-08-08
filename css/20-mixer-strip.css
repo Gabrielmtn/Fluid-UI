@@ -83,7 +83,7 @@
 #quality-underbar .qub-dd-btn:focus-visible {
     outline: none;
     background: rgba(24, 27, 32, 0.86);
-    border-color: rgba(74, 168, 255, 0.7);
+    border-color: rgba(236, 48, 19, 0.8);
     color: #fff;
     text-shadow: none;
 }
@@ -128,11 +128,11 @@
     cursor: pointer;
 }
 #quality-underbar .qub-dd-opt:hover {
-    background: rgba(74, 168, 255, 0.22);
+    background: rgba(236, 48, 19, 0.28);
     color: #fff;
 }
 #quality-underbar .qub-dd-opt.sel {
-    background: rgba(74, 168, 255, 0.32);
+    background: var(--accent, #ec3013);
     color: #fff;
 }
 /* Mobile: strip + sidebar are drawers — keep the canvas clean */
@@ -198,7 +198,7 @@ body > .controls {
 .mixer-channel[data-accent="orange"] { border-top: 2px solid rgba(255, 170, 80, 0.45); }
 .mixer-channel[data-accent="green"]  { border-top: 2px solid rgba(80, 220, 140, 0.45); }
 .mixer-channel[data-accent="purple"] { border-top: 2px solid rgba(180, 130, 255, 0.45); }
-.mixer-channel[data-accent="yellow"] { border-top: 2px solid rgba(255, 220, 80, 0.45); }
+.mixer-channel[data-accent="yellow"] { border-top: 2px solid rgba(236, 48, 19, 0.45); }
 .mixer-channel[data-accent="cyan"]   { border-top: 2px solid rgba(80, 210, 255, 0.45); }
 .mixer-channel[data-accent="pink"]   { border-top: 2px solid rgba(255, 130, 170, 0.45); }
 
@@ -259,7 +259,7 @@ body > .controls {
 .ch-value {
     font-family: 'Courier New', monospace;
     font-size: 13px;
-    color: #4fc3f7;
+    color: var(--ink-100, #f2f3f5);
     text-align: center;
     line-height: 1.2;
     min-height: 16px;
@@ -267,25 +267,25 @@ body > .controls {
     font-weight: 700;
 }
 
-/* Multiplier value doubles as the per-arm-colors button (gold, clickable) */
+/* Multiplier value doubles as the per-arm-colors button (raised cell = editable) */
 .ch-value.arm-colors-trigger {
     cursor: pointer;
     padding: 1px 8px;
     min-height: 0;
-    border-radius: 4px;
-    color: rgba(255, 220, 80, 0.95);
-    background: rgba(255, 220, 80, 0.15);
-    border: 1px solid rgba(255, 220, 80, 0.35);
+    border-radius: 0;
+    color: var(--ink-100, #f2f3f5);
+    background: var(--ground-600, #232830);
+    border: 1px solid var(--ground-500, #2a2e37);
     transition: background 0.15s, border-color 0.15s;
     user-select: none;
 }
 .ch-value.arm-colors-trigger:hover {
-    background: rgba(255, 220, 80, 0.28);
-    border-color: rgba(255, 220, 80, 0.6);
+    border-color: rgba(236, 48, 19, 0.6);
 }
 .ch-value.arm-colors-trigger.active {
-    background: rgba(255, 220, 80, 0.34);
-    border-color: rgba(255, 220, 80, 0.75);
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
+    color: #fff;
 }
 
 /* ── Color channel ── */
@@ -432,17 +432,17 @@ body > .controls {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 16px;
+    height: 18px;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    color: rgba(255, 255, 255, 0.25);
+    color: var(--ink-300, #b9bec7);
     cursor: pointer;
     padding: 0 8px;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.02);
+    border-radius: 0;
+    border: 1px solid var(--ground-500, #2a2e37);
+    background: var(--ground-600, #232830);
     white-space: nowrap;
     text-align: center;
     line-height: 1;
@@ -451,17 +451,15 @@ body > .controls {
     outline: none;
 }
 .ch-text-toggle:hover {
-    opacity: 0.8;
+    color: var(--ink-100, #f2f3f5);
 }
 .ch-text-toggle.active {
-    color: #4fc3f7;
-    text-shadow: 0 0 6px rgba(79, 195, 247, 0.5),
-                 0 0 14px rgba(79, 195, 247, 0.2);
-    background: rgba(79, 195, 247, 0.08);
-    border-color: rgba(79, 195, 247, 0.2);
+    color: #fff;
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
 }
 .ch-text-toggle.active:hover {
-    opacity: 0.85;
+    color: #fff;
 }
 
 /* ── Mixer divider ── */
@@ -509,9 +507,9 @@ body > .controls {
 }
 /* Paused state: play icon lit */
 #mixer-strip .mixer-actions #pauseBtn.active {
-    background: rgba(79, 195, 247, 0.18);
-    border-color: rgba(79, 195, 247, 0.45);
-    color: #4fc3f7;
+    background: rgba(236, 48, 19, 0.18);
+    border-color: rgba(236, 48, 19, 0.45);
+    color: var(--ink-100, #f2f3f5);
 }
 /* Frozen state: stop sign lit */
 #mixer-strip .mixer-actions #freezeBtn.active {
@@ -563,8 +561,8 @@ body > .controls {
 }
 .mixer-presets-trigger:hover,
 .mixer-presets-trigger.active {
-    background: rgba(100, 200, 255, 0.12);
-    border-color: rgba(100, 200, 255, 0.35);
+    background: rgba(236, 48, 19, 0.12);
+    border-color: rgba(236, 48, 19, 0.45);
     color: white;
 }
 .mixer-presets-trigger-label {
@@ -573,7 +571,7 @@ body > .controls {
     white-space: nowrap;
 }
 .mixer-presets-trigger-label.has-preset {
-    color: rgba(100, 200, 255, 0.95);
+    color: var(--ink-100, #f2f3f5);
 }
 .mixer-presets-trigger-chev {
     font-size: 8px;
@@ -740,7 +738,7 @@ body > .controls {
     flex-shrink: 0;
 }
 .mixer-preset-name-input:focus {
-    border-color: rgba(100,200,255,0.6);
+    border-color: rgba(236, 48, 19, 0.7);
 }
 
 /* ── Arm Colors Dropdown Toggle ── */
@@ -751,10 +749,10 @@ body > .controls {
     height: 22px;
     padding: 0;
     font-size: 12px;
-    background: rgba(255, 220, 80, 0.15) !important;
-    border: 1px solid rgba(255, 220, 80, 0.3) !important;
-    border-radius: 4px;
-    color: rgba(255, 220, 80, 0.9) !important;
+    background: var(--ground-600, #232830) !important;
+    border: 1px solid var(--ground-500, #2a2e37) !important;
+    border-radius: 0;
+    color: var(--ink-100, #f2f3f5) !important;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -762,14 +760,14 @@ body > .controls {
     margin-top: 4px;
 }
 .arm-colors-toggle:hover {
-    background: rgba(255, 220, 80, 0.25) !important;
+    border-color: rgba(236, 48, 19, 0.6) !important;
 }
 
 /* Arm Colors Panel */
 .arm-colors-panel {
     background: rgba(15, 20, 27, 0.98);
-    border: 1px solid rgba(255, 220, 80, 0.25);
-    border-radius: 8px;
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 0;
     padding: 10px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
     /* above the mobile menu sidebar (z 10000) — these popups can be opened
@@ -779,7 +777,7 @@ body > .controls {
 .arm-colors-header {
     font-size: 11px;
     font-weight: 600;
-    color: rgba(255, 220, 80, 0.9);
+    color: var(--ink-100, #f2f3f5);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
@@ -806,7 +804,7 @@ body > .controls {
 .arm-label {
     font-size: 11px;
     font-weight: 600;
-    color: rgba(255, 220, 80, 0.8);
+    color: var(--ink-300, #b9bec7);
     min-width: 16px;
 }
 .arm-picker {
@@ -831,7 +829,7 @@ body > .controls {
 }
 #mixer-strip .ch-label.brush-trigger:hover,
 #mixer-strip .ch-label.brush-trigger.active {
-    color: rgba(255, 220, 80, 1);
+    color: var(--ink-100, #f2f3f5);
 }
 .brush-trigger-chev {
     font-size: 8px;
@@ -850,7 +848,7 @@ body > .controls {
     transform: translateX(-105%);
     visibility: hidden;
     transition: transform 0.25s ease, visibility 0s linear 0.25s;
-    border-radius: 0 10px 10px 0;
+    border-radius: 0;
     box-shadow: 8px 0 24px rgba(0, 0, 0, 0.5);
 }
 .brush-settings-panel.slide-left.visible {
@@ -873,7 +871,7 @@ body > .controls {
 .brush-settings-panel .control-group label .value-display {
     float: right;
     font-family: 'Courier New', monospace;
-    color: rgba(255, 220, 80, 0.9);
+    color: var(--ink-100, #f2f3f5);
 }
 .brush-settings-panel .control-group input[type="range"] {
     width: 100%;
@@ -906,7 +904,7 @@ body > .controls {
     justify-content: center;
     height: 26px;
     font-size: 12px;
-    border-radius: 4px;
+    border-radius: 0;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: rgba(255, 255, 255, 0.55);
@@ -916,9 +914,9 @@ body > .controls {
     background: rgba(255, 255, 255, 0.1);
 }
 .brush-tip-btn.active {
-    background: rgba(255, 220, 80, 0.2);
-    border-color: rgba(255, 220, 80, 0.45);
-    color: rgba(255, 220, 80, 1);
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
+    color: #fff;
 }
 
 /* Brush preset chips */
@@ -937,21 +935,21 @@ body > .controls {
     padding: 3px 7px;
     font-size: 10px;
     font-weight: 500;
-    border-radius: 3px;
-    background: rgba(255, 220, 80, 0.1);
-    border: 1px solid rgba(255, 220, 80, 0.2);
-    color: rgba(255, 220, 80, 0.85);
+    border-radius: 0;
+    background: var(--ground-600, #232830);
+    border: 1px solid var(--ground-500, #2a2e37);
+    color: var(--ink-300, #b9bec7);
     cursor: pointer;
     max-width: 110px;
     overflow: hidden;
     white-space: nowrap;
 }
 .brush-preset-btn:hover {
-    background: rgba(255, 220, 80, 0.18);
+    color: var(--ink-100, #f2f3f5);
 }
 .brush-preset-btn.active {
-    background: rgba(255, 220, 80, 0.3);
-    border-color: rgba(255, 220, 80, 0.55);
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
     color: #fff;
     font-weight: 600;
 }

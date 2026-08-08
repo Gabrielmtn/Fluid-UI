@@ -1008,7 +1008,7 @@
         .rec-square-content .row > * { width: 100%; }
         .rec-mini button, .rec-mini input.time-input { height: 60px; min-width: 60px; border-radius: 14px; padding: 0 12px; font-size: 14px; font-weight: 600; background: linear-gradient(#1f2733, #151b24); color: #e6edf3; border: 1px solid rgba(255,255,255,0.14); box-shadow: inset 0 1px rgba(255,255,255,0.08), 0 1px 2px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; user-select: none; box-sizing: border-box; }
         .rec-mini button { letter-spacing: 0.2px; }
-        .rec-mini .action-record.active, .rec-mini.rec-recording .action-record { background: linear-gradient(180deg, #ff4d4d, #c22121); border-color: rgba(255,100,100,0.6); box-shadow: 0 0 20px rgba(255, 77, 77, 0.35), inset 0 1px rgba(255,255,255,0.25); color: #fff; }
+        .rec-mini .action-record.active, .rec-mini.rec-recording .action-record { background: var(--accent, #ec3013); border-color: var(--accent, #ec3013); box-shadow: 0 0 20px rgba(236, 48, 19, 0.35); color: #fff; }
         .rec-mini .action-multi.active { background: linear-gradient(180deg, #7b61ff, #4a33d1); border-color: rgba(123,97,255,0.6); box-shadow: 0 0 20px rgba(123,97,255,0.35), inset 0 1px rgba(255,255,255,0.25); color: #fff; }
         .rec-mini.rec-recording .action-multi:not(.active) { background: linear-gradient(#1f2733, #151b24); color: #e6edf3; border-color: rgba(255,255,255,0.14); box-shadow: inset 0 1px rgba(255,255,255,0.08), 0 1px 2px rgba(0,0,0,0.45); }
         .rec-mini .action-pause.active, .rec-mini.rec-playing .action-pause { background: linear-gradient(180deg, #58a6ff, #1a7cff); border-color: rgba(88,166,255,0.6); box-shadow: 0 0 18px rgba(88,166,255,0.3), inset 0 1px rgba(255,255,255,0.2); color: #fff; }
@@ -1248,7 +1248,7 @@
 }
 
 .stats-title {
-    color: #ffd700;
+    color: var(--ink-100, #f2f3f5);
     font-weight: bold;
     font-size: 12px;
     margin-bottom: 6px;
@@ -1269,7 +1269,7 @@
 }
 
 .stat-row span:last-child {
-    color: #4fc3f7;
+    color: var(--ink-100, #f2f3f5);
     font-weight: bold;
     text-align: right;
 }

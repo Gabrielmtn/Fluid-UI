@@ -10,16 +10,39 @@
    sets at runtime).
    ================================================================ */
 :root {
-    /* ── Accent (warm yellow used across active states) ── */
-    --accent: rgba(255, 220, 80, 1);
-    --accent-60: rgba(255, 220, 80, 0.6);
-    --accent-40: rgba(255, 220, 80, 0.4);
-    --accent-25: rgba(255, 220, 80, 0.25);
-    --accent-12: rgba(255, 220, 80, 0.12);
+    /* ── Accent (single accent: selection, primary action, record, focus) ──
+       Design-system unification 2026-08: the warm yellow, the cool blue
+       #4fc3f7 and the Multi-Brush gold all retired in favour of one red. */
+    --accent: #ec3013;
+    --accent-60: rgba(236, 48, 19, 0.6);
+    --accent-40: rgba(236, 48, 19, 0.4);
+    --accent-25: rgba(236, 48, 19, 0.25);
+    --accent-12: rgba(236, 48, 19, 0.12);
 
-    /* ── Cool accent (info / focus / sliders) ── */
-    --accent-cool: #4fc3f7;
-    --accent-cool-soft: rgba(100, 200, 255, 0.35);
+    /* ── Cool accent (DEPRECATED — now aliases the single accent) ── */
+    --accent-cool: #ec3013;
+    --accent-cool-soft: rgba(236, 48, 19, 0.35);
+
+    /* ── Control-surface grounds (design handoff 2026-08) ── */
+    --ground-950: #0a0b0e;   /* dividers, slider wells, app backdrop */
+    --ground-900: #0e0f12;   /* panel body */
+    --ground-800: #16181d;   /* rack row */
+    --ground-700: #191c22;   /* panel header, row hover */
+    --ground-600: #232830;   /* raised cell: steppers, inputs, unselected segments */
+    --ground-500: #2a2e37;   /* cell borders, tick marks */
+
+    /* ── Control-surface ink ── */
+    --ink-100: #f2f3f5;      /* labels AND values, full strength */
+    --ink-300: #b9bec7;      /* secondary text, unit suffixes */
+    --ink-500: #7b828e;      /* hints, counts, disabled */
+
+    /* ── Heat: filled portion of a range. Nothing else. ── */
+    --heat-0: #f0a626;
+    --heat-1: #e0432a;
+
+    /* ── Chrome: knob and cap faces — the only bevel allowed ── */
+    --chrome-0: #f6f7f9;
+    --chrome-1: #9aa1ad;
 
     /* ── Status ── */
     --ok: #3fb950;
@@ -51,10 +74,10 @@
     --sp-4: 12px;
     --sp-5: 16px;
 
-    /* ── Radii ── */
-    --radius-sm: 4px;
-    --radius-md: 6px;
-    --radius-lg: 10px;
+    /* ── Radii — flattened to 0 (design handoff 2026-08) ── */
+    --radius-sm: 0;
+    --radius-md: 0;
+    --radius-lg: 0;
 
     /* ── Font stack ── */
     --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;

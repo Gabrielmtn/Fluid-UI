@@ -408,7 +408,7 @@
     font-size: calc(10px * var(--ui-scale));
     min-width: 32px;
     text-align: right;
-    color: #4fc3f7;
+    color: var(--ink-100, #f2f3f5);
     font-weight: 600;
 }
 

@@ -51,10 +51,10 @@
                 appearance: none !important;
                 width: 14px !important;
                 height: 14px !important;
-                border-radius: 50% !important;
-                background: #4fc3f7 !important;
-                border: 2px solid rgba(255,255,255,0.5) !important;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+                border-radius: 0 !important;
+                background: linear-gradient(180deg, #f6f7f9, #9aa1ad) !important;
+                border: 1px solid #0a0b0e !important;
+                box-shadow: none !important;
                 cursor: pointer !important;
                 margin-top: -4px !important;
                 clip-path: none !important;
@@ -72,10 +72,10 @@
             .path-flow-slider::-moz-range-thumb {
                 width: 14px !important;
                 height: 14px !important;
-                border-radius: 50% !important;
-                background: #4fc3f7 !important;
-                border: 2px solid rgba(255,255,255,0.5) !important;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+                border-radius: 0 !important;
+                background: linear-gradient(180deg, #f6f7f9, #9aa1ad) !important;
+                border: 1px solid #0a0b0e !important;
+                box-shadow: none !important;
                 cursor: pointer !important;
                 clip-path: none !important;
             }

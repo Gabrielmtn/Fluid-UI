@@ -1819,7 +1819,7 @@
             slider.value = String(getDist());
             slider.style.cssText = 'flex:1;min-width:0;';
             var val = document.createElement('span');
-            val.style.cssText = 'font-size:10px;font-family:monospace;color:#4fc3f7;min-width:32px;text-align:right;';
+            val.style.cssText = 'font-size:10px;font-family:monospace;color:#f2f3f5;min-width:32px;text-align:right;';
             val.textContent = Math.round(parseFloat(slider.value) * 100) + '%';
             row.appendChild(lab); row.appendChild(slider); row.appendChild(val);
             return { row: row, slider: slider, val: val };
@@ -3952,7 +3952,7 @@
                         btn.title = m.title;
                         btn.dataset.mode = m.key;
                         var isActive = cfg.mode === m.key;
-                        btn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 6px;font-size:10px;border-radius:3px;background:' + (isActive ? 'rgba(255,220,80,0.25)' : 'rgba(255,255,255,0.08)') + ';color:' + (isActive ? 'rgba(255,220,80,1)' : 'rgba(255,255,255,0.6)') + ';border:1px solid ' + (isActive ? 'rgba(255,220,80,0.4)' : 'rgba(255,255,255,0.1)') + ';cursor:pointer;';
+                        btn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 6px;font-size:10px;border-radius:0;background:' + (isActive ? '#ec3013' : 'rgba(255,255,255,0.08)') + ';color:' + (isActive ? '#fff' : 'rgba(255,255,255,0.6)') + ';border:1px solid ' + (isActive ? '#ec3013' : 'rgba(255,255,255,0.1)') + ';cursor:pointer;';
                         btn.addEventListener('click', function() {
                             cfg.mode = m.key;
                             cfg.cachedColor = null;
@@ -3965,9 +3965,9 @@
                             btns.forEach(function(b) {
                                 var active = b.dataset.mode === m.key;
                                 b.classList.toggle('active', active);
-                                b.style.background = active ? 'rgba(255,220,80,0.25)' : 'rgba(255,255,255,0.08)';
-                                b.style.color = active ? 'rgba(255,220,80,1)' : 'rgba(255,255,255,0.6)';
-                                b.style.borderColor = active ? 'rgba(255,220,80,0.4)' : 'rgba(255,255,255,0.1)';
+                                b.style.background = active ? '#ec3013' : 'rgba(255,255,255,0.08)';
+                                b.style.color = active ? '#fff' : 'rgba(255,255,255,0.6)';
+                                b.style.borderColor = active ? '#ec3013' : 'rgba(255,255,255,0.1)';
                             });
                             picker.disabled = m.key !== 'fixed';
                             picker.style.opacity = m.key === 'fixed' ? '1' : '0.35';
@@ -3990,9 +3990,9 @@
                             btns.forEach(function(b) {
                                 var active = b.dataset.mode === 'fixed';
                                 b.classList.toggle('active', active);
-                                b.style.background = active ? 'rgba(255,220,80,0.25)' : 'rgba(255,255,255,0.08)';
-                                b.style.color = active ? 'rgba(255,220,80,1)' : 'rgba(255,255,255,0.6)';
-                                b.style.borderColor = active ? 'rgba(255,220,80,0.4)' : 'rgba(255,255,255,0.1)';
+                                b.style.background = active ? '#ec3013' : 'rgba(255,255,255,0.08)';
+                                b.style.color = active ? '#fff' : 'rgba(255,255,255,0.6)';
+                                b.style.borderColor = active ? '#ec3013' : 'rgba(255,255,255,0.1)';
                             });
                             picker.disabled = false;
                             picker.style.opacity = '1';
