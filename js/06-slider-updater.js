@@ -77,6 +77,32 @@
 
     var stack = document.createElement('div');
     stack.className = 'fader-stack';
+
+    /* Compact horizontal rows (label | slider | value on one line) get the
+       inline variant: the printed scale overlays the row's top gap instead
+       of adding 18px of height, so siblings still center on the track. */
+    var inlineRow = el.closest && el.closest(
+      '.layer-threshold, .collision-row, .audio-scene-ctl, .path-control-row');
+    if (!inlineRow && parent.classList && !parent.classList.contains('control-group')) {
+      try {
+        var pcs = getComputedStyle(parent);
+        if ((pcs.display === 'flex' || pcs.display === 'inline-flex')
+            && (pcs.flexDirection === 'row' || pcs.flexDirection === 'row-reverse')) {
+          inlineRow = parent;
+        }
+      } catch (_) {}
+    }
+    if (inlineRow) stack.classList.add('fader-stack-inline');
+
+    /* Layer-panel encapsulated sliders shield all pointer events on the
+       input so panel drag-scroll/layer drag never engages; the scale band
+       above the input is new surface that needs the same shield. */
+    if (el.classList && el.classList.contains('encapsulated-slider')) {
+      ['pointerdown', 'mousedown', 'touchstart', 'click', 'dblclick'].forEach(function (t) {
+        stack.addEventListener(t, function (ev) { ev.stopPropagation(); });
+      });
+    }
+
     parent.insertBefore(stack, el);
     stack.appendChild(buildScale(el));
     stack.appendChild(el);
@@ -155,10 +181,16 @@
   function applyFraction(el, clientX) {
     var rect = el.getBoundingClientRect();
     if (!rect.width) return;
-    var padX = 8, thumbW = 16;
-    var usable = rect.width - 2 * padX - thumbW;
+    /* Match the native thumb-travel model: the runnable track spans the FULL
+       input width (margin 0 -8px), so the thumb center travels [8, W-8] and
+       native mapping is frac = (x - left - 8) / (W - 16). Constants are CSS
+       px; rect/clientX are in the ui-scale-zoomed visual space, so scale
+       them by the element's effective zoom. */
+    var zoom = el.offsetWidth ? rect.width / el.offsetWidth : 1;
+    var edge = 8 * zoom;
+    var usable = rect.width - 2 * edge;
     if (usable <= 0) return;
-    var frac = (clientX - rect.left - padX - thumbW / 2) / usable;
+    var frac = (clientX - rect.left - edge) / usable;
     frac = Math.max(0, Math.min(1, frac));
     var min = toNumber(el.getAttribute('min'), 0);
     var max = toNumber(el.getAttribute('max'), 100);
@@ -173,7 +205,7 @@
   }
 
   function startRowForwarding() {
-    var dragEl = null;
+    var dragEl = null, dragId = null;
 
     document.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
@@ -188,22 +220,27 @@
       if (!el || el.disabled || !el.offsetParent) return;
       if (el.dataset && el.dataset.noScale === '1') return;
       dragEl = el;
+      dragId = e.pointerId;
       e.preventDefault();
       try { row.setPointerCapture(e.pointerId); } catch (_) {}
       applyFraction(el, e.clientX);
     }, true);
 
+    /* Only the pointer that started the drag may move or end it — a palm/
+       finger contact mid-drag on pen+touch hardware must not hijack it. */
     document.addEventListener('pointermove', function (e) {
-      if (dragEl) applyFraction(dragEl, e.clientX);
+      if (dragEl && e.pointerId === dragId) applyFraction(dragEl, e.clientX);
     }, true);
 
-    function endDrag() {
-      if (!dragEl) return;
+    function endDrag(e) {
+      if (!dragEl || (e && e.pointerId !== dragId)) return;
       dragEl.dispatchEvent(new Event('change', { bubbles: true }));
       dragEl = null;
+      dragId = null;
     }
     document.addEventListener('pointerup', endDrag, true);
     document.addEventListener('pointercancel', endDrag, true);
+    window.addEventListener('blur', function () { endDrag(); });
   }
 
   if (document.readyState === 'loading') {

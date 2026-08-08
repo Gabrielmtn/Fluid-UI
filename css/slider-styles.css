@@ -178,6 +178,19 @@ input[type=range]::-moz-range-thumb {
 .fader-scale span {
     white-space: nowrap;
 }
+/* Inline variant for compact horizontal rows (label | slider | value):
+   the scale overlays the gap above the input instead of adding height,
+   so row siblings keep centering on the track itself. */
+.fader-stack-inline {
+    position: relative;
+}
+.fader-stack-inline .fader-scale {
+    position: absolute;
+    top: -5px;
+    left: 0;
+    right: 0;
+    margin: 0;
+}
 
 /* ========================================
    TOUCH SAFETY NET (coarse pointers)

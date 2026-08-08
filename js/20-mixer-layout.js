@@ -355,6 +355,11 @@
             b.addEventListener('pointerdown', function (e) {
                 if (e.button !== 0) return;
                 e.preventDefault();
+                // Capture so pointerup is delivered to the cap even if the
+                // release happens elsewhere; window blur is the failsafe for
+                // Alt-Tab/OS dialogs stealing focus mid-hold (otherwise the
+                // repeat interval marches the value to min/max forever).
+                try { b.setPointerCapture(e.pointerId); } catch (_) {}
                 const coarse = e.shiftKey;
                 nudge(dir, coarse);
                 delay = setTimeout(function () {
@@ -364,6 +369,7 @@
             b.addEventListener('pointerup', stop);
             b.addEventListener('pointerleave', stop);
             b.addEventListener('pointercancel', stop);
+            window.addEventListener('blur', stop);
             return b;
         }
 
@@ -438,7 +444,10 @@
             }
         }
         sel.addEventListener('change', sync);
-        setInterval(sync, 2000); // programmatic sets (preset loads) fire no change
+        // 29-material-modes announces silent programmatic writes
+        // (yieldToExternal on preset/session/profile loads) with mm-sync.
+        sel.addEventListener('mm-sync', sync);
+        setInterval(sync, 2000); // last-resort backstop
         sync();
         return row;
     }

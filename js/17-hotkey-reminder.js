@@ -30,7 +30,9 @@
         // and bind whatever exists (degraded but functional).
         var waited = 0, lastCount = -1;
         var poll = setInterval(function () {
-            waited += 150;
+            // A hidden tab parks the rAF-gated UI build entirely — don't
+            // burn the give-up budget while nothing can possibly build.
+            if (!document.hidden) waited += 150;
             var header = document.querySelector('#mixer-strip .ch-header');
             var labels = document.querySelectorAll('#sidebar-right .control-group > label').length;
             var ready = header && labels > 0 && labels === lastCount;
@@ -83,9 +85,16 @@
     }
     function paletteRow() {
         return function () {
+            // NEVER return the carousel itself: refreshPaletteCarousel()
+            // wipes its innerHTML on every palette change, which would
+            // destroy the caps. The wrapper's "Palette" label is stable.
             var c = document.getElementById('paletteCarousel');
-            var g = c && c.closest('.control-group');
-            return g ? (g.querySelector('label') || g) : c;
+            if (!c) return null;
+            var wrap = c.parentElement;
+            var label = wrap ? wrap.querySelector(':scope > label') : null;
+            if (label) return label;
+            var g = c.closest('.control-group');
+            return g ? (g.querySelector('label') || g) : null;
         };
     }
 
@@ -99,8 +108,10 @@
         { keys: '⌃Scr',   mod: 'ctrl',       title: 'Ctrl+Scroll — density sustain',      where: stripHeader('densityDissipation') },
         { keys: '⌥⇧Scr',  mod: 'altshift',   title: 'Alt+Shift+Scroll — velocity sustain', where: stripHeader('velocityDissipation') },
         { keys: '⌃⇧Scr',  mod: 'ctrlshift',  title: 'Ctrl+Shift+Scroll — motion isolation', where: stripHeader('velocityInfluence') },
-        { keys: 'R',      mod: '',           title: 'Toggle random colours',              where: sel('[data-brush-mode="rnd"]') },
-        { keys: 'A',      mod: '',           title: 'Toggle palette stepping',            where: sel('[data-brush-mode="step"]') },
+        // R/A caps live on the Color channel head — the ~31px segment cells
+        // cannot hold label + cap without bleeding into the neighbour.
+        { keys: 'R',      mod: '',           title: 'R — toggle random colours',          where: sel('.ch-color-head') },
+        { keys: 'A',      mod: '',           title: 'A — toggle palette stepping',        where: sel('.ch-color-head') },
         { keys: '⇧S',     mod: '',           title: 'Shift+S — save current colour',      where: colorActionBtn(0) },
         { keys: '⇧X',     mod: '',           title: 'Shift+X — clear saved colours',      where: colorActionBtn(1) },
         { keys: '⌃←→',    mod: 'ctrl',       title: 'Ctrl+← / → — cycle palette',         where: paletteRow() },
@@ -189,8 +200,14 @@
         bar.appendChild(chipWrap);
         bar.appendChild(f1);
 
+        // Anchor to the stable #main-area (body flow), NOT the strip's
+        // current parent — mobile mode relocates the strip into the drawer,
+        // which would strand the row inside the sidebar.
+        var mainArea = document.getElementById('main-area');
         var strip = document.getElementById('mixer-strip');
-        if (strip && strip.parentElement) {
+        if (mainArea && mainArea.parentElement) {
+            mainArea.parentElement.insertBefore(bar, mainArea);
+        } else if (strip && strip.parentElement) {
             strip.parentElement.insertBefore(bar, strip.nextSibling);
         } else {
             document.body.insertBefore(bar, document.body.firstChild);
@@ -227,15 +244,20 @@
             live = combo;
             var anyRowShown = combo ? fillRow(combo) : false;
             bar.classList.toggle('visible', !!anyRowShown);
+            var anyLit = false;
             for (var i = 0; i < placed.length; i++) {
                 var p = placed[i];
                 var lit = !!combo && p.mod === combo;
+                if (lit) anyLit = true;
                 p.cap.classList.toggle('lit', lit);
             }
             // Dim rows the combo doesn't reach (a row is "reached" if any of
-            // its caps is lit). No combo -> everything back to normal.
+            // its caps is lit) — but only when the combo lights SOMETHING:
+            // an unmapped combo (e.g. Ctrl+Alt+Shift) must not dim the whole
+            // surface with nothing highlighted to explain why.
+            var dimming = !!combo && anyLit;
             var reached = null;
-            if (combo) {
+            if (dimming) {
                 reached = new Set();
                 for (var j = 0; j < placed.length; j++) {
                     if (placed[j].cap.classList.contains('lit')) reached.add(placed[j].row);
@@ -243,7 +265,7 @@
             }
             for (var k = 0; k < placed.length; k++) {
                 var row = placed[k].row;
-                row.classList.toggle('hk-dim', !!combo && !reached.has(row));
+                row.classList.toggle('hk-dim', dimming && !reached.has(row));
             }
         }
 

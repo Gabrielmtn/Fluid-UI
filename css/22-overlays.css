@@ -465,8 +465,8 @@ body.focus-mode #canvas {
     grid-template-rows: auto 0fr;
 }
 .path-layer-item.active-layer {
-    border-color: rgba(100, 200, 255, 0.4);
-    box-shadow: 0 0 8px rgba(100, 200, 255, 0.15);
+    border-color: rgba(236, 48, 19, 0.6);
+    box-shadow: 0 0 8px rgba(236, 48, 19, 0.18);
 }
 
 .path-layer-header {
@@ -611,8 +611,8 @@ body.focus-mode #canvas {
     margin-left: auto;
 }
 .path-use-brush-btn:hover {
-    background: rgba(100, 200, 255, 0.15);
-    border-color: rgba(100, 200, 255, 0.3);
+    background: rgba(236, 48, 19, 0.15);
+    border-color: rgba(236, 48, 19, 0.45);
 }
 
 /* Shape preset buttons */
@@ -638,8 +638,8 @@ body.focus-mode #canvas {
     transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
 .path-shape-btn:hover {
-    background: rgba(100, 200, 255, 0.15);
-    border-color: rgba(100, 200, 255, 0.3);
+    background: rgba(236, 48, 19, 0.15);
+    border-color: rgba(236, 48, 19, 0.45);
     transform: scale(1.05);
 }
 .path-shape-btn:active {

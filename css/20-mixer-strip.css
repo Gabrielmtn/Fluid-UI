@@ -138,6 +138,7 @@
 /* Mobile: strip + sidebar are drawers — keep the canvas clean */
 @media (max-width: 768px), (max-height: 500px) and (max-width: 1200px) {
     #quality-underbar { display: none; }
+    .hotkey-reminder { display: none !important; }
 }
 
 /* ── BODY LAYOUT: column instead of row ── */
@@ -187,7 +188,7 @@ body > .controls {
     padding: 2px 10px;
     min-width: 92px;
     flex: 1 0 auto;
-    max-width: 170px;
+    max-width: 200px;
     background: rgba(255, 255, 255, 0.015);
     border-right: 1px solid rgba(255, 255, 255, 0.03);
     position: relative;
@@ -743,8 +744,8 @@ body > .controls {
     background: rgba(255,255,255,0.1);
 }
 .mixer-presets-panel .mixer-preset-btn.active {
-    background: rgba(100,200,255,0.28);
-    border-color: rgba(100,200,255,0.55);
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
     color: white;
     font-weight: 600;
 }
@@ -765,10 +766,10 @@ body > .controls {
     text-align: left;
     padding: 6px 8px;
     font-size: 11px;
-    border-radius: 3px;
-    background: rgba(100,200,255,0.1);
-    color: rgba(100,200,255,0.85);
-    border: 1px solid rgba(100,200,255,0.18);
+    border-radius: 0;
+    background: var(--ground-600, #232830);
+    color: var(--ink-300, #b9bec7);
+    border: 1px solid var(--ground-500, #2a2e37);
     cursor: pointer;
     line-height: 1.2;
     overflow: hidden;
@@ -777,11 +778,12 @@ body > .controls {
     font-weight: 500;
 }
 .mixer-presets-panel .mixer-user-preset-btn:hover {
-    background: rgba(100,200,255,0.18);
+    color: var(--ink-100, #f2f3f5);
+    border-color: rgba(236, 48, 19, 0.6);
 }
 .mixer-presets-panel .mixer-user-preset-btn.active {
-    background: rgba(100,200,255,0.3);
-    border-color: rgba(100,200,255,0.5);
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
     color: white;
     font-weight: 600;
 }
@@ -833,8 +835,8 @@ body > .controls {
     padding: 2px 5px;
     font-size: 9px;
     background: rgba(0,0,0,0.4);
-    border: 1px solid rgba(100,200,255,0.3);
-    border-radius: 3px;
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 0;
     color: white;
     outline: none;
     flex-shrink: 0;

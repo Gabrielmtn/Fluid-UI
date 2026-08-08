@@ -238,7 +238,13 @@
         config.STAMP_NOISE = 0;
         config.STAMP_RADIUS_SCALE = 1;
         window.displayShadingInvert = 0;
-        if (sel) sel.value = 'fluid';
+        if (sel) {
+            sel.value = 'fluid';
+            // Announce the silent write so mirrors (the strip's segmented
+            // switch) resync immediately instead of on their poll. A custom
+            // event, NOT 'change' — 'change' would re-enter setMode.
+            try { sel.dispatchEvent(new Event('mm-sync')); } catch (e) { /* noop */ }
+        }
         if (slider) slider.title = 'Vorticity';
         refreshSpan();
         sizeSelectToLabel();

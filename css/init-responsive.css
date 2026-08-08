@@ -274,8 +274,8 @@
     border: 1px solid rgba(255, 255, 255, 0.04);
 }
 #sidebar-right .layer-item.active-layer {
-    background: rgba(100, 200, 255, 0.1);
-    border: 1px solid rgba(100, 200, 255, 0.35);
+    background: rgba(236, 48, 19, 0.1);
+    border: 1px solid rgba(236, 48, 19, 0.45);
 }
 
 /* Header: single row — thumbnail + title + collapse toggle */
