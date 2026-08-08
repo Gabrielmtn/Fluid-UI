@@ -372,29 +372,11 @@
 }
 #sidebar-right .layer-threshold span:first-child,
 #sidebar-right .layer-threshold .layer-slider-value {
-    margin-top: 10px; /* Nudge label and value down to align with slider knob center */
+    margin-top: 0; /* unified fader: label/value center against the 44px box */
 }
-/* Remove ALL dark borders from sidebar sliders */
-#sidebar-right input[type="range"] {
-    box-shadow: none !important;
-    border: none !important;
-}
-#sidebar-right input[type="range"]::-webkit-slider-container {
-    box-shadow: none !important;
-    border: none !important;
-}
-#sidebar-right input[type="range"]::-webkit-slider-runnable-track {
-    box-shadow: none !important;
-    border: none !important;
-}
-#sidebar-right input[type="range"]::-moz-range-track {
-    box-shadow: none !important;
-    border: none !important;
-}
-#sidebar-right input[type="range"]::-moz-range-progress {
-    box-shadow: none !important;
-    border: none !important;
-}
+/* (The old !important border/shadow strip for the retired bezel look was
+   removed — the unified fader's track ring is an inset box-shadow and
+   must survive in the sidebar.) */
 #sidebar-right .layer-threshold span:first-child {
     font-size: calc(9px * var(--ui-scale));
     text-transform: uppercase;

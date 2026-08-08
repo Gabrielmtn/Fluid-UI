@@ -227,10 +227,6 @@ body.focus-mode #canvas {
 .collision-refresh-btn:hover {
     opacity: 0.8;
 }
-.slider-orange {
-    accent-color: #ff8850;
-}
-
 /* ================================================================
    MUTATION ENGINE STYLES
    ================================================================ */

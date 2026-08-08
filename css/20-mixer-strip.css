@@ -238,22 +238,11 @@ body > .controls {
     display: flex;
     align-items: center;
     flex: 0 0 auto;
-    /* nudge the fader down: the accent border + tight header row make the
-       centered cluster read high, leaving a fat band under the slider */
-    transform: translateY(3px);
 }
 
+/* Strip faders take the unified treatment (no per-strip miniaturisation). */
 .ch-fader input[type="range"] {
     width: 100%;
-    --track-h: 0.45em;
-    --input-p: 0.35em;
-    --thumb-h: 1.1em;
-    --thumb-w: 0.6em;
-    --thumb-r: 3px;
-    --track-fill-alpha: 0.85;
-    background: linear-gradient(#1a1a1a, #222 20%, #333, #282828);
-    box-shadow: 0 1px 1px rgba(255, 255, 255, 0.06),
-                inset 0 1px 0 1px #0a0a0a;
 }
 
 .ch-value {

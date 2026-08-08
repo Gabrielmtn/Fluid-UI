@@ -23,12 +23,84 @@
     try { el.style.setProperty('--val', String(v)); } catch (_) {}
   }
 
+  /* ── Printed scale (design handoff Task 2) ─────────────────────────
+     Three stops — min, midpoint, max — generated from the input's own
+     attributes so ~57 controls need no hand markup and ranges stay
+     correct if attributes change. Decimal precision comes from the
+     step attribute; trailing zeros are trimmed for the scale only. */
+
+  function stepDecimals(el) {
+    var step = el.getAttribute('step');
+    if (!step || step === 'any') return 2;
+    var dot = step.indexOf('.');
+    return dot === -1 ? 0 : (step.length - dot - 1);
+  }
+
+  function fmtStop(n, decimals) {
+    var s = n.toFixed(Math.min(decimals, 6));
+    if (s.indexOf('.') !== -1) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s;
+  }
+
+  function buildScale(el) {
+    var min = toNumber(el.getAttribute('min'), 0);
+    var max = toNumber(el.getAttribute('max'), 100);
+    var d = stepDecimals(el);
+    var scale = document.createElement('div');
+    scale.className = 'fader-scale';
+    scale.setAttribute('aria-hidden', 'true');
+    var stops = [min, (min + max) / 2, max];
+    for (var i = 0; i < stops.length; i++) {
+      var span = document.createElement('span');
+      span.textContent = fmtStop(stops[i], d);
+      scale.appendChild(span);
+    }
+    return scale;
+  }
+
+  /* Wrap the input in a .fader-stack (scale row + input). Inputs get
+     re-parented at runtime (mixer strip adoption, popups) — appendChild
+     plucks the bare input out of its stack, so ensureStack() is called
+     again from the MutationObserver and rebuilds at the new location,
+     removing the orphaned stack it left behind. Opt out with
+     data-no-scale="1" on the input. */
+  function ensureStack(el) {
+    if (el.dataset && el.dataset.noScale === '1') return;
+    var parent = el.parentElement;
+    if (!parent) return;
+    if (parent.classList && parent.classList.contains('fader-stack')) return;
+
+    var old = el._faderStack;
+    if (old && old.parentElement && !old.querySelector('input[type="range"]')) {
+      old.parentElement.removeChild(old);
+    }
+
+    var stack = document.createElement('div');
+    stack.className = 'fader-stack';
+    parent.insertBefore(stack, el);
+    stack.appendChild(buildScale(el));
+    stack.appendChild(el);
+    el._faderStack = stack;
+  }
+
+  function refreshScale(el) {
+    var stack = el._faderStack;
+    if (!stack) return;
+    var scale = stack.querySelector('.fader-scale');
+    if (!scale) return;
+    var fresh = buildScale(el);
+    stack.replaceChild(fresh, scale);
+  }
+
   function initRangeInput(el) {
-    if (!el || el._sliderVarsInit) return;
-    el._sliderVarsInit = true;
-    setSliderVars(el);
-    el.addEventListener('input', onInput, { passive: true });
-    el.addEventListener('change', onInput, { passive: true });
+    if (!el) return;
+    if (!el._sliderVarsInit) {
+      el._sliderVarsInit = true;
+      setSliderVars(el);
+      el.addEventListener('input', onInput, { passive: true });
+      el.addEventListener('change', onInput, { passive: true });
+    }
+    ensureStack(el);
   }
 
   function initAll() {
@@ -52,6 +124,7 @@
             }
           } else if (m.type === 'attributes' && m.target && m.target.matches && m.target.matches('input[type="range"]')) {
             setSliderVars(m.target);
+            refreshScale(m.target);
           }
         }
       });

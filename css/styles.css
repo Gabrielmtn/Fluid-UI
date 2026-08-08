@@ -796,7 +796,6 @@
         
         .layer-threshold input[type="range"] {
             flex: 1;
-            height: 3px;
         }
         
         .layer-threshold span {
@@ -1336,26 +1335,11 @@
 #captureArea .cap-rz.cap-se { bottom: -4px; right: -4px; width: 10px; height: 10px; cursor: nwse-resize; }
 #captureArea .cap-rz.cap-sw { bottom: -4px; left: -4px; width: 10px; height: 10px; cursor: nesw-resize; }
 
-/* Layer slider overrides */
+/* Layer sliders: unified fader treatment; keep only the drag guards */
 .layer-threshold input[type="range"] {
-    --track-h: 0.5em;
-    --thumb-h: 1.0em;
-    --thumb-w: 1.0em;
-    outline-offset: -0.1em;
     -webkit-user-drag: none;
     user-select: none;
     touch-action: none;
-}
-.layer-threshold input[type="range"]::-webkit-slider-container {
-    box-shadow: none;
-    height: var(--track-h);
-}
-.layer-threshold input[type="range"]::-webkit-slider-runnable-track {
-    height: var(--thumb-h);
-}
-.layer-threshold input[type="range"]::-moz-range-track {
-    box-shadow: none;
-    height: var(--track-h);
 }
 
 /* Mobile Mode */
