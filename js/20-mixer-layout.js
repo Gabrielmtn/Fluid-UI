@@ -315,105 +315,6 @@
         'Color': 'Current brush color'
     };
 
-    // ── Stepper cell (design handoff 4.4, strip-scaled) ──────────────
-    // Wraps an existing value element as the well of a [–][value][+] cell.
-    // The nudge caps drive the backing slider like a user drag (value +
-    // 'input'), so bindings, displays and the CSS fill all stay in sync.
-    // Click the value well to type a number directly.
-    function stepperCell(valueEl, sliderId, fineStep, coarseStep) {
-        const cell = document.createElement('div');
-        cell.className = 'ch-stepper';
-
-        function decimalsOf(el) {
-            const s = String(el.step || '');
-            const dot = s.indexOf('.');
-            return dot === -1 ? 0 : s.length - dot - 1;
-        }
-        function writeValue(el, v) {
-            const min = parseFloat(el.min) || 0;
-            const max = parseFloat(el.max) || 100;
-            v = Math.max(min, Math.min(max, v));
-            el.value = v.toFixed(decimalsOf(el));
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        function nudge(dir, coarse) {
-            const el = document.getElementById(sliderId);
-            if (!el) return;
-            writeValue(el, (parseFloat(el.value) || 0) + dir * (coarse ? coarseStep : fineStep));
-        }
-        function cap(txt, dir) {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'ch-step-cap';
-            b.textContent = txt;
-            b.title = (dir < 0 ? 'Decrease' : 'Increase') + ' — hold Shift for coarse steps';
-            let delay = null, repeat = null;
-            function stop() {
-                clearTimeout(delay); clearInterval(repeat);
-                delay = repeat = null;
-            }
-            b.addEventListener('pointerdown', function (e) {
-                if (e.button !== 0) return;
-                e.preventDefault();
-                // Capture so pointerup is delivered to the cap even if the
-                // release happens elsewhere; window blur is the failsafe for
-                // Alt-Tab/OS dialogs stealing focus mid-hold (otherwise the
-                // repeat interval marches the value to min/max forever).
-                try { b.setPointerCapture(e.pointerId); } catch (_) {}
-                const coarse = e.shiftKey;
-                nudge(dir, coarse);
-                delay = setTimeout(function () {
-                    repeat = setInterval(function () { nudge(dir, coarse); }, 60);
-                }, 300);
-            });
-            b.addEventListener('pointerup', stop);
-            b.addEventListener('pointerleave', stop);
-            b.addEventListener('pointercancel', stop);
-            window.addEventListener('blur', stop);
-            return b;
-        }
-
-        // Click the well to type. In clay mode the curl well is the brush-shape
-        // picker (29-material-modes owns that click) — stand down there.
-        valueEl.addEventListener('click', function () {
-            if (sliderId === 'curl' && window.MaterialModes && window.MaterialModes.active()) return;
-            if (cell.querySelector('.ch-step-input')) return;
-            const el = document.getElementById(sliderId);
-            if (!el) return;
-            const inp = document.createElement('input');
-            inp.type = 'number';
-            inp.className = 'ch-step-input';
-            inp.min = el.min; inp.max = el.max; inp.step = el.step;
-            inp.value = el.value;
-            valueEl.style.display = 'none';
-            cell.insertBefore(inp, valueEl);
-            inp.focus();
-            inp.select();
-            let done = false;
-            function commit(apply) {
-                if (done) return;
-                done = true;
-                if (apply) {
-                    const v = parseFloat(inp.value);
-                    if (Number.isFinite(v)) writeValue(el, v);
-                }
-                inp.remove();
-                valueEl.style.display = '';
-            }
-            inp.addEventListener('keydown', function (e) {
-                e.stopPropagation(); // keep global hotkeys out while typing
-                if (e.key === 'Enter') commit(true);
-                else if (e.key === 'Escape') commit(false);
-            });
-            inp.addEventListener('blur', function () { commit(true); });
-        });
-
-        cell.appendChild(cap('–', -1));
-        cell.appendChild(valueEl);
-        cell.appendChild(cap('+', 1));
-        return cell;
-    }
-
     // ── Segmented material switch (design handoff 4.5 / Task 5) ─────
     // Replaces the ▼ select popover: all modes visible, one filled. The
     // native select stays in the DOM (hidden) as the value carrier —
@@ -486,22 +387,9 @@
             if (newValueId) val.id = newValueId;
             if (slider) val.textContent = fmtSlider(slider);
         }
-        // Brush Size and the Fluid count get real affordances: a bordered
-        // stepper cell whose caps nudge the value (design handoff Task 5).
-        // The stepper takes its own full-width row so the header label
-        // keeps its room (clipped labels fail the work order's checklist).
-        var stepperRow = null;
-        if (val) {
-            if (sliderId === 'brushSize' || sliderId === 'curl') {
-                stepperRow = stepperCell(val, sliderId, 1, 5);
-                stepperRow.classList.add('ch-stepper-row');
-            } else {
-                head.appendChild(val);
-            }
-        }
+        if (val) head.appendChild(val);
 
         ch.appendChild(head);
-        if (stepperRow) ch.appendChild(stepperRow);
 
         if (matSel) ch.appendChild(buildModeSegments(matSel));
 

@@ -108,10 +108,11 @@
         { keys: '⌃Scr',   mod: 'ctrl',       title: 'Ctrl+Scroll — density sustain',      where: stripHeader('densityDissipation') },
         { keys: '⌥⇧Scr',  mod: 'altshift',   title: 'Alt+Shift+Scroll — velocity sustain', where: stripHeader('velocityDissipation') },
         { keys: '⌃⇧Scr',  mod: 'ctrlshift',  title: 'Ctrl+Shift+Scroll — motion isolation', where: stripHeader('velocityInfluence') },
-        // R/A caps live on the Color channel head — the ~31px segment cells
-        // cannot hold label + cap without bleeding into the neighbour.
-        { keys: 'R',      mod: '',           title: 'R — toggle random colours',          where: sel('.ch-color-head') },
-        { keys: 'A',      mod: '',           title: 'A — toggle palette stepping',        where: sel('.ch-color-head') },
+        // NOTE: R (random) and A (step) carry NO in-place cap. The segment
+        // cells are ~31px — too narrow to hold label + cap — and parking the
+        // caps on the Color head just put two dead-looking boxes next to the
+        // swatch. The RND / STEP segments are self-labelling; F1 documents
+        // the keys.
         { keys: '⇧S',     mod: '',           title: 'Shift+S — save current colour',      where: colorActionBtn(0) },
         { keys: '⇧X',     mod: '',           title: 'Shift+X — clear saved colours',      where: colorActionBtn(1) },
         { keys: '⌃←→',    mod: 'ctrl',       title: 'Ctrl+← / → — cycle palette',         where: paletteRow() },
