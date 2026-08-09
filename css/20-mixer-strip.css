@@ -250,6 +250,12 @@ body > .controls {
 /* Strip faders take the unified treatment (no per-strip miniaturisation). */
 .ch-fader input[type="range"] {
     width: 100%;
+    /* Same treatment as the sidebar — same 22px track, same chrome knob —
+       but a tighter hit box. The 44px box is a RACK-ROW target (the design
+       handoff's own metric); the strip is a dense toolbar where 44px per
+       channel costs 16px of canvas on every screen. 30px still clears the
+       28px coarse-pointer floor. One variable (--input-py) restores it. */
+    --input-py: 4px;
 }
 
 .ch-value {
