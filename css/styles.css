@@ -436,13 +436,16 @@
         
         /* Slider styles moved to slider-styles.css */
         
-        /* Color well (design handoff 4.9): 38px square, flat. The round
-           swatch was the app's only circle and read as decoration. */
+        /* Colour well: 38px ROUND, flat. Owner override of handoff 4.9 —
+           shape carries meaning here: a disc reads as pigment (and echoes
+           the brush cursor ring), a square reads as one more UI cell. The
+           bevel/shadow the old swatch had is still gone, so it sits in the
+           flat system without pretending to be a button. */
         input[type="color"] {
             width: 38px;
             height: 38px;
             border: 1px solid var(--ground-500, #2a2e37);
-            border-radius: 0;
+            border-radius: 50%;
             cursor: pointer;
             padding: 0;
             background: transparent;
@@ -457,16 +460,16 @@
         }
         input[type="color"]::-webkit-color-swatch-wrapper {
             padding: 0;
-            border-radius: 0;
+            border-radius: 50%;
             overflow: hidden;
         }
         input[type="color"]::-webkit-color-swatch {
             border: none;
-            border-radius: 0;
+            border-radius: 50%;
         }
         input[type="color"]::-moz-color-swatch {
             border: none;
-            border-radius: 0;
+            border-radius: 50%;
         }
         
         .presets {

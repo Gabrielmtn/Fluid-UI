@@ -586,11 +586,11 @@ body.focus-mode #canvas {
 
 /* Color picker in path layer */
 .path-color-picker {
-    width: 32px;
+    width: 24px;
     height: 24px;
     padding: 0;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 0;
+    border-radius: 50%;
     cursor: pointer;
     background: transparent;
 }
@@ -598,7 +598,7 @@ body.focus-mode #canvas {
     padding: 2px;
 }
 .path-color-picker::-webkit-color-swatch {
-    border-radius: 0;
+    border-radius: 50%;
     border: none;
 }
 .path-use-brush-btn {

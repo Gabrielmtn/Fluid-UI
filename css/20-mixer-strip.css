@@ -315,7 +315,7 @@ body > .controls {
     flex: 0 0 auto;
     width: 20px;
     height: 20px;
-    border-radius: 0;
+    border-radius: 50%;
     border: 1px solid var(--ground-500, #2a2e37);
     cursor: pointer;
     padding: 0;
@@ -817,7 +817,7 @@ body > .controls {
 .arm-picker {
     width: 28px;
     height: 28px;
-    border-radius: 0;
+    border-radius: 50%;
     border: 1px solid var(--ground-500, #2a2e37);
     cursor: pointer;
     padding: 0;
