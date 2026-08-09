@@ -1494,15 +1494,6 @@ body.mobile-mode .controls.visible .mobile-menu-close {
 .hk-dim {
     opacity: 0.35;
 }
-/* Strip cells are tighter — smaller caps */
-#mixer-strip .hk-cap {
-    height: 14px;
-    min-width: 14px;
-    margin-left: 2px;
-    font-size: 8px;
-    padding: 0 2px;
-    letter-spacing: 0;
-}
 
 /* Appended row: strip chrome, sits in normal flow under the mixer strip
    and PUSHES the canvas down rather than covering it */

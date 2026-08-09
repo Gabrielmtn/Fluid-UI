@@ -51,13 +51,6 @@
     function sel(s) {
         return function () { return document.querySelector(s); };
     }
-    function stripHeader(sliderId) {
-        return function () {
-            var el = document.getElementById(sliderId);
-            var ch = el && el.closest('.mixer-channel');
-            return ch ? ch.querySelector('.ch-header') : null;
-        };
-    }
     function checkboxRow(id) {
         return function () {
             var el = document.getElementById(id);
@@ -101,18 +94,11 @@
     // ── Single source of truth for in-place caps ───────────────────────
     // mod: '' = plain key; 'ctrl'/'alt'/'ctrlshift'/'altshift'/'ctrlalt'
     // light up when that exact combo is held ≥250ms.
+    // NOTE: no caps in the mixer strip. At strip scale they render ~8px
+    // ("⌃⌥Scr"), which is unreadable glyph soup, and they steal the width
+    // the channel labels need. Strip bindings live in the appended row and
+    // the F1 modal; in-place caps are a sidebar affordance.
     var CAPS = [
-        { keys: '[ ]',    mod: '',           title: 'Brush size − / +  (Shift: coarse)', where: stripHeader('brushSize') },
-        { keys: '⌃⌥Scr',  mod: 'ctrlalt',    title: 'Ctrl+Alt+Scroll — vorticity',       where: stripHeader('curl') },
-        { keys: '1–8',    mod: '',           title: 'Multi-brush arms',                   where: stripHeader('multiplier') },
-        { keys: '⌃Scr',   mod: 'ctrl',       title: 'Ctrl+Scroll — density sustain',      where: stripHeader('densityDissipation') },
-        { keys: '⌥⇧Scr',  mod: 'altshift',   title: 'Alt+Shift+Scroll — velocity sustain', where: stripHeader('velocityDissipation') },
-        { keys: '⌃⇧Scr',  mod: 'ctrlshift',  title: 'Ctrl+Shift+Scroll — motion isolation', where: stripHeader('velocityInfluence') },
-        // NOTE: R (random) and A (step) carry NO in-place cap. The segment
-        // cells are ~31px — too narrow to hold label + cap — and parking the
-        // caps on the Color head just put two dead-looking boxes next to the
-        // swatch. The RND / STEP segments are self-labelling; F1 documents
-        // the keys.
         { keys: '⇧S',     mod: '',           title: 'Shift+S — save current colour',      where: colorActionBtn(0) },
         { keys: '⇧X',     mod: '',           title: 'Shift+X — clear saved colours',      where: colorActionBtn(1) },
         { keys: '⌃←→',    mod: 'ctrl',       title: 'Ctrl+← / → — cycle palette',         where: paletteRow() },
@@ -167,7 +153,7 @@
         // Empty reserved slots: rows without a binding keep the same right
         // margin so columns align and nothing reflows when a modifier lands.
         var slotHosts = document.querySelectorAll(
-            '#sidebar-right .control-group > label, #mixer-strip .ch-header');
+            '#sidebar-right .control-group > label');
         for (var i = 0; i < slotHosts.length; i++) {
             var host = slotHosts[i];
             var row = host.closest('.control-group, .ch-header') || host;

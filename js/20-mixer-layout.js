@@ -28,6 +28,12 @@
     });
 
     function initMixerLayout() {
+        // Build ONCE. The build re-parents live nodes by id, so a second run
+        // steals them into a second strip/sidebar and leaves the first pair
+        // half-empty. Two DOMContentLoaded deliveries (or a deferred rAF that
+        // fires after a manual re-init) used to produce exactly that.
+        if (document.getElementById('mixer-strip')) return;
+
         const controls = document.querySelector('.controls');
         const canvasArea = document.getElementById('canvas-area');
         if (!controls || !canvasArea) return;
@@ -315,44 +321,6 @@
         'Color': 'Current brush color'
     };
 
-    // ── Segmented material switch (design handoff 4.5 / Task 5) ─────
-    // Replaces the ▼ select popover: all modes visible, one filled. The
-    // native select stays in the DOM (hidden) as the value carrier —
-    // 29-material-modes binds by id and save/load reads it.
-    function buildModeSegments(sel) {
-        const row = document.createElement('div');
-        row.className = 'ch-seg-row';
-        const SHORT = { fluid: 'Fluid', acrylic: 'Wet', clay: 'Thick' };
-        Array.prototype.forEach.call(sel.options, function (opt) {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'ch-seg';
-            b.dataset.mode = opt.value;
-            b.textContent = SHORT[opt.value] || opt.textContent;
-            b.title = opt.textContent + ' — material mode';
-            b.addEventListener('click', function () {
-                if (sel.value === opt.value) return;
-                sel.value = opt.value;
-                sel.dispatchEvent(new Event('change', { bubbles: true }));
-                sync();
-            });
-            row.appendChild(b);
-        });
-        function sync() {
-            for (let i = 0; i < row.children.length; i++) {
-                const b = row.children[i];
-                b.classList.toggle('active', b.dataset.mode === sel.value);
-            }
-        }
-        sel.addEventListener('change', sync);
-        // 29-material-modes announces silent programmatic writes
-        // (yieldToExternal on preset/session/profile loads) with mm-sync.
-        sel.addEventListener('mm-sync', sync);
-        setInterval(sync, 2000); // last-resort backstop
-        sync();
-        return row;
-    }
-
     function faderChannel(label, accent, sliderId, existingValueId, newValueId) {
         const ch = document.createElement('div');
         ch.className = 'mixer-channel';
@@ -366,13 +334,21 @@
 
         const lbl = document.createElement('div');
         lbl.className = 'ch-label';
-        lbl.textContent = label;
-        // The Fluid channel's mode select is replaced by a segmented switch
-        // (Task 5): keep the native select hidden as the mode's value carrier.
+        // The Fluid channel's LABEL is the material selector — one compact
+        // widget in the row that already exists, rather than a second
+        // control row above the fader.
         const matSel = (sliderId === 'curl') ? document.getElementById('materialMode') : null;
         if (matSel) {
-            matSel.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
-            ch.appendChild(matSel);
+            matSel.style.cssText = '';
+            lbl.appendChild(matSel);
+            // Re-fit the select to its text in the strip's font — deferred a
+            // tick: the label is still detached, and computed styles on a
+            // detached node measure with the wrong font.
+            setTimeout(function () {
+                if (window.MaterialModes && window.MaterialModes.resizeLabel) window.MaterialModes.resizeLabel();
+            }, 0);
+        } else {
+            lbl.textContent = label;
         }
         if (CHANNEL_TOOLTIPS[label]) lbl.title = CHANNEL_TOOLTIPS[label];
         head.appendChild(lbl);
@@ -391,8 +367,6 @@
 
         ch.appendChild(head);
 
-        if (matSel) ch.appendChild(buildModeSegments(matSel));
-
         if (slider) {
             const fader = document.createElement('div');
             fader.className = 'ch-fader';
@@ -408,25 +382,10 @@
         ch.className = 'mixer-channel ch-wide';
         ch.dataset.accent = 'pink';
 
-        // Label + swatch share one row (the "head"); the Rnd/Step toggles sit below.
-        // Keeps the colour channel near fader height instead of stacking
-        // label → swatch → toggles vertically.
-        const head = document.createElement('div');
-        head.className = 'ch-color-head';
-
-        const lbl = document.createElement('div');
-        lbl.className = 'ch-label';
-        lbl.textContent = 'Color';
-        head.appendChild(lbl);
-
+        // The swatch sits INLINE with the mode switch instead of on a row of
+        // its own: the colour channel was three stacked rows (label+swatch /
+        // modes / ignite) and drove the strip's height.
         const picker = document.getElementById('colorPicker');
-        if (picker) {
-            picker.className = 'ch-color-input';
-            picker.style.cssText = '';
-            head.appendChild(picker);
-        }
-
-        ch.appendChild(head);
 
         // --- Toggle row: [Rnd|Step|🌈 segmented switch] + gap + [Gate] ---
         // Rnd/Step/Rainbow are mutually exclusive -> ONE gapless segmented
@@ -623,6 +582,14 @@
             igniteLock.classList.add('latched');
         });
 
+        // The swatch leads the second row: row 1 is the four colour toggles
+        // at a legible width, row 2 is swatch + Ignite + latch.
+        if (picker) {
+            picker.className = 'ch-color-input';
+            picker.style.cssText = '';
+            picker.title = 'Fluid colour — click to pick';
+            nudgeRow.appendChild(picker);
+        }
         nudgeRow.appendChild(igniteBtnColor);
         nudgeRow.appendChild(igniteLock);
         ch.appendChild(nudgeRow);
