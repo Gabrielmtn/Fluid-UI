@@ -272,6 +272,25 @@
                 vec2 mapped = vec2(cos(a), sin(a)) * bandedR;
                 return mapped + center;
             }
+            // Sobel gradient of the shading height field at an arbitrary UV.
+            // Factored out so surface shading can sample the FOLDED UV under
+            // kaleido: uShadeForm is built from the pre-fold frame (the fold
+            // exists only in this shader), so gradients must be looked up
+            // where the fold reads the image or the relief ignores the faces.
+            vec2 shadeSobel(vec2 uv, vec2 t2) {
+                const vec3 lumaW = vec3(0.299, 0.587, 0.114);
+                float lL  = dot(texture(uShadeForm, uv + vec2(-t2.x,  0.0 )).rgb, lumaW);
+                float lR  = dot(texture(uShadeForm, uv + vec2( t2.x,  0.0 )).rgb, lumaW);
+                float lT  = dot(texture(uShadeForm, uv + vec2( 0.0 ,  t2.y)).rgb, lumaW);
+                float lB  = dot(texture(uShadeForm, uv + vec2( 0.0 , -t2.y)).rgb, lumaW);
+                float lTL = dot(texture(uShadeForm, uv + vec2(-t2.x,  t2.y)).rgb, lumaW);
+                float lTR = dot(texture(uShadeForm, uv + vec2( t2.x,  t2.y)).rgb, lumaW);
+                float lBL = dot(texture(uShadeForm, uv + vec2(-t2.x, -t2.y)).rgb, lumaW);
+                float lBR = dot(texture(uShadeForm, uv + vec2( t2.x, -t2.y)).rgb, lumaW);
+                float gx = ((lTR + 2.0 * lR + lBR) - (lTL + 2.0 * lL + lBL)) * 0.0625;
+                float gy = ((lTL + 2.0 * lT + lTR) - (lBL + 2.0 * lB + lBR)) * 0.0625;
+                return vec2(gx, gy);
+            }
             void main() {
                 vec4 base = texture(uTexture, vUv);
                 vec4 kcol = base;
@@ -370,16 +389,18 @@
                     // same response as the original 1-texel differences on
                     // smooth ramps.
                     vec2 t2 = shadeTexelSize;
-                    float lL  = dot(texture(uShadeForm, vUv + vec2(-t2.x,  0.0 )).rgb, lumaW);
-                    float lR  = dot(texture(uShadeForm, vUv + vec2( t2.x,  0.0 )).rgb, lumaW);
-                    float lT  = dot(texture(uShadeForm, vUv + vec2( 0.0 ,  t2.y)).rgb, lumaW);
-                    float lB  = dot(texture(uShadeForm, vUv + vec2( 0.0 , -t2.y)).rgb, lumaW);
-                    float lTL = dot(texture(uShadeForm, vUv + vec2(-t2.x,  t2.y)).rgb, lumaW);
-                    float lTR = dot(texture(uShadeForm, vUv + vec2( t2.x,  t2.y)).rgb, lumaW);
-                    float lBL = dot(texture(uShadeForm, vUv + vec2(-t2.x, -t2.y)).rgb, lumaW);
-                    float lBR = dot(texture(uShadeForm, vUv + vec2( t2.x, -t2.y)).rgb, lumaW);
-                    float dx = ((lTR + 2.0 * lR + lBR) - (lTL + 2.0 * lL + lBL)) * 0.0625;
-                    float dy = ((lTL + 2.0 * lT + lTR) - (lBL + 2.0 * lB + lBR)) * 0.0625;
+                    // Gradient looked up at the kaleido-folded UV so every face
+                    // carries its own mirrored copy of the source relief, mixed
+                    // with the unfolded gradient by kBlend — the same dual-UV
+                    // treatment the glow gets below. Kaleido off: kw = 0 and
+                    // this is bit-identical to the single unfolded Sobel.
+                    vec2 g = shadeSobel(vUv, t2);
+                    if (doK) {
+                        float kw = clamp(kBlend, 0.0, 1.0);
+                        if (kw > 0.0) g = mix(g, shadeSobel(kUv, t2), kw);
+                    }
+                    float dx = g.x;
+                    float dy = g.y;
                     float nStr = displayShading * 6.0 * shadeFade * (shadeInvert > 0.5 ? -1.0 : 1.0);
                     vec3 N = normalize(vec3(dx * nStr, dy * nStr, 0.25));
                     // Two fixed studio lights (directions/colours unchanged):

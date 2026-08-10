@@ -259,9 +259,16 @@
         
         function getCanvasCoordinates(e) {
             const rect = canvas.getBoundingClientRect();
+            // Normalise through the rect instead of assuming 1 CSS px == 1
+            // canvas px. Identical while the canvas is untransformed, but it
+            // keeps strokes landing under the cursor once Zoom View scales or
+            // pans the wrapper (getBoundingClientRect already includes the
+            // CSS transform, so the raw offset would be off by the scale).
+            const sx = rect.width ? canvas.width / rect.width : 1;
+            const sy = rect.height ? canvas.height / rect.height : 1;
             return {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
+                x: (e.clientX - rect.left) * sx,
+                y: (e.clientY - rect.top) * sy
             };
         }
         

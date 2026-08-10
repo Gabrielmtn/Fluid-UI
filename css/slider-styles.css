@@ -1,6 +1,11 @@
 /* ========================================
-   MODERN SLIDER STYLES
-   Refactored slider system with gradient fills
+   FADER — the one slider treatment
+   Design handoff 2026-08 (COMPONENTS.md 4.1):
+   flat #0a0b0e well, 1px #2a2e37 inset ring, 9 ticks,
+   heat fill (#f0a626 -> #e0432a), 16x26 chrome knob,
+   square corners everywhere, 44px hit box.
+   The old five variants (.slider-star/-blue/-pink/-green/-gray)
+   are retired: one treatment, no exceptions.
    ======================================== */
 
 /* Enable JS-based features */
@@ -21,53 +26,37 @@ input[type=range] {
        track (slider renders FULL). A parenthesized-group divisor works on every browser.
        Most visible on non-zero-min sliders like Isolation (velocityInfluence, 1-5). */
     --pos: calc((var(--val) - var(--min)) / (var(--max) - var(--min)) * 100%);
-    
-    /* Dimensions */
-    --input-w: 100%;
-    --input-p: 0.5em;
-    --input-h: calc(var(--track-h) + 2 * var(--input-p));
-    --track-w: calc(var(--input-w) - 2 * var(--input-p));
-    --track-h: 0.875em;
-    --track-r: calc(0.5 * var(--track-h));
-    
-    /* Track gradient colors (default: yellow/orange) */
-    --track-c0-rgb: 226, 182, 8;    
-    --track-c1-rgb: 184, 2, 2;    
-    --track-fill-alpha: 0.65;      /* transparency of active fill */
-    --track-fill-alpha-b: 0.76;      /* transparency of active fill */
 
-    /* Track edge effect for rounded end */
-    --track-e: radial-gradient(circle farthest-side at 100%,
-            transparent calc(100% - 2px), 
-            #000 calc(100% - 1px))
-        0 / var(--track-r) no-repeat;
-    
-    /* Track gradient (semi-transparent so texture shows underneath) */
-    --track-g: linear-gradient(
-        90deg,
-        rgba(var(--track-c0-rgb), var(--track-fill-alpha)),
-        rgba(var(--track-c1-rgb), var(--track-fill-alpha))
-    );
-    
-    /* Thumb dimensions */
-    --thumb-h: 1.75em;
-    --thumb-w: var(--thumb-h);
-    --thumb-r: 50%;
-    --thumb-b: 2px;
-    --thumb-c: transparent;
-    --thumb-p: inset(0);
-    
-    /* Styling */
+    /* Dimensions (px, per the design handoff; the app-level ui-scale zoom
+       multiplies these uniformly). Padding is split into vertical/horizontal
+       components: the vertical component grows the HIT BOX to 44px without
+       shortening the visible track (the old single --input-p was 4-sided). */
+    --input-w: 100%;
+    --input-px: 8px;
+    --input-py: 11px;
+    --input-h: calc(var(--track-h) + 2 * var(--input-py));
+    --track-w: calc(var(--input-w) - 2 * var(--input-px));
+    --track-h: 22px;
+
+    /* Heat gradient — the filled portion of a range. Nothing else. */
+    --track-g: linear-gradient(90deg, var(--heat-0, #f0a626), var(--heat-1, #e0432a));
+
+    /* 9 evenly spaced 1px tick marks inside the well (line sits at the right
+       edge of each 10% tile; the 100% one hides under the border ring). */
+    --track-ticks: linear-gradient(270deg, var(--ground-500, #2a2e37) 1px, transparent 1px);
+
+    /* Thumb: chrome cap, square */
+    --thumb-h: 26px;
+    --thumb-w: 16px;
+
+    /* Styling: the element's own box is a transparent hit area —
+       the row supplies the ground. */
     width: var(--input-w);
     height: var(--input-h);
-    border-radius: var(--input-h);
-    box-shadow: 0 1px 1px rgba(255, 255, 255, 0.1), 
-                inset 0 1px 0 2px #0d0d0d;
-    background: linear-gradient(#0a0a0a, #111 15%, #272727, #1d1d1d);
+    border-radius: 0;
+    background: transparent;
     font: inherit;
-    transition: 0.3s;
     cursor: pointer;
-    outline-offset: -0.15em;
 }
 
 /* Remove default styling */
@@ -77,49 +66,46 @@ input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
 }
 
+input[type=range]:focus {
+    outline: none;
+}
+input[type=range]:focus-visible {
+    outline: 2px solid var(--accent, #ec3013);
+    outline-offset: 2px;
+}
+
 /* ========================================
-   WEBKIT (Chrome, Safari, Edge)
+   WEBKIT (Chrome, Safari, Edge, Electron)
    ======================================== */
 
 input[type=range]::-webkit-slider-container {
     -webkit-user-modify: read-write;
-    margin: var(--input-p);
+    margin: var(--input-py) var(--input-px);
     height: var(--track-h);
-    border-radius: var(--track-h);
-    box-shadow: inset 0 0 0 2px #000;
+    border-radius: 0;
+    /* 1px border ring (paints above the background layers) */
+    box-shadow: inset 0 0 0 1px var(--ground-500, #2a2e37);
     background:
-        var(--track-e),
-        var(--track-g) 0 / calc(var(--js, 0) * var(--pos)) 100% no-repeat,
-        linear-gradient(27deg, #a8a8a8 1px, transparent 1px) 0 1px / 4px 4px,
-        linear-gradient(207deg, #a8a8a8 1px, transparent 1px) 2px 0px / 4px 4px,
-        linear-gradient(27deg, #d0d0d0 1px, transparent 1px) 0px 2px / 4px 4px,
-        linear-gradient(207deg, #d0d0d0 1px, transparent 1px) 2px 1px / 4px 4px,
-        linear-gradient(90deg, #b8b8b8 2px, transparent 2px) 0 0 / 4px 4px,
-        linear-gradient(#c5c5c5 25%, #b0b0b0 25%, #b0b0b0 50%, transparent 50%, transparent 75%, #d8d8d8 75%, #d8d8d8) 0 0 / 4px 4px,
-        #9a9a9a;
+        /* heat fill: 1px inset from the ring, 6px vertical padding */
+        var(--track-g) 1px 50% / calc(var(--js, 0) * var(--pos)) calc(100% - 12px) no-repeat,
+        /* ticks beneath the fill */
+        var(--track-ticks) 0 0 / 10% 100%,
+        /* flat well */
+        var(--ground-950, #0a0b0e);
 }
 
 input[type=range]::-webkit-slider-runnable-track {
-    margin: 0 calc(-1 * var(--input-p));
+    margin: 0 calc(-1 * var(--input-px));
     height: var(--thumb-h);
-    box-shadow: 0 4px 3px rgba(0, 0, 0, 0.9);
 }
 
 input[type=range]::-webkit-slider-thumb {
     box-sizing: border-box;
-    border: solid var(--thumb-b) var(--thumb-c);
+    border: 1px solid var(--ground-950, #0a0b0e);
     width: var(--thumb-w);
     height: var(--thumb-h);
-    border-radius: var(--thumb-r);
-    box-shadow: 0 -1px #000, inset 0 -1px #8a8a8a;
-    background: 
-        conic-gradient(
-            #fefefe, #ebebeb, #989898 25%, 
-            #808080 0%, #797979, #b3b3b3 50%, 
-            #bdbdbd 0%, #d3d3d3, #989898, #d8d8d8, #fefefe
-        ) padding-box,
-        linear-gradient(#f9f9f9, #8d8d8c) border-box;
-    clip-path: var(--thumb-p);
+    border-radius: 0;
+    background: linear-gradient(180deg, var(--chrome-0, #f6f7f9), var(--chrome-1, #9aa1ad));
     cursor: ew-resize;
 }
 
@@ -128,155 +114,91 @@ input[type=range]::-webkit-slider-thumb {
    ======================================== */
 
 input[type=range]::-moz-range-track {
-    margin: var(--input-p);
+    margin: var(--input-py) var(--input-px);
+    width: var(--track-w);
     height: var(--track-h);
-    border-radius: var(--track-h);
-    box-shadow: inset 0 0 0 2px #000;
+    border-radius: 0;
+    box-shadow: inset 0 0 0 1px var(--ground-500, #2a2e37);
     background:
-        linear-gradient(27deg, #a8a8a8 1px, transparent 1px) 0 1px / 4px 4px,
-        linear-gradient(207deg, #a8a8a8 1px, transparent 1px) 2px 0px / 4px 4px,
-        linear-gradient(27deg, #d0d0d0 1px, transparent 1px) 0px 2px / 4px 4px,
-        linear-gradient(207deg, #d0d0d0 1px, transparent 1px) 2px 1px / 4px 4px,
-        linear-gradient(90deg, #b8b8b8 2px, transparent 2px) 0 0 / 4px 4px,
-        linear-gradient(#c5c5c5 25%, #b0b0b0 25%, #b0b0b0 50%, transparent 50%, transparent 75%, #d8d8d8 75%, #d8d8d8) 0 0 / 4px 4px,
-        #9a9a9a;
+        var(--track-ticks) 0 0 / 10% 100%,
+        var(--ground-950, #0a0b0e);
 }
 
 input[type=range]::-moz-range-progress {
-    height: var(--track-h);
-    border: solid var(--input-p) transparent;
-    border-right-width: 0;
-    border-radius: var(--input-h) 0 0 var(--input-h);
-    box-shadow: inset 0 0 0 2px #000;
-    background:
-        var(--track-g) 0 0 / 100% 100% no-repeat,
-        linear-gradient(27deg, #a8a8a8 1px, transparent 1px) 0 1px / 4px 4px,
-        linear-gradient(207deg, #a8a8a8 1px, transparent 1px) 2px 0px / 4px 4px,
-        linear-gradient(27deg, #d0d0d0 1px, transparent 1px) 0px 2px / 4px 4px,
-        linear-gradient(207deg, #d0d0d0 1px, transparent 1px) 2px 1px / 4px 4px,
-        linear-gradient(90deg, #b8b8b8 2px, transparent 2px) 0 0 / 4px 4px,
-        linear-gradient(#c5c5c5 25%, #b0b0b0 25%, #b0b0b0 50%, transparent 50%, transparent 75%, #d8d8d8 75%, #d8d8d8) 0 0 / 4px 4px;
-    background-clip: padding-box;
-    mask: 
-        radial-gradient(closest-side at var(--track-r), 
-            red calc(100% - 1px), transparent),
-        linear-gradient(red 0 0) var(--track-r) no-repeat;
-    mask-clip: padding-box;
-    mask-size: calc(var(--track-w) - var(--track-h));
+    height: calc(var(--track-h) - 12px);
+    border: none;
+    border-radius: 0;
+    background: var(--track-g) 0 0 / 100% 100%;
 }
 
 input[type=range]::-moz-range-thumb {
     box-sizing: border-box;
-    border: solid var(--thumb-b) var(--thumb-c);
+    border: 1px solid var(--ground-950, #0a0b0e);
     width: var(--thumb-w);
     height: var(--thumb-h);
-    border-radius: var(--thumb-r);
-    box-shadow: 0 -1px #000, inset 0 -1px #8a8a8a;
-    background: 
-        conic-gradient(
-            #fefefe, #ebebeb, #989898 25%, 
-            #808080 0%, #797979, #b3b3b3 50%, 
-            #bdbdbd 0%, #d3d3d3, #989898, #d8d8d8, #fefefe
-        ) padding-box,
-        linear-gradient(#f9f9f9, #8d8d8c) border-box;
-    clip-path: var(--thumb-p);
+    border-radius: 0;
+    background: linear-gradient(180deg, var(--chrome-0, #f6f7f9), var(--chrome-1, #9aa1ad));
     cursor: ew-resize;
 }
 
 /* ========================================
-   INTERACTION STATES
+   PRINTED SCALE (generated by js/06-slider-updater.js)
+   Three stops — min, midpoint, max.
    ======================================== */
 
-input[type=range]:hover,
-input[type=range]:focus {
-    outline: solid 2px var(--track-c1);
+.fader-stack {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+/* The whole row drags (pointer forwarding in 06-slider-updater.js) */
+.control-group:has(.fader-stack) {
+    cursor: ew-resize;
+}
+.fader-stack > input[type=range] {
+    display: block;
+    width: 100%;
+}
+.fader-scale {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-ui, sans-serif);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-500, #7b828e);
+    /* 5px below the label; 3px + the input's 11px transparent top padding
+       = 14px above the track well */
+    margin: 5px 0 3px;
+    padding: 0 var(--input-px, 8px);
+    line-height: 1;
+    user-select: none;
+    pointer-events: none;
+}
+.fader-scale span {
+    white-space: nowrap;
+}
+/* Inline variant for compact horizontal rows (label | slider | value):
+   the scale overlays the gap above the input instead of adding height,
+   so row siblings keep centering on the track itself. */
+.fader-stack-inline {
+    position: relative;
+}
+.fader-stack-inline .fader-scale {
+    position: absolute;
+    top: -5px;
+    left: 0;
+    right: 0;
+    margin: 0;
 }
 
 /* ========================================
-   SLIDER VARIANTS
+   TOUCH SAFETY NET (coarse pointers)
+   The 44px base box already exceeds these; kept as a floor.
    ======================================== */
-
-/* Star thumb (default yellow/orange) */
-input[type=range].slider-star {
-    --thumb-p: polygon(
-        calc(50% + (50% - 3px) * 1) calc(50% + (50% - 3px) * 0), 
-        97.5528258148% 65.4508497187%, 
-        calc(50% + (50% - 3px) * 0.8090169944) calc(50% + (50% - 3px) * 0.5877852523), 
-        79.3892626146% 90.4508497187%, 
-        calc(50% + (50% - 3px) * 0.3090169944) calc(50% + (50% - 3px) * 0.9510565163), 
-        50% 100%, 
-        calc(50% + (50% - 3px) * -0.3090169944) calc(50% + (50% - 3px) * 0.9510565163), 
-        20.6107373854% 90.4508497187%, 
-        calc(50% + (50% - 3px) * -0.8090169944) calc(50% + (50% - 3px) * 0.5877852523), 
-        2.4471741852% 65.4508497187%, 
-        calc(50% + (50% - 3px) * -1) calc(50% + (50% - 3px) * 0), 
-        2.4471741852% 34.5491502813%, 
-        calc(50% + (50% - 3px) * -0.8090169944) calc(50% + (50% - 3px) * -0.5877852523), 
-        20.6107373854% 9.5491502813%, 
-        calc(50% + (50% - 3px) * -0.3090169944) calc(50% + (50% - 3px) * -0.9510565163), 
-        50% 0%, 
-        calc(50% + (50% - 3px) * 0.3090169944) calc(50% + (50% - 3px) * -0.9510565163), 
-        79.3892626146% 9.5491502813%, 
-        calc(50% + (50% - 3px) * 0.8090169944) calc(50% + (50% - 3px) * -0.5877852523), 
-        97.5528258148% 34.5491502813%
-    );
-}
-
-/* Blue/cyan gradient */
-input[type=range].slider-blue {
-    --track-c0-rgb: 0, 16, 213;   /* #0010d5 */
-    --track-c1-rgb: 0, 209, 222;  /* #00d1de */
-}
-
-/* Red/pink gradient with rounded square thumb */
-input[type=range].slider-pink {
-    --thumb-r: 5px;
-    --track-c0-rgb: 204, 4, 13;    /* #cc040d */
-    --track-c1-rgb: 212, 77, 191;  /* #d44dbf */
-}
-
-/* Green/lime gradient with pill thumb */
-input[type=range].slider-green {
-    --thumb-w: 2em;
-    --thumb-h: 1.125em;
-    --thumb-r: var(--thumb-h);
-    --track-c0-rgb: 8, 195, 0;     /* #08c300 */
-    --track-c1-rgb: 170, 202, 0;   /* #aaca00 */
-}
-
-/* Gray gradient with tall thumb */
-input[type=range].slider-gray {
-    --thumb-w: 1.25em;
-    --thumb-h: 2em;
-    --track-c0-rgb: 15, 15, 15;    /* #0f0f0f */
-    --track-c1-rgb: 115, 115, 115; /* #737373 */
-}
-
-/* ========================================
-   MOBILE TOUCH TARGETS
-   Larger thumb + padding for finger control
-   ======================================== */
-body.mobile-mode input[type=range] {
-    --thumb-h: 2.4em;
-    --thumb-w: 2.4em;
-    --input-p: 0.7em;
-}
-body.mobile-mode input[type=range]::-webkit-slider-thumb {
-    cursor: grab;
-}
-body.mobile-mode input[type=range]::-moz-range-thumb {
-    cursor: grab;
-}
-
-/* 13.6: touch usability — bigger hit areas + thumbs on coarse pointers
-   (phones/tablets). Pointer-media gated so desktop mice are untouched. */
 @media (pointer: coarse) {
     input[type="range"] {
         min-height: 28px;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-        width: 22px;
-        height: 22px;
     }
     .encapsulated-slider {
         min-height: 28px;

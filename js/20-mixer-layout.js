@@ -28,6 +28,12 @@
     });
 
     function initMixerLayout() {
+        // Build ONCE. The build re-parents live nodes by id, so a second run
+        // steals them into a second strip/sidebar and leaves the first pair
+        // half-empty. Two DOMContentLoaded deliveries (or a deferred rAF that
+        // fires after a manual re-init) used to produce exactly that.
+        if (document.getElementById('mixer-strip')) return;
+
         const controls = document.querySelector('.controls');
         const canvasArea = document.getElementById('canvas-area');
         if (!controls || !canvasArea) return;
@@ -98,7 +104,10 @@
                 // Compare before writing: the 2s fallback interval otherwise
                 // invalidates style/layout every tick even when nothing
                 // changed (UI audit Stage 1 — no-op DOM writes aren't free).
-                var v = parseFloat(brushSlider.value).toFixed(1);
+                // Fine tips (down to 0.001) need 3 decimals or the readout
+                // reads a flat "0.0" across the whole detail range.
+                var n = parseFloat(brushSlider.value);
+                var v = (n < 1) ? n.toFixed(3) : n.toFixed(1);
                 if (brushDisplay.textContent !== v) brushDisplay.textContent = v;
             }
             brushSlider.addEventListener('input', syncBrush);
@@ -270,7 +279,7 @@
         // keeps the rarer replay + splat-ramp controls.
         buildBrushPanel(sizeChannel.querySelector('.ch-label'));
         strip.appendChild(sizeChannel);
-        strip.appendChild(faderChannel('Curl', 'blue', 'curl', 'curlValue'));
+        strip.appendChild(faderChannel('Fluid', 'blue', 'curl', 'curlValue'));
         strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
         var brushChannel = faderChannel('Multi-Brush', 'yellow', 'multiplier', 'multiplierValue');
@@ -305,7 +314,7 @@
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
         'Brush Size': 'Brush size for painting fluid — click the label for brush settings & presets',
-        'Curl': 'Vorticity strength - creates swirling motion',
+        'Fluid': 'Material mode (Fluid / Paint-Wet / Paint-Thick) + amount — vorticity in fluid mode',
         'Viscosity': 'Sharpness/detail enhancement',
         'Isolation': 'Motion isolation - how much color follows velocity',
         'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — click the value for arm colors',
@@ -328,14 +337,16 @@
 
         const lbl = document.createElement('div');
         lbl.className = 'ch-label';
-        // The Curl channel's label IS the material-mode selector (Curl/Fluid/
-        // Ooze/Clay) — adopt it from the sidebar markup instead of static text.
+        // The Fluid channel's LABEL is the material selector — one compact
+        // widget in the row that already exists, rather than a second
+        // control row above the fader.
         const matSel = (sliderId === 'curl') ? document.getElementById('materialMode') : null;
         if (matSel) {
+            matSel.style.cssText = '';
             lbl.appendChild(matSel);
-            // Re-fit the select to its label text in the strip's font — deferred
-            // a tick: this label is still detached here, and computed styles on
-            // a detached node measure with the wrong font.
+            // Re-fit the select to its text in the strip's font — deferred a
+            // tick: the label is still detached, and computed styles on a
+            // detached node measure with the wrong font.
             setTimeout(function () {
                 if (window.MaterialModes && window.MaterialModes.resizeLabel) window.MaterialModes.resizeLabel();
             }, 0);
@@ -374,29 +385,22 @@
         ch.className = 'mixer-channel ch-wide';
         ch.dataset.accent = 'pink';
 
-        // Label + swatch share one row (the "head"); the Rnd/Step toggles sit below.
-        // Keeps the colour channel near fader height instead of stacking
-        // label → swatch → toggles vertically.
-        const head = document.createElement('div');
-        head.className = 'ch-color-head';
-
-        const lbl = document.createElement('div');
-        lbl.className = 'ch-label';
-        lbl.textContent = 'Color';
-        head.appendChild(lbl);
-
+        // The swatch sits INLINE with the mode switch instead of on a row of
+        // its own: the colour channel was three stacked rows (label+swatch /
+        // modes / ignite) and drove the strip's height.
         const picker = document.getElementById('colorPicker');
-        if (picker) {
-            picker.className = 'ch-color-input';
-            picker.style.cssText = '';
-            head.appendChild(picker);
-        }
 
-        ch.appendChild(head);
-
-        // --- Toggle row (Random + Step) ---
+        // --- Toggle row: [Rnd|Step|🌈 segmented switch] + gap + [Gate] ---
+        // Rnd/Step/Rainbow are mutually exclusive -> ONE gapless segmented
+        // switch; Gate is an independent toggle drawn separately with its own
+        // border (design handoff Task 6: touching cells mean pick one,
+        // separated cells mean pick any).
         var toggleRow = document.createElement('div');
         toggleRow.className = 'ch-toggle-row';
+
+        var segWrap = document.createElement('div');
+        segWrap.className = 'ch-seg-switch';
+        toggleRow.appendChild(segWrap);
 
         var rnd = document.getElementById('randomColor');
         var stepEl = document.getElementById('stepPalette');
@@ -427,7 +431,7 @@
                     window.setActiveBrushColorMode(next);
                 }
             });
-            toggleRow.appendChild(btn);
+            segWrap.appendChild(btn);
             return btn;
         }
 
@@ -457,7 +461,7 @@
             gateEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
             var gateBtn = document.createElement('button');
             gateBtn.type = 'button';
-            gateBtn.className = 'ch-text-toggle' + (gateEl.checked ? ' active' : '');
+            gateBtn.className = 'ch-text-toggle ch-gate-toggle' + (gateEl.checked ? ' active' : '');
             gateBtn.textContent = 'Gate';
             gateBtn.title = 'Lock max to original color — repeated strokes can\'t overflow into white';
             gateBtn.addEventListener('click', function () {
@@ -495,10 +499,16 @@
             + 'painted at, and past the Gate cap. Slide right onto the lock to keep it on. '
             + 'Your density decay setting is untouched.';
 
+        // Latch cell (Task 7): permanently visible so the second mode is
+        // discoverable — a small indicator that is hollow when unlatched and
+        // fills white-on-accent when latched. Click toggles the latch; the
+        // old drag-onto-it gesture still arms it mid-hold.
         var igniteLock = document.createElement('div');
         igniteLock.className = 'ch-ignite-lock';
-        igniteLock.textContent = '🔒';
-        igniteLock.title = 'Release here to lock Ignite on';
+        igniteLock.title = 'Ignite latch — click to keep Ignite on hands-free';
+        var igniteDot = document.createElement('span');
+        igniteDot.className = 'ch-ignite-dot';
+        igniteLock.appendChild(igniteDot);
 
         var igniteLocked = false, lockArmed = false, ignitePid = null;
 
@@ -511,7 +521,7 @@
             if (window.DyeNudge) window.DyeNudge.release();
             igniteBtnColor.classList.remove('active', 'locked');
             nudgeRow.classList.remove('holding', 'armed');
-            igniteLock.classList.remove('armed');
+            igniteLock.classList.remove('armed', 'latched');
         }
         function setArmed(v) {
             if (v === lockArmed) return;
@@ -553,6 +563,7 @@
                 igniteLocked = true;
                 setArmed(false);
                 igniteBtnColor.classList.add('locked');
+                igniteLock.classList.add('latched');
                 nudgeRow.classList.add('holding');
                 return;
             }
@@ -560,15 +571,28 @@
         }
         igniteBtnColor.addEventListener('pointerup', igniteRelease);
         igniteBtnColor.addEventListener('pointercancel', igniteRelease);
-        // The padlock is also a click target once latched, so the way out is
-        // wherever the eye already is.
+        // The latch cell toggles: click latches Ignite on from idle (engage
+        // and decline to release), click again unlatches. Mid-hold the button
+        // owns the pointer, so releases there are handled by igniteRelease.
         igniteLock.addEventListener('pointerdown', function (e) {
-            if (!igniteLocked) return;
             e.preventDefault();
             e.stopPropagation();
-            igniteStop();
+            if (igniteLocked) { igniteStop(); return; }
+            if (ignitePid !== null) return;
+            igniteEngage();
+            igniteLocked = true;
+            igniteBtnColor.classList.add('locked');
+            igniteLock.classList.add('latched');
         });
 
+        // The swatch leads the second row: row 1 is the four colour toggles
+        // at a legible width, row 2 is swatch + Ignite + latch.
+        if (picker) {
+            picker.className = 'ch-color-input';
+            picker.style.cssText = '';
+            picker.title = 'Fluid colour — click to pick';
+            nudgeRow.appendChild(picker);
+        }
         nudgeRow.appendChild(igniteBtnColor);
         nudgeRow.appendChild(igniteLock);
         ch.appendChild(nudgeRow);
@@ -590,7 +614,7 @@
         if (pauseBtn) {
             pauseBtn.style.cssText = '';
             pauseBtn.textContent = '⏸';
-            pauseBtn.title = 'Pause / resume simulation';
+            pauseBtn.title = 'Pause / resume simulation (Shift+Space)';
             transportRow.appendChild(pauseBtn);
         }
 
@@ -598,7 +622,7 @@
         if (freezeBtn) {
             freezeBtn.style.cssText = '';
             freezeBtn.textContent = '🛑';
-            freezeBtn.title = 'Freeze / unfreeze fluid motion';
+            freezeBtn.title = 'Freeze / unfreeze fluid motion (Space)';
             transportRow.appendChild(freezeBtn);
         }
 
@@ -1562,6 +1586,14 @@
     function buildKaleidoscopeSection(controls) {
         const { sec, body } = makeSection('🔮 Kaleidoscope', 'purple', true);
 
+        // Mandala Studio leads the section: it's the guided way in (it rigs
+        // the raw controls below for you), so it should be the first thing
+        // read. Its panel keeps the toggle+collapsible pattern rather than
+        // being emptied, since it only applies while the mode is on.
+        moveCheckboxGroup('mandalaToggle', body);
+        const mandalaPanel = document.getElementById('mandalaPanel');
+        if (mandalaPanel) body.appendChild(mandalaPanel);
+
         moveCheckboxGroup('kaleidoToggle', body);
 
         // Move contents from kaleidoscope panel
@@ -1819,7 +1851,7 @@
             slider.value = String(getDist());
             slider.style.cssText = 'flex:1;min-width:0;';
             var val = document.createElement('span');
-            val.style.cssText = 'font-size:10px;font-family:monospace;color:#4fc3f7;min-width:32px;text-align:right;';
+            val.style.cssText = 'font-size:10px;font-family:monospace;color:#f2f3f5;min-width:32px;text-align:right;';
             val.textContent = Math.round(parseFloat(slider.value) * 100) + '%';
             row.appendChild(lab); row.appendChild(slider); row.appendChild(val);
             return { row: row, slider: slider, val: val };
@@ -1997,6 +2029,10 @@
             panel.style.left = '0px';
             panel.style.top = ((rect.bottom + 6) / z) + 'px';
             panel.style.width = PANEL_W + 'px';
+            // The panel outgrew short viewports (shapes row, splat-mode row):
+            // cap it to the space under the strip and scroll the overflow.
+            panel.style.maxHeight = Math.max(200, (window.innerHeight - rect.bottom - 18) / z) + 'px';
+            panel.style.overflowY = 'auto';
         }
 
         var header = document.createElement('div');
@@ -2006,6 +2042,9 @@
 
         function num(v, d) { return typeof v === 'number' ? v : d; }
         function pct(v) { return Math.round(v * 100) + '%'; }
+        // Sub-5% values show one decimal — the Spacing slider's low end goes
+        // to 0.1%, which plain pct() would round to a flat 0%.
+        function pctFine(v) { return v < 0.05 ? (v * 100).toFixed(1) + '%' : Math.round(v * 100) + '%'; }
 
         // Manual tweaks diverge from the applied preset → clear the chip
         // highlight. Preset apply drives the same handlers, so it flags
@@ -2141,7 +2180,9 @@
                 hardness: num(c.BRUSH_HARDNESS, 0.8),
                 stabilizer: num(c.BRUSH_STABILIZER, 0),
                 spacing: num(c.BRUSH_SPACING, 0.35),
-                jitter: num(c.BRUSH_JITTER, 0)
+                jitter: num(c.BRUSH_JITTER, 0),
+                splatMode: c.BRUSH_CONTINUOUS ? 'constant' : 'move',
+                shape: (window.BrushShapes && window.BrushShapes.activeId()) || null
             };
         }
         function applyBrushPreset(p) {
@@ -2161,10 +2202,17 @@
                 if (SETTERS.target) SETTERS.target(p.target);
                 if (SETTERS.tip) SETTERS.tip(p.tip | 0);
                 ['tipTexture', 'angle', 'flow', 'hardness', 'stabilizer', 'spacing', 'jitter',
-                 'eraser'
+                 'eraser', 'splatMode', 'shape'
                 ].forEach(function (k) {
                     if (SETTERS[k] && p[k] !== undefined) SETTERS[k](p[k]);
                 });
+                // Migration defaults: presets saved before the splat-mode /
+                // custom-shape controls existed carry neither key — they were
+                // authored with On-Move + no shape, so applying them must
+                // reset both or the current shape/Constant mode silently
+                // overrides the preset's brush.
+                if (p.splatMode === undefined && SETTERS.splatMode) SETTERS.splatMode('move');
+                if (p.shape === undefined && SETTERS.shape) SETTERS.shape(null);
             } finally { applyingPreset = false; }
         }
         // D7-1: let a .fluid project import refresh the brush-preset chips.
@@ -2294,16 +2342,97 @@
             b.dataset.tip = String(t.v);
             b.textContent = t.glyph;
             b.title = t.title;
-            b.addEventListener('click', function () { setBrushTip(t.v); markDirty(); });
+            b.addEventListener('click', function () {
+                // Picking a built-in tip dismisses any custom shape override
+                if (window.BrushShapes && window.BrushShapes.activeId()) window.BrushShapes.setActive(null);
+                setBrushTip(t.v);
+                markDirty();
+            });
             tipBtns.push(b);
             tipRow.appendChild(b);
         });
         panel.appendChild(tipRow);
+
+        // ── Custom shapes: user-authored stamp textures (33-brush-shapes).
+        // Import → the mask editor opens in adhoc mode (full shape suite +
+        // Smart Select) → Apply saves the cut-out as a stamp swatch here.
+        // The area is also an image drop target (32-file-drop).
+        var shapesArea = document.createElement('div');
+        shapesArea.className = 'brush-shapes-area';
+        var shapesRow = document.createElement('div');
+        shapesRow.className = 'brush-tip-row brush-shapes-row';
+        shapesArea.appendChild(shapesRow);
+        panel.appendChild(shapesArea);
+        var shapeFileInput = document.createElement('input');
+        shapeFileInput.type = 'file';
+        shapeFileInput.accept = 'image/png,image/jpeg,image/jpg,image/webp';
+        shapeFileInput.style.display = 'none';
+        shapesArea.appendChild(shapeFileInput);
+        shapeFileInput.addEventListener('change', function () {
+            var f = shapeFileInput.files && shapeFileInput.files[0];
+            if (f && window.BrushShapes) window.BrushShapes.beginImportFile(f);
+            shapeFileInput.value = '';
+        });
+        function renderBrushShapes() {
+            shapesRow.innerHTML = '';
+            var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
+            var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
+            lst.forEach(function (s) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'brush-tip-btn brush-shape-btn' + (s.id === act ? ' active' : '');
+                b.style.backgroundImage = 'url("' + s.dataURL + '")';
+                // Pin the sizing longhands inline: every .brush-tip-btn state
+                // rule (:hover, .active) uses the `background:` shorthand,
+                // which resets size/repeat/position — inline always wins, so
+                // the thumbnail can never blow up to natural size in a state
+                // whose CSS override was missed.
+                b.style.backgroundSize = 'contain';
+                b.style.backgroundRepeat = 'no-repeat';
+                b.style.backgroundPosition = 'center';
+                b.title = s.name + ' — click to paint with this shape · right-click to delete';
+                b.addEventListener('click', function () {
+                    if (!window.BrushShapes) return;
+                    window.BrushShapes.setActive(window.BrushShapes.activeId() === s.id ? null : s.id);
+                    markDirty();
+                });
+                b.addEventListener('contextmenu', function (e) {
+                    e.preventDefault();
+                    if (window.BrushShapes && confirm('Delete brush shape "' + s.name + '"?')) {
+                        window.BrushShapes.remove(s.id);
+                    }
+                });
+                shapesRow.appendChild(b);
+            });
+            var addB = document.createElement('button');
+            addB.type = 'button';
+            addB.className = 'brush-tip-btn brush-shape-add';
+            addB.textContent = '＋';
+            addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Smart Select). You can also drop an image anywhere on this row.';
+            addB.addEventListener('click', function () { shapeFileInput.click(); });
+            shapesRow.appendChild(addB);
+        }
+        SETTERS.shape = function (v) {
+            if (!window.BrushShapes) return;
+            window.BrushShapes.setActive((typeof v === 'string' && v) ? v : null);
+        };
+        window.__onBrushShapeChanged = function () {
+            renderBrushShapes();
+            // An active shape overrides the built-in tips — dim their state
+            var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
+            var curTip = (window.config && window.config.BRUSH_TIP) | 0;
+            tipBtns.forEach(function (tb) {
+                tb.classList.toggle('active', !act && parseInt(tb.dataset.tip, 10) === curTip);
+            });
+            syncTexState();
+        };
+        renderBrushShapes();
         var texGroup = pSlider('brushTipTexture', 'Texture', 0, 1, 0.01, 'BRUSH_TIP_TEXTURE', pct, 'tipTexture');
         function syncTexState() {
-            // Texture (stamp grain/blend) only shapes blob/chisel/streak
+            // Texture (stamp grain/blend) shapes blob/chisel/streak — and
+            // custom shape stamps, which run the same grain in the shader
             var t = ((window.config && window.config.BRUSH_TIP) | 0);
-            var on = t >= 1 && t <= 3;
+            var on = (t >= 1 && t <= 3) || !!(window.BrushShapes && window.BrushShapes.activeId());
             texGroup.style.opacity = on ? '1' : '0.4';
             var sl = texGroup.querySelector('input');
             if (sl) sl.disabled = !on;
@@ -2327,8 +2456,47 @@
         // Stabilizer slider removed 2026-07-30 (Gabriel): panel-length trim.
         // config.BRUSH_STABILIZER stays at its default; brush presets that
         // captured a stabilizer value simply no longer apply that key.
-        pSlider('brushSpacing', 'Spacing', 0.01, 1, 0.01, 'BRUSH_SPACING', pct, 'spacing');
+        // ── Splat mode: spaced-along-travel vs constant per-frame flow ──
+        var flowModeRow = document.createElement('div');
+        flowModeRow.className = 'brush-mode-row';
+        var onMoveBtn = document.createElement('button');
+        onMoveBtn.type = 'button'; onMoveBtn.className = 'brush-mode-btn active'; onMoveBtn.textContent = 'On Move';
+        onMoveBtn.title = 'Dabs are laid down along pointer travel — paint flows only while moving (Spacing applies)';
+        var constantBtn = document.createElement('button');
+        constantBtn.type = 'button'; constantBtn.className = 'brush-mode-btn'; constantBtn.textContent = 'Constant';
+        constantBtn.title = 'Paint flows every frame while the pointer is held, even standing still — Spacing does not apply';
+        flowModeRow.appendChild(onMoveBtn); flowModeRow.appendChild(constantBtn);
+        panel.appendChild(flowModeRow);
+        var spacingGroup; // assigned below — setSplatMode can run before it exists
+        function syncSpacingState() {
+            if (!spacingGroup) return;
+            var cont = !!(window.config && window.config.BRUSH_CONTINUOUS);
+            spacingGroup.style.opacity = cont ? '0.4' : '1';
+            var sl = spacingGroup.querySelector('input');
+            if (sl) sl.disabled = cont;
+        }
+        function setSplatMode(m) {
+            if (m !== 'constant') m = 'move';
+            if (window.config) window.config.BRUSH_CONTINUOUS = (m === 'constant');
+            onMoveBtn.classList.toggle('active', m === 'move');
+            constantBtn.classList.toggle('active', m === 'constant');
+            syncSpacingState();
+            try { if (window.settingsManager) window.settingsManager.set('brush.splatMode', m); } catch (_) {}
+        }
+        SETTERS.splatMode = setSplatMode;
+        onMoveBtn.addEventListener('click', function () { setSplatMode('move'); markDirty(); });
+        constantBtn.addEventListener('click', function () { setSplatMode('constant'); markDirty(); });
+        // Spacing low end extended to 0.1% (2026-08-09): 1% ≈ 2.3px between
+        // dabs at the default brush, which reads grainy at slow speeds — the
+        // sub-1% band plus the walker's lowered floor (05d0) is the true
+        // dense "ink line" range.
+        spacingGroup = pSlider('brushSpacing', 'Spacing', 0.001, 1, 0.001, 'BRUSH_SPACING', pctFine, 'spacing');
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
+        (function restoreSplatMode() {
+            var saved = null;
+            try { saved = window.settingsManager && window.settingsManager.get('brush.splatMode'); } catch (_) {}
+            setSplatMode(saved);
+        })();
 
         // ── Sketch layer ──
         sLabel('Sketch Layer');
@@ -3210,7 +3378,7 @@
         var focusLbl = document.createElement('label');
         focusLbl.setAttribute('for', 'focusModeToggle');
         focusLbl.style.margin = '0';
-        focusLbl.textContent = 'Focus Mode (S)';
+        focusLbl.textContent = 'Focus Mode (F)';
         focusGroup.appendChild(focusCb);
         focusGroup.appendChild(focusLbl);
         body.appendChild(focusGroup);
@@ -3952,7 +4120,7 @@
                         btn.title = m.title;
                         btn.dataset.mode = m.key;
                         var isActive = cfg.mode === m.key;
-                        btn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 6px;font-size:10px;border-radius:3px;background:' + (isActive ? 'rgba(255,220,80,0.25)' : 'rgba(255,255,255,0.08)') + ';color:' + (isActive ? 'rgba(255,220,80,1)' : 'rgba(255,255,255,0.6)') + ';border:1px solid ' + (isActive ? 'rgba(255,220,80,0.4)' : 'rgba(255,255,255,0.1)') + ';cursor:pointer;';
+                        btn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 6px;font-size:10px;border-radius:0;background:' + (isActive ? '#ec3013' : 'rgba(255,255,255,0.08)') + ';color:' + (isActive ? '#fff' : 'rgba(255,255,255,0.6)') + ';border:1px solid ' + (isActive ? '#ec3013' : 'rgba(255,255,255,0.1)') + ';cursor:pointer;';
                         btn.addEventListener('click', function() {
                             cfg.mode = m.key;
                             cfg.cachedColor = null;
@@ -3965,9 +4133,9 @@
                             btns.forEach(function(b) {
                                 var active = b.dataset.mode === m.key;
                                 b.classList.toggle('active', active);
-                                b.style.background = active ? 'rgba(255,220,80,0.25)' : 'rgba(255,255,255,0.08)';
-                                b.style.color = active ? 'rgba(255,220,80,1)' : 'rgba(255,255,255,0.6)';
-                                b.style.borderColor = active ? 'rgba(255,220,80,0.4)' : 'rgba(255,255,255,0.1)';
+                                b.style.background = active ? '#ec3013' : 'rgba(255,255,255,0.08)';
+                                b.style.color = active ? '#fff' : 'rgba(255,255,255,0.6)';
+                                b.style.borderColor = active ? '#ec3013' : 'rgba(255,255,255,0.1)';
                             });
                             picker.disabled = m.key !== 'fixed';
                             picker.style.opacity = m.key === 'fixed' ? '1' : '0.35';
@@ -3990,9 +4158,9 @@
                             btns.forEach(function(b) {
                                 var active = b.dataset.mode === 'fixed';
                                 b.classList.toggle('active', active);
-                                b.style.background = active ? 'rgba(255,220,80,0.25)' : 'rgba(255,255,255,0.08)';
-                                b.style.color = active ? 'rgba(255,220,80,1)' : 'rgba(255,255,255,0.6)';
-                                b.style.borderColor = active ? 'rgba(255,220,80,0.4)' : 'rgba(255,255,255,0.1)';
+                                b.style.background = active ? '#ec3013' : 'rgba(255,255,255,0.08)';
+                                b.style.color = active ? '#fff' : 'rgba(255,255,255,0.6)';
+                                b.style.borderColor = active ? '#ec3013' : 'rgba(255,255,255,0.1)';
                             });
                             picker.disabled = false;
                             picker.style.opacity = '1';

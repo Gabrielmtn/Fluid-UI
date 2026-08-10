@@ -109,9 +109,9 @@ body.focus-mode #canvas {
     opacity: 0.8;
 }
 .stream-format-grid button.active {
-    background: rgba(80, 210, 255, 0.2);
-    border-color: rgba(80, 210, 255, 0.4);
-    color: #4fc3f7;
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
+    color: #fff;
 }
 .stream-format-info {
     font-size: 9px;
@@ -227,10 +227,6 @@ body.focus-mode #canvas {
 .collision-refresh-btn:hover {
     opacity: 0.8;
 }
-.slider-orange {
-    accent-color: #ff8850;
-}
-
 /* ================================================================
    MUTATION ENGINE STYLES
    ================================================================ */
@@ -469,8 +465,8 @@ body.focus-mode #canvas {
     grid-template-rows: auto 0fr;
 }
 .path-layer-item.active-layer {
-    border-color: rgba(100, 200, 255, 0.4);
-    box-shadow: 0 0 8px rgba(100, 200, 255, 0.15);
+    border-color: rgba(236, 48, 19, 0.6);
+    box-shadow: 0 0 8px rgba(236, 48, 19, 0.18);
 }
 
 .path-layer-header {
@@ -583,18 +579,18 @@ body.focus-mode #canvas {
 .path-speed-val, .path-brush-val, .path-flow-val {
     font-size: 10px;
     font-family: 'Courier New', monospace;
-    color: #4fc3f7;
+    color: var(--ink-100, #f2f3f5);
     min-width: 28px;
     text-align: right;
 }
 
 /* Color picker in path layer */
 .path-color-picker {
-    width: 32px;
+    width: 24px;
     height: 24px;
     padding: 0;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
+    border-radius: 50%;
     cursor: pointer;
     background: transparent;
 }
@@ -602,7 +598,7 @@ body.focus-mode #canvas {
     padding: 2px;
 }
 .path-color-picker::-webkit-color-swatch {
-    border-radius: 2px;
+    border-radius: 50%;
     border: none;
 }
 .path-use-brush-btn {
@@ -615,8 +611,8 @@ body.focus-mode #canvas {
     margin-left: auto;
 }
 .path-use-brush-btn:hover {
-    background: rgba(100, 200, 255, 0.15);
-    border-color: rgba(100, 200, 255, 0.3);
+    background: rgba(236, 48, 19, 0.15);
+    border-color: rgba(236, 48, 19, 0.45);
 }
 
 /* Shape preset buttons */
@@ -642,8 +638,8 @@ body.focus-mode #canvas {
     transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
 .path-shape-btn:hover {
-    background: rgba(100, 200, 255, 0.15);
-    border-color: rgba(100, 200, 255, 0.3);
+    background: rgba(236, 48, 19, 0.15);
+    border-color: rgba(236, 48, 19, 0.45);
     transform: scale(1.05);
 }
 .path-shape-btn:active {
@@ -656,17 +652,18 @@ body.focus-mode #canvas {
     padding: 8px 12px;
     margin-top: 8px;
     font-size: 11px;
-    font-weight: 600;
-    background: linear-gradient(180deg, rgba(100, 200, 255, 0.18), rgba(100, 200, 255, 0.08));
-    border: 1px solid rgba(100, 200, 255, 0.3);
-    border-radius: 6px;
-    color: rgba(100, 200, 255, 0.95);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: var(--ground-600, #232830);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 0;
+    color: var(--ink-100, #f2f3f5);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
 }
 .path-draw-btn:hover {
-    background: linear-gradient(180deg, rgba(100, 200, 255, 0.25), rgba(100, 200, 255, 0.12));
-    border-color: rgba(100, 200, 255, 0.5);
+    border-color: rgba(236, 48, 19, 0.6);
 }
 
 /* Path preview canvas */
@@ -798,9 +795,9 @@ body.focus-mode #canvas {
     transition: background 0.15s, border-color 0.15s;
 }
 .path-transform-btn:hover:not(:disabled) {
-    background: rgba(100, 200, 255, 0.12);
-    border-color: rgba(100, 200, 255, 0.4);
-    color: var(--accent-cool);
+    background: rgba(236, 48, 19, 0.12);
+    border-color: rgba(236, 48, 19, 0.45);
+    color: var(--ink-100, #f2f3f5);
 }
 .path-transform-btn:disabled {
     opacity: 0.35;
@@ -832,9 +829,9 @@ body.focus-mode #canvas {
 .path-empty-state {
     text-align: center;
     padding: 18px 12px;
-    border: 1px dashed rgba(100, 200, 255, 0.25);
-    border-radius: 8px;
-    background: rgba(100, 200, 255, 0.03);
+    border: 1px dashed var(--ground-500, #2a2e37);
+    border-radius: 0;
+    background: rgba(255, 255, 255, 0.02);
 }
 .path-empty-icon {
     font-size: 20px;
@@ -855,17 +852,18 @@ body.focus-mode #canvas {
 .path-empty-create {
     padding: 6px 14px;
     font-size: 11px;
-    font-weight: 600;
-    background: linear-gradient(180deg, rgba(100, 200, 255, 0.18), rgba(100, 200, 255, 0.08));
-    border: 1px solid rgba(100, 200, 255, 0.3);
-    border-radius: 6px;
-    color: var(--accent-cool);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: var(--accent, #ec3013);
+    border: none;
+    border-radius: 0;
+    color: #fff;
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
+    transition: filter 0.15s;
 }
 .path-empty-create:hover {
-    background: linear-gradient(180deg, rgba(100, 200, 255, 0.25), rgba(100, 200, 255, 0.12));
-    border-color: rgba(100, 200, 255, 0.5);
+    filter: brightness(1.08);
 }
 
 /* ── Path Transform Overlay (move / resize) — mirrors the draw overlay ── */

@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; font-family: "Archivo", system-ui, sans-serif; }
+  doc-page:not(:defined) { visibility: hidden; }
+  a { color: #ec3013; text-decoration: none; border-bottom: 2px solid #ec3013; }
+  a:hover { color: #ae1800; border-bottom-color: #ae1800; }
+</style>
+<script src="./doc-page.js"></script>
+</helmet>
+<doc-page margin="0.7in">
+
+<div style="font:800 11px Archivo;letter-spacing:.16em;text-transform:uppercase;color:#ec3013;margin:0 0 10px">Design system audit · A Small Good Thing</div>
+<h1 style="font:900 46px/0.98 Archivo;letter-spacing:-0.025em;color:#201e1d;margin:0 0 18px;text-wrap:balance">The control surface is eleven panels of the same six controls.</h1>
+<p style="font:400 16px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">About 130 individual controls are spread across simulation, effects, kaleidoscope, display, light, presets, gestures, recording, layers, multiplayer and palettes. Almost all of them are one of seven things: a continuous value, a discrete mode, a boolean, an action, a momentary action, a stored item, or a color. What varies between them is not the job — it is the treatment. This document inventories what exists, proposes one grid and one set of parts to rebuild it on, and maps each current control onto its replacement.</p>
+<p style="font:400 16px/1.6 Archivo;color:#201e1d;margin:0 0 26px;max-width:62ch">The aesthetic stays where it is: a dark mixing desk. What changes is that the desk gets rack rails.</p>
+
+<div style="border-top:2px solid #201e1d;border-bottom:2px solid #201e1d;padding:16px 0;margin:0 0 8px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;break-inside:avoid">
+  <div><div style="font:900 34px/1 Archivo;color:#201e1d">~130</div><div style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin-top:6px">Controls</div></div>
+  <div><div style="font:900 34px/1 Archivo;color:#201e1d">11</div><div style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin-top:6px">Panels</div></div>
+  <div><div style="font:900 34px/1 Archivo;color:#201e1d">7</div><div style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin-top:6px">Control jobs</div></div>
+  <div><div style="font:900 34px/1 Archivo;color:#ec3013">12</div><div style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin-top:6px">Visual treatments in use</div></div>
+</div>
+
+<h2 style="font:800 27px/1.1 Archivo;letter-spacing:-0.015em;color:#201e1d;border-top:2px solid #201e1d;margin:44px 0 14px;padding-top:14px">1. What is actually there</h2>
+
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 16px;max-width:62ch">Sorted by job rather than by panel, the surface collapses fast. The right column is the count of distinct visual treatments currently serving that one job.</p>
+
+<table style="width:100%;border-collapse:collapse;font:400 14px/1.45 Archivo;color:#201e1d;margin:0 0 10px;break-inside:avoid">
+<thead>
+<tr>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:2px solid #201e1d">Job</th>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:2px solid #201e1d">Where it appears</th>
+<th style="text-align:right;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 0 8px 8px;border-bottom:2px solid #201e1d;white-space:nowrap">n / treatments</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Continuous value</td>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;color:#444141">Viscosity, Swirl, Relaxation, Zoom, Spin Speed, Gravity, Cursor Size, Replay Speed, Threshold…</td>
+<td style="padding:10px 0 10px 8px;border-bottom:1px solid #d7d3d3;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">51 / <strong style="color:#ec3013">5</strong></td>
+</tr>
+<tr>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Discrete mode</td>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;color:#444141">FPS Limit, Visual Quality, Kaleidoscope Mode, Blend Mode, Fluid / Paint-Wet / Paint-Thick, Multi-Brush</td>
+<td style="padding:10px 0 10px 8px;border-bottom:1px solid #d7d3d3;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">12 / <strong style="color:#ec3013">4</strong></td>
+</tr>
+<tr>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Boolean</td>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;color:#444141">Crisp Advection, Multigrid Pressure, Glow, Show Cursor, Empty Alpha Locked, Lock Canvas Borders</td>
+<td style="padding:10px 0 10px 8px;border-bottom:1px solid #d7d3d3;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">19 / <strong style="color:#ec3013">2</strong></td>
+</tr>
+<tr>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Action</td>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;color:#444141">Clear, Save, Record, Play All, Create Room, Export, Copy #, Reconnect</td>
+<td style="padding:10px 0 10px 8px;border-bottom:1px solid #d7d3d3;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">35 / <strong style="color:#ec3013">6</strong></td>
+</tr>
+<tr>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Momentary action</td>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;color:#444141">Ignite — fires while held, and can be latched on</td>
+<td style="padding:10px 0 10px 8px;border-bottom:1px solid #d7d3d3;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">1 / <strong style="color:#ec3013">1</strong></td>
+</tr>
+<tr>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Stored item</td>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;color:#444141">Physics presets, gesture cards, palettes, recorded layers</td>
+<td style="padding:10px 0 10px 8px;border-bottom:1px solid #d7d3d3;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">4 sets / <strong style="color:#ec3013">4</strong></td>
+</tr>
+<tr>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Color</td>
+<td style="padding:10px 8px 10px 0;border-bottom:1px solid #d7d3d3;color:#444141">Fluid Color, Background Color, Cursor Ring, saved swatches</td>
+<td style="padding:10px 0 10px 8px;border-bottom:1px solid #d7d3d3;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">4 / <strong style="color:#ec3013">3</strong></td>
+</tr>
+</tbody>
+</table>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#201e1d;margin:32px 0 10px">Three findings</h3>
+
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 12px;max-width:62ch"><strong>Affordance is inconsistent where it matters most.</strong> Brush Size, Fluid and Multi-Brush are the three most-used controls on the toolbar, and all three are set as plain text with a small marker beside them. Nothing about them says "press me" until you have already pressed them. Meanwhile a checkbox two panels down gets a full box, a border and a tick.</p>
+
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 12px;max-width:62ch"><strong>One job, five slider treatments.</strong> The toolbar slider, the panel slider, the ramp slider, the gear-knob slider and the tiny inline slider all set a number between two bounds. They differ in track height, fill gradient, knob shape, label case, and where the value sits. A user cannot learn one and apply it.</p>
+
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 24px;max-width:62ch"><strong>The preset lists spend their space on nothing.</strong> Gesture cards run at roughly a third fill — an emoji, a name, a thin hint line — while the panel they sit in is the narrowest column in the app. That space is the natural home for what those cards do not currently show: a stroke preview, a bound hotkey, and the left/right split spelled out at a readable size.</p>
+
+<h2 style="font:800 27px/1.1 Archivo;letter-spacing:-0.015em;color:#201e1d;border-top:2px solid #201e1d;margin:44px 0 14px;padding-top:14px">2. The grid: rack units</h2>
+
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 8px;max-width:62ch">Every control occupies one full-width row of fixed height, stacked like 19-inch gear. One control per row, no exceptions and no two-ups. The row is the only layout primitive; panels are runs of rows under a header; the whole surface is one column that scrolls.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 18px;max-width:62ch">This costs vertical space and buys three things: the label can be large, the value can be large, and every control has the same hit target and the same place to look.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:0;margin:0 0 8px;break-inside:avoid">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 18px;background:#191c22;border-bottom:2px solid #0a0b0e">
+    <span style="width:9px;height:9px;background:#ec3013;display:block"></span>
+    <span style="font:800 12px Archivo;letter-spacing:.16em;text-transform:uppercase;color:#f2f3f5">Simulation</span>
+    <span style="flex:1"></span>
+    <span style="font:700 11px Archivo;letter-spacing:.1em;color:#7b828e">11</span>
+  </div>
+  <div style="padding:14px 18px 18px;border-bottom:2px solid #0a0b0e;background:#16181d">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:0 0 12px">
+      <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Viscosity</span>
+      <span style="font:700 18px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">0.80</span>
+    </div>
+    <div style="height:14px;background:#0a0b0e;border:1px solid #2a2e37;position:relative">
+      <div style="position:absolute;inset:1px auto 1px 1px;width:46%;background:linear-gradient(90deg,#f0a626,#e0432a)"></div>
+      <div style="position:absolute;top:-5px;bottom:-5px;left:46%;width:14px;transform:translateX(-50%);background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:1px solid #0a0b0e"></div>
+    </div>
+  </div>
+  <div style="padding:14px 18px 18px;border-bottom:2px solid #0a0b0e;background:#16181d">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:0 0 12px">
+      <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Max Speed</span>
+      <span style="font:700 18px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">30</span>
+    </div>
+    <div style="height:14px;background:#0a0b0e;border:1px solid #2a2e37;position:relative">
+      <div style="position:absolute;inset:1px auto 1px 1px;width:72%;background:linear-gradient(90deg,#f0a626,#e0432a)"></div>
+      <div style="position:absolute;top:-5px;bottom:-5px;left:72%;width:14px;transform:translateX(-50%);background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:1px solid #0a0b0e"></div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:#16181d">
+    <span style="width:20px;height:20px;border:2px solid #7b828e;background:#ec3013;display:block;flex:none"></span>
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Crisp Advection</span>
+  </div>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 22px">Fig. 1 — Panel header, two value rows, one boolean row. Same width, same rhythm, same rule weight.</p>
+
+<table style="width:100%;border-collapse:collapse;font:400 14px/1.45 Archivo;color:#201e1d;margin:0 0 24px;break-inside:avoid">
+<thead>
+<tr>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:2px solid #201e1d">Rack metric</th>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 0 8px 8px;border-bottom:2px solid #201e1d">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700">Row height, value control</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">76px</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700">Row height, boolean / action</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">54px</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700">Row inset</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">18px horizontal, 14px top</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700">Row divider</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">2px, ground-950</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700">Panel width</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">300px fixed, 340px comfortable</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700">Minimum hit target</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">44px, full row width</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700">Corner radius</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">0 everywhere</td></tr>
+</tbody>
+</table>
+
+<sc-if value="{{ showTokenTable }}" hint-placeholder-val="{{ true }}">
+<h2 style="font:800 27px/1.1 Archivo;letter-spacing:-0.015em;color:#201e1d;border-top:2px solid #201e1d;margin:44px 0 14px;padding-top:14px">3. Tokens</h2>
+
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 18px;max-width:62ch">Six grounds, four inks, one accent, one heat ramp. The heat ramp is the only gradient in the system and it means exactly one thing: how much of a range is filled. It never decorates a button, a header or a card.</p>
+
+<table style="width:100%;border-collapse:collapse;font:400 13.5px/1.4 Archivo;color:#201e1d;margin:0 0 22px;break-inside:avoid">
+<thead>
+<tr>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:2px solid #201e1d">Token</th>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:2px solid #201e1d">Value</th>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 0 8px 8px;border-bottom:2px solid #201e1d">Role</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#0a0b0e;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>ground-950</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#0a0b0e</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Dividers, slider wells, app backdrop</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#0e0f12;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>ground-900</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#0e0f12</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Panel body</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#16181d;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>ground-800</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#16181d</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Rack row</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#191c22;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>ground-700</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#191c22</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Panel header, row hover</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#232830;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>ground-600</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#232830</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Raised cell — steppers, inputs, unselected segments</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#2a2e37;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>ground-500</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#2a2e37</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Cell borders, tick marks</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#f2f3f5;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>ink-100</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#f2f3f5</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Labels and values — both, at full strength</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#b9bec7;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>ink-300</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#b9bec7</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Secondary text, unit suffixes</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#7b828e;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>ink-500</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#7b828e</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Hints, counts, disabled</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:#ec3013;border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>accent</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#ec3013</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Selected state, primary action, record, focus ring</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:linear-gradient(90deg,#f0a626,#e0432a);border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>heat</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#f0a626 → #e0432a</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Filled portion of a range. Nothing else.</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700"><span style="display:inline-block;width:12px;height:12px;background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:1px solid #9b9797;margin-right:8px;vertical-align:-1px"></span>chrome</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">#f6f7f9 → #9aa1ad</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Knob and cap faces — the one place a bevel is allowed</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700">type / label</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">Archivo 800, 15px, .09em, upper</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Every control label, no exceptions</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700">type / value</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">Archivo 700, 18px, tabular</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Every readout, right-aligned to the row edge</td></tr>
+<tr><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-weight:700">type / section</td><td style="padding:8px 8px 8px 0;border-bottom:1px solid #d7d3d3;font-variant-numeric:tabular-nums">Archivo 800, 12px, .16em, upper</td><td style="padding:8px 0 8px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Panel headers</td></tr>
+</tbody>
+</table>
+</sc-if>
+
+<h2 style="font:800 27px/1.1 Archivo;letter-spacing:-0.015em;color:#201e1d;border-top:2px solid #201e1d;margin:44px 0 14px;padding-top:14px">4. The parts</h2>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.1 Fader — the default value control</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">A mixer channel throw with a printed scale beside it. The scale is what the current sliders are missing: without ticks, a value of 0.8 tells you nothing about where 0.8 sits. Drag anywhere on the row; the whole row is the target.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:18px;margin:0 0 8px;break-inside:avoid;user-select:none;touch-action:none">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin:0 0 14px">
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5;white-space:nowrap">Density Sustain</span>
+    <span style="font:700 18px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">{{ faderText }}</span>
+  </div>
+  <div style="display:flex;justify-content:space-between;margin:14px 0 5px">
+    <span style="font:700 10px Archivo;letter-spacing:.08em;color:#7b828e">0.90</span>
+    <span style="font:700 10px Archivo;letter-spacing:.08em;color:#7b828e">0.95</span>
+    <span style="font:700 10px Archivo;letter-spacing:.08em;color:#7b828e">1.00</span>
+  </div>
+  <div onPointerDown="{{ onFader }}" style="height:26px;background:#0a0b0e;border:1px solid #2a2e37;position:relative;cursor:ew-resize;padding:6px 0">
+    <div style="position:absolute;inset:0;display:flex;justify-content:space-between;padding:0 1px;pointer-events:none">
+      <span style="width:1px;background:#2a2e37"></span><span style="width:1px;background:#2a2e37"></span><span style="width:1px;background:#2a2e37"></span><span style="width:1px;background:#2a2e37"></span><span style="width:1px;background:#2a2e37"></span><span style="width:1px;background:#2a2e37"></span><span style="width:1px;background:#2a2e37"></span><span style="width:1px;background:#2a2e37"></span><span style="width:1px;background:#2a2e37"></span>
+    </div>
+    <div style="position:absolute;top:6px;bottom:6px;left:1px;width:{{ faderPct }};background:linear-gradient(90deg,#f0a626,#e0432a);pointer-events:none"></div>
+    <div style="position:absolute;top:-2px;bottom:-2px;left:{{ faderPct }};width:16px;transform:translateX(-50%);background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:1px solid #0a0b0e;pointer-events:none"></div>
+  </div>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 10px">Fig. 2 — Live. Drag the throw.</p>
+<sc-if value="{{ showMigration }}" hint-placeholder-val="{{ true }}">
+<div style="background:#eae9e9;border-top:2px solid #201e1d;padding:12px 14px;margin:0 0 24px;break-inside:avoid">
+  <div style="font:800 10px Archivo;letter-spacing:.14em;text-transform:uppercase;color:#ec3013;margin:0 0 6px">Migration</div>
+  <p style="font:400 14px/1.55 Archivo;color:#201e1d;margin:0">Replaces the panel slider and the ramp slider. Absorbs all 51 continuous values whose range is meaningful to see — Viscosity, Relaxation, Zoom, Blend, Threshold, Saturation, Cursor Size, Canvas Opacity, and every dissipation and smoothing control.</p>
+</div>
+</sc-if>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.2 Spinner — a behaviour, not a rack row</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">No track at all. Grab the number, drag in any direction, and the value follows total pointer distance under pointer lock — so a long range costs no width and never hits the end of a throw.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">That saving only pays somewhere narrow, which a rack row is not. Given a full-width row the spinner occupies the same height as a fader and shows strictly less — no scale, no sense of where the value sits in its range. An earlier draft of this document had it absorbing the iteration counts and Spin Speed; building it proved that wrong. In a rack row it is a slider-shaped object that is not a slider.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">So it is a behaviour attached to a readout, not a row of its own, and it belongs in exactly two places: the toolbar cell, where the value <em>is</em> the control and there is no room for a track, and underneath the rotary in 5.1. In the panel, integer ranges of about sixteen steps or fewer take the stepper cell in 4.4; everything else takes the fader.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:18px;margin:0 0 8px;break-inside:avoid;user-select:none;touch-action:none">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Spin Speed</span>
+    <span onPointerDown="{{ onSpin }}" style="font:700 18px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5;background:#232830;border:1px solid #2a2e37;padding:8px 14px;cursor:ns-resize;display:flex;align-items:center;gap:10px">
+      <span style="color:#7b828e;font-size:12px">◂▸</span>{{ spinText }}<span style="color:#7b828e;font-size:12px">°/s</span>
+    </span>
+  </div>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 10px">Fig. 3 — Live. Drag the readout in any direction. Shown at toolbar-cell scale, which is the only place it belongs.</p>
+<sc-if value="{{ showMigration }}" hint-placeholder-val="{{ true }}">
+<div style="background:#eae9e9;border-top:2px solid #201e1d;padding:12px 14px;margin:0 0 24px;break-inside:avoid">
+  <div style="font:800 10px Archivo;letter-spacing:.14em;text-transform:uppercase;color:#ec3013;margin:0 0 6px">Migration</div>
+  <p style="font:400 14px/1.55 Archivo;color:#201e1d;margin:0">Drives the toolbar cell in 6.2 and the rotary in 5.1. Nothing else. V-Cycles, Pre-Smooth and Post-Smooth (0–8) go to the stepper in 4.4; Segments, Angle, Spin Speed, Pressure Iteration, Coarse Solve and Max Speed go to the fader in 4.1 — all six are bounded, so a printed scale is worth more than a saved 26px.</p>
+</div>
+</sc-if>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.3 Fine-drag modifier</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Not a third control — a behaviour both of the above inherit. Hold Shift, or drag away from the track vertically, and the ratio of pointer travel to value change drops to a tenth. The row shows the active ratio while the modifier is held, so the user learns it by seeing it.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:18px;margin:0 0 8px;break-inside:avoid;user-select:none;touch-action:none">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin:0 0 6px">
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Velocity Sustain</span>
+    <span style="font:700 18px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">{{ fineText }}</span>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin:0 0 10px;height:14px">
+    <span style="font:800 10px Archivo;letter-spacing:.12em;text-transform:uppercase;color:{{ fineHintColor }}">{{ fineHint }}</span>
+  </div>
+  <div onPointerDown="{{ onFine }}" style="height:20px;background:#0a0b0e;border:1px solid #2a2e37;position:relative;cursor:ew-resize">
+    <div style="position:absolute;inset:1px auto 1px 1px;width:{{ finePct }};background:linear-gradient(90deg,#f0a626,#e0432a);pointer-events:none"></div>
+    <div style="position:absolute;top:-3px;bottom:-3px;left:{{ finePct }};width:16px;transform:translateX(-50%);background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:1px solid #0a0b0e;pointer-events:none"></div>
+  </div>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 24px">Fig. 4 — Live. Drag, then hold Shift or pull down while dragging.</p>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.4 Stepper cell</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">The fix for Brush Size and Fluid. A value that can be edited sits inside a raised cell with a border and two nudge caps. The cell is what says "editable"; the caps give a coarse path for people who do not want to drag. Click the number to type it.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:18px;margin:0 0 8px;break-inside:avoid">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 14px">
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Brush Size</span>
+    <span style="display:flex;border:1px solid #2a2e37">
+      <span style="width:34px;height:38px;background:linear-gradient(180deg,#2b303a,#1c2027);color:#f2f3f5;font:800 16px Archivo;display:flex;align-items:center;justify-content:center;border-right:1px solid #2a2e37">–</span>
+      <span style="min-width:66px;height:38px;background:#232830;color:#f2f3f5;font:700 18px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center">6.5</span>
+      <span style="width:34px;height:38px;background:linear-gradient(180deg,#2b303a,#1c2027);color:#f2f3f5;font:800 16px Archivo;display:flex;align-items:center;justify-content:center;border-left:1px solid #2a2e37">+</span>
+    </span>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Splat Count</span>
+    <span style="display:flex;border:1px solid #2a2e37">
+      <span style="width:34px;height:38px;background:linear-gradient(180deg,#2b303a,#1c2027);color:#f2f3f5;font:800 16px Archivo;display:flex;align-items:center;justify-content:center;border-right:1px solid #2a2e37">–</span>
+      <span style="min-width:66px;height:38px;background:#232830;color:#f2f3f5;font:700 18px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center">25</span>
+      <span style="width:34px;height:38px;background:linear-gradient(180deg,#2b303a,#1c2027);color:#f2f3f5;font:800 16px Archivo;display:flex;align-items:center;justify-content:center;border-left:1px solid #2a2e37">+</span>
+    </span>
+  </div>
+</div>
+<sc-if value="{{ showMigration }}" hint-placeholder-val="{{ true }}">
+<div style="background:#eae9e9;border-top:2px solid #201e1d;padding:12px 14px;margin:0 0 24px;break-inside:avoid">
+  <div style="font:800 10px Archivo;letter-spacing:.14em;text-transform:uppercase;color:#ec3013;margin:0 0 6px">Migration</div>
+  <p style="font:400 14px/1.55 Archivo;color:#201e1d;margin:0">Brush Size (currently text + ▸ marker) and Fluid's 25 (currently a bare number beside a caret) both become stepper cells. The caret that today opens a hidden popover is retired — the mode part of Fluid moves to a segmented switch, 4.5.</p>
+</div>
+</sc-if>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.5 Segmented switch</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Two to five mutually exclusive options, all visible, one filled. Replaces the RND / STEP / GATE cluster, the Multi-Brush multiplier, and every short dropdown. Six or more options stay a select, 4.6.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:18px;margin:0 0 8px;break-inside:avoid">
+  <div style="margin:0 0 16px">
+    <div style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5;margin:0 0 10px">Fluid Mode</div>
+    <div style="display:flex;border:1px solid #2a2e37">
+      <span style="flex:1;height:40px;background:#ec3013;color:#fff;font:800 12px Archivo;letter-spacing:.09em;text-transform:uppercase;display:flex;align-items:center;justify-content:center">Fluid</span>
+      <span style="flex:1;height:40px;background:#232830;color:#b9bec7;font:800 12px Archivo;letter-spacing:.09em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;border-left:1px solid #2a2e37">Paint-Wet</span>
+      <span style="flex:1;height:40px;background:#232830;color:#b9bec7;font:800 12px Archivo;letter-spacing:.09em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;border-left:1px solid #2a2e37">Paint-Thick</span>
+    </div>
+  </div>
+  <div>
+    <div style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5;margin:0 0 10px">Multi-Brush</div>
+    <div style="display:flex;border:1px solid #2a2e37">
+      <span style="flex:1;height:40px;background:#ec3013;color:#fff;font:800 13px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center">1×</span>
+      <span style="flex:1;height:40px;background:#232830;color:#b9bec7;font:800 13px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center;border-left:1px solid #2a2e37">2×</span>
+      <span style="flex:1;height:40px;background:#232830;color:#b9bec7;font:800 13px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center;border-left:1px solid #2a2e37">4×</span>
+      <span style="flex:1;height:40px;background:#232830;color:#b9bec7;font:800 13px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center;border-left:1px solid #2a2e37">6×</span>
+      <span style="flex:1;height:40px;background:#232830;color:#b9bec7;font:800 13px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center;border-left:1px solid #2a2e37">8×</span>
+    </div>
+  </div>
+</div>
+<sc-if value="{{ showMigration }}" hint-placeholder-val="{{ true }}">
+<div style="background:#eae9e9;border-top:2px solid #201e1d;padding:12px 14px;margin:0 0 24px;break-inside:avoid">
+  <div style="font:800 10px Archivo;letter-spacing:.14em;text-transform:uppercase;color:#ec3013;margin:0 0 6px">Migration</div>
+  <p style="font:400 14px/1.55 Archivo;color:#201e1d;margin:0">Absorbs: Multi-Brush 1×–8×, Fluid mode, Light Source Manual/Random, Recording Mode Off/Minimized/Full, Replay Speed 0.25×–4×, Replay Mode. The colour cluster splits: RND / STEP / 🌈 are a three-part exclusive choice and become one segmented switch; GATE is not part of that choice and becomes an independent boolean per 4.6. Drawing all four as identical pills is what made them read as one group.</p>
+</div>
+</sc-if>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.6 Select, boolean, input</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Long option lists keep a select, drawn as a raised cell to match the stepper. The boolean gets the full row as its target and states itself in the label alone — no separate on/off word. Text inputs share the cell chrome; the only difference is a caret.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:18px;margin:0 0 8px;break-inside:avoid">
+  <div style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5;margin:0 0 10px">FPS Limit</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;height:40px;background:#232830;border:1px solid #2a2e37;padding:0 14px;margin:0 0 20px">
+    <span style="font:700 15px Archivo;color:#f2f3f5">60 fps — Standard</span>
+    <span style="color:#7b828e;font-size:11px">▼</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;height:44px;border-top:2px solid #0a0b0e">
+    <span style="width:20px;height:20px;border:2px solid #7b828e;background:#ec3013;display:block;flex:none"></span>
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Multigrid Pressure</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;height:44px;border-top:2px solid #0a0b0e;border-bottom:2px solid #0a0b0e;margin:0 0 20px">
+    <span style="width:20px;height:20px;border:2px solid #2a2e37;background:#0a0b0e;display:block;flex:none"></span>
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#7b828e">Micro Detail</span>
+  </div>
+  <div style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5;margin:0 0 10px">Room Code</div>
+  <div style="display:flex;align-items:center;height:40px;background:#232830;border:1px solid #2a2e37;padding:0 14px">
+    <span style="font:700 17px Archivo;font-variant-numeric:tabular-nums;letter-spacing:.3em;color:#f2f3f5">4 8 2 9 1 6</span>
+    <span style="width:2px;height:20px;background:#ec3013;margin-left:6px;display:block"></span>
+  </div>
+</div>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.7 Buttons</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Three weights, and only three. Primary is a solid accent fill with a flush-left label; secondary is the raised cell; ghost is a bordered row for destructive or rare actions. Transport keeps square icon caps at 44px. The gradient-filled buttons in the current build (Create Room, Paint with a stranger) collapse into primary.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:18px;margin:0 0 8px;break-inside:avoid;display:flex;flex-direction:column;gap:12px">
+  <span style="height:44px;background:#ec3013;color:#fff;font:800 13px Archivo;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;padding:0 16px">Create Room</span>
+  <span style="height:44px;background:#232830;border:1px solid #2a2e37;color:#f2f3f5;font:800 13px Archivo;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;padding:0 16px">Paint with a stranger</span>
+  <span style="height:44px;background:transparent;border:2px solid #2a2e37;color:#b9bec7;font:800 13px Archivo;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;padding:0 16px">Clear canvas</span>
+  <span style="display:flex;gap:8px">
+    <span style="width:44px;height:44px;background:#232830;border:1px solid #2a2e37;color:#f2f3f5;font:700 14px Archivo;display:flex;align-items:center;justify-content:center">❙❙</span>
+    <span style="width:44px;height:44px;background:#232830;border:1px solid #2a2e37;color:#f2f3f5;font:700 14px Archivo;display:flex;align-items:center;justify-content:center">▶</span>
+    <span style="width:44px;height:44px;background:#232830;border:1px solid #2a2e37;color:#f2f3f5;font:700 14px Archivo;display:flex;align-items:center;justify-content:center">■</span>
+    <span style="width:44px;height:44px;background:#ec3013;border:1px solid #ec3013;color:#fff;font:700 14px Archivo;display:flex;align-items:center;justify-content:center">●</span>
+  </span>
+</div>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.8 Preset card</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">The card fills its width and earns it: a stroke preview on the left, the name at label size, the left/right split spelled out, and the bound hotkey where the eye already looks for it. This is the one component in the system allowed a preview image; everything else is type and rule.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:0;margin:0 0 8px;break-inside:avoid">
+  <div style="display:flex;align-items:stretch;gap:14px;padding:14px 16px;border-bottom:2px solid #0a0b0e;background:#16181d">
+    <span style="width:54px;flex:none;background:repeating-linear-gradient(135deg,#232830 0 6px,#1a1e25 6px 12px);border:1px solid #2a2e37"></span>
+    <span style="flex:1;display:flex;flex-direction:column;gap:5px">
+      <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Smash</span>
+      <span style="font:500 12.5px Archivo;color:#b9bec7">Left click — collide · Right click — expand</span>
+    </span>
+    <span style="width:26px;height:26px;flex:none;background:#232830;border:1px solid #2a2e37;color:#b9bec7;font:800 12px Archivo;display:flex;align-items:center;justify-content:center">1</span>
+  </div>
+  <div style="display:flex;align-items:stretch;gap:14px;padding:14px 16px;background:#16181d">
+    <span style="width:54px;flex:none;background:repeating-linear-gradient(135deg,#2a1f1c 0 6px,#1a1e25 6px 12px);border:1px solid #2a2e37"></span>
+    <span style="flex:1;display:flex;flex-direction:column;gap:5px">
+      <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Portal</span>
+      <span style="font:500 12.5px Archivo;color:#b9bec7">Left click — swoop · Right click — expand</span>
+    </span>
+    <span style="width:26px;height:26px;flex:none;background:#232830;border:1px solid #2a2e37;color:#b9bec7;font:800 12px Archivo;display:flex;align-items:center;justify-content:center">4</span>
+  </div>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 10px">Fig. 5 — Hatched blocks stand in for stroke previews rendered from the gesture itself.</p>
+<sc-if value="{{ showMigration }}" hint-placeholder-val="{{ true }}">
+<div style="background:#eae9e9;border-top:2px solid #201e1d;padding:12px 14px;margin:0 0 24px;break-inside:avoid">
+  <div style="font:800 10px Archivo;letter-spacing:.14em;text-transform:uppercase;color:#ec3013;margin:0 0 6px">Migration</div>
+  <p style="font:400 14px/1.55 Archivo;color:#201e1d;margin:0">One card serves gesture cards, physics presets and recorded layers. The emoji leading each gesture becomes the preview block; the 8px hint line becomes 12.5px readable copy; the currently unbound 1–8 multiplier keys are re-read as gesture hotkeys.</p>
+</div>
+</sc-if>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.9 Color well and palette chip</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Square, not circular — the circular fluid-color swatch is the only round object in the interface and it reads as decoration rather than control. Palettes are chips of their own swatches, so the name is a caption, not the whole affordance.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:18px;margin:0 0 24px;break-inside:avoid">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 18px">
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Fluid Color</span>
+    <span style="display:flex;gap:8px;align-items:center">
+      <span style="width:38px;height:38px;background:#2fb8c8;border:1px solid #2a2e37;display:block"></span>
+      <span style="width:38px;height:38px;background:#e0432a;border:1px solid #2a2e37;display:block"></span>
+      <span style="width:38px;height:38px;background:#f0a626;border:1px solid #2a2e37;display:block"></span>
+      <span style="width:38px;height:38px;background:#0a0b0e;border:2px solid #ec3013;display:block"></span>
+    </span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <span style="border:1px solid #2a2e37;background:#16181d;padding:8px;display:flex;flex-direction:column;gap:7px">
+      <span style="display:flex;height:20px"><span style="flex:1;background:#3c5a7a"></span><span style="flex:1;background:#6d8fb0"></span><span style="flex:1;background:#c9b28a"></span><span style="flex:1;background:#8a5b3c"></span></span>
+      <span style="font:800 11px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#b9bec7">Mountain Majesty</span>
+    </span>
+    <span style="border:2px solid #ec3013;background:#16181d;padding:8px;display:flex;flex-direction:column;gap:7px">
+      <span style="display:flex;height:20px"><span style="flex:1;background:#f0a626"></span><span style="flex:1;background:#e0432a"></span><span style="flex:1;background:#a8324f"></span><span style="flex:1;background:#4b2a55"></span></span>
+      <span style="font:800 11px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Sunset Dreams</span>
+    </span>
+  </div>
+</div>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.10 Momentary action with latch</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Ignite fires while held. It also has a latch that keeps it on, and that latch is currently invisible — a user has no way to know the control has two modes. Give the latch a cell of its own beside the button: a 30px square holding a 9px indicator, filled when latched. The button then reads as momentary by default and sustained when the indicator is lit, and both facts are on screen at once.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Firing fills with the accent, not the heat gradient. Heat means "this much of a range is filled" and nothing else; a momentary action has no range.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:18px;margin:0 0 8px;break-inside:avoid;display:flex;flex-direction:column;gap:14px">
+  <div>
+    <div style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e;margin:0 0 8px">Idle</div>
+    <div style="display:flex;gap:4px">
+      <span style="flex:1;height:38px;background:#232830;border:1px solid #2a2e37;color:#b9bec7;font:800 12px Archivo;letter-spacing:.12em;display:flex;align-items:center;justify-content:center">IGNITE</span>
+      <span style="width:38px;height:38px;border:1px solid #2a2e37;background:#232830;display:flex;align-items:center;justify-content:center"><span style="width:9px;height:9px;border:1px solid #7b828e;display:block"></span></span>
+    </div>
+  </div>
+  <div>
+    <div style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e;margin:0 0 8px">Held</div>
+    <div style="display:flex;gap:4px">
+      <span style="flex:1;height:38px;background:#ec3013;border:1px solid #ec3013;color:#fff;font:800 12px Archivo;letter-spacing:.12em;display:flex;align-items:center;justify-content:center">IGNITE</span>
+      <span style="width:38px;height:38px;border:1px solid #2a2e37;background:#232830;display:flex;align-items:center;justify-content:center"><span style="width:9px;height:9px;border:1px solid #7b828e;display:block"></span></span>
+    </div>
+  </div>
+  <div>
+    <div style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e;margin:0 0 8px">Latched — stays on, hands free</div>
+    <div style="display:flex;gap:4px">
+      <span style="flex:1;height:38px;background:#ec3013;border:1px solid #ec3013;color:#fff;font:800 12px Archivo;letter-spacing:.12em;display:flex;align-items:center;justify-content:center">IGNITE</span>
+      <span style="width:38px;height:38px;border:1px solid #ec3013;background:#ec3013;display:flex;align-items:center;justify-content:center"><span style="width:9px;height:9px;border:1px solid #fff;background:#fff;display:block"></span></span>
+    </div>
+  </div>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 24px">Fig. 10 — Three states. Held and latched look the same on the button; the latch cell is what tells them apart.</p>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.11 Color picker</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">The one component in the system that floats, and the only one allowed a shadow. Everything else is flat. It is 300px wide, anchored under the well that opened it rather than centred on the screen, and its number cells are the stepper cell from 4.4 at 30px — a picker should not introduce a fourth kind of number field.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Two changes from the current picker: the corners are square, and the RGB captions sit under their fields at 10px rather than floating between them. The eyedropper keeps its cell at the left of the hue row, at the same 26px as the current-colour disc beside it.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:0;margin:0 0 8px;break-inside:avoid;width:300px">
+  <div style="height:150px;position:relative;background:linear-gradient(to top,#000,rgba(0,0,0,0)),linear-gradient(to right,#fff,#0044ff)">
+    <span style="position:absolute;left:63%;top:5%;width:16px;height:16px;margin:-8px 0 0 -8px;border:2px solid #fff;display:block"></span>
+  </div>
+  <div style="padding:12px 14px;background:#16181d;border-top:2px solid #0a0b0e;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="width:26px;height:26px;flex:none;background:#232830;border:1px solid #2a2e37;color:#b9bec7;font:700 12px Archivo;display:flex;align-items:center;justify-content:center">⌖</span>
+      <span style="width:26px;height:26px;flex:none;background:#5970f2;border:1px solid #2a2e37;display:block"></span>
+      <span style="flex:1;height:20px;position:relative;border:1px solid #2a2e37;background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)">
+        <span style="position:absolute;left:62%;top:-3px;bottom:-3px;width:12px;transform:translateX(-50%);background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:1px solid #0a0b0e;display:block"></span>
+      </span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <span style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="height:30px;background:#232830;border:1px solid #2a2e37;color:#f2f3f5;font:700 14px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center">89</span><span style="font:800 10px Archivo;letter-spacing:.14em;color:#7b828e;text-align:center">R</span></span>
+      <span style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="height:30px;background:#232830;border:1px solid #2a2e37;color:#f2f3f5;font:700 14px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center">112</span><span style="font:800 10px Archivo;letter-spacing:.14em;color:#7b828e;text-align:center">G</span></span>
+      <span style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="height:30px;background:#232830;border:1px solid #2a2e37;color:#f2f3f5;font:700 14px Archivo;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center">242</span><span style="font:800 10px Archivo;letter-spacing:.14em;color:#7b828e;text-align:center">B</span></span>
+      <span style="width:56px;flex:none;height:30px;background:#ec3013;color:#fff;font:800 10px Archivo;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;justify-content:center">Done</span>
+    </div>
+  </div>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 24px">Fig. 11 — Shown at its true 300px width. The live version is in the prototype.</p>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:28px 0 8px">4.12 Brush cursor</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">The only component that lives on the canvas, and the most efficient one in the app. A ring whose diameter is the brush size, crossed by a chord whose rotation is the brush angle and whose colour is the colour about to be painted. Three values, no panel, at the exact point the eye is already looking.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">It is also the argument for the whole approach in 6.3. Nobody needs a legend to learn that scrolling changes the ring or that Shift+Scroll turns the chord, because the control and its feedback are the same object. Where a binding can be taught this way, it should be.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:0;margin:0 0 8px;break-inside:avoid;display:grid;grid-template-columns:repeat(3,1fr)">
+  <div style="aspect-ratio:1;background:#0a0b0e;border-right:2px solid #16181d;display:flex;align-items:center;justify-content:center;position:relative">
+    <span style="width:64px;height:64px;border:1px solid rgba(242,243,245,0.55);border-radius:50%;display:flex;align-items:center;justify-content:center"><span style="width:100%;height:2px;background:#4a5bd8;display:block"></span></span>
+    <span style="position:absolute;left:12px;bottom:10px;font:800 9px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#2a2e37">0° · blue next</span>
+  </div>
+  <div style="aspect-ratio:1;background:#0a0b0e;border-right:2px solid #16181d;display:flex;align-items:center;justify-content:center;position:relative">
+    <span style="width:64px;height:64px;border:1px solid rgba(242,243,245,0.55);border-radius:50%;display:flex;align-items:center;justify-content:center"><span style="width:100%;height:2px;background:#3fb950;transform:rotate(-72deg);display:block"></span></span>
+    <span style="position:absolute;left:12px;bottom:10px;font:800 9px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#2a2e37">−72° · green next</span>
+  </div>
+  <div style="aspect-ratio:1;background:#0a0b0e;display:flex;align-items:center;justify-content:center;position:relative">
+    <span style="width:112px;height:112px;border:1px solid rgba(242,243,245,0.55);border-radius:50%;display:flex;align-items:center;justify-content:center"><span style="width:100%;height:2px;background:#f0a626;transform:rotate(28deg);display:block"></span></span>
+    <span style="position:absolute;left:12px;bottom:10px;font:800 9px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#2a2e37">brush 68 · 28°</span>
+  </div>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 10px">Fig. 12 — Ring is size, chord is angle, chord colour is the upcoming colour. The circle is the one curve the system allows.</p>
+<sc-if value="{{ showMigration }}" hint-placeholder-val="{{ true }}">
+<div style="background:#eae9e9;border-top:2px solid #201e1d;padding:12px 14px;margin:0 0 24px;break-inside:avoid">
+  <div style="font:800 10px Archivo;letter-spacing:.14em;text-transform:uppercase;color:#201e1d;margin:0 0 6px">Keep as is</div>
+  <p style="font:400 14px/1.55 Archivo;color:#201e1d;margin:0">Nothing to migrate. The existing cursor already does this, and the Cursor Ring Color, Cursor Size and Cursor Opacity rows in 4.6 stay exactly where they are. The only open question is whether it should also carry gate or ignite state — it is the right place for them and the wrong place for anything more.</p>
+</div>
+</sc-if>
+
+<h2 style="font:800 27px/1.1 Archivo;letter-spacing:-0.015em;color:#201e1d;border-top:2px solid #201e1d;margin:44px 0 14px;padding-top:14px">5. Edge cases</h2>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#201e1d;margin:24px 0 8px">5.1 The kaleidoscope gear knobs</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 12px;max-width:62ch">The kaleidoscope rows use a toothed gear as the slider knob. It is the most characterful object in the interface and it is also the only control whose handle means something different from every other handle — it is drawn as a rotary but behaves as a linear slider. That mismatch is the problem, not the charm.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 12px;max-width:62ch">Two ways out. Retire the gear and let Kaleidoscope use faders like every other panel — cleanest, and loses the one piece of personality on the surface. Or promote it: make the gear a real endless rotary that drives the spinner behaviour from 4.2, and reserve it for the three genuinely rotational values, Angle, Twist and Spin Speed. Segments, Zoom and Blend become faders.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 22px;max-width:62ch">The second is worth the extra component. A rotary that actually rotates is not decoration, and confining it to angular quantities makes it legible rather than cute. It stays out of every other panel.</p>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#201e1d;margin:24px 0 8px">5.2 Controls that do not fit a rack row</h3>
+<table style="width:100%;border-collapse:collapse;font:400 14px/1.45 Archivo;color:#201e1d;margin:0 0 24px;break-inside:avoid">
+<thead>
+<tr>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:2px solid #201e1d">Case</th>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 0 8px 8px;border-bottom:2px solid #201e1d">Ruling</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Transport cluster</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Exempt. Record, pause, stop and play stay one 44px cap row — transport is read as a group, not as four controls.</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Layer list</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">A run of preset cards with a transport cap on each. Not rack rows.</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Saved swatches</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">A wrapping grid inside one row. The row's height grows; the inset does not change.</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Stats for Nerds</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Not a control panel. A read-only overlay — label/value pairs at 12px, no rack chrome, no hit targets.</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Light Shift path</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Lives on the canvas, not in the panel. See 6.1.</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Dependent rows</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Glow Intensity under Glow, Spin Speed under Animate Rotation: indent the row inset from 18px to 34px and dim the label to ink-300 when the parent is off. Never hide.</td></tr>
+</tbody>
+</table>
+
+<h2 style="font:800 27px/1.1 Archivo;letter-spacing:-0.015em;color:#201e1d;border-top:2px solid #201e1d;margin:44px 0 14px;padding-top:14px">6. Explorations</h2>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:24px 0 8px">6.1 The Light Shift playhead</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">A playhead already exists. Light Shift renders one on the colour-wheel picker with interpolated position, hue wrapping, and an inner core set to the exact colour being handed to the shader. It is well built and it is in the wrong place: it lives in a small picker inside a panel, it is read-only, and the path it travels is drawn on the canvas but represented nowhere on it.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Promote it. Keep the interpolation and the colour matching exactly as they are, and render the same head on the canvas over the drawn stroke: the path visible at low opacity, a chrome cap riding it, grabbing the cap to scrub and releasing to resume from where it was dropped. The picker head stays as the colour readout it already is. Speed stays a fader in the panel; position becomes direct.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:0;margin:0 0 8px;break-inside:avoid;user-select:none;touch-action:none">
+  <div onPointerDown="{{ onPath }}" style="position:relative;background:#0a0b0e;cursor:grab">
+    <svg viewBox="0 0 660 180" style="display:block;width:100%;height:auto">
+      <defs>
+        <linearGradient id="lsg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#2fb8c8" />
+          <stop offset="0.35" stop-color="#f0a626" />
+          <stop offset="0.7" stop-color="#e0432a" />
+          <stop offset="1" stop-color="#a8324f" />
+        </linearGradient>
+      </defs>
+      <path d="M30 120 C90 20, 150 20, 200 90 C250 160, 300 170, 360 110 C420 50, 470 30, 530 70 C580 103, 610 130, 640 100" fill="none" stroke="#232830" stroke-width="18" stroke-linecap="round" />
+      <path d="M30 120 C90 20, 150 20, 200 90 C250 160, 300 170, 360 110 C420 50, 470 30, 530 70 C580 103, 610 130, 640 100" fill="none" stroke="url(#lsg)" stroke-width="4" stroke-linecap="round" opacity="0.9" />
+    </svg>
+    <span style="position:absolute;left:{{ dotLeft }};top:{{ dotTop }};width:22px;height:22px;margin:-11px 0 0 -11px;background:linear-gradient(180deg,#f6f7f9,#9aa1ad);border:2px solid #0a0b0e;display:block;pointer-events:none"></span>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#16181d;border-top:2px solid #0a0b0e">
+    <span style="font:800 15px Archivo;letter-spacing:.09em;text-transform:uppercase;color:#f2f3f5">Path Position</span>
+    <span style="font:700 18px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">{{ playText }}</span>
+  </div>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 14px">Fig. 6 — Live. Drag the cap along the path; release to resume.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 22px;max-width:62ch">Three things fall out of this once the head is an object on the canvas rather than a dot in a picker. The path becomes editable — grab a point, move it. The head becomes a loop marker — drag a second cap on and you have an in/out range. And the same mechanism serves the recorder: a recorded layer is also a path through time, and it can be scrubbed the same way rather than through 0/0 arrows.</p>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:24px 0 8px">6.2 Compact toolbar</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">The horizontal strip is a rack rotated ninety degrees, and it should be built from the same parts: label above, value below, one control per cell, cells divided by the same 2px rule. Dense mode drops the track and keeps the spinner — the strip becomes a row of readouts you drag, which is what an experienced user is doing anyway.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:0;margin:0 0 8px;break-inside:avoid;display:flex">
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px">
+    <span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e">Brush</span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">6.5</span>
+  </span>
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px">
+    <span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e">Splats</span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">25</span>
+  </span>
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px">
+    <span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e">Viscosity</span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">0.80</span>
+  </span>
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px">
+    <span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e">Isolation</span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">2.50</span>
+  </span>
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px">
+    <span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e">Time</span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">1.00×</span>
+  </span>
+  <span style="width:56px;background:#232830;display:flex;align-items:center;justify-content:center;color:#f2f3f5;font:700 15px Archivo">❙❙</span>
+  <span style="width:56px;background:#ec3013;display:flex;align-items:center;justify-content:center;color:#fff;font:700 15px Archivo">●</span>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 24px">Fig. 7 — Dense mode. Every cell is a drag target; no cell hides its affordance.</p>
+
+<h3 style="font:800 15px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#ec3013;margin:24px 0 8px">6.3 The hotkey reminder</h3>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">The reminder panel appears at the top right whenever Shift, Ctrl or Alt is held, showing a sixteen-chip default group plus whichever modifier group matches. It lands on the mixer strip, and it teaches nothing. Four things are going wrong, and only one of them is the position.</p>
+
+<table style="width:100%;border-collapse:collapse;font:400 14px/1.45 Archivo;color:#201e1d;margin:0 0 20px;break-inside:avoid">
+<thead>
+<tr>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:2px solid #201e1d">What happens</th>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 0 8px 8px;border-bottom:2px solid #201e1d">Why it hurts</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">The default group always shows, on top of the modifier group</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Hold Ctrl to find Undo and you are shown sixteen bindings you did not ask for plus the three you did. The answer is 16% of the panel.</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Shift alone opens it</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Shift is a working modifier — coarse brush, rotate brush, save colour. The panel fires as noise in the middle of painting, which is exactly when the canvas must stay clear.</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">It is a floating layer over fixed chrome</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Nothing reflows to make room, so it covers Multi-Brush, Time, Density and Velocity — four live readouts — at the moment a modifier is held.</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">The binding never appears beside its control</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">A user who has just dragged Brush Size with the mouse is never told that <strong>[</strong> and <strong>]</strong> do the same thing. Recall is supported; learning is not.</td></tr>
+</tbody>
+</table>
+
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">The fix is to stop treating hotkeys as a list. Bind the legend to the control instead of to the modifier: every rack row and toolbar cell carries a key cap in its right margin — the same cap the preset card uses in 4.8. Holding a modifier lights the caps of the controls that modifier reaches, in place, and dims the rest. Nothing opens, nothing moves, nothing is covered, and the binding is learned where the control lives.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:0;margin:0 0 8px;break-inside:avoid;display:flex">
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px;opacity:0.35">
+    <span style="display:flex;justify-content:space-between;align-items:center"><span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e">Brush</span><span style="font:800 10px/17px Archivo;white-space:nowrap;height:17px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-width:34px;color:#7b828e;border:1px solid #2a2e37;padding:0 5px">[ ]</span></span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">30.0</span>
+  </span>
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px;opacity:0.35">
+    <span style="display:flex;justify-content:space-between;align-items:center"><span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e">Splats</span><span style="font:800 10px/17px Archivo;white-space:nowrap;height:17px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-width:34px;border:1px solid transparent"></span></span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">25</span>
+  </span>
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px">
+    <span style="display:flex;justify-content:space-between;align-items:center"><span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#f2f3f5">Physics</span><span style="font:800 10px/17px Archivo;white-space:nowrap;height:17px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-width:34px;color:#fff;background:#ec3013;border:1px solid #ec3013;padding:0 5px">↑↓</span></span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">512</span>
+  </span>
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px">
+    <span style="display:flex;justify-content:space-between;align-items:center"><span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#f2f3f5">Visual</span><span style="font:800 10px/17px Archivo;white-space:nowrap;height:17px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-width:34px;color:#fff;background:#ec3013;border:1px solid #ec3013;padding:0 5px">↑↓</span></span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">2K</span>
+  </span>
+  <span style="flex:1;padding:12px 14px;border-right:2px solid #0a0b0e;display:flex;flex-direction:column;gap:6px;opacity:0.35">
+    <span style="display:flex;justify-content:space-between;align-items:center"><span style="font:800 11px Archivo;letter-spacing:.12em;text-transform:uppercase;color:#7b828e">Time</span><span style="font:800 10px/17px Archivo;white-space:nowrap;height:17px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-width:34px;border:1px solid transparent"></span></span>
+    <span style="font:700 20px Archivo;font-variant-numeric:tabular-nums;color:#f2f3f5">1.00×</span>
+  </span>
+  <span style="width:96px;background:#191c22;border-left:2px solid #0a0b0e;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 12px">
+    <span style="font:800 10px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#ec3013">Alt+Shift</span>
+    <span style="font:500 10px Archivo;color:#7b828e">held</span>
+  </span>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 18px">Fig. 8 — Alt+Shift held. Two caps light, three cells dim, nothing is covered. The modifier badge replaces the whole floating panel.</p>
+
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 14px;max-width:62ch">Two bindings do not drive a visible control — Export, Mutate, Focus and the layer keys act on the app rather than on a cell. Those get a single rack row appended to the strip, at rack height, which pushes the canvas down by 34px instead of covering it. It carries only the held modifier's bindings; the default group is retired to the F1 reference, where a sixteen-item list belongs.</p>
+
+<div style="background:#0e0f12;border:2px solid #201e1d;padding:0;margin:0 0 8px;break-inside:avoid;display:flex;align-items:center;gap:0;height:38px">
+  <span style="width:96px;height:100%;background:#ec3013;color:#fff;font:800 10px Archivo;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;padding:0 12px;flex:none">Ctrl</span>
+  <span style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:2px solid #0a0b0e;height:100%"><span style="font:800 10px/16px Archivo;white-space:nowrap;color:#f2f3f5;background:#232830;border:1px solid #2a2e37;padding:2px 6px">← →</span><span style="font:700 12px Archivo;letter-spacing:.04em;color:#b9bec7;white-space:nowrap">Cycle palette</span></span>
+  <span style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:2px solid #0a0b0e;height:100%"><span style="font:800 10px/16px Archivo;white-space:nowrap;color:#f2f3f5;background:#232830;border:1px solid #2a2e37;padding:2px 6px">Z</span><span style="font:700 12px Archivo;letter-spacing:.04em;color:#b9bec7;white-space:nowrap">Undo</span></span>
+  <span style="display:flex;align-items:center;gap:8px;padding:0 14px;border-left:2px solid #0a0b0e;height:100%"><span style="font:800 10px/16px Archivo;white-space:nowrap;color:#f2f3f5;background:#232830;border:1px solid #2a2e37;padding:2px 6px">Y</span><span style="font:700 12px Archivo;letter-spacing:.04em;color:#b9bec7;white-space:nowrap">Redo</span></span>
+  <span style="flex:1"></span>
+  <span style="font:500 10px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#7b828e;padding:0 14px;white-space:nowrap">F1 — all hotkeys</span>
+</div>
+<p style="font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin:0 0 18px">Fig. 9 — Ctrl held. Three bindings, one row, in the layout rather than over it.</p>
+
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 12px;max-width:62ch">Three rules make the pattern learnable rather than merely smaller. Shift alone never triggers anything — it is a live modifier during painting, and its bindings surface only on the controls they touch. The row appears after a 250ms hold, so a modifier used in passing produces no flash. And once, the first time a user changes a value by mouse that has a binding, its cap flashes for two seconds beside the control they just used — the only moment a hotkey hint has a reader's full attention.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 22px;max-width:62ch">The F1 modal stays as it is. It is the reference, it is deliberate, and nothing above replaces it.</p>
+
+<sc-if value="{{ showMigration }}" hint-placeholder-val="{{ true }}">
+<h2 style="font:800 27px/1.1 Archivo;letter-spacing:-0.015em;color:#201e1d;border-top:2px solid #201e1d;margin:44px 0 14px;padding-top:14px">7. Migration map</h2>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 16px;max-width:62ch">Twelve current treatments to seven components. Nothing on this list requires a change to what a control does.</p>
+
+<table style="width:100%;border-collapse:collapse;font:400 14px/1.45 Archivo;color:#201e1d;margin:0 0 20px">
+<thead>
+<tr>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:2px solid #201e1d">Today</th>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:2px solid #201e1d">Becomes</th>
+<th style="text-align:left;font:800 11px Archivo;letter-spacing:.1em;text-transform:uppercase;padding:0 0 8px 8px;border-bottom:2px solid #201e1d">Note</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Panel slider (gradient track, ball knob)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Fader 4.1</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Gains a printed scale and a full-row hit target</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Ramp slider (Splat In / Splat Out)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Fader 4.1</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Easing name moves to a select above it</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Toolbar slider (thin track, pill knob)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Toolbar cell 6.2</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Track optional; value is always the target</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Gear-knob slider (Kaleidoscope)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Rotary 5.1 / Fader 4.1</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Rotary only for Angle, Twist, Spin Speed</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Text + ▸ (Brush Size)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Stepper cell 4.4</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">The hidden-affordance fix</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Text + ▼ (Fluid)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Stepper 4.4 + Segmented 4.5</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Splits into its count and its mode</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Gold pill (Multi-Brush 1×)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Segmented switch 4.5</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">All eight multipliers visible; gold retired</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Blue-outlined pills (RND / STEP / 🌈 / GATE)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Segmented 4.5 + boolean 4.6</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Three-part radio plus one separate toggle. Blue retired entirely</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Ignite (hold-to-fire, no visible latch)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Momentary + latch 4.10</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">The latch becomes a visible cell instead of hidden behaviour</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Color picker popover (rounded, floating)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Picker 4.11</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Squared, anchored to the well, RGB cells match 4.4</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Native checkbox</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Boolean row 4.6</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Row-wide target; label at 15px</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Gradient buttons (Create Room)</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Primary button 4.7</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Heat gradient reserved for range fills</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Emoji gesture cards</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Preset card 4.8</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Emoji becomes a stroke preview; hint becomes readable</td></tr>
+<tr><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;font-weight:700;vertical-align:top">Circular color swatch</td><td style="padding:9px 8px 9px 0;border-bottom:1px solid #d7d3d3;vertical-align:top">Color well 4.9</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #d7d3d3;color:#444141">Square, 38px, matches the swatch grid</td></tr>
+</tbody>
+</table>
+</sc-if>
+
+<h2 style="font:800 27px/1.1 Archivo;letter-spacing:-0.015em;color:#201e1d;border-top:2px solid #201e1d;margin:44px 0 14px;padding-top:14px">8. Order of work</h2>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 12px;max-width:62ch">The rack row first — it is the container everything else drops into, and it is where the legibility win is. The fader second, because it is now 57 of the 130 controls — six more since the spinner gave up its rack rows. The stepper cell and segmented switch third; between them they close the affordance gap on the three most-used controls in the app. Everything after that is consolidation.</p>
+<p style="font:400 15px/1.6 Archivo;color:#201e1d;margin:0 0 40px;max-width:62ch">The playhead is not on that path. It is a feature, not a cleanup, and it should be built when the rest of the surface has stopped moving.</p>
+
+</doc-page>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showMigration&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Report contents&quot;},&quot;showTokenTable&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Report contents&quot;}}">
+const SEGS = [
+  [[30,120],[90,20],[150,20],[200,90]],
+  [[200,90],[250,160],[300,170],[360,110]],
+  [[360,110],[420,50],[470,30],[530,70]],
+  [[530,70],[580,103],[610,130],[640,100]]
+];
+
+function bez(s, t) {
+  const u = 1 - t, a = u*u*u, b = 3*u*u*t, c = 3*u*t*t, d = t*t*t;
+  return [
+    a*s[0][0] + b*s[1][0] + c*s[2][0] + d*s[3][0],
+    a*s[0][1] + b*s[1][1] + c*s[2][1] + d*s[3][1]
+  ];
+}
+
+const SAMPLES = (() => {
+  const pts = [], N = 60;
+  SEGS.forEach(s => { for (let i = 0; i <= N; i++) pts.push(bez(s, i / N)); });
+  let len = 0;
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    len += Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]);
+    cum.push(len);
+  }
+  return { pts, cum, len };
+})();
+
+function atT(t) {
+  const target = Math.max(0, Math.min(1, t)) * SAMPLES.len;
+  const { pts, cum } = SAMPLES;
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < target) i++;
+  const span = cum[i] - cum[i-1] || 1;
+  const f = (target - cum[i-1]) / span;
+  return [
+    pts[i-1][0] + (pts[i][0] - pts[i-1][0]) * f,
+    pts[i-1][1] + (pts[i][1] - pts[i-1][1]) * f
+  ];
+}
+
+class Component extends DCLogic {
+  state = { fader: 0.62, spin: 30, fine: 0.45, fineMode: 0, playT: 0.28, scrubbing: false };
+
+  componentDidMount() {
+    let last = performance.now();
+    const tick = now => {
+      const dt = (now - last) / 1000;
+      last = now;
+      if (!this.state.scrubbing) {
+        this.setState(s => ({ playT: (s.playT + dt * 0.12) % 1 }));
+      }
+      this._raf = requestAnimationFrame(tick);
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+
+  componentWillUnmount() { cancelAnimationFrame(this._raf); }
+
+  trackDrag(e, key, opts) {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const set = ev => {
+      const frac = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+      if (!opts.fine) return this.setState({ [key]: frac });
+      const off = Math.abs(ev.clientY - (rect.top + rect.height / 2));
+      const precise = ev.shiftKey || off > 40;
+      this.setState(s => {
+        const next = precise ? s[key] + (frac - s[key]) * 0.08 : frac;
+        return { [key]: Math.max(0, Math.min(1, next)), fineMode: precise ? 1 : 0 };
+      });
+    };
+    set(e);
+    const move = ev => set(ev);
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      this.setState({ fineMode: 0 });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    e.preventDefault();
+  }
+
+  renderVals() {
+    const [px, py] = atT(this.state.playT);
+    return {
+      showMigration: this.props.showMigration ?? true,
+      showTokenTable: this.props.showTokenTable ?? true,
+
+      faderText: (0.90 + this.state.fader * 0.10).toFixed(4),
+      faderPct: (this.state.fader * 100).toFixed(2) + '%',
+      onFader: e => this.trackDrag(e, 'fader', {}),
+
+      spinText: Math.round(this.state.spin),
+      onSpin: e => {
+        const start = { x: e.clientX, y: e.clientY, v: this.state.spin };
+        const move = ev => {
+          const d = (ev.clientX - start.x) - (ev.clientY - start.y);
+          const k = ev.shiftKey ? 0.06 : 0.6;
+          this.setState({ spin: Math.max(0, Math.min(720, start.v + d * k)) });
+        };
+        const up = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        e.preventDefault();
+      },
+
+      fineText: (0.98 + this.state.fine * 0.02).toFixed(4),
+      finePct: (this.state.fine * 100).toFixed(2) + '%',
+      fineHint: this.state.fineMode ? 'Fine — 1:10' : 'Coarse — 1:1',
+      fineHintColor: this.state.fineMode ? '#ec3013' : '#7b828e',
+      onFine: e => this.trackDrag(e, 'fine', { fine: true }),
+
+      dotLeft: (px / 660 * 100).toFixed(3) + '%',
+      dotTop: (py / 180 * 100).toFixed(3) + '%',
+      playText: (this.state.playT * 100).toFixed(1) + '%',
+      onPath: e => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const seek = ev => {
+          const x = (ev.clientX - rect.left) / rect.width * 660;
+          const y = (ev.clientY - rect.top) / rect.height * 180;
+          let best = 0, bestD = Infinity;
+          SAMPLES.pts.forEach((p, i) => {
+            const d = (p[0] - x) ** 2 + (p[1] - y) ** 2;
+            if (d < bestD) { bestD = d; best = i; }
+          });
+          this.setState({ playT: SAMPLES.cum[best] / SAMPLES.len, scrubbing: true });
+        };
+        seek(e);
+        const move = ev => seek(ev);
+        const up = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+          this.setState({ scrubbing: false });
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        e.preventDefault();
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

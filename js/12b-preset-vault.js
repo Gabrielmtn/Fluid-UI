@@ -227,6 +227,31 @@
             Object.keys(ls).forEach(function (name) {
                 if (!diskNames[name]) { if (vfs.save(name, ls[name])) seeded++; }
             });
+            // Brush-library sidecar: WIPE-RECOVERY ONLY. Restore a library
+            // from disk only when the live localStorage copy is missing or
+            // empty — a stale disk copy must never clobber newer in-app work
+            // (per-preset envelope ride-alongs were tried first and did
+            // exactly that: divergent vintages, alphabetical-order wins).
+            var lib = readLibrary();
+            if (lib) {
+                var curP = null, curS = null;
+                try { curP = window.settingsManager && window.settingsManager.get('brush.presets'); } catch (_) {}
+                try { curS = window.settingsManager && window.settingsManager.get('brush.shapes'); } catch (_) {}
+                if ((!Array.isArray(curP) || !curP.length) && Array.isArray(lib.brushPresets) && lib.brushPresets.length && window.settingsManager) {
+                    try {
+                        window.settingsManager.set('brush.presets', lib.brushPresets);
+                        if (typeof window.__refreshBrushPresets === 'function') window.__refreshBrushPresets();
+                    } catch (_) {}
+                }
+                if ((!Array.isArray(curS) || !curS.length) && Array.isArray(lib.brushShapes) && lib.brushShapes.length) {
+                    try {
+                        if (window.BrushShapes) window.BrushShapes.importList(lib.brushShapes);
+                        else if (window.settingsManager) window.settingsManager.set('brush.shapes', lib.brushShapes);
+                    } catch (_) {}
+                }
+            } else {
+                writeLibrarySoon(); // first run with the sidecar: seed it
+            }
             return { restored: restored, seeded: seeded };
         }
     };
@@ -250,6 +275,40 @@
             };
         }
     }
+
+    // ── Brush-library sidecar (2026-08-09) ──────────────────────────────────
+    // Brush presets + custom brush shapes live only in localStorage; a wipe
+    // (the 2026-07-19 preset-loss class) destroys them. Mirror both into ONE
+    // dedicated vault file, rewritten (debounced) on every change. Restore
+    // happens in syncStartup above, and only when the live copy is empty.
+    function libPath() { return path.join(vaultDir, 'brush-library.json'); }
+    function readLibrary() {
+        try { return JSON.parse(fs.readFileSync(libPath(), 'utf8')); } catch (_) { return null; }
+    }
+    var libWriteTimer = null;
+    function writeLibrarySoon() {
+        if (libWriteTimer) clearTimeout(libWriteTimer);
+        libWriteTimer = setTimeout(function () {
+            libWriteTimer = null;
+            try {
+                var bp = null, bs = null;
+                try { bp = window.settingsManager && window.settingsManager.get('brush.presets'); } catch (_) {}
+                try { bs = window.settingsManager && window.settingsManager.get('brush.shapes'); } catch (_) {}
+                vfs.ensure();
+                var env = { format: 'fluid-brush-library', v: 1, savedAt: Date.now(),
+                            brushPresets: bp || [], brushShapes: bs || [] };
+                var tmp = libPath() + '.tmp';
+                fs.writeFileSync(tmp, JSON.stringify(env));
+                fs.renameSync(tmp, libPath());
+            } catch (_) {}
+        }, 800);
+    }
+    try {
+        if (window.settingsManager && typeof window.settingsManager.watch === 'function') {
+            window.settingsManager.watch('brush.presets', writeLibrarySoon);
+            window.settingsManager.watch('brush.shapes', writeLibrarySoon);
+        }
+    } catch (_) {}
 
     // ── Run startup reconciliation once the app's preset UI is ready ────────
     function runStartupSync() {

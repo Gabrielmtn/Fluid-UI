@@ -132,7 +132,7 @@
                         const oHost = element.querySelector('.raster-opacity-host');
                         const oVal = element.querySelector('.raster-opacity-val');
                         if (oHost) {
-                            const oSlider = buildEncapsulatedRange({ min: 0, max: 100, value: Math.round(rOpacity * 100), step: 1, className: 'encapsulated-slider slider-gray' });
+                            const oSlider = buildEncapsulatedRange({ min: 0, max: 100, value: Math.round(rOpacity * 100), step: 1, className: 'encapsulated-slider' });
                             oHost.appendChild(oSlider);
                             oSlider.addEventListener('input', () => {
                                 layer.opacity = parseInt(oSlider.value, 10) / 100;
@@ -259,7 +259,7 @@
                     const headerEl = element.querySelector('.layer-item-header');
                     if (headerEl) headerEl.draggable = true;
                     if (host && valueEl) {
-                        const slider = buildEncapsulatedRange({ min: 0, max: 100, value: layer.threshold, step: 1, className: 'encapsulated-slider slider-gray' });
+                        const slider = buildEncapsulatedRange({ min: 0, max: 100, value: layer.threshold, step: 1, className: 'encapsulated-slider' });
                         host.appendChild(slider);
                         slider.addEventListener('input', () => {
                             valueEl.textContent = slider.value + '%';
@@ -308,7 +308,7 @@
                         const strengthHost = element.querySelector('[data-cs="' + layer.index + '"]');
                         const strengthVal = element.querySelector('.collision-strength-val');
                         if (strengthHost) {
-                            const sSlider = buildEncapsulatedRange({ min: 0, max: 100, value: Math.round((layer.collisionStrength || 0.7) * 100), step: 1, className: 'encapsulated-slider slider-orange' });
+                            const sSlider = buildEncapsulatedRange({ min: 0, max: 100, value: Math.round((layer.collisionStrength || 0.7) * 100), step: 1, className: 'encapsulated-slider' });
                             strengthHost.appendChild(sSlider);
                             sSlider.addEventListener('input', () => {
                                 const v = parseInt(sSlider.value) / 100;
@@ -326,7 +326,7 @@
                         const threshVal = element.querySelector('.collision-threshold-val');
                         if (threshHost) {
                             const depthShape = layer.mask?.shapes?.find(s => s.type === 'depth-mask');
-                            const tSlider = buildEncapsulatedRange({ min: 0, max: 255, value: depthShape?.threshold || 128, step: 1, className: 'encapsulated-slider slider-orange' });
+                            const tSlider = buildEncapsulatedRange({ min: 0, max: 255, value: depthShape?.threshold || 128, step: 1, className: 'encapsulated-slider' });
                             threshHost.appendChild(tSlider);
                             tSlider.addEventListener('input', () => {
                                 const v = parseInt(tSlider.value);
@@ -502,6 +502,9 @@
             startDragUX();
         }
         function handleDragOver(e) {
+            // Not an internal row drag (e.g. an OS file drag) — let it bubble
+            // to the document-level file-drop handlers (32-file-drop).
+            if (!draggedElement) return;
             if (e.preventDefault) e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             const target = e.target.closest('.layer-item');
@@ -535,6 +538,7 @@
             });
         }
         function handleDrop(e) {
+            if (!draggedElement) return; // file drag — bubble to 32-file-drop
             if (e.stopPropagation) e.stopPropagation();
             e.preventDefault();
             const target = e.target.closest('.layer-item');
@@ -563,6 +567,7 @@
             draggedElement = null;
         }
         function handleDropZoneDragOver(e) {
+            if (!draggedElement) return; // file drag — bubble to 32-file-drop
             if (e.preventDefault) e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             const panel = document.getElementById('layersPanel');
@@ -571,6 +576,9 @@
             return false;
         }
         function handleDropZoneDrop(e) {
+            // File drag (or stray drop with no source row): without this guard
+            // the draggedElement dereference below throws on OS file drops.
+            if (!draggedElement) return;
             if (e.stopPropagation) e.stopPropagation();
             e.preventDefault();
             const dropPosition = this.dataset.dropPosition;

@@ -282,16 +282,30 @@
                 }
                 return;
             }
-            // ── Playback transport: Space ──
+            // ── Space transport ──
+            // Record mode keeps its playback transport; otherwise Space drives
+            // the sim: Space = stop/unstop fluid motion (freeze), Shift+Space =
+            // pause/unpause the simulation.
             if (key === ' ') {
                 e.preventDefault();
-                if (!recEnabled) return;
+                // OS key auto-repeat fires keydown ~25-30 Hz while held — a
+                // held Space must not strobe freeze/pause (or the playback
+                // transport) into a parity-random end state.
+                if (e.repeat) return;
+                if (recEnabled) {
+                    if (e.shiftKey) {
+                        // Shift+Space: play all / pause all
+                        if (typeof recTogglePlaybackAll === 'function') recTogglePlaybackAll();
+                    } else {
+                        // Space: play / pause active layer
+                        if (typeof recTogglePlayback === 'function') recTogglePlayback();
+                    }
+                    return;
+                }
                 if (e.shiftKey) {
-                    // Shift+Space: play all / pause all
-                    if (typeof recTogglePlaybackAll === 'function') recTogglePlaybackAll();
+                    if (typeof window.togglePause === 'function') window.togglePause();
                 } else {
-                    // Space: play / pause active layer
-                    if (typeof recTogglePlayback === 'function') recTogglePlayback();
+                    if (typeof window.toggleFreeze === 'function') window.toggleFreeze();
                 }
                 return;
             }

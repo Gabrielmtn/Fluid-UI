@@ -24,6 +24,9 @@
             uniform float ringSquash;  // ring ellipse squash (1 = circle, <1 = flattened vertically)
             uniform float barHalfW;    // >0: crisp bar stamp this half-width wide (aspect-corrected UV); EQ lane slabs
             uniform float barPoint;    // bar stamp tip lift: 0 = flat slab, >0 = pointed arch (flame tongue)
+            uniform sampler2D uStampTex; // custom brush-shape stamp (alpha = coverage), bound on unit 2
+            uniform float stampTexOn;    // 1 = the dye footprint comes from the stamp texture
+            uniform float stampAspect;   // stamp width/height, so non-square stamps keep their aspect
             uniform int gateColor;     // 1 = clamp dye at the splat's own color (no HDR overflow into white)
             uniform float gateFlow;    // Gate: 0-1 flow — scales the CONVERGENCE, not the colour, so low flow builds toward the TRUE colour instead of a darkened one
             uniform int isVelocity; // 1 for velocity, 0 for density
@@ -163,6 +166,36 @@
                         float rim = 1.4 * (0.55 + 0.9 * n);
                         float stamp = (1.0 - smoothstep(rim * 0.72, rim, m)) * (0.75 + 0.5 * n);
                         shape = mix(shape, stamp, stampNoise);
+                    }
+                    // Custom brush shape: the dye footprint is a user-authored
+                    // alpha stamp, sampled in the same rotated size-normalized
+                    // frame as the clay stamps. Dye ONLY — the velocity pass
+                    // stays gaussian (same rule as the clay stamps above). The
+                    // Texture slider's grain still applies, so custom shapes
+                    // can be roughened like the built-in tips.
+                    if (stampTexOn > 0.5 && ringRadius <= 0.0 && barHalfW <= 0.0) {
+                        vec2 q = p / sqrt(radius);
+                        vec2 qr = q;
+                        if (stampAngle != 0.0) {
+                            float ca = cos(stampAngle), sa = sin(stampAngle);
+                            qr = vec2(q.x * ca - q.y * sa, q.x * sa + q.y * ca);
+                        }
+                        // Long side spans the same visual extent as the gaussian
+                        // dab (its alpha-0.1 edge sits at |p| ~ 1.5*sqrt(radius));
+                        // support stays far inside the scissor rect (K = 6).
+                        vec2 he = (stampAspect >= 1.0)
+                            ? vec2(1.6, 1.6 / max(stampAspect, 0.001))
+                            : vec2(1.6 * max(stampAspect, 0.001), 1.6);
+                        vec2 suv = qr / (2.0 * he) + 0.5;
+                        float cov = 0.0;
+                        if (all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0)))) {
+                            cov = texture(uStampTex, suv).a;
+                        }
+                        if (stampNoise > 0.0) {
+                            float n2 = sn_noise(q * 3.0 + stampSeed);
+                            cov *= mix(1.0, 0.75 + 0.5 * n2, stampNoise);
+                        }
+                        shape = cov;
                     }
                     vec3 result;
                     // Pigment memory: what strength was this dye laid down at?

@@ -435,11 +435,55 @@
         }
         
         /* Slider styles moved to slider-styles.css */
-        
+
+        /* Mandala Studio: quiet divider between the symmetry rig and the
+           paint-feel sliders, so the panel reads as two groups not eight
+           loose controls. */
+        .mandala-radio {
+            display: flex;
+            gap: 6px;
+        }
+        .mandala-radio label {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            margin: 0;
+            padding: 6px 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid var(--ground-500, #2a2e37);
+            border-radius: 4px;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .mandala-radio label:has(input:checked) {
+            opacity: 1;
+            border-color: rgba(130, 205, 255, 0.7);
+            background: rgba(130, 205, 255, 0.12);
+        }
+
+        .mandala-sub {
+            margin: 14px 0 8px;
+            padding-top: 10px;
+            border-top: 1px solid var(--ground-500, #2a2e37);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.55;
+        }
+
+        /* Colour well: 38px ROUND, flat. Owner override of handoff 4.9 —
+           shape carries meaning here: a disc reads as pigment (and echoes
+           the brush cursor ring), a square reads as one more UI cell. The
+           bevel/shadow the old swatch had is still gone, so it sits in the
+           flat system without pretending to be a button. */
         input[type="color"] {
-            width: 40px;
-            height: 40px;
-            border: 2px solid rgba(255, 255, 255, 0.12);
+            width: 38px;
+            height: 38px;
+            border: 1px solid var(--ground-500, #2a2e37);
             border-radius: 50%;
             cursor: pointer;
             padding: 0;
@@ -448,8 +492,10 @@
             -moz-appearance: none;
             appearance: none;
             outline: none;
-            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4),
-                        inset 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        input[type="color"]:focus-visible {
+            outline: 2px solid var(--accent, #ec3013);
+            outline-offset: 2px;
         }
         input[type="color"]::-webkit-color-swatch-wrapper {
             padding: 0;
@@ -796,7 +842,6 @@
         
         .layer-threshold input[type="range"] {
             flex: 1;
-            height: 3px;
         }
         
         .layer-threshold span {
@@ -1008,7 +1053,7 @@
         .rec-square-content .row > * { width: 100%; }
         .rec-mini button, .rec-mini input.time-input { height: 60px; min-width: 60px; border-radius: 14px; padding: 0 12px; font-size: 14px; font-weight: 600; background: linear-gradient(#1f2733, #151b24); color: #e6edf3; border: 1px solid rgba(255,255,255,0.14); box-shadow: inset 0 1px rgba(255,255,255,0.08), 0 1px 2px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; user-select: none; box-sizing: border-box; }
         .rec-mini button { letter-spacing: 0.2px; }
-        .rec-mini .action-record.active, .rec-mini.rec-recording .action-record { background: linear-gradient(180deg, #ff4d4d, #c22121); border-color: rgba(255,100,100,0.6); box-shadow: 0 0 20px rgba(255, 77, 77, 0.35), inset 0 1px rgba(255,255,255,0.25); color: #fff; }
+        .rec-mini .action-record.active, .rec-mini.rec-recording .action-record { background: var(--accent, #ec3013); border-color: var(--accent, #ec3013); box-shadow: 0 0 20px rgba(236, 48, 19, 0.35); color: #fff; }
         .rec-mini .action-multi.active { background: linear-gradient(180deg, #7b61ff, #4a33d1); border-color: rgba(123,97,255,0.6); box-shadow: 0 0 20px rgba(123,97,255,0.35), inset 0 1px rgba(255,255,255,0.25); color: #fff; }
         .rec-mini.rec-recording .action-multi:not(.active) { background: linear-gradient(#1f2733, #151b24); color: #e6edf3; border-color: rgba(255,255,255,0.14); box-shadow: inset 0 1px rgba(255,255,255,0.08), 0 1px 2px rgba(0,0,0,0.45); }
         .rec-mini .action-pause.active, .rec-mini.rec-playing .action-pause { background: linear-gradient(180deg, #58a6ff, #1a7cff); border-color: rgba(88,166,255,0.6); box-shadow: 0 0 18px rgba(88,166,255,0.3), inset 0 1px rgba(255,255,255,0.2); color: #fff; }
@@ -1248,7 +1293,7 @@
 }
 
 .stats-title {
-    color: #ffd700;
+    color: var(--ink-100, #f2f3f5);
     font-weight: bold;
     font-size: 12px;
     margin-bottom: 6px;
@@ -1269,7 +1314,7 @@
 }
 
 .stat-row span:last-child {
-    color: #4fc3f7;
+    color: var(--ink-100, #f2f3f5);
     font-weight: bold;
     text-align: right;
 }
@@ -1336,26 +1381,11 @@
 #captureArea .cap-rz.cap-se { bottom: -4px; right: -4px; width: 10px; height: 10px; cursor: nwse-resize; }
 #captureArea .cap-rz.cap-sw { bottom: -4px; left: -4px; width: 10px; height: 10px; cursor: nesw-resize; }
 
-/* Layer slider overrides */
+/* Layer sliders: unified fader treatment; keep only the drag guards */
 .layer-threshold input[type="range"] {
-    --track-h: 0.5em;
-    --thumb-h: 1.0em;
-    --thumb-w: 1.0em;
-    outline-offset: -0.1em;
     -webkit-user-drag: none;
     user-select: none;
     touch-action: none;
-}
-.layer-threshold input[type="range"]::-webkit-slider-container {
-    box-shadow: none;
-    height: var(--track-h);
-}
-.layer-threshold input[type="range"]::-webkit-slider-runnable-track {
-    height: var(--thumb-h);
-}
-.layer-threshold input[type="range"]::-moz-range-track {
-    box-shadow: none;
-    height: var(--track-h);
 }
 
 /* Mobile Mode */
@@ -1465,94 +1495,124 @@ body.mobile-mode .controls.visible .mobile-menu-close {
 }
 
 
-/* ── Hotkey Reminder Panel (column layout, top-right) ── */
+/* ── Hotkey caps + appended reminder row (design handoff Task 9) ── */
 /* NOTE: No CSS transitions or will-change here — those create compositor layers
    that disrupt WebGL rendering in Electron's transparent window. */
-.hotkey-reminder {
-    position: fixed;
-    top: 32px;
-    right: 0;
-    z-index: 152;
-    display: none;
-}
 
-.hotkey-reminder.visible {
-    display: block;
-}
-
-.hotkey-reminder-inner {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    background: rgba(11, 14, 20, 0.94);
-    border-left: 1px solid rgba(88, 166, 255, 0.18);
-    border-bottom: 1px solid rgba(88, 166, 255, 0.12);
-    border-radius: 0 0 0 8px;
-    padding: 10px 14px;
-    max-height: calc(100vh - 40px);
-    overflow-y: auto;
-}
-
-.hotkey-reminder-inner::-webkit-scrollbar { width: 0; }
-
-.hk-group {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 5px 8px;
-}
-
-.hk-group.hk-hidden {
-    display: none;
-}
-
-.hk-group + .hk-group:not(.hk-hidden) {
-    padding-top: 6px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.hk-mod {
+/* In-place key caps: visible at rest in every control row's right margin */
+.hk-cap {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    height: 17px;
+    min-width: 30px;
+    padding: 0 4px;
+    margin-left: 8px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    font-family: var(--font-ui, sans-serif);
     font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: #a78bfa;
-    background: rgba(167, 139, 250, 0.15);
-    border: 1px solid rgba(167, 139, 250, 0.3);
-    border-radius: 4px;
-    padding: 3px 8px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1;
     white-space: nowrap;
+    color: var(--ink-500, #7b828e);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 0;
+    background: transparent;
+    user-select: none;
+}
+/* A cell with no binding reserves the slot so rows never reflow */
+.hk-cap-empty {
+    border-color: transparent;
+}
+/* Lit by the held modifier combo */
+.hk-cap.lit {
+    color: #fff;
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
+}
+/* Rows the held combo does not reach */
+.hk-dim {
+    opacity: 0.35;
+}
+
+/* Appended row: strip chrome, sits in normal flow under the mixer strip
+   and PUSHES the canvas down rather than covering it */
+.hotkey-reminder {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    height: 38px;
+    padding: 0 12px 0 0;
+    background: linear-gradient(180deg, #13171f, #0b0e14);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 149;
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--ink-300, #b9bec7);
+}
+.hotkey-reminder.visible {
+    display: flex;
+}
+.hk-row-mod {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    min-width: 112px;
+    padding: 0 12px;
+    background: var(--accent, #ec3013);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     flex-shrink: 0;
 }
-
-.hk-chip {
+.hk-row-chips {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.8);
+    gap: 0;
+    min-width: 0;
+    overflow: hidden;
 }
-
-.hk-chip.hk-sep {
-    display: none;
+.hk-row-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-300, #b9bec7);
+    border-right: 2px solid var(--ground-950, #0a0b0e);
 }
-
-.hk-chip kbd {
-    display: inline-block;
+.hk-row-chip kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 17px;
+    padding: 0 4px;
     font-family: inherit;
     font-size: 10px;
-    font-weight: 600;
-    color: #e6edf3;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 3px;
-    padding: 2px 5px;
-    min-width: 18px;
-    text-align: center;
-    line-height: 1.3;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+    font-weight: 800;
+    color: var(--ink-100, #f2f3f5);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 0;
+    line-height: 1;
+}
+.hk-row-f1 {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--ink-500, #7b828e);
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.hk-row-f1:hover {
+    color: var(--ink-100, #f2f3f5);
 }
 
 /* ── COS Oscillator UI ────────────────────────────────────────────────── */
