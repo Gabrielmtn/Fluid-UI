@@ -64,7 +64,7 @@
 
             btn.textContent = isPaused ? '▶' : '⏸';
 
-            btn.title = isPaused ? 'Resume simulation' : 'Pause simulation';
+            btn.title = isPaused ? 'Resume simulation (Shift+Space)' : 'Pause simulation (Shift+Space)';
 
             btn.classList.toggle('active', isPaused);
 
@@ -293,37 +293,30 @@
 
         
 
-        imageUpload.addEventListener('change', (e) => {
+        // Shared image → layer factory (2026-08-09): the upload button and the
+        // OS file-drop path (32-file-drop) both land here, so a dropped image
+        // behaves exactly like an uploaded one. Capacity/slot checks run at
+        // dataURL time so multi-file drops each re-check as they decode.
+        // Slots reserved between the synchronous slot-find below and the async
+        // probe.onload push — without this, two images dropped together both
+        // grab the same index while the first is still decoding.
+        const _pendingLayerSlots = new Set();
 
-            const file = e.target.files[0];
+        // Free image-layer capacity (32-file-drop trims multi-file drops to
+        // this so the user gets ONE aggregate message, not an alert per file)
+        window.layerSlotsFree = () => Math.max(0, MAX_LAYERS - layers.length - _pendingLayerSlots.size);
 
-            if (!file) return;
+        window.createLayerFromDataUrl = (dataUrl, title) => {
 
-            
-
-            // Validate file type
-
-            const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
-
-            if (!validTypes.includes(file.type)) {
-
-                alert('Please upload a PNG or JPG image.');
-
-                return;
-
-            }
-
-            
-
-            if (layers.length >= MAX_LAYERS) {
+            if (layers.length + _pendingLayerSlots.size >= MAX_LAYERS) {
 
                 alert('Maximum 10 layers reached. Delete some layers to create new ones.');
 
-                return;
+                return false;
 
             }
 
-            
+
 
             // Find first available slot
 
@@ -331,7 +324,7 @@
 
             for (let i = 0; i < MAX_LAYERS; i++) {
 
-                if (!layers.find(l => l.index === i)) {
+                if (!layers.find(l => l.index === i) && !_pendingLayerSlots.has(i)) {
 
                     availableIndex = i;
 
@@ -341,25 +334,17 @@
 
             }
 
-            
+
 
             if (availableIndex === -1) {
 
                 alert('No available layer slots.');
 
-                return;
+                return false;
 
             }
 
-            
-
-            // Read the file and create layer
-
-            const reader = new FileReader();
-
-            reader.onload = (event) => {
-
-                const dataUrl = event.target.result;
+            {
 
                 // Aspect-fit (2026-08-06): the layer div fills the wrapper and
                 // stretches its background (100% 100%), so any image whose
@@ -371,7 +356,11 @@
                 // already honors scaleX/scaleY, and the user can still resize.
                 const probe = new Image();
 
+                _pendingLayerSlots.add(availableIndex);
+
                 probe.onload = () => {
+
+                _pendingLayerSlots.delete(availableIndex);
 
                 const canvasEl = document.getElementById('canvas');
 
@@ -403,7 +392,7 @@
 
                     index: availableIndex,
 
-                    title: file.name.replace(/\.[^/.]+$/, ''), // Remove file extension
+                    title: title,
 
                     data: dataUrl,
 
@@ -472,13 +461,49 @@
 
                 probe.src = dataUrl;
 
+            }
+
+            return true;
+
+        };
+
+
+
+        window.createLayerFromFile = (file) => {
+
+            if (!file) return;
+
+            const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+
+            if (!validTypes.includes(file.type)) {
+
+                alert('Please upload a PNG, JPG, or WebP image.');
+
+                return;
+
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+
+                window.createLayerFromDataUrl(event.target.result, file.name.replace(/\.[^/.]+$/, ''));
+
             };
-
-
 
             reader.readAsDataURL(file);
 
-            
+        };
+
+
+
+        imageUpload.addEventListener('change', (e) => {
+
+            const file = e.target.files[0];
+
+            if (!file) return;
+
+            window.createLayerFromFile(file);
 
             // Reset input so the same file can be uploaded again if needed
 

@@ -330,7 +330,8 @@
             PRESSURE_DISSIPATION: 0.95, // was 0.944 — retuned with the multigrid solve
                                         // (low values were stabilizing unconverged Jacobi)
 
-            PRESSURE_ITERATIONS: 32,  // 32 gives clean incompressible flow without being expensive
+            PRESSURE_ITERATIONS: 17,  // 17 is the first-touch feel Gabriel tuned to; 32 solved
+                                      // "cleaner" but read stiff before the user touches anything
 
             CURL: 25,                 // Strong vortices for visually interesting fluid on first load
 
@@ -526,6 +527,12 @@
             BRUSH_SPACING: 0.35,      // D1 dab spacing as a fraction of brush diameter —
                                       // distance-parameterized stroke density (speed-
                                       // independent; kills the 1-dab-per-frame gaps)
+            BRUSH_CONTINUOUS: false,  // Splat mode: false = dabs spaced along travel
+                                      // ("on move", the classic feel); true = constant
+                                      // flow — one dab per frame while the pointer is
+                                      // held, even standing still (05j synthesizes the
+                                      // dab; the spacing walker is bypassed, fluid
+                                      // target only). Brush panel segmented row.
 
             BRUSH_TARGET: 'fluid',    // D2/D3 stroke routing: 'fluid' (splats), 'sketch'
                                       // (the active raster paint layer — normal-control

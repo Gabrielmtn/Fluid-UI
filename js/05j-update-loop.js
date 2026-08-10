@@ -143,6 +143,13 @@
             // Process replay even when paused so right-click replay always works
             processReplay();
             if (!isPaused) {
+                // Constant-flow bookkeeping: the engine branch below stops
+                // running once a stroke's queue drains, so a reset inside it
+                // never fires between strokes — a stale __contFlowLast would
+                // then make the FIRST frame of the next click compute dx from
+                // the previous stroke's position (a phantom velocity kick).
+                // Clear it any frame the pointer is up.
+                if (!pointer.down) window.__contFlowLast = null;
                 if (window.BrushEngine && (window.BrushEngine.isActive() || window.BrushEngine.pending()) && !isReplayActive) {
                     // D1 brush engine: drain this frame's dab train (distance-
                     // parameterized spacing + stabilizer + gap-fill, built in
@@ -151,7 +158,42 @@
                     // one dab per frame. Dab velocity already carries the
                     // momentum-per-distance rule, so total injected energy
                     // matches the legacy feel.
-                    const _dabs = window.BrushEngine.drain(64);
+                    let _dabs = window.BrushEngine.drain(64);
+                    // Constant-flow splat mode: while the pointer is held on the
+                    // fluid target, ignore the spacing walker's train and emit
+                    // exactly one dab per frame at the pointer — paint keeps
+                    // flowing while standing still (the classic hose feel).
+                    // dx/dy carry the real per-frame motion (×10, the legacy
+                    // delta→velocity gain) so moving strokes still inject
+                    // momentum; a stationary hold injects dye only, like the
+                    // press stamp. Sketch/mask targets keep the spaced train.
+                    if (config.BRUSH_CONTINUOUS && config.BRUSH_TARGET === 'fluid') {
+                        if (pointer.down && window.BrushEngine.isActive()) {
+                            const cx = pointer.x, cy = pointer.y;
+                            let cdx = 0, cdy = 0;
+                            if (window.__contFlowLast) {
+                                cdx = (cx - window.__contFlowLast.x) * 10;
+                                cdy = (cy - window.__contFlowLast.y) * 10;
+                            }
+                            window.__contFlowLast = { x: cx, y: cy };
+                            _dabs = [{ x: cx, y: cy, dx: cdx, dy: cdy, p: 1 }];
+                            // Recording taps raw pointer events, which don't fire
+                            // while stationary — capture the hold here. Frames
+                            // that moved ≥0.1px were already recorded by the
+                            // pointermove handler (same gate as 05d's).
+                            if (recEnabled && typeof recRecordInteraction === 'function'
+                                && (cdx * cdx + cdy * cdy) < 1.0) {
+                                recRecordInteraction(cx, cy, 0, 0, pointer.color);
+                            }
+                        } else {
+                            // Released (or between strokes): drop any walker
+                            // leftovers so no spaced tail paints after the hold.
+                            window.__contFlowLast = null;
+                            _dabs = [];
+                        }
+                    } else {
+                        window.__contFlowLast = null;
+                    }
                     if (_dabs.length) window.__lastPaintMs = nowMs;
                     const _toSketch = config.BRUSH_TARGET === 'sketch';
                     const _toMask = config.BRUSH_TARGET === 'mask';

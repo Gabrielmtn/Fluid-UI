@@ -502,6 +502,9 @@
             startDragUX();
         }
         function handleDragOver(e) {
+            // Not an internal row drag (e.g. an OS file drag) — let it bubble
+            // to the document-level file-drop handlers (32-file-drop).
+            if (!draggedElement) return;
             if (e.preventDefault) e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             const target = e.target.closest('.layer-item');
@@ -535,6 +538,7 @@
             });
         }
         function handleDrop(e) {
+            if (!draggedElement) return; // file drag — bubble to 32-file-drop
             if (e.stopPropagation) e.stopPropagation();
             e.preventDefault();
             const target = e.target.closest('.layer-item');
@@ -563,6 +567,7 @@
             draggedElement = null;
         }
         function handleDropZoneDragOver(e) {
+            if (!draggedElement) return; // file drag — bubble to 32-file-drop
             if (e.preventDefault) e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             const panel = document.getElementById('layersPanel');
@@ -571,6 +576,9 @@
             return false;
         }
         function handleDropZoneDrop(e) {
+            // File drag (or stray drop with no source row): without this guard
+            // the draggedElement dereference below throws on OS file drops.
+            if (!draggedElement) return;
             if (e.stopPropagation) e.stopPropagation();
             e.preventDefault();
             const dropPosition = this.dataset.dropPosition;

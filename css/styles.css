@@ -435,7 +435,46 @@
         }
         
         /* Slider styles moved to slider-styles.css */
-        
+
+        /* Mandala Studio: quiet divider between the symmetry rig and the
+           paint-feel sliders, so the panel reads as two groups not eight
+           loose controls. */
+        .mandala-radio {
+            display: flex;
+            gap: 6px;
+        }
+        .mandala-radio label {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            margin: 0;
+            padding: 6px 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid var(--ground-500, #2a2e37);
+            border-radius: 4px;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .mandala-radio label:has(input:checked) {
+            opacity: 1;
+            border-color: rgba(130, 205, 255, 0.7);
+            background: rgba(130, 205, 255, 0.12);
+        }
+
+        .mandala-sub {
+            margin: 14px 0 8px;
+            padding-top: 10px;
+            border-top: 1px solid var(--ground-500, #2a2e37);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.55;
+        }
+
         /* Colour well: 38px ROUND, flat. Owner override of handoff 4.9 —
            shape carries meaning here: a disc reads as pigment (and echoes
            the brush cursor ring), a square reads as one more UI cell. The

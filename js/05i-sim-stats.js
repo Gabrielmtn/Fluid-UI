@@ -99,6 +99,28 @@
             gl.uniform1f(splatProg.uniforms.stampAngle, (config.BRUSH_ANGLE || 0) * Math.PI / 180);
             gl.uniform1f(splatProg.uniforms.ringRadius, 0); // classic blob — never inherit a stale ring stamp
             gl.uniform1f(splatProg.uniforms.barHalfW, 0);   // ...or a stale bar stamp
+            // Custom brush shape (user-authored alpha stamp): user strokes only,
+            // same __brushTipOn gate as the tips. The shader block lives in the
+            // dye branch, so the velocity pass stays gaussian by construction.
+            // An active shape overrides the built-in tips (incl. Ring below).
+            let stampTex = null;
+            if (window.__brushTipOn && window.BrushShapes && typeof window.BrushShapes.getActiveStamp === 'function') {
+                stampTex = window.BrushShapes.getActiveStamp(); // {texture, aspect} | null
+            }
+            gl.uniform1f(splatProg.uniforms.stampTexOn, stampTex ? 1 : 0);
+            if (stampTex) {
+                gl.uniform1i(splatProg.uniforms.uStampTex, 2);
+                gl.uniform1f(splatProg.uniforms.stampAspect, stampTex.aspect || 1);
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, stampTex.texture);
+                // The Texture slider grains custom stamps too (the shader
+                // multiplies cov by the stampNoise grain) — drive stampNoise
+                // from it regardless of which tip is nominally selected, or
+                // the slider is inert with the Soft/Ring tips and material
+                // modes override it.
+                const stex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 0.7;
+                gl.uniform1f(splatProg.uniforms.stampNoise, Math.max(0, Math.min(1, stex)));
+            }
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
             // Gate flow: scales the convergence (see splatFrag). window.__splatFlow
             // is set per-dab by the paint loop and defaults to 1 (full) for every
@@ -129,10 +151,11 @@
             gl.uniform1i(splatProg.uniforms.isVelocity, 0); // Density pass
             gl.uniform1i(splatProg.uniforms.uTarget, 0);
             gl.uniform3fv(splatProg.uniforms.color, color);
-            if (brushTip === 4) {
+            if (brushTip === 4 && !stampTex) {
                 // Ring tip: thin dye band at ~the gaussian's visible radius
                 // (≈√radius in p-space) — dye pass ONLY, so the ring uniform
                 // never reinterprets the velocity pass as a radial push.
+                // (Skipped when a custom shape is active — the shape wins.)
                 gl.uniform1f(splatProg.uniforms.radius, baseRadius * 0.08); // band width²
                 gl.uniform1f(splatProg.uniforms.ringRadius, 0.75 * Math.sqrt(baseRadius));
                 gl.uniform1f(splatProg.uniforms.ringSquash, 1);

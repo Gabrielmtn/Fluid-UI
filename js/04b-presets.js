@@ -153,7 +153,7 @@
 
             const isUnfreezing = freezeBtn.classList.contains('active');
 
-            freezeBtn.title = isUnfreezing ? 'Freeze fluid motion' : 'Unfreeze fluid motion';
+            freezeBtn.title = isUnfreezing ? 'Freeze fluid motion (Space)' : 'Unfreeze fluid motion (Space)';
 
             if (isUnfreezing) {
 

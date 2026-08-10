@@ -20,7 +20,7 @@
 //
 // Config (04a defaults; controls in the strip's Brush panel):
 //   BRUSH_STABILIZER   0..1   (0 = raw input, no lag)
-//   BRUSH_SPACING      0.02..1 dab spacing as a fraction of brush diameter
+//   BRUSH_SPACING      0.001..1 dab spacing as a fraction of brush diameter
 //   BRUSH_JITTER       0..1   per-dab scatter, fraction of brush diameter
 // ═══════════════════════════════════════════════════════════════════
 (function () {
@@ -52,10 +52,12 @@
     }
 
     function spacingPx() {
-        // 1px floor (not 2): the Spacing slider goes down to 1%, and dense
-        // "ink line" strokes are the point of that range. The drain cap
-        // (64 dabs/frame) and MAX_QUEUE bound the cost of a fast flick.
-        return Math.max(1, cfg('BRUSH_SPACING', 0.35) * brushDiameterPx());
+        // 0.25px floor (was 1): the Spacing slider now reaches 0.1%, and the
+        // 1px floor made everything below ~1% indistinguishable — sub-pixel
+        // spacing is what dissolves the grainy dab-train look at slow speeds.
+        // The drain cap (64 dabs/frame) and MAX_QUEUE still bound the cost
+        // of a fast flick.
+        return Math.max(0.25, cfg('BRUSH_SPACING', 0.35) * brushDiameterPx());
     }
 
     // Emit dabs along the segment from the last processed sample toward
@@ -68,6 +70,18 @@
         var dx = x - lastEmitX, dy = y - lastEmitY;
         var dist = Math.hypot(dx, dy);
         if (dist < 1e-6) { lastP = p1; return; }
+        // Coalesce under load: with the sub-pixel spacing floor, a fast
+        // segment can demand far more dabs than the 64-dab/frame drain (05j)
+        // can retire — the queue would backlog toward MAX_QUEUE (~8 frames of
+        // cursor lag) and then silently skip interior dabs, tearing holes in
+        // exactly the dense "ink line" mode. Instead, bound this segment's
+        // dab count to what the queue can absorb and RAISE the effective
+        // spacing so the dabs still span the whole segment: continuity is
+        // preserved, density (not coverage) is what yields at speed. The
+        // momentum rule self-adjusts (vx scales with the effective spacing).
+        var segBudget = Math.max(8, Math.min(64, MAX_QUEUE - queue.length));
+        var expected = (dist + residual) / spacing;
+        if (expected > segBudget) spacing = (dist + residual) / segBudget;
         var ux = dx / dist, uy = dy / dist;
         // Per-dab velocity: momentum-per-distance matches the legacy path
         // (see header). 10 = the legacy delta→velocity gain in 05d.

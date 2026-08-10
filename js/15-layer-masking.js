@@ -44,7 +44,10 @@
                 for (let i = 0; i < size; i++) {
                     const v = shape.samMask[i];
                     const num = Number(v) || 0;
-                    arr[i] = num > 0 ? 1 : 0;
+                    // Preserve the stored value: soft masks carry 0-255
+                    // coverage (binarizing here destroyed their antialiased
+                    // edges), legacy hard masks carry 0/1 and pass through.
+                    arr[i] = Math.max(0, Math.min(255, num));
                 }
                 cloned.samMask = arr;
             }
@@ -724,9 +727,14 @@
         const canvas = document.getElementById('maskEditorCanvas');
         if (!canvas) return;
 
-        // Size canvas to match display canvas
+        // Size canvas to match display canvas — except in adhoc mode (brush
+        // shapes), where the editor works in the IMAGE's own space so nothing
+        // is aspect-stretched and the applied result is WYSIWYG.
         const displayCanvas = document.getElementById('canvas');
-        if (displayCanvas) {
+        if (maskState.activeMaskLayerId === 'adhoc' && maskState.adhocSource) {
+            canvas.width = maskState.adhocSource.width;
+            canvas.height = maskState.adhocSource.height;
+        } else if (displayCanvas) {
             canvas.width = displayCanvas.width;
             canvas.height = displayCanvas.height;
         }
@@ -745,6 +753,17 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         // Draw background based on layer type
+        if (maskState.activeMaskLayerId === 'adhoc' && maskState.adhocSource) {
+            // Ad-hoc image (brush-shape import): already decoded, draw sync
+            const aimg = maskState.adhocSource.image;
+            drawWithTransform(() => {
+                ctx.drawImage(aimg, 0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            });
+            drawMaskShapesWithTransform(ctx);
+            return;
+        }
         if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
             // For image layers, draw the ORIGINAL layer image — not the div's
             // current background, which is the already-masked (and for
@@ -1190,8 +1209,11 @@
                 
                 // Load current layer image for SAM
                 let imageToLoad = null;
-                
-                if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
+
+                if (maskState.activeMaskLayerId === 'adhoc' && maskState.adhocSource) {
+                    // Ad-hoc image (brush-shape import)
+                    imageToLoad = maskState.adhocSource.dataURL;
+                } else if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
                     // Image layer - use stored image data
                     const layerIndex = parseInt(maskState.activeMaskLayerId.replace('image-', ''));
                     const layer = window.layers?.find(l => l.index === layerIndex);
@@ -1211,10 +1233,18 @@
                 if (imageToLoad && window.samSegmenter) {
                     if (statusEl) statusEl.textContent = '⏳ Loading image...';
 
-                    // Use the main display canvas dimensions as the click/display space
-                    const displayCanvas = document.getElementById('canvas');
-                    const displayWidth = displayCanvas ? displayCanvas.width : null;
-                    const displayHeight = displayCanvas ? displayCanvas.height : null;
+                    // Use the click/display space the editor canvas is sized to:
+                    // adhoc mode works in the image's own space, everything else
+                    // in the main display canvas space.
+                    let displayWidth = null, displayHeight = null;
+                    if (maskState.activeMaskLayerId === 'adhoc' && maskState.adhocSource) {
+                        displayWidth = maskState.adhocSource.width;
+                        displayHeight = maskState.adhocSource.height;
+                    } else {
+                        const displayCanvas = document.getElementById('canvas');
+                        displayWidth = displayCanvas ? displayCanvas.width : null;
+                        displayHeight = displayCanvas ? displayCanvas.height : null;
+                    }
 
                     const success = await window.samSegmenter.loadImage(imageToLoad, displayWidth, displayHeight);
                     if (success) {
@@ -1584,6 +1614,152 @@
         }, 10);
     };
 
+    // ── Ad-hoc mask mode (2026-08-09): run the full editor (shape tools +
+    // Smart Select) against an arbitrary image, no layer involved. Used by
+    // custom brush shapes (33-brush-shapes). The editor canvas is sized to
+    // the IMAGE (capped 2048 long side) so nothing is aspect-stretched;
+    // shapes/SAM all operate in that space. On Apply, the caller gets a
+    // white/alpha canvas: alpha = image alpha (or inverted luminance for
+    // fully opaque images with no shapes) ∩ the drawn mask coverage.
+    window.enterAdhocMaskMode = function (imageDataURL, name, onApply) {
+        const img = new Image();
+        img.onload = () => {
+            const long = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+            // Work at a comfortable editing resolution: the editor canvas
+            // displays at its native CSS px (.mask-editor-canvas only has
+            // max-width/height), so a small brush image would otherwise open
+            // a postage-stamp editor. Scale small images UP to 800, cap huge
+            // ones at 2048 — the saved stamp is ≤128px either way (33).
+            const target = Math.min(2048, Math.max(long, 800));
+            const scale = target / long;
+            maskState.adhocSource = {
+                image: img,
+                dataURL: imageDataURL,
+                name: name || 'Brush Shape',
+                onApply: onApply,
+                width: Math.max(1, Math.round((img.naturalWidth || 1) * scale)),
+                height: Math.max(1, Math.round((img.naturalHeight || 1) * scale))
+            };
+            maskState.activeMaskLayerId = 'adhoc';
+            maskState.maskMode = 'show';
+            maskState.shapes = [];
+            maskState.selectedShapeIndex = null;
+            maskState.isDragging = false;
+            maskState.isResizing = false;
+            maskState.zoom = 1.0;
+            maskState.panX = 0;
+            maskState.panY = 0;
+            maskState.isPanning = false;
+            // A previous editor session may have left SAM state behind — a
+            // stale samPreviewMask would otherwise be converted into THIS
+            // stamp by the Apply nicety in exitAdhocMaskMode.
+            maskState.smartSelectPoints = [];
+            maskState.samPreviewMask = null;
+            maskState.samCandidates = [];
+            maskState.samSelectedCandidateIndex = 0;
+            showMaskEditor();
+            // Reset the overlay DOM too if Smart Select was left engaged
+            // (toggleSmartSelect's OFF branch restores the manual tools).
+            if (maskState.smartSelectMode && typeof window.toggleSmartSelect === 'function') {
+                try { window.toggleSmartSelect(); } catch (_) {}
+            }
+            setTimeout(() => {
+                updateMaskEditorTitle();
+                updateZoomDisplay();
+                renderMaskEditor();
+            }, 10);
+        };
+        img.onerror = () => { alert('Could not decode that image.'); };
+        img.src = imageDataURL;
+    };
+
+    // Rasterize the adhoc editor state into the caller's stamp canvas.
+    // Must run BEFORE maskState.shapes is reset.
+    function buildAdhocResultCanvas(src) {
+        const w = src.width, h = src.height;
+        const out = document.createElement('canvas');
+        out.width = w; out.height = h;
+        const octx = out.getContext('2d');
+        octx.drawImage(src.image, 0, 0, w, h);
+        let data;
+        try { data = octx.getImageData(0, 0, w, h); } catch (_) { return null; }
+        const px = data.data;
+        // Does the source image carry real transparency?
+        let hasAlpha = false;
+        for (let i = 3; i < px.length; i += 4) { if (px[i] < 250) { hasAlpha = true; break; } }
+        // Coverage from the drawn shapes (the canonical renderer handles
+        // every shape type incl. sam-mask softness)
+        let cov = null;
+        if (maskState.shapes.length && typeof window._drawMaskShape === 'function') {
+            const cc = document.createElement('canvas');
+            cc.width = w; cc.height = h;
+            const cctx = cc.getContext('2d');
+            maskState.shapes.forEach(s => {
+                // Same rotation wrap as applyLayerMask (05m): _drawMaskShape
+                // draws unrotated; the editor preview rotates via the canvas
+                // transform, so the applied result must too.
+                const rotation = s.rotation || 0;
+                if (rotation !== 0) {
+                    cctx.save();
+                    const cx = s.x + s.width / 2, cy = s.y + s.height / 2;
+                    cctx.translate(cx, cy);
+                    cctx.rotate((rotation * Math.PI) / 180);
+                    cctx.translate(-cx, -cy);
+                }
+                try { window._drawMaskShape(cctx, s); } catch (_) {}
+                if (rotation !== 0) cctx.restore();
+            });
+            cov = cctx.getImageData(0, 0, w, h).data;
+        }
+        const invertCov = maskState.maskMode === 'hide';
+        for (let i = 0; i < px.length; i += 4) {
+            let a;
+            if (hasAlpha) {
+                a = px[i + 3] / 255;
+            } else if (!cov) {
+                // Opaque image, no shapes: Photoshop convention — dark paints
+                const lum = (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]) / 255;
+                a = 1 - lum;
+            } else {
+                a = 1;
+            }
+            if (cov) {
+                let c = cov[i + 3] / 255;
+                if (invertCov) c = 1 - c;
+                a *= c;
+            }
+            px[i] = 255; px[i + 1] = 255; px[i + 2] = 255;
+            px[i + 3] = Math.round(Math.max(0, Math.min(1, a)) * 255);
+        }
+        octx.putImageData(data, 0, 0);
+        return out;
+    }
+
+    function exitAdhocMaskMode(save = true) {
+        const src = maskState.adhocSource;
+        // Same Apply nicety as image layers: a pending SAM preview with no
+        // finalized shape converts on Apply.
+        if (save && src && !maskState.shapes.length && maskState.samPreviewMask
+            && typeof window.runSAMSegmentation === 'function') {
+            window.runSAMSegmentation();
+        }
+        let result = null;
+        if (save && src) result = buildAdhocResultCanvas(src);
+        hideMaskEditor();
+        maskState.activeMaskLayerId = null;
+        maskState.shapes = [];
+        maskState.selectedShapeIndex = null;
+        maskState.adhocSource = null;
+        // Never leak this session's SAM preview into a later editor
+        maskState.smartSelectPoints = [];
+        maskState.samPreviewMask = null;
+        maskState.samCandidates = [];
+        maskState.samSelectedCandidateIndex = 0;
+        if (result && src && typeof src.onApply === 'function') {
+            try { src.onApply(result, src.name); } catch (e) { console.error('adhoc mask onApply failed', e); }
+        }
+    }
+
     // Exit mask mode for image layer
     function exitImageLayerMaskMode(save = true) {
         if (!maskState.activeMaskLayerId || !maskState.activeMaskLayerId.startsWith('image-')) return;
@@ -1643,19 +1819,31 @@
         }
     }
 
-    // Override exitMaskMode to handle both layer types
+    // Override exitMaskMode to handle every target type
     const originalExitMaskMode = window.exitMaskMode;
     window.exitMaskMode = function(save = true) {
-        if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
+        if (maskState.activeMaskLayerId === 'adhoc') {
+            exitAdhocMaskMode(save);
+        } else if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
             exitImageLayerMaskMode(save);
         } else {
             originalExitMaskMode(save);
         }
     };
 
-    // Update title function to handle both layer types
+    // Update title function to handle every target type
     const originalUpdateMaskEditorTitle = updateMaskEditorTitle;
     updateMaskEditorTitle = function() {
+        if (maskState.activeMaskLayerId === 'adhoc') {
+            const overlay = document.getElementById('maskEditorOverlay');
+            const header = overlay && overlay.querySelector('.mask-editor-header h3');
+            if (header) {
+                const shapeCount = maskState.shapes.length;
+                const nm = (maskState.adhocSource && maskState.adhocSource.name) || 'Brush Shape';
+                header.innerHTML = `🖌️ Brush Shape - ${window.escHtml(nm)} <span style="font-size: 14px; opacity: 0.7;">(${shapeCount} shape${shapeCount !== 1 ? 's' : ''})</span>`;
+            }
+            return;
+        }
         if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
             const layerIndex = parseInt(maskState.activeMaskLayerId.replace('image-', ''));
             const layer = window.layers?.find(l => l.index === layerIndex);

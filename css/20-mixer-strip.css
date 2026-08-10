@@ -926,6 +926,43 @@ body > .controls {
     color: #fff;
 }
 
+/* Custom brush shapes (33-brush-shapes): stamp swatches + add button */
+.brush-shapes-row {
+    flex-wrap: wrap;
+}
+.brush-shape-btn,
+.brush-shape-add {
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
+}
+/* The tip-button state rules use the `background:` SHORTHAND, which resets
+   size/repeat/position to initial at equal-or-higher specificity — leave the
+   swatch sizing to one rule and the stamp renders at its natural PNG size
+   (blown past the 26px tile) in whichever state was missed. Cover every
+   state here; 20-mixer also pins the longhands inline as the real guarantee. */
+.brush-shape-btn,
+.brush-tip-btn.brush-shape-btn:hover,
+.brush-tip-btn.brush-shape-btn.active,
+.brush-tip-btn.brush-shape-btn.active:hover {
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+.brush-shape-btn {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+.brush-tip-btn.brush-shape-btn:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+.brush-tip-btn.brush-shape-btn.active,
+.brush-tip-btn.brush-shape-btn.active:hover {
+    background-color: var(--accent, #ec3013);
+}
+.brush-shape-add {
+    font-size: 14px;
+}
+
 /* Brush preset chips */
 .brush-presets-chips {
     display: flex;

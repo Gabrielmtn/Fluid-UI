@@ -104,7 +104,10 @@
                 // Compare before writing: the 2s fallback interval otherwise
                 // invalidates style/layout every tick even when nothing
                 // changed (UI audit Stage 1 — no-op DOM writes aren't free).
-                var v = parseFloat(brushSlider.value).toFixed(1);
+                // Fine tips (down to 0.001) need 3 decimals or the readout
+                // reads a flat "0.0" across the whole detail range.
+                var n = parseFloat(brushSlider.value);
+                var v = (n < 1) ? n.toFixed(3) : n.toFixed(1);
                 if (brushDisplay.textContent !== v) brushDisplay.textContent = v;
             }
             brushSlider.addEventListener('input', syncBrush);
@@ -611,7 +614,7 @@
         if (pauseBtn) {
             pauseBtn.style.cssText = '';
             pauseBtn.textContent = '⏸';
-            pauseBtn.title = 'Pause / resume simulation';
+            pauseBtn.title = 'Pause / resume simulation (Shift+Space)';
             transportRow.appendChild(pauseBtn);
         }
 
@@ -619,7 +622,7 @@
         if (freezeBtn) {
             freezeBtn.style.cssText = '';
             freezeBtn.textContent = '🛑';
-            freezeBtn.title = 'Freeze / unfreeze fluid motion';
+            freezeBtn.title = 'Freeze / unfreeze fluid motion (Space)';
             transportRow.appendChild(freezeBtn);
         }
 
@@ -1583,6 +1586,14 @@
     function buildKaleidoscopeSection(controls) {
         const { sec, body } = makeSection('🔮 Kaleidoscope', 'purple', true);
 
+        // Mandala Studio leads the section: it's the guided way in (it rigs
+        // the raw controls below for you), so it should be the first thing
+        // read. Its panel keeps the toggle+collapsible pattern rather than
+        // being emptied, since it only applies while the mode is on.
+        moveCheckboxGroup('mandalaToggle', body);
+        const mandalaPanel = document.getElementById('mandalaPanel');
+        if (mandalaPanel) body.appendChild(mandalaPanel);
+
         moveCheckboxGroup('kaleidoToggle', body);
 
         // Move contents from kaleidoscope panel
@@ -2018,6 +2029,10 @@
             panel.style.left = '0px';
             panel.style.top = ((rect.bottom + 6) / z) + 'px';
             panel.style.width = PANEL_W + 'px';
+            // The panel outgrew short viewports (shapes row, splat-mode row):
+            // cap it to the space under the strip and scroll the overflow.
+            panel.style.maxHeight = Math.max(200, (window.innerHeight - rect.bottom - 18) / z) + 'px';
+            panel.style.overflowY = 'auto';
         }
 
         var header = document.createElement('div');
@@ -2027,6 +2042,9 @@
 
         function num(v, d) { return typeof v === 'number' ? v : d; }
         function pct(v) { return Math.round(v * 100) + '%'; }
+        // Sub-5% values show one decimal — the Spacing slider's low end goes
+        // to 0.1%, which plain pct() would round to a flat 0%.
+        function pctFine(v) { return v < 0.05 ? (v * 100).toFixed(1) + '%' : Math.round(v * 100) + '%'; }
 
         // Manual tweaks diverge from the applied preset → clear the chip
         // highlight. Preset apply drives the same handlers, so it flags
@@ -2162,7 +2180,9 @@
                 hardness: num(c.BRUSH_HARDNESS, 0.8),
                 stabilizer: num(c.BRUSH_STABILIZER, 0),
                 spacing: num(c.BRUSH_SPACING, 0.35),
-                jitter: num(c.BRUSH_JITTER, 0)
+                jitter: num(c.BRUSH_JITTER, 0),
+                splatMode: c.BRUSH_CONTINUOUS ? 'constant' : 'move',
+                shape: (window.BrushShapes && window.BrushShapes.activeId()) || null
             };
         }
         function applyBrushPreset(p) {
@@ -2182,10 +2202,17 @@
                 if (SETTERS.target) SETTERS.target(p.target);
                 if (SETTERS.tip) SETTERS.tip(p.tip | 0);
                 ['tipTexture', 'angle', 'flow', 'hardness', 'stabilizer', 'spacing', 'jitter',
-                 'eraser'
+                 'eraser', 'splatMode', 'shape'
                 ].forEach(function (k) {
                     if (SETTERS[k] && p[k] !== undefined) SETTERS[k](p[k]);
                 });
+                // Migration defaults: presets saved before the splat-mode /
+                // custom-shape controls existed carry neither key — they were
+                // authored with On-Move + no shape, so applying them must
+                // reset both or the current shape/Constant mode silently
+                // overrides the preset's brush.
+                if (p.splatMode === undefined && SETTERS.splatMode) SETTERS.splatMode('move');
+                if (p.shape === undefined && SETTERS.shape) SETTERS.shape(null);
             } finally { applyingPreset = false; }
         }
         // D7-1: let a .fluid project import refresh the brush-preset chips.
@@ -2315,16 +2342,97 @@
             b.dataset.tip = String(t.v);
             b.textContent = t.glyph;
             b.title = t.title;
-            b.addEventListener('click', function () { setBrushTip(t.v); markDirty(); });
+            b.addEventListener('click', function () {
+                // Picking a built-in tip dismisses any custom shape override
+                if (window.BrushShapes && window.BrushShapes.activeId()) window.BrushShapes.setActive(null);
+                setBrushTip(t.v);
+                markDirty();
+            });
             tipBtns.push(b);
             tipRow.appendChild(b);
         });
         panel.appendChild(tipRow);
+
+        // ── Custom shapes: user-authored stamp textures (33-brush-shapes).
+        // Import → the mask editor opens in adhoc mode (full shape suite +
+        // Smart Select) → Apply saves the cut-out as a stamp swatch here.
+        // The area is also an image drop target (32-file-drop).
+        var shapesArea = document.createElement('div');
+        shapesArea.className = 'brush-shapes-area';
+        var shapesRow = document.createElement('div');
+        shapesRow.className = 'brush-tip-row brush-shapes-row';
+        shapesArea.appendChild(shapesRow);
+        panel.appendChild(shapesArea);
+        var shapeFileInput = document.createElement('input');
+        shapeFileInput.type = 'file';
+        shapeFileInput.accept = 'image/png,image/jpeg,image/jpg,image/webp';
+        shapeFileInput.style.display = 'none';
+        shapesArea.appendChild(shapeFileInput);
+        shapeFileInput.addEventListener('change', function () {
+            var f = shapeFileInput.files && shapeFileInput.files[0];
+            if (f && window.BrushShapes) window.BrushShapes.beginImportFile(f);
+            shapeFileInput.value = '';
+        });
+        function renderBrushShapes() {
+            shapesRow.innerHTML = '';
+            var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
+            var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
+            lst.forEach(function (s) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'brush-tip-btn brush-shape-btn' + (s.id === act ? ' active' : '');
+                b.style.backgroundImage = 'url("' + s.dataURL + '")';
+                // Pin the sizing longhands inline: every .brush-tip-btn state
+                // rule (:hover, .active) uses the `background:` shorthand,
+                // which resets size/repeat/position — inline always wins, so
+                // the thumbnail can never blow up to natural size in a state
+                // whose CSS override was missed.
+                b.style.backgroundSize = 'contain';
+                b.style.backgroundRepeat = 'no-repeat';
+                b.style.backgroundPosition = 'center';
+                b.title = s.name + ' — click to paint with this shape · right-click to delete';
+                b.addEventListener('click', function () {
+                    if (!window.BrushShapes) return;
+                    window.BrushShapes.setActive(window.BrushShapes.activeId() === s.id ? null : s.id);
+                    markDirty();
+                });
+                b.addEventListener('contextmenu', function (e) {
+                    e.preventDefault();
+                    if (window.BrushShapes && confirm('Delete brush shape "' + s.name + '"?')) {
+                        window.BrushShapes.remove(s.id);
+                    }
+                });
+                shapesRow.appendChild(b);
+            });
+            var addB = document.createElement('button');
+            addB.type = 'button';
+            addB.className = 'brush-tip-btn brush-shape-add';
+            addB.textContent = '＋';
+            addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Smart Select). You can also drop an image anywhere on this row.';
+            addB.addEventListener('click', function () { shapeFileInput.click(); });
+            shapesRow.appendChild(addB);
+        }
+        SETTERS.shape = function (v) {
+            if (!window.BrushShapes) return;
+            window.BrushShapes.setActive((typeof v === 'string' && v) ? v : null);
+        };
+        window.__onBrushShapeChanged = function () {
+            renderBrushShapes();
+            // An active shape overrides the built-in tips — dim their state
+            var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
+            var curTip = (window.config && window.config.BRUSH_TIP) | 0;
+            tipBtns.forEach(function (tb) {
+                tb.classList.toggle('active', !act && parseInt(tb.dataset.tip, 10) === curTip);
+            });
+            syncTexState();
+        };
+        renderBrushShapes();
         var texGroup = pSlider('brushTipTexture', 'Texture', 0, 1, 0.01, 'BRUSH_TIP_TEXTURE', pct, 'tipTexture');
         function syncTexState() {
-            // Texture (stamp grain/blend) only shapes blob/chisel/streak
+            // Texture (stamp grain/blend) shapes blob/chisel/streak — and
+            // custom shape stamps, which run the same grain in the shader
             var t = ((window.config && window.config.BRUSH_TIP) | 0);
-            var on = t >= 1 && t <= 3;
+            var on = (t >= 1 && t <= 3) || !!(window.BrushShapes && window.BrushShapes.activeId());
             texGroup.style.opacity = on ? '1' : '0.4';
             var sl = texGroup.querySelector('input');
             if (sl) sl.disabled = !on;
@@ -2348,8 +2456,47 @@
         // Stabilizer slider removed 2026-07-30 (Gabriel): panel-length trim.
         // config.BRUSH_STABILIZER stays at its default; brush presets that
         // captured a stabilizer value simply no longer apply that key.
-        pSlider('brushSpacing', 'Spacing', 0.01, 1, 0.01, 'BRUSH_SPACING', pct, 'spacing');
+        // ── Splat mode: spaced-along-travel vs constant per-frame flow ──
+        var flowModeRow = document.createElement('div');
+        flowModeRow.className = 'brush-mode-row';
+        var onMoveBtn = document.createElement('button');
+        onMoveBtn.type = 'button'; onMoveBtn.className = 'brush-mode-btn active'; onMoveBtn.textContent = 'On Move';
+        onMoveBtn.title = 'Dabs are laid down along pointer travel — paint flows only while moving (Spacing applies)';
+        var constantBtn = document.createElement('button');
+        constantBtn.type = 'button'; constantBtn.className = 'brush-mode-btn'; constantBtn.textContent = 'Constant';
+        constantBtn.title = 'Paint flows every frame while the pointer is held, even standing still — Spacing does not apply';
+        flowModeRow.appendChild(onMoveBtn); flowModeRow.appendChild(constantBtn);
+        panel.appendChild(flowModeRow);
+        var spacingGroup; // assigned below — setSplatMode can run before it exists
+        function syncSpacingState() {
+            if (!spacingGroup) return;
+            var cont = !!(window.config && window.config.BRUSH_CONTINUOUS);
+            spacingGroup.style.opacity = cont ? '0.4' : '1';
+            var sl = spacingGroup.querySelector('input');
+            if (sl) sl.disabled = cont;
+        }
+        function setSplatMode(m) {
+            if (m !== 'constant') m = 'move';
+            if (window.config) window.config.BRUSH_CONTINUOUS = (m === 'constant');
+            onMoveBtn.classList.toggle('active', m === 'move');
+            constantBtn.classList.toggle('active', m === 'constant');
+            syncSpacingState();
+            try { if (window.settingsManager) window.settingsManager.set('brush.splatMode', m); } catch (_) {}
+        }
+        SETTERS.splatMode = setSplatMode;
+        onMoveBtn.addEventListener('click', function () { setSplatMode('move'); markDirty(); });
+        constantBtn.addEventListener('click', function () { setSplatMode('constant'); markDirty(); });
+        // Spacing low end extended to 0.1% (2026-08-09): 1% ≈ 2.3px between
+        // dabs at the default brush, which reads grainy at slow speeds — the
+        // sub-1% band plus the walker's lowered floor (05d0) is the true
+        // dense "ink line" range.
+        spacingGroup = pSlider('brushSpacing', 'Spacing', 0.001, 1, 0.001, 'BRUSH_SPACING', pctFine, 'spacing');
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
+        (function restoreSplatMode() {
+            var saved = null;
+            try { saved = window.settingsManager && window.settingsManager.get('brush.splatMode'); } catch (_) {}
+            setSplatMode(saved);
+        })();
 
         // ── Sketch layer ──
         sLabel('Sketch Layer');

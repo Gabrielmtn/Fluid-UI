@@ -695,7 +695,15 @@
                                 var sc = {};
                                 Object.keys(s).forEach(function(k) {
                                     var v = s[k];
-                                    if (k === 'samMask') return; // skip SAM masks (visual only)
+                                    if (k === 'samMask' && v instanceof Uint8Array) {
+                                        // Encode Smart-Select pixel masks like depthData —
+                                        // dropping them made every SAM-masked layer restore
+                                        // "cut off" (the shape survived, its pixels didn't)
+                                        // and freshly-made SAM masks die on the next save.
+                                        sc._samMaskB64 = _uint8ToBase64(v);
+                                        return;
+                                    }
+                                    if (k === 'samMask') return; // non-typed leftovers — skip
                                     if (k === 'depthData' && v instanceof Uint8Array) {
                                         // Encode collision depth data as base64 for exact restore
                                         sc._depthDataB64 = _uint8ToBase64(v);
@@ -704,7 +712,7 @@
                                     if (v instanceof Uint8Array || v instanceof Float32Array) return;
                                     sc[k] = v;
                                 });
-                                if (s.samMask) sc._hadSamMask = true;
+                                if (s.samMask && !sc._samMaskB64) sc._hadSamMask = true;
                                 return sc;
                             })
                         };
@@ -1268,6 +1276,15 @@
                                     needsDepthRefresh = true;
                                     delete sc._hadDepthData;
                                 }
+                                // Decode Smart-Select pixel masks (new format)
+                                if (sc._samMaskB64) {
+                                    try {
+                                        sc.samMask = _base64ToUint8(sc._samMaskB64);
+                                        delete sc._samMaskB64;
+                                    } catch(e) {
+                                        console.warn('Preset: failed to decode samMask base64', e);
+                                    }
+                                }
                                 if (sc._hadSamMask) delete sc._hadSamMask;
                                 return sc;
                             })
@@ -1437,6 +1454,7 @@
                     if (l.mask && l.mask.shapes) {
                         l.mask.shapes.forEach(function(s) {
                             if (s._depthDataB64) { s._hadDepthData = true; delete s._depthDataB64; }
+                            if (s._samMaskB64) { s._hadSamMask = true; delete s._samMaskB64; }
                         });
                     }
                 });
@@ -1480,6 +1498,7 @@
         if (s.layers) s.layers.forEach(function(l) {
             if (l.mask && l.mask.shapes) l.mask.shapes.forEach(function(sh) {
                 if (sh._depthDataB64) { sh._hadDepthData = true; delete sh._depthDataB64; }
+                if (sh._samMaskB64) { sh._hadSamMask = true; delete sh._samMaskB64; }
             });
         });
         ok = window.settingsManager.set(key, lite);
@@ -1680,11 +1699,14 @@
                 if (!snap) { console.warn('[Project] nothing to export'); return false; }
                 var brushPresets = null;
                 try { brushPresets = window.settingsManager ? window.settingsManager.get('brush.presets') : null; } catch (_) {}
+                var brushShapes = null;
+                try { brushShapes = window.settingsManager ? window.settingsManager.get('brush.shapes') : null; } catch (_) {}
                 var env = {
                     format: PROJECT_FORMAT, formatVersion: PROJECT_FORMAT_VERSION, app: 'Fluid-UI',
                     name: name, created: Date.now(), snapshot: snap
                 };
                 if (brushPresets) env.brushPresets = brushPresets;
+                if (brushShapes && brushShapes.length) env.brushShapes = brushShapes;
                 var blob = new Blob([JSON.stringify(env)], { type: 'application/json' });
                 var url = URL.createObjectURL(blob);
                 var a = document.createElement('a');
@@ -1721,6 +1743,9 @@
                             if (typeof window.__refreshBrushPresets === 'function') window.__refreshBrushPresets();
                         } catch (_) {}
                     }
+                    if (env.brushShapes && window.BrushShapes) {
+                        try { window.BrushShapes.importList(env.brushShapes); } catch (_) {}
+                    }
                     if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
                     if (cb) cb(null, env);
                 } catch (err) { if (cb) cb(err); else console.warn('[Project] import failed', err); }
@@ -1743,11 +1768,14 @@
                 if (!names.length) { showPresetStatus('No saved presets to export', '#ffa500'); return false; }
                 var brushPresets = null;
                 try { brushPresets = window.settingsManager ? window.settingsManager.get('brush.presets') : null; } catch (_) {}
+                var brushShapes = null;
+                try { brushShapes = window.settingsManager ? window.settingsManager.get('brush.shapes') : null; } catch (_) {}
                 var env = {
                     format: PRESETS_FORMAT, formatVersion: PRESETS_FORMAT_VERSION, app: 'Fluid-UI',
                     created: Date.now(), count: names.length, presets: presets
                 };
                 if (brushPresets) env.brushPresets = brushPresets;
+                if (brushShapes && brushShapes.length) env.brushShapes = brushShapes;
                 var blob = new Blob([JSON.stringify(env)], { type: 'application/json' });
                 var url = URL.createObjectURL(blob);
                 var a = document.createElement('a');
@@ -1793,6 +1821,9 @@
                             window.settingsManager.set('brush.presets', data.brushPresets);
                             if (typeof window.__refreshBrushPresets === 'function') window.__refreshBrushPresets();
                         } catch (_) {}
+                    }
+                    if (data.brushShapes && window.BrushShapes) {
+                        try { window.BrushShapes.importList(data.brushShapes); } catch (_) {}
                     }
                     if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
                     if (cb) cb(null, { imported: imported, degraded: degraded, failed: failed, total: names.length });

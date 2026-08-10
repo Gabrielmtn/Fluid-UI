@@ -28,7 +28,7 @@
         densityDissipation: {configKey: "DENSITY_DISSIPATION", ui: {min: 0.85, max: 1.005, step: 0.0001}, hard: {min: 0.85, max: 1.005}, def: 0.993, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.85, max: 1.005, step: 0.0001, scope: "basic"}},
         velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.5, max: 1.0009}, def: 0.999, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
         pressureDissipation: {configKey: "PRESSURE_DISSIPATION", ui: {min: 0.9, max: 1.0333, step: 0.001}, hard: {min: 0.75, max: 1.0333}, def: 0.95, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0333, step: 0.001, scope: "basic"}},
-        pressureIteration: {configKey: "PRESSURE_ITERATIONS", ui: {min: 1, max: 50, step: 1}, hard: {min: 1, max: 50}, def: 32, decimals: 0, category: "simulation", perfTier: 3, simSlider: true, mut: {min: 1, max: 50, step: 1, scope: "basic"}},
+        pressureIteration: {configKey: "PRESSURE_ITERATIONS", ui: {min: 1, max: 50, step: 1}, hard: {min: 1, max: 50}, def: 17, decimals: 0, category: "simulation", perfTier: 3, simSlider: true, mut: {min: 1, max: 50, step: 1, scope: "basic"}},
         // Multigrid V-cycle internals — deliberately no `mut`: the mutation
         // engine randomizing solver shape reads as a bug, not a style variant
         mgCycles: {configKey: "MG_CYCLES", ui: {min: 2, max: 4, step: 1}, hard: {min: 2, max: 4}, def: 2, decimals: 0, category: "simulation", perfTier: 3},
@@ -44,7 +44,14 @@
         curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 25, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
         velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 15, max: 60, step: 1, scope: "extended"}},
         sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "simulation", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
-        brushSize: {configKey: null, ui: {min: 0.1, max: 30, step: 0.1}, hard: {min: 0.1, max: 30}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
+        // Detail work (mandala tracery, fine linework) needs far finer tips
+        // than the old 0.1 floor allowed: the splat radius is variance-like,
+        // so footprint scales with sqrt(size) — 0.1 still painted a ~31px dab
+        // on a 900px canvas. 0.001 reaches ~3px. Step matches the min so every
+        // previously-saved value (11, 3, 0.1 …) stays on-step and survives a
+        // preset round-trip. Mutation keeps the old 0.1 floor — mutating to a
+        // hairline would just look like the brush stopped working.
+        brushSize: {configKey: null, ui: {min: 0.001, max: 30, step: 0.001}, hard: {min: 0.001, max: 30}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
         // No mut (Gabriel 2026-08-06): a mutated timeScale can slow the whole
         // sim to near-frozen, which reads as "mutate broke it", not a style.
@@ -82,7 +89,7 @@
         // D1 stroke engine (dynamically-created in buildBrushSection; no mut —
         // input-feel params, not style variants)
         brushStabilizer: {configKey: "BRUSH_STABILIZER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
-        brushSpacing: {configKey: "BRUSH_SPACING", ui: null, hard: {min: 0.01, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushSpacing: {configKey: "BRUSH_SPACING", ui: null, hard: {min: 0.001, max: 1}, def: null, decimals: 3, category: "brush", perfTier: 0, simSlider: false},
         brushHardness: {configKey: "BRUSH_HARDNESS", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushFlow: {configKey: "BRUSH_FLOW", ui: null, hard: {min: 0.05, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushJitter: {configKey: "BRUSH_JITTER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},

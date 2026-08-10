@@ -452,18 +452,24 @@
                 const currentValue = parseFloat(brushSizeSlider.value);
                 const minValue = parseFloat(brushSizeSlider.min);
                 const maxValue = parseFloat(brushSizeSlider.max);
-                // Proportional step: ~8% of current value, clamped to [0.1, 2.0]
-                // Gives fine control at small sizes, snappier at large sizes
+                // Proportional step: ~8% of current value, clamped to [0.001, 2.0]
+                // Gives fine control at small sizes, snappier at large sizes.
+                // The floor and the rounding below both used to sit at 0.1 —
+                // together they made every sub-0.1 size unreachable by wheel
+                // (a 0.04 result rounded to 0.0, then clamped back up), which
+                // is the fine-detail range mandala/tracery work lives in.
                 const scrollSpeed = Math.min(Math.abs(e.deltaY) / 100, 2); // 1–2× from scroll velocity
-                const stepSize = Math.max(0.1, Math.min(currentValue * 0.08 * scrollSpeed, 2.0));
+                const stepSize = Math.max(0.001, Math.min(currentValue * 0.08 * scrollSpeed, 2.0));
                 let newValue;
                 if (e.deltaY < 0) {
                     newValue = Math.min(currentValue + stepSize, maxValue);
                 } else {
                     newValue = Math.max(currentValue - stepSize, minValue);
                 }
-                // Round to one decimal for clean slider display
-                newValue = Math.round(newValue * 10) / 10;
+                // Keep 3 decimals in the fine range, 1 decimal above it, so the
+                // slider lands on clean values at both ends of the scale.
+                const prec = newValue < 1 ? 1000 : 10;
+                newValue = Math.round(newValue * prec) / prec;
                 brushSizeSlider.value = newValue;
                 brushSizeSlider.style.setProperty('--val', newValue);
                 config.SPLAT_RADIUS = newValue / 1000;
