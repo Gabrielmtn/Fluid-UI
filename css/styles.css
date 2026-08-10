@@ -50,6 +50,23 @@
         body.web-mode {
             padding-top: 0;
         }
+
+        /* Borderless / fullscreen display modes (js/36-display-mode.js) drop the
+           WINDOW chrome only: no titlebar, no frameless-resize handles, and the
+           32px the titlebar reserved goes back to the canvas. The control panels
+           deliberately stay — the Window Mode dropdown is the way back out. */
+        body.display-borderless #custom-titlebar,
+        body.display-fullscreen #custom-titlebar,
+        body.display-borderless .window-resize-edge,
+        body.display-fullscreen .window-resize-edge,
+        body.display-borderless .window-resize-corner,
+        body.display-fullscreen .window-resize-corner {
+            display: none !important;
+        }
+        body.display-borderless,
+        body.display-fullscreen {
+            padding-top: 0;
+        }
         
         .titlebar-drag-region {
             flex: 1;

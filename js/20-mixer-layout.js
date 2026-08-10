@@ -1691,6 +1691,10 @@
     function buildDisplaySection(controls) {
         const { sec, body } = makeSection('🖼️ Display', 'green', true);
 
+        // Window mode (Windowed / Borderless / Fullscreen) — first, because it
+        // is the only way back out of a fullscreen mode.
+        moveControlGroup('windowMode', body);
+
         // Move background color group (contains color picker + transparent toggle)
         const bgPicker = document.getElementById('backgroundColorPicker');
         if (bgPicker) {

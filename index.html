@@ -618,6 +618,14 @@
             <label for="brushCursorOpacity">Cursor Opacity <span id="brushCursorOpacityValue" class="value-display">50%</span></label>
             <input type="range" id="brushCursorOpacity" min="0" max="100" value="50" step="5">
         </div>
+        <div class="control-group">
+            <label for="windowMode">Window Mode</label>
+            <select id="windowMode">
+                <option value="windowed">Windowed</option>
+                <option value="borderless">Borderless Window</option>
+                <option value="fullscreen">Borderless Fullscreen</option>
+            </select>
+        </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="showCanvasHandles" checked>
             <label for="showCanvasHandles" style="margin: 0">Show Canvas Border & Handles</label>
@@ -1241,6 +1249,7 @@
     <script src="js/33-brush-shapes.js"></script>
     <script src="js/34-mandala-mode.js"></script>
     <script src="js/35-zoom-view.js"></script>
+    <script src="js/36-display-mode.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">

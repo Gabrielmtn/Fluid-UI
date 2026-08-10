@@ -107,6 +107,7 @@
         { keys: 'H',      mod: '',           title: 'Toggle canvas border & handles',     where: checkboxRow('showCanvasHandles') },
         { keys: 'L',      mod: '',           title: 'Lock canvas borders',                where: checkboxRow('lockCanvasBorders') },
         { keys: 'F',      mod: '',           title: 'Toggle focus mode',                  where: checkboxRow('focusModeToggle') },
+        { keys: 'F11',    mod: '',           title: 'F11 — toggle borderless fullscreen', where: groupLabel('windowMode') },
         { keys: '⌥↑↓',    mod: 'alt',        title: 'Alt+↑ / ↓ — visual quality',         where: groupLabel('visualResolution') },
         { keys: '⌥⇧↑↓',   mod: 'altshift',   title: 'Alt+Shift+↑ / ↓ — physics detail',   where: groupLabel('physicsResolution') },
         { keys: 'M',      mod: '',           title: 'M — mutate',                         where: idEl('mutationGenerate') }
