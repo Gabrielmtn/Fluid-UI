@@ -535,8 +535,9 @@ body.mobile-mode #sidebar-right > #mixer-strip {
     flex-wrap: wrap;
     overflow: visible;
     width: 100%;
-    padding: 6px;
-    gap: 6px;
+    padding: 6px 6px 4px;
+    gap: 8px;                    /* separates the stacked rows (colour / transport / presets) */
+    align-content: flex-start;
     box-shadow: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -546,8 +547,125 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-channel {
     flex: 1 1 calc(50% - 6px);   /* ~2 faders per row */
     border-right: none;
 }
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-presets {
-    flex: 1 1 100%;              /* presets + action buttons span full width */
+/* The strip's vertical dividers separate channels in a horizontal bar. Once
+   it wraps into stacked rows each one claims a whole line and contributes
+   its 6px top/bottom margins plus two row gaps — 20px of slack between rows
+   for a 1px rule that no longer divides anything. */
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-divider {
+    display: none;
+}
+/* Presets + action buttons span full width. `.mixer-presets` is a stale
+   class — the channel is `.mixer-presets-channel` (and its own rule sets
+   `flex: 0 0 auto`), so this never matched and Presets rendered as a stub
+   wedged beside the colour cluster. Both names kept in case older markup
+   is still around. */
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-presets,
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-presets-channel {
+    flex: 1 1 100%;
+    justify-content: stretch;
+}
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-presets-trigger {
+    width: 100%;
+    max-width: none;
+    height: 32px;                /* full-width row deserves a real hit box */
+    justify-content: space-between;
+}
+
+/* ── Colour cluster ──
+   Was: four mode toggles on one row, then the swatch stranded on the
+   Ignite row, all crammed into a half-width channel. Now the channel takes
+   the full width and lays out as a grid — swatch in its own column (sized
+   up to a proper touch target), Rnd/Step/Rainbow/Gate directly above
+   Ignite, latch beside it. */
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-channel.ch-wide {
+    flex: 1 1 100%;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+        "head head    head"
+        "well toggles toggles"
+        "well ignite  lock";
+    align-items: center;
+    /* Touch separation: these are small adjacent targets and a mis-tap on
+       Gate/Ignite is destructive-feeling. Gaps buy the safety; the block
+       stays short because the slack came out of the dividers, not here. */
+    column-gap: 12px;
+    row-gap: 8px;
+    padding: 2px 8px;
+}
+/* Space the four mode toggles apart from each other, and keep Gate visibly
+   detached from the Rnd/Step/Rainbow group it isn't part of. */
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-seg-switch {
+    gap: 8px;
+}
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row {
+    gap: 14px;
+}
+/* The colour label is hidden here, so its grid row is empty — collapse it
+   rather than paying a full row-gap for nothing. */
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-color-head:empty {
+    display: none;
+}
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-color-head { grid-area: head; }
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row {
+    grid-area: toggles;
+    margin: 0;
+    width: 100%;
+}
+/* The row's box dissolves so its three children become grid items of the
+   channel — that's what lets the swatch span both rows. The element stays in
+   the tree, so the .holding/.armed classes the Ignite hold-gesture sets still
+   drive their descendant styles, and the latch measures its own rect. */
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-nudge-row { display: contents; }
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-color-input,
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide input[type="color"] {
+    grid-area: well;
+    width: 44px;
+    height: 44px;
+    justify-self: center;
+}
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-nudge-btn {
+    grid-area: ignite;
+    width: 100%;
+    height: 26px;
+}
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-ignite-lock {
+    grid-area: lock;
+    width: 30px;
+    height: 26px;
+}
+/* Toggles get the taller touch height now that they own a full row */
+body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row .ch-text-toggle {
+    height: 26px;
+}
+
+/* ── Transport ──
+   The strip stacks pause/record over a full-width Clear to stay near the
+   fader height, which in the menu left a cramped little column hugging the
+   left edge. With a full row to work with, put all three side by side and
+   centre them. */
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions {
+    flex: 1 1 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;                   /* Clear sits next to record — worth the room */
+    padding: 2px 8px;
+}
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions .transport-row {
+    gap: 14px;
+}
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions button {
+    height: 28px;                /* matches the Ignite row's touch height */
+}
+/* The strip shrinks pause/record to 16px icon buttons to save horizontal
+   room it doesn't have. In the menu there's space, and 16px is well under
+   a usable touch target. */
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions .transport-row button {
+    min-width: 44px;
+}
+body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
+    min-width: 88px;
 }
 
 /* ── Sidebar content polish ── */
