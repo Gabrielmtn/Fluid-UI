@@ -70,6 +70,17 @@ export default class LobbyServer implements Party.Server {
     }
     this.lastSeen.set(uid, now);
 
+    // A waiter's keep-alive names the pub- room it is already sitting in, so a
+    // lost pointer (TTL expiry, restart, vacate race, dev-relay state loss) is
+    // re-adopted instead of a fresh room being minted. Without this, two
+    // phase-locked waiters whose pointers vanished each re-minted every tick
+    // and hopped into each other's abandoned rooms forever — both stuck on
+    // "Waiting for a stranger…" while chasing each other.
+    const holding =
+      typeof data.holding === "string" && /^pub-[A-Z0-9]{6}$/.test(data.holding)
+        ? data.holding
+        : null;
+
     // ── Synchronous critical section (no await between read and mutate) ──
     let roomId: string;
     let waiting: boolean;
@@ -90,7 +101,9 @@ export default class LobbyServer implements Party.Server {
       this.waitingUid = null;
       waiting = false;
     } else {
-      roomId = "pub-" + generateRoomCode();
+      // No live pointer: re-adopt the room the seeker already waits in
+      // (keep-alive re-registration) or mint a fresh one (new seeker).
+      roomId = holding || "pub-" + generateRoomCode();
       this.waitingRoomId = roomId;
       this.waitingSince = now;
       this.waitingUid = uid;

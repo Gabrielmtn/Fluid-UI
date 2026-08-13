@@ -108,39 +108,59 @@ function paintWithStranger() {
     hideMpError();
     closeMatchmaking();
     showMatchmaking();
-    try {
-        const isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
-        const protocol = isLocal ? 'ws:' : 'wss:';
-        const url = `${protocol}//${PARTYKIT_HOST}/parties/lobby/main?uid=${encodeURIComponent(DEVICE_UID)}`;
-        matchmakingSocket = new WebSocket(url);
-        var settled = false;
-        var timeout = setTimeout(function() {
-            if (settled) return;
-            settled = true; closeMatchmaking();
-            showMpError("Couldn't find a match. Try again."); showDisconnectedUI();
-        }, 9000);
-        matchmakingSocket.addEventListener('open', function() {
-            if (matchmakingSocket) matchmakingSocket.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID }));
-        });
-        matchmakingSocket.addEventListener('message', function(ev) {
-            var data; try { data = JSON.parse(ev.data); } catch (_) { return; }
-            if (data.type === 'matched') {
+    var settled = false;
+    var attempts = 0;
+    var MAX_MATCHMAKE_ATTEMPTS = 4;
+    // Overall window covers the first try plus up to three throttle retries.
+    var timeout = setTimeout(function() {
+        if (settled) return;
+        settled = true; closeMatchmaking();
+        showMpError("Couldn't find a match. Try again."); showDisconnectedUI();
+    }, 16000);
+    var tryMatchmake = function() {
+        if (settled) return;
+        attempts++;
+        try {
+            const isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
+            const protocol = isLocal ? 'ws:' : 'wss:';
+            const url = `${protocol}//${PARTYKIT_HOST}/parties/lobby/main?uid=${encodeURIComponent(DEVICE_UID)}`;
+            var ws = new WebSocket(url);
+            matchmakingSocket = ws;
+            ws.addEventListener('open', function() {
+                ws.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID }));
+            });
+            ws.addEventListener('message', function(ev) {
+                if (settled || ws !== matchmakingSocket) return;
+                var data; try { data = JSON.parse(ev.data); } catch (_) { return; }
+                if (data.type === 'matched') {
+                    settled = true; clearTimeout(timeout); closeMatchmaking();
+                    connectToRoom(data.roomId);
+                } else if (data.type === 'matchmake-error') {
+                    // The lobby throttles matchmakes per device id ("One
+                    // moment…"). Two tabs in one browser SHARE that id, so the
+                    // second tab's click lands inside the 3s window routinely —
+                    // retry past the throttle instead of failing the flow.
+                    if (/one moment/i.test(data.message || '') && attempts < MAX_MATCHMAKE_ATTEMPTS) {
+                        closeMatchmaking();
+                        setTimeout(tryMatchmake, 3300);
+                        return;
+                    }
+                    settled = true; clearTimeout(timeout); closeMatchmaking();
+                    showMpError(data.message || 'Try again in a moment.'); showDisconnectedUI();
+                }
+            });
+            ws.addEventListener('error', function() {
+                if (settled || ws !== matchmakingSocket) return;
                 settled = true; clearTimeout(timeout); closeMatchmaking();
-                connectToRoom(data.roomId);
-            } else if (data.type === 'matchmake-error') {
-                settled = true; clearTimeout(timeout); closeMatchmaking();
-                showMpError(data.message || 'Try again in a moment.'); showDisconnectedUI();
-            }
-        });
-        matchmakingSocket.addEventListener('error', function() {
+                showMpError("Couldn't reach matchmaking. Check your connection."); showDisconnectedUI();
+            });
+        } catch (e) {
             if (settled) return;
             settled = true; clearTimeout(timeout); closeMatchmaking();
-            showMpError("Couldn't reach matchmaking. Check your connection."); showDisconnectedUI();
-        });
-    } catch (e) {
-        closeMatchmaking();
-        showMpError("Couldn't start matchmaking."); showDisconnectedUI();
-    }
+            showMpError("Couldn't start matchmaking."); showDisconnectedUI();
+        }
+    };
+    tryMatchmake();
 }
 
 function closeMatchmaking() {
@@ -160,15 +180,26 @@ function closeMatchmaking() {
 // pairing us with ourselves. If it hands back a different room, someone else
 // was already waiting and we go to them.
 var strangerKeepAlive = null;
-var STRANGER_KEEPALIVE_MS = 45000; // comfortably inside the server's 60s TTL
+// First tick fires EARLY (~8-13s) so two seekers whose initial matchmakes
+// double-minted (the lobby's waiting pointer was lost between their requests)
+// converge within seconds instead of a 45s tick; later ticks stay comfortably
+// inside the server's 60s TTL. Both delays are jittered to break the
+// phase-lock of two waiters who started matchmaking simultaneously.
+function strangerKeepAliveDelay(first) {
+    return first ? 8000 + Math.random() * 5000 : 40000 + Math.random() * 10000;
+}
 
 function stopStrangerKeepAlive() {
-    if (strangerKeepAlive) { clearInterval(strangerKeepAlive); strangerKeepAlive = null; }
+    if (strangerKeepAlive) { clearTimeout(strangerKeepAlive); strangerKeepAlive = null; }
 }
 
 function startStrangerKeepAlive() {
     stopStrangerKeepAlive();
-    strangerKeepAlive = setInterval(function () {
+    scheduleStrangerKeepAlive(true);
+}
+
+function scheduleStrangerKeepAlive(first) {
+    strangerKeepAlive = setTimeout(function () {
         // Only while genuinely alone in a stranger room.
         if (!isStrangerRoom() || connectedClients >= 2 || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
             stopStrangerKeepAlive();
@@ -182,7 +213,11 @@ function startStrangerKeepAlive() {
             var done = false;
             var bail = setTimeout(function () { if (!done) { done = true; try { ws.close(); } catch (_) {} } }, 8000);
             ws.addEventListener('open', function () {
-                ws.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID }));
+                // `holding` names the room we already wait in: a lobby that
+                // lost its pointer re-adopts THIS room instead of minting a
+                // fresh one (which stranded phase-locked waiters in an
+                // endless hop-chase through each other's abandoned rooms).
+                ws.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID, holding: mine }));
             });
             ws.addEventListener('message', function (ev) {
                 if (done) return;
@@ -191,14 +226,18 @@ function startStrangerKeepAlive() {
                 done = true; clearTimeout(bail);
                 try { ws.close(); } catch (_) {}
                 // Still alone, and the lobby put someone else's room forward → join them.
+                // (Against the holding-aware relay a waiting:true reply always
+                // names OUR room, so this hop only fires on a real pairing.)
                 if (d.roomId && d.roomId !== mine && isStrangerRoom() && connectedClients < 2) {
                     stopStrangerKeepAlive();
                     connectToRoom(d.roomId);
+                    return;
                 }
             });
             ws.addEventListener('error', function () { done = true; clearTimeout(bail); });
         } catch (_) { /* transient network — try again next tick */ }
-    }, STRANGER_KEEPALIVE_MS);
+        scheduleStrangerKeepAlive(false);
+    }, strangerKeepAliveDelay(first));
 }
 
 // Host-only: toggle the room lock. The server confirms via a 'lock-state' broadcast.
