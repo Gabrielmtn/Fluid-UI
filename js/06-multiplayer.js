@@ -222,6 +222,7 @@ window.addEventListener('pageshow', function (e) {
 // pairing us with ourselves. If it hands back a different room, someone else
 // was already waiting and we go to them.
 var strangerKeepAlive = null;
+var strangerWasPaired = false; // so a partner's departure is ANNOUNCED, not silent
 // First tick fires EARLY (~8-13s) so two seekers whose initial matchmakes
 // double-minted (the lobby's waiting pointer was lost between their requests)
 // converge within seconds instead of a 45s tick; later ticks stay comfortably
@@ -1023,6 +1024,7 @@ function connectToRoom(roomCode) {
     reconnectAttempts = 0;
     myRole = 'guest';
     roomLocked = false;
+    strangerWasPaired = false;
     resetSettingsLock();
     resetTurnState();
 
@@ -1095,6 +1097,7 @@ function disconnectMultiplayer() {
     currentRoom = null;
     myRole = 'guest';
     roomLocked = false;
+    strangerWasPaired = false;
     resetSettingsLock();
     resetTurnState();
     if (partySocket) {
@@ -1779,10 +1782,25 @@ function updateConnectedView() {
     if (stranger) {
         var alone = connectedClients < 2;
         updateMultiplayerStatus(alone ? '🎲 Waiting for a stranger…' : '🎨 Painting with a stranger');
-        // Hold our matchmaking slot while alone; drop it (and the lobby pin
-        // socket that holds it open) the moment we pair.
-        if (alone) { if (!strangerKeepAlive) startStrangerKeepAlive(); }
-        else { stopStrangerKeepAlive(); closeMatchmaking(); }
+        // Waiting alone is NOT the same as painting together: show the amber
+        // dot while alone, and SAY it when a partner leaves. This used to
+        // slide back silently — green dot, connected panel — which read as
+        // "still connected" while you kept painting for nobody.
+        var dot = document.getElementById('connectionDot');
+        if (dot) dot.className = alone ? 'mp-dot mp-dot-connecting' : 'mp-dot mp-dot-connected';
+        if (alone) {
+            if (strangerWasPaired) {
+                strangerWasPaired = false;
+                showTurnToast('🚪 Your painting partner left — looking for a new stranger…');
+            }
+            // Hold our matchmaking slot while alone; drop it (and the lobby
+            // pin socket that holds it open) the moment we pair.
+            if (!strangerKeepAlive) startStrangerKeepAlive();
+        } else {
+            strangerWasPaired = true;
+            stopStrangerKeepAlive();
+            closeMatchmaking();
+        }
     } else {
         stopStrangerKeepAlive();
         updateMultiplayerStatus(roomLocked ? '🔒 Room locked' : 'Connected');
