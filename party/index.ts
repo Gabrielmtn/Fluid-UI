@@ -10,7 +10,18 @@ import {
 interface ConnState {
   uid: string;
   role: "host" | "guest";
+  // Liveness: stamped on every message. `pinger` marks a client that has
+  // sent at least one heartbeat — only those may be reaped for silence
+  // (old deployed clients never ping and must never be reaped).
+  lastSeen?: number;
+  pinger?: boolean;
 }
+
+// A pinger silent this long is presumed dead (client pings every ~20s, so
+// this tolerates two missed beats plus jitter). Reaping drives the normal
+// onClose cleanup: counts, host transfer, turn handoff, room reset.
+const REAP_SILENCE_MS = 65_000;
+const SWEEP_MIN_INTERVAL_MS = 10_000;
 
 // Take-turns mode: message types only the current painter may relay. Cursor and
 // pointer-up stay open so spectators can still point at things while watching.
@@ -79,6 +90,8 @@ export default class FluidPartyServer implements Party.Server {
   // live connections, so there is nothing worth persisting — and a lost invite
   // simply reads as "no answer", which the proposer's client already handles.
   pendingInvite: { from: string; seconds: number; at: number } | null = null;
+  lastSweep = 0; // zombie-reap rate limit (in-memory; a wake just sweeps again)
+  lastAlarmArm = 0;
   loaded = false;
   ready: Promise<void> | null = null;
 
@@ -128,9 +141,15 @@ export default class FluidPartyServer implements Party.Server {
 
     const uid = uidFromRequestUrl(ctx.request.url) || conn.id;
 
+    // Reap zombies BEFORE the capacity check: a dead-but-unreaped peer must
+    // not make a cap-2 stranger room refuse a live newcomer as "full".
+    this.lastSweep = 0;
+    const reaped = await this.maybeSweep();
+
     // Capacity. Count "others + self" so it is correct whether or not
     // getConnections() already includes the just-accepted connection.
-    const others = [...this.room.getConnections()].filter((c) => c.id !== conn.id).length;
+    const others = [...this.room.getConnections()]
+      .filter((c) => c.id !== conn.id && !reaped.has(c.id)).length;
     if (others + 1 > this.capacity) {
       conn.close(4002, "full");
       return;
@@ -198,6 +217,32 @@ export default class FluidPartyServer implements Party.Server {
       return;
     }
     if (!data) return;
+
+    // Liveness: every message refreshes the sender's lastSeen; the first
+    // heartbeat marks it reap-eligible (old clients never ping → never reaped).
+    if (this.managed) {
+      const prev = sender.state as ConnState | null;
+      if (prev) {
+        sender.setState({
+          ...prev,
+          lastSeen: Date.now(),
+          pinger: prev.pinger || data.type === "ping",
+        } as ConnState);
+      }
+      if (data.type === "ping") {
+        await this.maybeSweep();
+        // Keep the sweep alarm armed while heartbeats flow, so a zombie is
+        // reaped even if the room goes otherwise silent.
+        const now = Date.now();
+        if (now - this.lastAlarmArm > 25_000) {
+          this.lastAlarmArm = now;
+          await this.syncTurnAlarm();
+        }
+        return; // heartbeats are point-to-point — never relayed
+      }
+    } else if (data.type === "ping") {
+      return; // sys- rooms: swallow rather than spam the passthrough relay
+    }
 
     // Never relay a client-sent copy of a server-authored type (forgery).
     if (this.managed && SERVER_AUTHORED.has(data.type)) return;
@@ -467,11 +512,37 @@ export default class FluidPartyServer implements Party.Server {
     console.error(`Error for ${conn.id}:`, err);
   }
 
-  // Turn timer expiry: the brush auto-passes even if everyone is idle.
+  // Reap connections that heartbeat once and then went silent — a peer that
+  // died without a close frame (sleep, crash, dropped network) otherwise
+  // haunts the room for minutes on the platform's TCP timing: it holds the
+  // cap-2 stranger slot, keeps the survivor's count at 2 ("still connected"),
+  // and can capture the turn rotation. close() drives all onClose cleanup.
+  async maybeSweep(): Promise<Set<string>> {
+    const reaped = new Set<string>();
+    const now = Date.now();
+    if (now - this.lastSweep < SWEEP_MIN_INTERVAL_MS) return reaped;
+    this.lastSweep = now;
+    for (const c of this.room.getConnections()) {
+      const cs = c.state as ConnState | null;
+      if (cs && cs.pinger && cs.lastSeen && now - cs.lastSeen > REAP_SILENCE_MS) {
+        reaped.add(c.id);
+        try {
+          c.close(4003, "timeout");
+        } catch {
+          /* already gone */
+        }
+      }
+    }
+    return reaped;
+  }
+
+  // Alarm double-duty: zombie sweep + turn-timer expiry (the brush
+  // auto-passes even if everyone is idle).
   async onAlarm() {
     await this.ensureLoaded();
-    if (!this.turnsOn || !this.turnDeadline) return;
-    if (Date.now() >= this.turnDeadline - 250) {
+    this.lastSweep = 0; // the alarm is the guaranteed sweep — never skip it
+    await this.maybeSweep();
+    if (this.turnsOn && this.turnDeadline && Date.now() >= this.turnDeadline - 250) {
       this.advanceTurn();
       this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
       await this.persist();
@@ -569,17 +640,33 @@ export default class FluidPartyServer implements Party.Server {
     this.turnHolder = q[0] || null;
   }
 
-  // Keep the storage alarm aligned with the turn deadline. (This party has no
-  // other alarm use; the matchmaking lobby is a separate party.)
+  // Keep the storage alarm aligned with whichever comes first: the turn
+  // deadline, or the next zombie sweep (needed while any heartbeat-capable
+  // connection exists — with the turn timer off there is no other alarm, and
+  // a silent zombie would otherwise never be reaped in a quiet room).
   async syncTurnAlarm() {
     try {
-      if (this.turnsOn && this.turnDeadline) {
-        await this.room.storage.setAlarm(this.turnDeadline);
+      let next = 0;
+      if (this.turnsOn && this.turnDeadline) next = this.turnDeadline;
+      let hasPinger = false;
+      for (const c of this.room.getConnections()) {
+        const cs = c.state as ConnState | null;
+        if (cs && cs.pinger) {
+          hasPinger = true;
+          break;
+        }
+      }
+      if (hasPinger) {
+        const sweepAt = Date.now() + 30_000;
+        next = next ? Math.min(next, sweepAt) : sweepAt;
+      }
+      if (next) {
+        await this.room.storage.setAlarm(next);
       } else {
         await this.room.storage.deleteAlarm();
       }
     } catch {
-      /* best-effort — a missed alarm only delays the auto-pass */
+      /* best-effort — a missed alarm only delays the auto-pass/sweep */
     }
   }
 

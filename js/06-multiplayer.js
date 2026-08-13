@@ -718,10 +718,11 @@ function updateTurnBanner() {
     }
 }
 
-// ── Rotation wheel ──────────────────────────────────────────────────
-// Two artists: a bi-directional arrow between two nodes, painter highlighted.
-// Three or more: nodes evenly spaced on a circle (triangle/square/pentagon…)
-// with a center arrow pointing at the painter. Node colors match the artists'
+// ── Rotation display ────────────────────────────────────────────────
+// One layout for every room size (the old polygon got cramped and unclear
+// past two artists): the ACTIVE painter is always the big node on top, a
+// vertical arrow leads down to the WAITERS row, and waiters render in pass
+// order — the leftmost dot is next up. Node colors match the artists'
 // remote-cursor colors; your own node says "(you)".
 var _wheelKey = '';
 
@@ -782,59 +783,53 @@ function renderTurnWheel() {
         }
         svg += '<text x="112" y="92" text-anchor="middle" font-size="10" fill="#7b828e">waiting for another artist…</text>';
         svg += '</svg>';
-    } else if (n === 2) {
-        // Bi-directional arrow between the pair — the brush just swaps.
-        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' 124" xmlns="http://www.w3.org/2000/svg">';
-        if (clockText) {
-            svg += '<text id="turnWheelClock" x="112" y="48" text-anchor="middle" font-size="13" font-weight="700" fill="' + clockFill + '">' + clockText + '</text>';
-        }
-        svg += wheelNode(56, 74, 15, ids[0], ids[0] === turnHolderId);
-        svg += wheelNode(168, 74, 15, ids[1], ids[1] === turnHolderId);
-        svg += '<line x1="82" y1="74" x2="142" y2="74" stroke="#7b828e" stroke-width="2"/>' +
-               '<path d="M82,74 l9,-5 v10 z" fill="#7b828e"/>' +
-               '<path d="M142,74 l-9,-5 v10 z" fill="#7b828e"/>';
-        svg += wheelLabel(56, 108, ids[0], ids[0] === turnHolderId);
-        svg += wheelLabel(168, 108, ids[1], ids[1] === turnHolderId);
-        svg += '</svg>';
     } else {
-        // Polygon layout: node i sits at -90° + i·(360/n) around the center;
-        // a center arrow rotates to point at the painter.
-        var cx = 112, cy = 100, R = 47;
-        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' 198" xmlns="http://www.w3.org/2000/svg">';
-        // Faint guide ring so the rotation reads as one shape.
-        svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>';
-        var holderIdx = turnHolderId ? ids.indexOf(turnHolderId) : -1;
-        if (holderIdx !== -1) {
-            var rot = holderIdx * (360 / n); // arrow art points up = node 0
-            svg += '<g transform="translate(' + cx + ',' + cy + ')">' +
-                   '<g transform="rotate(' + rot + ')">' +
-                   '<line x1="0" y1="-18" x2="0" y2="-30" stroke="#f2f3f5" stroke-width="2.5"/>' +
-                   '<path d="M0,-38 l-5.5,9 h11 z" fill="#f2f3f5"/>' +
-                   '</g></g>';
+        // Active-on-top layout: the painter is the big node, a vertical arrow
+        // hands down to the waiters row (pass order, leftmost = next up).
+        var holderId2 = (turnHolderId && ids.indexOf(turnHolderId) !== -1) ? turnHolderId : null;
+        var hIdx = holderId2 ? ids.indexOf(holderId2) : -1;
+        // Waiters in the order the brush will reach them
+        var waiters = hIdx === -1 ? ids.slice()
+            : ids.slice(hIdx + 1).concat(ids.slice(0, hIdx));
+        // Waiters wrap to extra rows when the room is big
+        var PER_ROW = 6;
+        var wRows = Math.max(1, Math.ceil(waiters.length / PER_ROW));
+        var waiterTop = 96;           // y of the first waiters row
+        var rowH = 50;                // dot + staggered labels per row
+        var H = waiterTop + wRows * rowH + 2;
+        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+
+        // Active painter, centered on top (or a waiting slot if no holder)
+        if (holderId2) {
+            svg += wheelNode(112, 26, 16, holderId2, true);
+            svg += wheelLabel(112, 55, holderId2, true);
+        } else {
+            svg += '<circle cx="112" cy="26" r="16" fill="none" stroke="#7b828e" stroke-width="1.6" stroke-dasharray="4 3"/>';
+            svg += '<text x="112" y="55" text-anchor="middle" font-size="10" fill="#7b828e">waiting…</text>';
         }
         if (clockText) {
-            svg += '<text id="turnWheelClock" x="' + cx + '" y="' + (cy + 4) + '" text-anchor="middle" font-size="12" font-weight="700" fill="' + clockFill + '">' + clockText + '</text>';
+            svg += '<text id="turnWheelClock" x="150" y="31" text-anchor="start" font-size="14" font-weight="700" fill="' + clockFill + '">' + clockText + '</text>';
         }
-        for (var i = 0; i < n; i++) {
-            var ang = (-90 + i * (360 / n)) * Math.PI / 180;
-            var nx = cx + R * Math.cos(ang);
-            var ny = cy + R * Math.sin(ang);
-            var isH = ids[i] === turnHolderId;
-            svg += wheelNode(nx, ny, 12, ids[i], isH);
-            // Labels sit radially outside the ring, far enough that they
-            // clear the holder's highlight ring; wheelLabel clamps them back
-            // into frame on the sides. When clamping would drag a label onto
-            // its own node (long "(you)" names on side nodes), stack it
-            // below/above the node instead.
-            var lname = shortName(ids[i]) + (ids[i] === clientId ? ' (you)' : '');
-            var lhalf = lname.length * 2.9 + 4;
-            var lx = cx + (R + 27) * Math.cos(ang);
-            var ly = cy + (R + 27) * Math.sin(ang) + 3.5;
-            if (lx - lhalf < 0 || lx + lhalf > WHEEL_W) {
-                lx = nx;
-                ly = ny + (Math.sin(ang) >= 0 ? 27 : -21);
+        // Vertical hand-down arrow between active and waiters
+        svg += '<line x1="112" y1="62" x2="112" y2="80" stroke="#7b828e" stroke-width="2"/>' +
+               '<path d="M112,88 l-5,-9 h10 z" fill="#7b828e"/>';
+        // "next" cue over the first waiter
+        for (var i = 0; i < waiters.length; i++) {
+            var row = Math.floor(i / PER_ROW);
+            var inRow = Math.min(PER_ROW, waiters.length - row * PER_ROW);
+            var col = i - row * PER_ROW;
+            var spacing = Math.min(64, (WHEEL_W - 24) / Math.max(1, inRow));
+            var rowLeft = 112 - ((inRow - 1) * spacing) / 2;
+            var nx = rowLeft + col * spacing;
+            var ny = waiterTop + row * rowH;
+            svg += wheelNode(nx, ny, 10, waiters[i], false);
+            // Labels get crowded fast: stagger adjacent baselines so neighbors
+            // never collide; in packed rows name only YOU and the next-up.
+            var showLabel = inRow <= 4 || waiters[i] === clientId || i === 0;
+            if (showLabel) svg += wheelLabel(nx, ny + 20 + (col % 2) * 12, waiters[i], false);
+            if (i === 0) {
+                svg += '<text x="' + nx + '" y="' + (ny - 16) + '" text-anchor="middle" font-size="8" font-weight="700" fill="#9db8ff" letter-spacing="1">NEXT</text>';
             }
-            svg += wheelLabel(lx, ly, ids[i], isH);
         }
         svg += '</svg>';
     }
@@ -1132,6 +1127,7 @@ function initMultiplayer() {
 function disconnectMultiplayer() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
+    stopPing();
     closeMatchmaking();
     stopStrangerKeepAlive();
     _dabQueue.length = 0; // never carry one room's dabs into the next
@@ -1155,6 +1151,31 @@ function disconnectMultiplayer() {
     showDisconnectedUI();
 }
 
+// ── Liveness heartbeat ──────────────────────────────────────────────
+// The relay reaps connections that have pinged before and then gone silent
+// (~65s). Without this, a peer that died without a close frame (sleeping
+// laptop, crash, dropped network) haunted the room for minutes: it held the
+// cap-2 stranger slot, kept the survivor's count at 2 ("still connected"),
+// and could capture the turn rotation. Old clients never ping and are never
+// reaped, so mixed rooms stay safe; a live client wrongly reaped (e.g. on
+// wake from sleep) gets close code 4003, which takes the normal reconnect
+// path.
+var PING_MS = 20000;
+var pingTimer = null;
+function sendPing() {
+    if (partySocket && partySocket.readyState === WebSocket.OPEN) {
+        try { partySocket.send(JSON.stringify({ type: 'ping' })); } catch (_) {}
+    }
+}
+function startPing() {
+    stopPing();
+    sendPing(); // mark this connection reap-eligible immediately
+    pingTimer = setInterval(sendPing, PING_MS);
+}
+function stopPing() {
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+}
+
 // Stale-socket guard: every handler ignores events from a socket that is no
 // longer THE socket (replaced by a newer connect). Without this, an orphaned
 // socket's events keep mutating module state — its 'close' schedules a bogus
@@ -1169,6 +1190,7 @@ function onMultiplayerOpen(event) {
     if (partySocket && partySocket._connectTimeout) clearTimeout(partySocket._connectTimeout);
     isMultiplayerEnabled = true;
     reconnectAttempts = 0;
+    startPing();
     // Sync the hidden toggle
     var toggle = document.getElementById('multiplayerToggle');
     if (toggle) toggle.checked = true;
@@ -1360,6 +1382,7 @@ function onMultiplayerClose(event) {
     // closing later must not touch state or schedule a reconnect.
     if (event && event.target && event.target !== partySocket) return;
     console.log('Disconnected from multiplayer');
+    stopPing();
     isMultiplayerEnabled = false;
     clearRemoteCursors();
     // Server refused the join (locked room / full room) — don't retry in a loop.
