@@ -817,9 +817,21 @@ function updateTurnUI() {
     var isHost = myRole === 'host';
     var tBtn = document.getElementById('turnsBtn');
     if (tBtn) {
-        tBtn.style.display = isHost ? '' : 'none';
-        tBtn.textContent = turnsOn ? '🔁 Stop taking turns' : '🔁 Take turns';
+        // Guests see the control too, disabled — hiding it outright made the
+        // whole feature invisible to everyone but the host, who then had to
+        // explain it exists. Once turns are running the wheel/banner/status
+        // carry the state, so the dead button steps out of the way.
+        var showBtn = isHost || !turnsOn;
+        tBtn.style.display = showBtn ? '' : 'none';
+        tBtn.disabled = !isHost;
+        tBtn.textContent = isHost
+            ? (turnsOn ? '🔁 Stop taking turns' : '🔁 Take turns')
+            : '🔁 Take turns · host only';
+        tBtn.title = isHost
+            ? "Take turns painting — one artist at a time while everyone else watches with the painter's settings mirrored live"
+            : 'Only the room host can start taking turns';
         tBtn.classList.toggle('active', turnsOn);
+        tBtn.classList.toggle('mp-btn-muted', !isHost);
     }
     var tSel = document.getElementById('turnTimerSel');
     if (tSel) tSel.style.display = isHost ? '' : 'none';

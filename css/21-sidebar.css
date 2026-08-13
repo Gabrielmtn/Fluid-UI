@@ -1020,6 +1020,15 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 .mp-btn-lock:hover {
     opacity: 0.85;
 }
+/* Non-host view of a host-only control: present, explained, inert */
+.mp-btn-lock.mp-btn-muted,
+.mp-btn-lock.mp-btn-muted:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--ground-500, #2a2e37);
+    color: var(--ink-500, #7b828e);
+    cursor: default;
+    opacity: 1;
+}
 /* Take-turns mode: host toggle stays .mp-btn-lock; these are the extras */
 .mp-btn-lock.active {
     background: rgba(236, 48, 19, 0.3);
