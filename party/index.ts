@@ -33,7 +33,12 @@ const SERVER_AUTHORED = new Set([
   "lock-state",
   "host-changed",
   "turn-state",
+  "turn-invite-offer",
+  "turn-invite-result",
 ]);
+
+// How long a "shall we take turns?" invite stands before it goes stale.
+const INVITE_TTL_MS = 30_000;
 
 // The play-room party. One instance per room id (/parties/fluid/<id>).
 //
@@ -69,6 +74,10 @@ export default class FluidPartyServer implements Party.Server {
   turnHolder: string | null = null; // uid of the current painter
   turnMs = 60_000; // host-chosen turn length (0 = no timer)
   turnDeadline = 0; // epoch ms when the current turn auto-passes (0 = none)
+  // Stranger-pair consent, in memory only: it lives ~30s inside a room with two
+  // live connections, so there is nothing worth persisting — and a lost invite
+  // simply reads as "no answer", which the proposer's client already handles.
+  pendingInvite: { from: string; seconds: number; at: number } | null = null;
   loaded = false;
   ready: Promise<void> | null = null;
 
@@ -206,40 +215,95 @@ export default class FluidPartyServer implements Party.Server {
       return;
     }
 
-    // ── Host-only take-turns toggle (also carries the turn length) ──
+    // ── Take-turns toggle (also carries the turn length) ──
+    // Private rooms: host-only, as with the lock. Stranger pairs have no real
+    // host (it is just whoever connected first), so either member may start
+    // turns — but starting requires the partner's consent, so the direct "on"
+    // path is refused there and must go through turn-invite below. Either
+    // member may switch turns OFF: leaving the mode needs no permission.
     if (data.type === "turns" && this.managed) {
       await this.ensureLoaded();
       const st = sender.state as ConnState | null;
-      const isHost = !!st && (st.role === "host" || st.uid === this.hostId);
-      if (!isHost) return;
-      const wasOn = this.turnsOn;
-      this.turnsOn = !!data.on;
-      if (this.turnsOn) {
-        // Turn length: 0 = no timer; otherwise clamp to something sane.
-        if (typeof data.seconds === "number" && Number.isFinite(data.seconds)) {
-          const s = Math.floor(data.seconds);
-          this.turnMs = s <= 0 ? 0 : Math.max(10, Math.min(600, s)) * 1000;
-        }
-        if (!wasOn) {
-          // Rotation = the enabling host first, then everyone else connected.
-          const uids: string[] = st ? [st.uid] : [];
-          for (const c of this.room.getConnections()) {
-            const cs = c.state as ConnState | null;
-            if (cs && !uids.includes(cs.uid)) uids.push(cs.uid);
-          }
-          this.turnQueue = uids;
-          this.turnHolder = uids[0] || null;
-        }
-        // A (re)enable or a timer change restarts the current turn's clock.
-        this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+      if (!st) return;
+      const isHost = st.role === "host" || st.uid === this.hostId;
+      const pair = this.kind === "public";
+      const wantOn = !!data.on;
+      if (!isHost && !(pair && !wantOn)) return;
+      if (pair && wantOn && !this.turnsOn) return; // needs consent — use turn-invite
+      if (wantOn) {
+        this.enableTurns(st.uid, data.seconds);
       } else {
+        this.turnsOn = false;
         this.turnQueue = [];
         this.turnHolder = null;
         this.turnDeadline = 0;
+        this.pendingInvite = null;
       }
       await this.persist(); // commit before announcing (same rule as the lock)
       await this.syncTurnAlarm();
       this.broadcastTurnState();
+      return;
+    }
+
+    // ── Stranger-pair consent: "shall we take turns?" ──
+    // Either member proposes; the partner accepts or declines. Nothing changes
+    // until they agree, so neither person can impose the mode on the other.
+    if (data.type === "turn-invite" && this.kind === "public") {
+      await this.ensureLoaded();
+      const st = sender.state as ConnState | null;
+      if (!st || this.turnsOn) return;
+      const other = [...this.room.getConnections()].find((c) => {
+        const cs = c.state as ConnState | null;
+        return !!cs && cs.uid !== st.uid;
+      });
+      if (!other) return; // nobody to ask yet
+      const seconds = typeof data.seconds === "number" ? data.seconds : 60;
+
+      // Crossing invites (both clicked at once): the second one is consent.
+      const p = this.livePendingInvite();
+      const otherState = other.state as ConnState | null;
+      if (p && otherState && p.from === otherState.uid) {
+        this.pendingInvite = null;
+        this.enableTurns(p.from, p.seconds);
+        await this.persist();
+        await this.syncTurnAlarm();
+        this.broadcastTurnState();
+        return;
+      }
+
+      this.pendingInvite = { from: st.uid, seconds, at: Date.now() };
+      other.send(
+        JSON.stringify({
+          type: "turn-invite-offer",
+          from: sender.id,
+          seconds,
+          expiresIn: INVITE_TTL_MS,
+          timestamp: Date.now(),
+        })
+      );
+      return;
+    }
+
+    if (data.type === "turn-invite-response" && this.kind === "public") {
+      await this.ensureLoaded();
+      const st = sender.state as ConnState | null;
+      const p = this.livePendingInvite();
+      // Only the person who was ASKED may answer, and only once.
+      if (!st || !p || p.from === st.uid) return;
+      this.pendingInvite = null;
+      if (data.accept) {
+        this.enableTurns(p.from, p.seconds);
+        await this.persist();
+        await this.syncTurnAlarm();
+        this.broadcastTurnState();
+      } else {
+        const proposer = this.connForUid(p.from);
+        if (proposer) {
+          proposer.send(
+            JSON.stringify({ type: "turn-invite-result", accepted: false, by: sender.id, timestamp: Date.now() })
+          );
+        }
+      }
       return;
     }
 
@@ -302,6 +366,7 @@ export default class FluidPartyServer implements Party.Server {
       this.turnQueue = [];
       this.turnHolder = null;
       this.turnDeadline = 0;
+      this.pendingInvite = null;
       await this.room.storage.deleteAll();
       try {
         await this.room.storage.deleteAlarm();
@@ -313,6 +378,16 @@ export default class FluidPartyServer implements Party.Server {
     }
 
     const st = conn.state as ConnState | null;
+
+    // A pending invite dies with either party: the asker leaving makes it
+    // moot, and the asked leaving means nobody can answer it.
+    if (this.pendingInvite && st) {
+      const stillHereForInvite = remaining.some((c) => {
+        const cs = c.state as ConnState | null;
+        return !!cs && cs.uid === st.uid;
+      });
+      if (!stillHereForInvite) this.pendingInvite = null;
+    }
 
     // Host left but others remain → transfer host so lock/unlock stays usable.
     if (st && st.uid === this.hostId) {
@@ -405,6 +480,52 @@ export default class FluidPartyServer implements Party.Server {
       if (cs && cs.uid === uid) found = c.id;
     }
     return found;
+  }
+
+  // The pending invite, or null if there is none / it went stale.
+  livePendingInvite() {
+    const p = this.pendingInvite;
+    if (!p) return null;
+    if (Date.now() - p.at > INVITE_TTL_MS) {
+      this.pendingInvite = null;
+      return null;
+    }
+    return p;
+  }
+
+  // Newest live connection for a uid (see clientIdForUid for why newest).
+  connForUid(uid: string): Party.Connection | null {
+    let found: Party.Connection | null = null;
+    for (const c of this.room.getConnections()) {
+      const cs = c.state as ConnState | null;
+      if (cs && cs.uid === uid) found = c;
+    }
+    return found;
+  }
+
+  // Switch turns on with `starterUid` painting first, then everyone else
+  // connected. Shared by the host toggle and an accepted stranger invite.
+  // Caller persists, syncs the alarm, and broadcasts.
+  enableTurns(starterUid: string, seconds?: unknown) {
+    const wasOn = this.turnsOn;
+    this.turnsOn = true;
+    this.pendingInvite = null;
+    // Turn length: 0 = no timer; otherwise clamp to something sane.
+    if (typeof seconds === "number" && Number.isFinite(seconds)) {
+      const s = Math.floor(seconds);
+      this.turnMs = s <= 0 ? 0 : Math.max(10, Math.min(600, s)) * 1000;
+    }
+    if (!wasOn) {
+      const uids: string[] = [starterUid];
+      for (const c of this.room.getConnections()) {
+        const cs = c.state as ConnState | null;
+        if (cs && !uids.includes(cs.uid)) uids.push(cs.uid);
+      }
+      this.turnQueue = uids;
+      this.turnHolder = uids[0] || null;
+    }
+    // A (re)enable or a timer change restarts the current turn's clock.
+    this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
   }
 
   // Advance the brush to the next connected member after the current holder.
