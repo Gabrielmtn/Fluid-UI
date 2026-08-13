@@ -345,6 +345,17 @@ function captureLookSnapshot() {
         lightShiftPath: full.lightShiftPath || null,
         brushState: full.brushState || null,
         material: full.material || null,
+        // Oscillators animate look params — without them a watcher saw only
+        // the 2s poll's choppy sampled values instead of the animation itself.
+        cosOscillator: full.cosOscillator ||
+            ((window.cosOscillator && window.cosOscillator.getState) ? window.cosOscillator.getState() : null),
+        // Transport is MIRROR-ONLY state (deliberately not part of presets —
+        // loading a preset should never pause you). A painter's pause or
+        // freeze is part of the performance, so the audience gets it too.
+        transport: {
+            paused: (typeof isPaused !== 'undefined') ? !!isPaused : false,
+            frozen: !!window.__fluidFrozen
+        },
         ssOrigin: full.ssOrigin || null,
         armColors: full.armColors || null
     };
@@ -361,25 +372,44 @@ function captureLookSnapshot() {
 }
 
 var settingsLockLastSent = ''; // last snapshot JSON the host broadcast (poll diff gate)
+
+// The relay SILENTLY drops messages over 16KB — for a user with a big saved-
+// color/palette library the whole look snapshot vanished on every send, so a
+// watcher got per-dab paint properties (they ride the stroke messages) but no
+// slider/setting changes at all: "density didn't carry" was this. Sanitize on
+// the SENDER (the receiver strips long strings/data URLs anyway, so they are
+// pure wasted bytes), then shed bulky optional sections, then as a last
+// resort send the core look alone — a partial mirror always beats a silent
+// total drop.
+function fitLookSnapshot(snap) {
+    if (!snap) return null;
+    var out = sanitizeLockSnapshot(snap) || {};
+    var SHED = ['userPalettes', 'savedColors', 'lightShiftPath', 'ssOrigin', 'brushState'];
+    for (var i = 0; i < SHED.length; i++) {
+        try { if (JSON.stringify(out).length <= 14000) break; } catch (_) { break; }
+        delete out[SHED[i]];
+    }
+    var len = 0;
+    try { len = JSON.stringify(out).length; } catch (_) {}
+    if (len > 15000) {
+        console.warn('[mp] look snapshot still ' + len + 'B after shedding — sending core look only');
+        out = { sliders: out.sliders, checkboxes: out.checkboxes, selects: out.selects,
+                colors: out.colors, kaleido: out.kaleido, paletteIndex: out.paletteIndex,
+                material: out.material, cosOscillator: out.cosOscillator,
+                transport: out.transport, armColors: out.armColors };
+    }
+    return out;
+}
 function broadcastSettingsLock() {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
     var msg = { type: 'settings-lock', locked: settingsLockOn, timestamp: Date.now() };
     if (settingsLockOn) {
         var snap = captureLookSnapshot();
-        // Diff gate records the PRE-shed JSON (the poll compares fresh
-        // unshedded captures against this — post-shed it would never match
+        // Diff gate records the PRE-fit JSON (the poll compares fresh
+        // unshedded captures against this — post-fit it would never match
         // an oversize snapshot and the poll would re-send every tick).
         try { settingsLockLastSent = JSON.stringify(snap || null); } catch (_) { settingsLockLastSent = ''; }
-        // Relay caps messages at 16KB — shed bulky optional sections before
-        // sending, or the whole lock update silently never arrives.
-        if (snap) {
-            try {
-                ['userPalettes', 'savedColors', 'lightShiftPath'].forEach(function (k) {
-                    if (JSON.stringify(snap).length > 14000) delete snap[k];
-                });
-            } catch (_) {}
-        }
-        msg.snapshot = snap;
+        msg.snapshot = fitLookSnapshot(snap);
     }
     partySocket.send(JSON.stringify(msg));
 }
@@ -389,16 +419,9 @@ function broadcastSettingsLock() {
 function broadcastTurnLook() {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
     var snap = captureLookSnapshot();
-    // Same pre-shed diff gate as the settings lock (shared with the poll).
+    // Same pre-fit diff gate as the settings lock (shared with the poll).
     try { settingsLockLastSent = JSON.stringify(snap || null); } catch (_) { settingsLockLastSent = ''; }
-    if (snap) {
-        try {
-            ['userPalettes', 'savedColors', 'lightShiftPath'].forEach(function (k) {
-                if (JSON.stringify(snap).length > 14000) delete snap[k];
-            });
-        } catch (_) {}
-    }
-    partySocket.send(JSON.stringify({ type: 'turn-look', snapshot: snap, timestamp: Date.now() }));
+    partySocket.send(JSON.stringify({ type: 'turn-look', snapshot: fitLookSnapshot(snap), timestamp: Date.now() }));
 }
 
 // The look mirror serves two features: the 13.5 host settings lock, and
@@ -467,7 +490,8 @@ function toggleSettingsLock() {
 // the preset — those sections could never arrive even if sent).
 var LOCK_SNAPSHOT_ALLOW = ['sliders', 'checkboxes', 'selects', 'colors', 'savedColors',
     'paletteIndex', 'paletteName', 'armColors', 'brushState', 'lightPos',
-    'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin', 'material'];
+    'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin', 'material',
+    'cosOscillator', 'transport'];
 // Bounded recursive clean: primitives-only leaves (no data: URLs, strings
 // capped), depth ≤ 3 so armColors [{mode,color}], lightShiftPath waypoints
 // and userPalettes [{name, colors: [...]}] survive — the old one-level rule
@@ -533,6 +557,21 @@ function applyRemoteLookSnapshot(snapshot) {
         try { window.applyPresetSnapshot(safeSnap); }
         catch (e) { console.warn('look mirror: snapshot apply failed', e); }
         finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
+        // Transport parity (mirror-only; applyPresetSnapshot ignores it): the
+        // painter pausing or freezing the fluid is part of the performance.
+        try {
+            var t = safeSnap.transport;
+            if (t) {
+                if (typeof t.paused === 'boolean' && typeof isPaused !== 'undefined' &&
+                    !!isPaused !== t.paused && typeof window.togglePause === 'function') {
+                    window.togglePause();
+                }
+                if (typeof t.frozen === 'boolean' && !!window.__fluidFrozen !== t.frozen &&
+                    typeof window.toggleFreeze === 'function') {
+                    window.toggleFreeze();
+                }
+            }
+        } catch (e) { /* best-effort */ }
     }
 }
 
