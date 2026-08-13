@@ -363,6 +363,15 @@
         // filtered out of these pointer handlers.
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'touch') return; // touchstart owns touch
+            // Take-turns multiplayer: while it's someone else's turn, both
+            // painting AND right-click replay (which rebroadcasts a stroke)
+            // are gated — the relay would drop them and the local-only paint
+            // would silently desync this client from the room.
+            if (window.__mpTurnBlocked && (e.button === 0 || e.button === 2)) {
+                if (e.button === 2) e.preventDefault();
+                if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
+                return;
+            }
             // Right-click / pen-barrel replay always works, even when paused
             if (e.button === 2) {
                 e.preventDefault();
@@ -723,6 +732,12 @@
                 return;
             }
             if (TouchGestures.isSuppressed()) return;
+            // Take-turns multiplayer: painting is gated while it's not our turn
+            // (see the pointerdown note).
+            if (window.__mpTurnBlocked) {
+                if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
+                return;
+            }
             const touch = e.touches[0];
             const coords = getCanvasCoordinates(touch);
             pointer.down = true;

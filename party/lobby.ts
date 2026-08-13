@@ -25,6 +25,14 @@ export default class LobbyServer implements Party.Server {
   // Who is holding the waiting room. Without this a second matchmake from the
   // SAME device is handed its own room with waiting:false — "matched" alone.
   waitingUid: string | null = null;
+  // The waiter's lobby CONNECTION. Clients now keep this socket open while
+  // they wait: a live connection pins this instance (so the pointer can't be
+  // lost to an idle eviction between two seekers), and its close means the
+  // waiter really left — clear the slot immediately instead of stranding new
+  // seekers in an empty room until the TTL. In-memory only: connection ids
+  // are meaningless across a restart (the client's keep-alive re-registers
+  // via `holding` after one).
+  waitingConnId: string | null = null;
   loaded = false;
   ready: Promise<void> | null = null;
   lastSeen: Map<string, number> = new Map(); // uid -> last matchmake ts (best-effort throttle)
@@ -70,6 +78,17 @@ export default class LobbyServer implements Party.Server {
     }
     this.lastSeen.set(uid, now);
 
+    // A waiter's keep-alive names the pub- room it is already sitting in, so a
+    // lost pointer (TTL expiry, restart, vacate race, dev-relay state loss) is
+    // re-adopted instead of a fresh room being minted. Without this, two
+    // phase-locked waiters whose pointers vanished each re-minted every tick
+    // and hopped into each other's abandoned rooms forever — both stuck on
+    // "Waiting for a stranger…" while chasing each other.
+    const holding =
+      typeof data.holding === "string" && /^pub-[A-Z0-9]{6}$/.test(data.holding)
+        ? data.holding
+        : null;
+
     // ── Synchronous critical section (no await between read and mutate) ──
     let roomId: string;
     let waiting: boolean;
@@ -90,13 +109,17 @@ export default class LobbyServer implements Party.Server {
       this.waitingUid = null;
       waiting = false;
     } else {
-      roomId = "pub-" + generateRoomCode();
+      // No live pointer: re-adopt the room the seeker already waits in
+      // (keep-alive re-registration) or mint a fresh one (new seeker).
+      roomId = holding || "pub-" + generateRoomCode();
       this.waitingRoomId = roomId;
       this.waitingSince = now;
       this.waitingUid = uid;
       waiting = true;
     }
     // ────────────────────────────────────────────────────────────────────
+
+    this.waitingConnId = waiting ? sender.id : null;
 
     // Commit the waiting-pointer mutation BEFORE replying, so the seeker never
     // acts on a pairing decision an eviction could lose (which would strand both
@@ -106,6 +129,18 @@ export default class LobbyServer implements Party.Server {
     if (waiting) await this.room.storage.setAlarm(now + WAIT_TTL_MS + 1000);
 
     sender.send(JSON.stringify({ type: "matched", roomId, waiting }));
+  }
+
+  // The waiter hung up (left the site, joined a code room, or got paired and
+  // dropped the pin): free the slot right away so the next seeker never gets
+  // pointed at a room whose occupant is gone.
+  async onClose(conn: Party.Connection) {
+    if (this.waitingConnId && conn.id === this.waitingConnId) {
+      this.waitingConnId = null;
+      this.waitingRoomId = null;
+      this.waitingUid = null;
+      await this.persistWaiting();
+    }
   }
 
   // Server-only endpoint: a public play room reports it emptied, so we can clear

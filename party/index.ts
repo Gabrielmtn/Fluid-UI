@@ -12,6 +12,29 @@ interface ConnState {
   role: "host" | "guest";
 }
 
+// Take-turns mode: message types only the current painter may relay. Cursor and
+// pointer-up stay open so spectators can still point at things while watching.
+const TURN_HOLDER_ONLY = new Set([
+  "splat",
+  "stroke",
+  "stroke-chunk",
+  "clear",
+  "preset",
+  "turn-look",
+]);
+
+// Message types only this relay may author. A client-sent copy is a forgery —
+// e.g. a fake 'turn-state' would gate every other member's painting and
+// settings — so the relay never forwards one (managed rooms; sys- rooms stay
+// pure passthrough for the legacy sub-app).
+const SERVER_AUTHORED = new Set([
+  "connected",
+  "client-count",
+  "lock-state",
+  "host-changed",
+  "turn-state",
+]);
+
 // The play-room party. One instance per room id (/parties/fluid/<id>).
 //
 // Behavior depends on the id prefix (see shared.roomKind):
@@ -38,6 +61,14 @@ export default class FluidPartyServer implements Party.Server {
   locked = false;
   hostId: string | null = null;
   members: Set<string> = new Set(); // uids ever admitted = the lock allowlist
+  // Take-turns mode: one member paints at a time, everyone else watches.
+  // Keyed by uid (stable across reconnects); broadcast to clients as connection
+  // ids so members' uids — the lock re-admission key — never reach other clients.
+  turnsOn = false;
+  turnQueue: string[] = []; // uids of connected members, rotation order
+  turnHolder: string | null = null; // uid of the current painter
+  turnMs = 60_000; // host-chosen turn length (0 = no timer)
+  turnDeadline = 0; // epoch ms when the current turn auto-passes (0 = none)
   loaded = false;
   ready: Promise<void> | null = null;
 
@@ -49,6 +80,12 @@ export default class FluidPartyServer implements Party.Server {
     this.locked = (await this.room.storage.get<boolean>("locked")) || false;
     this.hostId = (await this.room.storage.get<string>("hostId")) || null;
     this.members = new Set((await this.room.storage.get<string[]>("members")) || []);
+    this.turnsOn = (await this.room.storage.get<boolean>("turnsOn")) || false;
+    this.turnQueue = (await this.room.storage.get<string[]>("turnQueue")) || [];
+    this.turnHolder = (await this.room.storage.get<string>("turnHolder")) || null;
+    const tm = await this.room.storage.get<number>("turnMs");
+    this.turnMs = typeof tm === "number" ? tm : 60_000;
+    this.turnDeadline = (await this.room.storage.get<number>("turnDeadline")) || 0;
     this.loaded = true;
   }
 
@@ -95,6 +132,21 @@ export default class FluidPartyServer implements Party.Server {
       return;
     }
 
+    // Dirty-restart self-heal: a cleanly emptied room always resets this state
+    // in onClose, so arriving FIRST in a room whose persisted state still names
+    // a host or a running rotation means the previous instance died without
+    // closes (redeploy/eviction). The named members may never return — rebuild
+    // around this member instead of pinning the room on ghosts.
+    if (others === 0) {
+      if (this.hostId && this.hostId !== uid) this.hostId = uid;
+      if (this.turnsOn) {
+        this.turnQueue = [uid];
+        this.turnHolder = uid;
+        this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+        await this.syncTurnAlarm();
+      }
+    }
+
     // Host election — synchronous compare-and-set on in-memory state (no await
     // between read and write, so two simultaneous first-joiners can't both win).
     if (!this.hostId) this.hostId = uid;
@@ -102,6 +154,9 @@ export default class FluidPartyServer implements Party.Server {
     conn.setState({ uid, role } as ConnState);
 
     this.members.add(uid);
+    // Joining while turns are running: append to the rotation (no holder change).
+    if (this.turnsOn && !this.turnQueue.includes(uid)) this.turnQueue.push(uid);
+    if (this.turnsOn && !this.turnHolder) this.turnHolder = uid;
     // Persist BEFORE telling the client it's in: a member must be durably on the
     // allowlist before they rely on being re-admittable to a (future) locked room.
     await this.persist();
@@ -119,6 +174,9 @@ export default class FluidPartyServer implements Party.Server {
       })
     );
     this.broadcastClientCount();
+    // Everyone (including the joiner, and the holder whose conn id may have
+    // changed across a reconnect) re-syncs the rotation.
+    if (this.turnsOn) this.broadcastTurnState();
   }
 
   async onMessage(message: string, sender: Party.Connection) {
@@ -130,6 +188,9 @@ export default class FluidPartyServer implements Party.Server {
       return;
     }
     if (!data) return;
+
+    // Never relay a client-sent copy of a server-authored type (forgery).
+    if (this.managed && SERVER_AUTHORED.has(data.type)) return;
 
     // ── Host-only reversible lock toggle (managed rooms only) ──
     if (data.type === "lock" && this.managed) {
@@ -143,6 +204,77 @@ export default class FluidPartyServer implements Party.Server {
         JSON.stringify({ type: "lock-state", locked: this.locked, timestamp: Date.now() })
       );
       return;
+    }
+
+    // ── Host-only take-turns toggle (also carries the turn length) ──
+    if (data.type === "turns" && this.managed) {
+      await this.ensureLoaded();
+      const st = sender.state as ConnState | null;
+      const isHost = !!st && (st.role === "host" || st.uid === this.hostId);
+      if (!isHost) return;
+      const wasOn = this.turnsOn;
+      this.turnsOn = !!data.on;
+      if (this.turnsOn) {
+        // Turn length: 0 = no timer; otherwise clamp to something sane.
+        if (typeof data.seconds === "number" && Number.isFinite(data.seconds)) {
+          const s = Math.floor(data.seconds);
+          this.turnMs = s <= 0 ? 0 : Math.max(10, Math.min(600, s)) * 1000;
+        }
+        if (!wasOn) {
+          // Rotation = the enabling host first, then everyone else connected.
+          const uids: string[] = st ? [st.uid] : [];
+          for (const c of this.room.getConnections()) {
+            const cs = c.state as ConnState | null;
+            if (cs && !uids.includes(cs.uid)) uids.push(cs.uid);
+          }
+          this.turnQueue = uids;
+          this.turnHolder = uids[0] || null;
+        }
+        // A (re)enable or a timer change restarts the current turn's clock.
+        this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+      } else {
+        this.turnQueue = [];
+        this.turnHolder = null;
+        this.turnDeadline = 0;
+      }
+      await this.persist(); // commit before announcing (same rule as the lock)
+      await this.syncTurnAlarm();
+      this.broadcastTurnState();
+      return;
+    }
+
+    // ── Pass the brush: the painter passes, or the host skips an AFK painter ──
+    if (data.type === "turn-pass" && this.managed) {
+      await this.ensureLoaded();
+      if (!this.turnsOn) return;
+      const st = sender.state as ConnState | null;
+      const isHost = !!st && (st.role === "host" || st.uid === this.hostId);
+      const isHolder = !!st && st.uid === this.turnHolder;
+      if (!isHost && !isHolder) return;
+      this.advanceTurn();
+      this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+      await this.persist();
+      await this.syncTurnAlarm();
+      this.broadcastTurnState();
+      return;
+    }
+
+    // ── Take-turns enforcement: only the painter's actions relay ──
+    // (Belt to the client-side braces: a stale or modified client can't paint,
+    // wipe, or restyle the room out of turn.)
+    if (this.managed) {
+      if (!this.loaded) await this.ensureLoaded();
+      if (this.turnsOn) {
+        if (data.type === "settings-lock") return; // superseded while taking turns
+        if (TURN_HOLDER_ONLY.has(data.type)) {
+          const st = sender.state as ConnState | null;
+          if (!st || st.uid !== this.turnHolder) return;
+        }
+      } else if (data.type === "turn-look") {
+        // No painter exists while turns are off — a stray or forged look
+        // snapshot must not reach (and restyle) other members.
+        return;
+      }
     }
 
     // ── Default relay: stamp sender id/timestamp + broadcast to everyone else ──
@@ -166,13 +298,23 @@ export default class FluidPartyServer implements Party.Server {
       this.locked = false;
       this.hostId = null;
       this.members.clear();
+      this.turnsOn = false;
+      this.turnQueue = [];
+      this.turnHolder = null;
+      this.turnDeadline = 0;
       await this.room.storage.deleteAll();
+      try {
+        await this.room.storage.deleteAlarm();
+      } catch {
+        /* no alarm scheduled */
+      }
       if (this.kind === "public") this.notifyLobbyVacate();
       return;
     }
 
-    // Host left but others remain → transfer host so lock/unlock stays usable.
     const st = conn.state as ConnState | null;
+
+    // Host left but others remain → transfer host so lock/unlock stays usable.
     if (st && st.uid === this.hostId) {
       const nextState = remaining[0].state as ConnState | null;
       this.hostId = nextState ? nextState.uid : null;
@@ -183,10 +325,61 @@ export default class FluidPartyServer implements Party.Server {
         );
       }
     }
+
+    // Rotation upkeep: a member with no remaining connection leaves the queue;
+    // if the painter left, the brush passes to whoever was next after them.
+    if (this.turnsOn && st) {
+      const stillHere = remaining.some((c) => {
+        const cs = c.state as ConnState | null;
+        return !!cs && cs.uid === st.uid;
+      });
+      if (!stillHere && this.turnQueue.includes(st.uid)) {
+        const wasHolder = st.uid === this.turnHolder;
+        const idx = this.turnQueue.indexOf(st.uid);
+        this.turnQueue = this.turnQueue.filter((u) => u !== st.uid);
+        if (wasHolder) {
+          this.turnHolder = null;
+          if (this.turnQueue.length) {
+            // idx now points at the member who was after the departed painter
+            for (let step = 0; step < this.turnQueue.length; step++) {
+              const cand = this.turnQueue[(idx + step) % this.turnQueue.length];
+              if (this.clientIdForUid(cand, conn.id)) {
+                this.turnHolder = cand;
+                break;
+              }
+            }
+            if (!this.turnHolder) this.turnHolder = this.turnQueue[0];
+          }
+          this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+          await this.syncTurnAlarm();
+        }
+        await this.persist();
+        this.broadcastTurnState(conn.id);
+      } else if (stillHere) {
+        // The uid survives on another connection (second tab, or a zombie
+        // socket outliving a quick reconnect). Uid-keyed state is unchanged,
+        // but clients key on CONNECTION ids — re-advertise so the holder and
+        // order map to live ids, or the room stays keyed to a dead one.
+        this.broadcastTurnState(conn.id);
+      }
+    }
   }
 
   onError(conn: Party.Connection, err: Error) {
     console.error(`Error for ${conn.id}:`, err);
+  }
+
+  // Turn timer expiry: the brush auto-passes even if everyone is idle.
+  async onAlarm() {
+    await this.ensureLoaded();
+    if (!this.turnsOn || !this.turnDeadline) return;
+    if (Date.now() >= this.turnDeadline - 250) {
+      this.advanceTurn();
+      this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+      await this.persist();
+      this.broadcastTurnState();
+    }
+    await this.syncTurnAlarm();
   }
 
   // ── helpers ──
@@ -200,6 +393,73 @@ export default class FluidPartyServer implements Party.Server {
     );
   }
 
+  // Live connection id for a uid (optionally ignoring a closing conn). When a
+  // device holds several connections (second tab, or a zombie socket briefly
+  // outliving a reconnect), prefer the NEWEST — connections enumerate in
+  // insertion order, and a zombie is always older than its replacement.
+  clientIdForUid(uid: string, excludeId?: string): string | null {
+    let found: string | null = null;
+    for (const c of this.room.getConnections()) {
+      if (excludeId && c.id === excludeId) continue;
+      const cs = c.state as ConnState | null;
+      if (cs && cs.uid === uid) found = c.id;
+    }
+    return found;
+  }
+
+  // Advance the brush to the next connected member after the current holder.
+  advanceTurn() {
+    const q = this.turnQueue;
+    if (!q.length) {
+      this.turnHolder = null;
+      return;
+    }
+    const i = this.turnHolder ? q.indexOf(this.turnHolder) : -1;
+    for (let step = 1; step <= q.length; step++) {
+      const cand = q[(i + step) % q.length];
+      if (this.clientIdForUid(cand)) {
+        this.turnHolder = cand;
+        return;
+      }
+    }
+    this.turnHolder = q[0] || null;
+  }
+
+  // Keep the storage alarm aligned with the turn deadline. (This party has no
+  // other alarm use; the matchmaking lobby is a separate party.)
+  async syncTurnAlarm() {
+    try {
+      if (this.turnsOn && this.turnDeadline) {
+        await this.room.storage.setAlarm(this.turnDeadline);
+      } else {
+        await this.room.storage.deleteAlarm();
+      }
+    } catch {
+      /* best-effort — a missed alarm only delays the auto-pass */
+    }
+  }
+
+  // Rotation snapshot for clients. Members ride as connection ids (clients
+  // already see those on every relayed message) — never as uids. `timestamp`
+  // doubles as the server-clock reference for the countdown (clients compute
+  // their skew from it, so `deadline` needs no synchronized clocks).
+  broadcastTurnState(excludeConnId?: string) {
+    const order = this.turnQueue
+      .map((u) => this.clientIdForUid(u, excludeConnId))
+      .filter((id): id is string => !!id);
+    this.room.broadcast(
+      JSON.stringify({
+        type: "turn-state",
+        on: this.turnsOn,
+        holder: this.turnHolder ? this.clientIdForUid(this.turnHolder, excludeConnId) : null,
+        order,
+        turnMs: this.turnMs,
+        deadline: this.turnDeadline || null,
+        timestamp: Date.now(),
+      })
+    );
+  }
+
   persist() {
     return Promise.all([
       this.room.storage.put("locked", this.locked),
@@ -207,6 +467,13 @@ export default class FluidPartyServer implements Party.Server {
         ? this.room.storage.put("hostId", this.hostId)
         : this.room.storage.delete("hostId"),
       this.room.storage.put("members", [...this.members]),
+      this.room.storage.put("turnsOn", this.turnsOn),
+      this.room.storage.put("turnQueue", this.turnQueue),
+      this.room.storage.put("turnMs", this.turnMs),
+      this.room.storage.put("turnDeadline", this.turnDeadline),
+      this.turnHolder
+        ? this.room.storage.put("turnHolder", this.turnHolder)
+        : this.room.storage.delete("turnHolder"),
     ]);
   }
 

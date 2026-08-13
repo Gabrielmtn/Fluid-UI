@@ -42,6 +42,20 @@
 
         window.clearCanvas = () => {
 
+            // Take-turns multiplayer: watchers can't wipe the shared canvas —
+            // the relay would drop the broadcast, so a local wipe would
+            // silently desync this client from the room. The painter's OWN
+            // relayed clear arrives under __mpApplyingRemote and passes (same
+            // exemption as every 13.5 settings-lock gate).
+
+            if (window.__mpTurnBlocked && !window.__mpApplyingRemote) {
+
+                if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
+
+                return;
+
+            }
+
             wipeSimulation();
 
             // Broadcast to multiplayer clients
