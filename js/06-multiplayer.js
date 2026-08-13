@@ -17,6 +17,15 @@ let matchmakingSocket = null;
 let myRole = 'guest';     // 'host' | 'guest' in a managed room
 let roomLocked = false;   // current room's server-confirmed lock state
 
+// ── Take-turns mode (server-confirmed via 'turn-state' broadcasts) ──
+// One member paints at a time; everyone else watches with the painter's look
+// settings mirrored live. The server keys turns by stable uid but talks to
+// clients in connection ids (same ids every relayed message already carries).
+var turnsOn = false;        // room-wide flag
+var turnHolderId = null;    // connection id of the current painter (null = none)
+var turnOrder = [];         // connection ids in rotation order
+window.__mpTurnBlocked = false; // paint gate (read by 05d pointer/touch + 04f clear)
+
 // Stable per-device id (opaque, localStorage). Used to re-admit a dropped
 // member into a locked room and to throttle matchmaking. NOT a security token.
 const DEVICE_UID = (function() {
@@ -284,12 +293,41 @@ function broadcastSettingsLock() {
     partySocket.send(JSON.stringify(msg));
 }
 
-// While locked, the host's live edits re-broadcast (debounced) so
-// locked guests track them — "mirror every look-affecting setting"
+// Take-turns twin of broadcastSettingsLock: the current painter's look rides a
+// 'turn-look' message (the relay only forwards it from the turn holder).
+function broadcastTurnLook() {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    var snap = captureLookSnapshot();
+    // Same pre-shed diff gate as the settings lock (shared with the poll).
+    try { settingsLockLastSent = JSON.stringify(snap || null); } catch (_) { settingsLockLastSent = ''; }
+    if (snap) {
+        try {
+            ['userPalettes', 'savedColors', 'lightShiftPath'].forEach(function (k) {
+                if (JSON.stringify(snap).length > 14000) delete snap[k];
+            });
+        } catch (_) {}
+    }
+    partySocket.send(JSON.stringify({ type: 'turn-look', snapshot: snap, timestamp: Date.now() }));
+}
+
+// The look mirror serves two features: the 13.5 host settings lock, and
+// take-turns mode (the current painter's look mirrors to every watcher).
+// Exactly one can be live at a time — turns supersede the host lock.
+function mirrorActive() {
+    if (turnsOn) return isMyTurn() ? 'turn' : null;
+    return settingsLockOn ? 'lock' : null;
+}
+function broadcastLookMirror() {
+    var m = mirrorActive();
+    if (m === 'lock') broadcastSettingsLock();
+    else if (m === 'turn') broadcastTurnLook();
+}
+// While mirroring, live edits re-broadcast (debounced) so the watching side
+// tracks them — "mirror every look-affecting setting"
 function hostLockMirrorHandler() {
-    if (!settingsLockOn) return;
+    if (!mirrorActive()) return;
     if (settingsLockDebounce) clearTimeout(settingsLockDebounce);
-    settingsLockDebounce = setTimeout(broadcastSettingsLock, 400);
+    settingsLockDebounce = setTimeout(broadcastLookMirror, 400);
 }
 var settingsLockPoll = null;
 function installHostLockMirror() {
@@ -301,7 +339,7 @@ function installHostLockMirror() {
     // drags, kaleido buttons, Mutate. Diff-gated so a quiet host sends
     // nothing; captureLookSnapshot is the cheap lookOnly capture.
     settingsLockPoll = setInterval(function () {
-        if (!settingsLockOn) return;
+        if (!mirrorActive()) return;
         var j;
         try { j = JSON.stringify(captureLookSnapshot() || null); } catch (_) { return; }
         if (j !== settingsLockLastSent) hostLockMirrorHandler();
@@ -316,11 +354,15 @@ function removeHostLockMirror() {
     if (settingsLockDebounce) { clearTimeout(settingsLockDebounce); settingsLockDebounce = null; }
     if (settingsLockPoll) { clearInterval(settingsLockPoll); settingsLockPoll = null; }
 }
+// Install/remove the mirror to match whichever feature currently needs it.
+function syncLookMirror() {
+    if (mirrorActive()) installHostLockMirror(); else removeHostLockMirror();
+}
 
 function toggleSettingsLock() {
     settingsLockOn = !settingsLockOn;
     broadcastSettingsLock();
-    if (settingsLockOn) installHostLockMirror(); else removeHostLockMirror();
+    syncLookMirror();
     updateConnectedView();
 }
 
@@ -384,24 +426,187 @@ function setSettingsLockedByHost(locked, snapshot) {
                 'color:#ffb347;font-size:12px;font-weight:600;pointer-events:none;';
             document.body.appendChild(banner);
         }
-        var safeSnap = sanitizeLockSnapshot(snapshot);
-        if (safeSnap && typeof window.applyPresetSnapshot === 'function') {
-            isProcessingRemoteEvent = true;
-            window.__mpApplyingRemote = true;
-            try { window.applyPresetSnapshot(safeSnap); }
-            catch (e) { console.warn('settings-lock: snapshot apply failed', e); }
-            finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
-        }
+        applyRemoteLookSnapshot(snapshot);
     } else if (banner) {
         banner.remove();
     }
 }
 
+// Sanitize + apply a look snapshot from an untrusted peer (settings lock or
+// take-turns mirror — both ride the same capture/sanitize/apply pipeline).
+function applyRemoteLookSnapshot(snapshot) {
+    var safeSnap = sanitizeLockSnapshot(snapshot);
+    if (safeSnap && typeof window.applyPresetSnapshot === 'function') {
+        isProcessingRemoteEvent = true;
+        window.__mpApplyingRemote = true;
+        try { window.applyPresetSnapshot(safeSnap); }
+        catch (e) { console.warn('look mirror: snapshot apply failed', e); }
+        finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
+    }
+}
+
 function resetSettingsLock() {
     settingsLockOn = false;
-    removeHostLockMirror();
+    syncLookMirror(); // keeps the turn mirror alive if we're the current painter
     setSettingsLockedByHost(false, null);
 }
+
+// ── Take-turns mode ─────────────────────────────────────────────────
+// No points, no timer — the brush just passes around the room. While it's not
+// your turn, painting/clear are gated (05d/04f read __mpTurnBlocked), your look
+// settings are driven by the painter (same __mpSettingsLocked gate as 13.5),
+// and the painter's edits arrive as 'turn-look' snapshots. When the brush
+// reaches you, you inherit the canvas and settings as they stand — like
+// picking up the brush at a shared easel.
+function isMyTurn() { return turnsOn && !!turnHolderId && turnHolderId === clientId; }
+
+// Re-derive the two gates from the current turn state (also called after code
+// paths that clear __mpSettingsLocked wholesale, e.g. a host promotion).
+function syncTurnGates() {
+    if (turnsOn) {
+        window.__mpTurnBlocked = !isMyTurn();
+        window.__mpSettingsLocked = !isMyTurn();
+    } else {
+        window.__mpTurnBlocked = false;
+        // The watcher gate dies with the mode. Any pre-turns 13.5 host lock
+        // was already superseded when turns switched on (the relay refuses
+        // 'settings-lock' while turns run), so nothing legitimate is cleared
+        // — without this, a watcher's settings stayed locked forever after
+        // the host turned turns off.
+        window.__mpSettingsLocked = false;
+    }
+}
+
+function applyTurnState(wasMyTurn) {
+    if (turnsOn) {
+        // Turns supersede the 13.5 settings lock on both ends: the host's lock
+        // intent drops (the relay refuses 'settings-lock' while turns run) and
+        // any guest-side locked banner/gate is replaced by the turn state.
+        settingsLockOn = false;
+        setSettingsLockedByHost(false, null);
+    }
+    // The brush was taken from us mid-stroke (a host Skip or a pass racing
+    // our drag): end the live stroke NOW. The relay already drops our splats,
+    // so anything we kept painting locally would exist on no other canvas.
+    if (wasMyTurn && !isMyTurn() && window.pointer && window.pointer.down) {
+        try { if (typeof broadcastPointerUp === 'function') broadcastPointerUp(); } catch (_) {}
+        window.pointer.down = false;
+        window.pointer.moved = false;
+        _dabQueue.length = 0;
+        if (window.BrushEngine && window.BrushEngine.isActive()) window.BrushEngine.abort();
+    }
+    syncTurnGates();
+    syncLookMirror();
+    // Whenever we hold the brush on a rotation update, (re)send our look:
+    // gaining the brush snaps every watcher from the previous painter to us,
+    // and a join/leave/pass resync catches late joiners who would otherwise
+    // keep their own look until our next edit.
+    if (isMyTurn()) broadcastTurnLook();
+    updateConnectedView();
+}
+
+function resetTurnState() {
+    turnsOn = false;
+    turnHolderId = null;
+    turnOrder = [];
+    syncTurnGates(); // clears BOTH gates (turnsOn is false)
+    syncLookMirror();
+    var banner = document.getElementById('mpTurnBanner');
+    if (banner) banner.remove();
+}
+
+// Fixed banner while turns are running (mirrors the settings-lock banner).
+function updateTurnBanner() {
+    var banner = document.getElementById('mpTurnBanner');
+    if (!turnsOn || !isMultiplayerEnabled) {
+        if (banner) banner.remove();
+        return;
+    }
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'mpTurnBanner';
+        banner.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10002;' +
+            'padding:6px 14px;border-radius:8px;background:rgba(15,20,27,0.92);' +
+            'font-size:12px;font-weight:600;pointer-events:none;';
+        document.body.appendChild(banner);
+    }
+    if (isMyTurn()) {
+        banner.textContent = '🖌 Your turn — everyone sees your settings';
+        banner.style.border = '1px solid rgba(63,185,80,0.55)';
+        banner.style.color = '#3fb950';
+    } else if (turnHolderId) {
+        banner.textContent = '👀 ' + shortName(turnHolderId) + ' is painting — your settings mirror theirs';
+        banner.style.border = '1px solid rgba(255,178,71,0.5)';
+        banner.style.color = '#ffb347';
+    } else {
+        banner.textContent = '⏳ Waiting for the next painter…';
+        banner.style.border = '1px solid rgba(255,178,71,0.5)';
+        banner.style.color = '#ffb347';
+    }
+}
+
+// Panel widgets: the host's Take turns toggle, the rotation status line, and
+// the Pass/Skip button (painter passes; host can skip an AFK painter).
+function updateTurnUI() {
+    updateTurnBanner();
+    var isHost = myRole === 'host';
+    var tBtn = document.getElementById('turnsBtn');
+    if (tBtn) {
+        tBtn.style.display = isHost ? '' : 'none';
+        tBtn.textContent = turnsOn ? '🔁 Stop taking turns' : '🔁 Take turns';
+        tBtn.classList.toggle('active', turnsOn);
+    }
+    var pBtn = document.getElementById('turnPassBtn');
+    if (pBtn) {
+        var showPass = turnsOn && (isMyTurn() || isHost);
+        pBtn.style.display = showPass ? '' : 'none';
+        pBtn.textContent = isMyTurn() ? '➡ Pass turn' : '⏭ Skip turn';
+    }
+    var tStat = document.getElementById('turnStatus');
+    if (tStat) {
+        if (!turnsOn) {
+            tStat.style.display = 'none';
+        } else {
+            tStat.style.display = '';
+            var n = turnOrder.length;
+            var who = isMyTurn() ? '🖌 Your turn' : (turnHolderId ? '🖌 ' + shortName(turnHolderId) + ' painting' : '⏳ Waiting');
+            tStat.textContent = who + ' · ' + n + (n === 1 ? ' artist' : ' artists') + ' in rotation';
+            tStat.classList.toggle('mp-turn-you', isMyTurn());
+        }
+    }
+}
+
+function toggleTurns() {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    partySocket.send(JSON.stringify({ type: 'turns', on: !turnsOn }));
+}
+
+function passTurn() {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    partySocket.send(JSON.stringify({ type: 'turn-pass' }));
+}
+
+// Throttled "not your turn" toast, fired from the gated paint/clear paths.
+var _turnHintAt = 0;
+var _turnHintTimer = null;
+window.__mpTurnHint = function () {
+    var now = Date.now();
+    if (now - _turnHintAt < 1500) return;
+    _turnHintAt = now;
+    var el = document.getElementById('mpTurnHint');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'mpTurnHint';
+        el.style.cssText = 'position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:10002;' +
+            'padding:6px 14px;border-radius:8px;background:rgba(15,20,27,0.92);border:1px solid rgba(122,162,255,0.5);' +
+            'color:#9db8ff;font-size:12px;font-weight:600;pointer-events:none;transition:opacity 0.3s;';
+        document.body.appendChild(el);
+    }
+    el.textContent = turnHolderId ? ('🖌 It\'s ' + shortName(turnHolderId) + '\'s turn') : '⏳ Waiting for the next painter…';
+    el.style.opacity = '1';
+    if (_turnHintTimer) clearTimeout(_turnHintTimer);
+    _turnHintTimer = setTimeout(function () { el.style.opacity = '0'; }, 1400);
+};
 
 // Core connect logic
 function connectToRoom(roomCode) {
@@ -415,6 +620,7 @@ function connectToRoom(roomCode) {
     myRole = 'guest';
     roomLocked = false;
     resetSettingsLock();
+    resetTurnState();
 
     // Stranger rooms are ephemeral — keep them out of the shareable URL hash;
     // private/code rooms stay in the hash so a #CODE deep-link auto-joins.
@@ -429,6 +635,16 @@ function connectToRoom(roomCode) {
 
 function doConnect() {
     if (!currentRoom) return;
+    // Never stack sockets: a reconnect timer (or a stale socket's close event)
+    // can fire after a newer socket was already opened — e.g. joining a new
+    // room while the previous connection was still CONNECTING. The overwritten
+    // socket used to stay alive server-side with its handlers attached, so the
+    // tab processed every broadcast twice and the relay saw two connections
+    // per device (which take-turns, keyed to connection ids, cannot tolerate).
+    if (partySocket) {
+        try { partySocket.close(); } catch (_) {}
+        partySocket = null;
+    }
     try {
         const isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
         const protocol = isLocal ? 'ws:' : 'wss:';
@@ -477,6 +693,7 @@ function disconnectMultiplayer() {
     myRole = 'guest';
     roomLocked = false;
     resetSettingsLock();
+    resetTurnState();
     if (partySocket) {
         partySocket.close();
         partySocket = null;
@@ -491,7 +708,16 @@ function disconnectMultiplayer() {
     showDisconnectedUI();
 }
 
+// Stale-socket guard: every handler ignores events from a socket that is no
+// longer THE socket (replaced by a newer connect). Without this, an orphaned
+// socket's events keep mutating module state — its 'close' schedules a bogus
+// reconnect (stacking connections) and its messages double-apply.
+function isCurrentSocket(event) {
+    return !!event && !!partySocket && event.target === partySocket;
+}
+
 function onMultiplayerOpen(event) {
+    if (!isCurrentSocket(event)) return;
     console.log('Connected to multiplayer! Room:', currentRoom);
     if (partySocket && partySocket._connectTimeout) clearTimeout(partySocket._connectTimeout);
     isMultiplayerEnabled = true;
@@ -503,6 +729,7 @@ function onMultiplayerOpen(event) {
 }
 
 function onMultiplayerMessage(event) {
+    if (!isCurrentSocket(event)) return;
     try {
         const data = JSON.parse(event.data);
 
@@ -512,6 +739,15 @@ function onMultiplayerMessage(event) {
                 connectedClients = data.totalClients;
                 if (data.role) myRole = data.role;
                 if (typeof data.locked === 'boolean') roomLocked = data.locked;
+                // Fresh socket = fresh room state. An auto-reconnect (doConnect)
+                // can land in a room whose turns/lock were switched off while we
+                // were away — and the server only announces turn-state when
+                // turns are ON — so stale gates must not survive the socket.
+                // When turns ARE on, the authoritative turn-state follows this
+                // message immediately and rebuilds everything. (Host-side
+                // settingsLockOn intent is deliberately left alone.)
+                resetTurnState();
+                setSettingsLockedByHost(false, null);
                 updateConnectedView();
                 break;
 
@@ -527,8 +763,10 @@ function onMultiplayerMessage(event) {
 
             case 'host-changed':
                 myRole = (data.hostId === DEVICE_UID) ? 'host' : 'guest';
-                // Promotion to host frees this client from any settings lock
-                if (myRole === 'host') resetSettingsLock();
+                // Promotion to host frees this client from any settings lock —
+                // but NOT from the turn gates (a promoted watcher still waits
+                // for the brush), so re-derive those after the reset.
+                if (myRole === 'host') { resetSettingsLock(); syncTurnGates(); }
                 updateConnectedView();
                 break;
 
@@ -596,8 +834,37 @@ function onMultiplayerMessage(event) {
             case 'settings-lock':
                 // Host locked/unlocked look settings (13.5). Hosts never
                 // gate themselves — only guests enter the locked state.
-                if (data.clientId !== clientId && myRole !== 'host') {
+                // While turns run the relay refuses these; ignore any that
+                // slip through (e.g. sent just before turns switched on).
+                if (data.clientId !== clientId && myRole !== 'host' && !turnsOn) {
                     setSettingsLockedByHost(!!data.locked, data.snapshot || null);
+                }
+                break;
+
+            case 'turn-state': {
+                // Server-confirmed rotation update (host toggled turns, a pass,
+                // a join/leave, or a reconnect changed a connection id).
+                // Server-authored broadcasts never carry a clientId; the relay
+                // stamps one onto every client-relayed message — so a clientId
+                // here means a forged copy from a peer (the new relay drops
+                // those, but the previously deployed relay forwards anything).
+                if (data.clientId) break;
+                var wasMyTurn = isMyTurn();
+                turnsOn = !!data.on;
+                turnHolderId = (typeof data.holder === 'string' && data.holder) ? data.holder : null;
+                turnOrder = Array.isArray(data.order)
+                    ? data.order.filter(function (x) { return typeof x === 'string'; })
+                    : [];
+                applyTurnState(wasMyTurn);
+                break;
+            }
+
+            case 'turn-look':
+                // The current painter's look snapshot. The relay only forwards
+                // these from the turn holder; the holder check here just guards
+                // against reordered stragglers from a previous painter.
+                if (turnsOn && !isMyTurn() && data.clientId === turnHolderId) {
+                    applyRemoteLookSnapshot(data.snapshot || null);
                 }
                 break;
         }
@@ -607,12 +874,17 @@ function onMultiplayerMessage(event) {
 }
 
 function onMultiplayerClose(event) {
+    // A socket we already replaced (or nulled in disconnectMultiplayer)
+    // closing later must not touch state or schedule a reconnect.
+    if (event && event.target && event.target !== partySocket) return;
     console.log('Disconnected from multiplayer');
     isMultiplayerEnabled = false;
     clearRemoteCursors();
     // Server refused the join (locked room / full room) — don't retry in a loop.
     if (event && (event.code === 4001 || event.code === 4002)) {
         currentRoom = null; lastRoom = null;
+        resetSettingsLock();
+        resetTurnState(); // never leave turn gates on a client with no room
         history.replaceState(null, '', window.location.pathname + window.location.search);
         showMpError(event.code === 4001
             ? 'This room is locked — ask the host for an invite.'
@@ -637,6 +909,10 @@ function onMultiplayerClose(event) {
 function giveUpConnection(msg) {
     lastRoom = currentRoom;
     currentRoom = null;
+    // A watcher whose connection died must not stay gated (or banner-ed)
+    // offline — they're back to painting alone now.
+    resetSettingsLock();
+    resetTurnState();
     showMpError(msg);
     showDisconnectedUI();
     var rc = document.getElementById('reconnectBtn');
@@ -644,6 +920,7 @@ function giveUpConnection(msg) {
 }
 
 function onMultiplayerError(error) {
+    if (error && error.target && partySocket && error.target !== partySocket) return;
     console.error('Multiplayer error:', error);
 }
 
@@ -1084,16 +1361,18 @@ function updateConnectedView() {
         lockBtn.style.display = canLock ? '' : 'none';
         lockBtn.textContent = roomLocked ? '🔓 Unlock room' : '🔒 Lock room';
     }
-    // Settings lock (13.5): any host can lock look settings (incl. stranger rooms).
+    // Settings lock (13.5): any host can lock look settings (incl. stranger
+    // rooms) — hidden while turns run, which supersede it.
     var sLockBtn = document.getElementById('settingsLockBtn');
     if (sLockBtn) {
-        sLockBtn.style.display = isHost ? '' : 'none';
+        sLockBtn.style.display = (isHost && !turnsOn) ? '' : 'none';
         sLockBtn.textContent = settingsLockOn ? '🎛 Unlock settings' : '🎛 Lock settings';
         sLockBtn.classList.toggle('active', settingsLockOn);
     }
     // Locked badge: non-host members see why no one else can join.
     setShown('lockBadge', !stranger && roomLocked && !isHost);
 
+    updateTurnUI();
     updateUsersDisplay();
 }
 
@@ -1191,6 +1470,12 @@ function initMultiplayerUI() {
     var sLockBtn = document.getElementById('settingsLockBtn');
     if (sLockBtn) sLockBtn.addEventListener('click', toggleSettingsLock);
 
+    var turnsBtn = document.getElementById('turnsBtn');
+    if (turnsBtn) turnsBtn.addEventListener('click', toggleTurns);
+
+    var turnPassBtn = document.getElementById('turnPassBtn');
+    if (turnPassBtn) turnPassBtn.addEventListener('click', passTurn);
+
     // Auto-join if URL has room hash
     var hashRoom = getRoomFromHash();
     if (hashRoom && hashRoom !== 'DEFAULT-ROOM') {
@@ -1212,6 +1497,8 @@ window.createRoom = createRoom;
 window.joinRoom = joinRoom;
 window.paintWithStranger = paintWithStranger;
 window.toggleLock = toggleLock;
+window.toggleTurns = toggleTurns;
+window.passTurn = passTurn;
 window.copyRoomCode = copyRoomCode;
 window.disconnectMultiplayer = disconnectMultiplayer;
 
