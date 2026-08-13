@@ -345,6 +345,7 @@ function captureLookSnapshot() {
         lightShiftPath: full.lightShiftPath || null,
         brushState: full.brushState || null,
         material: full.material || null,
+        brushTip: full.brushTip || null,
         // Oscillators animate look params — without them a watcher saw only
         // the 2s poll's choppy sampled values instead of the animation itself.
         cosOscillator: full.cosOscillator ||
@@ -491,7 +492,7 @@ function toggleSettingsLock() {
 var LOCK_SNAPSHOT_ALLOW = ['sliders', 'checkboxes', 'selects', 'colors', 'savedColors',
     'paletteIndex', 'paletteName', 'armColors', 'brushState', 'lightPos',
     'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin', 'material',
-    'cosOscillator', 'transport'];
+    'brushTip', 'cosOscillator', 'transport'];
 // Bounded recursive clean: primitives-only leaves (no data: URLs, strings
 // capped), depth ≤ 3 so armColors [{mode,color}], lightShiftPath waypoints
 // and userPalettes [{name, colors: [...]}] survive — the old one-level rule
