@@ -567,6 +567,10 @@ function syncTurnGates() {
 }
 
 function applyTurnState(wasMyTurn) {
+    // Any authoritative rotation update settles an outstanding invite —
+    // an accept arrives as turn-state, not as a separate result message.
+    clearInviteWait();
+    dismissTurnInvitePrompt();
     if (turnsOn) {
         // Turns supersede the 13.5 settings lock on both ends: the host's lock
         // intent drops (the relay refuses 'settings-lock' while turns run) and
@@ -600,6 +604,8 @@ function resetTurnState() {
     turnOrder = [];
     turnMsLocal = 0;
     turnDeadlineLocal = 0;
+    clearInviteWait();
+    dismissTurnInvitePrompt();
     stopTurnTick();
     syncTurnGates(); // clears BOTH gates (turnsOn is false)
     syncLookMirror();
@@ -815,29 +821,46 @@ function updateTurnStatusLine() {
 function updateTurnUI() {
     updateTurnBanner();
     var isHost = myRole === 'host';
+    // Stranger pairs have no meaningful host, so both painters drive turns:
+    // either may ask (consent flow) and either may stop.
+    var pair = isStrangerRoom();
+    var canDrive = isHost || pair;
     var tBtn = document.getElementById('turnsBtn');
     if (tBtn) {
-        // Guests see the control too, disabled — hiding it outright made the
-        // whole feature invisible to everyone but the host, who then had to
-        // explain it exists. Once turns are running the wheel/banner/status
+        // Non-drivers see the control too, disabled — hiding it outright made
+        // the whole feature invisible to everyone but the host, who then had
+        // to explain it exists. Once turns are running the wheel/banner/status
         // carry the state, so the dead button steps out of the way.
-        var showBtn = isHost || !turnsOn;
+        var showBtn = canDrive || !turnsOn;
         tBtn.style.display = showBtn ? '' : 'none';
-        tBtn.disabled = !isHost;
-        tBtn.textContent = isHost
-            ? (turnsOn ? '🔁 Stop taking turns' : '🔁 Take turns')
-            : '🔁 Take turns · host only';
-        tBtn.title = isHost
-            ? "Take turns painting — one artist at a time while everyone else watches with the painter's settings mirrored live"
-            : 'Only the room host can start taking turns';
+        tBtn.disabled = !canDrive || invitePending;
+        if (invitePending) {
+            tBtn.textContent = '⏳ Waiting for their answer…';
+            tBtn.title = 'Your partner has been asked to take turns';
+        } else if (!canDrive) {
+            tBtn.textContent = '🔁 Take turns · host only';
+            tBtn.title = 'Only the room host can start taking turns';
+        } else if (turnsOn) {
+            tBtn.textContent = '🔁 Stop taking turns';
+            tBtn.title = 'Go back to painting at the same time';
+        } else {
+            tBtn.textContent = pair ? '🔁 Ask to take turns' : '🔁 Take turns';
+            tBtn.title = pair
+                ? 'Ask your partner to take turns — nothing changes unless they agree'
+                : "Take turns painting — one artist at a time while everyone else watches with the painter's settings mirrored live";
+        }
         tBtn.classList.toggle('active', turnsOn);
-        tBtn.classList.toggle('mp-btn-muted', !isHost);
+        tBtn.classList.toggle('mp-btn-muted', !canDrive || invitePending);
     }
     var tSel = document.getElementById('turnTimerSel');
-    if (tSel) tSel.style.display = isHost ? '' : 'none';
+    // The asker picks the length (it rides along in the invite), so both
+    // members of a pair get the picker.
+    if (tSel) tSel.style.display = (canDrive && !turnsOn) || (isHost && turnsOn) ? '' : 'none';
     var pBtn = document.getElementById('turnPassBtn');
     if (pBtn) {
-        var showPass = turnsOn && (isMyTurn() || isHost);
+        // Skipping SOMEONE ELSE's turn is a host power, and a stranger pair has
+        // no real host — so in a pair you may only pass your own turn.
+        var showPass = turnsOn && (isMyTurn() || (isHost && !pair));
         pBtn.style.display = showPass ? '' : 'none';
         pBtn.textContent = isMyTurn() ? '➡ Pass turn' : '⏭ Skip turn';
     }
@@ -852,8 +875,100 @@ function turnTimerSeconds() {
     return isNaN(v) ? 60 : v;
 }
 
+// ── Stranger-pair consent ───────────────────────────────────────────
+// A stranger room has no real host — "host" is just whoever connected first —
+// so either painter may propose taking turns and the other agrees or doesn't.
+// Nothing changes on either canvas until they agree.
+var invitePending = false;      // we asked; waiting on their answer
+var inviteTimeout = null;
+var INVITE_WAIT_MS = 30000;     // matches the relay's invite TTL
+
+function clearInviteWait() {
+    invitePending = false;
+    if (inviteTimeout) { clearTimeout(inviteTimeout); inviteTimeout = null; }
+}
+
+function sendTurnInvite() {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    if (invitePending || turnsOn) return;
+    invitePending = true;
+    partySocket.send(JSON.stringify({ type: 'turn-invite', seconds: turnTimerSeconds() }));
+    inviteTimeout = setTimeout(function () {
+        if (!invitePending) return;
+        clearInviteWait();
+        showTurnToast('⏳ No answer — they may not be at the keyboard.');
+        updateTurnUI();
+    }, INVITE_WAIT_MS);
+    updateTurnUI();
+}
+
+function answerTurnInvite(accept) {
+    dismissTurnInvitePrompt();
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    partySocket.send(JSON.stringify({ type: 'turn-invite-response', accept: !!accept }));
+}
+
+function dismissTurnInvitePrompt() {
+    var el = document.getElementById('mpTurnInvite');
+    if (el) el.remove();
+}
+
+// The partner asked us. Accept/Decline, shown near the turn banner so the
+// whole turn conversation happens in one place on screen.
+function showTurnInvitePrompt(fromId, seconds) {
+    dismissTurnInvitePrompt();
+    var el = document.createElement('div');
+    el.id = 'mpTurnInvite';
+    el.className = 'mp-turn-invite';
+    var who = fromId ? shortName(fromId) : 'Your partner';
+    var len = (typeof seconds === 'number' && seconds > 0)
+        ? (seconds >= 60 ? (seconds / 60) + ' min' : seconds + ' sec') + ' each'
+        : 'no timer';
+    var msg = document.createElement('span');
+    msg.textContent = '🔁 ' + who + ' wants to take turns painting (' + len + ')';
+    var yes = document.createElement('button');
+    yes.className = 'mp-invite-yes';
+    yes.textContent = 'Take turns';
+    yes.addEventListener('click', function () { answerTurnInvite(true); });
+    var no = document.createElement('button');
+    no.className = 'mp-invite-no';
+    no.textContent = 'No thanks';
+    no.addEventListener('click', function () { answerTurnInvite(false); });
+    el.appendChild(msg);
+    el.appendChild(yes);
+    el.appendChild(no);
+    document.body.appendChild(el);
+    // Expire in step with the relay's TTL so a stale prompt can't linger and
+    // answer an invite the server has already forgotten.
+    setTimeout(function () {
+        var still = document.getElementById('mpTurnInvite');
+        if (still === el) el.remove();
+    }, INVITE_WAIT_MS);
+}
+
+// Brief, non-blocking feedback for invite outcomes.
+function showTurnToast(text) {
+    var el = document.getElementById('mpTurnToast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'mpTurnToast';
+        el.className = 'mp-turn-toast';
+        document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.style.opacity = '1';
+    if (showTurnToast._t) clearTimeout(showTurnToast._t);
+    showTurnToast._t = setTimeout(function () { el.style.opacity = '0'; }, 2600);
+}
+
 function toggleTurns() {
     if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    // Starting turns in a stranger pair needs the partner's yes; stopping
+    // never does, and neither does anything in a hosted private room.
+    if (isStrangerRoom() && !turnsOn) {
+        sendTurnInvite();
+        return;
+    }
     partySocket.send(JSON.stringify({ type: 'turns', on: !turnsOn, seconds: turnTimerSeconds() }));
 }
 
@@ -1141,6 +1256,21 @@ function onMultiplayerMessage(event) {
                 applyTurnState(wasMyTurn);
                 break;
             }
+
+            case 'turn-invite-offer':
+                // Partner proposed taking turns (stranger pairs only). Server-
+                // authored: the relay never forwards a client-sent copy.
+                if (!turnsOn) showTurnInvitePrompt(data.from, data.seconds);
+                break;
+
+            case 'turn-invite-result':
+                // Only sent on a decline — an accept arrives as turn-state.
+                if (!data.accepted) {
+                    clearInviteWait();
+                    showTurnToast('🙅 ' + (data.by ? shortName(data.by) : 'They') + ' would rather keep painting together');
+                    updateTurnUI();
+                }
+                break;
 
             case 'turn-look':
                 // The current painter's look snapshot. The relay only forwards

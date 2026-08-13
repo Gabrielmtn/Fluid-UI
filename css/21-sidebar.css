@@ -1034,6 +1034,65 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     background: rgba(236, 48, 19, 0.3);
     border-color: rgba(236, 48, 19, 0.6);
 }
+/* "Shall we take turns?" prompt — stranger pairs, shown to the person asked.
+   Sits just under the turn banner so the whole turn conversation is in one
+   place on screen. */
+.mp-turn-invite {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10003;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(15, 20, 27, 0.96);
+    border: 1px solid rgba(122, 162, 255, 0.55);
+    color: var(--ink-100, #f2f3f5);
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+.mp-turn-invite button {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 0;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.mp-invite-yes {
+    background: rgba(63, 185, 80, 0.22);
+    border: 1px solid rgba(63, 185, 80, 0.6);
+    color: #3fb950;
+}
+.mp-invite-no {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--ground-500, #2a2e37);
+    color: var(--ink-300, #b9bec7);
+}
+.mp-turn-invite button:hover {
+    opacity: 0.85;
+}
+/* Transient feedback for invite outcomes (declined / no answer) */
+.mp-turn-toast {
+    position: fixed;
+    top: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10002;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: rgba(15, 20, 27, 0.92);
+    border: 1px solid rgba(122, 162, 255, 0.5);
+    color: #9db8ff;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
 /* Turn-length picker shown to the host beside the Take turns toggle */
 .mp-turn-timer {
     width: 100%;
