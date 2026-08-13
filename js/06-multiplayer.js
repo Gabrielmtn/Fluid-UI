@@ -344,6 +344,7 @@ function captureLookSnapshot() {
         lightPos: full.lightPos || null,
         lightShiftPath: full.lightShiftPath || null,
         brushState: full.brushState || null,
+        material: full.material || null,
         ssOrigin: full.ssOrigin || null,
         armColors: full.armColors || null
     };
@@ -466,7 +467,7 @@ function toggleSettingsLock() {
 // the preset — those sections could never arrive even if sent).
 var LOCK_SNAPSHOT_ALLOW = ['sliders', 'checkboxes', 'selects', 'colors', 'savedColors',
     'paletteIndex', 'paletteName', 'armColors', 'brushState', 'lightPos',
-    'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin'];
+    'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin', 'material'];
 // Bounded recursive clean: primitives-only leaves (no data: URLs, strings
 // capped), depth ≤ 3 so armColors [{mode,color}], lightShiftPath waypoints
 // and userPalettes [{name, colors: [...]}] survive — the old one-level rule

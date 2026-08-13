@@ -1039,42 +1039,54 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
    place on screen. */
 .mp-turn-invite {
     position: fixed;
-    top: 8px;
+    top: 10px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10003;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: rgba(15, 20, 27, 0.96);
-    border: 1px solid rgba(122, 162, 255, 0.55);
-    color: var(--ink-100, #f2f3f5);
-    font-size: 12px;
-    font-weight: 600;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    /* High-contrast orange: this has to register over ANY painting */
+    background: linear-gradient(180deg, #ffa63a, #f07f12);
+    border: 2px solid #ffd9a0;
+    color: #211203;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 10px 34px rgba(240, 130, 20, 0.55), 0 3px 10px rgba(0, 0, 0, 0.55);
+    animation:
+        mpInviteIn 0.55s cubic-bezier(0.2, 1.35, 0.4, 1) both,
+        mpInvitePulse 1.6s ease-in-out 0.6s 4;
+}
+@keyframes mpInviteIn {
+    from { transform: translate(-50%, -160%) scale(0.92); opacity: 0; }
+    to   { transform: translate(-50%, 0) scale(1); opacity: 1; }
+}
+@keyframes mpInvitePulse {
+    0%, 100% { box-shadow: 0 10px 34px rgba(240, 130, 20, 0.55), 0 3px 10px rgba(0, 0, 0, 0.55); }
+    50%      { box-shadow: 0 10px 52px rgba(255, 160, 40, 0.95), 0 3px 10px rgba(0, 0, 0, 0.55); }
 }
 .mp-turn-invite button {
-    padding: 5px 12px;
+    padding: 7px 14px;
     font-size: 12px;
-    font-weight: 700;
-    border-radius: 0;
+    font-weight: 800;
+    border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
 }
 .mp-invite-yes {
-    background: rgba(63, 185, 80, 0.22);
-    border: 1px solid rgba(63, 185, 80, 0.6);
-    color: #3fb950;
+    background: #1d6f2c;
+    border: 1px solid #12481c;
+    color: #ffffff;
 }
 .mp-invite-no {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--ground-500, #2a2e37);
-    color: var(--ink-300, #b9bec7);
+    background: rgba(33, 18, 3, 0.16);
+    border: 1px solid rgba(33, 18, 3, 0.45);
+    color: #211203;
 }
 .mp-turn-invite button:hover {
-    opacity: 0.85;
+    filter: brightness(1.15);
 }
 /* Transient feedback for invite outcomes (declined / no answer) */
 .mp-turn-toast {
