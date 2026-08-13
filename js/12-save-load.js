@@ -817,6 +817,16 @@
             // plain fluid while the source was in a paint material.
             material: (window.MaterialModes && window.MaterialModes.getState)
                 ? window.MaterialModes.getState() : null,
+            // Brush tip (Soft/Blob/Chisel/Streak/Ring + optional custom-shape
+            // id + stamp angle): config-only state with no registry slider —
+            // without it a peer rendered your strokes with THEIR tip, and a
+            // restored preset lost the tip entirely.
+            brushTip: {
+                tip: (window.config ? window.config.BRUSH_TIP : 0) | 0,
+                shapeId: (window.BrushShapes && window.BrushShapes.activeId)
+                    ? (window.BrushShapes.activeId() || null) : null,
+                angle: window.config ? (window.config.BRUSH_ANGLE || 0) : 0
+            },
             ssOrigin: ssOrigin,
             canvasWrapper: canvasWrapper,
             sidebarSections: sidebarSections,
@@ -1425,6 +1435,31 @@
                 window.pathLayers.restoreSnapshot(snapshot.pathLayers);
             }
         } catch(_){}
+
+        // Brush tip: config-level state the slider/checkbox passes above
+        // cannot reach. A custom shape only re-activates if THIS client has
+        // the same stamp (shape images cannot ride a snapshot); otherwise the
+        // built-in tip underneath is the honest fallback.
+        try {
+            if (snapshot.brushTip && window.config) {
+                var bt = snapshot.brushTip;
+                if (typeof bt.tip === 'number') {
+                    window.config.BRUSH_TIP = Math.max(0, Math.min(4, bt.tip | 0));
+                    try { if (window.settingsManager) window.settingsManager.set('brush.tip', window.config.BRUSH_TIP); } catch (_) {}
+                }
+                if (typeof bt.angle === 'number' && isFinite(bt.angle)) {
+                    window.config.BRUSH_ANGLE = Math.max(0, Math.min(360, bt.angle));
+                    var angEl = $('brushAngle');
+                    if (angEl) { angEl.value = window.config.BRUSH_ANGLE; angEl.style.setProperty('--val', angEl.value); }
+                }
+                if (window.BrushShapes && window.BrushShapes.setActive) {
+                    var wantShape = (typeof bt.shapeId === 'string' && bt.shapeId) ? bt.shapeId : null;
+                    var have = wantShape && (window.BrushShapes.list() || []).some(function (s) { return s.id === wantShape; });
+                    window.BrushShapes.setActive(have ? wantShape : null);
+                }
+                if (window.__onBrushShapeChanged) window.__onBrushShapeChanged();
+            }
+        } catch (e) { console.warn('brush tip apply failed', e); }
 
         // Material macro layer LAST: the raw slider/checkbox writes above ran
         // with material yielded (05h forces yieldToExternal during external
