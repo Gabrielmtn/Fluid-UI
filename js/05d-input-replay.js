@@ -179,9 +179,9 @@
             }
             return allEvents;
         }
-        function replayStroke(broadcast = true) {
+        function replayStroke(broadcast = true, reuse = false) {
             var eventsToReplay;
-            if (!broadcast && window._activeReplayEvents && window._activeReplayEvents.length) {
+            if (reuse && window._activeReplayEvents && window._activeReplayEvents.length) {
                 // Looping — reuse the snapshot from the initial trigger
                 eventsToReplay = window._activeReplayEvents;
             } else if (window.replayMode === 'time') {
@@ -316,9 +316,14 @@
                     }
                 }
                 if (replayIndex >= events.length) {
-                    // If right button still held, loop replay without rebroadcast
+                    // Right button still held → loop, and REBROADCAST each
+                    // pass. Loops used to skip the rebroadcast (anti-spam),
+                    // so a held replay repeated on the painter's canvas while
+                    // every peer saw it exactly once — in a turn performance
+                    // the audience must see every loop. Peers restart their
+                    // replay on each arrival, so they loop in lockstep.
                     if (isRightMouseDown) {
-                        replayStroke(false);
+                        replayStroke(true, true);
                     } else {
                         isReplayActive = false;
                         window._activeReplayEvents = null;
