@@ -811,6 +811,12 @@
             lightShiftPath: lightShiftPath,
             focusState: focusState,
             brushState: brushState,
+            // Material macro layer (Fluid / Paint-Wet / Paint-Thick): its core
+            // effects live in config keys with no captured control, so without
+            // this section a restored preset (or a mirroring peer) stayed on
+            // plain fluid while the source was in a paint material.
+            material: (window.MaterialModes && window.MaterialModes.getState)
+                ? window.MaterialModes.getState() : null,
             ssOrigin: ssOrigin,
             canvasWrapper: canvasWrapper,
             sidebarSections: sidebarSections,
@@ -1419,6 +1425,18 @@
                 window.pathLayers.restoreSnapshot(snapshot.pathLayers);
             }
         } catch(_){}
+
+        // Material macro layer LAST: the raw slider/checkbox writes above ran
+        // with material yielded (05h forces yieldToExternal during external
+        // writes), so this re-enters the snapshot's material — entering from
+        // fluid snapshots the just-applied raw baseline, meaning a later
+        // return to Fluid restores THIS preset's values. Old snapshots have
+        // no material field → treated as fluid → behavior unchanged.
+        try {
+            if (window.MaterialModes && window.MaterialModes.applyState) {
+                window.MaterialModes.applyState(snapshot.material || { mode: 'fluid' });
+            }
+        } catch (e) { console.warn('material apply failed', e); }
 
         console.log('Preset applied: v' + (snapshot.version || 1) + ', ' +
             Object.keys(snapshot.sliders || {}).length + ' sliders, ' +

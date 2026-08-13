@@ -261,6 +261,39 @@
         displayValue: displayValue,
         setMode: setMode,
         yieldToExternal: yieldToExternal,
+        // Snapshot support (presets + the multiplayer look mirror). Material
+        // used to be invisible to snapshots — its core effects live in config
+        // keys with no captured control (STAMP_NOISE/RADIUS_SCALE/SHAPE,
+        // displayShadingInvert), so a peer or a restored preset stayed on
+        // plain fluid while the painter was in Paint-Thick. State travels as
+        // {mode, amount, shape} and re-enters through the same setMode path a
+        // user click takes.
+        getState: function () {
+            return {
+                mode: mode,
+                amount: (mode !== 'fluid' && slider) ? parseFloat(slider.value) : null,
+                shape: shapeIdx
+            };
+        },
+        applyState: function (st) {
+            if (!slider || !sel) return;
+            var next = (st && typeof st.mode === 'string') ? st.mode : 'fluid';
+            if (next !== 'fluid' && !MATERIALS[next]) return;
+            if (st && typeof st.shape === 'number' && st.shape >= 0 && st.shape < SHAPES.length) {
+                shapeIdx = Math.floor(st.shape);
+                try { localStorage.setItem(LS_SHAPE, String(shapeIdx)); } catch (e) { /* noop */ }
+            }
+            if (next === 'fluid') { yieldToExternal(); return; }
+            // Entering from fluid snapshots the (just-applied) raw baseline, so
+            // leaving the material later restores the snapshot's fluid state.
+            setMode(next);
+            if (st && typeof st.amount === 'number' && isFinite(st.amount)) {
+                slider.value = String(st.amount);
+                slider.style.setProperty('--val', slider.value);
+                try { localStorage.setItem(LS_AMOUNT + '.' + mode, slider.value); } catch (e) { /* noop */ }
+            }
+            applyMaterial();
+        },
         // Re-measure the select after a layout move (the mixer strip adopts it
         // into a label with a different font than the sidebar's)
         resizeLabel: sizeSelectToLabel
