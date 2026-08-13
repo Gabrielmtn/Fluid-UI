@@ -449,6 +449,29 @@
                                       // Straight dye edges have zero Laplacian — moving
                                       // fronts keep their crispness. 0 = off.
 
+            COLLIDER_FLOW_KEEP: 1.0,  // Wall-drain flow gate (2026-08-11). The drain that stops
+                                      // colliders burning their shape into the artwork used to
+                                      // test coverage dilated by a sim texel, so on an
+                                      // INTRICATE collider it covered the gaps BETWEEN details
+                                      // too — and at 6%/frame that band ate dye in transit,
+                                      // not just dye pinned in walls. Measured on a fine dot
+                                      // lattice: partial-coverage texels kept 2-4% of their
+                                      // dye over 2s (open fluid kept 54%) and total dye mass
+                                      // fell to 0.59x the collider-free run — the "collider
+                                      // dulls the fluid" report, loudest under Gate (capped
+                                      // dye has no HDR headroom to hide the loss).
+                                      // 1 = drain only dye that is actually stuck; 0 = legacy.
+                                      // See advectionFrag in 05b.
+            COLLIDER_DRAIN: 0.06,     // Rate of that drain, per 60fps frame. 0 = off (dye
+                                      // pinned in walls then burns the mask shape into the
+                                      // artwork, which is what the drain exists to prevent).
+            COLLIDER_DRAIN_DILATE: 0.0, // Whether the drain tests coverage dilated by a sim
+                                      // texel (1 = legacy) or the texel's own coverage (0).
+                                      // The dilation was for sub-texel gaps and the thin
+                                      // pinned rim; on a fine mask it instead pushed a
+                                      // 4-dye-texel eating band around EVERY detail. The
+                                      // flow gate above now covers the rim case.
+
             DEBAND: 0.0,              // De-band / "organic" taper (2026-07-18): softens the
                                       // MacCormack anti-diffusion where dye is BOTH hard-edged
                                       // and moving fast (the terrace cliffs of no-curl acrylic
@@ -558,6 +581,19 @@
                                       // asymmetric stamp shapes (chisel/streak) in the splat
                                       // shader; the brush-ring cursor's line shows this angle.
                                       // Round tips (soft/blob/ring) are rotation-invariant.
+
+            SYMMETRY_MODE: 'radial',  // Multi-Brush arm layout (05g symmetryTransforms).
+                                      // 'radial' = the classic C_n ring (default, unchanged);
+                                      // 'mirrorX'/'mirrorY'/'mirrorQuad' fold that ring across
+                                      // the centre axes (dihedral — 2n/2n/4n dabs); 'spiral'
+                                      // = rotate + shrink per copy; 'rake' = bristles offset
+                                      // perpendicular to travel. Multi-Brush dropdown select.
+            SYM_SPIRAL_TURN: 2.39996, // 'spiral' turn per copy in radians. Default is the
+                                      // golden angle, which is why the arms never line up
+                                      // into spokes the way an even fraction of 2π does.
+            SYM_SPIRAL_SCALE: 0.82,   // 'spiral' shrink per copy, toward the centre
+            SYM_RAKE_SPACING: 1.0,    // 'rake' bristle gap in brush diameters, so the rake
+                                      // opens and closes with the Size fader
 
             SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
                                       // Painterly sub-grid wisps on moving paint; dies with

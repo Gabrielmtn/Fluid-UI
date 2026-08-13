@@ -4014,6 +4014,38 @@
         header.textContent = 'Brush Colors';
         panel.appendChild(header);
 
+        // Symmetry leads the panel: this dropdown IS the Multi-Brush panel, and
+        // the mode decides what the arms listed below actually are. The element
+        // is authored in index.html and MOVED here, not cloned — a clone would
+        // leave the persisted #symmetryMode id pointing at a stale hidden copy.
+        var symGroup = document.getElementById('symmetryModeGroup');
+        if (symGroup) {
+            symGroup.style.padding = '6px 8px 0';
+            panel.appendChild(symGroup);
+        }
+        var symNote = document.createElement('div');
+        symNote.className = 'arm-sym-note';
+        symNote.style.cssText = 'padding:2px 8px 6px;font-size:9px;color:rgba(255,255,255,0.45);';
+        panel.appendChild(symNote);
+
+        function updateSymNote() {
+            var slider = document.getElementById('multiplier');
+            var n = slider ? parseInt(slider.value, 10) || 1 : 1;
+            var mode = (window.config && window.config.SYMMETRY_MODE) || 'radial';
+            var dabs = n;
+            if (typeof window.symmetryTransforms === 'function') {
+                try { dabs = window.symmetryTransforms(mode, n, 1, 0).length; } catch (_) {}
+            }
+            // The dab count, not the arm count, is what costs: Quad at 8 arms
+            // is 32 splats per stroke sample, and nothing else on screen says so.
+            symNote.textContent = n + (n === 1 ? ' arm → ' : ' arms → ') +
+                dabs + (dabs === 1 ? ' dab' : ' dabs') + ' per stroke sample';
+        }
+        if (symGroup) {
+            var symSel = symGroup.querySelector('#symmetryMode');
+            if (symSel) symSel.addEventListener('change', updateSymNote);
+        }
+
         var rowsWrap = document.createElement('div');
         rowsWrap.className = 'arm-colors-rows';
         panel.appendChild(rowsWrap);
@@ -4091,6 +4123,7 @@
             // random/step). The old "set multiplier to 2+" hint gated the
             // whole panel behind multi-arm mode.
             count = Math.max(1, count);
+            updateSymNote();   // arm count feeds the dab-count hint
             ensureArmConfig(count);
             var arr = window.multiArmColors;
 

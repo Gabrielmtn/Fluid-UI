@@ -145,6 +145,10 @@
         visualResolution: {options: ["4096", "2048", "1536", "1024", "512", "256"], def: "2048", mut: null},
         physicsResolution: {options: ["2048", "1536", "1024", "512", "384", "256", "192", "128", "64", "32"], def: "512", mut: null},
         kaleidoMode: {options: ["1", "2", "3", "4", "5", "0"], def: "1", mut: {options: ["0", "1", "2", "3", "4", "5"], scope: "basic"}},
+        // Multi-Brush arm layout. No `mut`: symmetry only shapes FUTURE
+        // strokes, so a mutation would leave the preview frame identical
+        // and then silently change how the user's next stroke lands.
+        symmetryMode: {options: ["radial", "mirrorX", "mirrorY", "mirrorQuad", "spiral", "rake"], def: "radial", mut: null},
         fpsCap: {options: ["30", "60", "120", "144", "165", "240", "native", "0"], def: "30", mut: null},
         lightMode: {options: ["manual", "random"], def: "manual", mut: {options: null, scope: "extended"}},
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
