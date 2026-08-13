@@ -1132,6 +1132,7 @@ function initMultiplayer() {
 function disconnectMultiplayer() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
+    stopPing();
     closeMatchmaking();
     stopStrangerKeepAlive();
     _dabQueue.length = 0; // never carry one room's dabs into the next
@@ -1155,6 +1156,31 @@ function disconnectMultiplayer() {
     showDisconnectedUI();
 }
 
+// ── Liveness heartbeat ──────────────────────────────────────────────
+// The relay reaps connections that have pinged before and then gone silent
+// (~65s). Without this, a peer that died without a close frame (sleeping
+// laptop, crash, dropped network) haunted the room for minutes: it held the
+// cap-2 stranger slot, kept the survivor's count at 2 ("still connected"),
+// and could capture the turn rotation. Old clients never ping and are never
+// reaped, so mixed rooms stay safe; a live client wrongly reaped (e.g. on
+// wake from sleep) gets close code 4003, which takes the normal reconnect
+// path.
+var PING_MS = 20000;
+var pingTimer = null;
+function sendPing() {
+    if (partySocket && partySocket.readyState === WebSocket.OPEN) {
+        try { partySocket.send(JSON.stringify({ type: 'ping' })); } catch (_) {}
+    }
+}
+function startPing() {
+    stopPing();
+    sendPing(); // mark this connection reap-eligible immediately
+    pingTimer = setInterval(sendPing, PING_MS);
+}
+function stopPing() {
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+}
+
 // Stale-socket guard: every handler ignores events from a socket that is no
 // longer THE socket (replaced by a newer connect). Without this, an orphaned
 // socket's events keep mutating module state — its 'close' schedules a bogus
@@ -1169,6 +1195,7 @@ function onMultiplayerOpen(event) {
     if (partySocket && partySocket._connectTimeout) clearTimeout(partySocket._connectTimeout);
     isMultiplayerEnabled = true;
     reconnectAttempts = 0;
+    startPing();
     // Sync the hidden toggle
     var toggle = document.getElementById('multiplayerToggle');
     if (toggle) toggle.checked = true;
@@ -1360,6 +1387,7 @@ function onMultiplayerClose(event) {
     // closing later must not touch state or schedule a reconnect.
     if (event && event.target && event.target !== partySocket) return;
     console.log('Disconnected from multiplayer');
+    stopPing();
     isMultiplayerEnabled = false;
     clearRemoteCursors();
     // Server refused the join (locked room / full room) — don't retry in a loop.
