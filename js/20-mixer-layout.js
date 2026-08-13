@@ -830,7 +830,11 @@
                 btn.title = 'Load "' + name + '"';
                 btn.addEventListener('click', function() {
                     var snapshot = presets[name];
-                    if (snapshot && typeof window.applyPresetSnapshot === 'function') {
+                    // Full-state apply — see 12-save-load: a preset click must
+                    // land on a complete deterministic state.
+                    if (snapshot && typeof window.applyPresetSnapshotFull === 'function') {
+                        window.applyPresetSnapshotFull(snapshot);
+                    } else if (snapshot && typeof window.applyPresetSnapshot === 'function') {
                         window.applyPresetSnapshot(snapshot);
                     }
                     // Built-in active state clears through the real state owner
@@ -3911,7 +3915,11 @@
                 btn.textContent = name;
                 btn.title = 'Load "' + name + '"';
                 btn.addEventListener('click', function() {
-                    if (typeof window.applyPresetSnapshot === 'function') {
+                    // Full-state apply — see 12-save-load: a preset click must
+                    // land on a complete deterministic state.
+                    if (typeof window.applyPresetSnapshotFull === 'function') {
+                        window.applyPresetSnapshotFull(presets[name]);
+                    } else if (typeof window.applyPresetSnapshot === 'function') {
                         window.applyPresetSnapshot(presets[name]);
                     }
                     presetList.querySelectorAll('.user-preset-btn').forEach(function(b) { b.classList.remove('active'); });
