@@ -526,8 +526,11 @@
                         return;
                     }
                 }
-                // Magnetic snap to 1.0 for density slider
-                if (id === 'densityDissipation') {
+                // Magnetic snap to 1.0 for density slider — USER DRAGS ONLY
+                // (e.isTrusted). Programmatic applies (presets, the look
+                // mirror) dispatch untrusted events; the magnet used to grab
+                // e.g. a preset's 0.999 and quietly turn it into 1.0.
+                if (id === 'densityDissipation' && e.isTrusted) {
                     const snapTarget = 1.0;
                     const snapRange = 0.003; // How close you need to be to snap
                     const pushThrough = 0.008; // How far you need to push to break free

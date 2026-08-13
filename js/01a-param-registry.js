@@ -280,6 +280,28 @@
         return { sliders: sliders, checkboxes: checkboxes, selects: selects };
     }
 
+    // Full defaults snapshot for the preset baseline: every param with a
+    // known default, keyed like a preset snapshot's sliders/checkboxes/
+    // selects sections. Dynamic controls hydrate their def from the DOM's
+    // defaultValue (the value the strip created them with); params whose
+    // default is still unknown are omitted rather than guessed.
+    function defaults() {
+        var out = { sliders: {}, checkboxes: {}, selects: {} };
+        Object.keys(SLIDERS).forEach(function (id) {
+            var s = _hydrate(id, SLIDERS[id]);
+            if (typeof s.def === 'number' && isFinite(s.def)) out.sliders[id] = s.def;
+        });
+        Object.keys(CHECKBOXES).forEach(function (id) {
+            var d = CHECKBOXES[id].def;
+            if (typeof d === 'boolean') out.checkboxes[id] = d;
+        });
+        Object.keys(SELECTS).forEach(function (id) {
+            var d = SELECTS[id].def;
+            if (typeof d === 'string') out.selects[id] = d;
+        });
+        return out;
+    }
+
     // Dev check: report drift between registry and live DOM attributes.
     // Enable with localStorage.debugParams = '1'.
     function verifyDom() {
@@ -314,6 +336,7 @@
         clampConfigObject: clampConfigObject,
         toSliderConfig: toSliderConfig,
         toMutationSchemas: toMutationSchemas,
+        defaults: defaults,
         verifyDom: verifyDom
     };
 
