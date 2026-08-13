@@ -1039,7 +1039,10 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 /* Rotation wheel: who's in the round and whose turn it is */
 .mp-turn-wheel {
-    margin-bottom: 8px;
+    padding: 10px 6px 6px;
+    margin: 2px 0 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--ground-500, #2a2e37);
 }
 .mp-turn-wheel svg {
     display: block;

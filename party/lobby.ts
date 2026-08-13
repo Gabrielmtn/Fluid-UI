@@ -25,6 +25,14 @@ export default class LobbyServer implements Party.Server {
   // Who is holding the waiting room. Without this a second matchmake from the
   // SAME device is handed its own room with waiting:false — "matched" alone.
   waitingUid: string | null = null;
+  // The waiter's lobby CONNECTION. Clients now keep this socket open while
+  // they wait: a live connection pins this instance (so the pointer can't be
+  // lost to an idle eviction between two seekers), and its close means the
+  // waiter really left — clear the slot immediately instead of stranding new
+  // seekers in an empty room until the TTL. In-memory only: connection ids
+  // are meaningless across a restart (the client's keep-alive re-registers
+  // via `holding` after one).
+  waitingConnId: string | null = null;
   loaded = false;
   ready: Promise<void> | null = null;
   lastSeen: Map<string, number> = new Map(); // uid -> last matchmake ts (best-effort throttle)
@@ -111,6 +119,8 @@ export default class LobbyServer implements Party.Server {
     }
     // ────────────────────────────────────────────────────────────────────
 
+    this.waitingConnId = waiting ? sender.id : null;
+
     // Commit the waiting-pointer mutation BEFORE replying, so the seeker never
     // acts on a pairing decision an eviction could lose (which would strand both
     // seekers alone in separate rooms). The in-memory mutation already happened
@@ -119,6 +129,18 @@ export default class LobbyServer implements Party.Server {
     if (waiting) await this.room.storage.setAlarm(now + WAIT_TTL_MS + 1000);
 
     sender.send(JSON.stringify({ type: "matched", roomId, waiting }));
+  }
+
+  // The waiter hung up (left the site, joined a code room, or got paired and
+  // dropped the pin): free the slot right away so the next seeker never gets
+  // pointed at a room whose occupant is gone.
+  async onClose(conn: Party.Connection) {
+    if (this.waitingConnId && conn.id === this.waitingConnId) {
+      this.waitingConnId = null;
+      this.waitingRoomId = null;
+      this.waitingUid = null;
+      await this.persistWaiting();
+    }
   }
 
   // Server-only endpoint: a public play room reports it emptied, so we can clear

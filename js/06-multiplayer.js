@@ -139,19 +139,39 @@ function paintWithStranger() {
                 ws.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID }));
             });
             ws.addEventListener('message', function(ev) {
-                if (settled || ws !== matchmakingSocket) return;
+                if (ws !== matchmakingSocket) return;
                 var data; try { data = JSON.parse(ev.data); } catch (_) { return; }
                 if (data.type === 'matched') {
-                    settled = true; clearTimeout(timeout); closeMatchmaking();
-                    connectToRoom(data.roomId);
-                } else if (data.type === 'matchmake-error') {
+                    if (!settled) {
+                        settled = true; clearTimeout(timeout);
+                        // waiting:false → paired into another seeker's room; the
+                        // lobby is done with us. waiting:true → we ARE the waiting
+                        // slot: keep this socket OPEN — a live connection pins the
+                        // lobby (its pointer can't be lost to an idle eviction,
+                        // the exact hole that let two seekers mint separate rooms
+                        // and miss each other), and closing it is how the lobby
+                        // knows the waiter left. The keep-alive rides it too.
+                        if (data.waiting === false) closeMatchmaking();
+                        connectToRoom(data.roomId);
+                    } else if (data.waiting === false && data.roomId && data.roomId !== currentRoom &&
+                               isStrangerRoom() && connectedClients < 2) {
+                        // A keep-alive on the pin was paired into another lone
+                        // waiter's room — go join them.
+                        closeMatchmaking();
+                        stopStrangerKeepAlive();
+                        connectToRoom(data.roomId);
+                    }
+                    return;
+                }
+                if (data.type === 'matchmake-error') {
+                    if (settled) return; // a pinned keep-alive hit the throttle — harmless
                     // The lobby throttles matchmakes per device id ("One
                     // moment…"). Two tabs in one browser SHARE that id, so the
                     // second tab's click lands inside the 3s window routinely —
                     // retry past the throttle instead of failing the flow.
                     if (/one moment/i.test(data.message || '') && attempts < MAX_MATCHMAKE_ATTEMPTS) {
                         closeMatchmaking();
-                        setTimeout(tryMatchmake, 3300);
+                        matchmakeRetryTimer = setTimeout(tryMatchmake, 3300);
                         return;
                     }
                     settled = true; clearTimeout(timeout); closeMatchmaking();
@@ -172,12 +192,25 @@ function paintWithStranger() {
     tryMatchmake();
 }
 
+var matchmakeRetryTimer = null;
 function closeMatchmaking() {
+    if (matchmakeRetryTimer) { clearTimeout(matchmakeRetryTimer); matchmakeRetryTimer = null; }
     if (matchmakingSocket) {
         try { matchmakingSocket.close(); } catch (_) {}
         matchmakingSocket = null;
     }
 }
+
+// bfcache: a page restored from the back/forward cache resumes with DEAD
+// sockets but LIVE timers — a pending matchmake retry or stranger keep-alive
+// would fire into the stale state and wander the client into a phantom pub-
+// room (joined out of nowhere, then dropped). Come back clean instead.
+window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    closeMatchmaking();
+    stopStrangerKeepAlive();
+    if (partySocket || currentRoom) disconnectMultiplayer();
+});
 
 // ── Stranger keep-alive ──────────────────────────────────────────────
 // A lone seeker sits in its minted pub- room with the lobby socket closed.
@@ -215,6 +248,15 @@ function scheduleStrangerKeepAlive(first) {
             return;
         }
         var mine = currentRoom;
+        // Normal path: the waiting pin socket is open — refresh our slot on it.
+        // (Replies land in the paintWithStranger handler: waiting:true refreshes
+        // are ignored there; a waiting:false pairing makes us hop to the room.)
+        if (matchmakingSocket && matchmakingSocket.readyState === WebSocket.OPEN) {
+            try { matchmakingSocket.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID, holding: mine })); } catch (_) {}
+            scheduleStrangerKeepAlive(false);
+            return;
+        }
+        // Fallback (pin died — network blip): a short-lived socket re-registers.
         try {
             var proto = isPlainWsHost(PARTYKIT_HOST) ? 'ws' : 'wss';
             var ws = new WebSocket(proto + '://' + PARTYKIT_HOST + '/parties/lobby/main?uid=' + encodeURIComponent(DEVICE_UID));
@@ -648,11 +690,17 @@ function wheelNode(cx, cy, r, id, isHolder) {
     return s;
 }
 
-function wheelLabel(x, y, anchor, id, isHolder) {
+var WHEEL_W = 224; // viewBox width shared by every layout
+
+function wheelLabel(x, y, id, isHolder) {
     var name = shortName(id) + (id === clientId ? ' (you)' : '');
+    // Clamp horizontally so side labels never run off the frame (~5.8px/char
+    // at font-size 10, centered) — clipped names were half the cramped look.
+    var half = name.length * 2.9 + 4;
+    x = Math.max(half, Math.min(WHEEL_W - half, x));
     var fill = isHolder ? '#ffffff' : '#b9bec7';
     var weight = (id === clientId || isHolder) ? '700' : '400';
-    return '<text x="' + x + '" y="' + y + '" text-anchor="' + anchor + '" font-size="10" font-weight="' + weight + '" fill="' + fill + '">' + name + '</text>';
+    return '<text x="' + x + '" y="' + y + '" text-anchor="middle" font-size="10" font-weight="' + weight + '" fill="' + fill + '">' + name + '</text>';
 }
 
 function renderTurnWheel() {
@@ -679,39 +727,41 @@ function renderTurnWheel() {
     var svg = '';
 
     if (n <= 1) {
-        svg = '<svg viewBox="0 0 220 96" xmlns="http://www.w3.org/2000/svg">';
+        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' 104" xmlns="http://www.w3.org/2000/svg">';
         if (n === 1) {
-            svg += wheelNode(110, 34, 15, ids[0], ids[0] === turnHolderId);
-            svg += wheelLabel(110, 66, 'middle', ids[0], ids[0] === turnHolderId);
+            svg += wheelNode(112, 36, 15, ids[0], ids[0] === turnHolderId);
+            svg += wheelLabel(112, 70, ids[0], ids[0] === turnHolderId);
         }
-        svg += '<text x="110" y="86" text-anchor="middle" font-size="10" fill="#7b828e">waiting for another artist…</text>';
+        svg += '<text x="112" y="92" text-anchor="middle" font-size="10" fill="#7b828e">waiting for another artist…</text>';
         svg += '</svg>';
     } else if (n === 2) {
         // Bi-directional arrow between the pair — the brush just swaps.
-        svg = '<svg viewBox="0 0 220 112" xmlns="http://www.w3.org/2000/svg">';
+        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' 124" xmlns="http://www.w3.org/2000/svg">';
         if (clockText) {
-            svg += '<text id="turnWheelClock" x="110" y="46" text-anchor="middle" font-size="13" font-weight="700" fill="' + clockFill + '">' + clockText + '</text>';
+            svg += '<text id="turnWheelClock" x="112" y="48" text-anchor="middle" font-size="13" font-weight="700" fill="' + clockFill + '">' + clockText + '</text>';
         }
-        svg += wheelNode(52, 66, 15, ids[0], ids[0] === turnHolderId);
-        svg += wheelNode(168, 66, 15, ids[1], ids[1] === turnHolderId);
-        svg += '<line x1="78" y1="66" x2="142" y2="66" stroke="#7b828e" stroke-width="2"/>' +
-               '<path d="M78,66 l9,-5 v10 z" fill="#7b828e"/>' +
-               '<path d="M142,66 l-9,-5 v10 z" fill="#7b828e"/>';
-        svg += wheelLabel(52, 97, 'middle', ids[0], ids[0] === turnHolderId);
-        svg += wheelLabel(168, 97, 'middle', ids[1], ids[1] === turnHolderId);
+        svg += wheelNode(56, 74, 15, ids[0], ids[0] === turnHolderId);
+        svg += wheelNode(168, 74, 15, ids[1], ids[1] === turnHolderId);
+        svg += '<line x1="82" y1="74" x2="142" y2="74" stroke="#7b828e" stroke-width="2"/>' +
+               '<path d="M82,74 l9,-5 v10 z" fill="#7b828e"/>' +
+               '<path d="M142,74 l-9,-5 v10 z" fill="#7b828e"/>';
+        svg += wheelLabel(56, 108, ids[0], ids[0] === turnHolderId);
+        svg += wheelLabel(168, 108, ids[1], ids[1] === turnHolderId);
         svg += '</svg>';
     } else {
         // Polygon layout: node i sits at -90° + i·(360/n) around the center;
         // a center arrow rotates to point at the painter.
-        var cx = 110, cy = 80, R = 46;
-        svg = '<svg viewBox="0 0 220 160" xmlns="http://www.w3.org/2000/svg">';
+        var cx = 112, cy = 100, R = 47;
+        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' 198" xmlns="http://www.w3.org/2000/svg">';
+        // Faint guide ring so the rotation reads as one shape.
+        svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>';
         var holderIdx = turnHolderId ? ids.indexOf(turnHolderId) : -1;
         if (holderIdx !== -1) {
             var rot = holderIdx * (360 / n); // arrow art points up = node 0
             svg += '<g transform="translate(' + cx + ',' + cy + ')">' +
                    '<g transform="rotate(' + rot + ')">' +
-                   '<line x1="0" y1="-17" x2="0" y2="-29" stroke="#f2f3f5" stroke-width="2.5"/>' +
-                   '<path d="M0,-37 l-5.5,9 h11 z" fill="#f2f3f5"/>' +
+                   '<line x1="0" y1="-18" x2="0" y2="-30" stroke="#f2f3f5" stroke-width="2.5"/>' +
+                   '<path d="M0,-38 l-5.5,9 h11 z" fill="#f2f3f5"/>' +
                    '</g></g>';
         }
         if (clockText) {
@@ -723,12 +773,20 @@ function renderTurnWheel() {
             var ny = cy + R * Math.sin(ang);
             var isH = ids[i] === turnHolderId;
             svg += wheelNode(nx, ny, 12, ids[i], isH);
-            var lx = cx + (R + 22) * Math.cos(ang);
-            var ly = cy + (R + 22) * Math.sin(ang);
-            var anchor = Math.cos(ang) < -0.35 ? 'end' : (Math.cos(ang) > 0.35 ? 'start' : 'middle');
-            // Pull side labels back toward the node so they stay in frame.
-            if (anchor !== 'middle') lx = cx + (R + 16) * Math.cos(ang);
-            svg += wheelLabel(lx, ly + 4, anchor, ids[i], isH);
+            // Labels sit radially outside the ring, far enough that they
+            // clear the holder's highlight ring; wheelLabel clamps them back
+            // into frame on the sides. When clamping would drag a label onto
+            // its own node (long "(you)" names on side nodes), stack it
+            // below/above the node instead.
+            var lname = shortName(ids[i]) + (ids[i] === clientId ? ' (you)' : '');
+            var lhalf = lname.length * 2.9 + 4;
+            var lx = cx + (R + 27) * Math.cos(ang);
+            var ly = cy + (R + 27) * Math.sin(ang) + 3.5;
+            if (lx - lhalf < 0 || lx + lhalf > WHEEL_W) {
+                lx = nx;
+                ly = ny + (Math.sin(ang) >= 0 ? 27 : -21);
+            }
+            svg += wheelLabel(lx, ly, ids[i], isH);
         }
         svg += '</svg>';
     }
@@ -1122,6 +1180,8 @@ function onMultiplayerClose(event) {
 function giveUpConnection(msg) {
     lastRoom = currentRoom;
     currentRoom = null;
+    closeMatchmaking(); // drop any waiting pin — we're no longer in that room
+    stopStrangerKeepAlive();
     // A watcher whose connection died must not stay gated (or banner-ed)
     // offline — they're back to painting alone now.
     resetSettingsLock();
@@ -1552,9 +1612,10 @@ function updateConnectedView() {
     if (stranger) {
         var alone = connectedClients < 2;
         updateMultiplayerStatus(alone ? '🎲 Waiting for a stranger…' : '🎨 Painting with a stranger');
-        // Hold our matchmaking slot while alone; drop it the moment we pair.
+        // Hold our matchmaking slot while alone; drop it (and the lobby pin
+        // socket that holds it open) the moment we pair.
         if (alone) { if (!strangerKeepAlive) startStrangerKeepAlive(); }
-        else stopStrangerKeepAlive();
+        else { stopStrangerKeepAlive(); closeMatchmaking(); }
     } else {
         stopStrangerKeepAlive();
         updateMultiplayerStatus(roomLocked ? '🔒 Room locked' : 'Connected');
