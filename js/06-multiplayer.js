@@ -24,6 +24,8 @@ let roomLocked = false;   // current room's server-confirmed lock state
 var turnsOn = false;        // room-wide flag
 var turnHolderId = null;    // connection id of the current painter (null = none)
 var turnOrder = [];         // connection ids in rotation order
+var turnMsLocal = 0;        // turn length from the server (0 = no timer)
+var turnDeadlineLocal = 0;  // local-clock time the turn auto-passes (0 = none)
 window.__mpTurnBlocked = false; // paint gate (read by 05d pointer/touch + 04f clear)
 
 // Stable per-device id (opaque, localStorage). Used to re-admit a dropped
@@ -60,6 +62,14 @@ const PARTYKIT_HOST = (function() {
     if (/\.partykit\.dev$/.test(host)) return host;
     return 'fluid-ui-multiplayer.gabrielmtn.partykit.dev';
 })();
+
+// ws:// for local/LAN dev relays (no TLS there); wss:// for real deploys.
+// Covers localhost, loopback, and RFC1918 LAN addresses so another device on
+// the same network (phone/tablet) can point at a `partykit dev` relay via
+// the host override.
+function isPlainWsHost(h) {
+    return /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/.test(h);
+}
 
 // Generate a random 6-character room code
 function generateRoomCode() {
@@ -121,8 +131,7 @@ function paintWithStranger() {
         if (settled) return;
         attempts++;
         try {
-            const isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
-            const protocol = isLocal ? 'ws:' : 'wss:';
+            const protocol = isPlainWsHost(PARTYKIT_HOST) ? 'ws:' : 'wss:';
             const url = `${protocol}//${PARTYKIT_HOST}/parties/lobby/main?uid=${encodeURIComponent(DEVICE_UID)}`;
             var ws = new WebSocket(url);
             matchmakingSocket = ws;
@@ -207,8 +216,7 @@ function scheduleStrangerKeepAlive(first) {
         }
         var mine = currentRoom;
         try {
-            var isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
-            var proto = isLocal ? 'ws' : 'wss';
+            var proto = isPlainWsHost(PARTYKIT_HOST) ? 'ws' : 'wss';
             var ws = new WebSocket(proto + '://' + PARTYKIT_HOST + '/parties/lobby/main?uid=' + encodeURIComponent(DEVICE_UID));
             var done = false;
             var bail = setTimeout(function () { if (!done) { done = true; try { ws.close(); } catch (_) {} } }, 8000);
@@ -548,10 +556,44 @@ function resetTurnState() {
     turnsOn = false;
     turnHolderId = null;
     turnOrder = [];
+    turnMsLocal = 0;
+    turnDeadlineLocal = 0;
+    stopTurnTick();
     syncTurnGates(); // clears BOTH gates (turnsOn is false)
     syncLookMirror();
     var banner = document.getElementById('mpTurnBanner');
     if (banner) banner.remove();
+    var wheel = document.getElementById('turnWheel');
+    if (wheel) { wheel.style.display = 'none'; wheel.innerHTML = ''; }
+    _wheelKey = '';
+}
+
+// ── Turn countdown ──────────────────────────────────────────────────
+// The server owns the clock (its alarm auto-passes the brush); clients only
+// RENDER the remaining time from the skew-adjusted deadline.
+var turnTickTimer = null;
+
+function fmtRemaining() {
+    if (!turnDeadlineLocal) return '';
+    var s = Math.max(0, Math.round((turnDeadlineLocal - Date.now()) / 1000));
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return m + ':' + (r < 10 ? '0' : '') + r;
+}
+
+function stopTurnTick() {
+    if (turnTickTimer) { clearInterval(turnTickTimer); turnTickTimer = null; }
+}
+
+function ensureTurnTick() {
+    if (turnTickTimer) return;
+    turnTickTimer = setInterval(function () {
+        if (!turnsOn || !turnDeadlineLocal) { stopTurnTick(); return; }
+        updateTurnBanner();
+        updateTurnStatusLine();
+        var clock = document.getElementById('turnWheelClock');
+        if (clock) clock.textContent = fmtRemaining();
+    }, 500);
 }
 
 // Fixed banner while turns are running (mirrors the settings-lock banner).
@@ -569,12 +611,14 @@ function updateTurnBanner() {
             'font-size:12px;font-weight:600;pointer-events:none;';
         document.body.appendChild(banner);
     }
+    var t = fmtRemaining();
+    var clock = t ? ' (' + t + ')' : '';
     if (isMyTurn()) {
-        banner.textContent = '🖌 Your turn — everyone sees your settings';
+        banner.textContent = '🖌 Your turn' + clock + ' — everyone sees your settings';
         banner.style.border = '1px solid rgba(63,185,80,0.55)';
         banner.style.color = '#3fb950';
     } else if (turnHolderId) {
-        banner.textContent = '👀 ' + shortName(turnHolderId) + ' is painting — your settings mirror theirs';
+        banner.textContent = '👀 ' + shortName(turnHolderId) + ' is painting' + clock + ' — your settings mirror theirs';
         banner.style.border = '1px solid rgba(255,178,71,0.5)';
         banner.style.color = '#ffb347';
     } else {
@@ -584,8 +628,132 @@ function updateTurnBanner() {
     }
 }
 
-// Panel widgets: the host's Take turns toggle, the rotation status line, and
-// the Pass/Skip button (painter passes; host can skip an AFK painter).
+// ── Rotation wheel ──────────────────────────────────────────────────
+// Two artists: a bi-directional arrow between two nodes, painter highlighted.
+// Three or more: nodes evenly spaced on a circle (triangle/square/pentagon…)
+// with a center arrow pointing at the painter. Node colors match the artists'
+// remote-cursor colors; your own node says "(you)".
+var _wheelKey = '';
+
+function wheelNode(cx, cy, r, id, isHolder) {
+    var col = colorForClient(id);
+    var s = '';
+    if (isHolder) {
+        s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r + 4.5) + '" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.9"/>';
+    }
+    s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + col + '" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>';
+    if (isHolder) {
+        s += '<text x="' + cx + '" y="' + (cy + 4.5) + '" text-anchor="middle" font-size="13">🖌</text>';
+    }
+    return s;
+}
+
+function wheelLabel(x, y, anchor, id, isHolder) {
+    var name = shortName(id) + (id === clientId ? ' (you)' : '');
+    var fill = isHolder ? '#ffffff' : '#b9bec7';
+    var weight = (id === clientId || isHolder) ? '700' : '400';
+    return '<text x="' + x + '" y="' + y + '" text-anchor="' + anchor + '" font-size="10" font-weight="' + weight + '" fill="' + fill + '">' + name + '</text>';
+}
+
+function renderTurnWheel() {
+    var host = document.getElementById('turnWheel');
+    if (!host) return;
+    if (!turnsOn || !isMultiplayerEnabled) {
+        host.style.display = 'none';
+        if (host.innerHTML) host.innerHTML = '';
+        _wheelKey = '';
+        return;
+    }
+    host.style.display = '';
+    var ids = turnOrder.slice();
+    if (!ids.length && turnHolderId) ids = [turnHolderId];
+    var key = ids.join('|') + '#' + (turnHolderId || '') + '#' + (clientId || '') + '#' + (turnDeadlineLocal ? 1 : 0);
+    if (key === _wheelKey) {
+        // Rotation unchanged — the tick only refreshes the clock text.
+        return;
+    }
+    _wheelKey = key;
+    var n = ids.length;
+    var clockText = fmtRemaining();
+    var clockFill = isMyTurn() ? '#3fb950' : '#ffb347';
+    var svg = '';
+
+    if (n <= 1) {
+        svg = '<svg viewBox="0 0 220 96" xmlns="http://www.w3.org/2000/svg">';
+        if (n === 1) {
+            svg += wheelNode(110, 34, 15, ids[0], ids[0] === turnHolderId);
+            svg += wheelLabel(110, 66, 'middle', ids[0], ids[0] === turnHolderId);
+        }
+        svg += '<text x="110" y="86" text-anchor="middle" font-size="10" fill="#7b828e">waiting for another artist…</text>';
+        svg += '</svg>';
+    } else if (n === 2) {
+        // Bi-directional arrow between the pair — the brush just swaps.
+        svg = '<svg viewBox="0 0 220 112" xmlns="http://www.w3.org/2000/svg">';
+        if (clockText) {
+            svg += '<text id="turnWheelClock" x="110" y="46" text-anchor="middle" font-size="13" font-weight="700" fill="' + clockFill + '">' + clockText + '</text>';
+        }
+        svg += wheelNode(52, 66, 15, ids[0], ids[0] === turnHolderId);
+        svg += wheelNode(168, 66, 15, ids[1], ids[1] === turnHolderId);
+        svg += '<line x1="78" y1="66" x2="142" y2="66" stroke="#7b828e" stroke-width="2"/>' +
+               '<path d="M78,66 l9,-5 v10 z" fill="#7b828e"/>' +
+               '<path d="M142,66 l-9,-5 v10 z" fill="#7b828e"/>';
+        svg += wheelLabel(52, 97, 'middle', ids[0], ids[0] === turnHolderId);
+        svg += wheelLabel(168, 97, 'middle', ids[1], ids[1] === turnHolderId);
+        svg += '</svg>';
+    } else {
+        // Polygon layout: node i sits at -90° + i·(360/n) around the center;
+        // a center arrow rotates to point at the painter.
+        var cx = 110, cy = 80, R = 46;
+        svg = '<svg viewBox="0 0 220 160" xmlns="http://www.w3.org/2000/svg">';
+        var holderIdx = turnHolderId ? ids.indexOf(turnHolderId) : -1;
+        if (holderIdx !== -1) {
+            var rot = holderIdx * (360 / n); // arrow art points up = node 0
+            svg += '<g transform="translate(' + cx + ',' + cy + ')">' +
+                   '<g transform="rotate(' + rot + ')">' +
+                   '<line x1="0" y1="-17" x2="0" y2="-29" stroke="#f2f3f5" stroke-width="2.5"/>' +
+                   '<path d="M0,-37 l-5.5,9 h11 z" fill="#f2f3f5"/>' +
+                   '</g></g>';
+        }
+        if (clockText) {
+            svg += '<text id="turnWheelClock" x="' + cx + '" y="' + (cy + 4) + '" text-anchor="middle" font-size="12" font-weight="700" fill="' + clockFill + '">' + clockText + '</text>';
+        }
+        for (var i = 0; i < n; i++) {
+            var ang = (-90 + i * (360 / n)) * Math.PI / 180;
+            var nx = cx + R * Math.cos(ang);
+            var ny = cy + R * Math.sin(ang);
+            var isH = ids[i] === turnHolderId;
+            svg += wheelNode(nx, ny, 12, ids[i], isH);
+            var lx = cx + (R + 22) * Math.cos(ang);
+            var ly = cy + (R + 22) * Math.sin(ang);
+            var anchor = Math.cos(ang) < -0.35 ? 'end' : (Math.cos(ang) > 0.35 ? 'start' : 'middle');
+            // Pull side labels back toward the node so they stay in frame.
+            if (anchor !== 'middle') lx = cx + (R + 16) * Math.cos(ang);
+            svg += wheelLabel(lx, ly + 4, anchor, ids[i], isH);
+        }
+        svg += '</svg>';
+    }
+    host.innerHTML = svg;
+}
+
+// Countdown + rotation-size line under the wheel (refreshed by the tick).
+function updateTurnStatusLine() {
+    var tStat = document.getElementById('turnStatus');
+    if (!tStat) return;
+    if (!turnsOn) {
+        tStat.style.display = 'none';
+        return;
+    }
+    tStat.style.display = '';
+    var n = turnOrder.length;
+    var t = fmtRemaining();
+    var who = isMyTurn() ? '🖌 Your turn' : (turnHolderId ? '🖌 ' + shortName(turnHolderId) + ' painting' : '⏳ Waiting');
+    tStat.textContent = who + (t ? ' · ⏱ ' + t : '') + ' · ' + n + (n === 1 ? ' artist' : ' artists');
+    tStat.classList.toggle('mp-turn-you', isMyTurn());
+}
+
+// Panel widgets: the host's Take turns toggle + turn-length picker, the
+// rotation wheel, the countdown line, and the Pass/Skip button (painter
+// passes; host can skip an AFK painter).
 function updateTurnUI() {
     updateTurnBanner();
     var isHost = myRole === 'host';
@@ -595,29 +763,28 @@ function updateTurnUI() {
         tBtn.textContent = turnsOn ? '🔁 Stop taking turns' : '🔁 Take turns';
         tBtn.classList.toggle('active', turnsOn);
     }
+    var tSel = document.getElementById('turnTimerSel');
+    if (tSel) tSel.style.display = isHost ? '' : 'none';
     var pBtn = document.getElementById('turnPassBtn');
     if (pBtn) {
         var showPass = turnsOn && (isMyTurn() || isHost);
         pBtn.style.display = showPass ? '' : 'none';
         pBtn.textContent = isMyTurn() ? '➡ Pass turn' : '⏭ Skip turn';
     }
-    var tStat = document.getElementById('turnStatus');
-    if (tStat) {
-        if (!turnsOn) {
-            tStat.style.display = 'none';
-        } else {
-            tStat.style.display = '';
-            var n = turnOrder.length;
-            var who = isMyTurn() ? '🖌 Your turn' : (turnHolderId ? '🖌 ' + shortName(turnHolderId) + ' painting' : '⏳ Waiting');
-            tStat.textContent = who + ' · ' + n + (n === 1 ? ' artist' : ' artists') + ' in rotation';
-            tStat.classList.toggle('mp-turn-you', isMyTurn());
-        }
-    }
+    renderTurnWheel();
+    updateTurnStatusLine();
+    if (turnsOn && turnDeadlineLocal) ensureTurnTick(); else stopTurnTick();
+}
+
+function turnTimerSeconds() {
+    var sel = document.getElementById('turnTimerSel');
+    var v = sel ? parseInt(sel.value, 10) : 60;
+    return isNaN(v) ? 60 : v;
 }
 
 function toggleTurns() {
     if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
-    partySocket.send(JSON.stringify({ type: 'turns', on: !turnsOn }));
+    partySocket.send(JSON.stringify({ type: 'turns', on: !turnsOn, seconds: turnTimerSeconds() }));
 }
 
 function passTurn() {
@@ -685,8 +852,7 @@ function doConnect() {
         partySocket = null;
     }
     try {
-        const isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
-        const protocol = isLocal ? 'ws:' : 'wss:';
+        const protocol = isPlainWsHost(PARTYKIT_HOST) ? 'ws:' : 'wss:';
         const url = `${protocol}//${PARTYKIT_HOST}/parties/fluid/${currentRoom}?uid=${encodeURIComponent(DEVICE_UID)}`;
         console.log('Connecting to PartyKit:', url);
         showConnecting();
@@ -894,6 +1060,14 @@ function onMultiplayerMessage(event) {
                 turnOrder = Array.isArray(data.order)
                     ? data.order.filter(function (x) { return typeof x === 'string'; })
                     : [];
+                turnMsLocal = (typeof data.turnMs === 'number' && data.turnMs > 0) ? data.turnMs : 0;
+                // The countdown needs no synchronized clocks: the message's
+                // server timestamp gives us the skew to shift the deadline
+                // onto the local clock.
+                turnDeadlineLocal = (typeof data.deadline === 'number' && data.deadline > 0 &&
+                    typeof data.timestamp === 'number')
+                    ? data.deadline + (Date.now() - data.timestamp)
+                    : 0;
                 applyTurnState(wasMyTurn);
                 break;
             }
@@ -1514,6 +1688,15 @@ function initMultiplayerUI() {
 
     var turnPassBtn = document.getElementById('turnPassBtn');
     if (turnPassBtn) turnPassBtn.addEventListener('click', passTurn);
+
+    var turnTimerSel = document.getElementById('turnTimerSel');
+    if (turnTimerSel) turnTimerSel.addEventListener('change', function () {
+        // Host changing the length mid-round applies it immediately
+        // (restarts the current turn's clock server-side).
+        if (turnsOn && myRole === 'host' && partySocket && partySocket.readyState === WebSocket.OPEN) {
+            partySocket.send(JSON.stringify({ type: 'turns', on: true, seconds: turnTimerSeconds() }));
+        }
+    });
 
     // Auto-join if URL has room hash
     var hashRoom = getRoomFromHash();

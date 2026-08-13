@@ -67,6 +67,8 @@ export default class FluidPartyServer implements Party.Server {
   turnsOn = false;
   turnQueue: string[] = []; // uids of connected members, rotation order
   turnHolder: string | null = null; // uid of the current painter
+  turnMs = 60_000; // host-chosen turn length (0 = no timer)
+  turnDeadline = 0; // epoch ms when the current turn auto-passes (0 = none)
   loaded = false;
   ready: Promise<void> | null = null;
 
@@ -81,6 +83,9 @@ export default class FluidPartyServer implements Party.Server {
     this.turnsOn = (await this.room.storage.get<boolean>("turnsOn")) || false;
     this.turnQueue = (await this.room.storage.get<string[]>("turnQueue")) || [];
     this.turnHolder = (await this.room.storage.get<string>("turnHolder")) || null;
+    const tm = await this.room.storage.get<number>("turnMs");
+    this.turnMs = typeof tm === "number" ? tm : 60_000;
+    this.turnDeadline = (await this.room.storage.get<number>("turnDeadline")) || 0;
     this.loaded = true;
   }
 
@@ -137,6 +142,8 @@ export default class FluidPartyServer implements Party.Server {
       if (this.turnsOn) {
         this.turnQueue = [uid];
         this.turnHolder = uid;
+        this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+        await this.syncTurnAlarm();
       }
     }
 
@@ -199,27 +206,39 @@ export default class FluidPartyServer implements Party.Server {
       return;
     }
 
-    // ── Host-only take-turns toggle ──
+    // ── Host-only take-turns toggle (also carries the turn length) ──
     if (data.type === "turns" && this.managed) {
       await this.ensureLoaded();
       const st = sender.state as ConnState | null;
       const isHost = !!st && (st.role === "host" || st.uid === this.hostId);
       if (!isHost) return;
+      const wasOn = this.turnsOn;
       this.turnsOn = !!data.on;
       if (this.turnsOn) {
-        // Rotation = the enabling host first, then everyone else connected.
-        const uids: string[] = st ? [st.uid] : [];
-        for (const c of this.room.getConnections()) {
-          const cs = c.state as ConnState | null;
-          if (cs && !uids.includes(cs.uid)) uids.push(cs.uid);
+        // Turn length: 0 = no timer; otherwise clamp to something sane.
+        if (typeof data.seconds === "number" && Number.isFinite(data.seconds)) {
+          const s = Math.floor(data.seconds);
+          this.turnMs = s <= 0 ? 0 : Math.max(10, Math.min(600, s)) * 1000;
         }
-        this.turnQueue = uids;
-        this.turnHolder = uids[0] || null;
+        if (!wasOn) {
+          // Rotation = the enabling host first, then everyone else connected.
+          const uids: string[] = st ? [st.uid] : [];
+          for (const c of this.room.getConnections()) {
+            const cs = c.state as ConnState | null;
+            if (cs && !uids.includes(cs.uid)) uids.push(cs.uid);
+          }
+          this.turnQueue = uids;
+          this.turnHolder = uids[0] || null;
+        }
+        // A (re)enable or a timer change restarts the current turn's clock.
+        this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
       } else {
         this.turnQueue = [];
         this.turnHolder = null;
+        this.turnDeadline = 0;
       }
       await this.persist(); // commit before announcing (same rule as the lock)
+      await this.syncTurnAlarm();
       this.broadcastTurnState();
       return;
     }
@@ -233,7 +252,9 @@ export default class FluidPartyServer implements Party.Server {
       const isHolder = !!st && st.uid === this.turnHolder;
       if (!isHost && !isHolder) return;
       this.advanceTurn();
+      this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
       await this.persist();
+      await this.syncTurnAlarm();
       this.broadcastTurnState();
       return;
     }
@@ -280,7 +301,13 @@ export default class FluidPartyServer implements Party.Server {
       this.turnsOn = false;
       this.turnQueue = [];
       this.turnHolder = null;
+      this.turnDeadline = 0;
       await this.room.storage.deleteAll();
+      try {
+        await this.room.storage.deleteAlarm();
+      } catch {
+        /* no alarm scheduled */
+      }
       if (this.kind === "public") this.notifyLobbyVacate();
       return;
     }
@@ -323,6 +350,8 @@ export default class FluidPartyServer implements Party.Server {
             }
             if (!this.turnHolder) this.turnHolder = this.turnQueue[0];
           }
+          this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+          await this.syncTurnAlarm();
         }
         await this.persist();
         this.broadcastTurnState(conn.id);
@@ -338,6 +367,19 @@ export default class FluidPartyServer implements Party.Server {
 
   onError(conn: Party.Connection, err: Error) {
     console.error(`Error for ${conn.id}:`, err);
+  }
+
+  // Turn timer expiry: the brush auto-passes even if everyone is idle.
+  async onAlarm() {
+    await this.ensureLoaded();
+    if (!this.turnsOn || !this.turnDeadline) return;
+    if (Date.now() >= this.turnDeadline - 250) {
+      this.advanceTurn();
+      this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+      await this.persist();
+      this.broadcastTurnState();
+    }
+    await this.syncTurnAlarm();
   }
 
   // ── helpers ──
@@ -383,8 +425,24 @@ export default class FluidPartyServer implements Party.Server {
     this.turnHolder = q[0] || null;
   }
 
+  // Keep the storage alarm aligned with the turn deadline. (This party has no
+  // other alarm use; the matchmaking lobby is a separate party.)
+  async syncTurnAlarm() {
+    try {
+      if (this.turnsOn && this.turnDeadline) {
+        await this.room.storage.setAlarm(this.turnDeadline);
+      } else {
+        await this.room.storage.deleteAlarm();
+      }
+    } catch {
+      /* best-effort — a missed alarm only delays the auto-pass */
+    }
+  }
+
   // Rotation snapshot for clients. Members ride as connection ids (clients
-  // already see those on every relayed message) — never as uids.
+  // already see those on every relayed message) — never as uids. `timestamp`
+  // doubles as the server-clock reference for the countdown (clients compute
+  // their skew from it, so `deadline` needs no synchronized clocks).
   broadcastTurnState(excludeConnId?: string) {
     const order = this.turnQueue
       .map((u) => this.clientIdForUid(u, excludeConnId))
@@ -395,6 +453,8 @@ export default class FluidPartyServer implements Party.Server {
         on: this.turnsOn,
         holder: this.turnHolder ? this.clientIdForUid(this.turnHolder, excludeConnId) : null,
         order,
+        turnMs: this.turnMs,
+        deadline: this.turnDeadline || null,
         timestamp: Date.now(),
       })
     );
@@ -409,6 +469,8 @@ export default class FluidPartyServer implements Party.Server {
       this.room.storage.put("members", [...this.members]),
       this.room.storage.put("turnsOn", this.turnsOn),
       this.room.storage.put("turnQueue", this.turnQueue),
+      this.room.storage.put("turnMs", this.turnMs),
+      this.room.storage.put("turnDeadline", this.turnDeadline),
       this.turnHolder
         ? this.room.storage.put("turnHolder", this.turnHolder)
         : this.room.storage.delete("turnHolder"),

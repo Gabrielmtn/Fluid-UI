@@ -1025,6 +1025,31 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     background: rgba(236, 48, 19, 0.3);
     border-color: rgba(236, 48, 19, 0.6);
 }
+/* Turn-length picker shown to the host beside the Take turns toggle */
+.mp-turn-timer {
+    width: 100%;
+    padding: 6px;
+    font-size: 11px;
+    background: var(--ground-600, #232830);
+    border: 1px solid var(--ground-500, #2a2e37);
+    color: var(--ink-100, #f2f3f5);
+    border-radius: 0;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+/* Rotation wheel: who's in the round and whose turn it is */
+.mp-turn-wheel {
+    margin-bottom: 8px;
+}
+.mp-turn-wheel svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.mp-turn-wheel text {
+    font-family: inherit;
+    user-select: none;
+}
 /* Rotation status line ("🖌 Artist-QT painting · 3 artists in rotation") */
 .mp-turn-status {
     font-size: 10px;

@@ -801,6 +801,14 @@
                 <button id="lockRoomBtn" class="mp-btn-lock" style="display:none">🔒 Lock room</button>
                 <button id="settingsLockBtn" class="mp-btn-lock" style="display:none" title="Lock look settings so guests mirror yours (their performance controls stay local)">🎛 Lock settings</button>
                 <button id="turnsBtn" class="mp-btn-lock" style="display:none" title="Take turns painting — one artist at a time while everyone else watches with the painter's settings mirrored live">🔁 Take turns</button>
+                <select id="turnTimerSel" class="mp-turn-timer" style="display:none" title="How long each artist holds the brush before it auto-passes">
+                    <option value="30">30 sec turns</option>
+                    <option value="60" selected>1 min turns</option>
+                    <option value="120">2 min turns</option>
+                    <option value="300">5 min turns</option>
+                    <option value="0">No timer</option>
+                </select>
+                <div id="turnWheel" class="mp-turn-wheel" style="display:none"></div>
                 <div id="turnStatus" class="mp-turn-status" style="display:none"></div>
                 <button id="turnPassBtn" class="mp-btn-pass" style="display:none" title="Hand the brush to the next artist in the rotation">➡ Pass turn</button>
                 <div id="connectedUsers" class="mp-users">1 user</div>
