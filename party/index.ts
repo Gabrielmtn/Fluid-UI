@@ -35,6 +35,7 @@ const SERVER_AUTHORED = new Set([
   "turn-state",
   "turn-invite-offer",
   "turn-invite-result",
+  "turn-invite-sent",
 ]);
 
 // How long a "shall we take turns?" invite stands before it goes stale.
@@ -252,11 +253,28 @@ export default class FluidPartyServer implements Party.Server {
       await this.ensureLoaded();
       const st = sender.state as ConnState | null;
       if (!st || this.turnsOn) return;
-      const other = [...this.room.getConnections()].find((c) => {
+      // ALWAYS answer the asker. A silent drop here strands them on
+      // "Waiting for their answer…" with no way to tell whether the partner
+      // is ignoring them, absent, or the room simply cannot do this.
+      const others = [...this.room.getConnections()].filter((c) => c.id !== sender.id);
+      const other = others.find((c) => {
         const cs = c.state as ConnState | null;
         return !!cs && cs.uid !== st.uid;
       });
-      if (!other) return; // nobody to ask yet
+      if (!other) {
+        // No partner with a DIFFERENT device id. Either we are alone, or both
+        // windows are the same browser profile (they share the localStorage
+        // device id), which turn-taking cannot tell apart into two painters.
+        sender.send(
+          JSON.stringify({
+            type: "turn-invite-result",
+            accepted: false,
+            reason: others.length ? "same-device" : "alone",
+            timestamp: Date.now(),
+          })
+        );
+        return;
+      }
       const seconds = typeof data.seconds === "number" ? data.seconds : 60;
 
       // Crossing invites (both clicked at once): the second one is consent.
@@ -280,6 +298,11 @@ export default class FluidPartyServer implements Party.Server {
           expiresIn: INVITE_TTL_MS,
           timestamp: Date.now(),
         })
+      );
+      // Ack the asker: its absence is how a client detects a relay too old to
+      // understand invites (which otherwise looks exactly like a silent partner).
+      sender.send(
+        JSON.stringify({ type: "turn-invite-sent", to: other.id, timestamp: Date.now() })
       );
       return;
     }

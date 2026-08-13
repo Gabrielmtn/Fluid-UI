@@ -881,11 +881,14 @@ function turnTimerSeconds() {
 // Nothing changes on either canvas until they agree.
 var invitePending = false;      // we asked; waiting on their answer
 var inviteTimeout = null;
+var inviteAckTimeout = null;
 var INVITE_WAIT_MS = 30000;     // matches the relay's invite TTL
+var INVITE_ACK_MS = 4000;       // server ack must beat this
 
 function clearInviteWait() {
     invitePending = false;
     if (inviteTimeout) { clearTimeout(inviteTimeout); inviteTimeout = null; }
+    if (inviteAckTimeout) { clearTimeout(inviteAckTimeout); inviteAckTimeout = null; }
 }
 
 function sendTurnInvite() {
@@ -893,6 +896,16 @@ function sendTurnInvite() {
     if (invitePending || turnsOn) return;
     invitePending = true;
     partySocket.send(JSON.stringify({ type: 'turn-invite', seconds: turnTimerSeconds() }));
+    // A relay that predates turn invites has no handler for the message and
+    // simply rebroadcasts it, so nothing ever comes back. Without this probe
+    // that is indistinguishable from a partner who is ignoring you — you just
+    // wait 30s for "no answer". The ack turns it into a real explanation.
+    inviteAckTimeout = setTimeout(function () {
+        if (!invitePending) return;
+        clearInviteWait();
+        showTurnToast('⚠ This room\'s server is too old for turn invites — it needs a relay update.');
+        updateTurnUI();
+    }, INVITE_ACK_MS);
     inviteTimeout = setTimeout(function () {
         if (!invitePending) return;
         clearInviteWait();
@@ -1263,11 +1276,23 @@ function onMultiplayerMessage(event) {
                 if (!turnsOn) showTurnInvitePrompt(data.from, data.seconds);
                 break;
 
+            case 'turn-invite-sent':
+                // Relay accepted the invite and delivered it — stop the
+                // old-relay probe, keep waiting for the human.
+                if (inviteAckTimeout) { clearTimeout(inviteAckTimeout); inviteAckTimeout = null; }
+                break;
+
             case 'turn-invite-result':
-                // Only sent on a decline — an accept arrives as turn-state.
+                // Only sent when it did NOT start — an accept arrives as turn-state.
                 if (!data.accepted) {
                     clearInviteWait();
-                    showTurnToast('🙅 ' + (data.by ? shortName(data.by) : 'They') + ' would rather keep painting together');
+                    if (data.reason === 'same-device') {
+                        showTurnToast('⚠ Both windows share one device id — open the other in a different browser or a private window.');
+                    } else if (data.reason === 'alone') {
+                        showTurnToast('⏳ Nobody else in the room yet.');
+                    } else {
+                        showTurnToast('🙅 ' + (data.by ? shortName(data.by) : 'They') + ' would rather keep painting together');
+                    }
                     updateTurnUI();
                 }
                 break;
