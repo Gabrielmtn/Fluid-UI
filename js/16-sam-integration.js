@@ -145,11 +145,23 @@ class SAMSegmenter {
             // surface at session creation, so the whole load is attempted per
             // device rather than feature-detecting up front.
             const dtype = (typeof window !== 'undefined' && window.config && window.config.MAGIC_MASK_DTYPE) || 'fp32';
-            const attempts = [];
-            if (typeof navigator !== 'undefined' && navigator.gpu) {
-                attempts.push({ device: 'webgpu', dtype });
-            }
-            attempts.push({ device: 'wasm', dtype });
+
+            // CPU (wasm) is the DEFAULT, and not merely a fallback: ONNX
+            // Runtime's WebGPU backend returns numerically corrupted masks for
+            // BOTH SAM models here. Measured on identical images and prompts
+            // (true IoU against ground truth, 5-click logo):
+            //     SlimSAM-77   wasm 0.878    webgpu 0.210
+            //     EdgeTAM      wasm 0.848    webgpu 0.212
+            // WebGPU also reported a predicted IoU of 1.015 — outside the
+            // head's valid range, so it is genuine numerical breakage rather
+            // than a slightly different mask. Segmentation runs once per click
+            // (~0.3-2s on CPU), so the GPU path buys nothing worth that.
+            // config.MAGIC_MASK_DEVICE = 'webgpu' re-tests it after an upstream
+            // ORT fix.
+            const forced = (typeof window !== 'undefined' && window.config && window.config.MAGIC_MASK_DEVICE) || null;
+            const attempts = forced
+                ? [{ device: forced, dtype }, { device: 'wasm', dtype }]
+                : [{ device: 'wasm', dtype }];
 
             console.log(`📥 Loading segmentation model "${modelId}"...`);
             let lastError = null;
@@ -803,6 +815,13 @@ class SAMSegmenter {
             // offers every proposal either way.
             const trustIoU = (typeof window !== 'undefined' && window.config && typeof window.config.MAGIC_MASK_TRUST_IOU === 'number')
                 ? window.config.MAGIC_MASK_TRUST_IOU : 0.6;
+            // The proposals are ranked by the model's predicted-IoU head, which
+            // IS trustworthy on the CPU backend (measured on a 5-click logo:
+            // predicted [0.927, 0.995, 0.974] against true [0.207, 0.878,
+            // 0.846] — it ranks the best mask first). It only goes flat on
+            // painterly/abstract content, where the model is out of
+            // distribution and will rank a speck first; there the largest
+            // proposal under the coverage cap is the better default.
             const confident = peakIoU >= trustIoU;
 
             let bestIdx = eligible[0];
@@ -811,7 +830,9 @@ class SAMSegmenter {
             } else {
                 for (const i of eligible) if (covs[i] > covs[bestIdx]) bestIdx = i;
             }
-            console.log(` Selected default candidate ${bestIdx} (IoU ${candidates[bestIdx].iou.toFixed(3)}, coverage ${(covs[bestIdx] * 100).toFixed(1)}%) of ${candidates.length} — ${confident ? 'by IoU (confident)' : 'largest (low confidence, peak IoU ' + peakIoU.toFixed(3) + ')'}`);
+            const why = confident ? 'by predicted IoU'
+                : `largest (low confidence, peak IoU ${peakIoU.toFixed(3)})`;
+            console.log(` Selected default candidate ${bestIdx} (IoU ${candidates[bestIdx].iou.toFixed(3)}, coverage ${(covs[bestIdx] * 100).toFixed(1)}%) of ${candidates.length} — ${why}`);
 
             return {
                 primary: candidates[bestIdx],

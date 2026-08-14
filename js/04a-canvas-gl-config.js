@@ -513,12 +513,18 @@
                                       // in 05a. Console-tunable.
 
             MAGIC_MASK_MODEL: 'onnx-community/EdgeTAM-ONNX',
-                                      // Magic Mask Objects segmentation model (2026-08-14):
-                                      // EdgeTAM = Meta's on-device SAM2 derivative — ~40MB fp32,
-                                      // CPU/WASM-fast, replaces SlimSAM-77. Any Sam2-family
-                                      // ONNX repo works (e.g. 'onnx-community/sam2.1-hiera-tiny-ONNX'
-                                      // for higher quality at ~3x the latency). Console-tunable;
-                                      // takes effect on next model load (reload page to re-init).
+                                      // Magic Mask Objects segmentation model. MEASURED against
+                                      // ground truth on the CPU backend (2026-08-14), 5-click
+                                      // selection, true IoU:
+                                      //   content       EdgeTAM (SAM 2)   SlimSAM-77 (SAM 1)
+                                      //   logo/text          0.85               0.88
+                                      //   abstract art       0.80               0.27
+                                      // A wash on graphics and type, but the distilled SAM 2 is
+                                      // ~3x better on painterly/fluid captures, so it stays the
+                                      // default. 'Xenova/slimsam-77-uniform' is the SAM 1 model
+                                      // and is also bundled for Electron — the loader handles
+                                      // either architecture, so it is a one-line swap.
+                                      // Console-tunable; reload the page to re-init.
 
             MAGIC_MASK_DTYPE: 'fp32', // Weight precision for the model above. EdgeTAM's fp16/q8
                                       // exports produce garbage masks (verified vs the upstream
