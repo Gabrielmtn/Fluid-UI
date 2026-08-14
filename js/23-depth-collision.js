@@ -74,7 +74,9 @@ class DepthEstimator {
             this.updateDownloadProgress('Downloading depth model...', 10);
 
             this.pipeline = await pipeline('depth-estimation', 'Xenova/depth-anything-small-hf', {
-                quantized: true,
+                // v3 runtime: 'quantized: true' is the removed v2 option — dtype 'q8'
+                // maps to the same model_quantized.onnx the Electron build bundles.
+                dtype: 'q8',
                 progress_callback: (progress) => {
                     if (progress.status === 'progress' && progress.total) {
                         const percent = Math.round((progress.loaded / progress.total) * 100);

@@ -512,6 +512,26 @@
                                       // 1 = full hybrid; 0 = old whiteness-only. See displayFrag
                                       // in 05a. Console-tunable.
 
+            MAGIC_MASK_MODEL: 'onnx-community/EdgeTAM-ONNX',
+                                      // Magic Mask Objects segmentation model (2026-08-14):
+                                      // EdgeTAM = Meta's on-device SAM2 derivative — ~40MB fp32,
+                                      // CPU/WASM-fast, replaces SlimSAM-77. Any Sam2-family
+                                      // ONNX repo works (e.g. 'onnx-community/sam2.1-hiera-tiny-ONNX'
+                                      // for higher quality at ~3x the latency). Console-tunable;
+                                      // takes effect on next model load (reload page to re-init).
+
+            MAGIC_MASK_DTYPE: 'fp32', // Weight precision for the model above. EdgeTAM's fp16/q8
+                                      // exports produce garbage masks (verified vs the upstream
+                                      // truck.jpg reference) — keep fp32 unless a future model
+                                      // repo ships working reduced-precision weights.
+
+            MAGIC_MASK_MAX_COVER: 0.8,
+                                      // Default-candidate picker: proposals covering more than
+                                      // this fraction of the canvas lose to any tighter proposal
+                                      // (predicted IoU loves "select everything" on flat painterly
+                                      // content). 1.0 = old pure-IoU behavior. The 1/2/3 candidate
+                                      // cycler still offers every proposal.
+
             DYE_MEMORY_DISS: 0.9995,  // Pigment memory half-life (2026-07-20): dye alpha
                                       // remembers the strength a stroke was PAINTED at, so
                                       // Ignite restores the original colour instead of just

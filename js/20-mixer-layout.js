@@ -2362,8 +2362,8 @@
         panel.appendChild(tipRow);
 
         // ── Custom shapes: user-authored stamp textures (33-brush-shapes).
-        // Import → the mask editor opens in adhoc mode (full shape suite +
-        // Smart Select) → Apply saves the cut-out as a stamp swatch here.
+        // Import → the mask editor opens in adhoc mode (full stamp suite +
+        // Magic Mask Objects) → Apply saves the cut-out as a stamp swatch here.
         // The area is also an image drop target (32-file-drop).
         var shapesArea = document.createElement('div');
         shapesArea.className = 'brush-shapes-area';
@@ -2416,7 +2416,7 @@
             addB.type = 'button';
             addB.className = 'brush-tip-btn brush-shape-add';
             addB.textContent = '＋';
-            addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Smart Select). You can also drop an image anywhere on this row.';
+            addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Magic Mask Objects). You can also drop an image anywhere on this row.';
             addB.addEventListener('click', function () { shapeFileInput.click(); });
             shapesRow.appendChild(addB);
         }

@@ -21,6 +21,7 @@
         panStartY: 0,
         smartSelectMode: false,
         smartSelectPoints: [], // {x, y, label} where label is 1 for include, 0 for exclude
+        stampMenuOpen: false,  // Stamps submenu (shape tools) expanded?
         isProcessingSAM: false,
         // SAM multi-proposal UX
         samCandidates: [],        // Array of processed mask candidates from SAM
@@ -151,6 +152,7 @@
             document.body.appendChild(overlay);
         }
         overlay.style.display = 'flex';
+        updateStampMenuDisplay();
     }
 
     // Hide mask editor overlay
@@ -271,28 +273,31 @@
                             <span>Hide Areas</span>
                         </label>
                     </div>
-                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                        <button id="smartSelectBtn" class="mask-mode-btn" onclick="window.toggleSmartSelect()" title="AI-Powered Object Selection&#10;Click objects to automatically segment&#10;First use: Downloads ~40MB model (cached locally)">
-                            <span style="font-size: 18px;">🤖</span> Smart Select
+                    <div class="mask-tools-row" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                        <button id="smartSelectBtn" class="mask-mode-btn magic-mask-btn" onclick="window.toggleSmartSelect()" title="AI-powered object masking&#10;Click objects and the model cuts them out for you&#10;First use: downloads a ~40 MB model (cached locally)">
+                            <span style="font-size: 18px;">🪄</span> Magic Mask Objects
+                        </button>
+                        <button id="stampMenuBtn" class="mask-mode-btn stamp-menu-btn" onclick="window.toggleStampMenu()" title="Stamp shapes onto the mask&#10;Rectangles, circles, stars and more — drag to place, resize with the handle">
+                            <span style="font-size: 16px;">▦</span> Stamps <span class="stamp-caret">▾</span>
                         </button>
                         <span id="samLoadingStatus" style="font-size: 12px; color: #8b949e; align-self: center;"></span>
                     </div>
-                    <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px; padding: 0 4px;">
-                        Shape Tools (Drag to move, resize handle to scale):
+                    <div id="stampMenu" class="mask-stamp-menu" style="display: none;">
+                        <div class="mask-stamp-hint">Click a shape to stamp it onto the mask — drag to move it, grab the handle to resize.</div>
+                        <div id="manualShapeTools" class="mask-shape-tools">
+                            <button class="mask-tool-btn" data-shape="rect" title="Stamp a Rectangle">▭</button>
+                            <button class="mask-tool-btn" data-shape="roundrect" title="Stamp a Rounded Rectangle">▢</button>
+                            <button class="mask-tool-btn" data-shape="circle" title="Stamp a Circle">◯</button>
+                            <button class="mask-tool-btn" data-shape="ellipse" title="Stamp an Ellipse">⬭</button>
+                            <button class="mask-tool-btn" data-shape="triangle" title="Stamp a Triangle">△</button>
+                            <button class="mask-tool-btn" data-shape="pentagon" title="Stamp a Pentagon">⬟</button>
+                            <button class="mask-tool-btn" data-shape="hexagon" title="Stamp a Hexagon">⬡</button>
+                            <button class="mask-tool-btn" data-shape="star" title="Stamp a Star">★</button>
+                        </div>
                     </div>
-                    <div id="manualShapeTools" class="mask-shape-tools" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                        <button class="mask-tool-btn" data-shape="rect" title="Add Rectangle">▭</button>
-                        <button class="mask-tool-btn" data-shape="roundrect" title="Add Rounded Rectangle">▢</button>
-                        <button class="mask-tool-btn" data-shape="circle" title="Add Circle">◯</button>
-                        <button class="mask-tool-btn" data-shape="ellipse" title="Add Ellipse">⬭</button>
-                        <button class="mask-tool-btn" data-shape="triangle" title="Add Triangle">△</button>
-                        <button class="mask-tool-btn" data-shape="pentagon" title="Add Pentagon">⬟</button>
-                        <button class="mask-tool-btn" data-shape="hexagon" title="Add Hexagon">⬡</button>
-                        <button class="mask-tool-btn" data-shape="star" title="Add Star">★</button>
-                    </div>
-                    <div id="smartSelectControls" style="display: none; background: rgba(88, 166, 255, 0.08); padding: 12px; border-radius: 6px; margin-bottom: 8px;">
-                        <div style="font-size: 13px; color: #58a6ff; margin-bottom: 8px; font-weight: 600;">
-                            🎯 Click to add points:
+                    <div id="smartSelectControls" style="display: none; background: rgba(63, 185, 80, 0.08); padding: 12px; border-radius: 6px; margin-bottom: 8px; border: 1px solid rgba(63, 185, 80, 0.2);">
+                        <div style="font-size: 13px; color: #3fb950; margin-bottom: 8px; font-weight: 600;">
+                            🪄 Click the objects you want masked:
                         </div>
                         <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px;">
                             • <strong style="color: #3fb950;">Left-click</strong>: Include point (green)<br>
@@ -301,15 +306,16 @@
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button id="samSegmentBtn" class="mask-action-btn" onclick="window.runSAMSegmentation()" style="flex: 1; background: linear-gradient(180deg, #238636, #1a7f37);" disabled>
-                                ✨ Segment Object
+                                ✨ Magic Mask It
                             </button>
                             <button class="mask-action-btn" onclick="window.clearSAMPoints()">
                                 🗑️ Clear Points
                             </button>
                         </div>
+                        <div id="samCandidateControls" style="display: none; gap: 6px; margin-top: 8px; align-items: center;" title="The AI proposes a few cutouts — hover to preview, click to choose"></div>
                         <div id="samLoadingIndicator" style="display: none; margin-top: 8px; padding: 8px; background: rgba(88, 166, 255, 0.15); border-radius: 4px; font-size: 12px; color: #58a6ff; text-align: center;">
                             <span class="sam-spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(88, 166, 255, 0.3); border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px;"></span>
-                            AI segmenting object...
+                            Magic Mask is cutting out your object...
                         </div>
                     </div>
                     <div class="mask-rotation-control" id="maskRotationControl" style="display: none; padding: 8px 12px; background: rgba(88, 166, 255, 0.05); border-radius: 6px; margin-top: 8px;">
@@ -1163,24 +1169,41 @@
         ctx.closePath();
     }
 
-    // Toggle smart select mode
+    // Show/hide the Stamps submenu according to maskState (hidden entirely
+    // while Magic Mask mode is engaged)
+    function updateStampMenuDisplay() {
+        const stampMenu = document.getElementById('stampMenu');
+        const stampBtn = document.getElementById('stampMenuBtn');
+        const open = maskState.stampMenuOpen && !maskState.smartSelectMode;
+        if (stampMenu) stampMenu.style.display = open ? 'block' : 'none';
+        if (stampBtn) {
+            stampBtn.classList.toggle('open', open);
+            stampBtn.style.display = maskState.smartSelectMode ? 'none' : '';
+        }
+    }
+
+    // Toggle the Stamps submenu (shape tools)
+    window.toggleStampMenu = function() {
+        maskState.stampMenuOpen = !maskState.stampMenuOpen;
+        updateStampMenuDisplay();
+    };
+
+    // Toggle Magic Mask Objects mode (AI segmentation)
     window.toggleSmartSelect = async function() {
         maskState.smartSelectMode = !maskState.smartSelectMode;
-        
+
         const smartSelectBtn = document.getElementById('smartSelectBtn');
-        const manualTools = document.getElementById('manualShapeTools');
         const smartControls = document.getElementById('smartSelectControls');
         const hintDiv = document.getElementById('maskHint');
-        
+
         if (maskState.smartSelectMode) {
-            smartSelectBtn.style.background = 'linear-gradient(180deg, #238636, #1a7f37)';
-            smartSelectBtn.style.color = '#fff';
+            smartSelectBtn.classList.add('engaged');
             smartSelectBtn.disabled = true; // Disable during initialization
-            manualTools.style.display = 'none';
+            updateStampMenuDisplay();
             smartControls.style.display = 'block';
-            
+
             if (hintDiv) {
-                hintDiv.innerHTML = '<strong style="color: #3fb950;">🤖 AI Mode:</strong> Left-click objects to include • Right-click to exclude • Shift+Click to pan';
+                hintDiv.innerHTML = '<strong style="color: #3fb950;">🪄 Magic Mask:</strong> Left-click objects to include • Right-click to exclude • Shift+Click to pan';
             }
 
             // Hardness slider removed; SAM now uses a fixed default hardness
@@ -1263,16 +1286,15 @@
                 }
             }
         } else {
-            smartSelectBtn.style.background = '';
-            smartSelectBtn.style.color = '';
-            manualTools.style.display = 'grid';
+            smartSelectBtn.classList.remove('engaged');
             smartControls.style.display = 'none';
             maskState.smartSelectPoints = [];
-            
+            updateStampMenuDisplay();
+
             if (hintDiv) {
                 hintDiv.innerHTML = '<strong style="color: #58a6ff;">💡 Tip:</strong> Scroll to zoom • Middle-click to pan • Shift+Drag for fine positioning';
             }
-            
+
             renderMaskEditor();
         }
     };
@@ -1383,6 +1405,11 @@
         candControls.style.display = 'flex';
         const idx = Math.min(Math.max(maskState.samSelectedCandidateIndex, 0), total - 1);
 
+        const label = document.createElement('span');
+        label.textContent = 'Cutout options:';
+        label.style.cssText = 'font-size: 12px; color: #8b949e; margin-right: 4px;';
+        candControls.appendChild(label);
+
         for (let i = 0; i < total; i++) {
             const btn = document.createElement('button');
             btn.className = 'mask-zoom-btn';
@@ -1472,7 +1499,7 @@
             maskState.smartSelectPoints = [];
             maskState.samPreviewMask = null;
             
-            // Auto-disable Smart Select mode so user can immediately transform the shape
+            // Auto-disable Magic Mask mode so user can immediately transform the shape
             if (maskState.smartSelectMode) {
                 window.toggleSmartSelect();
             }
@@ -1614,8 +1641,8 @@
         }, 10);
     };
 
-    // ── Ad-hoc mask mode (2026-08-09): run the full editor (shape tools +
-    // Smart Select) against an arbitrary image, no layer involved. Used by
+    // ── Ad-hoc mask mode (2026-08-09): run the full editor (stamps +
+    // Magic Mask Objects) against an arbitrary image, no layer involved. Used by
     // custom brush shapes (33-brush-shapes). The editor canvas is sized to
     // the IMAGE (capped 2048 long side) so nothing is aspect-stretched;
     // shapes/SAM all operate in that space. On Apply, the caller gets a
@@ -1658,7 +1685,7 @@
             maskState.samCandidates = [];
             maskState.samSelectedCandidateIndex = 0;
             showMaskEditor();
-            // Reset the overlay DOM too if Smart Select was left engaged
+            // Reset the overlay DOM too if Magic Mask was left engaged
             // (toggleSmartSelect's OFF branch restores the manual tools).
             if (maskState.smartSelectMode && typeof window.toggleSmartSelect === 'function') {
                 try { window.toggleSmartSelect(); } catch (_) {}

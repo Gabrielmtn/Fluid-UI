@@ -1,5 +1,11 @@
-// Segment Anything Model (SAM) Integration
-// Uses Transformers.js to run SAM in the browser for intelligent object segmentation
+// Magic Mask Objects — promptable object segmentation (SAM 2 family)
+// Uses the vendored Transformers.js v3 runtime to run EdgeTAM (Meta's
+// on-device SAM2 derivative) fully in the browser: WebGPU when available,
+// WASM otherwise. Model repo is config-tunable (config.MAGIC_MASK_MODEL);
+// any Sam2-family ONNX export (sam2.1-hiera-*, EdgeTAM, sam3-tracker) works
+// because they share the Sam2Model embed/prompt API. The class keeps its
+// historical "SAMSegmenter"/window.samSegmenter names — every mask-editor
+// call site binds to those.
 
 class SAMSegmenter {
     constructor() {
@@ -12,6 +18,9 @@ class SAMSegmenter {
         this.transformers = null;
         this.displayWidth = null;
         this.displayHeight = null;
+        this.device = null;   // 'webgpu' | 'wasm' — chosen at initialize()
+        this.dtype = null;    // 'fp16' (webgpu) | 'q8' (wasm)
+        this.modelId = null;
     }
 
     async loadTransformers() {
@@ -90,7 +99,7 @@ class SAMSegmenter {
         }
         
         this.isLoading = true;
-        console.log('🤖 Loading SAM model...');
+        console.log('🪄 Loading Magic Mask segmentation model...');
         
         // Update status indicator
         this.updateLoadingStatus('loading');
@@ -102,46 +111,72 @@ class SAMSegmenter {
             // Load Transformers.js library first
             this.updateDownloadProgress('Loading AI library...', 5);
             const transformers = await this.loadTransformers();
-            const { SamModel, AutoProcessor, env } = transformers;
-            
-            // Ensure WASM is properly set up
+            const { AutoModel, AutoProcessor } = transformers;
+
             console.log('🔧 Configuring ONNX Runtime for browser...');
             this.updateDownloadProgress('Configuring AI runtime...', 8);
-            
-            // Load SAM model (using smaller variant for better performance)
+
             if (onProgress) onProgress('Loading model...', 0);
             this.updateDownloadProgress('Downloading AI model...', 10);
-            
-            console.log('📥 Loading SAM model from HuggingFace...');
-            
-            let downloadComplete = false;
-            
-            this.model = await SamModel.from_pretrained('Xenova/slimsam-77-uniform', {
-                // Use quantized weights (as recommended for browser)
-                quantized: true,
-                // Let Transformers.js choose the appropriate backend (wasm) internally
-                progress_callback: (progress) => {
-                    console.log('📊 Model download progress:', progress);
-                    if (progress.status === 'progress' && progress.total) {
-                        const percent = Math.round((progress.loaded / progress.total) * 100);
-                        const fileName = progress.file ? progress.file.split('/').pop() : 'model';
-                        this.updateDownloadProgress(`Downloading: ${fileName}`, 10 + Math.floor(percent * 0.75));
-                        if (onProgress) onProgress(`Downloading ${fileName}...`, percent);
-                    } else if (progress.status === 'done') {
-                        downloadComplete = true;
-                        console.log('✅ Download complete, initializing model...');
-                        this.updateDownloadProgress('Initializing model...', 90);
-                    } else if (progress.status === 'initiate') {
-                        this.updateDownloadProgress('Starting download...', 10);
-                    }
+
+            const modelId = (typeof window !== 'undefined' && window.config && window.config.MAGIC_MASK_MODEL)
+                || 'onnx-community/EdgeTAM-ONNX';
+            this.modelId = modelId;
+
+            const progress_callback = (progress) => {
+                console.log('📊 Model download progress:', progress);
+                if (progress.status === 'progress' && progress.total) {
+                    const percent = Math.round((progress.loaded / progress.total) * 100);
+                    const fileName = progress.file ? progress.file.split('/').pop() : 'model';
+                    this.updateDownloadProgress(`Downloading: ${fileName}`, 10 + Math.floor(percent * 0.75));
+                    if (onProgress) onProgress(`Downloading ${fileName}...`, percent);
+                } else if (progress.status === 'done') {
+                    console.log('✅ Download complete, initializing model...');
+                    this.updateDownloadProgress('Initializing model...', 90);
+                } else if (progress.status === 'initiate') {
+                    this.updateDownloadProgress('Starting download...', 10);
                 }
-            });
-            
-            console.log('✅ Model object created successfully:', typeof this.model);
-            
+            };
+
+            // fp32 on both devices: EdgeTAM's reduced-precision exports are
+            // BROKEN (measured 2026-08-14 on the upstream truck.jpg reference:
+            // fp32 reproduces iou [0.047, 0.49, 0.757]; fp16 AND q8 collapse to
+            // ~0 garbage — which is why the repo pins dtype fp32). Failures can
+            // surface at session creation, so the whole load is attempted per
+            // device rather than feature-detecting up front.
+            const dtype = (typeof window !== 'undefined' && window.config && window.config.MAGIC_MASK_DTYPE) || 'fp32';
+            const attempts = [];
+            if (typeof navigator !== 'undefined' && navigator.gpu) {
+                attempts.push({ device: 'webgpu', dtype });
+            }
+            attempts.push({ device: 'wasm', dtype });
+
+            console.log(`📥 Loading segmentation model "${modelId}"...`);
+            let lastError = null;
+            for (const attempt of attempts) {
+                try {
+                    this.model = await AutoModel.from_pretrained(modelId, {
+                        device: attempt.device,
+                        dtype: attempt.dtype,
+                        progress_callback,
+                    });
+                    this.device = attempt.device;
+                    this.dtype = attempt.dtype;
+                    lastError = null;
+                    break;
+                } catch (err) {
+                    console.warn(`⚠ ${attempt.device}/${attempt.dtype} load failed, trying next backend:`, err.message);
+                    lastError = err;
+                    this.model = null;
+                }
+            }
+            if (!this.model) throw lastError || new Error('No usable backend for segmentation model');
+
+            console.log(`✅ Model ready on ${this.device} (${this.dtype}):`, modelId);
+
             this.updateDownloadProgress('Loading processor...', 95);
-            this.processor = await AutoProcessor.from_pretrained('Xenova/slimsam-77-uniform');
-            
+            this.processor = await AutoProcessor.from_pretrained(modelId);
+
             this.updateDownloadProgress('Complete!', 100);
             
             this.isReady = true;
@@ -185,7 +220,7 @@ class SAMSegmenter {
             setTimeout(() => {
                 this.hideDownloadModal();
                 console.error('💬 Showing error dialog:', modalMsg);
-                alert('⚠️ AI Smart Select Error\n\n' + modalMsg);
+                alert('⚠️ Magic Mask Objects Error\n\n' + modalMsg);
             }, 2000);
         }
     }
@@ -237,12 +272,12 @@ class SAMSegmenter {
                     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
                     text-align: center;
                 ">
-                    <div style="font-size: 48px; margin-bottom: 16px;">🤖</div>
-                    <h2 style="color: #58a6ff; margin: 0 0 12px 0; font-size: 24px; font-weight: 600;">
-                        Downloading AI Model
+                    <div style="font-size: 48px; margin-bottom: 16px;">🪄</div>
+                    <h2 style="color: #3fb950; margin: 0 0 12px 0; font-size: 24px; font-weight: 600;">
+                        Downloading Magic Mask Model
                     </h2>
                     <p id="samDownloadMessage" style="color: #8b949e; margin: 0 0 24px 0; font-size: 14px;">
-                        First-time setup: Downloading Segment Anything Model...
+                        First-time setup: Downloading EdgeTAM (Segment Anything 2 family)...
                     </p>
                     <div style="
                         background: rgba(0, 0, 0, 0.3);
@@ -273,7 +308,7 @@ class SAMSegmenter {
                         font-size: 12px;
                         line-height: 1.6;
                     ">
-                        💾 Model size: ~40MB<br>
+                        💾 Model size: ~40 MB<br>
                         ⚡ One-time download • Cached for instant future use<br>
                         🔒 Runs entirely in your browser
                     </div>
@@ -341,6 +376,21 @@ class SAMSegmenter {
         }
     }
 
+    // Run the image (no prompts) through the processor to get pixel_values +
+    // original/reshaped sizes. Some processor wrappers (Sam2VideoProcessor)
+    // route _call differently, so fall back to the bare image processor.
+    async _processImage(image) {
+        try {
+            return await this.processor(image);
+        } catch (e) {
+            if (this.processor && this.processor.image_processor) {
+                console.warn('⚠ processor(image) failed, using image_processor directly:', e.message);
+                return await this.processor.image_processor(image);
+            }
+            throw e;
+        }
+    }
+
     async loadImage(imageUrl, displayWidth = null, displayHeight = null) {
         try {
             if (!this.transformers) {
@@ -381,7 +431,7 @@ class SAMSegmenter {
                 }
 
                 // Prepare base image inputs and image embeddings once (no points yet)
-                this.imageInputs = await this.processor(this.currentImage);
+                this.imageInputs = await this._processImage(this.currentImage);
                 this.imageEmbeddings = await this.model.get_image_embeddings(this.imageInputs);
                 console.log('✅ Image inputs and embeddings prepared for segmentation', {
                     original_sizes: this.imageInputs.original_sizes?.data || this.imageInputs.original_sizes,
@@ -428,7 +478,7 @@ class SAMSegmenter {
             // Reuse precomputed image inputs and embeddings like the Xenova worker.
             let imageInputs = this.imageInputs;
             if (!imageInputs) {
-                imageInputs = await this.processor(this.currentImage);
+                imageInputs = await this._processImage(this.currentImage);
                 this.imageInputs = imageInputs;
             }
 
@@ -501,8 +551,13 @@ class SAMSegmenter {
             });
             console.log('🔍 IoU scores:', outputs.iou_scores.data);
 
-            // Post-process masks to original image size
-            const masks = await this.processor.post_process_masks(
+            // Post-process masks to original image size (post_process_masks
+            // lives on SamProcessor, or on the image processor if AutoProcessor
+            // resolved a generic wrapper)
+            const postProcessor = (typeof this.processor.post_process_masks === 'function')
+                ? this.processor
+                : this.processor.image_processor;
+            const masks = await postProcessor.post_process_masks(
                 outputs.pred_masks,
                 original_sizes,
                 reshaped_input_sizes,
@@ -688,16 +743,43 @@ class SAMSegmenter {
                 return null;
             }
 
-            // Choose the best candidate by IoU as the default selection
-            let bestIdx = 0;
-            let bestIoU = candidates[0].iou;
-            for (let i = 1; i < candidates.length; i++) {
+            // Choose the default candidate: highest predicted IoU, but a
+            // proposal that swallows most of the canvas is only used when
+            // nothing tighter exists. "Click an object" should never default
+            // to everything — the near-full-canvas proposal often outscores
+            // the clean object cutout on flat/painterly content, and the
+            // user can still reach it through the candidate cycler.
+            const maxCover = (typeof window !== 'undefined' && window.config && typeof window.config.MAGIC_MASK_MAX_COVER === 'number')
+                ? window.config.MAGIC_MASK_MAX_COVER : 0.8;
+            const coverageOf = (c) => {
+                let filled = 0;
+                const stride = 4; // sampled estimate is plenty for a threshold test
+                for (let i = 0; i < c.data.length; i += stride) {
+                    if (c.data[i] > 127) filled++;
+                }
+                return (filled * stride) / c.data.length;
+            };
+            const covs = candidates.map(coverageOf);
+            let bestIdx = -1;
+            let bestIoU = -Infinity;
+            for (let i = 0; i < candidates.length; i++) {
+                if (covs[i] > maxCover) continue;
                 if (candidates[i].iou > bestIoU) {
                     bestIoU = candidates[i].iou;
                     bestIdx = i;
                 }
             }
-            console.log(` Selected default candidate ${bestIdx} with IoU: ${bestIoU.toFixed(3)} out of ${candidates.length}`);
+            if (bestIdx === -1) { // everything is near-full-canvas — fall back to raw IoU
+                bestIdx = 0;
+                bestIoU = candidates[0].iou;
+                for (let i = 1; i < candidates.length; i++) {
+                    if (candidates[i].iou > bestIoU) {
+                        bestIoU = candidates[i].iou;
+                        bestIdx = i;
+                    }
+                }
+            }
+            console.log(` Selected default candidate ${bestIdx} (IoU ${bestIoU.toFixed(3)}, coverage ${(covs[bestIdx] * 100).toFixed(1)}%) of ${candidates.length}`);
 
             return {
                 primary: candidates[bestIdx],

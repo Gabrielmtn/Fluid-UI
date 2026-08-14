@@ -139,23 +139,57 @@
 }
 
 
+/* Stamps submenu — shape tools live under the "Stamps" button */
+.mask-stamp-menu {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    animation: stampMenuOpen 0.18s ease;
+}
+
+@keyframes stampMenuOpen {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.mask-stamp-hint {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 8px;
+    padding: 0 2px;
+}
+
 .mask-shape-tools {
-    display: flex;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+    gap: 6px;
 }
 
 .mask-tool-btn {
     background: linear-gradient(#2a2f3a, #1f2430);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
+    border-radius: 12px;
     color: #e6edf3;
     font-size: 24px;
-    width: 48px;
+    min-width: 48px;
     height: 48px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: transform 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.mask-tool-btn:hover {
+    transform: translateY(-1px) scale(1.04);
+    border-color: rgba(255, 200, 120, 0.5);
+    color: #ffd8a8;
+}
+
+.mask-tool-btn:active {
+    transform: translateY(0) scale(0.98);
 }
 
 
@@ -310,7 +344,7 @@
 }
 
 
-/* Smart Select Button */
+/* Mask editor tool buttons (Magic Mask Objects / Stamps) */
 .mask-mode-btn {
     padding: 10px 16px;
     background: linear-gradient(180deg, #2a3340, #1f2632);
@@ -324,6 +358,57 @@
     align-items: center;
     gap: 6px;
     flex: 1;
+}
+
+/* Magic Mask Objects — reads green even at rest so it pops out of the panel */
+.magic-mask-btn {
+    background: linear-gradient(180deg, rgba(35, 134, 54, 0.35), rgba(26, 127, 55, 0.18));
+    border: 1px solid rgba(63, 185, 80, 0.65);
+    color: #3fb950;
+    box-shadow: 0 0 10px rgba(63, 185, 80, 0.15), inset 0 1px 0 rgba(63, 185, 80, 0.2);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.magic-mask-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(35, 134, 54, 0.5), rgba(26, 127, 55, 0.3));
+    border-color: rgba(63, 185, 80, 0.9);
+    color: #56d364;
+    box-shadow: 0 0 16px rgba(63, 185, 80, 0.3), inset 0 1px 0 rgba(63, 185, 80, 0.25);
+}
+
+/* Engaged = mode is on: solid green fill + glow */
+.magic-mask-btn.engaged {
+    background: linear-gradient(180deg, #2ea043, #238636);
+    border-color: rgba(87, 213, 108, 0.9);
+    color: #fff;
+    box-shadow: 0 0 18px rgba(63, 185, 80, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.magic-mask-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+/* Stamps submenu trigger */
+.stamp-menu-btn {
+    flex: 0 0 auto;
+}
+
+.stamp-menu-btn .stamp-caret {
+    font-size: 11px;
+    opacity: 0.7;
+    transition: transform 0.15s ease;
+}
+
+.stamp-menu-btn.open {
+    background: linear-gradient(180deg, #334052, #26303f);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
+.stamp-menu-btn.open .stamp-caret {
+    transform: rotate(180deg);
 }
 
 
