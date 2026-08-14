@@ -525,6 +525,13 @@
                                       // truck.jpg reference) — keep fp32 unless a future model
                                       // repo ships working reduced-precision weights.
 
+            MAGIC_MASK_TRUST_IOU: 0.6,
+                                      // Above this predicted IoU the model is treated as
+                                      // confident and its own ranking picks the default
+                                      // cutout; below it (painterly/abstract content, where
+                                      // the scores go flat and it will rank a speck first)
+                                      // the largest proposal under MAGIC_MASK_MAX_COVER wins.
+
             MAGIC_MASK_MAX_COVER: 0.8,
                                       // Default-candidate picker: proposals covering more than
                                       // this fraction of the canvas lose to any tighter proposal

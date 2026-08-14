@@ -760,26 +760,37 @@ class SAMSegmenter {
                 return (filled * stride) / c.data.length;
             };
             const covs = candidates.map(coverageOf);
-            let bestIdx = -1;
-            let bestIoU = -Infinity;
+            const eligible = [];
             for (let i = 0; i < candidates.length; i++) {
-                if (covs[i] > maxCover) continue;
-                if (candidates[i].iou > bestIoU) {
-                    bestIoU = candidates[i].iou;
-                    bestIdx = i;
-                }
+                if (covs[i] <= maxCover) eligible.push(i);
             }
-            if (bestIdx === -1) { // everything is near-full-canvas — fall back to raw IoU
-                bestIdx = 0;
-                bestIoU = candidates[0].iou;
-                for (let i = 1; i < candidates.length; i++) {
-                    if (candidates[i].iou > bestIoU) {
-                        bestIoU = candidates[i].iou;
-                        bestIdx = i;
-                    }
-                }
+            // Everything is near-full-canvas — take them all rather than nothing
+            if (!eligible.length) for (let i = 0; i < candidates.length; i++) eligible.push(i);
+
+            let peakIoU = -Infinity;
+            for (const i of eligible) if (candidates[i].iou > peakIoU) peakIoU = candidates[i].iou;
+
+            // The IoU head is the model's own "which proposal is good" signal
+            // and it is reliable on photographic content — but on painterly /
+            // abstract art (fluid captures, mandalas) the model is out of
+            // distribution and its scores go nearly flat, where it will happily
+            // rank a 47x65 speck above a 461x532 region. Measured on a
+            // mandala: [0.03, 0.297, 0.477] picked the speck, which is the
+            // "never fills the shape in" complaint. So: trust IoU when the
+            // model is confident, and fall back to the LARGEST proposal under
+            // the coverage cap when it clearly is not. The cutout cycler still
+            // offers every proposal either way.
+            const trustIoU = (typeof window !== 'undefined' && window.config && typeof window.config.MAGIC_MASK_TRUST_IOU === 'number')
+                ? window.config.MAGIC_MASK_TRUST_IOU : 0.6;
+            const confident = peakIoU >= trustIoU;
+
+            let bestIdx = eligible[0];
+            if (confident) {
+                for (const i of eligible) if (candidates[i].iou > candidates[bestIdx].iou) bestIdx = i;
+            } else {
+                for (const i of eligible) if (covs[i] > covs[bestIdx]) bestIdx = i;
             }
-            console.log(` Selected default candidate ${bestIdx} (IoU ${bestIoU.toFixed(3)}, coverage ${(covs[bestIdx] * 100).toFixed(1)}%) of ${candidates.length}`);
+            console.log(` Selected default candidate ${bestIdx} (IoU ${candidates[bestIdx].iou.toFixed(3)}, coverage ${(covs[bestIdx] * 100).toFixed(1)}%) of ${candidates.length} — ${confident ? 'by IoU (confident)' : 'largest (low confidence, peak IoU ' + peakIoU.toFixed(3) + ')'}`);
 
             return {
                 primary: candidates[bestIdx],
