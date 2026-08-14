@@ -118,7 +118,7 @@ function we(){if(0<Ua)Va=we;else if(q)aa(e),Ta();else{for(;0<Hc.length;)Hc.shift
 })();
 export default ortWasmThreaded;
 var isPthread = globalThis.self?.name?.startsWith('em-pthread');
-var isNode = typeof globalThis.process?.versions?.node == 'string';
+var isNode = typeof globalThis.process?.versions?.node == 'string' && globalThis.process?.type !== 'renderer'; /* FLUID-UI PATCH: ort's trailing pthread bootstrap lacks emscripten's Electron-renderer exclusion, so under nodeIntegration the bare worker_threads import rejects the whole module in Electron */
 if (isNode) isPthread = (await import('worker_threads')).workerData === 'em-pthread';
 
 // When running as a pthread, construct a new instance on startup

@@ -23,8 +23,6 @@ function appRootDiskPath() {
     return p;
 }
 
-let _wasmBlobPaths = null;
-
 export function configureTransformersEnv(env) {
     const onnxWasm = env.backends.onnx.wasm;
 
@@ -40,19 +38,18 @@ export function configureTransformersEnv(env) {
     const path = require('path');
     const root = appRootDiskPath();
 
-    // ORT v3 layout: one .mjs loader + one .wasm binary (the jsep build).
-    // wasmPaths accepts a {mjs, wasm} URL pair — hand both over as blobs.
-    if (!_wasmBlobPaths) {
-        const mk = (f, type) => {
-            const buf = fs.readFileSync(path.join(root, 'js', 'vendor', 'transformers', f));
-            return URL.createObjectURL(new Blob([buf], { type }));
-        };
-        _wasmBlobPaths = {
-            mjs: mk('ort-wasm-simd-threaded.jsep.mjs', 'text/javascript'),
-            wasm: mk('ort-wasm-simd-threaded.jsep.wasm', 'application/wasm'),
-        };
+    // ORT v3 layout: an ES-module loader (.mjs) + one wasm binary (the jsep
+    // build). Under file:// the .mjs imports fine as a same-scheme module URL
+    // (blob: module imports are NOT reliable from a null-origin file:// page),
+    // but fetch() of the .wasm would fail — so hand the raw bytes over via
+    // wasmBinary, which short-circuits emscripten's fetch entirely.
+    onnxWasm.wasmPaths = {
+        mjs: new URL('./ort-wasm-simd-threaded.jsep.mjs', import.meta.url).href,
+    };
+    if (!onnxWasm.wasmBinary) {
+        const buf = fs.readFileSync(path.join(root, 'js', 'vendor', 'transformers', 'ort-wasm-simd-threaded.jsep.wasm'));
+        onnxWasm.wasmBinary = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     }
-    onnxWasm.wasmPaths = _wasmBlobPaths;
     // No crossOriginIsolation under file:// — stay single-threaded.
     onnxWasm.numThreads = 1;
 

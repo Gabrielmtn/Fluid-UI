@@ -19,7 +19,18 @@ function log(...args) {
     try {
         log('[info] Importing VENDORED Transformers.js (js/vendor/transformers, v3.8.1)...');
 
-        const transformers = await import('./js/vendor/transformers/transformers.min.js');
+        // Mirror 16-sam-integration: hide `process` during the import so the
+        // bundle's module-scope env detection takes the browser path even in
+        // Electron (process.release.name === 'node' there).
+        const hadProcess = typeof globalThis.process !== 'undefined';
+        const originalProcess = globalThis.process;
+        let transformers;
+        try {
+            if (hadProcess) { try { globalThis.process = undefined; } catch (e) { /* best effort */ } }
+            transformers = await import('./js/vendor/transformers/transformers.min.js');
+        } finally {
+            if (hadProcess) globalThis.process = originalProcess;
+        }
         const { AutoModel, AutoProcessor, RawImage, env } = transformers;
 
         log('[ok] Transformers.js imported');
