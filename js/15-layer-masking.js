@@ -996,12 +996,16 @@
                 if (match) { r = parseInt(match[1]); g = parseInt(match[2]); b = parseInt(match[3]); a = match[4] ? parseFloat(match[4]) : 1.0; }
             }
 
-            // D0.5 rev 2: fwidth-style adaptive band matching the obstacle
-            // compositor — the editor preview edge must agree with the
-            // collider edge (AA at edges, hard cut on flat midtones).
+            // D0.5 rev 2: fwidth-style adaptive band — same threshold center
+            // as the obstacle compositor so the editor preview edge lands
+            // where the collider edge lands (AA at edges, hard cut on flat
+            // midtones). Preview-only 8x cap (see 05m applyRudimentaryMask):
+            // keeps the spatial ramp ~1.5px on steep edges; the solver path
+            // keeps the hard cap.
             let bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
                 ? window.config.DEPTH_EDGE_BAND : 12;
             if (bandCap < 0.5) bandCap = 0.5;
+            bandCap = Math.min(bandCap * 8, 127);
             const ddp = shape.depthData;
             const dpw = shape.depthWidth;
             // No flip: depth data is stored top-down, same as this canvas
