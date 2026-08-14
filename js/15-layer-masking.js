@@ -460,20 +460,37 @@
         if (!canvas) return;
 
         // Transform screen center to canvas coordinates accounting for zoom/pan
-        // This ensures shapes are created at the visible center, in original canvas space
-        const centerX = (canvas.width / 2 - maskState.panX) / maskState.zoom;
-        const centerY = (canvas.height / 2 - maskState.panY) / maskState.zoom;
-        
+        // (and the layer view), so shapes are created at the VISIBLE centre
+        // but stored in original canvas space
+        const c = fromLayerView(
+            (canvas.width / 2 - maskState.panX) / maskState.zoom,
+            (canvas.height / 2 - maskState.panY) / maskState.zoom,
+            canvas
+        );
+        const centerX = c.x, centerY = c.y;
+
         // Default size in canvas coordinates (divided by zoom for finer control when zoomed in)
         // At 100% zoom: 5% of canvas | At 1000% zoom: 0.5% of canvas (pixel-level)
         const defaultSize = Math.min(canvas.width, canvas.height) * 0.05 / maskState.zoom;
 
+        // Pre-stretch by the inverse layer view so a stamp reads the same in
+        // the editor and in the applied mask: stored space is squashed by the
+        // layer's contain-fit, and the div squeezes it back on screen.
+        // 'circle' is radius-from-WIDTH only, so on a squashed layer it has to
+        // become an ellipse to stay round (pentagon/hexagon/star take
+        // min(w,h), which the stretch leaves alone).
+        const vs = layerViewScale(canvas);
+        const anisotropic = Math.abs(vs.sx - vs.sy) > 1e-3;
+        const stampType = (type === 'circle' && anisotropic) ? 'ellipse' : type;
+        const w = defaultSize / vs.sx;
+        const h = (type === 'circle' ? defaultSize : defaultSize * 0.6) / vs.sy;
+
         const shape = {
-            type: type,
-            x: centerX - defaultSize / 2,
-            y: centerY - defaultSize / 2,
-            width: defaultSize,
-            height: type === 'circle' ? defaultSize : defaultSize * 0.6,
+            type: stampType,
+            x: centerX - w / 2,
+            y: centerY - h / 2,
+            width: w,
+            height: h,
             rotation: 0
         };
 
@@ -531,9 +548,14 @@
         const screenX = (e.clientX - rect.left) * (canvas.width / rect.width);
         const screenY = (e.clientY - rect.top) * (canvas.height / rect.height);
         
-        // Transform to canvas coordinates accounting for zoom/pan
-        const x = (screenX - maskState.panX) / maskState.zoom;
-        const y = (screenY - maskState.panY) / maskState.zoom;
+        // Transform to canvas coordinates accounting for zoom/pan, then back
+        // through the layer view so points/shapes land in STORED space
+        const _p = fromLayerView(
+            (screenX - maskState.panX) / maskState.zoom,
+            (screenY - maskState.panY) / maskState.zoom,
+            canvas
+        );
+        const x = _p.x, y = _p.y;
 
         // Smart select mode - add points for SAM
         if (maskState.smartSelectMode) {
@@ -623,9 +645,14 @@
             return;
         }
         
-        // Transform to canvas coordinates accounting for zoom/pan
-        const x = (screenX - maskState.panX) / maskState.zoom;
-        const y = (screenY - maskState.panY) / maskState.zoom;
+        // Transform to canvas coordinates accounting for zoom/pan, then back
+        // through the layer view so drags track the cursor in STORED space
+        const _p = fromLayerView(
+            (screenX - maskState.panX) / maskState.zoom,
+            (screenY - maskState.panY) / maskState.zoom,
+            canvas
+        );
+        const x = _p.x, y = _p.y;
 
         if (maskState.isDragging && maskState.selectedShapeIndex !== null) {
             const dx = x - maskState.dragStartX;
@@ -728,6 +755,91 @@
         }
     }
 
+    // ── Layer view transform (aspect parity with the app) ──────────────
+    // An image layer is a full-bleed div whose background is STRETCHED to the
+    // canvas box (background-size:100% 100%) and then squeezed back by the
+    // div's CSS transform — which carries the contain-fit baked into
+    // scaleX/scaleY at import (04f createLayerFromDataUrl), plus any
+    // move/resize/rotate the user applied. So the layer the user SEES is the
+    // transformed one, while mask shapes are stored in the UNTRANSFORMED
+    // stretched space, because that is the space applyLayerMask (05m) bakes
+    // in before the div re-applies the transform.
+    //
+    // The editor therefore treats the layer transform as a VIEW transform:
+    // composed into every draw, inverted for every mouse mapping. Stored
+    // shape coordinates, the bake, and SAM's display-space mapping are all
+    // untouched — only what's on screen changes.
+    function getLayerViewMatrix(canvas) {
+        if (typeof DOMMatrix === 'undefined' || !canvas) return null;
+        const id = maskState.activeMaskLayerId;
+        if (typeof id !== 'string' || !id.startsWith('image-')) return null;
+        const layer = (window.layers || []).find(l => l.index === parseInt(id.slice(6), 10));
+        if (!layer) return null;
+
+        const sx = (typeof layer.scaleX === 'number') ? layer.scaleX : 1;
+        const sy = (typeof layer.scaleY === 'number') ? layer.scaleY : 1;
+        const rot = layer.rotation || 0;
+        if (Math.abs(sx) < 1e-6 || Math.abs(sy) < 1e-6) return null; // not invertible
+
+        // layer.x/y are CSS px of the canvas box; the editor works in the
+        // display canvas's BUFFER px, which can differ (HiDPI / render cap).
+        let kx = 1, ky = 1;
+        const displayCanvas = document.getElementById('canvas');
+        if (displayCanvas) {
+            const r = displayCanvas.getBoundingClientRect();
+            if (r.width > 0) kx = displayCanvas.width / r.width;
+            if (r.height > 0) ky = displayCanvas.height / r.height;
+        }
+        const tx = (layer.x || 0) * kx;
+        const ty = (layer.y || 0) * ky;
+
+        if (sx === 1 && sy === 1 && !rot && !tx && !ty) return null; // identity
+
+        // Mirrors renderLayers' `translate(x,y) rotate(r) scale(sx,sy)` with
+        // transform-origin: center center (05k updateLayerZIndices).
+        const cx = canvas.width / 2, cy = canvas.height / 2;
+        return new DOMMatrix()
+            .translateSelf(cx, cy)
+            .translateSelf(tx, ty)
+            .rotateSelf(rot)
+            .scaleSelf(sx, sy)
+            .translateSelf(-cx, -cy);
+    }
+
+    // Compose the layer view onto ctx — call AFTER the pan/zoom transform.
+    function applyLayerView(ctx, canvas) {
+        const m = getLayerViewMatrix(canvas);
+        if (m) ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+    }
+
+    // Per-axis view scale, for chrome that must stay square on screen
+    // (handles, markers) and for shapes that should be stamped un-squashed.
+    function layerViewScale(canvas) {
+        const m = getLayerViewMatrix(canvas);
+        if (!m) return { sx: 1, sy: 1 };
+        // Column magnitudes = the scale this matrix applies per axis.
+        return {
+            sx: Math.hypot(m.a, m.b) || 1,
+            sy: Math.hypot(m.c, m.d) || 1,
+        };
+    }
+
+    // Map a point from stored space into view space (post layer transform).
+    function toLayerView(x, y, canvas) {
+        const m = getLayerViewMatrix(canvas);
+        if (!m) return { x, y };
+        const p = m.transformPoint(new DOMPoint(x, y));
+        return { x: p.x, y: p.y };
+    }
+
+    // Map an already un-panned/un-zoomed editor point back to stored space.
+    function fromLayerView(x, y, canvas) {
+        const m = getLayerViewMatrix(canvas);
+        if (!m) return { x, y };
+        const p = m.inverse().transformPoint(new DOMPoint(x, y));
+        return { x: p.x, y: p.y };
+    }
+
     // Render mask editor canvas
     function renderMaskEditor() {
         const canvas = document.getElementById('maskEditorCanvas');
@@ -752,6 +864,7 @@
             ctx.save();
             ctx.translate(maskState.panX, maskState.panY);
             ctx.scale(maskState.zoom, maskState.zoom);
+            applyLayerView(ctx, canvas);
             drawFn();
             ctx.restore();
         };
@@ -827,6 +940,11 @@
         ctx.save();
         ctx.translate(maskState.panX, maskState.panY);
         ctx.scale(maskState.zoom, maskState.zoom);
+        applyLayerView(ctx, canvas);
+        // Shapes live in the layer's (possibly squashed) stored space, so
+        // strokes/handles need the inverse scale to stay square on screen.
+        const vs = layerViewScale(canvas);
+        const vsMean = (vs.sx + vs.sy) / 2;
 
         // Draw shapes
         maskState.shapes.forEach((shape, index) => {
@@ -843,7 +961,7 @@
             ctx.strokeStyle = isSelected 
                 ? 'rgba(255, 200, 0, 0.9)' 
                 : 'rgba(255, 255, 255, 0.6)';
-            ctx.lineWidth = (isSelected ? 3 : 2) / maskState.zoom;
+            ctx.lineWidth = (isSelected ? 3 : 2) / (maskState.zoom * vsMean);
 
             // Apply rotation if set
             const rotation = shape.rotation || 0;
@@ -868,14 +986,17 @@
 
             // Draw resize handle if selected (size scaled to screen pixels)
             if (isSelected) {
-                const handleSize = 12 / maskState.zoom; // Keep handle same screen size
-                const handleOffset = 6 / maskState.zoom;
+                // Per-axis so the grab handle stays a square on screen even
+                // when the layer view squashes one axis (hit-testing is
+                // unchanged — it runs in stored space).
+                const handleW = 12 / (maskState.zoom * vs.sx);
+                const handleH = 12 / (maskState.zoom * vs.sy);
                 ctx.fillStyle = 'rgba(255, 200, 0, 0.9)';
                 ctx.fillRect(
-                    shape.x + shape.width - handleOffset, 
-                    shape.y + shape.height - handleOffset, 
-                    handleSize, 
-                    handleSize
+                    shape.x + shape.width - handleW / 2,
+                    shape.y + shape.height - handleH / 2,
+                    handleW,
+                    handleH
                 );
             }
 
@@ -921,14 +1042,16 @@
             ctx.save();
             ctx.translate(maskState.panX, maskState.panY);
             ctx.scale(maskState.zoom, maskState.zoom);
+            applyLayerView(ctx, canvas);
             ctx.drawImage(tempCanvas, 0, 0, maskWidth, maskHeight);
-            
+
             // Draw bounding box
+            const pvs = layerViewScale(canvas);
             const bbox = mask.boundingBox;
             ctx.strokeStyle = '#3fb950';
-            ctx.lineWidth = 2 / maskState.zoom;
+            ctx.lineWidth = 2 / (maskState.zoom * (pvs.sx + pvs.sy) / 2);
             ctx.strokeRect(bbox.x, bbox.y, bbox.width, bbox.height);
-            
+
             ctx.restore();
         }
         
@@ -938,29 +1061,33 @@
             ctx.translate(maskState.panX, maskState.panY);
             ctx.scale(maskState.zoom, maskState.zoom);
             
+            // Markers are chrome, not geometry: map the POSITION through the
+            // layer view but draw the glyph unscaled, so rings stay round and
+            // the numbers stay readable on a squashed layer.
             maskState.smartSelectPoints.forEach((point, index) => {
+                const p = toLayerView(point.x, point.y, canvas);
                 const pointSize = 8 / maskState.zoom;
                 const outerSize = 12 / maskState.zoom;
-                
+
                 // Draw outer ring
                 ctx.strokeStyle = point.label === 1 ? '#3fb950' : '#f85149';
                 ctx.lineWidth = 3 / maskState.zoom;
                 ctx.beginPath();
-                ctx.arc(point.x, point.y, outerSize, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, outerSize, 0, Math.PI * 2);
                 ctx.stroke();
-                
+
                 // Draw filled center
                 ctx.fillStyle = point.label === 1 ? '#3fb950' : '#f85149';
                 ctx.beginPath();
-                ctx.arc(point.x, point.y, pointSize, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, pointSize, 0, Math.PI * 2);
                 ctx.fill();
-                
+
                 // Draw point number
                 ctx.fillStyle = '#fff';
                 ctx.font = `bold ${14 / maskState.zoom}px sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(String(index + 1), point.x, point.y);
+                ctx.fillText(String(index + 1), p.x, p.y);
             });
             
             ctx.restore();
