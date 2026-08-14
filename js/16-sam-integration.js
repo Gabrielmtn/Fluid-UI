@@ -650,17 +650,30 @@ class SAMSegmenter {
                 return (v00 * (1 - tx) + v10 * tx) * (1 - ty) + (v01 * (1 - tx) + v11 * tx) * ty;
             }
             // 3x3 box filter: 0/1 field → 0-255 coverage with a 1px soft edge
-            // (used when no rescale is needed, so same-res masks get AA too)
+            // (used when no rescale is needed, so same-res masks get AA too).
+            //
+            // The AA only ever ADDS coverage outside the mask — a pixel the
+            // model marked as foreground stays fully opaque. Averaging over the
+            // neighbourhood unconditionally also eats into THIN features from
+            // the inside, because a narrow stroke is nearly all boundary:
+            // measured on 120px text, a letter came back only 64.6% opaque,
+            // which is the washed-out "doesn't fill in properly" look on text
+            // and thin shapes. Solid interiors + a soft outer skirt keeps the
+            // antialiased edge without the erosion.
+            const solidFill = !(typeof window !== 'undefined' && window.config
+                && window.config.MAGIC_MASK_SOLID_FILL === false);
             function binaryToCoverage(srcData, srcW, srcH) {
                 const out = new Uint8Array(srcW * srcH);
                 for (let y = 0; y < srcH; y++) {
                     const y0 = Math.max(y - 1, 0), y1 = Math.min(y + 1, srcH - 1);
                     for (let x = 0; x < srcW; x++) {
+                        const idx = y * srcW + x;
+                        if (solidFill && srcData[idx]) { out[idx] = 255; continue; }
                         const x0 = Math.max(x - 1, 0), x1 = Math.min(x + 1, srcW - 1);
                         let sum = 0, cnt = 0;
                         for (let yy = y0; yy <= y1; yy++)
                             for (let xx = x0; xx <= x1; xx++) { sum += srcData[yy * srcW + xx]; cnt++; }
-                        out[y * srcW + x] = Math.round((sum / cnt) * 255);
+                        out[idx] = Math.round((sum / cnt) * 255);
                     }
                 }
                 return out;
@@ -686,9 +699,17 @@ class SAMSegmenter {
 
                     for (let y = 0; y < dispH; y++) {
                         const fy = (y + 0.5) * srcH / dispH - 0.5;
+                        const ny = Math.min(srcH - 1, Math.max(0, Math.round(fy)));
                         for (let x = 0; x < dispW; x++) {
                             const fx = (x + 0.5) * srcW / dispW - 0.5;
-                            const cov = sampleBilinear(srcData, srcW, srcH, fx, fy);
+                            let cov = sampleBilinear(srcData, srcW, srcH, fx, fy);
+                            // Same rule as binaryToCoverage: resampling may add a
+                            // soft skirt outside the mask but must never erode a
+                            // foreground pixel, or thin strokes fade out.
+                            if (solidFill && cov > 0 && cov < 1) {
+                                const nx = Math.min(srcW - 1, Math.max(0, Math.round(fx)));
+                                if (srcData[ny * srcW + nx]) cov = 1;
+                            }
                             if (cov > 0) {
                                 const dstIdx = y * dispW + x;
                                 scaled[dstIdx] = Math.round(cov * 255);

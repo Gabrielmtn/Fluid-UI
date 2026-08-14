@@ -525,6 +525,14 @@
                                       // truck.jpg reference) — keep fp32 unless a future model
                                       // repo ships working reduced-precision weights.
 
+            MAGIC_MASK_SOLID_FILL: true,
+                                      // Mask antialiasing only ADDS a soft skirt outside the
+                                      // cutout; pixels the model marked foreground stay fully
+                                      // opaque. Averaging them unconditionally eats thin
+                                      // features from the inside (120px text measured only
+                                      // 64.6% opaque = the washed-out look on text/shapes).
+                                      // false = old behaviour (softer, thinner).
+
             MAGIC_MASK_TRUST_IOU: 0.6,
                                       // Above this predicted IoU the model is treated as
                                       // confident and its own ranking picks the default
