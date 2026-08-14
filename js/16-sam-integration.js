@@ -157,7 +157,11 @@ class SAMSegmenter {
             // than a slightly different mask. Segmentation runs once per click
             // (~0.3-2s on CPU), so the GPU path buys nothing worth that.
             // config.MAGIC_MASK_DEVICE = 'webgpu' re-tests it after an upstream
-            // ORT fix.
+            // ORT fix — but note the vendored ORT binary is now the CPU-only
+            // build (half the size, and it kept the web bundle under PartyKit's
+            // 20MB per-asset cap), so that also needs the .jsep build restored:
+            // requesting webgpu against this one fails with "not built with
+            // JSEP support" AND poisons the wasm attempt that follows it.
             const forced = (typeof window !== 'undefined' && window.config && window.config.MAGIC_MASK_DEVICE) || null;
             const attempts = forced
                 ? [{ device: forced, dtype }, { device: 'wasm', dtype }]

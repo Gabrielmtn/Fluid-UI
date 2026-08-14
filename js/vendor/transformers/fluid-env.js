@@ -1,9 +1,14 @@
 // Fluid-UI glue for the vendored Transformers.js runtime — NOT part of the
 // upstream package (upstream files here: transformers.min.js v3.8.1 +
-// ort-wasm-simd-threaded.jsep.* — Apache-2.0, see LICENSE in this directory).
-// The .jsep build is ONNX Runtime's combined WASM + WebGPU binary; there is no
-// separate non-jsep file in the v3 dist. Wires wasm + model-weight loading for
-// both builds:
+// ort-wasm-simd-threaded.* — Apache-2.0, see LICENSE in this directory).
+//
+// This is ONNX Runtime's CPU-ONLY build, taken from onnxruntime-web rather
+// than the .jsep (WASM + WebGPU) binary that transformers.js ships in its own
+// dist. Two reasons: WebGPU returns numerically corrupted masks for both SAM
+// models (see 16-sam-integration), so the GPU half is dead weight; and at
+// 20.6MB the .jsep binary exceeds PartyKit's 20MB per-asset deploy limit,
+// where the CPU build is 10.6MB. Wires wasm + model-weight loading for both
+// builds:
 //   web      — wasm served from this directory (same origin); model weights
 //              stream from Hugging Face into the browser cache (as before).
 //   Electron — fetch() cannot read file:// URLs, so the ORT runtime is handed
@@ -27,7 +32,15 @@ export function configureTransformersEnv(env) {
     const onnxWasm = env.backends.onnx.wasm;
 
     if (!IS_ELECTRON) {
-        onnxWasm.wasmPaths = new URL('./', import.meta.url).href;
+        // Name both files explicitly rather than handing over a directory:
+        // transformers.js is built against ORT's .jsep flavour, so given only a
+        // directory it derives 'ort-wasm-simd-threaded.jsep.*' and 404s on the
+        // CPU-only binary vendored here.
+        const here = new URL('./', import.meta.url).href;
+        onnxWasm.wasmPaths = {
+            mjs: here + 'ort-wasm-simd-threaded.mjs',
+            wasm: here + 'ort-wasm-simd-threaded.wasm',
+        };
         env.allowRemoteModels = true;
         env.allowLocalModels = false;
         env.useBrowserCache = true;
@@ -38,16 +51,16 @@ export function configureTransformersEnv(env) {
     const path = require('path');
     const root = appRootDiskPath();
 
-    // ORT v3 layout: an ES-module loader (.mjs) + one wasm binary (the jsep
-    // build). Under file:// the .mjs imports fine as a same-scheme module URL
-    // (blob: module imports are NOT reliable from a null-origin file:// page),
-    // but fetch() of the .wasm would fail — so hand the raw bytes over via
-    // wasmBinary, which short-circuits emscripten's fetch entirely.
+    // ORT v3 layout: an ES-module loader (.mjs) + one wasm binary. Under
+    // file:// the .mjs imports fine as a same-scheme module URL (blob: module
+    // imports are NOT reliable from a null-origin file:// page), but fetch()
+    // of the .wasm would fail — so hand the raw bytes over via wasmBinary,
+    // which short-circuits emscripten's fetch entirely.
     onnxWasm.wasmPaths = {
-        mjs: new URL('./ort-wasm-simd-threaded.jsep.mjs', import.meta.url).href,
+        mjs: new URL('./ort-wasm-simd-threaded.mjs', import.meta.url).href,
     };
     if (!onnxWasm.wasmBinary) {
-        const buf = fs.readFileSync(path.join(root, 'js', 'vendor', 'transformers', 'ort-wasm-simd-threaded.jsep.wasm'));
+        const buf = fs.readFileSync(path.join(root, 'js', 'vendor', 'transformers', 'ort-wasm-simd-threaded.wasm'));
         onnxWasm.wasmBinary = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     }
     // No crossOriginIsolation under file:// — stay single-threaded.

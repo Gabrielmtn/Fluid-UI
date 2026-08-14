@@ -42,12 +42,13 @@ function log(...args) {
         log('[debug] env.useBrowserCache =', env.useBrowserCache);
         log('[debug] wasmPaths =', env.backends.onnx.wasm.wasmPaths);
 
-        // Same model + backend selection the app uses (16-sam-integration).
-        // fp32 only — EdgeTAM's fp16/q8 exports produce garbage masks.
+        // Same model + backend the app uses (16-sam-integration): CPU only.
+        // fp32 because EdgeTAM's fp16/q8 exports produce garbage masks, and
+        // wasm because ORT's WebGPU backend corrupts the masks — the vendored
+        // binary is now the CPU-only build, so merely REQUESTING webgpu fails
+        // ("not built with JSEP support") and poisons the wasm attempt after it.
         const modelId = 'onnx-community/EdgeTAM-ONNX';
-        const attempts = [];
-        if (navigator.gpu) attempts.push({ device: 'webgpu', dtype: 'fp32' });
-        attempts.push({ device: 'wasm', dtype: 'fp32' });
+        const attempts = [{ device: 'wasm', dtype: 'fp32' }];
 
         let model = null, used = null;
         for (const attempt of attempts) {
