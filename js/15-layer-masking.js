@@ -153,6 +153,9 @@
         }
         overlay.style.display = 'flex';
         updateStampMenuDisplay();
+        // The overlay persists across editor sessions — reset the Apply
+        // button from whatever busy state the last session left it in.
+        samSyncApplyBusy();
     }
 
     // Hide mask editor overlay
@@ -580,12 +583,16 @@
                 if (maskState.samDebounceTimer) {
                     clearTimeout(maskState.samDebounceTimer);
                 }
-                // Run shortly after the last click so multiple rapid clicks coalesce
+                // Run shortly after the last click so multiple rapid clicks
+                // coalesce. Null the handle when it fires — a stale truthy id
+                // would read as "still pending" to samCutoutPending forever.
                 maskState.samDebounceTimer = setTimeout(() => {
+                    maskState.samDebounceTimer = null;
                     autoRunSAMSegmentation();
                 }, 200);
             }
-            
+            samSyncApplyBusy();
+
             e.preventDefault();
             return;
         }
@@ -1464,17 +1471,42 @@
         if (loadingIndicator) {
             loadingIndicator.style.display = 'none';
         }
-        
+
+        // No points, no timers → Apply is available again
+        samSyncApplyBusy();
         renderMaskEditor();
     };
-    
+
+    // Magic Mask is a slow async chain: first-use model download → image
+    // embed → 200ms click debounce → CPU-only inference. While a cutout is
+    // still on its way for the placed points, Apply must not fall through to
+    // buildAdhocResultCanvas's whole-image fallback — that authors a stamp
+    // covering the full file rect (the "giant square" brush bug).
+    function samCutoutPending() {
+        return !!(maskState.isProcessingSAM || maskState.samDebounceTimer ||
+            (maskState.smartSelectPoints.length && !maskState.samPreviewMask &&
+                !maskState.shapes.length));
+    }
+
+    // Reflect the pending state on the ✓ Apply button so the user can see
+    // why Apply is waiting (also covers the model-still-downloading window,
+    // where clicks schedule nothing at all).
+    function samSyncApplyBusy() {
+        const btn = document.querySelector('.mask-apply-btn');
+        if (!btn) return;
+        const busy = samCutoutPending();
+        btn.disabled = busy;
+        btn.textContent = busy ? '⏳ Cutting out…' : '✓ Apply Mask';
+    }
+
     // Auto-run SAM segmentation (live preview)
     async function autoRunSAMSegmentation() {
         if (maskState.isProcessingSAM) return;
         if (maskState.smartSelectPoints.length === 0) return;
         if (!window.samSegmenter || !window.samSegmenter.isReady) return;
-        
+
         maskState.isProcessingSAM = true;
+        samSyncApplyBusy();
         
         // Show loading indicator
         const loadingIndicator = document.getElementById('samLoadingIndicator');
@@ -1511,7 +1543,8 @@
             console.error('❌ Auto-segmentation error:', error);
         } finally {
             maskState.isProcessingSAM = false;
-            
+            samSyncApplyBusy();
+
             // Hide loading indicator
             if (loadingIndicator) {
                 loadingIndicator.style.display = 'none';
@@ -1895,6 +1928,13 @@
 
     function exitAdhocMaskMode(save = true) {
         const src = maskState.adhocSource;
+        // Applying while the cutout is still in flight would build the
+        // whole-image fallback stamp — the full-file-rect "giant square".
+        // Hold the editor open instead; Cancel is always available.
+        if (save && samCutoutPending()) {
+            alert('Magic Mask is still cutting out your object — wait for the green preview, or Cancel.');
+            return;
+        }
         // Same Apply nicety as image layers: a pending SAM preview with no
         // finalized shape converts on Apply.
         if (save && src && !maskState.shapes.length && maskState.samPreviewMask
@@ -1921,6 +1961,12 @@
     // Exit mask mode for image layer
     function exitImageLayerMaskMode(save = true) {
         if (!maskState.activeMaskLayerId || !maskState.activeMaskLayerId.startsWith('image-')) return;
+        // Same in-flight guard as the adhoc editor: applying before the
+        // cutout lands would save an empty/incomplete mask.
+        if (save && samCutoutPending()) {
+            alert('Magic Mask is still cutting out your object — wait for the green preview, or Cancel.');
+            return;
+        }
 
         const layerIndex = parseInt(maskState.activeMaskLayerId.replace('image-', ''));
         const layer = window.layers?.find(l => l.index === layerIndex);

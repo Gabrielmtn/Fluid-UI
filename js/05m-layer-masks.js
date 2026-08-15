@@ -276,12 +276,12 @@
                         data[idx + 3] = shape.samSoft ? v : 255;
                     }
                 }
-                // If the mask is empty for some reason, fall back to the
-                // bounding box so we don't silently do nothing.
+                // An empty sam-mask means segmentation produced nothing —
+                // skip it. The old bounding-box fallback literally painted a
+                // filled rect the size of the shape, turning "no mask" into
+                // "solid square" (live candidates are guaranteed non-empty,
+                // so this only fires on bad saved data).
                 if (nonZero === 0) {
-                    ctx.beginPath();
-                    ctx.rect(shape.x, shape.y, shape.width, shape.height);
-                    ctx.fill();
                     return;
                 }
                 tempCtx.putImageData(imageData, 0, 0);
