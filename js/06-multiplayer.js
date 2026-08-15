@@ -1128,13 +1128,18 @@ function initMultiplayer() {
     if (!currentRoom) createRoom();
 }
 
-function disconnectMultiplayer() {
+// rememberRoom: keep the room for the Reconnect button (used by the record
+// drawer's Multiplayer toggle so a misclick-leave isn't a one-way door).
+// Default callers leave lastRoom alone — a deliberate panel disconnect
+// stays a clean exit.
+function disconnectMultiplayer(rememberRoom) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
     stopPing();
     closeMatchmaking();
     stopStrangerKeepAlive();
     _dabQueue.length = 0; // never carry one room's dabs into the next
+    if (rememberRoom && currentRoom) lastRoom = currentRoom;
     currentRoom = null;
     myRole = 'guest';
     roomLocked = false;
@@ -1153,6 +1158,12 @@ function disconnectMultiplayer() {
     // Clear URL hash
     history.replaceState(null, '', window.location.pathname + window.location.search);
     showDisconnectedUI();
+    // showDisconnectedUI hides the Reconnect button; re-show it when this
+    // disconnect asked to keep the door open (same pattern as giveUpConnection).
+    if (rememberRoom && lastRoom) {
+        var rc = document.getElementById('reconnectBtn');
+        if (rc) rc.style.display = '';
+    }
 }
 
 // ── Liveness heartbeat ──────────────────────────────────────────────

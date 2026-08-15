@@ -1059,8 +1059,17 @@
                 if (cb) cb.checked = true;
                 if (typeof initMultiplayer === 'function') initMultiplayer();
             } else {
+                // One unguarded click here used to close the socket outright —
+                // the relay drops you from the Take Turns rotation and passes
+                // the brush on, and (for stranger rooms) there's no way back.
+                // Confirm before leaving, and keep the room for Reconnect.
+                const inTurns = !!window.turnsOn;
+                const msg = inTurns
+                    ? 'Leave the multiplayer room?\n\nTake Turns is on — leaving gives up your spot in the rotation.'
+                    : 'Leave the multiplayer room?';
+                if (!window.confirm(msg)) { recRenderUI(); return; }
                 if (cb) cb.checked = false;
-                if (typeof disconnectMultiplayer === 'function') disconnectMultiplayer();
+                if (typeof disconnectMultiplayer === 'function') disconnectMultiplayer(true);
             }
             // Let connection events update state, but refresh UI immediately for button highlight
             recRenderUI();
