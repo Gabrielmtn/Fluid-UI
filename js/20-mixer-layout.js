@@ -262,6 +262,42 @@
         }
     }
 
+    // One shared disclosure affordance (user-test 2026-08-15): Brush Size,
+    // Fluid, and Multi-Brush each hid extra controls behind a DIFFERENT
+    // secret handshake — a clickable label with an 8px chevron, a select
+    // disguised as a label, a clickable value cell. None read as
+    // interactive. Every channel with more-settings now also carries an
+    // explicit gear button in its header; the original triggers stay
+    // clickable for muscle memory.
+    function makeChGear(title) {
+        var g = document.createElement('button');
+        g.type = 'button';
+        g.className = 'ch-gear';
+        g.title = title;
+        // U+2699 + VS15 forces the monochrome TEXT gear glyph (no emoji
+        // coloring), so currentColor styling applies like any icon font.
+        g.textContent = '⚙︎';
+        return g;
+    }
+
+    // Delegate the gear to an existing trigger element and mirror its
+    // active state (set/cleared by the panel handlers AND the outside-click
+    // closers — a MutationObserver keeps the gear honest either way). The
+    // delegated .click() raises a fresh event targeting the trigger, which
+    // every outside-click closer already exempts.
+    function wireGearToTrigger(gear, trigger) {
+        if (!trigger) { gear.disabled = true; return; }
+        gear.addEventListener('click', function (e) {
+            e.stopPropagation();
+            trigger.click();
+        });
+        try {
+            new MutationObserver(function () {
+                gear.classList.toggle('active', trigger.classList.contains('active'));
+            }).observe(trigger, { attributes: true, attributeFilter: ['class'] });
+        } catch (_) {}
+    }
+
     // ─── MIXER STRIP ─────────────────────────────────────────────
     function buildMixerStrip(controls) {
         const strip = document.createElement('div');
@@ -278,16 +314,40 @@
         // panel — too common to bury in the sidebar. The sidebar Brush section
         // keeps the rarer replay + splat-ramp controls.
         buildBrushPanel(sizeChannel.querySelector('.ch-label'));
+        var sizeGear = makeChGear('Brush settings & presets');
+        wireGearToTrigger(sizeGear, sizeChannel.querySelector('.ch-label'));
+        sizeChannel.querySelector('.ch-header').appendChild(sizeGear);
         strip.appendChild(sizeChannel);
-        strip.appendChild(faderChannel('Fluid', 'blue', 'curl', 'curlValue'));
+
+        var fluidChannel = faderChannel('Fluid', 'blue', 'curl', 'curlValue');
+        // The Fluid gear opens the material picker (the disguised
+        // #materialMode select). showPicker needs Chromium 121+; older
+        // builds at least get focus so the arrow keys work.
+        var fluidGear = makeChGear('Material mode — Fluid / Paint-Wet / Paint-Thick');
+        fluidGear.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var sel = document.getElementById('materialMode');
+            if (!sel) return;
+            if (typeof sel.showPicker === 'function') {
+                try { sel.showPicker(); return; } catch (_) {}
+            }
+            sel.focus();
+        });
+        fluidChannel.querySelector('.ch-header').appendChild(fluidGear);
+        strip.appendChild(fluidChannel);
+
         strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
         var brushChannel = faderChannel('Multi-Brush', 'yellow', 'multiplier', 'multiplierValue');
         // The multiplier value ("1x") IS the brush-colors trigger — click it to
-        // open the per-arm brush color controls (no separate icon button).
+        // open the per-arm brush color controls; the gear is the discoverable
+        // second door to the same popup.
         // Query from the (detached) channel: faderChannel already re-parented
         // the value element, so document.getElementById would miss it here.
         buildArmColorsDropdown(brushChannel.querySelector('#multiplierValue'));
+        var armGear = makeChGear('Multi-brush arm colors & symmetry');
+        wireGearToTrigger(armGear, brushChannel.querySelector('#multiplierValue'));
+        brushChannel.querySelector('.ch-header').appendChild(armGear);
         strip.appendChild(brushChannel);
         strip.appendChild(faderChannel('Time', 'pink', 'timeScale', 'timeScaleValue'));
         strip.appendChild(faderChannel('Density', 'cyan', 'densityDissipation', 'densityValue'));
@@ -313,11 +373,11 @@
 
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
-        'Brush Size': 'Brush size for painting fluid — click the label for brush settings & presets',
-        'Fluid': 'Material mode (Fluid / Paint-Wet / Paint-Thick) + amount — vorticity in fluid mode',
+        'Brush Size': 'Brush size for painting fluid — the ⚙ opens brush settings & presets',
+        'Fluid': 'Material mode (Fluid / Paint-Wet / Paint-Thick) + amount — the ⚙ opens the material picker',
         'Viscosity': 'Sharpness/detail enhancement',
         'Isolation': 'Motion isolation - how much color follows velocity',
-        'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — click the value for arm colors',
+        'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — the ⚙ opens arm colors & symmetry',
         'Time': 'Simulation time scale',
         'Density': 'How fast color fades',
         'Velocity': 'How fast motion fades',
