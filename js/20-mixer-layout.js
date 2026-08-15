@@ -4141,9 +4141,26 @@
                     var picker = document.createElement('input');
                     picker.type = 'color';
                     picker.className = 'arm-picker';
-                    picker.value = cfg.color || '#ffffff';
+                    // 'main' arms paint the live default color (resolveArmColor
+                    // defers to pointer.color), so show THAT — not the arm's
+                    // stored custom hex. Display-only: cfg.color is untouched,
+                    // and .value is set by property so the picker's input
+                    // handler (which flips the arm to 'fixed' and persists)
+                    // never fires. Rebuilds re-run this on every default-color
+                    // change while the popup is open, so it tracks live.
+                    if (cfg.mode === 'main') {
+                        var mainPk = document.getElementById('colorPicker');
+                        picker.value = (mainPk && mainPk.value) || cfg.color || '#ffffff';
+                    } else {
+                        picker.value = cfg.color || '#ffffff';
+                    }
                     picker.disabled = cfg.mode !== 'fixed';
-                    if (cfg.mode !== 'fixed') picker.style.opacity = '0.35';
+                    // Generative modes (rainbow/random/step) dim the swatch —
+                    // no single color is "the" color. A 'main' arm's swatch is
+                    // accurate (it IS the default color), so keep it readable.
+                    if (cfg.mode !== 'fixed') {
+                        picker.style.opacity = (cfg.mode === 'main') ? '0.8' : '0.35';
+                    }
 
                     var modes = [
                         { key: 'main',    text: '\u25CF', title: 'Follow pointer color' },
