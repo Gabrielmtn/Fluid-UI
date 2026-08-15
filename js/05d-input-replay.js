@@ -707,7 +707,10 @@
                     v = Math.max(parseFloat(s.min), Math.min(parseFloat(s.max), Math.round(v * 10) / 10));
                     s.value = v;
                     s.style.setProperty('--val', v);
-                    config.SPLAT_RADIUS = v / 1000; // same drive as the 05h wheel path
+                    // Drive it like a user drag (matches the brush-preset apply
+                    // idiom): 05h's input binding sets SPLAT_RADIUS and the strip
+                    // label updates instantly instead of on its 2s fallback poll.
+                    s.dispatchEvent(new Event('input', { bubbles: true }));
                     toast('🖌 Brush ' + v.toFixed(1));
                 } else {
                     let v = Math.round(period0 + (cy0 - m.cy) / 25); // drag up = longer
