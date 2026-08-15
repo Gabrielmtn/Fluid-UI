@@ -137,6 +137,9 @@
         maskState.activeMaskLayerId = null;
         maskState.shapes = [];
         maskState.selectedShapeIndex = null;
+        // maskState persists across editor sessions — leftover Magic Mask
+        // points from this one must not wedge a later session's Apply button.
+        resetSamSessionState();
 
         // Refresh UI
         if (typeof window.recRenderUI === 'function') {
@@ -1364,6 +1367,10 @@
                 if (!window.samSegmenter.isReady) {
                     if (statusEl) statusEl.textContent = '⚠ Failed to load';
                     smartSelectBtn.disabled = false; // Re-enable button
+                    // Points placed while preparing will never segment now —
+                    // drop them so they can't hold Apply in its busy state.
+                    maskState.smartSelectPoints = [];
+                    samSyncApplyBusy();
                     alert('Failed to load AI model. Please refresh and try again.');
                     return;
                 }
@@ -1415,18 +1422,43 @@
                             segmentBtn.title = 'Click to run AI segmentation on selected points';
                         }
                         smartSelectBtn.disabled = false;
+                        // Points placed while the model/image was preparing
+                        // scheduled no inference (the click debounce requires
+                        // isReady) — run them now, so the busy Apply state
+                        // self-resolves into a preview instead of showing
+                        // '⏳ Cutting out…' forever with nothing running.
+                        if (maskState.smartSelectPoints.length) {
+                            autoRunSAMSegmentation();
+                        }
                     } else {
                         if (statusEl) statusEl.textContent = '⚠ Image load failed';
                         smartSelectBtn.disabled = false;
+                        // Nothing will ever segment these points — stand down.
+                        maskState.smartSelectPoints = [];
+                        samSyncApplyBusy();
                     }
                 } else {
                     smartSelectBtn.disabled = false;
+                    // No image to segment against — placed points are inert.
+                    maskState.smartSelectPoints = [];
+                    samSyncApplyBusy();
                 }
             }
         } else {
             smartSelectBtn.classList.remove('engaged');
             smartControls.style.display = 'none';
             maskState.smartSelectPoints = [];
+            // Leaving Magic Mask must stand the busy machinery down too: a
+            // pending debounce would fire into autoRun's zero-points early
+            // return (before its resync), and stale busy state would keep
+            // the Apply button disabled while the user draws manual shapes.
+            // The preview (if one landed) is kept — Apply still converts it,
+            // same as before.
+            if (maskState.samDebounceTimer) {
+                clearTimeout(maskState.samDebounceTimer);
+                maskState.samDebounceTimer = null;
+            }
+            samSyncApplyBusy();
             updateStampMenuDisplay();
 
             if (hintDiv) {
@@ -1497,6 +1529,24 @@
         const busy = samCutoutPending();
         btn.disabled = busy;
         btn.textContent = busy ? '⏳ Cutting out…' : '✓ Apply Mask';
+    }
+
+    // Fully stand down this session's Magic Mask state — points, preview,
+    // candidates, pending debounce — and resync the Apply button. Every
+    // editor exit path must call this: maskState and the overlay both
+    // persist across editor sessions, so a cancelled session's leftover
+    // points would otherwise hold a LATER session's Apply button in its
+    // busy state (samCutoutPending's points-without-preview clause).
+    function resetSamSessionState() {
+        maskState.smartSelectPoints = [];
+        maskState.samPreviewMask = null;
+        maskState.samCandidates = [];
+        maskState.samSelectedCandidateIndex = 0;
+        if (maskState.samDebounceTimer) {
+            clearTimeout(maskState.samDebounceTimer);
+            maskState.samDebounceTimer = null;
+        }
+        samSyncApplyBusy();
     }
 
     // Auto-run SAM segmentation (live preview)
@@ -1949,10 +1999,8 @@
         maskState.selectedShapeIndex = null;
         maskState.adhocSource = null;
         // Never leak this session's SAM preview into a later editor
-        maskState.smartSelectPoints = [];
-        maskState.samPreviewMask = null;
-        maskState.samCandidates = [];
-        maskState.samSelectedCandidateIndex = 0;
+        // (also clears any pending debounce and resyncs the Apply button)
+        resetSamSessionState();
         if (result && src && typeof src.onApply === 'function') {
             try { src.onApply(result, src.name); } catch (e) { console.error('adhoc mask onApply failed', e); }
         }
@@ -1994,6 +2042,9 @@
         maskState.activeMaskLayerId = null;
         maskState.shapes = [];
         maskState.selectedShapeIndex = null;
+        // Same anti-leak reset as the adhoc/recording exits: stale points
+        // from a cancelled session would disable Apply on the next open.
+        resetSamSessionState();
 
         // Apply mask to layer immediately
         if (save && layer && typeof window.applyLayerMask === 'function') {
