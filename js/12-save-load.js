@@ -57,7 +57,7 @@
     // Frozen fallbacks — used ONLY if ParamRegistry failed to load (in which
     // case apply-side clamping is broken anyway). Mirrors pre-registry coverage.
     var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','swirl','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','clarity','vibrance','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','shadingIntensity'];
-    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','macCormackToggle','multigridToggle','ascendToggle','ascendRandomness','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
+    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','macCormackToggle','multigridToggle','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
     var FALLBACK_SELECT_IDS = ['visualResolution','physicsResolution','kaleidoMode','fpsCap','lightMode','lightShiftMode','recMode','recPlaybackSpeed','audioMode','audioReactSource','audioAutoSplatMode','splatInMode','splatOutMode'];
 
     var _PR = window.ParamRegistry;
@@ -309,7 +309,11 @@
             if (Array.isArray(savedArm) && savedArm.length) {
                 arm.length = 0;
                 savedArm.forEach(function(c) {
-                    arm.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                    // 'rainbow' (removed 2026-08-15, photosensitivity): stale
+                    // saved modes land as 'fixed' so the row shows a real
+                    // active mode instead of nothing.
+                    var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
+                    arm.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
                 });
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             } else {
@@ -952,7 +956,10 @@
                 if (!armArr) { armArr = []; window.multiArmColors = armArr; }
                 armArr.length = 0;
                 snapshot.armColors.forEach(function(c) {
-                    armArr.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                    // 'rainbow' (removed 2026-08-15, photosensitivity): old
+                    // presets and stale peers' snapshots coerce to 'fixed'.
+                    var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
+                    armArr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
                 });
                 if (window.settingsManager) {
                     window.settingsManager.set('brush.armColors', snapshot.armColors);

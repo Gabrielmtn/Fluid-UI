@@ -126,8 +126,10 @@
         macCormackToggle: {def: true, mutScope: null},
         multigridToggle: {def: true, mutScope: null},
         glowToggle: {def: false, mutScope: "extended"},
-        ascendToggle: {def: false, mutScope: "extended"},
-        ascendRandomness: {def: false, mutScope: "extended"},
+        // ascendToggle/ascendRandomness removed 2026-08-15 (photosensitivity):
+        // deleting the entries is load-bearing — old presets/snapshots that
+        // carry them skip-with-warn (12-save-load coerceCheckbox null path)
+        // and Mutate's extended scope can no longer flip Ascend on.
         shootingStarToggle: {def: false, mutScope: "extended"},
         hoverCaptureToggle: {def: false, mutScope: null},
         detachCaptureToggle: {def: false, mutScope: null},

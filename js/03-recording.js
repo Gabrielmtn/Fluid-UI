@@ -390,13 +390,17 @@
                 const cMode = layer.colorMode || 'original';
                 let genMode = null, genPalette = null, liveSolid = null;
                 if (cMode === 'original') {
-                    if (/^(random|rainbow|step)$/.test(layer.recordMode || '')) {
+                    // 'rainbow' dropped from the generative set (removed
+                    // 2026-08-15, photosensitivity): old rainbow recordings
+                    // fall through to the non-generative baked-color path —
+                    // still colorful, but no fresh random color per splat.
+                    if (/^(random|step)$/.test(layer.recordMode || '')) {
                         genMode = layer.recordMode;
                         genPalette = layer.recordStepPalette || null;
                     }
                 } else if (cMode === 'live') {
                     const cm = (window.multiArmColors && window.multiArmColors[0] && window.multiArmColors[0].mode) || 'main';
-                    if (/^(random|rainbow|step)$/.test(cm)) {
+                    if (/^(random|step)$/.test(cm)) {
                         genMode = cm; // current palette (recGenerativeColor reads it live)
                     } else if (cm === 'fixed' && window.multiArmColors[0].color) {
                         liveSolid = recHexToRgb(window.multiArmColors[0].color);
@@ -798,11 +802,11 @@
         }
 
         // Fresh replay color for a generative record/live mode (1.3 rework):
-        // random/rainbow → a new vibrant color; step → the next palette entry
+        // random → a new vibrant color; step → the next palette entry
         // (record-time palette for 'original', current for 'live'). Non-
         // generative modes never call this. Per-layer step index on the layer.
         function recGenerativeColor(mode, palette, layer) {
-            if (mode === 'random' || mode === 'rainbow') {
+            if (mode === 'random') {
                 return window.generateVibrantColor ? window.generateVibrantColor()
                     : [Math.random(), Math.random(), Math.random()];
             }

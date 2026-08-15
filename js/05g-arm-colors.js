@@ -23,8 +23,7 @@
             // advanceColor drives the single RNG and the picker "next" preview,
             // so the top-nav toggles and this per-arm path never draw two
             // different colours for the same stroke. Arms >0 keep their own
-            // cache below. Rainbow can't defer — it changes per splat — so it
-            // stays on the per-arm generateVibrantColor path even for arm 0.
+            // cache below.
             if (armIndex === 0 && (cfg.mode === 'random' || cfg.mode === 'step')) return fallbackColor;
             if (cfg.mode === 'fixed') {
                 var hex = cfg.color || '#ffffff';
@@ -34,10 +33,9 @@
                     parseInt(hex.slice(5, 7), 16) / 255
                 ];
             }
-            if (cfg.mode === 'rainbow') {
-                // New color on every single splat call
-                return generateVibrantColor();
-            }
+            // 'rainbow' (new random colour per splat) removed 2026-08-15 for
+            // photosensitivity — a stale mode string falls through to
+            // fallbackColor here, and every ingest path coerces it to 'fixed'.
             if (cfg.mode === 'random') {
                 // Color set once on mouseup; held for the whole stroke
                 if (!cfg.cachedColor) cfg.cachedColor = generateVibrantColor();
@@ -519,8 +517,7 @@
                 for (var i = 0; i < chips.length; i++) {
                     var bm = chips[i].getAttribute('data-brush-mode');
                     var on = (bm === 'rnd' && m === 'random')
-                          || (bm === 'step' && m === 'step')
-                          || (bm === 'rainbow' && m === 'rainbow');
+                          || (bm === 'step' && m === 'step');
                     chips[i].classList.toggle('active', on);
                 }
                 // Picker shows the fixed swatch (no 'input' dispatch).
@@ -545,10 +542,12 @@
             }
         }
         window.syncBrushColorUI = syncBrushColorUI;
-        // The one action. mode ∈ 'fixed' | 'random' | 'step' | 'rainbow'.
+        // The one action. mode ∈ 'fixed' | 'random' | 'step'.
+        // ('rainbow' removed 2026-08-15 — this coercion is the sanitizer that
+        // turns any stale saved/mirrored 'rainbow' into 'fixed'.)
         function setActiveBrushColorMode(mode, opts) {
             opts = opts || {};
-            if (mode !== 'random' && mode !== 'step' && mode !== 'rainbow') mode = 'fixed';
+            if (mode !== 'random' && mode !== 'step') mode = 'fixed';
             var a0 = ensureArm0();
             a0.mode = mode;
             a0.cachedColor = null;
@@ -565,8 +564,7 @@
             syncBrushColorUI(opts.skipPanel ? { skipPanel: true } : undefined);
             // Side effects AFTER the checkboxes reflect the new mode (advanceColor
             // reads them): seed the picker "next" preview for random/step, set
-            // pointer.color for fixed. Rainbow needs nothing — resolveArmColor
-            // draws per splat.
+            // pointer.color for fixed.
             if (mode === 'random' || mode === 'step') {
                 advanceColor();
                 if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();

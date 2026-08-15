@@ -89,8 +89,7 @@ All 60+ controls from the original sidebar have been mapped to the new professio
 - ✅ 🌀 Vortex (Left: Clockwise | Right: Counter)
 - ✅ 🌌 Portal (Left: Swoop | Right: Expand)
 - ✅ 🎨 Portrait
-- ✅ ⬆️ Ascend
-- ✅ Ascend Randomness toggle
+- ❌ ⬆️ Ascend + Randomness — REMOVED 2026-08-15 (photosensitivity: 20Hz random-color loop)
 
 ### Layers Section
 - ✅ Capture Layer button

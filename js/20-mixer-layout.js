@@ -449,10 +449,10 @@
             makeColorModeChip('Step', 'step', 'step', 'Step through the palette each stroke',
                 stepEl.checked || arm0Mode() === 'step');
         }
-        // Rainbow has NO backing checkbox — it lives only in arm0.mode, which
-        // already persists (multiArmColors) and is understood by recording.
-        makeColorModeChip('🌈', 'rainbow', 'rainbow', 'Rainbow — a new colour every splat',
-            arm0Mode() === 'rainbow');
+        // Rainbow chip removed 2026-08-15 (photosensitivity: a new random
+        // colour every splat strobes while painting). Stale saved 'rainbow'
+        // modes coerce to 'fixed' at every ingest (05g allowlist + 12's
+        // preset/autoload sanitizers).
 
         // Gate chip (independent of Rnd/Step exclusivity): clamps dye at the
         // stroke's own color so repeated paint can't overflow into white.
@@ -1175,7 +1175,7 @@
                       'shadingIntensity', 'displayShadingToggle',
                       'lightShiftSpeed', 'lightShiftThreshold', 'lightShiftIntensity', 'lightShiftSaturation',
                       'lightPos', 'lightShiftPath'],
-            animations: ['ascendToggle', 'ascendRandomness', 'shootingStarToggle',
+            animations: ['shootingStarToggle',
                          'ssFrequency', 'ssAngle', 'ssLength', 'ssSize', 'ssVariance', 'ssGravity', 'ssOrigin'],
             audio: ['audioReactToggle', 'arMapAutoSplat', 'arMapSize', 'arMapKaleido', 'arMapColor',
                     'audioSensitivity', 'audioBeatThreshold']
@@ -1581,7 +1581,6 @@
         body.appendChild(grid);
 
         // Toggle animations (full-width, with collapsible settings)
-        moveEl('ascendToggleWrap', body);
         moveEl('shootingStarWrap', body);
 
         return sec;
@@ -4119,8 +4118,8 @@
             var slider = document.getElementById('multiplier');
             var count = slider ? parseInt(slider.value, 10) || 1 : 1;
             // Brush controls exist at EVERY arm count (2026-07-13) — at 1x the
-            // single row IS the brush's color mode (follow/fixed/rainbow/
-            // random/step). The old "set multiplier to 2+" hint gated the
+            // single row IS the brush's color mode (follow/fixed/random/
+            // step). The old "set multiplier to 2+" hint gated the
             // whole panel behind multi-arm mode.
             count = Math.max(1, count);
             updateSymNote();   // arm count feeds the dab-count hint
@@ -4155,7 +4154,7 @@
                         picker.value = cfg.color || '#ffffff';
                     }
                     picker.disabled = cfg.mode !== 'fixed';
-                    // Generative modes (rainbow/random/step) dim the swatch —
+                    // Generative modes (random/step) dim the swatch —
                     // no single color is "the" color. A 'main' arm's swatch is
                     // accurate (it IS the default color), so keep it readable.
                     if (cfg.mode !== 'fixed') {
@@ -4165,7 +4164,7 @@
                     var modes = [
                         { key: 'main',    text: '\u25CF', title: 'Follow pointer color' },
                         { key: 'fixed',   text: '\u25C6', title: 'Fixed color' },
-                        { key: 'rainbow', text: '\uD83C\uDF08', title: 'Rainbow — new color every splat' },
+                        // 'rainbow' removed 2026-08-15 (photosensitivity)
                         { key: 'random',  text: 'R',      title: 'Random — new color each stroke' },
                         { key: 'step',    text: 'S',      title: 'Step through palette each stroke' }
                     ];
