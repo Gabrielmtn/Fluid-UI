@@ -307,29 +307,31 @@
             <label for="stepPalette" style="margin: 0">Cycle palette colors</label>
         </div>
         <div class="control-group">
-            <label for="visualResolution">Visual Quality</label>
+            <label for="visualResolution">Image Sharpness</label>
+            <!-- Option VALUES are load-bearing (registry-validated, presets
+                 match numerically, undo snapshots store them) — text only. -->
             <select id="visualResolution">
-                <option value="4096">Cinematic (4K)</option>
-                <option value="2048" selected>Ultra (2K)</option>
-                <option value="1536">Very High (1.5K)</option>
-                <option value="1024">High (1K)</option>
-                <option value="512">Medium (512)</option>
-                <option value="256">Low (256)</option>
+                <option value="4096">4096 — Sharpest (heavy GPU)</option>
+                <option value="2048" selected>2048 — Sharp (default)</option>
+                <option value="1536">1536 — Medium</option>
+                <option value="1024">1024 — Soft (fast)</option>
+                <option value="512">512 — Softer (faster)</option>
+                <option value="256">256 — Softest (fastest)</option>
             </select>
         </div>
         <div class="control-group">
-            <label for="physicsResolution">Physics Detail</label>
+            <label for="physicsResolution">Motion Detail</label>
             <select id="physicsResolution">
-                <option value="2048">Ultra Extreme (2K)</option>
-                <option value="1536">Extreme+ (1.5K)</option>
-                <option value="1024">Extreme (1K)</option>
-                <option value="512" selected>Ultra (512)</option>
-                <option value="384">High (384)</option>
-                <option value="256">Standard (256)</option>
-                <option value="192">Balanced (192)</option>
-                <option value="128">Medium (128)</option>
-                <option value="64">Low (64)</option>
-                <option value="32">Minimum (32)</option>
+                <option value="2048">2048 — Ultra-fine (heavy GPU)</option>
+                <option value="1536">1536 — Extra-fine</option>
+                <option value="1024">1024 — Very fine</option>
+                <option value="512" selected>512 — Fine (default)</option>
+                <option value="384">384 — Medium-fine</option>
+                <option value="256">256 — Medium</option>
+                <option value="192">192 — Medium-coarse</option>
+                <option value="128">128 — Coarse</option>
+                <option value="64">64 — Very coarse (fast)</option>
+                <option value="32">32 — Coarsest (fastest)</option>
             </select>
         </div>
         <div class="control-group">
@@ -1112,8 +1114,8 @@
                 <div>
                     <h3>Resolution</h3>
                     <ul>
-                        <li>Alt+↑ / Alt+↓ — Visual Quality + / −</li>
-                        <li>Alt+Shift+↑ / Alt+Shift+↓ — Physics + / −</li>
+                        <li>Alt+↑ / Alt+↓ — Image Sharpness + / −</li>
+                        <li>Alt+Shift+↑ / Alt+Shift+↓ — Motion Detail + / −</li>
                     </ul>
                 </div>
                 <div>

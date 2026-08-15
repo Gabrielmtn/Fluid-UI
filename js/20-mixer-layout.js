@@ -922,9 +922,15 @@
         // options as a themeable list header on open (the native <optgroup>
         // popup can't be dark-themed in this build — white OS frame — so we
         // drive a hidden native <select> from a custom list instead).
-        [['visualResolution', 'Visual Quality'], ['physicsResolution', 'Physics Detail']].forEach(function (pair) {
+        // Copy pass 2026-08-15: 'Visual Quality'/'Physics Detail' said
+        // nothing. Honest names + a one-line mechanism caption in the open
+        // list, and a permanent micro-label above each resting pill so the
+        // two aren't just two unlabeled numbers at the bottom of the screen.
+        [['visualResolution', 'Image Sharpness', 'Resolution of the paint itself — sharper costs GPU'],
+         ['physicsResolution', 'Motion Detail', 'Resolution of the motion sim — finer swirls cost GPU']
+        ].forEach(function (pair) {
             const sel = document.getElementById(pair[0]);
-            if (sel) bar.appendChild(makeQubDropdown(sel, pair[1]));
+            if (sel) bar.appendChild(makeQubDropdown(sel, pair[1], pair[2]));
         });
         document.body.appendChild(bar);
         // Trim the right edge to #canvas-area's right — the drawing region's
@@ -952,14 +958,21 @@
     // Custom themeable dropdown that drives a hidden native <select> (so all
     // existing change bindings + save/load keep working by id). Opens UPWARD
     // with a label header on top — the fix for the unstylable native popup.
-    function makeQubDropdown(sel, labelText) {
+    function makeQubDropdown(sel, labelText, captionText) {
         sel.classList.add('qub-native-hidden');
         const wrap = document.createElement('div');
         wrap.className = 'qub-dd';
+        // Permanent micro-label above the resting pill — without it the bar
+        // reads as two bare numbers ("2048 ▾ 512 ▾") with no clue which is
+        // which until hover.
+        const cap = document.createElement('div');
+        cap.className = 'qub-dd-cap';
+        cap.textContent = labelText;
+        wrap.appendChild(cap);
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'qub-dd-btn';
-        btn.title = labelText;
+        btn.title = captionText ? (labelText + ' — ' + captionText) : labelText;
         const val = document.createElement('span');
         val.className = 'qub-dd-val';
         btn.appendChild(val);
@@ -970,6 +983,14 @@
         hdr.className = 'qub-dd-hdr';
         hdr.textContent = labelText;
         list.appendChild(hdr);
+        if (captionText) {
+            // One-line mechanism caption under the open-list header — the
+            // custom list makes this possible where native <option> can't.
+            const sub = document.createElement('div');
+            sub.className = 'qub-dd-sub';
+            sub.textContent = captionText;
+            list.appendChild(sub);
+        }
 
         const syncVal = function () {
             const o = sel.options[sel.selectedIndex];
@@ -1617,7 +1638,7 @@
     function buildSimulationSection() {
         const { sec, body } = makeSection('⚙️ Simulation', 'blue', true);
 
-        // UX-9.1: Visual Quality + Physics Detail live in the top-right quality
+        // UX-9.1: Image Sharpness + Motion Detail live in the quality
         // underbar (buildQualityUnderbar) for always-visible quick access.
         moveControlGroup('fpsCap', body);
         moveControlGroup('pressureDissipation', body);

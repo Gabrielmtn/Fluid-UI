@@ -61,8 +61,8 @@
         return function () {
             var el = document.getElementById(id);
             if (!el) return null;
-            // The quality underbar adopts some selects (Visual Quality /
-            // Physics Detail) as hidden state-holders — the visible control
+            // The quality underbar adopts some selects (Image Sharpness /
+            // Motion Detail) as hidden state-holders — the visible control
             // there is the custom dropdown button.
             var dd = el.closest('.qub-dd');
             if (dd) return dd.querySelector('.qub-dd-btn') || dd;
@@ -108,8 +108,8 @@
         { keys: 'L',      mod: '',           title: 'Lock canvas borders',                where: checkboxRow('lockCanvasBorders') },
         { keys: 'F',      mod: '',           title: 'Toggle focus mode',                  where: checkboxRow('focusModeToggle') },
         { keys: 'F11',    mod: '',           title: 'F11 — toggle borderless fullscreen', where: groupLabel('windowMode') },
-        { keys: '⌥↑↓',    mod: 'alt',        title: 'Alt+↑ / ↓ — visual quality',         where: groupLabel('visualResolution') },
-        { keys: '⌥⇧↑↓',   mod: 'altshift',   title: 'Alt+Shift+↑ / ↓ — physics detail',   where: groupLabel('physicsResolution') },
+        { keys: '⌥↑↓',    mod: 'alt',        title: 'Alt+↑ / ↓ — image sharpness',        where: groupLabel('visualResolution') },
+        { keys: '⌥⇧↑↓',   mod: 'altshift',   title: 'Alt+Shift+↑ / ↓ — motion detail',    where: groupLabel('physicsResolution') },
         { keys: 'M',      mod: '',           title: 'M — mutate',                         where: idEl('mutationGenerate') }
     ];
 

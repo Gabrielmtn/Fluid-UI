@@ -51,6 +51,36 @@
     position: relative;
     display: inline-block;
 }
+/* Permanent micro-label above each resting pill (copy pass 2026-08-15):
+   without it the bar was two unlabeled numbers. Ghost treatment matches the
+   pill; transition-free (Electron transparent-window compositor rule). */
+#quality-underbar .qub-dd-cap {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(200, 205, 212, 0.6);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    padding: 0 8px 1px;
+    pointer-events: none;
+    user-select: none;
+}
+/* One-line mechanism caption under the open-list header (the header's own
+   divider steps aside so the pair reads as one block) */
+#quality-underbar .qub-dd-hdr:has(+ .qub-dd-sub) {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 1px;
+}
+#quality-underbar .qub-dd-sub {
+    font-size: 9px;
+    color: #8b93a0;
+    padding: 4px 8px 6px;
+    margin-bottom: 3px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    white-space: normal;
+    max-width: 220px;
+}
 #quality-underbar .qub-dd-btn {
     display: flex;
     align-items: center;
