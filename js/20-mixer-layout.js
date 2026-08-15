@@ -506,9 +506,11 @@
         if (stepEl) {
             stepEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
             ch.appendChild(stepEl);
-            // 'Cycle' (renamed from 'Step' 2026-08-15): advances one palette
-            // colour per stroke. The mode key/checkbox id stay 'step'.
-            makeColorModeChip('Cycle', 'step', 'step', 'Cycle palette — advance one palette colour each stroke',
+            // 'Palette' (renamed from 'Step' 2026-08-15, Gabriel's pick):
+            // advances one palette colour per stroke. The mode key/checkbox
+            // id stay 'step'; the carousel label became 'Palettes' to
+            // disambiguate.
+            makeColorModeChip('Palette', 'step', 'step', 'Palette mode — advance one palette colour each stroke',
                 stepEl.checked || arm0Mode() === 'step');
         }
         // Rainbow chip removed 2026-08-15 (photosensitivity: a new random
@@ -4290,7 +4292,7 @@
                         { key: 'fixed',   text: '\u25C6', title: 'Fixed color' },
                         // 'rainbow' removed 2026-08-15 (photosensitivity)
                         { key: 'random',  text: 'R',      title: 'Random — new color each stroke' },
-                        { key: 'step',    text: 'S',      title: 'Cycle palette — new palette colour each stroke' }
+                        { key: 'step',    text: 'S',      title: 'Palette mode — new palette colour each stroke' }
                     ];
 
                     var modeWrap = document.createElement('div');
