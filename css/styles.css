@@ -228,6 +228,21 @@
             overscroll-behavior: none;
         }
 
+        /* Accidental page-zoom guard, CSS half (JS half: 13-mobile-mode.js
+           pinch guards). manipulation keeps pan/scroll but kills double-tap
+           zoom on the UI chrome — the canvas is already touch-action:none,
+           and faders carry their own stricter pan-y (slider-styles.css).
+           touch-action does not inherit, so list the tap surfaces. */
+        body,
+        button,
+        select,
+        label,
+        #mixer-strip,
+        #sidebar-right,
+        #quality-underbar {
+            touch-action: manipulation;
+        }
+
         .resize-handle {
             position: absolute;
             background: rgba(100, 200, 255, 0.3);

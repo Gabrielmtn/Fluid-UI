@@ -13,6 +13,32 @@
     let savedVibrance = null;
     let savedClarity = null;
 
+    // ── Accidental page-zoom guard (all touch devices, not just mobile-mode:
+    // an iPad in desktop-class layout has the same problem) ──────────────
+    // The viewport meta already says user-scalable=no, but iOS Safari has
+    // ignored that since iOS 10: any pinch or double-tap landing on the
+    // drawer, strip, or buttons zooms the whole PAGE — fixed-position UI
+    // then breaks and it's fiddly to pinch back. touch-action protects only
+    // the canvas (styles.css), so guard the rest here:
+    // - gesturestart/gesturechange are iOS's pinch events; preventDefault
+    //   reliably blocks page pinch-zoom. The canvas never sees them anyway
+    //   (its touch handlers preventDefault first).
+    // - The touchmove guard is the belt-and-braces for multi-touch on UI
+    //   chrome; anything inside #canvas-area is exempt so the canvas's own
+    //   two-finger gestures (05d TouchGestures) keep working.
+    // Double-tap zoom on UI is killed by touch-action:manipulation in CSS.
+    ['gesturestart', 'gesturechange'].forEach(function (t) {
+        document.addEventListener(t, function (e) {
+            e.preventDefault();
+        }, { passive: false });
+    });
+    document.addEventListener('touchmove', function (e) {
+        if (e.touches && e.touches.length > 1 &&
+            !(e.target && e.target.closest && e.target.closest('#canvas-area'))) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
     // Detect if device is mobile/tablet
     function isMobileDevice() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
