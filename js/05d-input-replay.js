@@ -179,9 +179,9 @@
             }
             return allEvents;
         }
-        function replayStroke(broadcast = true) {
+        function replayStroke(broadcast = true, reuse = false) {
             var eventsToReplay;
-            if (!broadcast && window._activeReplayEvents && window._activeReplayEvents.length) {
+            if (reuse && window._activeReplayEvents && window._activeReplayEvents.length) {
                 // Looping — reuse the snapshot from the initial trigger
                 eventsToReplay = window._activeReplayEvents;
             } else if (window.replayMode === 'time') {
@@ -316,9 +316,14 @@
                     }
                 }
                 if (replayIndex >= events.length) {
-                    // If right button still held, loop replay without rebroadcast
+                    // Right button still held → loop, and REBROADCAST each
+                    // pass. Loops used to skip the rebroadcast (anti-spam),
+                    // so a held replay repeated on the painter's canvas while
+                    // every peer saw it exactly once — in a turn performance
+                    // the audience must see every loop. Peers restart their
+                    // replay on each arrival, so they loop in lockstep.
                     if (isRightMouseDown) {
-                        replayStroke(false);
+                        replayStroke(true, true);
                     } else {
                         isReplayActive = false;
                         window._activeReplayEvents = null;
@@ -363,6 +368,15 @@
         // filtered out of these pointer handlers.
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'touch') return; // touchstart owns touch
+            // Take-turns multiplayer: while it's someone else's turn, both
+            // painting AND right-click replay (which rebroadcasts a stroke)
+            // are gated — the relay would drop them and the local-only paint
+            // would silently desync this client from the room.
+            if (window.__mpTurnBlocked && (e.button === 0 || e.button === 2)) {
+                if (e.button === 2) e.preventDefault();
+                if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
+                return;
+            }
             // Right-click / pen-barrel replay always works, even when paused
             if (e.button === 2) {
                 e.preventDefault();
@@ -723,6 +737,12 @@
                 return;
             }
             if (TouchGestures.isSuppressed()) return;
+            // Take-turns multiplayer: painting is gated while it's not our turn
+            // (see the pointerdown note).
+            if (window.__mpTurnBlocked) {
+                if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
+                return;
+            }
             const touch = e.touches[0];
             const coords = getCanvasCoordinates(touch);
             pointer.down = true;

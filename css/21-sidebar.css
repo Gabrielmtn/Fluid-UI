@@ -1020,6 +1020,151 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 .mp-btn-lock:hover {
     opacity: 0.85;
 }
+/* Non-host view of a host-only control: present, explained, inert */
+.mp-btn-lock.mp-btn-muted,
+.mp-btn-lock.mp-btn-muted:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--ground-500, #2a2e37);
+    color: var(--ink-500, #7b828e);
+    cursor: default;
+    opacity: 1;
+}
+/* Take-turns mode: host toggle stays .mp-btn-lock; these are the extras */
+.mp-btn-lock.active {
+    background: rgba(236, 48, 19, 0.3);
+    border-color: rgba(236, 48, 19, 0.6);
+}
+/* "Shall we take turns?" prompt — stranger pairs, shown to the person asked.
+   Sits just under the turn banner so the whole turn conversation is in one
+   place on screen. */
+.mp-turn-invite {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10003;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    /* High-contrast orange: this has to register over ANY painting */
+    background: linear-gradient(180deg, #ffa63a, #f07f12);
+    border: 2px solid #ffd9a0;
+    color: #211203;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 10px 34px rgba(240, 130, 20, 0.55), 0 3px 10px rgba(0, 0, 0, 0.55);
+    animation:
+        mpInviteIn 0.55s cubic-bezier(0.2, 1.35, 0.4, 1) both,
+        mpInvitePulse 1.6s ease-in-out 0.6s 4;
+}
+@keyframes mpInviteIn {
+    from { transform: translate(-50%, -160%) scale(0.92); opacity: 0; }
+    to   { transform: translate(-50%, 0) scale(1); opacity: 1; }
+}
+@keyframes mpInvitePulse {
+    0%, 100% { box-shadow: 0 10px 34px rgba(240, 130, 20, 0.55), 0 3px 10px rgba(0, 0, 0, 0.55); }
+    50%      { box-shadow: 0 10px 52px rgba(255, 160, 40, 0.95), 0 3px 10px rgba(0, 0, 0, 0.55); }
+}
+.mp-turn-invite button {
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 800;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.mp-invite-yes {
+    background: #1d6f2c;
+    border: 1px solid #12481c;
+    color: #ffffff;
+}
+.mp-invite-no {
+    background: rgba(33, 18, 3, 0.16);
+    border: 1px solid rgba(33, 18, 3, 0.45);
+    color: #211203;
+}
+.mp-turn-invite button:hover {
+    filter: brightness(1.15);
+}
+/* Transient feedback for invite outcomes (declined / no answer) */
+.mp-turn-toast {
+    position: fixed;
+    top: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10002;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: rgba(15, 20, 27, 0.92);
+    border: 1px solid rgba(122, 162, 255, 0.5);
+    color: #9db8ff;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+/* Turn-length picker shown to the host beside the Take turns toggle */
+.mp-turn-timer {
+    width: 100%;
+    padding: 6px;
+    font-size: 11px;
+    background: var(--ground-600, #232830);
+    border: 1px solid var(--ground-500, #2a2e37);
+    color: var(--ink-100, #f2f3f5);
+    border-radius: 0;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+/* Rotation wheel: who's in the round and whose turn it is */
+.mp-turn-wheel {
+    padding: 10px 6px 6px;
+    margin: 2px 0 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--ground-500, #2a2e37);
+}
+.mp-turn-wheel svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.mp-turn-wheel text {
+    font-family: inherit;
+    user-select: none;
+}
+/* Rotation status line ("🖌 Artist-QT painting · 3 artists in rotation") */
+.mp-turn-status {
+    font-size: 10px;
+    text-align: center;
+    color: var(--ink-300, #b9bec7);
+    background: rgba(255, 178, 71, 0.08);
+    border: 1px solid rgba(255, 178, 71, 0.25);
+    border-radius: 0;
+    padding: 4px 8px;
+    margin-bottom: 8px;
+}
+.mp-turn-status.mp-turn-you {
+    color: #3fb950;
+    background: rgba(63, 185, 80, 0.1);
+    border-color: rgba(63, 185, 80, 0.35);
+}
+/* Pass/Skip the brush — the take-turns primary action */
+.mp-btn-pass {
+    width: 100%;
+    padding: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(63, 185, 80, 0.14);
+    border: 1px solid rgba(63, 185, 80, 0.35);
+    color: var(--ink-100, #f2f3f5);
+    border-radius: 0;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+.mp-btn-pass:hover {
+    opacity: 0.85;
+}
 /* Badge shown to non-host members of a locked room */
 .mp-lock-badge {
     font-size: 10px;

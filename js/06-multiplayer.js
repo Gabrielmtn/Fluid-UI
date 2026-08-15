@@ -17,6 +17,17 @@ let matchmakingSocket = null;
 let myRole = 'guest';     // 'host' | 'guest' in a managed room
 let roomLocked = false;   // current room's server-confirmed lock state
 
+// ── Take-turns mode (server-confirmed via 'turn-state' broadcasts) ──
+// One member paints at a time; everyone else watches with the painter's look
+// settings mirrored live. The server keys turns by stable uid but talks to
+// clients in connection ids (same ids every relayed message already carries).
+var turnsOn = false;        // room-wide flag
+var turnHolderId = null;    // connection id of the current painter (null = none)
+var turnOrder = [];         // connection ids in rotation order
+var turnMsLocal = 0;        // turn length from the server (0 = no timer)
+var turnDeadlineLocal = 0;  // local-clock time the turn auto-passes (0 = none)
+window.__mpTurnBlocked = false; // paint gate (read by 05d pointer/touch + 04f clear)
+
 // Stable per-device id (opaque, localStorage). Used to re-admit a dropped
 // member into a locked room and to throttle matchmaking. NOT a security token.
 const DEVICE_UID = (function() {
@@ -51,6 +62,14 @@ const PARTYKIT_HOST = (function() {
     if (/\.partykit\.dev$/.test(host)) return host;
     return 'fluid-ui-multiplayer.gabrielmtn.partykit.dev';
 })();
+
+// ws:// for local/LAN dev relays (no TLS there); wss:// for real deploys.
+// Covers localhost, loopback, and RFC1918 LAN addresses so another device on
+// the same network (phone/tablet) can point at a `partykit dev` relay via
+// the host override.
+function isPlainWsHost(h) {
+    return /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/.test(h);
+}
 
 // Generate a random 6-character room code
 function generateRoomCode() {
@@ -99,47 +118,99 @@ function paintWithStranger() {
     hideMpError();
     closeMatchmaking();
     showMatchmaking();
-    try {
-        const isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
-        const protocol = isLocal ? 'ws:' : 'wss:';
-        const url = `${protocol}//${PARTYKIT_HOST}/parties/lobby/main?uid=${encodeURIComponent(DEVICE_UID)}`;
-        matchmakingSocket = new WebSocket(url);
-        var settled = false;
-        var timeout = setTimeout(function() {
-            if (settled) return;
-            settled = true; closeMatchmaking();
-            showMpError("Couldn't find a match. Try again."); showDisconnectedUI();
-        }, 9000);
-        matchmakingSocket.addEventListener('open', function() {
-            if (matchmakingSocket) matchmakingSocket.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID }));
-        });
-        matchmakingSocket.addEventListener('message', function(ev) {
-            var data; try { data = JSON.parse(ev.data); } catch (_) { return; }
-            if (data.type === 'matched') {
+    var settled = false;
+    var attempts = 0;
+    var MAX_MATCHMAKE_ATTEMPTS = 4;
+    // Overall window covers the first try plus up to three throttle retries.
+    var timeout = setTimeout(function() {
+        if (settled) return;
+        settled = true; closeMatchmaking();
+        showMpError("Couldn't find a match. Try again."); showDisconnectedUI();
+    }, 16000);
+    var tryMatchmake = function() {
+        if (settled) return;
+        attempts++;
+        try {
+            const protocol = isPlainWsHost(PARTYKIT_HOST) ? 'ws:' : 'wss:';
+            const url = `${protocol}//${PARTYKIT_HOST}/parties/lobby/main?uid=${encodeURIComponent(DEVICE_UID)}`;
+            var ws = new WebSocket(url);
+            matchmakingSocket = ws;
+            ws.addEventListener('open', function() {
+                ws.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID }));
+            });
+            ws.addEventListener('message', function(ev) {
+                if (ws !== matchmakingSocket) return;
+                var data; try { data = JSON.parse(ev.data); } catch (_) { return; }
+                if (data.type === 'matched') {
+                    if (!settled) {
+                        settled = true; clearTimeout(timeout);
+                        // waiting:false → paired into another seeker's room; the
+                        // lobby is done with us. waiting:true → we ARE the waiting
+                        // slot: keep this socket OPEN — a live connection pins the
+                        // lobby (its pointer can't be lost to an idle eviction,
+                        // the exact hole that let two seekers mint separate rooms
+                        // and miss each other), and closing it is how the lobby
+                        // knows the waiter left. The keep-alive rides it too.
+                        if (data.waiting === false) closeMatchmaking();
+                        connectToRoom(data.roomId);
+                    } else if (data.waiting === false && data.roomId && data.roomId !== currentRoom &&
+                               isStrangerRoom() && connectedClients < 2) {
+                        // A keep-alive on the pin was paired into another lone
+                        // waiter's room — go join them.
+                        closeMatchmaking();
+                        stopStrangerKeepAlive();
+                        connectToRoom(data.roomId);
+                    }
+                    return;
+                }
+                if (data.type === 'matchmake-error') {
+                    if (settled) return; // a pinned keep-alive hit the throttle — harmless
+                    // The lobby throttles matchmakes per device id ("One
+                    // moment…"). Two tabs in one browser SHARE that id, so the
+                    // second tab's click lands inside the 3s window routinely —
+                    // retry past the throttle instead of failing the flow.
+                    if (/one moment/i.test(data.message || '') && attempts < MAX_MATCHMAKE_ATTEMPTS) {
+                        closeMatchmaking();
+                        matchmakeRetryTimer = setTimeout(tryMatchmake, 3300);
+                        return;
+                    }
+                    settled = true; clearTimeout(timeout); closeMatchmaking();
+                    showMpError(data.message || 'Try again in a moment.'); showDisconnectedUI();
+                }
+            });
+            ws.addEventListener('error', function() {
+                if (settled || ws !== matchmakingSocket) return;
                 settled = true; clearTimeout(timeout); closeMatchmaking();
-                connectToRoom(data.roomId);
-            } else if (data.type === 'matchmake-error') {
-                settled = true; clearTimeout(timeout); closeMatchmaking();
-                showMpError(data.message || 'Try again in a moment.'); showDisconnectedUI();
-            }
-        });
-        matchmakingSocket.addEventListener('error', function() {
+                showMpError("Couldn't reach matchmaking. Check your connection."); showDisconnectedUI();
+            });
+        } catch (e) {
             if (settled) return;
             settled = true; clearTimeout(timeout); closeMatchmaking();
-            showMpError("Couldn't reach matchmaking. Check your connection."); showDisconnectedUI();
-        });
-    } catch (e) {
-        closeMatchmaking();
-        showMpError("Couldn't start matchmaking."); showDisconnectedUI();
-    }
+            showMpError("Couldn't start matchmaking."); showDisconnectedUI();
+        }
+    };
+    tryMatchmake();
 }
 
+var matchmakeRetryTimer = null;
 function closeMatchmaking() {
+    if (matchmakeRetryTimer) { clearTimeout(matchmakeRetryTimer); matchmakeRetryTimer = null; }
     if (matchmakingSocket) {
         try { matchmakingSocket.close(); } catch (_) {}
         matchmakingSocket = null;
     }
 }
+
+// bfcache: a page restored from the back/forward cache resumes with DEAD
+// sockets but LIVE timers — a pending matchmake retry or stranger keep-alive
+// would fire into the stale state and wander the client into a phantom pub-
+// room (joined out of nowhere, then dropped). Come back clean instead.
+window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    closeMatchmaking();
+    stopStrangerKeepAlive();
+    if (partySocket || currentRoom) disconnectMultiplayer();
+});
 
 // ── Stranger keep-alive ──────────────────────────────────────────────
 // A lone seeker sits in its minted pub- room with the lobby socket closed.
@@ -151,29 +222,53 @@ function closeMatchmaking() {
 // pairing us with ourselves. If it hands back a different room, someone else
 // was already waiting and we go to them.
 var strangerKeepAlive = null;
-var STRANGER_KEEPALIVE_MS = 45000; // comfortably inside the server's 60s TTL
+var strangerWasPaired = false; // so a partner's departure is ANNOUNCED, not silent
+// First tick fires EARLY (~8-13s) so two seekers whose initial matchmakes
+// double-minted (the lobby's waiting pointer was lost between their requests)
+// converge within seconds instead of a 45s tick; later ticks stay comfortably
+// inside the server's 60s TTL. Both delays are jittered to break the
+// phase-lock of two waiters who started matchmaking simultaneously.
+function strangerKeepAliveDelay(first) {
+    return first ? 8000 + Math.random() * 5000 : 40000 + Math.random() * 10000;
+}
 
 function stopStrangerKeepAlive() {
-    if (strangerKeepAlive) { clearInterval(strangerKeepAlive); strangerKeepAlive = null; }
+    if (strangerKeepAlive) { clearTimeout(strangerKeepAlive); strangerKeepAlive = null; }
 }
 
 function startStrangerKeepAlive() {
     stopStrangerKeepAlive();
-    strangerKeepAlive = setInterval(function () {
+    scheduleStrangerKeepAlive(true);
+}
+
+function scheduleStrangerKeepAlive(first) {
+    strangerKeepAlive = setTimeout(function () {
         // Only while genuinely alone in a stranger room.
         if (!isStrangerRoom() || connectedClients >= 2 || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
             stopStrangerKeepAlive();
             return;
         }
         var mine = currentRoom;
+        // Normal path: the waiting pin socket is open — refresh our slot on it.
+        // (Replies land in the paintWithStranger handler: waiting:true refreshes
+        // are ignored there; a waiting:false pairing makes us hop to the room.)
+        if (matchmakingSocket && matchmakingSocket.readyState === WebSocket.OPEN) {
+            try { matchmakingSocket.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID, holding: mine })); } catch (_) {}
+            scheduleStrangerKeepAlive(false);
+            return;
+        }
+        // Fallback (pin died — network blip): a short-lived socket re-registers.
         try {
-            var isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
-            var proto = isLocal ? 'ws' : 'wss';
+            var proto = isPlainWsHost(PARTYKIT_HOST) ? 'ws' : 'wss';
             var ws = new WebSocket(proto + '://' + PARTYKIT_HOST + '/parties/lobby/main?uid=' + encodeURIComponent(DEVICE_UID));
             var done = false;
             var bail = setTimeout(function () { if (!done) { done = true; try { ws.close(); } catch (_) {} } }, 8000);
             ws.addEventListener('open', function () {
-                ws.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID }));
+                // `holding` names the room we already wait in: a lobby that
+                // lost its pointer re-adopts THIS room instead of minting a
+                // fresh one (which stranded phase-locked waiters in an
+                // endless hop-chase through each other's abandoned rooms).
+                ws.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID, holding: mine }));
             });
             ws.addEventListener('message', function (ev) {
                 if (done) return;
@@ -182,14 +277,18 @@ function startStrangerKeepAlive() {
                 done = true; clearTimeout(bail);
                 try { ws.close(); } catch (_) {}
                 // Still alone, and the lobby put someone else's room forward → join them.
+                // (Against the holding-aware relay a waiting:true reply always
+                // names OUR room, so this hop only fires on a real pairing.)
                 if (d.roomId && d.roomId !== mine && isStrangerRoom() && connectedClients < 2) {
                     stopStrangerKeepAlive();
                     connectToRoom(d.roomId);
+                    return;
                 }
             });
             ws.addEventListener('error', function () { done = true; clearTimeout(bail); });
         } catch (_) { /* transient network — try again next tick */ }
-    }, STRANGER_KEEPALIVE_MS);
+        scheduleStrangerKeepAlive(false);
+    }, strangerKeepAliveDelay(first));
 }
 
 // Host-only: toggle the room lock. The server confirms via a 'lock-state' broadcast.
@@ -245,6 +344,19 @@ function captureLookSnapshot() {
         lightPos: full.lightPos || null,
         lightShiftPath: full.lightShiftPath || null,
         brushState: full.brushState || null,
+        material: full.material || null,
+        brushTip: full.brushTip || null,
+        // Oscillators animate look params — without them a watcher saw only
+        // the 2s poll's choppy sampled values instead of the animation itself.
+        cosOscillator: full.cosOscillator ||
+            ((window.cosOscillator && window.cosOscillator.getState) ? window.cosOscillator.getState() : null),
+        // Transport is MIRROR-ONLY state (deliberately not part of presets —
+        // loading a preset should never pause you). A painter's pause or
+        // freeze is part of the performance, so the audience gets it too.
+        transport: {
+            paused: (typeof isPaused !== 'undefined') ? !!isPaused : false,
+            frozen: !!window.__fluidFrozen
+        },
         ssOrigin: full.ssOrigin || null,
         armColors: full.armColors || null
     };
@@ -261,35 +373,76 @@ function captureLookSnapshot() {
 }
 
 var settingsLockLastSent = ''; // last snapshot JSON the host broadcast (poll diff gate)
+
+// The relay SILENTLY drops messages over 16KB — for a user with a big saved-
+// color/palette library the whole look snapshot vanished on every send, so a
+// watcher got per-dab paint properties (they ride the stroke messages) but no
+// slider/setting changes at all: "density didn't carry" was this. Sanitize on
+// the SENDER (the receiver strips long strings/data URLs anyway, so they are
+// pure wasted bytes), then shed bulky optional sections, then as a last
+// resort send the core look alone — a partial mirror always beats a silent
+// total drop.
+function fitLookSnapshot(snap) {
+    if (!snap) return null;
+    var out = sanitizeLockSnapshot(snap) || {};
+    var SHED = ['userPalettes', 'savedColors', 'lightShiftPath', 'ssOrigin', 'brushState'];
+    for (var i = 0; i < SHED.length; i++) {
+        try { if (JSON.stringify(out).length <= 14000) break; } catch (_) { break; }
+        delete out[SHED[i]];
+    }
+    var len = 0;
+    try { len = JSON.stringify(out).length; } catch (_) {}
+    if (len > 15000) {
+        console.warn('[mp] look snapshot still ' + len + 'B after shedding — sending core look only');
+        out = { sliders: out.sliders, checkboxes: out.checkboxes, selects: out.selects,
+                colors: out.colors, kaleido: out.kaleido, paletteIndex: out.paletteIndex,
+                material: out.material, cosOscillator: out.cosOscillator,
+                transport: out.transport, armColors: out.armColors };
+    }
+    return out;
+}
 function broadcastSettingsLock() {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
     var msg = { type: 'settings-lock', locked: settingsLockOn, timestamp: Date.now() };
     if (settingsLockOn) {
         var snap = captureLookSnapshot();
-        // Diff gate records the PRE-shed JSON (the poll compares fresh
-        // unshedded captures against this — post-shed it would never match
+        // Diff gate records the PRE-fit JSON (the poll compares fresh
+        // unshedded captures against this — post-fit it would never match
         // an oversize snapshot and the poll would re-send every tick).
         try { settingsLockLastSent = JSON.stringify(snap || null); } catch (_) { settingsLockLastSent = ''; }
-        // Relay caps messages at 16KB — shed bulky optional sections before
-        // sending, or the whole lock update silently never arrives.
-        if (snap) {
-            try {
-                ['userPalettes', 'savedColors', 'lightShiftPath'].forEach(function (k) {
-                    if (JSON.stringify(snap).length > 14000) delete snap[k];
-                });
-            } catch (_) {}
-        }
-        msg.snapshot = snap;
+        msg.snapshot = fitLookSnapshot(snap);
     }
     partySocket.send(JSON.stringify(msg));
 }
 
-// While locked, the host's live edits re-broadcast (debounced) so
-// locked guests track them — "mirror every look-affecting setting"
+// Take-turns twin of broadcastSettingsLock: the current painter's look rides a
+// 'turn-look' message (the relay only forwards it from the turn holder).
+function broadcastTurnLook() {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    var snap = captureLookSnapshot();
+    // Same pre-fit diff gate as the settings lock (shared with the poll).
+    try { settingsLockLastSent = JSON.stringify(snap || null); } catch (_) { settingsLockLastSent = ''; }
+    partySocket.send(JSON.stringify({ type: 'turn-look', snapshot: fitLookSnapshot(snap), timestamp: Date.now() }));
+}
+
+// The look mirror serves two features: the 13.5 host settings lock, and
+// take-turns mode (the current painter's look mirrors to every watcher).
+// Exactly one can be live at a time — turns supersede the host lock.
+function mirrorActive() {
+    if (turnsOn) return isMyTurn() ? 'turn' : null;
+    return settingsLockOn ? 'lock' : null;
+}
+function broadcastLookMirror() {
+    var m = mirrorActive();
+    if (m === 'lock') broadcastSettingsLock();
+    else if (m === 'turn') broadcastTurnLook();
+}
+// While mirroring, live edits re-broadcast (debounced) so the watching side
+// tracks them — "mirror every look-affecting setting"
 function hostLockMirrorHandler() {
-    if (!settingsLockOn) return;
+    if (!mirrorActive()) return;
     if (settingsLockDebounce) clearTimeout(settingsLockDebounce);
-    settingsLockDebounce = setTimeout(broadcastSettingsLock, 400);
+    settingsLockDebounce = setTimeout(broadcastLookMirror, 400);
 }
 var settingsLockPoll = null;
 function installHostLockMirror() {
@@ -301,7 +454,7 @@ function installHostLockMirror() {
     // drags, kaleido buttons, Mutate. Diff-gated so a quiet host sends
     // nothing; captureLookSnapshot is the cheap lookOnly capture.
     settingsLockPoll = setInterval(function () {
-        if (!settingsLockOn) return;
+        if (!mirrorActive()) return;
         var j;
         try { j = JSON.stringify(captureLookSnapshot() || null); } catch (_) { return; }
         if (j !== settingsLockLastSent) hostLockMirrorHandler();
@@ -316,11 +469,15 @@ function removeHostLockMirror() {
     if (settingsLockDebounce) { clearTimeout(settingsLockDebounce); settingsLockDebounce = null; }
     if (settingsLockPoll) { clearInterval(settingsLockPoll); settingsLockPoll = null; }
 }
+// Install/remove the mirror to match whichever feature currently needs it.
+function syncLookMirror() {
+    if (mirrorActive()) installHostLockMirror(); else removeHostLockMirror();
+}
 
 function toggleSettingsLock() {
     settingsLockOn = !settingsLockOn;
     broadcastSettingsLock();
-    if (settingsLockOn) installHostLockMirror(); else removeHostLockMirror();
+    syncLookMirror();
     updateConnectedView();
 }
 
@@ -334,7 +491,8 @@ function toggleSettingsLock() {
 // the preset — those sections could never arrive even if sent).
 var LOCK_SNAPSHOT_ALLOW = ['sliders', 'checkboxes', 'selects', 'colors', 'savedColors',
     'paletteIndex', 'paletteName', 'armColors', 'brushState', 'lightPos',
-    'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin'];
+    'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin', 'material',
+    'brushTip', 'cosOscillator', 'transport'];
 // Bounded recursive clean: primitives-only leaves (no data: URLs, strings
 // capped), depth ≤ 3 so armColors [{mode,color}], lightShiftPath waypoints
 // and userPalettes [{name, colors: [...]}] survive — the old one-level rule
@@ -384,24 +542,512 @@ function setSettingsLockedByHost(locked, snapshot) {
                 'color:#ffb347;font-size:12px;font-weight:600;pointer-events:none;';
             document.body.appendChild(banner);
         }
-        var safeSnap = sanitizeLockSnapshot(snapshot);
-        if (safeSnap && typeof window.applyPresetSnapshot === 'function') {
-            isProcessingRemoteEvent = true;
-            window.__mpApplyingRemote = true;
-            try { window.applyPresetSnapshot(safeSnap); }
-            catch (e) { console.warn('settings-lock: snapshot apply failed', e); }
-            finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
-        }
+        applyRemoteLookSnapshot(snapshot);
     } else if (banner) {
         banner.remove();
     }
 }
 
+// Sanitize + apply a look snapshot from an untrusted peer (settings lock or
+// take-turns mirror — both ride the same capture/sanitize/apply pipeline).
+function applyRemoteLookSnapshot(snapshot) {
+    var safeSnap = sanitizeLockSnapshot(snapshot);
+    if (safeSnap && typeof window.applyPresetSnapshot === 'function') {
+        isProcessingRemoteEvent = true;
+        window.__mpApplyingRemote = true;
+        try { window.applyPresetSnapshot(safeSnap); }
+        catch (e) { console.warn('look mirror: snapshot apply failed', e); }
+        finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
+        // Transport parity (mirror-only; applyPresetSnapshot ignores it): the
+        // painter pausing or freezing the fluid is part of the performance.
+        try {
+            var t = safeSnap.transport;
+            if (t) {
+                if (typeof t.paused === 'boolean' && typeof isPaused !== 'undefined' &&
+                    !!isPaused !== t.paused && typeof window.togglePause === 'function') {
+                    window.togglePause();
+                }
+                if (typeof t.frozen === 'boolean' && !!window.__fluidFrozen !== t.frozen &&
+                    typeof window.toggleFreeze === 'function') {
+                    window.toggleFreeze();
+                }
+            }
+        } catch (e) { /* best-effort */ }
+    }
+}
+
 function resetSettingsLock() {
     settingsLockOn = false;
-    removeHostLockMirror();
+    syncLookMirror(); // keeps the turn mirror alive if we're the current painter
     setSettingsLockedByHost(false, null);
 }
+
+// ── Take-turns mode ─────────────────────────────────────────────────
+// No points, no timer — the brush just passes around the room. While it's not
+// your turn, painting/clear are gated (05d/04f read __mpTurnBlocked), your look
+// settings are driven by the painter (same __mpSettingsLocked gate as 13.5),
+// and the painter's edits arrive as 'turn-look' snapshots. When the brush
+// reaches you, you inherit the canvas and settings as they stand — like
+// picking up the brush at a shared easel.
+function isMyTurn() { return turnsOn && !!turnHolderId && turnHolderId === clientId; }
+
+// Re-derive the two gates from the current turn state (also called after code
+// paths that clear __mpSettingsLocked wholesale, e.g. a host promotion).
+function syncTurnGates() {
+    if (turnsOn) {
+        window.__mpTurnBlocked = !isMyTurn();
+        window.__mpSettingsLocked = !isMyTurn();
+    } else {
+        window.__mpTurnBlocked = false;
+        // The watcher gate dies with the mode. Any pre-turns 13.5 host lock
+        // was already superseded when turns switched on (the relay refuses
+        // 'settings-lock' while turns run), so nothing legitimate is cleared
+        // — without this, a watcher's settings stayed locked forever after
+        // the host turned turns off.
+        window.__mpSettingsLocked = false;
+    }
+}
+
+function applyTurnState(wasMyTurn) {
+    // Any authoritative rotation update settles an outstanding invite —
+    // an accept arrives as turn-state, not as a separate result message.
+    clearInviteWait();
+    dismissTurnInvitePrompt();
+    if (turnsOn) {
+        // Turns supersede the 13.5 settings lock on both ends: the host's lock
+        // intent drops (the relay refuses 'settings-lock' while turns run) and
+        // any guest-side locked banner/gate is replaced by the turn state.
+        settingsLockOn = false;
+        setSettingsLockedByHost(false, null);
+    }
+    // The brush was taken from us mid-stroke (a host Skip or a pass racing
+    // our drag): end the live stroke NOW. The relay already drops our splats,
+    // so anything we kept painting locally would exist on no other canvas.
+    if (wasMyTurn && !isMyTurn() && window.pointer && window.pointer.down) {
+        try { if (typeof broadcastPointerUp === 'function') broadcastPointerUp(); } catch (_) {}
+        window.pointer.down = false;
+        window.pointer.moved = false;
+        _dabQueue.length = 0;
+        if (window.BrushEngine && window.BrushEngine.isActive()) window.BrushEngine.abort();
+    }
+    syncTurnGates();
+    syncLookMirror();
+    // Whenever we hold the brush on a rotation update, (re)send our look:
+    // gaining the brush snaps every watcher from the previous painter to us,
+    // and a join/leave/pass resync catches late joiners who would otherwise
+    // keep their own look until our next edit.
+    if (isMyTurn()) broadcastTurnLook();
+    updateConnectedView();
+}
+
+function resetTurnState() {
+    turnsOn = false;
+    turnHolderId = null;
+    turnOrder = [];
+    turnMsLocal = 0;
+    turnDeadlineLocal = 0;
+    clearInviteWait();
+    dismissTurnInvitePrompt();
+    stopTurnTick();
+    syncTurnGates(); // clears BOTH gates (turnsOn is false)
+    syncLookMirror();
+    var banner = document.getElementById('mpTurnBanner');
+    if (banner) banner.remove();
+    var wheel = document.getElementById('turnWheel');
+    if (wheel) { wheel.style.display = 'none'; wheel.innerHTML = ''; }
+    _wheelKey = '';
+}
+
+// ── Turn countdown ──────────────────────────────────────────────────
+// The server owns the clock (its alarm auto-passes the brush); clients only
+// RENDER the remaining time from the skew-adjusted deadline.
+var turnTickTimer = null;
+
+function fmtRemaining() {
+    if (!turnDeadlineLocal) return '';
+    var s = Math.max(0, Math.round((turnDeadlineLocal - Date.now()) / 1000));
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return m + ':' + (r < 10 ? '0' : '') + r;
+}
+
+function stopTurnTick() {
+    if (turnTickTimer) { clearInterval(turnTickTimer); turnTickTimer = null; }
+}
+
+function ensureTurnTick() {
+    if (turnTickTimer) return;
+    turnTickTimer = setInterval(function () {
+        if (!turnsOn || !turnDeadlineLocal) { stopTurnTick(); return; }
+        updateTurnBanner();
+        updateTurnStatusLine();
+        var clock = document.getElementById('turnWheelClock');
+        if (clock) clock.textContent = fmtRemaining();
+    }, 500);
+}
+
+// Fixed banner while turns are running (mirrors the settings-lock banner).
+function updateTurnBanner() {
+    var banner = document.getElementById('mpTurnBanner');
+    if (!turnsOn || !isMultiplayerEnabled) {
+        if (banner) banner.remove();
+        return;
+    }
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'mpTurnBanner';
+        banner.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10002;' +
+            'padding:6px 14px;border-radius:8px;background:rgba(15,20,27,0.92);' +
+            'font-size:12px;font-weight:600;pointer-events:none;';
+        document.body.appendChild(banner);
+    }
+    var t = fmtRemaining();
+    var clock = t ? ' (' + t + ')' : '';
+    if (isMyTurn()) {
+        banner.textContent = '🖌 Your turn' + clock + ' — everyone sees your settings';
+        banner.style.border = '1px solid rgba(63,185,80,0.55)';
+        banner.style.color = '#3fb950';
+    } else if (turnHolderId) {
+        banner.textContent = '👀 ' + shortName(turnHolderId) + ' is painting' + clock + ' — your settings mirror theirs';
+        banner.style.border = '1px solid rgba(255,178,71,0.5)';
+        banner.style.color = '#ffb347';
+    } else {
+        banner.textContent = '⏳ Waiting for the next painter…';
+        banner.style.border = '1px solid rgba(255,178,71,0.5)';
+        banner.style.color = '#ffb347';
+    }
+}
+
+// ── Rotation display ────────────────────────────────────────────────
+// One layout for every room size (the old polygon got cramped and unclear
+// past two artists): the ACTIVE painter is always the big node on top, a
+// vertical arrow leads down to the WAITERS row, and waiters render in pass
+// order — the leftmost dot is next up. Node colors match the artists'
+// remote-cursor colors; your own node says "(you)".
+var _wheelKey = '';
+
+function wheelNode(cx, cy, r, id, isHolder) {
+    var col = colorForClient(id);
+    var s = '';
+    if (isHolder) {
+        s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r + 4.5) + '" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.9"/>';
+    }
+    s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + col + '" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>';
+    if (isHolder) {
+        s += '<text x="' + cx + '" y="' + (cy + 4.5) + '" text-anchor="middle" font-size="13">🖌</text>';
+    }
+    return s;
+}
+
+var WHEEL_W = 224; // viewBox width shared by every layout
+
+function wheelLabel(x, y, id, isHolder) {
+    var name = shortName(id) + (id === clientId ? ' (you)' : '');
+    // Clamp horizontally so side labels never run off the frame (~5.8px/char
+    // at font-size 10, centered) — clipped names were half the cramped look.
+    var half = name.length * 2.9 + 4;
+    x = Math.max(half, Math.min(WHEEL_W - half, x));
+    var fill = isHolder ? '#ffffff' : '#b9bec7';
+    var weight = (id === clientId || isHolder) ? '700' : '400';
+    return '<text x="' + x + '" y="' + y + '" text-anchor="middle" font-size="10" font-weight="' + weight + '" fill="' + fill + '">' + name + '</text>';
+}
+
+function renderTurnWheel() {
+    var host = document.getElementById('turnWheel');
+    if (!host) return;
+    if (!turnsOn || !isMultiplayerEnabled) {
+        host.style.display = 'none';
+        if (host.innerHTML) host.innerHTML = '';
+        _wheelKey = '';
+        return;
+    }
+    host.style.display = '';
+    var ids = turnOrder.slice();
+    if (!ids.length && turnHolderId) ids = [turnHolderId];
+    var key = ids.join('|') + '#' + (turnHolderId || '') + '#' + (clientId || '') + '#' + (turnDeadlineLocal ? 1 : 0);
+    if (key === _wheelKey) {
+        // Rotation unchanged — the tick only refreshes the clock text.
+        return;
+    }
+    _wheelKey = key;
+    var n = ids.length;
+    var clockText = fmtRemaining();
+    var clockFill = isMyTurn() ? '#3fb950' : '#ffb347';
+    var svg = '';
+
+    if (n <= 1) {
+        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' 104" xmlns="http://www.w3.org/2000/svg">';
+        if (n === 1) {
+            svg += wheelNode(112, 36, 15, ids[0], ids[0] === turnHolderId);
+            svg += wheelLabel(112, 70, ids[0], ids[0] === turnHolderId);
+        }
+        svg += '<text x="112" y="92" text-anchor="middle" font-size="10" fill="#7b828e">waiting for another artist…</text>';
+        svg += '</svg>';
+    } else {
+        // Active-on-top layout: the painter is the big node, a vertical arrow
+        // hands down to the waiters row (pass order, leftmost = next up).
+        var holderId2 = (turnHolderId && ids.indexOf(turnHolderId) !== -1) ? turnHolderId : null;
+        var hIdx = holderId2 ? ids.indexOf(holderId2) : -1;
+        // Waiters in the order the brush will reach them
+        var waiters = hIdx === -1 ? ids.slice()
+            : ids.slice(hIdx + 1).concat(ids.slice(0, hIdx));
+        // Waiters wrap to extra rows when the room is big
+        var PER_ROW = 6;
+        var wRows = Math.max(1, Math.ceil(waiters.length / PER_ROW));
+        var waiterTop = 96;           // y of the first waiters row
+        var rowH = 50;                // dot + staggered labels per row
+        var H = waiterTop + wRows * rowH + 2;
+        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+
+        // Active painter, centered on top (or a waiting slot if no holder)
+        if (holderId2) {
+            svg += wheelNode(112, 26, 16, holderId2, true);
+            svg += wheelLabel(112, 55, holderId2, true);
+        } else {
+            svg += '<circle cx="112" cy="26" r="16" fill="none" stroke="#7b828e" stroke-width="1.6" stroke-dasharray="4 3"/>';
+            svg += '<text x="112" y="55" text-anchor="middle" font-size="10" fill="#7b828e">waiting…</text>';
+        }
+        if (clockText) {
+            svg += '<text id="turnWheelClock" x="150" y="31" text-anchor="start" font-size="14" font-weight="700" fill="' + clockFill + '">' + clockText + '</text>';
+        }
+        // Vertical hand-down arrow between active and waiters
+        svg += '<line x1="112" y1="62" x2="112" y2="80" stroke="#7b828e" stroke-width="2"/>' +
+               '<path d="M112,88 l-5,-9 h10 z" fill="#7b828e"/>';
+        // "next" cue over the first waiter
+        for (var i = 0; i < waiters.length; i++) {
+            var row = Math.floor(i / PER_ROW);
+            var inRow = Math.min(PER_ROW, waiters.length - row * PER_ROW);
+            var col = i - row * PER_ROW;
+            var spacing = Math.min(64, (WHEEL_W - 24) / Math.max(1, inRow));
+            var rowLeft = 112 - ((inRow - 1) * spacing) / 2;
+            var nx = rowLeft + col * spacing;
+            var ny = waiterTop + row * rowH;
+            svg += wheelNode(nx, ny, 10, waiters[i], false);
+            // Labels get crowded fast: stagger adjacent baselines so neighbors
+            // never collide; in packed rows name only YOU and the next-up.
+            var showLabel = inRow <= 4 || waiters[i] === clientId || i === 0;
+            if (showLabel) svg += wheelLabel(nx, ny + 20 + (col % 2) * 12, waiters[i], false);
+            if (i === 0) {
+                svg += '<text x="' + nx + '" y="' + (ny - 16) + '" text-anchor="middle" font-size="8" font-weight="700" fill="#9db8ff" letter-spacing="1">NEXT</text>';
+            }
+        }
+        svg += '</svg>';
+    }
+    host.innerHTML = svg;
+}
+
+// Countdown + rotation-size line under the wheel (refreshed by the tick).
+function updateTurnStatusLine() {
+    var tStat = document.getElementById('turnStatus');
+    if (!tStat) return;
+    if (!turnsOn) {
+        tStat.style.display = 'none';
+        return;
+    }
+    tStat.style.display = '';
+    var n = turnOrder.length;
+    var t = fmtRemaining();
+    var who = isMyTurn() ? '🖌 Your turn' : (turnHolderId ? '🖌 ' + shortName(turnHolderId) + ' painting' : '⏳ Waiting');
+    tStat.textContent = who + (t ? ' · ⏱ ' + t : '') + ' · ' + n + (n === 1 ? ' artist' : ' artists');
+    tStat.classList.toggle('mp-turn-you', isMyTurn());
+}
+
+// Panel widgets: the host's Take turns toggle + turn-length picker, the
+// rotation wheel, the countdown line, and the Pass/Skip button (painter
+// passes; host can skip an AFK painter).
+function updateTurnUI() {
+    updateTurnBanner();
+    var isHost = myRole === 'host';
+    // Stranger pairs have no meaningful host, so both painters drive turns:
+    // either may ask (consent flow) and either may stop.
+    var pair = isStrangerRoom();
+    var canDrive = isHost || pair;
+    var tBtn = document.getElementById('turnsBtn');
+    if (tBtn) {
+        // Non-drivers see the control too, disabled — hiding it outright made
+        // the whole feature invisible to everyone but the host, who then had
+        // to explain it exists. Once turns are running the wheel/banner/status
+        // carry the state, so the dead button steps out of the way.
+        var showBtn = canDrive || !turnsOn;
+        tBtn.style.display = showBtn ? '' : 'none';
+        tBtn.disabled = !canDrive || invitePending;
+        if (invitePending) {
+            tBtn.textContent = '⏳ Waiting for their answer…';
+            tBtn.title = 'Your partner has been asked to take turns';
+        } else if (!canDrive) {
+            tBtn.textContent = '🔁 Take turns · host only';
+            tBtn.title = 'Only the room host can start taking turns';
+        } else if (turnsOn) {
+            tBtn.textContent = '🔁 Stop taking turns';
+            tBtn.title = 'Go back to painting at the same time';
+        } else {
+            tBtn.textContent = pair ? '🔁 Ask to take turns' : '🔁 Take turns';
+            tBtn.title = pair
+                ? 'Ask your partner to take turns — nothing changes unless they agree'
+                : "Take turns painting — one artist at a time while everyone else watches with the painter's settings mirrored live";
+        }
+        tBtn.classList.toggle('active', turnsOn);
+        tBtn.classList.toggle('mp-btn-muted', !canDrive || invitePending);
+    }
+    var tSel = document.getElementById('turnTimerSel');
+    // The asker picks the length (it rides along in the invite), so both
+    // members of a pair get the picker.
+    if (tSel) tSel.style.display = (canDrive && !turnsOn) || (isHost && turnsOn) ? '' : 'none';
+    var pBtn = document.getElementById('turnPassBtn');
+    if (pBtn) {
+        // Skipping SOMEONE ELSE's turn is a host power, and a stranger pair has
+        // no real host — so in a pair you may only pass your own turn.
+        var showPass = turnsOn && (isMyTurn() || (isHost && !pair));
+        pBtn.style.display = showPass ? '' : 'none';
+        pBtn.textContent = isMyTurn() ? '➡ Pass turn' : '⏭ Skip turn';
+    }
+    renderTurnWheel();
+    updateTurnStatusLine();
+    if (turnsOn && turnDeadlineLocal) ensureTurnTick(); else stopTurnTick();
+}
+
+function turnTimerSeconds() {
+    var sel = document.getElementById('turnTimerSel');
+    var v = sel ? parseInt(sel.value, 10) : 60;
+    return isNaN(v) ? 60 : v;
+}
+
+// ── Stranger-pair consent ───────────────────────────────────────────
+// A stranger room has no real host — "host" is just whoever connected first —
+// so either painter may propose taking turns and the other agrees or doesn't.
+// Nothing changes on either canvas until they agree.
+var invitePending = false;      // we asked; waiting on their answer
+var inviteTimeout = null;
+var inviteAckTimeout = null;
+var INVITE_WAIT_MS = 30000;     // matches the relay's invite TTL
+var INVITE_ACK_MS = 4000;       // server ack must beat this
+
+function clearInviteWait() {
+    invitePending = false;
+    if (inviteTimeout) { clearTimeout(inviteTimeout); inviteTimeout = null; }
+    if (inviteAckTimeout) { clearTimeout(inviteAckTimeout); inviteAckTimeout = null; }
+}
+
+function sendTurnInvite() {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    if (invitePending || turnsOn) return;
+    invitePending = true;
+    partySocket.send(JSON.stringify({ type: 'turn-invite', seconds: turnTimerSeconds() }));
+    // A relay that predates turn invites has no handler for the message and
+    // simply rebroadcasts it, so nothing ever comes back. Without this probe
+    // that is indistinguishable from a partner who is ignoring you — you just
+    // wait 30s for "no answer". The ack turns it into a real explanation.
+    inviteAckTimeout = setTimeout(function () {
+        if (!invitePending) return;
+        clearInviteWait();
+        showTurnToast('⚠ This room\'s server is too old for turn invites — it needs a relay update.');
+        updateTurnUI();
+    }, INVITE_ACK_MS);
+    inviteTimeout = setTimeout(function () {
+        if (!invitePending) return;
+        clearInviteWait();
+        showTurnToast('⏳ No answer — they may not be at the keyboard.');
+        updateTurnUI();
+    }, INVITE_WAIT_MS);
+    updateTurnUI();
+}
+
+function answerTurnInvite(accept) {
+    dismissTurnInvitePrompt();
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    partySocket.send(JSON.stringify({ type: 'turn-invite-response', accept: !!accept }));
+}
+
+function dismissTurnInvitePrompt() {
+    var el = document.getElementById('mpTurnInvite');
+    if (el) el.remove();
+}
+
+// The partner asked us. Accept/Decline, shown near the turn banner so the
+// whole turn conversation happens in one place on screen.
+function showTurnInvitePrompt(fromId, seconds) {
+    dismissTurnInvitePrompt();
+    var el = document.createElement('div');
+    el.id = 'mpTurnInvite';
+    el.className = 'mp-turn-invite';
+    var who = fromId ? shortName(fromId) : 'Your partner';
+    var len = (typeof seconds === 'number' && seconds > 0)
+        ? (seconds >= 60 ? (seconds / 60) + ' min' : seconds + ' sec') + ' each'
+        : 'no timer';
+    var msg = document.createElement('span');
+    msg.textContent = '🔁 ' + who + ' wants to take turns painting (' + len + ')';
+    var yes = document.createElement('button');
+    yes.className = 'mp-invite-yes';
+    yes.textContent = 'Take turns';
+    yes.addEventListener('click', function () { answerTurnInvite(true); });
+    var no = document.createElement('button');
+    no.className = 'mp-invite-no';
+    no.textContent = 'No thanks';
+    no.addEventListener('click', function () { answerTurnInvite(false); });
+    el.appendChild(msg);
+    el.appendChild(yes);
+    el.appendChild(no);
+    document.body.appendChild(el);
+    // Expire in step with the relay's TTL so a stale prompt can't linger and
+    // answer an invite the server has already forgotten.
+    setTimeout(function () {
+        var still = document.getElementById('mpTurnInvite');
+        if (still === el) el.remove();
+    }, INVITE_WAIT_MS);
+}
+
+// Brief, non-blocking feedback for invite outcomes.
+function showTurnToast(text) {
+    var el = document.getElementById('mpTurnToast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'mpTurnToast';
+        el.className = 'mp-turn-toast';
+        document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.style.opacity = '1';
+    if (showTurnToast._t) clearTimeout(showTurnToast._t);
+    showTurnToast._t = setTimeout(function () { el.style.opacity = '0'; }, 2600);
+}
+
+function toggleTurns() {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    // Starting turns in a stranger pair needs the partner's yes; stopping
+    // never does, and neither does anything in a hosted private room.
+    if (isStrangerRoom() && !turnsOn) {
+        sendTurnInvite();
+        return;
+    }
+    partySocket.send(JSON.stringify({ type: 'turns', on: !turnsOn, seconds: turnTimerSeconds() }));
+}
+
+function passTurn() {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    partySocket.send(JSON.stringify({ type: 'turn-pass' }));
+}
+
+// Throttled "not your turn" toast, fired from the gated paint/clear paths.
+var _turnHintAt = 0;
+var _turnHintTimer = null;
+window.__mpTurnHint = function () {
+    var now = Date.now();
+    if (now - _turnHintAt < 1500) return;
+    _turnHintAt = now;
+    var el = document.getElementById('mpTurnHint');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'mpTurnHint';
+        el.style.cssText = 'position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:10002;' +
+            'padding:6px 14px;border-radius:8px;background:rgba(15,20,27,0.92);border:1px solid rgba(122,162,255,0.5);' +
+            'color:#9db8ff;font-size:12px;font-weight:600;pointer-events:none;transition:opacity 0.3s;';
+        document.body.appendChild(el);
+    }
+    el.textContent = turnHolderId ? ('🖌 It\'s ' + shortName(turnHolderId) + '\'s turn') : '⏳ Waiting for the next painter…';
+    el.style.opacity = '1';
+    if (_turnHintTimer) clearTimeout(_turnHintTimer);
+    _turnHintTimer = setTimeout(function () { el.style.opacity = '0'; }, 1400);
+};
 
 // Core connect logic
 function connectToRoom(roomCode) {
@@ -414,7 +1060,9 @@ function connectToRoom(roomCode) {
     reconnectAttempts = 0;
     myRole = 'guest';
     roomLocked = false;
+    strangerWasPaired = false;
     resetSettingsLock();
+    resetTurnState();
 
     // Stranger rooms are ephemeral — keep them out of the shareable URL hash;
     // private/code rooms stay in the hash so a #CODE deep-link auto-joins.
@@ -429,9 +1077,18 @@ function connectToRoom(roomCode) {
 
 function doConnect() {
     if (!currentRoom) return;
+    // Never stack sockets: a reconnect timer (or a stale socket's close event)
+    // can fire after a newer socket was already opened — e.g. joining a new
+    // room while the previous connection was still CONNECTING. The overwritten
+    // socket used to stay alive server-side with its handlers attached, so the
+    // tab processed every broadcast twice and the relay saw two connections
+    // per device (which take-turns, keyed to connection ids, cannot tolerate).
+    if (partySocket) {
+        try { partySocket.close(); } catch (_) {}
+        partySocket = null;
+    }
     try {
-        const isLocal = PARTYKIT_HOST.startsWith('localhost') || PARTYKIT_HOST.startsWith('127.0.0.1');
-        const protocol = isLocal ? 'ws:' : 'wss:';
+        const protocol = isPlainWsHost(PARTYKIT_HOST) ? 'ws:' : 'wss:';
         const url = `${protocol}//${PARTYKIT_HOST}/parties/fluid/${currentRoom}?uid=${encodeURIComponent(DEVICE_UID)}`;
         console.log('Connecting to PartyKit:', url);
         showConnecting();
@@ -470,13 +1127,16 @@ function initMultiplayer() {
 function disconnectMultiplayer() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
+    stopPing();
     closeMatchmaking();
     stopStrangerKeepAlive();
     _dabQueue.length = 0; // never carry one room's dabs into the next
     currentRoom = null;
     myRole = 'guest';
     roomLocked = false;
+    strangerWasPaired = false;
     resetSettingsLock();
+    resetTurnState();
     if (partySocket) {
         partySocket.close();
         partySocket = null;
@@ -491,11 +1151,46 @@ function disconnectMultiplayer() {
     showDisconnectedUI();
 }
 
+// ── Liveness heartbeat ──────────────────────────────────────────────
+// The relay reaps connections that have pinged before and then gone silent
+// (~65s). Without this, a peer that died without a close frame (sleeping
+// laptop, crash, dropped network) haunted the room for minutes: it held the
+// cap-2 stranger slot, kept the survivor's count at 2 ("still connected"),
+// and could capture the turn rotation. Old clients never ping and are never
+// reaped, so mixed rooms stay safe; a live client wrongly reaped (e.g. on
+// wake from sleep) gets close code 4003, which takes the normal reconnect
+// path.
+var PING_MS = 20000;
+var pingTimer = null;
+function sendPing() {
+    if (partySocket && partySocket.readyState === WebSocket.OPEN) {
+        try { partySocket.send(JSON.stringify({ type: 'ping' })); } catch (_) {}
+    }
+}
+function startPing() {
+    stopPing();
+    sendPing(); // mark this connection reap-eligible immediately
+    pingTimer = setInterval(sendPing, PING_MS);
+}
+function stopPing() {
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+}
+
+// Stale-socket guard: every handler ignores events from a socket that is no
+// longer THE socket (replaced by a newer connect). Without this, an orphaned
+// socket's events keep mutating module state — its 'close' schedules a bogus
+// reconnect (stacking connections) and its messages double-apply.
+function isCurrentSocket(event) {
+    return !!event && !!partySocket && event.target === partySocket;
+}
+
 function onMultiplayerOpen(event) {
+    if (!isCurrentSocket(event)) return;
     console.log('Connected to multiplayer! Room:', currentRoom);
     if (partySocket && partySocket._connectTimeout) clearTimeout(partySocket._connectTimeout);
     isMultiplayerEnabled = true;
     reconnectAttempts = 0;
+    startPing();
     // Sync the hidden toggle
     var toggle = document.getElementById('multiplayerToggle');
     if (toggle) toggle.checked = true;
@@ -503,6 +1198,7 @@ function onMultiplayerOpen(event) {
 }
 
 function onMultiplayerMessage(event) {
+    if (!isCurrentSocket(event)) return;
     try {
         const data = JSON.parse(event.data);
 
@@ -512,6 +1208,15 @@ function onMultiplayerMessage(event) {
                 connectedClients = data.totalClients;
                 if (data.role) myRole = data.role;
                 if (typeof data.locked === 'boolean') roomLocked = data.locked;
+                // Fresh socket = fresh room state. An auto-reconnect (doConnect)
+                // can land in a room whose turns/lock were switched off while we
+                // were away — and the server only announces turn-state when
+                // turns are ON — so stale gates must not survive the socket.
+                // When turns ARE on, the authoritative turn-state follows this
+                // message immediately and rebuilds everything. (Host-side
+                // settingsLockOn intent is deliberately left alone.)
+                resetTurnState();
+                setSettingsLockedByHost(false, null);
                 updateConnectedView();
                 break;
 
@@ -527,8 +1232,10 @@ function onMultiplayerMessage(event) {
 
             case 'host-changed':
                 myRole = (data.hostId === DEVICE_UID) ? 'host' : 'guest';
-                // Promotion to host frees this client from any settings lock
-                if (myRole === 'host') resetSettingsLock();
+                // Promotion to host frees this client from any settings lock —
+                // but NOT from the turn gates (a promoted watcher still waits
+                // for the brush), so re-derive those after the reset.
+                if (myRole === 'host') { resetSettingsLock(); syncTurnGates(); }
                 updateConnectedView();
                 break;
 
@@ -596,8 +1303,72 @@ function onMultiplayerMessage(event) {
             case 'settings-lock':
                 // Host locked/unlocked look settings (13.5). Hosts never
                 // gate themselves — only guests enter the locked state.
-                if (data.clientId !== clientId && myRole !== 'host') {
+                // While turns run the relay refuses these; ignore any that
+                // slip through (e.g. sent just before turns switched on).
+                if (data.clientId !== clientId && myRole !== 'host' && !turnsOn) {
                     setSettingsLockedByHost(!!data.locked, data.snapshot || null);
+                }
+                break;
+
+            case 'turn-state': {
+                // Server-confirmed rotation update (host toggled turns, a pass,
+                // a join/leave, or a reconnect changed a connection id).
+                // Server-authored broadcasts never carry a clientId; the relay
+                // stamps one onto every client-relayed message — so a clientId
+                // here means a forged copy from a peer (the new relay drops
+                // those, but the previously deployed relay forwards anything).
+                if (data.clientId) break;
+                var wasMyTurn = isMyTurn();
+                turnsOn = !!data.on;
+                turnHolderId = (typeof data.holder === 'string' && data.holder) ? data.holder : null;
+                turnOrder = Array.isArray(data.order)
+                    ? data.order.filter(function (x) { return typeof x === 'string'; })
+                    : [];
+                turnMsLocal = (typeof data.turnMs === 'number' && data.turnMs > 0) ? data.turnMs : 0;
+                // The countdown needs no synchronized clocks: the message's
+                // server timestamp gives us the skew to shift the deadline
+                // onto the local clock.
+                turnDeadlineLocal = (typeof data.deadline === 'number' && data.deadline > 0 &&
+                    typeof data.timestamp === 'number')
+                    ? data.deadline + (Date.now() - data.timestamp)
+                    : 0;
+                applyTurnState(wasMyTurn);
+                break;
+            }
+
+            case 'turn-invite-offer':
+                // Partner proposed taking turns (stranger pairs only). Server-
+                // authored: the relay never forwards a client-sent copy.
+                if (!turnsOn) showTurnInvitePrompt(data.from, data.seconds);
+                break;
+
+            case 'turn-invite-sent':
+                // Relay accepted the invite and delivered it — stop the
+                // old-relay probe, keep waiting for the human.
+                if (inviteAckTimeout) { clearTimeout(inviteAckTimeout); inviteAckTimeout = null; }
+                break;
+
+            case 'turn-invite-result':
+                // Only sent when it did NOT start — an accept arrives as turn-state.
+                if (!data.accepted) {
+                    clearInviteWait();
+                    if (data.reason === 'same-device') {
+                        showTurnToast('⚠ Both windows share one device id — open the other in a different browser or a private window.');
+                    } else if (data.reason === 'alone') {
+                        showTurnToast('⏳ Nobody else in the room yet.');
+                    } else {
+                        showTurnToast('🙅 ' + (data.by ? shortName(data.by) : 'They') + ' would rather keep painting together');
+                    }
+                    updateTurnUI();
+                }
+                break;
+
+            case 'turn-look':
+                // The current painter's look snapshot. The relay only forwards
+                // these from the turn holder; the holder check here just guards
+                // against reordered stragglers from a previous painter.
+                if (turnsOn && !isMyTurn() && data.clientId === turnHolderId) {
+                    applyRemoteLookSnapshot(data.snapshot || null);
                 }
                 break;
         }
@@ -607,12 +1378,18 @@ function onMultiplayerMessage(event) {
 }
 
 function onMultiplayerClose(event) {
+    // A socket we already replaced (or nulled in disconnectMultiplayer)
+    // closing later must not touch state or schedule a reconnect.
+    if (event && event.target && event.target !== partySocket) return;
     console.log('Disconnected from multiplayer');
+    stopPing();
     isMultiplayerEnabled = false;
     clearRemoteCursors();
     // Server refused the join (locked room / full room) — don't retry in a loop.
     if (event && (event.code === 4001 || event.code === 4002)) {
         currentRoom = null; lastRoom = null;
+        resetSettingsLock();
+        resetTurnState(); // never leave turn gates on a client with no room
         history.replaceState(null, '', window.location.pathname + window.location.search);
         showMpError(event.code === 4001
             ? 'This room is locked — ask the host for an invite.'
@@ -637,6 +1414,12 @@ function onMultiplayerClose(event) {
 function giveUpConnection(msg) {
     lastRoom = currentRoom;
     currentRoom = null;
+    closeMatchmaking(); // drop any waiting pin — we're no longer in that room
+    stopStrangerKeepAlive();
+    // A watcher whose connection died must not stay gated (or banner-ed)
+    // offline — they're back to painting alone now.
+    resetSettingsLock();
+    resetTurnState();
     showMpError(msg);
     showDisconnectedUI();
     var rc = document.getElementById('reconnectBtn');
@@ -644,6 +1427,7 @@ function giveUpConnection(msg) {
 }
 
 function onMultiplayerError(error) {
+    if (error && error.target && partySocket && error.target !== partySocket) return;
     console.error('Multiplayer error:', error);
 }
 
@@ -1062,9 +1846,25 @@ function updateConnectedView() {
     if (stranger) {
         var alone = connectedClients < 2;
         updateMultiplayerStatus(alone ? '🎲 Waiting for a stranger…' : '🎨 Painting with a stranger');
-        // Hold our matchmaking slot while alone; drop it the moment we pair.
-        if (alone) { if (!strangerKeepAlive) startStrangerKeepAlive(); }
-        else stopStrangerKeepAlive();
+        // Waiting alone is NOT the same as painting together: show the amber
+        // dot while alone, and SAY it when a partner leaves. This used to
+        // slide back silently — green dot, connected panel — which read as
+        // "still connected" while you kept painting for nobody.
+        var dot = document.getElementById('connectionDot');
+        if (dot) dot.className = alone ? 'mp-dot mp-dot-connecting' : 'mp-dot mp-dot-connected';
+        if (alone) {
+            if (strangerWasPaired) {
+                strangerWasPaired = false;
+                showTurnToast('🚪 Your painting partner left — looking for a new stranger…');
+            }
+            // Hold our matchmaking slot while alone; drop it (and the lobby
+            // pin socket that holds it open) the moment we pair.
+            if (!strangerKeepAlive) startStrangerKeepAlive();
+        } else {
+            strangerWasPaired = true;
+            stopStrangerKeepAlive();
+            closeMatchmaking();
+        }
     } else {
         stopStrangerKeepAlive();
         updateMultiplayerStatus(roomLocked ? '🔒 Room locked' : 'Connected');
@@ -1084,16 +1884,18 @@ function updateConnectedView() {
         lockBtn.style.display = canLock ? '' : 'none';
         lockBtn.textContent = roomLocked ? '🔓 Unlock room' : '🔒 Lock room';
     }
-    // Settings lock (13.5): any host can lock look settings (incl. stranger rooms).
+    // Settings lock (13.5): any host can lock look settings (incl. stranger
+    // rooms) — hidden while turns run, which supersede it.
     var sLockBtn = document.getElementById('settingsLockBtn');
     if (sLockBtn) {
-        sLockBtn.style.display = isHost ? '' : 'none';
+        sLockBtn.style.display = (isHost && !turnsOn) ? '' : 'none';
         sLockBtn.textContent = settingsLockOn ? '🎛 Unlock settings' : '🎛 Lock settings';
         sLockBtn.classList.toggle('active', settingsLockOn);
     }
     // Locked badge: non-host members see why no one else can join.
     setShown('lockBadge', !stranger && roomLocked && !isHost);
 
+    updateTurnUI();
     updateUsersDisplay();
 }
 
@@ -1191,6 +1993,21 @@ function initMultiplayerUI() {
     var sLockBtn = document.getElementById('settingsLockBtn');
     if (sLockBtn) sLockBtn.addEventListener('click', toggleSettingsLock);
 
+    var turnsBtn = document.getElementById('turnsBtn');
+    if (turnsBtn) turnsBtn.addEventListener('click', toggleTurns);
+
+    var turnPassBtn = document.getElementById('turnPassBtn');
+    if (turnPassBtn) turnPassBtn.addEventListener('click', passTurn);
+
+    var turnTimerSel = document.getElementById('turnTimerSel');
+    if (turnTimerSel) turnTimerSel.addEventListener('change', function () {
+        // Host changing the length mid-round applies it immediately
+        // (restarts the current turn's clock server-side).
+        if (turnsOn && myRole === 'host' && partySocket && partySocket.readyState === WebSocket.OPEN) {
+            partySocket.send(JSON.stringify({ type: 'turns', on: true, seconds: turnTimerSeconds() }));
+        }
+    });
+
     // Auto-join if URL has room hash
     var hashRoom = getRoomFromHash();
     if (hashRoom && hashRoom !== 'DEFAULT-ROOM') {
@@ -1212,6 +2029,8 @@ window.createRoom = createRoom;
 window.joinRoom = joinRoom;
 window.paintWithStranger = paintWithStranger;
 window.toggleLock = toggleLock;
+window.toggleTurns = toggleTurns;
+window.passTurn = passTurn;
 window.copyRoomCode = copyRoomCode;
 window.disconnectMultiplayer = disconnectMultiplayer;
 

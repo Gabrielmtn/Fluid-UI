@@ -36,6 +36,16 @@
 
         
 
+        // The built-ins' config-key deltas expressed as snapshot slider ids
+        // (SPLAT_RADIUS is slider-space brushSize / 1000).
+        const PRESET_KEY_TO_SLIDER = {
+            DENSITY_DISSIPATION: 'densityDissipation',
+            VELOCITY_DISSIPATION: 'velocityDissipation',
+            PRESSURE_DISSIPATION: 'pressureDissipation',
+            PRESSURE_ITERATIONS: 'pressureIteration',
+            CURL: 'curl'
+        };
+
         window.applyPreset = (name) => {
 
             // 13.5: look settings locked by the multiplayer host — local preset
@@ -53,15 +63,27 @@
 
 
 
-            // Instant application — clamped through the param registry
-
-            const safePreset = (window.ParamRegistry && window.ParamRegistry.clampConfigObject)
-
-                ? window.ParamRegistry.clampConfigObject(preset)
-
-                : preset;
-
-            Object.assign(config, safePreset);
+            // Full-state application (2026-08-13): a preset click must land on
+            // the exact same COMPLETE state every time. These used to be raw
+            // config deltas over whatever was active — so Surface Shading,
+            // kaleido, materials, arm colors etc. all survived a preset click.
+            // Now the delta overlays the registry-defaults baseline and goes
+            // through the full snapshot apply (which also resets material and
+            // brush tip). Falls back to the legacy delta path if 12-save-load
+            // has not loaded yet.
+            if (typeof window.applyPresetSnapshotFull === 'function') {
+                const sliders = {};
+                Object.keys(PRESET_KEY_TO_SLIDER).forEach((k) => {
+                    if (preset[k] !== undefined) sliders[PRESET_KEY_TO_SLIDER[k]] = preset[k];
+                });
+                if (preset.SPLAT_RADIUS !== undefined) sliders.brushSize = preset.SPLAT_RADIUS * 1000;
+                window.applyPresetSnapshotFull({ sliders: sliders });
+            } else {
+                const safePreset = (window.ParamRegistry && window.ParamRegistry.clampConfigObject)
+                    ? window.ParamRegistry.clampConfigObject(preset)
+                    : preset;
+                Object.assign(config, safePreset);
+            }
 
             // Soft reset: the preset changes the workload (stale statistics) but
             // not the hardware — keep the current quality tier, re-learn from it.
@@ -71,7 +93,7 @@
                 (window.QualityGovernor.softReset || window.QualityGovernor.reset)();
             }
 
-            
+
 
             // Single DOM update
 

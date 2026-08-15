@@ -811,6 +811,22 @@
             lightShiftPath: lightShiftPath,
             focusState: focusState,
             brushState: brushState,
+            // Material macro layer (Fluid / Paint-Wet / Paint-Thick): its core
+            // effects live in config keys with no captured control, so without
+            // this section a restored preset (or a mirroring peer) stayed on
+            // plain fluid while the source was in a paint material.
+            material: (window.MaterialModes && window.MaterialModes.getState)
+                ? window.MaterialModes.getState() : null,
+            // Brush tip (Soft/Blob/Chisel/Streak/Ring + optional custom-shape
+            // id + stamp angle): config-only state with no registry slider —
+            // without it a peer rendered your strokes with THEIR tip, and a
+            // restored preset lost the tip entirely.
+            brushTip: {
+                tip: (window.config ? window.config.BRUSH_TIP : 0) | 0,
+                shapeId: (window.BrushShapes && window.BrushShapes.activeId)
+                    ? (window.BrushShapes.activeId() || null) : null,
+                angle: window.config ? (window.config.BRUSH_ANGLE || 0) : 0
+            },
             ssOrigin: ssOrigin,
             canvasWrapper: canvasWrapper,
             sidebarSections: sidebarSections,
@@ -831,6 +847,15 @@
         // applies (user presets, autoload) are gated; the host's lock snapshot
         // itself arrives under __mpApplyingRemote and passes through.
         if (window.__mpSettingsLocked && !window.__mpApplyingRemote) return;
+        // External-writer flag for 05h's handlers: (a) an active material must
+        // YIELD so the snapshot's raw CURL lands as CURL, not as a macro
+        // amount (without this, applying a preset while in Paint-Thick left
+        // clay's curl in place); (b) programmatic writes must not clear the
+        // active-preset state. The flag was checked in 05h but never raised
+        // anywhere until now. Cleared in a 0-timeout too so an unexpected
+        // throw can never leave it stuck.
+        window._profileApplying = true;
+        setTimeout(function () { window._profileApplying = false; }, 0);
         var reg = window.ParamRegistry;
         // Soft reset: keep the governor's quality tier across snapshot loads —
         // a hard reset snapped to full quality and stuttered for seconds while
@@ -1420,6 +1445,45 @@
             }
         } catch(_){}
 
+        // Brush tip: config-level state the slider/checkbox passes above
+        // cannot reach. A custom shape only re-activates if THIS client has
+        // the same stamp (shape images cannot ride a snapshot); otherwise the
+        // built-in tip underneath is the honest fallback.
+        try {
+            if (snapshot.brushTip && window.config) {
+                var bt = snapshot.brushTip;
+                if (typeof bt.tip === 'number') {
+                    window.config.BRUSH_TIP = Math.max(0, Math.min(4, bt.tip | 0));
+                    try { if (window.settingsManager) window.settingsManager.set('brush.tip', window.config.BRUSH_TIP); } catch (_) {}
+                }
+                if (typeof bt.angle === 'number' && isFinite(bt.angle)) {
+                    window.config.BRUSH_ANGLE = Math.max(0, Math.min(360, bt.angle));
+                    var angEl = $('brushAngle');
+                    if (angEl) { angEl.value = window.config.BRUSH_ANGLE; angEl.style.setProperty('--val', angEl.value); }
+                }
+                if (window.BrushShapes && window.BrushShapes.setActive) {
+                    var wantShape = (typeof bt.shapeId === 'string' && bt.shapeId) ? bt.shapeId : null;
+                    var have = wantShape && (window.BrushShapes.list() || []).some(function (s) { return s.id === wantShape; });
+                    window.BrushShapes.setActive(have ? wantShape : null);
+                }
+                if (window.__onBrushShapeChanged) window.__onBrushShapeChanged();
+            }
+        } catch (e) { console.warn('brush tip apply failed', e); }
+
+        // Material macro layer LAST: the raw slider/checkbox writes above ran
+        // with material yielded (05h forces yieldToExternal during external
+        // writes), so this re-enters the snapshot's material — entering from
+        // fluid snapshots the just-applied raw baseline, meaning a later
+        // return to Fluid restores THIS preset's values. Old snapshots have
+        // no material field → treated as fluid → behavior unchanged.
+        try {
+            if (window.MaterialModes && window.MaterialModes.applyState) {
+                window.MaterialModes.applyState(snapshot.material || { mode: 'fluid' });
+            }
+        } catch (e) { console.warn('material apply failed', e); }
+
+        window._profileApplying = false;
+
         console.log('Preset applied: v' + (snapshot.version || 1) + ', ' +
             Object.keys(snapshot.sliders || {}).length + ' sliders, ' +
             Object.keys(snapshot.checkboxes || {}).length + ' checkboxes, ' +
@@ -1427,6 +1491,65 @@
             (snapshot.layers ? ', ' + snapshot.layers.length + ' layers' : '') +
             (snapshot.recordedLayers ? ', ' + snapshot.recordedLayers.length + ' recorded layers' : ''));
     }
+
+    // ── Full-state preset application ───────────────────────────────
+    // A preset click must land on the exact same COMPLETE state no matter
+    // what was active before. Historically both built-ins and (older) user
+    // presets were deltas over the current state — so e.g. Surface Shading
+    // survived a preset click. The baseline is registry defaults for every
+    // look param plus canonical defaults for the sections outside the
+    // registry; the preset's own values overlay it.
+    //
+    // Deliberately NOT part of a look, so never baselined:
+    //  - machine/workflow-local keys (resolutions, fps cap, recording,
+    //    stats, autoload) — a preset is a look, not a machine profile
+    //  - content (layers, masks, branding, recordings) and libraries
+    //    (savedColors, userPalettes)
+    // The multiplayer look mirror keeps using plain applyPresetSnapshot:
+    // its snapshots are intentionally partial (size shedding), and filling
+    // gaps with defaults there would wipe watcher state mid-performance.
+    var BASELINE_SKIP = { visualResolution: 1, physicsResolution: 1, fpsCap: 1,
+        recMode: 1, recPlaybackSpeed: 1, statsToggle: 1, autoloadSettings: 1,
+        preserveFluidOpacity: 1 };
+
+    function baselineLookSnapshot() {
+        var base = {
+            sliders: {}, checkboxes: {}, selects: {},
+            colors: { background: '#000000', brush: '#ffffff', brandingText: '#ffffff' },
+            kaleido: { mode: 1, segments: 12, angle: 0, twist: 0, zoom: 1, blend: 1 },
+            paletteIndex: 0,
+            armColors: [{ mode: 'main', color: '#ffffff', stepIndex: 0 }],
+            lightPos: { x: 0.5, y: 0.5 },
+            brushState: { replayMode: 'stroke', replayTimePeriod: 5, replaySpeed: 1,
+                replayLiveColors: false, splatInMode: 'instant', splatOutMode: 'instant',
+                splatInDist: 0.15, splatOutDist: 0.15 },
+            material: { mode: 'fluid', amount: null, shape: 0 },
+            brushTip: { tip: 0, shapeId: null, angle: 0 }
+        };
+        var reg = window.ParamRegistry;
+        if (reg && reg.defaults) {
+            var d = reg.defaults();
+            Object.keys(d.sliders).forEach(function (k) { if (!BASELINE_SKIP[k]) base.sliders[k] = d.sliders[k]; });
+            Object.keys(d.checkboxes).forEach(function (k) { if (!BASELINE_SKIP[k]) base.checkboxes[k] = d.checkboxes[k]; });
+            Object.keys(d.selects).forEach(function (k) { if (!BASELINE_SKIP[k]) base.selects[k] = d.selects[k]; });
+        }
+        return base;
+    }
+
+    function applyPresetSnapshotFull(snapshot) {
+        if (!snapshot) return;
+        var base = baselineLookSnapshot();
+        var merged = Object.assign({}, snapshot);
+        ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
+            merged[sec] = Object.assign({}, base[sec], snapshot[sec] || {});
+        });
+        ['colors', 'kaleido', 'brushState', 'material', 'brushTip', 'lightPos', 'armColors'].forEach(function (sec) {
+            if (snapshot[sec] === undefined || snapshot[sec] === null) merged[sec] = base[sec];
+        });
+        if (merged.paletteIndex === undefined || merged.paletteIndex === null) merged.paletteIndex = base.paletteIndex;
+        applyPresetSnapshot(merged);
+    }
+    window.applyPresetSnapshotFull = applyPresetSnapshotFull;
 
     function getUserPresets() {
         if (!window.Settings) return {};
@@ -1542,7 +1665,10 @@
             btn.title = 'Load "' + name + '"';
             btn.addEventListener('click', function() {
                 var snapshot = presets[name];
-                applyPresetSnapshot(snapshot);
+                // Full-state apply: older saved presets may predate sections
+                // (material, brush tip…) — defaults fill what they lack, so
+                // loading one always lands on a complete deterministic state.
+                applyPresetSnapshotFull(snapshot);
                 showPresetStatus('Loaded: ' + name, '#3fb950');
                 // A user preset supersedes any built-in active state (via the
                 // real state owner in 04b), and highlights on BOTH user-preset
