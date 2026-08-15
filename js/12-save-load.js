@@ -1465,14 +1465,24 @@
                 var bt = snapshot.brushTip;
                 if (typeof bt.tip === 'number') {
                     window.config.BRUSH_TIP = Math.max(0, Math.min(4, bt.tip | 0));
-                    try { if (window.settingsManager) window.settingsManager.set('brush.tip', window.config.BRUSH_TIP); } catch (_) {}
+                    // Mirror the painter's tip live, but never let a REMOTE
+                    // snapshot rewrite the local user's saved tip preference.
+                    if (!window.__mpApplyingRemote) {
+                        try { if (window.settingsManager) window.settingsManager.set('brush.tip', window.config.BRUSH_TIP); } catch (_) {}
+                    }
                 }
                 if (typeof bt.angle === 'number' && isFinite(bt.angle)) {
                     window.config.BRUSH_ANGLE = Math.max(0, Math.min(360, bt.angle));
                     var angEl = $('brushAngle');
                     if (angEl) { angEl.value = window.config.BRUSH_ANGLE; angEl.style.setProperty('--val', angEl.value); }
                 }
-                if (window.BrushShapes && window.BrushShapes.setActive) {
+                // Custom-shape selection is viewer-LOCAL: remote strokes never
+                // render with custom stamps (05i __remoteStroke gate), so a
+                // remote snapshot has no business driving it — and setActive
+                // PERSISTS, so the old unconditional apply wiped the watcher's
+                // own shape selection (usually to null) across reloads on
+                // every look-mirror tick.
+                if (window.BrushShapes && window.BrushShapes.setActive && !window.__mpApplyingRemote) {
                     var wantShape = (typeof bt.shapeId === 'string' && bt.shapeId) ? bt.shapeId : null;
                     var have = wantShape && (window.BrushShapes.list() || []).some(function (s) { return s.id === wantShape; });
                     window.BrushShapes.setActive(have ? wantShape : null);

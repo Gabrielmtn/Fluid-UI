@@ -1606,6 +1606,9 @@ function handleRemoteSplat(data) {
         }
 
         isProcessingRemoteEvent = true;
+        // Peer strokes must not pick up THIS client's custom stamp (05i gates
+        // getActiveStamp on this flag); built-in tips still render for them.
+        window.__remoteStroke = true;
         try {
             // 1.3 parity path: the sender's real dab train. Each dab is applied
             // with ITS OWN full velocity, verbatim — no gap-fill invention and
@@ -1666,6 +1669,7 @@ function handleRemoteSplat(data) {
             remoteLastPositions.set(data.clientId, { x: canvasX, y: canvasY });
         } finally {
             isProcessingRemoteEvent = false;
+            window.__remoteStroke = false;
         }
     }
 }

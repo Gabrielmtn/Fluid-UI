@@ -305,12 +305,20 @@
                     // still resolve on top either way).
                     var repCol = (window.replayLiveColors && window.pointer && window.pointer.color)
                         ? window.pointer.color.slice() : ev.color;
-                    if (typeof window.applyMultiSplatWith === 'function') {
-                        window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, repCol,
-                            ev.mult || 1, (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS);
-                    } else {
-                        multiSplat(ev.x, ev.y, ev.dx, ev.dy, repCol, false);
-                    }
+                    // Replayed strokes are not live viewer strokes: the
+                    // viewer's active custom stamp must not restyle them —
+                    // events carry no shape info, so "current active shape"
+                    // was arbitrary (and printed broken stamps everywhere).
+                    // Built-in tips still apply (05i gate).
+                    window.__remoteStroke = true;
+                    try {
+                        if (typeof window.applyMultiSplatWith === 'function') {
+                            window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, repCol,
+                                ev.mult || 1, (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS);
+                        } else {
+                            multiSplat(ev.x, ev.y, ev.dx, ev.dy, repCol, false);
+                        }
+                    } finally { window.__remoteStroke = false; }
                     if (typeof recRecordInteraction === 'function' && recEnabled) {
                         try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}
                     }
