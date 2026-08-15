@@ -1056,8 +1056,21 @@ class DepthEstimator {
     // Live binding: the collider keeps tracking its source surface.
     // kind (optional) = 'raster' | 'mask': which ACTIVE surface a fresh
     // binding should read; re-enabling with no kind keeps the old source.
-    function setSketchLive(on, kind) {
+    // opts.rebind: start a FRESH binding on the currently ACTIVE surface of
+    // `kind`, leaving any existing live collider behind as a static-bound
+    // collision layer. Load-bearing for the Paint Collider button: without
+    // it, the on-branch below only rebinds when the source KIND differs —
+    // never the id — and scheduleSketchRefresh filters mutations to the
+    // bound id, so painting a NEWLY created mask would refresh nothing.
+    function setSketchLive(on, kind, opts) {
         on = !!on;
+        if (on && opts && opts.rebind) {
+            _sketchLive = false;
+            _boundSrc = null;
+            // The old live layer keeps its collisionSource and stays a
+            // collider; it just stops being THE live slot.
+            _sketchColliderIndex = null;
+        }
         if (on === _sketchLive && (!on || !kind || (_boundSrc && _boundSrc.kind === kind))) return _sketchLive;
         if (on) {
             if (!_boundSrc || (kind && _boundSrc.kind !== kind)) {
@@ -1095,7 +1108,7 @@ class DepthEstimator {
         if (typeof window.__onSketchLiveChanged === 'function') window.__onSketchLiveChanged(_sketchLive, _boundSrc);
         return _sketchLive;
     }
-    function setMaskLive(on) { return setSketchLive(on, 'mask'); }
+    function setMaskLive(on, opts) { return setSketchLive(on, 'mask', opts); }
 
     function isSketchLive() { return _sketchLive; }
     function boundColliderSource() { return _boundSrc ? { kind: _boundSrc.kind, id: _boundSrc.id } : null; }
