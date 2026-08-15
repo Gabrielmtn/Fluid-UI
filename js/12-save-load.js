@@ -1063,8 +1063,11 @@
                 var bs = snapshot.brushState;
                 if (bs.replayMode) {
                     window.replayMode = bs.replayMode;
-                    // Update UI buttons
-                    var strokeBtns = document.querySelectorAll('.brush-mode-btn');
+                    // Update UI buttons — [data-mode] scopes this to the Replay Mode
+                    // Stroke/Time pair; ~19 other buttons share .brush-mode-btn without
+                    // dataset.mode (Paint Into, On Move/Constant, ⟳ Live…) and an
+                    // unscoped query strips their active state on every snapshot apply.
+                    var strokeBtns = document.querySelectorAll('.brush-mode-btn[data-mode]');
                     strokeBtns.forEach(function(b) {
                         b.classList.toggle('active', b.dataset.mode === bs.replayMode);
                     });
