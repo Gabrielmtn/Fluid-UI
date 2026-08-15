@@ -1000,25 +1000,42 @@ class DepthEstimator {
         if (_boundSrc && _resolveBoundFBO()) {
             layer.collisionSource = { kind: _boundSrc.kind, id: _boundSrc.id };
             updateObstacleFromLayers();
+            // The GPU reads the bound source directly, so physics needs
+            // nothing more from us — but the SEEN surfaces (panel thumbnail,
+            // on-canvas film, and the mask editor's backdrop, which draws
+            // layer.originalData) were left frozen at the snapshot taken when
+            // the layer was created: painting a Paint-Collider mask showed a
+            // blank thumbnail and an empty Edit Mask canvas. Refresh them
+            // from the source here — one readback per coalesced 120ms
+            // stroke-end refresh, the same cost the non-bound path below has
+            // always paid.
+            var srcBuilt = buildSketchDepth(true);
+            if (srcBuilt) _applyColliderPreview(layer, srcBuilt);
             return;
         }
         var built = buildSketchDepth(true); // empty sketch → zeroed collider
         if (!built) return;
         updateLayerDepthMask(_sketchColliderIndex, built.depth);
-        // Keep every visible surface in sync with what now collides, using
-        // the SAME opaque-grayscale convention addCollisionLayer uses for
-        // layer.data (the transparent alpha=coverage preview went blank on
-        // dark thumbnails — the painted shape never showed in the Layers
-        // panel, and full renderLayers() re-renders showed nothing at all).
+        _applyColliderPreview(layer, built);
+    }
+
+    // Keep every visible surface in sync with what now collides, using the
+    // SAME opaque-grayscale convention addCollisionLayer uses for layer.data
+    // (the transparent alpha=coverage preview went blank on dark thumbnails —
+    // the painted shape never showed in the Layers panel, and full
+    // renderLayers() re-renders showed nothing at all). originalData keeps
+    // the alpha-coverage version: that's what the mask editor draws.
+    function _applyColliderPreview(layer, built) {
+        if (!layer || !built) return;
         var opaqueUrl = _depthToOpaqueUrl(built.depth);
-        layer.data = opaqueUrl;              // panel thumbnail source
+        layer.data = opaqueUrl;                // panel thumbnail source
         layer.originalData = built.previewUrl; // alpha-coverage mask (data)
-        var layerDiv = document.getElementById('layer' + _sketchColliderIndex);
+        var layerDiv = document.getElementById('layer' + layer.index);
         if (layerDiv) layerDiv.style.backgroundImage = 'url(' + opaqueUrl + ')';
         // Update the Layers-panel thumbnail IN PLACE (no full re-render per
         // stroke — renderLayers rebuilds the whole panel and would fight
         // scroll position / drag state at painting cadence).
-        var thumb = document.querySelector('.layer-item[data-layer-index="' + _sketchColliderIndex + '"] .layer-thumbnail');
+        var thumb = document.querySelector('.layer-item[data-layer-index="' + layer.index + '"] .layer-thumbnail');
         if (thumb) thumb.style.backgroundImage = 'url(' + opaqueUrl + ')';
         else if (typeof window.renderLayers === 'function') window.renderLayers();
     }
