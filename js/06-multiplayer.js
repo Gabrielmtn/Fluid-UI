@@ -705,24 +705,42 @@ function updateTurnChip() {
         return;
     }
     // Underbar lookup at CALL time, null-guarded: 06 (deferred loader) and
-    // the underbar build (DCL+800ms+rAF) race in both directions — if the
-    // bar isn't there yet, the next turn-state render retries.
+    // the underbar build (DCL+800ms+rAF) race in both directions. When the
+    // bar is missing OR hidden (mobile/short-window media queries hide
+    // #quality-underbar entirely), the chip floats fixed top-center on
+    // <body> instead — the old banner's spot — so turn state is never
+    // invisible; the placement is re-evaluated on every render/tick.
     var bar = document.getElementById('quality-underbar');
-    if (!bar) return;
+    var barVisible = false;
+    if (bar) { try { barVisible = getComputedStyle(bar).display !== 'none'; } catch (_) {} }
+    var wantParent = barVisible ? bar : document.body;
     if (!chip) {
         chip = document.createElement('button');
         chip.id = 'mpTurnChip';
         chip.type = 'button';
         chip.addEventListener('click', function () {
-            // Bring the rotation into view (panel queue is the full detail)
+            // Bring the rotation into view. On mobile the sidebar is a
+            // closed drawer — open it first; and the Multi Artist section
+            // collapses to zero height, so expand it or the scroll lands
+            // on nothing visible.
+            var controls = document.getElementById('sidebar-right');
+            if (document.body.classList.contains('mobile-mode') && controls &&
+                !controls.classList.contains('visible')) {
+                var mt = document.getElementById('mobileMenuToggle');
+                if (mt) mt.click(); else controls.classList.add('visible');
+            }
             var t = document.getElementById('turnWheel') || document.getElementById('turnsBtn');
-            if (t && t.scrollIntoView) {
+            if (!t) return;
+            var sec = t.closest ? t.closest('.sidebar-section') : null;
+            if (sec) sec.classList.remove('collapsed');
+            if (t.scrollIntoView) {
                 try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
                 catch (_) { t.scrollIntoView(); }
             }
         });
-        bar.appendChild(chip);
     }
+    if (chip.parentElement !== wantParent) wantParent.appendChild(chip);
+    chip.classList.toggle('floating', !barVisible);
     var t = fmtRemaining();
     var clock = t ? ' · ' + t : '';
     if (isMyTurn()) {

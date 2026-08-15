@@ -66,9 +66,13 @@
     user-select: none;
 }
 /* Take Turns presence chip (06-multiplayer updateTurnChip): whose turn it
-   is, always on screen. Ghost treatment like the pills; transition-free
-   per the Electron transparent-window compositor rule. */
-#quality-underbar #mpTurnChip {
+   is, always on screen. Lives in the underbar when that's visible; floats
+   fixed top-center (the old banner's spot) when the bar is hidden or not
+   built yet — the media queries below hide the whole bar on mobile/short
+   windows, and turn state must never be invisible. Unscoped selector so
+   both parents style identically. Transition-free per the Electron
+   transparent-window compositor rule. */
+#mpTurnChip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -84,14 +88,25 @@
     cursor: pointer;
     align-self: flex-end;
     white-space: nowrap;
+    pointer-events: auto;
 }
-#quality-underbar #mpTurnChip:hover {
+#mpTurnChip:hover {
     background: rgba(24, 27, 32, 0.86);
     text-shadow: none;
 }
-#quality-underbar #mpTurnChip.you {
+#mpTurnChip.you {
     color: #3fb950;
     border-color: rgba(63, 185, 80, 0.55);
+}
+#mpTurnChip.floating {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10002;
+    height: 26px;
+    background: rgba(15, 20, 27, 0.92);
+    text-shadow: none;
 }
 /* One-line mechanism caption under the open-list header (the header's own
    divider steps aside so the pair reads as one block) */
