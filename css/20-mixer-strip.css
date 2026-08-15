@@ -65,6 +65,34 @@
     pointer-events: none;
     user-select: none;
 }
+/* Take Turns presence chip (06-multiplayer updateTurnChip): whose turn it
+   is, always on screen. Ghost treatment like the pills; transition-free
+   per the Electron transparent-window compositor rule. */
+#quality-underbar #mpTurnChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 1px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: transparent;
+    color: #ffb347;
+    border: 1px solid rgba(255, 178, 71, 0.45);
+    border-radius: 11px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    cursor: pointer;
+    align-self: flex-end;
+    white-space: nowrap;
+}
+#quality-underbar #mpTurnChip:hover {
+    background: rgba(24, 27, 32, 0.86);
+    text-shadow: none;
+}
+#quality-underbar #mpTurnChip.you {
+    color: #3fb950;
+    border-color: rgba(63, 185, 80, 0.55);
+}
 /* One-line mechanism caption under the open-list header (the header's own
    divider steps aside so the pair reads as one block) */
 #quality-underbar .qub-dd-hdr:has(+ .qub-dd-sub) {
