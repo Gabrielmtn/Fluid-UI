@@ -112,6 +112,18 @@
         { keys: '⌥⇧↑↓',   mod: 'altshift',   title: 'Alt+Shift+↑ / ↓ — motion detail',    where: groupLabel('physicsResolution') },
         { keys: 'M',      mod: '',           title: 'M — mutate',                         where: idEl('mutationGenerate') }
     ];
+    // The caps shipped with macOS modifier glyphs (⌃⌥⇧) on what is mostly a
+    // Windows app — glyph soup to anyone who never used a Mac. Everywhere
+    // else in this file already speaks words (MOD_LABEL, titles), so expand
+    // the glyphs unless we're actually on a Mac.
+    if (!/Mac/i.test(navigator.platform || '')) {
+        CAPS.forEach(function (c) {
+            c.keys = c.keys
+                .replace(/⌃/g, 'Ctrl+')
+                .replace(/⌥/g, 'Alt+')
+                .replace(/⇧/g, 'Shift+');
+        });
+    }
 
     // Appended-row content: bindings with NO visible control, keyed by the
     // exact combo. (Shift alone never triggers, so plain-Shift extras live

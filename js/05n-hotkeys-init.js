@@ -9,9 +9,33 @@
         // Hotkeys modal + Undo/Redo implementation
         const hotkeyOverlay = document.getElementById('hotkeyOverlay');
         const hotkeyClose = document.getElementById('hotkeyClose');
-        function showHotkeys() { if (hotkeyOverlay) hotkeyOverlay.style.display = 'flex'; }
+        // Key-chip pass (2026-08-15): the modal's <li>s are authored as
+        // "Keys — Description" prose; on first open, wrap the key half in
+        // <kbd> + the rest in .hk-desc so the CSS renders real key caps.
+        // Lines without the ' — ' separator are left untouched.
+        let hotkeysChipped = false;
+        function chipHotkeyList() {
+            if (hotkeysChipped || !hotkeyOverlay) return;
+            hotkeysChipped = true;
+            hotkeyOverlay.querySelectorAll('.hotkey-body li').forEach((li) => {
+                const t = li.textContent;
+                const i = t.indexOf(' — ');
+                if (i <= 0) return;
+                const kbd = document.createElement('kbd');
+                kbd.textContent = t.slice(0, i);
+                const d = document.createElement('span');
+                d.className = 'hk-desc';
+                d.textContent = t.slice(i + 3);
+                li.textContent = '';
+                li.appendChild(kbd);
+                li.appendChild(d);
+            });
+        }
+        function showHotkeys() { if (hotkeyOverlay) { chipHotkeyList(); hotkeyOverlay.style.display = 'flex'; } }
         function hideHotkeys() { if (hotkeyOverlay) hotkeyOverlay.style.display = 'none'; }
-        function toggleHotkeys() { if (!hotkeyOverlay) return; hotkeyOverlay.style.display = (hotkeyOverlay.style.display === 'flex' ? 'none' : 'flex'); }
+        function toggleHotkeys() { if (!hotkeyOverlay) return; chipHotkeyList(); hotkeyOverlay.style.display = (hotkeyOverlay.style.display === 'flex' ? 'none' : 'flex'); }
+        // Mobile has no F1 — 13-mobile-mode's '?' button opens the modal.
+        window.toggleHotkeys = toggleHotkeys;
         if (hotkeyClose) hotkeyClose.addEventListener('click', hideHotkeys);
         if (hotkeyOverlay) hotkeyOverlay.addEventListener('click', (e) => { if (e.target === hotkeyOverlay) hideHotkeys(); });
         let undoStack = [];

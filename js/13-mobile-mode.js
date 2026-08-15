@@ -61,6 +61,22 @@
             mobileMenuToggle.classList.add('show');
         }
 
+        // Mobile has NO path to the hotkeys modal otherwise: F1/? are
+        // keyboard-only and the clickable reminder row is display:none under
+        // 768px. A small '?' pill under the ☰ opens it (05n exposes
+        // window.toggleHotkeys; modal already scrolls at 85vh).
+        if (!document.getElementById('mobileHotkeysBtn')) {
+            var hkBtn = document.createElement('button');
+            hkBtn.id = 'mobileHotkeysBtn';
+            hkBtn.type = 'button';
+            hkBtn.setAttribute('aria-label', 'Shortcuts & help');
+            hkBtn.textContent = '?';
+            hkBtn.addEventListener('click', function () {
+                if (typeof window.toggleHotkeys === 'function') window.toggleHotkeys();
+            });
+            document.body.appendChild(hkBtn);
+        }
+
         // Boost color vibrance/clarity for mobile displays (often washed out)
         try {
             if (window.config) {
