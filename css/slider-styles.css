@@ -57,6 +57,13 @@ input[type=range] {
     background: transparent;
     font: inherit;
     cursor: pointer;
+    /* Without this, browser gesture arbitration owns finger/stylus drags:
+       a drag starting on the slider is claimed as a container pan, the
+       input gets pointercancel, and only taps commit — "sliders require
+       taps" on mobile/pen. pan-y (NOT none) so a vertical swipe that
+       starts on a fader still scrolls the drawer. Same fix the layer
+       sliders already shipped (styles.css .layer-threshold). */
+    touch-action: pan-y;
 }
 
 /* Remove default styling */
@@ -199,6 +206,10 @@ input[type=range]::-moz-range-thumb {
 @media (pointer: coarse) {
     input[type="range"] {
         min-height: 28px;
+        /* iOS WebKit only starts a drag ON the thumb once -webkit-appearance
+           is none — 16px is under finger size, so drags landed on the track
+           and died. Wider knob on coarse pointers only; desktop unchanged. */
+        --thumb-w: 28px;
     }
     .encapsulated-slider {
         min-height: 28px;

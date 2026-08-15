@@ -431,6 +431,11 @@
 
         .control-group {
             margin-bottom: 15px;
+            /* Keep pen full-row drags (06-slider-updater forwarding) from
+               being claimed as container pans mid-drag — preventDefault on
+               pointerdown can't stop panning, only touch-action can.
+               pan-y so vertical drawer scrolling still starts here. */
+            touch-action: pan-y;
         }
         
         .control-group label {

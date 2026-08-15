@@ -235,6 +235,12 @@ body > .controls {
     display: flex;
     align-items: center;
     flex: 0 0 auto;
+    /* The strip scrolls horizontally (overflow-x:auto) — without this a
+       touch/pen drag starting on a fader was claimed as a strip pan and
+       the slider only ever saw taps. Strip channels get no row-drag
+       forwarding (it's .control-group-scoped), so the CSS must carry it.
+       pan-y keeps vertical drawer scrolling alive in mobile mode. */
+    touch-action: pan-y;
 }
 /* No printed scale in the strip: the channel already shows its value in
    the header, and the extra row per channel is what grew the bar. The
