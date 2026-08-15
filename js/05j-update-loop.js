@@ -728,6 +728,14 @@
                     window.DyeNudge ? window.DyeNudge.restoreGain() : 1.0);
                 // M2 dye floor (motion-gated Nyquist removal — see 05b)
                 gl.uniform1f(advectionProg.uniforms.hfFloorDye, config.HF_FLOOR_DYE || 0.0);
+                // Wall-drain flow gate: spare dye that is still moving past a
+                // collider (see the drain in advectionFrag). 0 = legacy drain.
+                gl.uniform1f(advectionProg.uniforms.obsFlowKeep,
+                    (typeof config.COLLIDER_FLOW_KEEP === 'number') ? config.COLLIDER_FLOW_KEEP : 1.0);
+                gl.uniform1f(advectionProg.uniforms.obsDrainRate,
+                    (typeof config.COLLIDER_DRAIN === 'number') ? config.COLLIDER_DRAIN : 0.06);
+                gl.uniform1f(advectionProg.uniforms.obsDrainDilate,
+                    (typeof config.COLLIDER_DRAIN_DILATE === 'number') ? config.COLLIDER_DRAIN_DILATE : 0.0);
                 // Reset the decay-debt accumulator on SLIDER changes only: the
                 // nudge ramps the effective rate every frame, and resetting on
                 // that would zero the debt before it ever clears the fp16

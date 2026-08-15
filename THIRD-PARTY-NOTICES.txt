@@ -47,18 +47,19 @@ MIT License. Copyright (c) contributors to the @electron/remote project.
 License text: https://github.com/electron/remote/blob/main/LICENSE
 
 
-4. Transformers.js (@xenova/transformers)
------------------------------------------
+4. Transformers.js (@huggingface/transformers)
+----------------------------------------------
 The optional AI-assisted import features (image segmentation, depth
-estimation) use Transformers.js by Xenova / Hugging Face, under the
+estimation) use Transformers.js by Hugging Face, under the
 Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
-Source: https://github.com/xenova/transformers.js
+Source: https://github.com/huggingface/transformers.js
 
 
 5. AI model weights (optional import features)
 ----------------------------------------------
-- SlimSAM (Xenova/slimsam-77-uniform, from nielsr/slimsam-77-uniform,
-  derived from Meta's Segment Anything) — Apache License 2.0.
+- EdgeTAM (onnx-community/EdgeTAM-ONNX, from facebook/EdgeTAM — Meta's
+  on-device Track Anything Model, Segment Anything 2 family) — Apache
+  License 2.0.
 - Depth Anything V1 small (Xenova/depth-anything-small-hf, from
   LiheYoung/depth-anything-small-hf) — Apache License 2.0.
 

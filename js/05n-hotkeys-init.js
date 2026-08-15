@@ -238,10 +238,13 @@
             const key = e.key;
             const lower = key.length === 1 ? key.toLowerCase() : key;
             const ctrlOrMeta = e.ctrlKey || e.metaKey;
-            // Chromium fullscreen (F11)
+            // Fullscreen (F11) — convenience toggle for the Window Mode setting
+            // in the sidebar's Display section, which is the real authority.
             if (key === 'F11') {
                 e.preventDefault();
-                if (!document.fullscreenElement) {
+                if (window.displayMode) {
+                    window.displayMode.toggleFullscreen();
+                } else if (!document.fullscreenElement) {
                     const el = document.documentElement;
                     if (el.requestFullscreen) el.requestFullscreen();
                 } else {

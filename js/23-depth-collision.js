@@ -74,7 +74,9 @@ class DepthEstimator {
             this.updateDownloadProgress('Downloading depth model...', 10);
 
             this.pipeline = await pipeline('depth-estimation', 'Xenova/depth-anything-small-hf', {
-                quantized: true,
+                // v3 runtime: 'quantized: true' is the removed v2 option — dtype 'q8'
+                // maps to the same model_quantized.onnx the Electron build bundles.
+                dtype: 'q8',
                 progress_callback: (progress) => {
                     if (progress.status === 'progress' && progress.total) {
                         const percent = Math.round((progress.loaded / progress.total) * 100);
@@ -244,6 +246,11 @@ class DepthEstimator {
     var collisionEnabled = false;
     var obstacleCanvas = null;   // offscreen canvas for rasterizing masks
     var _obsBlurCanvas = null, _obsBlurCtx = null; // sim-scale edge smoothing (D0.5 rev 3)
+    // Long-side cap for collision maps built from layer content (threshold /
+    // shapes / full image). 1024 ≥ the 2×sim obstacle compose canvas, so the
+    // physics loses nothing — but the visible mask preview now upscales ~2×
+    // instead of the old 512-wide ~4×, which read as chunky stairs.
+    var COLLISION_MAP_MAX = 1024;
     var obstacleCtx = null;
     var webcamStreams = {};       // layerIndex → { stream, video, intervalId }
     // Procedural obstacle source: a draw(ctx, simW, simH) callback composited
@@ -333,7 +340,7 @@ class DepthEstimator {
         var cw = canvasEl ? canvasEl.width : 1920;
         var ch = canvasEl ? canvasEl.height : 1080;
 
-        var scale = Math.min(1, 512 / cw);
+        var scale = Math.min(1, COLLISION_MAP_MAX / Math.max(cw, ch));
         var tw = Math.round(cw * scale);
         var th = Math.round(ch * scale);
 
@@ -389,9 +396,14 @@ class DepthEstimator {
     }
 
     // ── Mode 2: Luminance-threshold alpha from original image ─────
-    // Mirrors the rudimentary mask logic in 05-fluid-sim.js:
-    // pixels whose luminance falls below the threshold become transparent
-    // (non-collision), brighter pixels become collision boundaries.
+    // Mirrors the rudimentary mask logic in 05m-layer-masks.js: the layer
+    // slider picks a luminance cut. The map stores the CONTINUOUS luminance —
+    // the cut itself lives in the depth-mask shape's threshold — so every
+    // consumer (the adaptive-band edge AA in preview + obstacle compositor,
+    // the collision Threshold slider, Invert) operates on real gradients.
+    // Binarizing here was the jagged-collider bug: a 0/255 cut leaves the AA
+    // band nothing to smooth over, and re-thresholding binary data makes the
+    // collision Threshold slider a no-op.
     function _collisionFromThreshold(layer) {
         var imgSrc = layer.originalData || layer.data;
         if (!imgSrc) { console.warn('Layer has no image data'); return; }
@@ -402,7 +414,7 @@ class DepthEstimator {
             var cw = canvasEl ? canvasEl.width : 1920;
             var ch = canvasEl ? canvasEl.height : 1080;
 
-            var scale = Math.min(1, 512 / cw);
+            var scale = Math.min(1, COLLISION_MAP_MAX / Math.max(cw, ch));
             var tw = Math.round(cw * scale);
             var th = Math.round(ch * scale);
 
@@ -414,17 +426,18 @@ class DepthEstimator {
 
             var imageData = ctx.getImageData(0, 0, tw, th);
             var data = imageData.data;
-            var thresholdValue = Math.round((layer.threshold / 100) * 255);
             var collisionData = new Uint8Array(tw * th);
 
             for (var i = 0; i < collisionData.length; i++) {
                 var idx = i * 4;
                 var lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-                collisionData[i] = lum >= thresholdValue ? 255 : 0;
+                collisionData[i] = (lum + 0.5) | 0;
             }
 
             var depth = { width: tw, height: th, data: collisionData };
-            addCollisionLayer(depth, imgSrc, (layer.title || 'Layer') + ' Collision', _transformOf(layer));
+            var opts = _transformOf(layer);
+            opts.threshold = Math.round((layer.threshold / 100) * 255);
+            addCollisionLayer(depth, imgSrc, (layer.title || 'Layer') + ' Collision', opts);
         };
         img.src = imgSrc;
     }
@@ -440,7 +453,7 @@ class DepthEstimator {
             var cw = canvasEl ? canvasEl.width : 1920;
             var ch = canvasEl ? canvasEl.height : 1080;
 
-            var scale = Math.min(1, 512 / cw);
+            var scale = Math.min(1, COLLISION_MAP_MAX / Math.max(cw, ch));
             var tw = Math.round(cw * scale);
             var th = Math.round(ch * scale);
 
@@ -742,7 +755,9 @@ class DepthEstimator {
                     depthData: new Uint8Array(depth.data),
                     depthWidth: depth.width,
                     depthHeight: depth.height,
-                    threshold: 128,
+                    // Threshold-generated colliders carry the cut the user
+                    // dialed in on the source layer's mask slider
+                    threshold: (typeof opts.threshold === 'number') ? opts.threshold : 128,
                     invert: false
                 }]
             }
@@ -758,6 +773,12 @@ class DepthEstimator {
 
         // Render and update
         window.renderLayers();
+
+        // Paint the thresholded mask preview (adaptive-band AA) instead of
+        // leaving the raw grayscale map on the div — the edge the user sees
+        // must be the collider edge from the start, not only after the first
+        // Threshold-slider touch.
+        if (typeof window.applyLayerMask === 'function') window.applyLayerMask(newIndex);
 
         // Update obstacle texture
         collisionEnabled = true;

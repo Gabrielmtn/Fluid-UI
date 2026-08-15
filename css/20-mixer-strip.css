@@ -194,14 +194,10 @@ body > .controls {
     position: relative;
 }
 
-/* Accent top border per channel type */
-.mixer-channel[data-accent="blue"]   { border-top: 2px solid rgba(88, 166, 255, 0.45); }
-.mixer-channel[data-accent="orange"] { border-top: 2px solid rgba(255, 170, 80, 0.45); }
-.mixer-channel[data-accent="green"]  { border-top: 2px solid rgba(80, 220, 140, 0.45); }
-.mixer-channel[data-accent="purple"] { border-top: 2px solid rgba(180, 130, 255, 0.45); }
-.mixer-channel[data-accent="yellow"] { border-top: 2px solid rgba(236, 48, 19, 0.45); }
-.mixer-channel[data-accent="cyan"]   { border-top: 2px solid rgba(80, 210, 255, 0.45); }
-.mixer-channel[data-accent="pink"]   { border-top: 2px solid rgba(255, 130, 170, 0.45); }
+/* The per-channel accent top borders (blue/orange/green/purple/yellow/cyan/
+   pink) were removed 2026-08-11 — the strip reads cleaner without the colour
+   banding. The data-accent attribute is still set in 20-mixer-layout.js as a
+   channel-type hook; nothing styles off it now. */
 
 .ch-label {
     font-size: 11px;

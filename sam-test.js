@@ -17,71 +17,99 @@ function log(...args) {
 
 (async () => {
     try {
-        log('[info] Importing Transformers.js from CDN...');
+        log('[info] Importing VENDORED Transformers.js (js/vendor/transformers, v3.8.1)...');
 
-        const transformers = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
-        const { SamModel, AutoProcessor, RawImage, env } = transformers;
+        // Mirror 16-sam-integration: hide `process` during the import so the
+        // bundle's module-scope env detection takes the browser path even in
+        // Electron (process.release.name === 'node' there).
+        const hadProcess = typeof globalThis.process !== 'undefined';
+        const originalProcess = globalThis.process;
+        let transformers;
+        try {
+            if (hadProcess) { try { globalThis.process = undefined; } catch (e) { /* best effort */ } }
+            transformers = await import('./js/vendor/transformers/transformers.min.js');
+        } finally {
+            if (hadProcess) globalThis.process = originalProcess;
+        }
+        const { AutoModel, AutoProcessor, RawImage, env } = transformers;
 
         log('[ok] Transformers.js imported');
-        log('[debug] env keys:', Object.keys(env));
 
-        // Minimal, documented configuration
-        env.allowRemoteModels = true;
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
+        const { configureTransformersEnv } = await import('./js/vendor/transformers/fluid-env.js');
+        configureTransformersEnv(env);
 
         log('[debug] env.allowRemoteModels =', env.allowRemoteModels);
-        log('[debug] env.allowLocalModels =', env.allowLocalModels);
         log('[debug] env.useBrowserCache =', env.useBrowserCache);
+        log('[debug] wasmPaths =', env.backends.onnx.wasm.wasmPaths);
 
-        // Official example from Xenova/slimsam-77-uniform model card
-        log('[step] Loading SAM model...');
-        const model = await SamModel.from_pretrained('Xenova/slimsam-77-uniform');
-        log('[ok] SAM model loaded');
+        // Same model + backend the app uses (16-sam-integration): CPU only.
+        // fp32 because EdgeTAM's fp16/q8 exports produce garbage masks, and
+        // wasm because ORT's WebGPU backend corrupts the masks — the vendored
+        // binary is now the CPU-only build, so merely REQUESTING webgpu fails
+        // ("not built with JSEP support") and poisons the wasm attempt after it.
+        const modelId = 'onnx-community/EdgeTAM-ONNX';
+        const attempts = [{ device: 'wasm', dtype: 'fp32' }];
 
-        log('[step] Loading SAM processor...');
-        const processor = await AutoProcessor.from_pretrained('Xenova/slimsam-77-uniform');
-        log('[ok] SAM processor loaded');
+        let model = null, used = null;
+        for (const attempt of attempts) {
+            try {
+                log(`[step] Loading ${modelId} on ${attempt.device} (${attempt.dtype})...`);
+                model = await AutoModel.from_pretrained(modelId, attempt);
+                used = attempt;
+                break;
+            } catch (e) {
+                log(`[warn] ${attempt.device} failed: ${e?.message || e}`);
+            }
+        }
+        if (!model) throw new Error('No backend could load the model');
+        log(`[ok] Model loaded on ${used.device} (${used.dtype})`);
+
+        log('[step] Loading processor...');
+        const processor = await AutoProcessor.from_pretrained(modelId);
+        log('[ok] Processor loaded:', processor.constructor.name);
 
         const img_url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/corgi.jpg';
         log('[step] Loading test image:', img_url);
         const raw_image = await RawImage.read(img_url);
-        log('[ok] Image loaded');
+        log('[ok] Image loaded', raw_image.width + 'x' + raw_image.height);
 
-        // First, prepare image inputs (no points yet)
+        // Prepare image inputs (no points yet) + cached embeddings, app-style
         log('[step] Preparing image inputs with processor...');
         const imageInputs = await processor(raw_image);
-        log('[ok] Image inputs prepared');
+        log('[ok] Image inputs prepared; reshaped =', imageInputs.reshaped_input_sizes);
 
-        // SAM expects input_points to be a 4D tensor:
-        // [batch_size, point_batch_size, nb_points_per_image, 2]
-        // For a single image, single point batch, single point:
-        const input_points = [[[[340, 250]]]]; // [1, 1, 1, 2]
-        const input_labels = [[[1]]]; // [1, 1, 1] (positive point)
-        log('[debug] input_points structure:', input_points);
-        log('[debug] input_labels structure:', input_labels);
+        log('[step] Computing image embeddings...');
+        const embeddings = await model.get_image_embeddings(imageInputs);
+        log('[ok] Embeddings:', Object.keys(embeddings));
 
-        log('[step] Running SAM model...');
-        const outputs = await model({
-            ...imageInputs,
-            input_points,
-            input_labels,
-        });
+        // Point prompt in RESHAPED (1024x1024) space, like the app does:
+        // display point (340, 250) on the ~640x480 corgi → scale to 1024.
+        const rw = imageInputs.reshaped_input_sizes[0][1];
+        const rh = imageInputs.reshaped_input_sizes[0][0];
+        const px = 340 / raw_image.width * rw;
+        const py = 250 / raw_image.height * rh;
+        const { Tensor } = transformers;
+        const input_points = new Tensor('float32', new Float32Array([px, py]), [1, 1, 1, 2]);
+        const input_labels = new Tensor('int64', [1n], [1, 1, 1]);
+
+        log('[step] Running decoder with cached embeddings...');
+        const outputs = await model({ ...embeddings, input_points, input_labels });
         log('[ok] Model run completed');
 
         log('[step] Post-processing masks...');
-        const masks = await processor.post_process_masks(
+        const pp = typeof processor.post_process_masks === 'function' ? processor : processor.image_processor;
+        const masks = await pp.post_process_masks(
             outputs.pred_masks,
             imageInputs.original_sizes,
             imageInputs.reshaped_input_sizes,
         );
 
         log('[result] masks[0][0] dims:', masks[0][0].dims);
-        log('[result] iou_scores:', outputs.iou_scores);
-        log('[done] SAM test finished successfully');
+        log('[result] iou_scores:', Array.from(outputs.iou_scores.data));
+        log('[done] Magic Mask (EdgeTAM) test finished successfully');
     } catch (err) {
         console.error(err);
-        log('[error] SAM test failed:', err?.message || err);
+        log('[error] Magic Mask test failed:', err?.message || err);
         if (err?.stack) log('[stack]', err.stack);
     }
 })();

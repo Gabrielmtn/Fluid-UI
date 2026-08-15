@@ -7,7 +7,7 @@
 //   bound in 05i splat() on texture unit 2).
 // FLOW: import an image (file picker or drop on the Brush panel's shape
 //   area) → the mask editor opens in adhoc mode (15-layer-masking:
-//   enterAdhocMaskMode — full shape suite + Smart Select) → Apply
+//   enterAdhocMaskMode — full stamp suite + Magic Mask Objects) → Apply
 //   rasterizes a white/alpha stamp → cropped to its alpha bounding box,
 //   downscaled to ≤128px, persisted as a PNG dataURL.
 // STORAGE: settingsManager 'brush.shapes' = [{id, name, dataURL}] (≤24),

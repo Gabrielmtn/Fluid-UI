@@ -472,6 +472,9 @@
             uniform float hfFloorDye; // M2: dye Nyquist-removal strength (0 = off)
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
+            uniform float obsFlowKeep; // 1 = spare MOVING dye from the wall drain (0 = legacy)
+            uniform float obsDrainRate;   // per-frame wall-interior dye drain (0 = off)
+            uniform float obsDrainDilate; // 1 = drain the dilated wall band (legacy), 0 = cores only
             // ── Pigment memory (dye alpha) ──────────────────────────────
             // Dye alpha used to be a vestigial copy of the decay — written
             // 1.0 by every splat, then multiplied down alongside rgb, and
@@ -541,9 +544,18 @@
                     // forced-dissipation halo around detailed masks
                     // ("something forcing dissipation", 2026-07-14).
                     float obsInterior = 0.0;
+                    // Wall-drain coverage (2026-08-11). Same idea as obsInterior
+                    // but WITHOUT the dilation — see the drain below for why the
+                    // dilated field cannot be the one that decides what to eat.
+                    float obsCore = 0.0;
+                    // Pinned-dye gate for the wall drain further down (2026-08-11).
+                    // 1 = this dye cannot get out (drain it), 0 = it is flowing
+                    // (leave it alone). See the drain for the measurements.
+                    float obsPinned = 1.0;
                     if (hasObstacle == 1) {
                         // Dilate by one sim texel: sub-texel mask gaps and the
                         // thin pinned rim still count as wall-adjacent.
+                        float covOwn = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
                         float obsD = texture(uObstacle, vUv).r;
                         obsD = max(obsD, texture(uObstacle, vUv + vec2(obstacleTexelSize.x, 0.0)).r);
                         obsD = max(obsD, texture(uObstacle, vUv - vec2(obstacleTexelSize.x, 0.0)).r);
@@ -554,6 +566,16 @@
                         // walls legitimately let dye THROUGH — draining it
                         // there would eat paint the physics allows to pass.
                         obsInterior = obsStrengthResponse() * smoothstep(0.55, 0.95, covD);
+                        obsCore = obsStrengthResponse()
+                                * smoothstep(0.55, 0.95, mix(covOwn, covD, obsDrainDilate));
+                        // Speed separates pinned dye from dye merely PASSING a
+                        // wall. Measured on the fine dot lattice (UV/s, sim 512):
+                        // wall interior 1e-5 median / 1.2e-3 p90, the partial
+                        // coverage skirt and the gaps between details 5e-3 to
+                        // 4e-2, open fluid ~1e-1. The window sits in the gap, so
+                        // interiors keep ~98% of the drain and anything actually
+                        // transporting keeps its paint.
+                        obsPinned = 1.0 - obsFlowKeep * smoothstep(0.001, 0.012, speed);
                     }
                     if ((dissipation < 0.999 || hasObstacle == 1) && frozen < 0.5) {
                         // M3 units: speed is UV/s now (was cells/s). The old
@@ -661,7 +683,29 @@
                         // The stagnation-pile-up the apron used to clear is
                         // handled by the obstacle-aware projection now (flow
                         // deflects instead of ramming).
-                        color *= 1.0 - obsInterior * 0.06 * dt * 60.0;
+                        //   WHAT IT EATS (2026-08-11). obsInterior dilates
+                        // coverage by a SIM texel to catch sub-texel gaps and the
+                        // thin pinned rim — which at dye resolution is a 4-texel
+                        // band around every wall. Fine for a few big shapes; on an
+                        // INTRICATE collider that band is most of the region, and
+                        // the fluid flows straight through it, so at 6%/frame it
+                        // stopped being a drain and became a dye SINK. Measured on
+                        // a fine dot lattice (strength 1.0): partial-coverage
+                        // texels kept 2-4% of their dye over 2s where open fluid
+                        // kept 54%, and total dye mass fell to 0.59x the
+                        // collider-free run — the "intricate collider dulls
+                        // everything" report. Loudest under Gate, whose dye is
+                        // capped at the picked colour and so has no HDR headroom
+                        // to hide the loss.
+                        //   So the drain gets its own coverage (obsCore, the
+                        // texel's OWN by default) and a flow gate (obsPinned):
+                        // dye that is genuinely stuck still dissolves — wall
+                        // interiors are damped to a standstill, verified 99.8%
+                        // cleared in the paint-then-add-collider burn-in case —
+                        // while dye in transit keeps its paint. Measured on the
+                        // same lattice at strength 0.9: displayed value +50%,
+                        // lit area 0.11 -> 0.56 of the collider region.
+                        color *= 1.0 - obsCore * obsPinned * obsDrainRate * dt * 60.0;
                     }
                     // Guaranteed-zero cleanup. Multiplicative decay alone never
                     // reaches zero (and half-float storage stalls it at a dim

@@ -1,13 +1,22 @@
 // Fluid-UI glue for the vendored Transformers.js runtime — NOT part of the
-// upstream package (upstream files here: transformers.min.js + ort-*.wasm,
-// Apache-2.0, see LICENSE in this directory). Wires wasm + model-weight
-// loading for both builds:
+// upstream package (upstream files here: transformers.min.js v3.8.1 +
+// ort-wasm-simd-threaded.* — Apache-2.0, see LICENSE in this directory).
+//
+// This is ONNX Runtime's CPU-ONLY build, taken from onnxruntime-web rather
+// than the .jsep (WASM + WebGPU) binary that transformers.js ships in its own
+// dist. Two reasons: WebGPU returns numerically corrupted masks for both SAM
+// models (see 16-sam-integration), so the GPU half is dead weight; and at
+// 20.6MB the .jsep binary exceeds PartyKit's 20MB per-asset deploy limit,
+// where the CPU build is 10.6MB. Wires wasm + model-weight loading for both
+// builds:
 //   web      — wasm served from this directory (same origin); model weights
 //              stream from Hugging Face into the browser cache (as before).
-//   Electron — fetch() cannot read file:// URLs, so the ORT wasm is handed
+//   Electron — fetch() cannot read file:// URLs, so the ORT runtime is handed
 //              over as blob: URLs read with fs, and model weights load from
 //              the bundled <app>/models directory through a tiny fs-backed
 //              custom-cache adapter. Fully offline; no CDN, no downloads.
+//              (NOTE: updated for the v3 file layout alongside the 3.8.1
+//              runtime bump — needs an Electron smoke test on steam-prep.)
 
 const IS_ELECTRON = !!(typeof process !== 'undefined' && process.versions && process.versions.electron);
 
@@ -19,13 +28,19 @@ function appRootDiskPath() {
     return p;
 }
 
-let _wasmBlobMap = null;
-
 export function configureTransformersEnv(env) {
     const onnxWasm = env.backends.onnx.wasm;
 
     if (!IS_ELECTRON) {
-        onnxWasm.wasmPaths = new URL('./', import.meta.url).href;
+        // Name both files explicitly rather than handing over a directory:
+        // transformers.js is built against ORT's .jsep flavour, so given only a
+        // directory it derives 'ort-wasm-simd-threaded.jsep.*' and 404s on the
+        // CPU-only binary vendored here.
+        const here = new URL('./', import.meta.url).href;
+        onnxWasm.wasmPaths = {
+            mjs: here + 'ort-wasm-simd-threaded.mjs',
+            wasm: here + 'ort-wasm-simd-threaded.wasm',
+        };
         env.allowRemoteModels = true;
         env.allowLocalModels = false;
         env.useBrowserCache = true;
@@ -36,22 +51,27 @@ export function configureTransformersEnv(env) {
     const path = require('path');
     const root = appRootDiskPath();
 
-    // Threaded wasm variants are never selected (no crossOriginIsolated under
-    // file://), so only the two single-thread files are bundled and mapped.
-    if (!_wasmBlobMap) {
-        _wasmBlobMap = {};
-        for (const f of ['ort-wasm.wasm', 'ort-wasm-simd.wasm']) {
-            const buf = fs.readFileSync(path.join(root, 'js', 'vendor', 'transformers', f));
-            _wasmBlobMap[f] = URL.createObjectURL(new Blob([buf], { type: 'application/wasm' }));
-        }
+    // ORT v3 layout: an ES-module loader (.mjs) + one wasm binary. Under
+    // file:// the .mjs imports fine as a same-scheme module URL (blob: module
+    // imports are NOT reliable from a null-origin file:// page), but fetch()
+    // of the .wasm would fail — so hand the raw bytes over via wasmBinary,
+    // which short-circuits emscripten's fetch entirely.
+    onnxWasm.wasmPaths = {
+        mjs: new URL('./ort-wasm-simd-threaded.mjs', import.meta.url).href,
+    };
+    if (!onnxWasm.wasmBinary) {
+        const buf = fs.readFileSync(path.join(root, 'js', 'vendor', 'transformers', 'ort-wasm-simd-threaded.wasm'));
+        onnxWasm.wasmBinary = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     }
-    onnxWasm.wasmPaths = _wasmBlobMap;
+    // No crossOriginIsolation under file:// — stay single-threaded.
     onnxWasm.numThreads = 1;
 
     // Model weights ship in <app>/models. Transformers' local-path reads also
     // go through fetch(), so intercept via the custom-cache hook and serve
     // with fs. Remote stays OFF: a missing bundled file must fail loudly
     // (that's a packaging bug), never fall back to a runtime download.
+    // External-data pairs (.onnx + .onnx_data, used by EdgeTAM) resolve
+    // through the same path mapping.
     env.allowLocalModels = true;
     env.allowRemoteModels = false;
     env.localModelPath = 'models';

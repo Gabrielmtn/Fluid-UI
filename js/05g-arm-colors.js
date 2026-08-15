@@ -88,6 +88,141 @@
             }
         }
         window.advanceArmColors = advanceArmColors;
+
+        // ── Multi-Brush symmetry (2026-08-11) ─────────────────────────────
+        // The arm loop in multiSplat used to be hardcoded C_n: n copies of the
+        // dab rotated about the canvas centre. Every mode is now that SAME
+        // loop with a different transform list, so a new mode is data, not
+        // code.
+        //
+        // A transform is a 2x3 affine [m00,m01,m02, m10,m11,m12] in
+        // CENTRE-RELATIVE space. Position maps through the whole affine;
+        // velocity through the LINEAR part only — velocity is a direction, not
+        // a point, so a translation (rake) must leave it alone, while a
+        // reflection has to flip it or the mirrored dye would swim the wrong
+        // way. `arm` is the SOURCE arm index: a mirrored twin reuses its
+        // source's colour, so a mirror reads as one brush folded over rather
+        // than as two unrelated brushes.
+        //
+        // 'radial' deliberately keeps m02/m12 at exactly 0 and multiplies in
+        // the same order as the pre-mode code, so it stays bit-identical to
+        // what shipped before symmetry existed.
+        var SYM_MIRROR_X  = [-1, 0, 0,  0,  1, 0];   // across the vertical axis
+        var SYM_MIRROR_Y  = [ 1, 0, 0,  0, -1, 0];   // across the horizontal axis
+        var SYM_MIRROR_XY = [-1, 0, 0,  0, -1, 0];   // both (= point reflection)
+
+        function symCfg(key, def) {
+            var c = window.config;
+            return (c && typeof c[key] === 'number') ? c[key] : def;
+        }
+        function symRot(ang) {
+            var c = Math.cos(ang), s = Math.sin(ang);
+            return [c, -s, 0, s, c, 0];
+        }
+        function symCompose(A, B) {   // A applied after B
+            return [
+                A[0]*B[0] + A[1]*B[3], A[0]*B[1] + A[1]*B[4], A[0]*B[2] + A[1]*B[5] + A[2],
+                A[3]*B[0] + A[4]*B[3], A[3]*B[1] + A[4]*B[4], A[3]*B[2] + A[4]*B[5] + A[5]
+            ];
+        }
+        // Approximate brush DIAMETER in canvas px — the same estimate the dab
+        // walker uses (05d0), so rake spacing opens and closes with the Size
+        // fader instead of drifting out of scale.
+        function symBrushDiameterPx() {
+            var h = (typeof canvas !== 'undefined' && canvas && canvas.height) || 1080;
+            return Math.max(4, 2 * Math.sqrt(symCfg('SPLAT_RADIUS', 0.011)) * h);
+        }
+
+        // Centre-based lists depend only on (mode, arms) and this runs per dab,
+        // so build them once per change. Rake is travel-dependent and stays
+        // uncached (it is a handful of adds).
+        var symCacheKey = '';
+        var symCacheList = null;
+
+        function symmetryTransforms(mode, n, dx, dy) {
+            n = Math.max(1, n | 0);
+            if (mode === 'rake') {
+                // Local, not centre-based: copies ride alongside the stroke like
+                // the bristles of a rake. Pure translation, so every bristle
+                // pushes the fluid exactly the way the real tip does.
+                var gap = symCfg('SYM_RAKE_SPACING', 1) * symBrushDiameterPx();
+                var sp = Math.hypot(dx, dy);
+                // The initial press has no travel to be perpendicular to; spread
+                // it horizontally so the rake still reads as a rake instead of
+                // stacking n dabs on one spot.
+                var px = sp > 1e-6 ? -dy / sp : 0;
+                var py = sp > 1e-6 ?  dx / sp : 1;
+                var rk = [];
+                for (var r = 0; r < n; r++) {
+                    var off = (r - (n - 1) / 2) * gap;
+                    rk.push({ m: [1, 0, px * off, 0, 1, py * off], arm: r });
+                }
+                return rk;
+            }
+            var key = mode + '|' + n;
+            if (symCacheKey === key && symCacheList) return symCacheList;
+
+            var out = [];
+            if (mode === 'spiral') {
+                // Similarity symmetry: each copy turns AND shrinks toward the
+                // centre, so the arms trace a logarithmic spiral instead of a
+                // ring. The golden-angle default is what keeps them from
+                // collapsing into spokes.
+                var turn = symCfg('SYM_SPIRAL_TURN', 2.39996);
+                var shrink = symCfg('SYM_SPIRAL_SCALE', 0.82);
+                var k = 1;
+                for (var i = 0; i < n; i++) {
+                    var ca = Math.cos(turn * i), sa = Math.sin(turn * i);
+                    out.push({ m: [ca * k, -sa * k, 0, sa * k, ca * k, 0], arm: i });
+                    k *= shrink;
+                }
+            } else {
+                // Rotational family. Adding the mirrors to C_n generates the
+                // dihedral group, so 'mirrorX' at 8 arms IS a proper D8
+                // kaleidoscope rather than eight independent tips.
+                var mirrors = mode === 'mirrorX' ? [SYM_MIRROR_X]
+                            : mode === 'mirrorY' ? [SYM_MIRROR_Y]
+                            : mode === 'mirrorQuad' ? [SYM_MIRROR_X, SYM_MIRROR_Y, SYM_MIRROR_XY]
+                            : null;   // 'radial' and any unknown/stale mode
+                var seen = mirrors ? Object.create(null) : null;
+                for (var a = 0; a < n; a++) {
+                    var R = symRot((Math.PI * 2 * a) / n);
+                    var variants = [R];
+                    if (mirrors) {
+                        for (var j = 0; j < mirrors.length; j++) variants.push(symCompose(mirrors[j], R));
+                    }
+                    for (var v = 0; v < variants.length; v++) {
+                        if (seen) {
+                            // A mirror can land back on a rotation already in the
+                            // set — Quad at an even arm count is the loud case,
+                            // since D_n has 2n elements, not 4n. Without this the
+                            // duplicates double-dose dye on those arms.
+                            var dk = variants[v].map(function (q) { return Math.round(q * 1e6); }).join(',');
+                            if (seen[dk]) continue;
+                            seen[dk] = 1;
+                        }
+                        out.push({ m: variants[v], arm: a });
+                    }
+                }
+            }
+            symCacheKey = key;
+            symCacheList = out;
+            return out;
+        }
+        // Exposed for the dropdown's dab-count hint (and console poking)
+        window.symmetryTransforms = symmetryTransforms;
+
+        // The select lives in the Multi-Brush dropdown (20-mixer-layout moves it
+        // there). config is the single source of truth, so presets, session
+        // autoload and the multiplayer lock all land through this one 'change'
+        // — no second restore path to keep in sync.
+        (function initSymmetryMode() {
+            var el = document.getElementById('symmetryMode');
+            if (!el) return;
+            function applySymmetryMode() { config.SYMMETRY_MODE = el.value || 'radial'; }
+            el.addEventListener('change', applySymmetryMode);
+            applySymmetryMode();
+        })();
         // exactColor: programmatic splat sources (path layers, audio scenes,
         // animations) pass true so their configured color is deposited as-is on
         // every arm. Pointer strokes, stroke replay, and remote-peer strokes
@@ -102,21 +237,24 @@
             window.__unsavedWork = true; // every dye source funnels through here
             window.__brushTipOn = !exactColor;
             try {
-            // Kaleidoscope behavior
+            // Multi-Brush arms: one dab per symmetry transform (see the
+            // symmetryTransforms block above for what each mode builds).
             const centerX = canvas.width * 0.5;
             const centerY = canvas.height * 0.5;
-            for (let i = 0; i < animationMultiplier; i++) {
-                const angle = (Math.PI * 2 * i) / animationMultiplier;
-                const relX = x - centerX;
-                const relY = y - centerY;
-                const rotatedX = relX * Math.cos(angle) - relY * Math.sin(angle);
-                const rotatedY = relX * Math.sin(angle) + relY * Math.cos(angle);
-                const finalX = rotatedX + centerX;
-                const finalY = rotatedY + centerY;
-                const rotatedDx = dx * Math.cos(angle) - dy * Math.sin(angle);
-                const rotatedDy = dx * Math.sin(angle) + dy * Math.cos(angle);
-                const armColor = exactColor ? color : resolveArmColor(i, color);
-                splat(finalX, finalY, rotatedDx, rotatedDy, armColor);
+            const transforms = symmetryTransforms(config.SYMMETRY_MODE, animationMultiplier, dx, dy);
+            const relX = x - centerX;
+            const relY = y - centerY;
+            for (let i = 0; i < transforms.length; i++) {
+                const m = transforms[i].m;
+                const finalX = (m[0] * relX + m[1] * relY + m[2]) + centerX;
+                const finalY = (m[3] * relX + m[4] * relY + m[5]) + centerY;
+                // Linear part only: velocity is a direction, so it must not
+                // pick up the translation (rake) — but it MUST take the flip
+                // (mirrors), or the reflected dye swims the wrong way.
+                const armDx = m[0] * dx + m[1] * dy;
+                const armDy = m[3] * dx + m[4] * dy;
+                const armColor = exactColor ? color : resolveArmColor(transforms[i].arm, color);
+                splat(finalX, finalY, armDx, armDy, armColor);
             }
             if (shouldBroadcast && typeof broadcastSplat === 'function') {
                 broadcastSplat(

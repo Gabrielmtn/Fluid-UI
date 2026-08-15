@@ -207,14 +207,18 @@
                 const data = _dmImgData.data;
                 // Zero out buffer — we only write obstacle pixels below
                 data.fill(0);
-                // D0.5 edge quality rev 2: fwidth-style ADAPTIVE soft cut,
-                // matching the obstacle compositor in 23-depth-collision.js —
-                // the visible mask edge and the collider edge must agree.
-                // Band scales with the local depth gradient: edges get ~0.75px
-                // of AA, flat midtone regions cut hard (no porous half-walls).
+                // D0.5 edge quality rev 2: fwidth-style ADAPTIVE soft cut —
+                // same threshold center as the obstacle compositor in
+                // 23-depth-collision.js so preview and collider edges land in
+                // the same place. Band scales with the local depth gradient;
+                // flat midtone regions cut hard (no porous half-walls).
                 let bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
                     ? window.config.DEPTH_EDGE_BAND : 12;
                 if (bandCap < 0.5) bandCap = 0.5;
+                // Preview-only 8x cap (see applyRudimentaryMask): keeps the
+                // spatial ramp ~1.5px on steep edges instead of sub-pixel
+                // (= visibly jagged). The solver path keeps the hard cap.
+                bandCap = Math.min(bandCap * 8, 127);
                 const dd = shape.depthData;
                 // No flip: depth data is stored top-down, same as this canvas.
                 // (GL orientation is handled once at obstacle-texture upload.)
@@ -445,20 +449,43 @@
             const img = new Image();
             img.onload = () => {
                 ctx.drawImage(img, 0, 0, maskCanvas.width, maskCanvas.height);
-                // Apply alpha threshold - pixels below threshold become transparent
+                // Luminance cut with the SAME fwidth-style adaptive band the
+                // depth-mask paths use (drawMaskShape above, obstacle
+                // compositor in 23-depth-collision): edges get sub-pixel AA,
+                // flat regions still cut hard. A binary cut here was the
+                // jagged-edge source — and 🧱 Generate Collision Layer bakes
+                // this exact cut, so preview and collider edges must agree.
                 const imageData = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
                 const data = imageData.data;
                 const thresholdValue = Math.round((threshold / 100) * 255);
-                for (let i = 0; i < data.length; i += 4) {
-                    // Calculate luminance (perceived brightness)
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
-                    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-                    // Make dark pixels transparent based on threshold
-                    if (luminance < thresholdValue) {
-                        data[i + 3] = 0; // Set alpha to 0
-                    }
+                const w = maskCanvas.width, h = maskCanvas.height;
+                const n = w * h;
+                const lum = new Uint8ClampedArray(n);
+                for (let i = 0, j = 0; i < n; i++, j += 4) {
+                    lum[i] = 0.299 * data[j] + 0.587 * data[j + 1] + 0.114 * data[j + 2];
+                }
+                let bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+                    ? window.config.DEPTH_EDGE_BAND : 12;
+                if (bandCap < 0.5) bandCap = 0.5;
+                // Preview cap is 8x the solver cap: band=0.75·grad needs to
+                // reach ~96 on a full 0→255 step to keep the spatial ramp at
+                // ~1.5px (2·band/grad). At the solver's cap of 12 a steep edge
+                // gets 0.2px of AA — measured binary, i.e. still jagged. The
+                // obstacle compositor keeps the hard cap (solver needs it and
+                // rev-3 blur bounds the physical edge separately).
+                bandCap = Math.min(bandCap * 8, 127);
+                for (let i = 0; i < n; i++) {
+                    const xI = i - ((i / w) | 0) * w;
+                    const gx = Math.abs(lum[i + (xI < w - 1 ? 1 : 0)] - lum[i - (xI > 0 ? 1 : 0)]) * 0.5;
+                    const gy = Math.abs(lum[i + (i < n - w ? w : 0)] - lum[i - (i >= w ? w : 0)]) * 0.5;
+                    let band = (gx > gy ? gx : gy) * 0.75;
+                    if (band < 0.5) band = 0.5;
+                    if (band > bandCap) band = bandCap;
+                    let t = (lum[i] - (thresholdValue - band)) / (band * 2);
+                    if (t < 0) t = 0; else if (t > 1) t = 1;
+                    const cov = t * t * (3 - 2 * t);
+                    const ai = i * 4 + 3;
+                    data[ai] = (data[ai] * cov + 0.5) | 0;
                 }
                 ctx.putImageData(imageData, 0, 0);
                 layerDiv.style.backgroundImage = `url(${maskCanvas.toDataURL()})`;

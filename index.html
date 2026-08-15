@@ -480,6 +480,21 @@
             <label for="multiplier">✨ Multiplier <span id="multiplierValue" class="value-display">1x</span></label>
             <input type="range" id="multiplier" min="1" max="8" value="1" step="1">
         </div>
+        <!-- Multi-Brush symmetry. Declared here (not built in JS) so the id
+             exists for the registry-driven select persistence before the mixer
+             runs; buildArmColorsDropdown moves this group into the Multi-Brush
+             dropdown, next to the per-arm colour rows it governs. -->
+        <div class="control-group" id="symmetryModeGroup">
+            <label for="symmetryMode">🪞 Symmetry</label>
+            <select id="symmetryMode">
+                <option value="radial">Radial</option>
+                <option value="mirrorX">Mirror L↔R</option>
+                <option value="mirrorY">Mirror U↕D</option>
+                <option value="mirrorQuad">Mirror Quad</option>
+                <option value="spiral">Spiral</option>
+                <option value="rake">Rake</option>
+            </select>
+        </div>
         <div class="control-group">
             <label for="timeScale">⏱️ Time <span id="timeScaleValue" class="value-display">1.00x</span></label>
             <input type="range" id="timeScale" min="0.01" max="3" value="1" step="0.01">
@@ -617,6 +632,14 @@
         <div class="control-group" style="margin-top: 5px; margin-left: 10px;">
             <label for="brushCursorOpacity">Cursor Opacity <span id="brushCursorOpacityValue" class="value-display">50%</span></label>
             <input type="range" id="brushCursorOpacity" min="0" max="100" value="50" step="5">
+        </div>
+        <div class="control-group">
+            <label for="windowMode">Window Mode</label>
+            <select id="windowMode">
+                <option value="windowed">Windowed</option>
+                <option value="borderless">Borderless Window</option>
+                <option value="fullscreen">Borderless Fullscreen</option>
+            </select>
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="showCanvasHandles" checked>
@@ -1252,6 +1275,7 @@
     <script src="js/33-brush-shapes.js"></script>
     <script src="js/34-mandala-mode.js"></script>
     <script src="js/35-zoom-view.js"></script>
+    <script src="js/36-display-mode.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">
