@@ -193,6 +193,9 @@
         f1.textContent = 'F1 — ALL HOTKEYS';
         f1.title = 'Open the full hotkey reference';
         f1.addEventListener('click', function () {
+            // Route through 05n's opener so its one-time key-chip pass runs —
+            // setting display directly showed the modal as unchipped prose.
+            if (typeof window.showHotkeys === 'function') { window.showHotkeys(); return; }
             var ov = document.getElementById('hotkeyOverlay');
             if (ov) ov.style.display = 'flex';
         });

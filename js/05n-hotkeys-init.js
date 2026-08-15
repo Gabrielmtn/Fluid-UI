@@ -34,8 +34,11 @@
         function showHotkeys() { if (hotkeyOverlay) { chipHotkeyList(); hotkeyOverlay.style.display = 'flex'; } }
         function hideHotkeys() { if (hotkeyOverlay) hotkeyOverlay.style.display = 'none'; }
         function toggleHotkeys() { if (!hotkeyOverlay) return; chipHotkeyList(); hotkeyOverlay.style.display = (hotkeyOverlay.style.display === 'flex' ? 'none' : 'flex'); }
-        // Mobile has no F1 — 13-mobile-mode's '?' button opens the modal.
+        // Exposed for the two non-keyboard openers: 13-mobile-mode's '?'
+        // button (toggle) and 17-hotkey-reminder's 'F1 — ALL HOTKEYS' pill
+        // (show) — both must route through here so the chip pass runs.
         window.toggleHotkeys = toggleHotkeys;
+        window.showHotkeys = showHotkeys;
         if (hotkeyClose) hotkeyClose.addEventListener('click', hideHotkeys);
         if (hotkeyOverlay) hotkeyOverlay.addEventListener('click', (e) => { if (e.target === hotkeyOverlay) hideHotkeys(); });
         let undoStack = [];
