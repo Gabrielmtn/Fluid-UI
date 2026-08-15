@@ -897,6 +897,14 @@
                     // clobbers the preset's sliders (also guards old snapshots
                     // saved before PRESET_SKIP excluded it at capture time).
                     if (id === 'preserveFluidOpacity' || id === 'autoloadSettings') return;
+                    // Remote look-mirror applies must not touch sketch/mask
+                    // workflow prefs: setCheck dispatches 'change', whose
+                    // handler persists to settingsManager — a peer's snapshot
+                    // would overwrite the local user's saved eraser/paint-layer
+                    // state (guards old clients that still send these keys;
+                    // new senders already exclude them via MP_PERF_LOCAL_KEYS).
+                    if (window.__mpApplyingRemote &&
+                        (id === 'brushEraser' || id === 'sketchVisible')) return;
                     if (reg && reg.coerceCheckbox(id, snapshot.checkboxes[id]) === null) {
                         console.warn('[Preset] skipping unknown checkbox', id); return;
                     }

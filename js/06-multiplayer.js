@@ -313,9 +313,13 @@ window.__mpApplyingRemote = false; // lets the host's snapshot through the gate
 // Perf-tier + local-workflow controls that never ride the lock snapshot:
 // resolution/governor/fps stay local (the governor's look-preserving
 // ladder is the precedent), recording/stats/autoload are per-user UI.
+// brushEraser/sketchVisible are sketch/mask *workflow* state, not look —
+// mirroring them let a painter's snapshot silently rewrite the watcher's
+// saved eraser/paint-layer prefs (pCheckbox persists on 'change').
 var MP_PERF_LOCAL_KEYS = [
     'visualResolution', 'physicsResolution', 'fpsCap',
-    'recMode', 'recPlaybackSpeed', 'statsToggle', 'autoloadSettings'
+    'recMode', 'recPlaybackSpeed', 'statsToggle', 'autoloadSettings',
+    'brushEraser', 'sketchVisible'
 ];
 
 function captureLookSnapshot() {
