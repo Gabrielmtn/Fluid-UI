@@ -543,13 +543,13 @@
                 if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
                 archiveCurrentStroke();
                 advanceColor();
-                // Defer arm color advance until splatOut easing finishes
-                // so random/step colors don't change mid-easing
-                if (splatOutActive) {
-                    pendingArmAdvance = true;
-                } else {
-                    advanceArmColors();
-                }
+                // Defer arm color advance until ALL painting settles — the
+                // splat-out tail AND the stabilizer's queued catch-up dabs
+                // (05j flushes on full engine idle). Advancing at release
+                // repainted the still-draining tail dabs in next-stroke
+                // colors while arm 0 kept the old pointer color: the
+                // "three colors at stroke end" flash.
+                pendingArmAdvance = true;
             }
         }
         // Listened on WINDOW so a captured pointer's release is caught wherever it
@@ -840,11 +840,9 @@
                 if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
                 archiveCurrentStroke();
                 advanceColor();
-                if (splatOutActive) {
-                    pendingArmAdvance = true;
-                } else {
-                    advanceArmColors();
-                }
+                // Same deferred advance as finishLeftStroke: flush on full
+                // paint idle in 05j, never at release.
+                pendingArmAdvance = true;
                 if (typeof broadcastPointerUp === 'function') {
                     broadcastPointerUp();
                 }
