@@ -2001,7 +2001,10 @@ function initMultiplayerUI() {
     });
 
     var discBtn = document.getElementById('disconnectBtn');
-    if (discBtn) discBtn.addEventListener('click', disconnectMultiplayer);
+    // Wrapped: registering the function directly would pass the MouseEvent
+    // as the rememberRoom param — a deliberate Disconnect is a clean exit
+    // and must NOT offer Reconnect or overwrite lastRoom.
+    if (discBtn) discBtn.addEventListener('click', function () { disconnectMultiplayer(); });
 
     var strangerBtn = document.getElementById('strangerBtn');
     if (strangerBtn) strangerBtn.addEventListener('click', paintWithStranger);
