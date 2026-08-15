@@ -256,14 +256,15 @@ body.focus-mode #canvas {
     min-width: 70px;
     flex-shrink: 0;
 }
-.mutation-field-wide {
-    flex-direction: column;
-    align-items: stretch;
-}
-.mutation-field-wide label {
+/* (.mutation-field-wide retired 2026-08-15 — Strength is a standard
+   .control-group row now) */
+/* Scope segmented toggle (Basic | All): stretch the cells across the row */
+.mutation-field .mutation-scope-seg {
+    flex: 1;
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 4px;
+}
+.mutation-field .mutation-scope-seg .ch-text-toggle {
+    flex: 1;
 }
 .mutation-field select {
     flex: 1;

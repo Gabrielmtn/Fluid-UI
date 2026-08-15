@@ -1048,26 +1048,57 @@
         const controlsRow = document.createElement('div');
         controlsRow.className = 'mutation-controls';
 
-        // Scope
+        // Scope — a binary choice (engine contract: strictly 'basic'|'all'),
+        // so a two-cell segmented toggle instead of a dropdown hiding two
+        // options. The hidden native select stays as the state-holder:
+        // getOptions() keeps reading #mutationScope by id, unchanged (the
+        // codebase's established hidden-native-control pattern).
         const scopeWrap = document.createElement('div');
         scopeWrap.className = 'mutation-field';
         scopeWrap.innerHTML = '<label>Scope</label>';
         const scopeSel = document.createElement('select');
         scopeSel.id = 'mutationScope';
         scopeSel.innerHTML = '<option value="basic">Basic</option><option value="all">All</option>';
+        scopeSel.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+        const scopeSeg = document.createElement('div');
+        scopeSeg.className = 'ch-seg-switch mutation-scope-seg';
+        [['basic', 'Basic', 'Mutate the everyday look params only'],
+         ['all',   'All',   'Mutate everything mutable, including rarely-touched params']
+        ].forEach(function (m) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ch-text-toggle' + (scopeSel.value === m[0] ? ' active' : '');
+            b.textContent = m[1];
+            b.title = m[2];
+            b.addEventListener('click', function () {
+                scopeSel.value = m[0];
+                Array.prototype.forEach.call(
+                    scopeSeg.querySelectorAll('.ch-text-toggle'),
+                    function (x) { x.classList.remove('active'); });
+                b.classList.add('active');
+            });
+            scopeSeg.appendChild(b);
+        });
+        scopeWrap.appendChild(scopeSeg);
         scopeWrap.appendChild(scopeSel);
         controlsRow.appendChild(scopeWrap);
 
-        // Strength
+        // Strength — a standard sidebar row (.control-group: sidebar
+        // typography + the full-row drag forwarding, which the bespoke
+        // .mutation-field row missed), shown as a percentage. data-no-scale
+        // skips the auto-printed 0.05/0.53/1 stops — arbitrary-looking
+        // numbers for a subjective subtle→wild control.
         const strWrap = document.createElement('div');
-        strWrap.className = 'mutation-field mutation-field-wide';
-        strWrap.innerHTML = '<label>Strength <span id="mutationStrengthVal" class="value-display">0.30</span></label>';
+        strWrap.className = 'control-group';
+        strWrap.innerHTML = '<label>Strength <span id="mutationStrengthVal" class="value-display">30%</span></label>';
         const strSlider = document.createElement('input');
         strSlider.type = 'range'; strSlider.id = 'mutationStrength';
         strSlider.min = '0.05'; strSlider.max = '1'; strSlider.step = '0.05'; strSlider.value = '0.3';
+        strSlider.setAttribute('data-no-scale', '1');
+        strSlider.title = 'How far each mutation may push a param — subtle nudges left, wild swings right';
         strSlider.addEventListener('input', function () {
             var disp = document.getElementById('mutationStrengthVal');
-            if (disp) disp.textContent = parseFloat(this.value).toFixed(2);
+            if (disp) disp.textContent = Math.round(parseFloat(this.value) * 100) + '%';
         });
         strWrap.appendChild(strSlider);
         controlsRow.appendChild(strWrap);
