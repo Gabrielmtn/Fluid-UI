@@ -4194,7 +4194,15 @@
             if (saved && Array.isArray(saved) && saved.length) {
                 arr.length = 0;
                 saved.forEach(function(c) {
-                    arr.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                    // 'rainbow' (removed 2026-08-15) must be coerced HERE
+                    // too: this ingest runs LAST at boot — 12's sanitized
+                    // autoload is discarded when deferred 05g re-creates
+                    // multiArmColors, then this re-reads raw localStorage.
+                    // Without the coercion a pre-removal save resurrected
+                    // the dead mode every launch (row showed no active
+                    // mode, arm painted fallback).
+                    var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
+                    arr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
                 });
             } else {
                 // No saved per-arm config: import the active brush's mode from the

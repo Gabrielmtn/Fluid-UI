@@ -962,7 +962,12 @@
                     armArr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
                 });
                 if (window.settingsManager) {
-                    window.settingsManager.set('brush.armColors', snapshot.armColors);
+                    // Persist the SANITIZED arms, not the raw snapshot — an
+                    // old preset's 'rainbow' would otherwise reseed
+                    // localStorage and resurrect on the next launch.
+                    window.settingsManager.set('brush.armColors', armArr.map(function (a) {
+                        return { mode: a.mode, color: a.color, stepIndex: a.stepIndex };
+                    }));
                 }
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             }
