@@ -268,7 +268,7 @@
             </div>
             <div class="control-group checkbox-group" style="margin-top: 8px;">
                 <input type="checkbox" id="colorGate">
-                <label for="colorGate" style="margin: 0" title="Lock max to original color — repeated strokes can't overflow into white">Gate</label>
+                <label for="colorGate" style="margin: 0" title="Cap Color — lock the max at the stroke's original color so repeated strokes can't blow out to white">Cap Color</label>
             </div>
             <div style="margin-top: 10px;">
                 <label>Palette <span id="paletteImportStatus" class="import-status"></span></label>
@@ -304,7 +304,7 @@
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="stepPalette">
-            <label for="stepPalette" style="margin: 0">Step through palette</label>
+            <label for="stepPalette" style="margin: 0">Cycle palette colors</label>
         </div>
         <div class="control-group">
             <label for="visualResolution">Visual Quality</label>
@@ -1102,7 +1102,7 @@
                     <h3>Colors & Palettes</h3>
                     <ul>
                         <li>R — Toggle Random Colors</li>
-                        <li>A — Toggle Step Through Palette</li>
+                        <li>A — Toggle Cycle Palette</li>
                         <li>N — Next Color</li>
                         <li>Shift+S — Save Color</li>
                         <li>Shift+X — Clear Colors</li>

@@ -294,7 +294,7 @@ body > .controls {
 
 /* ── Color channel ── */
 .mixer-channel.ch-wide {
-    /* wide enough that RND / STEP / 🌈 / GATE all read at full length */
+    /* wide enough that RND / CYCLE / CAP all read at full length */
     min-width: 200px;
     max-width: 210px;
     gap: 3px;

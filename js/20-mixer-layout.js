@@ -390,7 +390,7 @@
         // modes / ignite) and drove the strip's height.
         const picker = document.getElementById('colorPicker');
 
-        // --- Toggle row: [Rnd|Step|🌈 segmented switch] + gap + [Gate] ---
+        // --- Toggle row: [Rnd|Cycle segmented switch] + gap + [Cap] ---
         // Rnd/Step/Rainbow are mutually exclusive -> ONE gapless segmented
         // switch; Gate is an independent toggle drawn separately with its own
         // border (design handoff Task 6: touching cells mean pick one,
@@ -446,7 +446,9 @@
         if (stepEl) {
             stepEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
             ch.appendChild(stepEl);
-            makeColorModeChip('Step', 'step', 'step', 'Step through the palette each stroke',
+            // 'Cycle' (renamed from 'Step' 2026-08-15): advances one palette
+            // colour per stroke. The mode key/checkbox id stay 'step'.
+            makeColorModeChip('Cycle', 'step', 'step', 'Cycle palette — advance one palette colour each stroke',
                 stepEl.checked || arm0Mode() === 'step');
         }
         // Rainbow chip removed 2026-08-15 (photosensitivity: a new random
@@ -454,16 +456,18 @@
         // modes coerce to 'fixed' at every ingest (05g allowlist + 12's
         // preset/autoload sanitizers).
 
-        // Gate chip (independent of Rnd/Step exclusivity): clamps dye at the
-        // stroke's own color so repeated paint can't overflow into white.
+        // Cap Color chip (renamed from 'Gate' 2026-08-15 — user-test copy
+        // pass; the id colorGate and all persisted keys stay). Independent of
+        // Rnd/Cycle exclusivity: clamps dye at the stroke's own color so
+        // repeated paint can't overflow into white.
         var gateEl = document.getElementById('colorGate');
         if (gateEl) {
             gateEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
             var gateBtn = document.createElement('button');
             gateBtn.type = 'button';
             gateBtn.className = 'ch-text-toggle ch-gate-toggle' + (gateEl.checked ? ' active' : '');
-            gateBtn.textContent = 'Gate';
-            gateBtn.title = 'Lock max to original color — repeated strokes can\'t overflow into white';
+            gateBtn.textContent = 'Cap';
+            gateBtn.title = 'Cap Color — lock the max at the stroke\'s original color so repeated strokes can\'t blow out to white';
             gateBtn.addEventListener('click', function () {
                 gateEl.checked = !gateEl.checked;
                 gateEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -496,7 +500,7 @@
         igniteBtnColor.className = 'ch-text-toggle ch-nudge-btn';
         igniteBtnColor.textContent = '🔥 Ignite';
         igniteBtnColor.title = 'Hold to perk the fluid up — faded dye is pulled back to the colour it was '
-            + 'painted at, and past the Gate cap. Slide right onto the lock to keep it on. '
+            + 'painted at, past even the Cap Color limit. Slide right onto the lock to keep it on. '
             + 'Your density decay setting is untouched.';
 
         // Latch cell (Task 7): permanently visible so the second mode is
@@ -4166,7 +4170,7 @@
                         { key: 'fixed',   text: '\u25C6', title: 'Fixed color' },
                         // 'rainbow' removed 2026-08-15 (photosensitivity)
                         { key: 'random',  text: 'R',      title: 'Random — new color each stroke' },
-                        { key: 'step',    text: 'S',      title: 'Step through palette each stroke' }
+                        { key: 'step',    text: 'S',      title: 'Cycle palette — new palette colour each stroke' }
                     ];
 
                     var modeWrap = document.createElement('div');
