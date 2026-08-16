@@ -2977,6 +2977,14 @@
                     '<option value="mic">Mic</option><option value="system">System</option><option value="file">File</option>' +
                 '</select>' +
             '</div>' +
+            // Playback row (2026-08-16): a loaded file plays out loud now, so
+            // it needs a volume/mute and a restart. Hidden unless a FILE is
+            // the source \u2014 mic/system are never monitored (feedback/echo).
+            '<div class="audio-mini-row audio-play-row" id="audioPlayRow" style="display:none;">' +
+                '<button id="audioMuteBtn" class="audio-play-btn" title="Mute playback (visuals keep reacting)">\ud83d\udd0a</button>' +
+                '<input type="range" id="audioVolume" class="audio-vol" min="0" max="1" step="0.01" value="0.85" title="Playback volume" data-no-scale="1">' +
+                '<button id="audioRestartBtn" class="audio-play-btn" title="Restart the track from the beginning">\u23ee</button>' +
+            '</div>' +
             '<canvas id="audioMiniTimeline" class="audio-mini-timeline" title="Composer segments"></canvas>' +
             '<button id="audioOpenFullBtn" class="audio-mini-full" title="Open full audio panel">\u2b06\ufe0f Full Audio</button>';
         body.appendChild(mini);
@@ -3016,6 +3024,42 @@
             else enableCb.checked = false;
             fileInput.value = '';
         });
+
+        // ── Playback controls (file source only) ──
+        var playRow = mini.querySelector('#audioPlayRow');
+        var muteBtn = mini.querySelector('#audioMuteBtn');
+        var volSlider = mini.querySelector('#audioVolume');
+        var restartBtn = mini.querySelector('#audioRestartBtn');
+        function syncPlayRow() {
+            var ar = window.audioReactive;
+            var on = !!(ar && ar.isMonitorable && ar.isMonitorable());
+            if (playRow) playRow.style.display = on ? '' : 'none';
+            if (!on || !ar) return;
+            if (volSlider) volSlider.value = ar.getMonitorVolume();
+            if (muteBtn) {
+                var m = ar.isMuted();
+                muteBtn.textContent = m ? '🔇' : '🔊';
+                muteBtn.classList.toggle('muted', m);
+                muteBtn.title = m ? 'Unmute playback' : 'Mute playback (visuals keep reacting)';
+            }
+        }
+        // 22-audio-reactive fires this whenever the source changes (or stops),
+        // including the async file-decode completion.
+        window.__onAudioSourceChanged = function () { syncPlayRow(); };
+        if (muteBtn) muteBtn.addEventListener('click', function () {
+            if (!window.audioReactive) return;
+            window.audioReactive.setMuted(!window.audioReactive.isMuted());
+            syncPlayRow();
+        });
+        if (volSlider) volSlider.addEventListener('input', function () {
+            if (!window.audioReactive) return;
+            window.audioReactive.setMonitorVolume(parseFloat(volSlider.value));
+            if (window.audioReactive.isMuted()) { window.audioReactive.setMuted(false); syncPlayRow(); }
+        });
+        if (restartBtn) restartBtn.addEventListener('click', function () {
+            if (window.audioReactive && window.audioReactive.restart) window.audioReactive.restart();
+        });
+        syncPlayRow();
 
         mini.querySelector('#audioOpenFullBtn').addEventListener('click', function () {
             modeSel.value = 'full';

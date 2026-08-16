@@ -119,8 +119,56 @@
                 if (typeof s === 'number') sensitivity = s;
                 var bt = window.settingsManager.get('audio.beatThreshold');
                 if (typeof bt === 'number') beatThreshold = bt;
+                var mv = window.settingsManager.get('audio.monitorVolume');
+                if (typeof mv === 'number') monitorVolume = Math.max(0, Math.min(1, mv));
             }
         } catch (_) {}
+    }
+
+    // ── Playback / monitoring (2026-08-16) ────────────────────────────
+    // A loaded FILE used to be analysed silently: it drove the visuals but
+    // came out of no speaker, so users had to line the track up by hand in a
+    // video editor afterwards. Files now route to the speakers through a
+    // gain node, and every source feeds a MediaStream tap the video exporter
+    // can mux in. Mic/system are deliberately NOT monitored — echoing a mic
+    // to the speakers is feedback, and system audio is already audible.
+    var monitorGain = null;      // → audioCtx.destination (file playback)
+    var monitorVolume = 0.85;
+    var monitorMuted = false;
+    var exportTap = null;        // MediaStreamAudioDestinationNode for export
+    var srcKind = null;          // 'mic' | 'system' | 'file'
+    var fileBuffer = null;       // decoded file, kept so playback can restart
+    var fileStartedAt = 0;       // audioCtx time the current pass began
+
+    function ensureMonitor() {
+        if (!audioCtx) return null;
+        if (!monitorGain) {
+            monitorGain = audioCtx.createGain();
+            monitorGain.gain.value = monitorMuted ? 0 : monitorVolume;
+            monitorGain.connect(audioCtx.destination);
+        }
+        return monitorGain;
+    }
+    function ensureExportTap() {
+        if (!audioCtx) return null;
+        if (!exportTap && audioCtx.createMediaStreamDestination) {
+            exportTap = audioCtx.createMediaStreamDestination();
+        }
+        return exportTap;
+    }
+    // Fan a freshly created source out to the analysers + taps.
+    function routeSource(src, monitorable) {
+        src.connect(analyser);
+        if (hiRes) { try { src.connect(hiRes.analyser); } catch (_) {} }
+        var tap = ensureExportTap();
+        if (tap) { try { src.connect(tap); } catch (_) {} }
+        if (monitorable) {
+            var mon = ensureMonitor();
+            if (mon) { try { src.connect(mon); } catch (_) {} }
+        }
+    }
+    function applyMonitorGain() {
+        if (monitorGain) monitorGain.gain.value = monitorMuted ? 0 : monitorVolume;
     }
 
     // ─── AUDIO SETUP ────────────────────────────────────────────
@@ -207,18 +255,39 @@
                 ensureContext();
                 audioCtx.decodeAudioData(reader.result, function (buffer) {
                     if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
+                    fileBuffer = buffer;
+                    srcKind = 'file';
                     var src = audioCtx.createBufferSource();
                     src.buffer = buffer;
                     src.loop = true;
-                    src.connect(analyser);
-                    if (hiRes) { try { src.connect(hiRes.analyser); } catch (_) {} }
+                    routeSource(src, true); // audible: this is the user's own track
                     src.start(0);
+                    fileStartedAt = audioCtx.currentTime;
                     sourceNode = src;
+                    if (typeof window.__onAudioSourceChanged === 'function') {
+                        try { window.__onAudioSourceChanged('file'); } catch (_) {}
+                    }
                     resolve();
                 }, reject);
             };
             reader.readAsArrayBuffer(file);
         });
+    }
+
+    // Restart the loaded track from its beginning — the practical way to line
+    // a take up with a video export (the loop otherwise runs from whenever
+    // the file happened to load).
+    function restartFile() {
+        if (!audioCtx || !fileBuffer) return false;
+        if (sourceNode) { try { sourceNode.stop(); } catch (_) {} try { sourceNode.disconnect(); } catch (_) {} }
+        var src = audioCtx.createBufferSource();
+        src.buffer = fileBuffer;
+        src.loop = true;
+        routeSource(src, true);
+        src.start(0);
+        fileStartedAt = audioCtx.currentTime;
+        sourceNode = src;
+        return true;
     }
 
     function ensureContext() {
@@ -268,9 +337,14 @@
         stream = s;
         ensureContext();
         if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
+        fileBuffer = null;
         sourceNode = audioCtx.createMediaStreamSource(s);
-        sourceNode.connect(analyser);
-        if (hiRes) { try { sourceNode.connect(hiRes.analyser); } catch (_) {} }
+        // NOT monitored: a mic echoed to the speakers is a feedback loop, and
+        // system audio is already coming out of them.
+        routeSource(sourceNode, false);
+        if (typeof window.__onAudioSourceChanged === 'function') {
+            try { window.__onAudioSourceChanged(srcKind); } catch (_) {}
+        }
 
         // Handle stream ending unexpectedly (user revokes permission, etc.)
         s.addEventListener('inactive', function () {
@@ -286,8 +360,20 @@
 
     function stopAudio() {
         if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
-        if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} sourceNode = null; }
+        if (sourceNode) {
+            // Buffer sources must be STOPPED, not just unpatched — a
+            // disconnected source keeps running and would still be playing
+            // (silently) if it were ever re-patched.
+            try { if (sourceNode.stop) sourceNode.stop(); } catch (_) {}
+            try { sourceNode.disconnect(); } catch (_) {}
+            sourceNode = null;
+        }
         if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+        fileBuffer = null;
+        srcKind = null;
+        if (typeof window.__onAudioSourceChanged === 'function') {
+            try { window.__onAudioSourceChanged(null); } catch (_) {}
+        }
         restoreOriginals();
     }
 
@@ -765,11 +851,16 @@
         enabled = true;
 
         var p;
+        // srcKind drives monitoring (files are audible) and what the video
+        // exporter is allowed to mux in.
         if (source === 'file' && fileObj) {
+            srcKind = 'file';
             p = startFile(fileObj);
         } else if (source === 'system') {
+            srcKind = 'system';
             p = startSystemAudio();
         } else {
+            srcKind = 'mic';
             p = startMic();
         }
 
@@ -794,6 +885,36 @@
         enable: enable,
         disable: disable,
         isEnabled: function () { return enabled; },
+
+        // ── Playback / monitoring (2026-08-16) ──
+        sourceKind: function () { return srcKind; },
+        // Only a loaded file plays through the speakers (see routeSource).
+        isMonitorable: function () { return srcKind === 'file' && !!fileBuffer; },
+        getMonitorVolume: function () { return monitorVolume; },
+        isMuted: function () { return monitorMuted; },
+        setMonitorVolume: function (v) {
+            monitorVolume = Math.max(0, Math.min(1, Number(v) || 0));
+            applyMonitorGain();
+            try { if (window.settingsManager) window.settingsManager.set('audio.monitorVolume', monitorVolume); } catch (_) {}
+            return monitorVolume;
+        },
+        setMuted: function (m) { monitorMuted = !!m; applyMonitorGain(); return monitorMuted; },
+        restart: restartFile,
+        // Seconds into the current loop pass (files only) — for UI readouts.
+        position: function () {
+            if (!audioCtx || !fileBuffer) return null;
+            var d = fileBuffer.duration || 0;
+            if (!d) return null;
+            return { time: (audioCtx.currentTime - fileStartedAt) % d, duration: d };
+        },
+        // Live MediaStream of whatever is being analysed, for the video
+        // exporter to mux in. Mic is withheld: recording someone's room by
+        // side effect of enabling mic-reactive visuals is a nasty surprise.
+        getOutputStream: function () {
+            if (!enabled || !audioCtx || srcKind === 'mic') return null;
+            var tap = ensureExportTap();
+            return tap ? tap.stream : null;
+        },
         getBands: function () {
             return {
                 bass: bass, mid: mid, treble: treble, overall: overall,
