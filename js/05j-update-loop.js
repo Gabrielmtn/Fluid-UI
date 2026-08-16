@@ -193,6 +193,19 @@
                         }
                     } else {
                         window.__contFlowLast = null;
+                        // Time-based splat-in needs the ramp re-evaluated while
+                        // the brush is held STILL — the whole point is that a
+                        // click blooms instead of stamping, and a stationary
+                        // press produces no dabs to hang that off. Emit one
+                        // zero-velocity dab per frame (dye only, no momentum)
+                        // until the ramp tops out; after that the stroke is at
+                        // full size and there is nothing left to animate.
+                        if (window.splatInMode === 'time' && pointer.down && !_dabs.length &&
+                            config.BRUSH_TARGET === 'fluid' &&
+                            window.BrushEngine && window.BrushEngine.isActive() &&
+                            getSplatInMult() < 0.999) {
+                            _dabs = [{ x: pointer.x, y: pointer.y, dx: 0, dy: 0, p: 1 }];
+                        }
                     }
                     if (_dabs.length) window.__lastPaintMs = nowMs;
                     const _toSketch = config.BRUSH_TARGET === 'sketch';
@@ -223,7 +236,12 @@
                         // (gateFlow) with the colour kept TRUE; additive bakes flow
                         // into the colour value. Keeping press + drag on one helper
                         // is what stops splat-one and the drag from diverging.
-                        const col = window.__applyPaintFlow(pointer.color, flowMul);
+                        // The splat-in ramp scales dye as well as radius (05d
+                        // __splatInFlowMul): the shader's centre deposit is
+                        // radius-independent, so a size-only ramp still stamped
+                        // full-strength colour on the first dab.
+                        const inFlow = window.__splatInFlowMul ? window.__splatInFlowMul(inMult) : 1;
+                        const col = window.__applyPaintFlow(pointer.color, flowMul * inFlow);
                         // Publish the true painted radius so recording captures the
                         // actual (splat-in ramped) brush size, not the base.
                         window.__lastPaintRadius = config.SPLAT_RADIUS * inMult;

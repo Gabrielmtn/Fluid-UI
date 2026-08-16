@@ -41,23 +41,64 @@
         function smoothstep(t) {
             return t * t * (3.0 - 2.0 * t);
         }
+        // 'time' mode: ramp over SECONDS since the press rather than travel.
+        // The distance modes are deliberately speed-independent, which is right
+        // for a stroke — but it means a CLICK that never moves cannot ramp at
+        // all: t stays 0 and the dab is pinned at the floor forever. Ramping on
+        // elapsed time is what lets a press bloom in. splatDownTime/splatUpTime
+        // were already being stamped on every press and release and never read
+        // by anything; they finally have a job.
+        if (typeof window.splatInMs !== 'number') window.splatInMs = 350;
+        if (typeof window.splatOutMs !== 'number') window.splatOutMs = 350;
+        function rampShape(mode, t) {
+            return (mode === 'linear') ? t : smoothstep(t);
+        }
         function getSplatInMult() {
-            if (window.splatInMode === 'instant') return 1.0;
-            const D = window.splatInDist || 0;
-            if (D <= 0.0001) return 1.0;
-            const t = Math.min(splatStrokeDist / D, 1.0);
-            const shape = (window.splatInMode === 'linear') ? t : smoothstep(t);
+            const mode = window.splatInMode;
+            if (mode === 'instant') return 1.0;
+            let t;
+            if (mode === 'time') {
+                const ms = window.splatInMs || 0;
+                if (ms <= 1) return 1.0;
+                t = Math.min((Date.now() - splatDownTime) / ms, 1.0);
+            } else {
+                const D = window.splatInDist || 0;
+                if (D <= 0.0001) return 1.0;
+                t = Math.min(splatStrokeDist / D, 1.0);
+            }
+            const shape = rampShape(mode === 'time' ? 'easing' : mode, t);
             return SPLAT_START_FLOOR + (1.0 - SPLAT_START_FLOOR) * shape;
         }
         function getSplatOutMult() {
-            if (window.splatOutMode === 'instant') return 0.0;
-            const D = window.splatOutDist || 0;
-            if (D <= 0.0001) return 0.0;
-            const t = Math.min(splatTailDist / D, 1.0);
+            const mode = window.splatOutMode;
+            if (mode === 'instant') return 0.0;
+            let t;
+            if (mode === 'time') {
+                const ms = window.splatOutMs || 0;
+                if (ms <= 1) return 0.0;
+                t = Math.min((Date.now() - splatUpTime) / ms, 1.0);
+            } else {
+                const D = window.splatOutDist || 0;
+                if (D <= 0.0001) return 0.0;
+                t = Math.min(splatTailDist / D, 1.0);
+            }
             if (t >= 1.0) return 0.0;
             const remaining = 1.0 - t;
-            return (window.splatOutMode === 'linear') ? remaining : smoothstep(remaining);
+            return rampShape(mode === 'time' ? 'easing' : mode, remaining);
         }
+        // The ramp scales the dab's RADIUS, but the splat shader's centre
+        // deposit is exp(0) = 1 whatever the radius — so every mode still laid
+        // down full-saturation colour in the first frame. That is the "flashes
+        // in like a camera" part, and no radius-only ramp can fix it. Ease the
+        // dye with the same shape: at the floor a dab is faint AND small, and
+        // it builds. Returns a flow multiplier to fold into the Flow slider's.
+        function splatInFlowMul(inMult) {
+            if (window.splatInMode === 'instant') return 1.0;
+            // Map the radius multiplier back onto its 0..1 shape so flow starts
+            // at the floor too rather than at full.
+            return Math.max(0, Math.min(1, inMult));
+        }
+        window.__splatInFlowMul = splatInFlowMul;
         function splatWithRadius(x, y, dx, dy, color, radius) {
             const saved = config.SPLAT_RADIUS;
             config.SPLAT_RADIUS = radius;
@@ -450,11 +491,14 @@
                 if (typeof window.__maskStamp === 'function') window.__maskStamp(coords.x, coords.y, 1);
             } else {
                 // Begin stroke recording and include the initial splat.
+                // Radius FIRST: pushStrokeEvent reads __lastPaintRadius, so
+                // computing it after meant every stroke's press event recorded
+                // the PREVIOUS stroke's size.
                 startStroke(pointer.x, pointer.y);
-                const _pcol = applyPaintFlow(pointer.color, pressFlowMul());
-                pushStrokeEvent(pointer.x, pointer.y, 0, 0, _pcol);
                 const inMult = getSplatInMult();
                 window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
+                const _pcol = applyPaintFlow(pointer.color, pressFlowMul() * splatInFlowMul(inMult));
+                pushStrokeEvent(pointer.x, pointer.y, 0, 0, _pcol);
                 if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, _pcol);
                 multiSplatWithRadius(pointer.x, pointer.y, 0, 0, _pcol, config.SPLAT_RADIUS * inMult);
                 window.__splatFlow = 1; // reset so the engine/tail/programmatic splats stay full-flow

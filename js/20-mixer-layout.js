@@ -1940,7 +1940,7 @@
         var splatInSelect = document.createElement('select');
         splatInSelect.id = 'splatInMode';
         splatInSelect.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,200,100,0.3);color:white;border-radius:4px;margin-bottom:6px;';
-        [['instant','Instant'],['linear','Linear'],['easing','Easing']].forEach(function(opt) {
+        [['instant','Instant'],['linear','Linear'],['easing','Easing'],['time','Over time']].forEach(function(opt) {
             var o = document.createElement('option');
             o.value = opt[0]; o.textContent = opt[1];
             splatInSelect.appendChild(o);
@@ -1949,6 +1949,13 @@
 
         // Ramp-distance slider (how far the brush travels before reaching full
         // size). Built by a small helper shared by in/out.
+        // Ramp cap raised 0.5 -> 2.0 canvas-widths (2026-08-16): a fast stroke
+        // crossed half a canvas width in ~200ms, so even "Easing" read as
+        // instant — the range simply could not express a gradual entrance.
+        // Step 0.01 -> 0.005 for finer control near the short end, where most
+        // of the useful settings live. Neither value is a registry param and
+        // snapshots apply them unclamped, so widening cannot invalidate
+        // anything already saved.
         function makeRampRow(id, getDist) {
             var row = document.createElement('div');
             row.style.cssText = 'display:flex;align-items:center;gap:6px;margin:-2px 0 8px;';
@@ -1957,14 +1964,20 @@
             lab.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.45);min-width:30px;';
             var slider = document.createElement('input');
             slider.type = 'range'; slider.id = id;
-            slider.min = '0'; slider.max = '0.5'; slider.step = '0.01';
+            slider.min = '0'; slider.max = '2'; slider.step = '0.005';
             slider.value = String(getDist());
             slider.style.cssText = 'flex:1;min-width:0;';
             var val = document.createElement('span');
-            val.style.cssText = 'font-size:10px;font-family:monospace;color:#f2f3f5;min-width:32px;text-align:right;';
-            val.textContent = Math.round(parseFloat(slider.value) * 100) + '%';
+            val.style.cssText = 'font-size:10px;font-family:monospace;color:#f2f3f5;min-width:38px;text-align:right;';
+            val.textContent = fmtRamp(parseFloat(slider.value));
             row.appendChild(lab); row.appendChild(slider); row.appendChild(val);
             return { row: row, slider: slider, val: val };
+        }
+        // Sub-1% settings are usable now that the step is 0.005, so the readout
+        // needs a decimal down there or several distinct values all read "1%".
+        function fmtRamp(v) {
+            var pct = v * 100;
+            return (pct < 10 ? pct.toFixed(1) : Math.round(pct)) + '%';
         }
         var inRamp = makeRampRow('splatInDist', function () { return window.splatInDist != null ? window.splatInDist : 0.15; });
         body.appendChild(inRamp.row);
@@ -1978,7 +1991,7 @@
         var splatOutSelect = document.createElement('select');
         splatOutSelect.id = 'splatOutMode';
         splatOutSelect.style.cssText = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,200,100,0.3);color:white;border-radius:4px;margin-bottom:6px;';
-        [['instant','Instant'],['linear','Linear'],['easing','Easing']].forEach(function(opt) {
+        [['instant','Instant'],['linear','Linear'],['easing','Easing'],['time','Over time']].forEach(function(opt) {
             var o = document.createElement('option');
             o.value = opt[0]; o.textContent = opt[1];
             splatOutSelect.appendChild(o);
@@ -1989,33 +2002,74 @@
         body.appendChild(outRamp.row);
 
         // --- Wire splat in/out ---
-        // Ramp slider only matters for linear/easing; dim it when mode is instant.
-        function syncRamp(ramp, sel) {
-            var on = sel.value !== 'instant';
+        // One row, two meanings: the distance modes ramp over TRAVEL (a % of
+        // canvas width) and "Over time" ramps over SECONDS, so the row retargets
+        // itself rather than adding a second slider that is dead half the time.
+        // It stays dimmed and disabled for Instant, which has nothing to ramp.
+        function rampSpec(mode) {
+            return (mode === 'time')
+                ? { label: 'Time', min: '0.05', max: '3', step: '0.05' }
+                : { label: 'Ramp', min: '0',    max: '2', step: '0.005' };
+        }
+        function fmtSecs(v) { return (v < 1 ? Math.round(v * 1000) + 'ms' : v.toFixed(2) + 's'); }
+        function syncRamp(ramp, sel, kind) {
+            var mode = sel.value;
+            var on = mode !== 'instant';
             ramp.row.style.opacity = on ? '1' : '0.4';
             ramp.slider.disabled = !on;
+            var spec = rampSpec(mode);
+            ramp.row.firstChild.textContent = spec.label;
+            ramp.slider.min = spec.min; ramp.slider.max = spec.max; ramp.slider.step = spec.step;
+            if (mode === 'time') {
+                var ms = (kind === 'in' ? window.splatInMs : window.splatOutMs);
+                if (typeof ms !== 'number') ms = 350;
+                ramp.slider.value = String(ms / 1000);
+                ramp.val.textContent = fmtSecs(ms / 1000);
+            } else {
+                var d = (kind === 'in' ? window.splatInDist : window.splatOutDist);
+                if (typeof d !== 'number') d = 0.15;
+                ramp.slider.value = String(d);
+                ramp.val.textContent = fmtRamp(d);
+            }
+            // The fill is painted from a CSS var that only tracks input/change,
+            // so a programmatic min/max/value swap leaves it stale.
+            ramp.slider.style.setProperty('--min', ramp.slider.min);
+            ramp.slider.style.setProperty('--max', ramp.slider.max);
+            ramp.slider.style.setProperty('--val', ramp.slider.value);
         }
         splatInSelect.addEventListener('change', function() {
             window.splatInMode = splatInSelect.value;
-            syncRamp(inRamp, splatInSelect);
+            syncRamp(inRamp, splatInSelect, 'in');
             try { if (window.settingsManager) window.settingsManager.set('brush.splatInMode', splatInSelect.value); } catch(_) {}
         });
         splatOutSelect.addEventListener('change', function() {
             window.splatOutMode = splatOutSelect.value;
-            syncRamp(outRamp, splatOutSelect);
+            syncRamp(outRamp, splatOutSelect, 'out');
             try { if (window.settingsManager) window.settingsManager.set('brush.splatOutMode', splatOutSelect.value); } catch(_) {}
         });
         inRamp.slider.addEventListener('input', function() {
             var v = parseFloat(inRamp.slider.value);
-            window.splatInDist = v;
-            inRamp.val.textContent = Math.round(v * 100) + '%';
-            try { if (window.settingsManager) window.settingsManager.set('brush.splatInDist', v); } catch(_) {}
+            if (splatInSelect.value === 'time') {
+                window.splatInMs = v * 1000;
+                inRamp.val.textContent = fmtSecs(v);
+                try { if (window.settingsManager) window.settingsManager.set('brush.splatInMs', window.splatInMs); } catch(_) {}
+            } else {
+                window.splatInDist = v;
+                inRamp.val.textContent = fmtRamp(v);
+                try { if (window.settingsManager) window.settingsManager.set('brush.splatInDist', v); } catch(_) {}
+            }
         });
         outRamp.slider.addEventListener('input', function() {
             var v = parseFloat(outRamp.slider.value);
-            window.splatOutDist = v;
-            outRamp.val.textContent = Math.round(v * 100) + '%';
-            try { if (window.settingsManager) window.settingsManager.set('brush.splatOutDist', v); } catch(_) {}
+            if (splatOutSelect.value === 'time') {
+                window.splatOutMs = v * 1000;
+                outRamp.val.textContent = fmtSecs(v);
+                try { if (window.settingsManager) window.settingsManager.set('brush.splatOutMs', window.splatOutMs); } catch(_) {}
+            } else {
+                window.splatOutDist = v;
+                outRamp.val.textContent = fmtRamp(v);
+                try { if (window.settingsManager) window.settingsManager.set('brush.splatOutDist', v); } catch(_) {}
+            }
         });
 
         // --- Wire mode toggle ---
@@ -2082,23 +2136,21 @@
                     splatOutSelect.value = savedSplatOut;
                     window.splatOutMode = savedSplatOut;
                 }
+                // Values only — syncRamp below points the row at whichever of
+                // these the restored mode actually uses.
                 var savedInDist = window.settingsManager.get('brush.splatInDist');
-                if (typeof savedInDist === 'number') {
-                    window.splatInDist = savedInDist;
-                    inRamp.slider.value = savedInDist;
-                    inRamp.val.textContent = Math.round(savedInDist * 100) + '%';
-                }
+                if (typeof savedInDist === 'number') window.splatInDist = savedInDist;
                 var savedOutDist = window.settingsManager.get('brush.splatOutDist');
-                if (typeof savedOutDist === 'number') {
-                    window.splatOutDist = savedOutDist;
-                    outRamp.slider.value = savedOutDist;
-                    outRamp.val.textContent = Math.round(savedOutDist * 100) + '%';
-                }
+                if (typeof savedOutDist === 'number') window.splatOutDist = savedOutDist;
+                var savedInMs = window.settingsManager.get('brush.splatInMs');
+                if (typeof savedInMs === 'number') window.splatInMs = savedInMs;
+                var savedOutMs = window.settingsManager.get('brush.splatOutMs');
+                if (typeof savedOutMs === 'number') window.splatOutMs = savedOutMs;
             }
         } catch (_) {}
-        // Reflect the in/out mode in the ramp sliders' enabled state
-        syncRamp(inRamp, splatInSelect);
-        syncRamp(outRamp, splatOutSelect);
+        // Point each ramp row at its mode's units and reflect the restored value
+        syncRamp(inRamp, splatInSelect, 'in');
+        syncRamp(outRamp, splatOutSelect, 'out');
 
         // Defaults
         if (!window.replayMode) window.replayMode = 'stroke';
