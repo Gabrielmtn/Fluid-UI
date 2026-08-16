@@ -453,6 +453,21 @@
                     vec3 glowC = mix(texture(uGlow, vUv).rgb, texture(uGlow, kUv).rgb,
                                      doK ? clamp(kBlend, 0.0, 1.0) : 0.0);
                     glowC = pow(max(glowC, vec3(0.0)), vec3(1.0 / 2.2));
+                    // Glow and Light Shift aim at the same pixels: overbright
+                    // dye. The halo carries that dye's own near-white hue, so
+                    // summing it raw both washed the recolor out (the mix below
+                    // starts from a base near 2.0 and clamps back to white) and
+                    // painted original white around the region LS had just
+                    // recolored. The glow texture holds only over-threshold
+                    // energy, and LS exists to say what colour that energy
+                    // takes -- so tint the halo the same way, luminance
+                    // preserved, scaled by the user's Intensity. Untouched when
+                    // Light Shift is off.
+                    if (lightShiftEnabled > 0.5) {
+                        float glum = dot(glowC, vec3(0.299, 0.587, 0.114));
+                        glowC = mix(glowC, lightShiftColor * glum,
+                                    clamp(lightShiftIntensity, 0.0, 1.0));
+                    }
                     vec3 gsum = color.rgb + glowC;
                     if (gateWhite > 0.0) {
                         // Gate on: the ceiling's whole promise is "never blow
