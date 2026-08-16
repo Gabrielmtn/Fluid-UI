@@ -1561,7 +1561,15 @@ function queueDab(xNorm, yNorm, dxAbs, dyAbs, radius) {
         +dxAbs.toFixed(3), +dyAbs.toFixed(3),
         +(radius || 0).toFixed(5)
     ]);
-    if (_dabQueue.length >= DAB_MAX_PER_MSG) flushDabs(null, 1, true);
+    // Arm count is stamped per message, so a forced flush must carry the real
+    // multiplier — hardcoding 1 here collapsed dense strokes to a single arm on
+    // every peer. Read the lexical binding, not window.animationMultiplier:
+    // 04e-anim-portal assigns the former without mirroring the latter.
+    if (_dabQueue.length >= DAB_MAX_PER_MSG) flushDabs(null, currentArmMult(), true);
+}
+
+function currentArmMult() {
+    return (typeof animationMultiplier === 'number') ? animationMultiplier : 1;
 }
 
 function flushDabs(color, mult, force) {
@@ -1616,7 +1624,7 @@ function broadcastPointerUp() {
     }
     // Push the stroke's tail dabs before the peer is told the stroke ended,
     // or the last sub-flush-interval dabs would be stranded in the queue.
-    flushDabs(window.__mpLastDabColor, 1, true);
+    flushDabs(window.__mpLastDabColor, currentArmMult(), true);
 
     console.log('[Multiplayer] Broadcasting pointer-up');
     partySocket.send(JSON.stringify({
