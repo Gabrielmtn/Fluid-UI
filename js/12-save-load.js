@@ -1054,7 +1054,17 @@
         try {
             if (snapshot.lightShiftPath) {
                 if (window.lightShift && window.lightShift.setPath) {
-                    window.lightShift.setPath(snapshot.lightShiftPath);
+                    // setPath restarts the playhead at index 0. The multiplayer
+                    // mirror re-applies this snapshot as often as every 400ms, so
+                    // re-setting an unchanged path pinned a watcher's colour cycle
+                    // at its first stop while the painter's animated. Only set when
+                    // the path actually differs.
+                    var _lsSame = false;
+                    try {
+                        _lsSame = window.lightShift.getPath &&
+                            JSON.stringify(snapshot.lightShiftPath) === JSON.stringify(window.lightShift.getPath());
+                    } catch (_) {}
+                    if (!_lsSame) window.lightShift.setPath(snapshot.lightShiftPath);
                 } else if (typeof window.lightShiftWaypoints !== 'undefined') {
                     window.lightShiftWaypoints = JSON.parse(JSON.stringify(snapshot.lightShiftPath));
                 }

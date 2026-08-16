@@ -322,6 +322,37 @@ var MP_PERF_LOCAL_KEYS = [
     'brushEraser', 'sketchVisible'
 ];
 
+// A freehand light-shift path stores one full-precision point per ~2px of
+// drag — ~117 bytes each, so a normal path is ~12KB on its own and pushed the
+// whole snapshot past the shed threshold below. The path was then deleted
+// SILENTLY, and a watcher ran with Light Shift "enabled" but no path at all:
+// their overexposed whites stayed white while the host's took the path's
+// colours. That asymmetry is what "theirs looked more blown out" was.
+//
+// A mirror doesn't need every sample — resample to at most MIRROR_PATH_POINTS
+// (keeping both endpoints) and round to 1 decimal. ~4KB, comfortably inside
+// the budget. Presets keep the full-fidelity path: only this mirror copy is
+// compacted, and the wire shape is unchanged so old clients still apply it.
+var MIRROR_PATH_POINTS = 64;
+function compactLightShiftPath(path) {
+    if (!path || !path.length) return path || null;
+    var r1 = function (v) { return (typeof v === 'number') ? Math.round(v * 10) / 10 : v; };
+    var src = path;
+    if (src.length > MIRROR_PATH_POINTS) {
+        var out = [];
+        var step = (src.length - 1) / (MIRROR_PATH_POINTS - 1);
+        for (var i = 0; i < MIRROR_PATH_POINTS; i++) {
+            out.push(src[Math.round(i * step)]);
+        }
+        src = out;
+    }
+    return src.map(function (p) {
+        if (!p || typeof p !== 'object') return p;
+        return { x: r1(p.x), y: r1(p.y), hue: r1(p.hue),
+                 saturation: r1(p.saturation), lightness: r1(p.lightness) };
+    });
+}
+
 function captureLookSnapshot() {
     if (typeof window.capturePresetSnapshot !== 'function') return null;
     var full;
@@ -346,7 +377,7 @@ function captureLookSnapshot() {
         savedColors: full.savedColors || null,
         userPalettes: full.userPalettes || null,
         lightPos: full.lightPos || null,
-        lightShiftPath: full.lightShiftPath || null,
+        lightShiftPath: compactLightShiftPath(full.lightShiftPath),
         brushState: full.brushState || null,
         material: full.material || null,
         brushTip: full.brushTip || null,
@@ -392,6 +423,9 @@ function fitLookSnapshot(snap) {
     var SHED = ['userPalettes', 'savedColors', 'lightShiftPath', 'ssOrigin', 'brushState'];
     for (var i = 0; i < SHED.length; i++) {
         try { if (JSON.stringify(out).length <= 14000) break; } catch (_) { break; }
+        // Shedding used to be completely silent, which is why a dropped
+        // lightShiftPath took a user test to find. Say what went overboard.
+        if (out[SHED[i]] != null) console.warn('[mp] look snapshot over budget — dropping ' + SHED[i]);
         delete out[SHED[i]];
     }
     var len = 0;
