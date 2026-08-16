@@ -626,13 +626,10 @@
             SYMMETRY_MODE: 'radial',  // Multi-Brush arm layout (05g symmetryTransforms).
                                       // 'radial' = the classic C_n ring (default, unchanged);
                                       // 'mirrorX'/'mirrorY'/'mirrorQuad' fold that ring across
-                                      // the centre axes (dihedral — 2n/2n/4n dabs); 'spiral'
-                                      // = rotate + shrink per copy; 'rake' = bristles offset
-                                      // perpendicular to travel. Multi-Brush dropdown select.
-            SYM_SPIRAL_TURN: 2.39996, // 'spiral' turn per copy in radians. Default is the
-                                      // golden angle, which is why the arms never line up
-                                      // into spokes the way an even fraction of 2π does.
-            SYM_SPIRAL_SCALE: 0.82,   // 'spiral' shrink per copy, toward the centre
+                                      // the centre axes (dihedral — 2n/2n/4n dabs); 'rake' =
+                                      // bristles offset perpendicular to travel. Multi-Brush
+                                      // dropdown select. (A 'spiral' mode was retired 2026-08-16
+                                      // — it never read right; stale values coerce to radial.)
             SYM_RAKE_SPACING: 1.0,    // 'rake' bristle gap in brush diameters, so the rake
                                       // opens and closes with the Size fader
 

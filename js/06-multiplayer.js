@@ -1682,13 +1682,23 @@ function handleRemoteSplat(data) {
         // Apply the SENDER's symmetry layout when the message carries it
         // (2026-08-16 fidelity audit: a mirrorX painter measured as radial on
         // the peer — the arms are positions, not styling). Unknown strings
-        // fall back to radial inside symmetryTransforms; old senders omit the
-        // field and keep the viewer's own mode, as before.
+        // old senders omit the field and keep the viewer's own mode, as before.
+        // The value is COERCED through the registry before it touches config: a
+        // peer on a cached bundle can still send a retired mode ('spiral'), and
+        // writing that raw let the 2s mirror poll re-persist and re-broadcast it
+        // — the same way a retired arm-colour mode came back from the dead once.
         var _symPrev = null;
-        if (data.data && typeof data.data.sym === 'string' && window.config &&
-            data.data.sym !== window.config.SYMMETRY_MODE) {
-            _symPrev = window.config.SYMMETRY_MODE;
-            window.config.SYMMETRY_MODE = data.data.sym;
+        if (data.data && typeof data.data.sym === 'string' && window.config) {
+            var _sym = data.data.sym;
+            try {
+                if (window.ParamRegistry && window.ParamRegistry.coerceSelect) {
+                    _sym = window.ParamRegistry.coerceSelect('symmetryMode', _sym) || 'radial';
+                }
+            } catch (_) {}
+            if (_sym !== window.config.SYMMETRY_MODE) {
+                _symPrev = window.config.SYMMETRY_MODE;
+                window.config.SYMMETRY_MODE = _sym;
+            }
         }
         try {
             // 1.3 parity path: the sender's real dab train. Each dab is applied

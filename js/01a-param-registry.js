@@ -150,7 +150,11 @@
         // Multi-Brush arm layout. No `mut`: symmetry only shapes FUTURE
         // strokes, so a mutation would leave the preview frame identical
         // and then silently change how the user's next stroke lands.
-        symmetryMode: {options: ["radial", "mirrorX", "mirrorY", "mirrorQuad", "spiral", "rake"], def: "radial", mut: null},
+        // 'spiral' retired 2026-08-16. It MUST stay out of this list: coerceSelect
+        // only maps a value to the default when the list rejects it, so leaving it
+        // here would let a stale 'spiral' through, fail the DOM option check, and
+        // make preset apply skip the select silently.
+        symmetryMode: {options: ["radial", "mirrorX", "mirrorY", "mirrorQuad", "rake"], def: "radial", mut: null},
         fpsCap: {options: ["30", "60", "120", "144", "165", "240", "native", "0"], def: "30", mut: null},
         lightMode: {options: ["manual", "random"], def: "manual", mut: {options: null, scope: "extended"}},
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},

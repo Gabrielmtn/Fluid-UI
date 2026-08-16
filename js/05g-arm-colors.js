@@ -161,46 +161,32 @@
             if (symCacheKey === key && symCacheList) return symCacheList;
 
             var out = [];
-            if (mode === 'spiral') {
-                // Similarity symmetry: each copy turns AND shrinks toward the
-                // centre, so the arms trace a logarithmic spiral instead of a
-                // ring. The golden-angle default is what keeps them from
-                // collapsing into spokes.
-                var turn = symCfg('SYM_SPIRAL_TURN', 2.39996);
-                var shrink = symCfg('SYM_SPIRAL_SCALE', 0.82);
-                var k = 1;
-                for (var i = 0; i < n; i++) {
-                    var ca = Math.cos(turn * i), sa = Math.sin(turn * i);
-                    out.push({ m: [ca * k, -sa * k, 0, sa * k, ca * k, 0], arm: i });
-                    k *= shrink;
+            // Rotational family. Adding the mirrors to C_n generates the
+            // dihedral group, so 'mirrorX' at 8 arms IS a proper D8
+            // kaleidoscope rather than eight independent tips.
+            var mirrors = mode === 'mirrorX' ? [SYM_MIRROR_X]
+                        : mode === 'mirrorY' ? [SYM_MIRROR_Y]
+                        : mode === 'mirrorQuad' ? [SYM_MIRROR_X, SYM_MIRROR_Y, SYM_MIRROR_XY]
+                        : null;   // 'radial' and any unknown/stale mode (e.g. a
+                                  // retired 'spiral' from an old preset or peer)
+            var seen = mirrors ? Object.create(null) : null;
+            for (var a = 0; a < n; a++) {
+                var R = symRot((Math.PI * 2 * a) / n);
+                var variants = [R];
+                if (mirrors) {
+                    for (var j = 0; j < mirrors.length; j++) variants.push(symCompose(mirrors[j], R));
                 }
-            } else {
-                // Rotational family. Adding the mirrors to C_n generates the
-                // dihedral group, so 'mirrorX' at 8 arms IS a proper D8
-                // kaleidoscope rather than eight independent tips.
-                var mirrors = mode === 'mirrorX' ? [SYM_MIRROR_X]
-                            : mode === 'mirrorY' ? [SYM_MIRROR_Y]
-                            : mode === 'mirrorQuad' ? [SYM_MIRROR_X, SYM_MIRROR_Y, SYM_MIRROR_XY]
-                            : null;   // 'radial' and any unknown/stale mode
-                var seen = mirrors ? Object.create(null) : null;
-                for (var a = 0; a < n; a++) {
-                    var R = symRot((Math.PI * 2 * a) / n);
-                    var variants = [R];
-                    if (mirrors) {
-                        for (var j = 0; j < mirrors.length; j++) variants.push(symCompose(mirrors[j], R));
+                for (var v = 0; v < variants.length; v++) {
+                    if (seen) {
+                        // A mirror can land back on a rotation already in the
+                        // set — Quad at an even arm count is the loud case,
+                        // since D_n has 2n elements, not 4n. Without this the
+                        // duplicates double-dose dye on those arms.
+                        var dk = variants[v].map(function (q) { return Math.round(q * 1e6); }).join(',');
+                        if (seen[dk]) continue;
+                        seen[dk] = 1;
                     }
-                    for (var v = 0; v < variants.length; v++) {
-                        if (seen) {
-                            // A mirror can land back on a rotation already in the
-                            // set — Quad at an even arm count is the loud case,
-                            // since D_n has 2n elements, not 4n. Without this the
-                            // duplicates double-dose dye on those arms.
-                            var dk = variants[v].map(function (q) { return Math.round(q * 1e6); }).join(',');
-                            if (seen[dk]) continue;
-                            seen[dk] = 1;
-                        }
-                        out.push({ m: variants[v], arm: a });
-                    }
+                    out.push({ m: variants[v], arm: a });
                 }
             }
             symCacheKey = key;
