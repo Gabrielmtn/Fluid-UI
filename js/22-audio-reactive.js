@@ -148,6 +148,14 @@
     var fileOffset = 0;          // seconds into the buffer while paused
     var fileLoop = true;
     var fileName = '';
+    // Generation token. Starting a source is ASYNC (file decode, getUserMedia,
+    // getDisplayMedia) and those completions used to attach unconditionally —
+    // so turning audio off mid-decode left the finished decode starting
+    // playback anyway: engine "disabled", checkbox clear, transport hidden,
+    // and a track audibly playing with no control to stop it. Every enable()
+    // and disable() bumps this; a completion whose token is stale cleans up
+    // after itself and attaches nothing.
+    var startToken = 0;
 
     // One-shot: resume the context on the next real user interaction, for the
     // case where the policy refused an ungestured resume(). A source already
@@ -201,7 +209,7 @@
     }
 
     // ─── AUDIO SETUP ────────────────────────────────────────────
-    function startMic() {
+    function startMic(token) {
         return navigator.mediaDevices.getUserMedia({
             audio: {
                 echoCancellation: false,
@@ -209,24 +217,24 @@
                 autoGainControl: false
             },
             video: false
-        }).then(function (s) { connectStream(s); });
+        }).then(function (s) { connectStream(s, token); });
     }
 
-    function startSystemAudio() {
+    function startSystemAudio(token) {
         // Electron path: use desktopCapturer for reliable system audio capture
         try {
             var remote = require('@electron/remote');
             var desktopCapturer = remote.desktopCapturer;
             if (desktopCapturer) {
-                return startSystemAudioElectron(desktopCapturer);
+                return startSystemAudioElectron(desktopCapturer, token);
             }
         } catch (_) {}
 
         // Browser fallback: getDisplayMedia
-        return startSystemAudioBrowser();
+        return startSystemAudioBrowser(token);
     }
 
-    function startSystemAudioElectron(desktopCapturer) {
+    function startSystemAudioElectron(desktopCapturer, token) {
         return desktopCapturer.getSources({ types: ['screen'] }).then(function (sources) {
             if (!sources || !sources.length) {
                 return Promise.reject(new Error('No screen sources available'));
@@ -256,11 +264,11 @@
             }
             // Stop video tracks — in Electron getUserMedia the audio survives
             s.getVideoTracks().forEach(function (t) { t.stop(); });
-            connectStream(s);
+            connectStream(s, token);
         });
     }
 
-    function startSystemAudioBrowser() {
+    function startSystemAudioBrowser(token) {
         // getDisplayMedia: audio constraints must be simple boolean, not getUserMedia-style
         return navigator.mediaDevices.getDisplayMedia({
             audio: true,
@@ -273,7 +281,7 @@
             }
             // Keep the full stream — createMediaStreamSource ignores video tracks
             // but the video track must stay alive to keep the stream active
-            connectStream(s);
+            connectStream(s, token);
         });
     }
 
@@ -301,7 +309,7 @@
         } catch (_) {}
     }
 
-    function startFile(file) {
+    function startFile(file, token) {
         return new Promise(function (resolve, reject) {
             var reader = new FileReader();
             var fail = function (err) {
@@ -317,6 +325,9 @@
             reader.onload = function () {
                 ensureContext();
                 var p = audioCtx.decodeAudioData(reader.result, function (buffer) {
+                    // Audio was turned off (or re-sourced) while we decoded —
+                    // attach nothing, or it plays on with the UI showing off.
+                    if (token !== startToken) { resolve(); return; }
                     if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
                     fileBuffer = buffer;
                     srcKind = 'file';
@@ -484,7 +495,14 @@
         return hiRes;
     }
 
-    function connectStream(s) {
+    function connectStream(s, token) {
+        // Stale permission grant (user turned audio off, or switched source,
+        // while the browser prompt was up): drop the stream instead of
+        // attaching it — otherwise the mic stays hot with the UI showing off.
+        if (typeof token === 'number' && token !== startToken) {
+            try { s.getTracks().forEach(function (t) { t.stop(); }); } catch (_) {}
+            return;
+        }
         stream = s;
         ensureContext();
         if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
@@ -999,27 +1017,33 @@
     function enable(source, fileObj) {
         if (enabled) disable();
         enabled = true;
+        var myToken = ++startToken;
 
         var p;
         // srcKind drives monitoring (files are audible) and what the video
         // exporter is allowed to mux in.
         if (source === 'file' && fileObj) {
             srcKind = 'file';
-            p = startFile(fileObj);
+            p = startFile(fileObj, myToken);
         } else if (source === 'system') {
             srcKind = 'system';
-            p = startSystemAudio();
+            p = startSystemAudio(myToken);
         } else {
             srcKind = 'mic';
-            p = startMic();
+            p = startMic(myToken);
         }
 
         p.then(function () {
+            // Superseded while we were starting (audio turned off, or a
+            // different source chosen) — the start path attached nothing, so
+            // don't spin the analysis loop up over it either.
+            if (myToken !== startToken) return;
             startLoop();
             // Success is also a state change (the file path resolves async,
             // long after the click) — let the UI mirror reality.
             notifySourceChanged();
         }).catch(function (err) {
+            if (myToken !== startToken) return; // a newer start owns the state
             console.warn('Audio reactive: failed to start', err);
             enabled = false;
             srcKind = null;
@@ -1032,6 +1056,9 @@
 
     function disable() {
         enabled = false;
+        // Invalidate any in-flight start (decode / permission prompt) so it
+        // can't attach a source after we've torn everything down.
+        startToken++;
         stopAudio();
     }
 
