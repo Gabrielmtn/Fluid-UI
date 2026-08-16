@@ -54,6 +54,7 @@
                 // collisionStrength (default 0.7) with antialiased detail —
                 // partial-strength texels must still block firmly.
                 float obsBlock = 1.0;
+                float obsBlockDye = 1.0;
                 if (hasObstacle == 1) {
                     // Must match obstacleSolidityGLSL's curve: dye injection
                     // blocking and the projection's wall must agree on where
@@ -63,6 +64,16 @@
                     float osr = clamp(uObsMax, 0.0, 1.0);
                     osr = min(osr * osr * osr, 0.997); // full-range strength curve + stability ceiling (matches solidity())
                     obsBlock = 1.0 - osr * smoothstep(0.35, 0.85, ocov);
+                    // The BRUSH is blocked by coverage alone, with no strength
+                    // term (2026-08-16). The s^3 permeability curve is right for
+                    // flow — a weak wall should leak — but applying it to direct
+                    // deposition meant the brush painted 27% of every dab INTO a
+                    // wall at the 0.9 default, and under Gate repeated dabs
+                    // converge on the full picked colour, so a wall could simply
+                    // be painted over. That is why colliding did not feel like
+                    // colliding. Paint now goes AROUND the shape at every
+                    // strength; advection through a leaky wall is untouched.
+                    obsBlockDye = 1.0 - smoothstep(0.35, 0.85, ocov);
                 }
                 if (isVelocity == 1) {
                     // Motion Isolation: prevent new velocity from affecting areas with existing velocity
@@ -222,11 +233,11 @@
                         // that can never reach full. (The old JS baked flow into the
                         // colour value — fine for the additive branch below, but
                         // under Gate that made every low-flow stroke a dark hue.)
-                        float w = clamp(shape, 0.0, 1.0) * obsBlock * gateFlow;
+                        float w = clamp(shape, 0.0, 1.0) * obsBlockDye * gateFlow;
                         result = mix(base, color, w);
                         newMem = mix(baseMem, max(color.r, max(color.g, color.b)), w);
                     } else {
-                        result = base + shape * color * obsBlock;
+                        result = base + shape * color * obsBlockDye;
                         newMem = max(baseMem, max(result.r, max(result.g, result.b)));
                     }
                     fragColor = vec4(result, newMem);

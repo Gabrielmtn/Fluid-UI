@@ -347,6 +347,17 @@
     border: 1px solid rgba(255, 255, 255, 0.04);
     line-height: 1.2;
 }
+/* Delete says "Delete". A trash glyph in a row of other glyphs is a guess,
+   and this is the one button in the row you cannot take back. */
+#sidebar-right .layer-delete-btn {
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 700;
+    margin-left: auto;          /* sits apart from the icon cluster */
+    color: rgba(255, 150, 140, 0.95);
+    background: rgba(255, 80, 70, 0.10);
+    border-color: rgba(255, 80, 70, 0.22);
+}
 
 /* Mask control buttons */
 #sidebar-right .layer-mask-controls {

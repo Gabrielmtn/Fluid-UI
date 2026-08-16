@@ -99,7 +99,7 @@
                                     <button class="layer-btn" onclick="toggleLayer(${layer.index})">
                                         ${layer.visible ? '👁️' : '👁️‍🗨️'}
                                     </button>
-                                    <button class="layer-btn" onclick="deleteLayer(${layer.index})">🗑️</button>
+                                    <button class="layer-btn layer-delete-btn" onclick="deleteLayer(${layer.index})" title="Delete this layer">Delete</button>
                                 </div>
                                 <div class="layer-threshold">
                                     <span>Opacity:</span>
@@ -187,8 +187,8 @@
                             <button class="layer-btn" onclick="toggleLayer(${layer.index})">
                                 ${layer.visible ? '👁️' : '👁️‍🗨️'}
                             </button>
-                            <button class="layer-btn layer-mask-btn ${hasMask ? 'has-mask' : ''} ${layer.mask?.enabled ? 'active' : ''}" onclick="toggleImageLayerMask(${layer.index})" title="${hasMask ? (layer.mask?.enabled ? 'Disable Mask' : 'Enable Mask') : 'No mask defined'}">✂️</button>
-                            <button class="layer-btn" onclick="deleteLayer(${layer.index})">🗑️</button>
+                            <button class="layer-btn layer-mask-btn ${hasMask ? 'has-mask' : ''} ${layer.mask?.enabled ? 'active' : ''}" onclick="toggleImageLayerMask(${layer.index})" title="${layer.isCollision ? (layer.mask?.enabled ? 'Collision ON — click to disable this collider' : 'Collision OFF — click to enable') : (hasMask ? (layer.mask?.enabled ? 'Disable Mask' : 'Enable Mask') : 'No mask defined')}">✂️</button>
+                            <button class="layer-btn layer-delete-btn" onclick="deleteLayer(${layer.index})" title="Delete this layer">Delete</button>
                         </div>
                         ${window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer) ? `
                         <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
@@ -197,7 +197,7 @@
                         ` : hasMask ? `
                         <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
                             <button class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">✏️ Edit Mask</button>
-                            <button class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">🗑️ Clear</button>
+                            <button class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">Clear Mask</button>
                             <button class="mask-control-btn" onclick="window.Masks && Masks.importFromLayer(${layer.index})" title="Import this layer's mask (SAM / depth / shapes) as a paintable Mask — edit it with the brush, clip layers with it, or bind it as a collider">⤓ Mask</button>
                             <span style="font-size:11px; opacity:0.7;">${layer.mask.shapes.length} shape${layer.mask.shapes.length !== 1 ? 's' : ''}</span>
                         </div>
@@ -231,18 +231,11 @@
                         ${layer.isCollision ? `
                         <div class="collision-controls" data-collision-layer="${layer.index}">
                             <div class="collision-row">
-                                <label class="collision-label">Mode</label>
-                                <select class="collision-mode-select" data-ci="${layer.index}">
-                                    <option value="block" ${layer.collisionMode === 'block' ? 'selected' : ''}>Block</option>
-                                    <option value="slow" ${layer.collisionMode === 'slow' ? 'selected' : ''}>Slow</option>
-                                    <option value="deflect" ${layer.collisionMode === 'deflect' ? 'selected' : ''}>Deflect</option>
-                                </select>
-                            </div>
-                            <div class="collision-row">
                                 <label class="collision-label">Strength</label>
                                 <div class="collision-slider-host" data-cs="${layer.index}"></div>
                                 <span class="collision-strength-val">${(layer.collisionStrength || 0.7).toFixed(1)}</span>
                             </div>
+                            ${window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer) ? '' : `
                             <div class="collision-row">
                                 <label class="collision-label">Threshold</label>
                                 <div class="collision-slider-host" data-ct="${layer.index}"></div>
@@ -252,7 +245,7 @@
                                 <label class="collision-toggle"><input type="checkbox" class="collision-invert-cb" data-cinv="${layer.index}" ${layer.mask?.shapes?.[0]?.invert ? 'checked' : ''}> Invert</label>
                                 <button type="button" class="collision-refresh-btn" data-cref="${layer.index}" title="Re-run depth estimation">🔄</button>
                             </div>
-                            <div style="font-size:10px;opacity:0.55;line-height:1.35;margin-top:4px;">💡 Soft edges: feather or mask the source first — the collider inherits the edge. Cleanest route: paint a Mask (Brush panel), then → Collider.</div>
+                            `}
                         </div>
                         ` : ''}
                         </div>

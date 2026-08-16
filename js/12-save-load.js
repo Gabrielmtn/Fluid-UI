@@ -685,6 +685,7 @@
                         title: layer.title || ('Layer ' + layer.index),
                         data: layer.data || null,
                         originalData: layer.originalData || layer.data || null,
+                        filmData: layer.filmData || null,   // collider on-canvas film
                         visible: layer.visible !== false,
                         active: !!layer.active,
                         threshold: layer.threshold || 0,
@@ -1273,12 +1274,16 @@
                             var layersHost = document.getElementById('layers-container') || canvasWrapper;
                             if (layersHost) layersHost.appendChild(layerDiv);
                         }
-                        layerDiv.style.backgroundImage = 'url(' + ld.data + ')';
+                        // Prefer the tinted coverage film; ld.data is the OPAQUE
+                        // map (black off-wall) and painting that full-bleed over
+                        // the canvas is the veil described in 23-depth-collision.
+                        // Presets saved before filmData existed fall back to it.
+                        layerDiv.style.backgroundImage = 'url(' + (ld.filmData || ld.data) + ')';
                         // Stretch — matches the obstacle compositor's mapping (see 23-depth-collision.js)
                         layerDiv.style.backgroundSize = '100% 100%';
                         layerDiv.style.backgroundPosition = 'center';
                         layerDiv.style.display = ld.visible ? 'block' : 'none';
-                        layerDiv.style.opacity = '0.55';
+                        layerDiv.style.opacity = ld.filmData ? '0.3' : '0.55';
                     } else {
                         // Regular image layers use pre-existing layerN divs
                         layerDiv = document.getElementById('layer' + ld.index);
@@ -1294,6 +1299,7 @@
                         title: ld.title || ('Layer ' + ld.index),
                         data: ld.data,
                         originalData: ld.originalData || ld.data,
+                        filmData: ld.filmData || null,
                         visible: ld.visible !== false,
                         active: false,
                         threshold: ld.threshold || 0,
