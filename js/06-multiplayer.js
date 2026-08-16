@@ -720,7 +720,7 @@ function updateTurnChip() {
         chip.type = 'button';
         chip.addEventListener('click', function () {
             // Bring the rotation into view. On mobile the sidebar is a
-            // closed drawer — open it first; and the Multi Artist section
+            // closed drawer — open it first; and the Multiplayer section
             // collapses to zero height, so expand it or the scroll lands
             // on nothing visible.
             var controls = document.getElementById('sidebar-right');

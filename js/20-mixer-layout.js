@@ -3905,9 +3905,9 @@
 
     function buildMultiArtistSection() {
         // Collapsed by default like the rest of the sidebar (UI starts fully collapsed).
-        const { sec, body } = makeSection('🌐 Multi Artist', 'blue', true);
+        const { sec, body } = makeSection('🌐 Multiplayer', 'blue', true);
 
-        // Move the new multi artist panel
+        // Move the multiplayer panel
         var panel = document.getElementById('multiArtistPanel');
         if (panel) body.appendChild(panel);
 
