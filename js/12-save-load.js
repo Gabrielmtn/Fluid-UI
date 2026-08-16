@@ -197,6 +197,12 @@
         // the legacy checkboxes + color.brush programmatically, and the 05g
         // handlers must not hijack arm0.mode — the reconcile in 6b owns it.
         window.__brushColorRestoring = true;
+        // Same reason applyPresetSnapshot raises this: the checkbox pass below
+        // dispatches 'change' on every restored checkbox, and handlers that
+        // rewrite OTHER controls (kaleido → multiplier) would clobber values
+        // this very function just restored. Without it, a session saved with
+        // kaleido on booted at 8 arms no matter what multiplier was saved.
+        window._profileApplying = true;
 
         // ── 1. Palettes (must happen before other UI that references them) ──
         try {
@@ -326,6 +332,10 @@
         } catch(_) {}
         window.__brushColorRestoring = false;
         if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI();
+        // Release on the next tick, matching applyPresetSnapshot: any change
+        // handlers queued by this load still see the flag, manual edits after
+        // boot do not.
+        setTimeout(function () { window._profileApplying = false; }, 0);
 
         // ── 7. Canvas wrapper rect ──
         var wr = sm.get('canvas.wrapperRect');
