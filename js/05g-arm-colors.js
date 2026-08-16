@@ -137,6 +137,15 @@
         var symCacheKey = '';
         var symCacheList = null;
 
+        // Smoothed rake heading. The bristle line used to be rebuilt from each
+        // dab's raw instantaneous direction, and a dab is one pointer segment —
+        // 1-2px, integer-quantized for a mouse, so its angle can swing ±45°
+        // between consecutive dabs from quantization alone. With the outermost
+        // bristle sitting hundreds of px off the tip, that swing threw it across
+        // the canvas every dab: the "spastic" rake. Worst on slow, careful
+        // strokes, where the segments are shortest and the angle noisiest.
+        var rakeUx = 0, rakeUy = 1, rakeHas = false;
+
         function symmetryTransforms(mode, n, dx, dy) {
             n = Math.max(1, n | 0);
             if (mode === 'rake') {
@@ -145,11 +154,32 @@
                 // pushes the fluid exactly the way the real tip does.
                 var gap = symCfg('SYM_RAKE_SPACING', 1) * symBrushDiameterPx();
                 var sp = Math.hypot(dx, dy);
-                // The initial press has no travel to be perpendicular to; spread
-                // it horizontally so the rake still reads as a rake instead of
-                // stacking n dabs on one spot.
-                var px = sp > 1e-6 ? -dy / sp : 0;
-                var py = sp > 1e-6 ?  dx / sp : 1;
+                if (sp > 1e-6) {
+                    var ux = dx / sp, uy = dy / sp;
+                    // Dragging back along the stroke shouldn't spin the rake 180°
+                    // (which would also reverse arm order, and with it the colours).
+                    // A real rake keeps its line through a reversal.
+                    if (rakeHas && (ux * rakeUx + uy * rakeUy) < 0) { ux = -ux; uy = -uy; }
+                    if (!rakeHas) {
+                        rakeUx = ux; rakeUy = uy; rakeHas = true;
+                    } else {
+                        // Turn over a fixed distance of TRAVEL, not per dab, so the
+                        // feel is identical at any Spacing setting or stroke speed.
+                        // |v| is 10x the dab's travel in both the engine and legacy
+                        // paths, hence sp/10.
+                        var turnPx = symCfg('SYM_RAKE_SMOOTH', 2.5) * symBrushDiameterPx();
+                        var k = turnPx > 0 ? Math.min(1, (sp / 10) / turnPx) : 1;
+                        rakeUx += k * (ux - rakeUx);
+                        rakeUy += k * (uy - rakeUy);
+                        var rl = Math.hypot(rakeUx, rakeUy);
+                        if (rl > 1e-6) { rakeUx /= rl; rakeUy /= rl; }
+                        else { rakeUx = ux; rakeUy = uy; }
+                    }
+                }
+                // A press has no travel of its own: inherit the carried heading
+                // rather than snapping to vertical and then jumping on first move.
+                var px = rakeHas ? -rakeUy : 0;
+                var py = rakeHas ?  rakeUx : 1;
                 var rk = [];
                 for (var r = 0; r < n; r++) {
                     var off = (r - (n - 1) / 2) * gap;

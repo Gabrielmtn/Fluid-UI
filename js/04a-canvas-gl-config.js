@@ -630,6 +630,11 @@
                                       // bristles offset perpendicular to travel. Multi-Brush
                                       // dropdown select. (A 'spiral' mode was retired 2026-08-16
                                       // — it never read right; stale values coerce to radial.)
+            SYM_RAKE_SMOOTH: 2.5,     // 'rake' heading smoothing: brush diameters of TRAVEL
+                                      // the bristle line takes to turn. Per-dab direction is
+                                      // one 1-2px pointer segment (±45° of quantization
+                                      // noise), amplified by the outer bristle's long lever
+                                      // arm — this is what stops it whipping. 0 disables.
             SYM_RAKE_SPACING: 1.0,    // 'rake' bristle gap in brush diameters, so the rake
                                       // opens and closes with the Size fader
 
