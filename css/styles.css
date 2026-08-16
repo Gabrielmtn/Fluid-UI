@@ -445,30 +445,33 @@
            ancestry-scoped rules no longer matched. */
 
         .control-group {
-            margin-bottom: 15px;
+            margin-bottom: 8px;
             /* Keep pen full-row drags (06-slider-updater forwarding) from
                being claimed as container pans mid-drag — preventDefault on
                pointerdown can't stop panning, only touch-action can.
                pan-y so vertical drawer scrolling still starts here. */
             touch-action: pan-y;
         }
-        
+
+        /* Same density pass as the sidebar rows (21-sidebar.css): the name
+           carries the row, the number supports it. */
         .control-group label {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 11px;
+            margin-bottom: 4px;
             font-size: 12px;
             text-transform: uppercase;
-            opacity: 0.8;
+            font-weight: 700;
+            opacity: 1;
             letter-spacing: 0.5px;
         }
-        
+
         .control-group label .value-display {
-            font-size: 16px;
+            font-size: 12px;
             text-transform: none;
-            opacity: 1;
-            font-weight: 600;
+            opacity: 0.75;
+            font-weight: 500;
         }
         
         /* Slider styles moved to slider-styles.css */

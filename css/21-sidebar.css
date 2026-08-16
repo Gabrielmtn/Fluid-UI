@@ -121,9 +121,16 @@
 .sidebar-section[data-color="cyan"]   .section-title { color: rgba(80, 210, 255, 0.75); }
 .sidebar-section[data-color="pink"]   .section-title { color: rgba(255, 130, 170, 0.75); }
 
-/* ── Compact controls within sidebar ── */
+/* ── Compact controls within sidebar ──
+   Density pass (2026-08-16): a row spent ~95px to carry ~39px of
+   information, and the hierarchy was inverted — the NAME rendered at 10px
+   70%-opacity while its number sat at 13px/600, so the eye landed on
+   digits and had to hunt for what they belonged to. Worse, the 0.7 on the
+   label cascaded to the value (its opacity:1 is relative to the parent),
+   so nothing in the row rendered at full contrast. Names are now the
+   strongest thing in the row and everything else gives way. */
 #sidebar-right .control-group {
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 #sidebar-right .control-group:last-child {
     margin-bottom: 0;
@@ -132,18 +139,38 @@
     display: flex;
     justify-content: flex-start;
     align-items: center;
-    margin-bottom: 6px;
+    margin-bottom: 2px;
     font-size: 10px;
     text-transform: uppercase;
-    opacity: 0.7;
+    font-weight: 700;
+    opacity: 1;
     letter-spacing: 0.4px;
 }
 #sidebar-right .control-group label .value-display {
-    font-size: 13px;
+    font-size: 11px;
     text-transform: none;
-    opacity: 1;
-    font-weight: 600;
+    opacity: 0.75;
+    font-weight: 500;
     margin-left: auto; /* value right-aligned; hk-cap sits beyond it */
+}
+/* The printed 0/mid/max band duplicates a number the row already shows on
+   its right, at 18px of height per row. The strip dropped it for the same
+   reason; the comment there claiming the sidebar has "no value column" has
+   been stale ever since these rows gained one. */
+#sidebar-right .fader-scale {
+    display: none;
+}
+/* 44px is the design handoff's RACK-ROW target and it is the single largest
+   line item in a row. 32px still clears the 28px coarse-pointer floor, and
+   the media query below hands the full 44px back to touch, which is who the
+   number was for. */
+#sidebar-right .control-group input[type="range"] {
+    --input-py: 5px;
+}
+@media (pointer: coarse) {
+    #sidebar-right .control-group input[type="range"] {
+        --input-py: 11px;
+    }
 }
 /* Rows without a value span: the cap alone takes the right margin */
 #sidebar-right .control-group label .hk-cap:first-of-type:last-child,
