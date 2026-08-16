@@ -289,6 +289,16 @@
                         // can die while stabilizer dabs still drain. The
                         // full-idle gate above owns the flush.
                         splatOutActive = false;
+                        // Wire flush: the tail queues dabs AFTER
+                        // broadcastPointerUp already force-flushed, so its
+                        // final sub-interval dabs would sit in the queue until
+                        // the NEXT stroke pushed them — measured as a stray dab
+                        // from the previous stroke landing out of order at the
+                        // start of the next one. End of tail = end of stroke.
+                        if (typeof window.flushDabs === 'function') {
+                            window.flushDabs(window.__mpLastDabColor,
+                                (typeof animationMultiplier === 'number' ? animationMultiplier : 1), true);
+                        }
                     } else {
                         // Tail dye honors the Flow slider like the stroke it ends
                         const tailFlow = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
@@ -300,7 +310,21 @@
                         // softly — no abrupt stop.
                         const outProgress = 1.0 - outMult; // 0 at start → 1 at end
                         const decayRate = 0.96 - 0.06 * outProgress; // 0.96 → 0.90
-                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * decayRate, splatOutDy * decayRate, tailCol, config.SPLAT_RADIUS * splatReleaseInMult * outMult);
+                        const tailRadius = config.SPLAT_RADIUS * splatReleaseInMult * outMult;
+                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * decayRate, splatOutDy * decayRate, tailCol, tailRadius);
+                        // 2026-08-16 fidelity audit: the release tail is part of
+                        // the stroke the painter sees — peers used to watch
+                        // strokes stop dead at lift while the painter's eased
+                        // out. The tail rides the same dab wire as the stroke.
+                        if (typeof window.queueDab === 'function') {
+                            window.__mpLastDabColor = tailCol;
+                            window.queueDab(splatOutX / canvas.width, splatOutY / canvas.height,
+                                splatOutDx * decayRate, splatOutDy * decayRate, tailRadius);
+                        }
+                        if (typeof window.flushDabs === 'function') {
+                            window.flushDabs(tailCol,
+                                (typeof animationMultiplier === 'number' ? animationMultiplier : 1), false);
+                        }
                         // Advance the tail along the decaying velocity + accumulate
                         // its travel for the distance-based taper.
                         splatOutX += splatOutDx / 10;

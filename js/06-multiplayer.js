@@ -1464,7 +1464,9 @@ function onMultiplayerError(error) {
     console.error('Multiplayer error:', error);
 }
 
-function broadcastSplat(x, y, dx, dy, color, mult, radius) {
+// down=true marks a stroke-opening press stamp so the receiver starts a fresh
+// segment instead of interpolating from the previous stroke's end.
+function broadcastSplat(x, y, dx, dy, color, mult, radius, down) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
         return;
     }
@@ -1483,7 +1485,13 @@ function broadcastSplat(x, y, dx, dy, color, mult, radius) {
 
     partySocket.send(JSON.stringify({
         type: 'splat',
-        data: { x, y, dx, dy, color, mult, radius: effRadius },
+        // sym (2026-08-16 fidelity audit): the painter's symmetry layout
+        // decides WHERE the arms land; without it peers applied dabs under
+        // their OWN mode and the paint landed elsewhere. Additive field —
+        // old receivers ignore it.
+        data: { x, y, dx, dy, color, mult, radius: effRadius,
+                sym: (window.config && window.config.SYMMETRY_MODE) || 'radial',
+                down: !!down },
         timestamp: now
     }));
     broadcastSplat.lastSent = now;
@@ -1545,6 +1553,8 @@ function flushDabs(color, mult, force) {
             color: color || window.__mpLastDabColor || [1, 0, 0],
             mult: mult || 1,
             radius: last[4] || undefined,
+            // Painter's arm layout — see broadcastSplat's sym note.
+            sym: (window.config && window.config.SYMMETRY_MODE) || 'radial',
             dabs: dabs
         },
         timestamp: now
@@ -1627,6 +1637,17 @@ function handleRemoteSplat(data) {
         // Peer strokes must not pick up THIS client's custom stamp (05i gates
         // getActiveStamp on this flag); built-in tips still render for them.
         window.__remoteStroke = true;
+        // Apply the SENDER's symmetry layout when the message carries it
+        // (2026-08-16 fidelity audit: a mirrorX painter measured as radial on
+        // the peer — the arms are positions, not styling). Unknown strings
+        // fall back to radial inside symmetryTransforms; old senders omit the
+        // field and keep the viewer's own mode, as before.
+        var _symPrev = null;
+        if (data.data && typeof data.data.sym === 'string' && window.config &&
+            data.data.sym !== window.config.SYMMETRY_MODE) {
+            _symPrev = window.config.SYMMETRY_MODE;
+            window.config.SYMMETRY_MODE = data.data.sym;
+        }
         try {
             // 1.3 parity path: the sender's real dab train. Each dab is applied
             // with ITS OWN full velocity, verbatim — no gap-fill invention and
@@ -1651,6 +1672,13 @@ function handleRemoteSplat(data) {
             }
 
             // Legacy path — a peer on the previous build, or the press stamp.
+            // A press stamp OPENS a stroke, so it must never gap-fill from
+            // wherever the last one ended: measured (2026-08-16 audit) as 8
+            // phantom dabs painting a straight line from the end of the
+            // previous stroke to the start of the next. pointer-up clears the
+            // position, but the release TAIL now streams dabs after it and
+            // re-seeds it, so the flag is what makes this reliable.
+            if (data.data.down) remoteLastPositions.delete(data.clientId);
             const lastPos = remoteLastPositions.get(data.clientId);
             // Gap-fill between network messages at ~12px spacing (matching how
             // densely local mousemove events deposit dabs), splitting the
@@ -1688,6 +1716,7 @@ function handleRemoteSplat(data) {
         } finally {
             isProcessingRemoteEvent = false;
             window.__remoteStroke = false;
+            if (_symPrev !== null) window.config.SYMMETRY_MODE = _symPrev;
         }
     }
 }

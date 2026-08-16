@@ -12,6 +12,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["http-server", "public", "-p", "8092", "-c-1"],
       "port": 8092
+    },
+    {
+      "name": "party-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["partykit", "dev", "--serve", "."],
+      "port": 1999
     }
   ]
 }

@@ -431,12 +431,20 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
-            // D2 routing: sketch strokes are plain raster paint — no fluid
-            // replay events, no recording timelines, no multiplayer
-            // broadcast (local-only until D7's unified schema)
+            // D2/D3 routing: sketch and mask strokes are surface paint — no
+            // fluid replay events, no recording timelines, no multiplayer
+            // broadcast (local-only until D7's unified schema). The gate used
+            // to test 'sketch' only, so collider painting ('mask') pressed a
+            // DYE splat into the fluid — locally AND broadcast to peers, who
+            // saw phantom colour blobs while the painter drew invisible-to-
+            // them walls (found by the 2026-08-16 multiplayer fidelity audit).
             const _sketchTarget = config.BRUSH_TARGET === 'sketch';
+            const _maskTarget = config.BRUSH_TARGET === 'mask';
             if (_sketchTarget) {
                 if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
+            } else if (_maskTarget) {
+                // Press lands in the mask, same as the 05j dab route.
+                if (typeof window.__maskStamp === 'function') window.__maskStamp(coords.x, coords.y, 1);
             } else {
                 // Begin stroke recording and include the initial splat.
                 startStroke(pointer.x, pointer.y);
@@ -452,7 +460,7 @@
             // the engine (fed from the pointermove listener below, drained in
             // 05j). The immediate press stamp above stays for latency.
             if (window.BrushEngine) window.BrushEngine.begin(coords.x, coords.y);
-            if (!_sketchTarget && typeof broadcastSplat === 'function') {
+            if (!_sketchTarget && !_maskTarget && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
                     coords.y / canvas.height,
@@ -460,7 +468,8 @@
                     0,
                     pointer.color,
                     (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
-                    config.SPLAT_RADIUS
+                    config.SPLAT_RADIUS,
+                    true   // stroke-opening press: no gap-fill from the last stroke
                 );
             }
         });
@@ -532,7 +541,11 @@
             if (wasDown && typeof broadcastPointerUp === 'function') {
                 broadcastPointerUp();
             }
-            if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
+            // Tail is a FLUID effect: sketch and mask (collider) strokes must
+            // not arm it — the sketch-only test let a collider stroke's lift
+            // squirt a dye tail into the fluid at the wall's end, locally and
+            // (once tails rode the wire) on every peer. Audit 2026-08-16.
+            if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid') {
                 splatUpTime = Date.now();
                 splatOutActive = true;
                 splatTailDist = 0;
@@ -766,9 +779,14 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
+            // Same sketch/mask routing as the pointerdown press (see the
+            // audit note there): mask presses stamp the mask, never the fluid.
             const _sketchTargetT = config.BRUSH_TARGET === 'sketch';
+            const _maskTargetT = config.BRUSH_TARGET === 'mask';
             if (_sketchTargetT) {
                 if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
+            } else if (_maskTargetT) {
+                if (typeof window.__maskStamp === 'function') window.__maskStamp(coords.x, coords.y, 1);
             } else {
                 const inMult = getSplatInMult();
                 window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
@@ -781,7 +799,7 @@
             if (window.BrushEngine) {
                 window.BrushEngine.begin(coords.x, coords.y);
             }
-            if (!_sketchTargetT && typeof broadcastSplat === 'function') {
+            if (!_sketchTargetT && !_maskTargetT && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
                     coords.y / canvas.height,
@@ -789,7 +807,8 @@
                     0,
                     pointer.color,
                     (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
-                    config.SPLAT_RADIUS
+                    config.SPLAT_RADIUS,
+                    true   // stroke-opening press: no gap-fill from the last stroke
                 );
             }
         }, { passive: false });
@@ -832,7 +851,8 @@
         window.addEventListener('touchend', (e) => {
             TouchGestures.end(e);
             if (pointer.down) {
-                if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
+                // Same fluid-only tail gate as finishLeftStroke (audit note there)
+                if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid') {
                     splatUpTime = Date.now();
                     splatOutActive = true;
                     splatTailDist = 0;
