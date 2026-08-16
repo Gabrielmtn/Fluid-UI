@@ -1494,6 +1494,30 @@ body.rec-open #sidebar-right {
 }
 .audio-mini-enable input { margin: 0; cursor: pointer; }
 .audio-mini-src { flex: 1; min-width: 0; }
+/* Readable dropdown list (2026-08-16). Chromium paints a native <option>
+   popup from the control's background-COLOR — a gradient background-IMAGE
+   is ignored — so a select whose colour is transparent drops its list onto
+   the platform's light surface, where our light option text reads as grey
+   on white (that was Mic/System/File: only the blue-highlighted row was
+   legible). #sidebar-right's select rules fixed this for the sidebar, but
+   the audio enable row TRAVELS — into the studio drawer for Full mode and
+   into the scene box for scene modes — so it must be styled by its own
+   class, not by where it currently lives. Same treatment for every select
+   in the drawer, which sits outside the sidebar entirely. */
+.audio-mini-src,
+#recDrawer select {
+    background-color: var(--ground-950, #0b0f14);
+    color: var(--ink-100, #e6edf3);
+    color-scheme: dark;
+}
+/* Baseline for options app-wide: they are never used as disguised labels
+   (unlike the material-mode select), so an opaque dark row is always right,
+   and any future relocated control inherits a readable popup. The
+   material-mode option rule above is more specific and still wins. */
+select option {
+    background-color: var(--ground-950, #0b0f14);
+    color: var(--ink-100, #e6edf3);
+}
 /* Playback row: shown only while a FILE is the source (it is the only
    source routed to the speakers — mic/system would feed back or echo). */
 .audio-play-row { margin: 6px 0 2px; }
