@@ -388,6 +388,10 @@
             if (e.button === 2) {
                 e.preventDefault();
                 isRightMouseDown = true;
+                // Capture, like the paint path does: without it a release that
+                // happens off-window is never delivered here and the hold
+                // strands. (The paint branch below captures; this one never did.)
+                try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
                 if (pointer.down) {
                     // Left/tip is held — enter pause-only mode.
                     // Snapshot velocity for the fast-brush easter egg on release.
@@ -482,6 +486,17 @@
         // arriving even when the pen drifts off-canvas, so the stroke never freezes.
         canvas.addEventListener('pointermove', (e) => {
             if (e.pointerType === 'touch') return; // touchmove owns touch
+            // Self-heal a stranded replay hold. A hovering pen streams moves with
+            // no buttons held, so the first move after a missed barrel release
+            // clears it and painting comes back immediately — instead of staying
+            // dead until the app restarts. A genuine mouse right-hold and a
+            // barrel-held hover both still report bit 2, so a deliberate replay
+            // hold is untouched.
+            if (isRightMouseDown && (e.buttons & 2) === 0) {
+                isRightMouseDown = false;
+                isReplayActive = false;
+                window._activeReplayEvents = null;
+            }
             if (isPaused || isReplayActive) return;
             // Engine feed: replay every coalesced sub-frame sample (position)
             // while a stroke is live. Density is governed by BRUSH_SPACING.
@@ -580,6 +595,18 @@
             if (window.__paintPointerId != null) {
                 try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
                 window.__paintPointerId = null;
+            }
+            // Trust the buttons BITMASK, not just which button this event names.
+            // A pen barrel press arrives as button 2 and latches the replay hold;
+            // if its release never comes back as a button-2 pointerup — released
+            // while hovering, released off-window, or swallowed by the OS
+            // press-and-hold gesture — the hold stuck forever. A stuck hold
+            // re-launches the last stroke's replay every pass, which both sprays
+            // dye where you were painting and gates all further painting down to
+            // press dots: "the stylus stopped working". It also rebroadcast every
+            // pass, so one stuck client locked painting for the whole room.
+            if (isRightMouseDown && (e.buttons & 2) === 0 && e.button !== 2) {
+                isRightMouseDown = false;
             }
             if (e.button === 2) {
                 isRightMouseDown = false;
