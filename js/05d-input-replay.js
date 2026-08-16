@@ -299,12 +299,11 @@
                     // "use current live settings" behavior meant a stroke
                     // painted small replayed at whatever the slider says now —
                     // and remote strokes replayed at the RECEIVER's brush size.
-                    // 1.1 Live colors (opt-in): repaint the stroke with the
-                    // CURRENT brush color instead of the recorded one — the
-                    // faithful-replay default stays (recorded color, arm modes
-                    // still resolve on top either way).
-                    var repCol = (window.replayLiveColors && window.pointer && window.pointer.color)
-                        ? window.pointer.color.slice() : ev.color;
+                    // Replay is faithful: the colour that was painted. (The
+                    // "use current colour" opt-in was removed 2026-08-16 — arm
+                    // modes resolve on top of this value, and arm 0's usual
+                    // 'fixed' mode discarded the live colour anyway.)
+                    var repCol = ev.color;
                     // Replayed strokes are not live viewer strokes: the
                     // viewer's active custom stamp must not restyle them —
                     // events carry no shape info, so "current active shape"

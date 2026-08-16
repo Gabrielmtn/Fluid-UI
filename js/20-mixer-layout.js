@@ -1908,7 +1908,7 @@
 
         var speedLbl = document.createElement('label');
         speedLbl.setAttribute('for', 'replaySpeed');
-        speedLbl.innerHTML = 'Replay Speed <span class="value-display" id="replaySpeedValue">1.0×</span>';
+        speedLbl.innerHTML = 'Replay Speed <span class="value-display" id="replaySpeedValue">1×</span>';
 
         var speedSlider = document.createElement('input');
         speedSlider.type = 'range';
@@ -1922,30 +1922,15 @@
         speedGroup.appendChild(speedSlider);
         body.appendChild(speedGroup);
 
-        // 1.1 Live colors: replay repaints with the CURRENT brush color
-        // instead of the recorded one (faithful replay stays the default)
-        var liveColGroup = document.createElement('div');
-        liveColGroup.className = 'control-group';
-        var liveColLabel = document.createElement('label');
-        liveColLabel.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;';
-        var liveColCb = document.createElement('input');
-        liveColCb.type = 'checkbox';
-        liveColCb.id = 'replayLiveColors';
-        var liveColText = document.createElement('span');
-        liveColText.textContent = 'Replay uses current color';
-        liveColLabel.title = 'Off = faithful replay (the colors you painted with). On = the stroke repaints with whatever color the brush has NOW.';
-        liveColLabel.appendChild(liveColCb);
-        liveColLabel.appendChild(liveColText);
-        liveColGroup.appendChild(liveColLabel);
-        body.appendChild(liveColGroup);
-        liveColCb.addEventListener('change', function () {
-            window.replayLiveColors = liveColCb.checked;
-            try { if (window.settingsManager) window.settingsManager.set('brush.replayLiveColors', liveColCb.checked); } catch (_) {}
-        });
-        try {
-            var savedLiveCol = window.settingsManager && window.settingsManager.get('brush.replayLiveColors');
-            if (savedLiveCol) { liveColCb.checked = true; window.replayLiveColors = true; }
-        } catch (_) {}
+        // "Replay uses current color" removed 2026-08-16. It handed the live
+        // colour to the splat without exactColor, so the arm modes resolved on
+        // top of it — and arm 0 sits in 'fixed' mode for anyone who has ever
+        // touched the colour picker, which discarded the live colour entirely.
+        // The checkbox therefore did nothing for most users, diverged what
+        // recordings stored from what the painter saw, and on watchers (whose
+        // pointer colour defaults to red until they paint) could repaint peer
+        // replays red. Faithful replay is now the only behaviour.
+
         // --- Splat In ---
         var splatInLabel = document.createElement('label');
         splatInLabel.className = 'brush-section-label';

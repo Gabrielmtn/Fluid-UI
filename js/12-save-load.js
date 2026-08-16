@@ -608,11 +608,13 @@
         } catch(_){}
 
         // ── Brush section runtime ──
+        // replaySpeed/replayLiveColors deliberately absent (2026-08-16): speed is
+        // per-user workflow state like fpsCap — a Scene click resetting your
+        // playback rate is never what you meant — and the live-colour flag is
+        // retired. See applyPresetSnapshot for the matching read side.
         var brushState = {
             replayMode: window.replayMode || 'stroke',
             replayTimePeriod: window.replayTimePeriod || 5,
-            replaySpeed: typeof window.replaySpeed === 'number' ? window.replaySpeed : 1,
-            replayLiveColors: !!window.replayLiveColors,
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
             splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
@@ -1119,18 +1121,13 @@
                     var tInput = document.getElementById('replayTimePeriod');
                     if (tInput) tInput.value = bs.replayTimePeriod;
                 }
-                if (typeof bs.replaySpeed === 'number') {
-                    window.replaySpeed = bs.replaySpeed;
-                    var spSlider = document.getElementById('replaySpeed');
-                    if (spSlider) spSlider.value = bs.replaySpeed;
-                    var spVal = document.getElementById('replaySpeedValue');
-                    if (spVal) spVal.textContent = bs.replaySpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
-                }
-                if (typeof bs.replayLiveColors === 'boolean') {
-                    window.replayLiveColors = bs.replayLiveColors;
-                    var lcCb = document.getElementById('replayLiveColors');
-                    if (lcCb) lcCb.checked = bs.replayLiveColors;
-                }
+                // bs.replaySpeed / bs.replayLiveColors (older snapshots): both
+                // retired 2026-08-16 and intentionally ignored. Speed used to be
+                // rewritten here on every preset, Scene, .fluid import and
+                // multiplayer mirror tick — eventlessly, so the fader's fill
+                // never repainted and the value never persisted: it looked broken
+                // and came back wrong at the next boot. It is now owned solely by
+                // its own slider. Old snapshots carrying these keys are harmless.
                 // bs.refreshRate (older snapshots): the Splat Rate throttle was
                 // removed 2026-08-06 (replay always honored the recorded rate;
                 // the live-paint throttle was superseded by BRUSH_SPACING) —
@@ -1573,8 +1570,8 @@
             paletteIndex: 0,
             armColors: [{ mode: 'main', color: '#ffffff', stepIndex: 0 }],
             lightPos: { x: 0.5, y: 0.5 },
-            brushState: { replayMode: 'stroke', replayTimePeriod: 5, replaySpeed: 1,
-                replayLiveColors: false, splatInMode: 'instant', splatOutMode: 'instant',
+            brushState: { replayMode: 'stroke', replayTimePeriod: 5,
+                splatInMode: 'instant', splatOutMode: 'instant',
                 splatInDist: 0.15, splatOutDist: 0.15 },
             material: { mode: 'fluid', amount: null, shape: 0 },
             brushTip: { tip: 0, shapeId: null, angle: 0 }
