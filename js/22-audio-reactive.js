@@ -139,6 +139,15 @@
     var srcKind = null;          // 'mic' | 'system' | 'file'
     var fileBuffer = null;       // decoded file, kept so playback can restart
     var fileStartedAt = 0;       // audioCtx time the current pass began
+    // Transport. An AudioBufferSourceNode cannot be paused or seeked — it is
+    // one-shot — so "pause" means stop it and remember the offset, and
+    // resume/seek means build a fresh source and start(0, offset). Every
+    // rebuild re-runs routeSource, so the analyser, monitor and export tap
+    // stay attached across transport moves.
+    var filePaused = false;
+    var fileOffset = 0;          // seconds into the buffer while paused
+    var fileLoop = true;
+    var fileName = '';
 
     function ensureMonitor() {
         if (!audioCtx) return null;
@@ -257,16 +266,11 @@
                     if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
                     fileBuffer = buffer;
                     srcKind = 'file';
-                    var src = audioCtx.createBufferSource();
-                    src.buffer = buffer;
-                    src.loop = true;
-                    routeSource(src, true); // audible: this is the user's own track
-                    src.start(0);
-                    fileStartedAt = audioCtx.currentTime;
-                    sourceNode = src;
-                    if (typeof window.__onAudioSourceChanged === 'function') {
-                        try { window.__onAudioSourceChanged('file'); } catch (_) {}
-                    }
+                    fileName = (file && file.name) || '';
+                    filePaused = false;
+                    fileOffset = 0;
+                    playFileFrom(0);
+                    notifySourceChanged();
                     resolve();
                 }, reject);
             };
@@ -274,20 +278,90 @@
         });
     }
 
+    function notifySourceChanged() {
+        if (typeof window.__onAudioSourceChanged === 'function') {
+            try { window.__onAudioSourceChanged(srcKind); } catch (_) {}
+        }
+    }
+    function stopFileSource() {
+        if (!sourceNode) return;
+        try { sourceNode.onended = null; } catch (_) {}
+        try { if (sourceNode.stop) sourceNode.stop(); } catch (_) {}
+        try { sourceNode.disconnect(); } catch (_) {}
+        sourceNode = null;
+    }
+    // Build and start a source at `offset` seconds. The single place playback
+    // begins, so pause/resume/seek/restart/loop-change all share one path.
+    function playFileFrom(offset) {
+        if (!audioCtx || !fileBuffer) return false;
+        var dur = fileBuffer.duration || 0;
+        offset = Math.max(0, Math.min(dur ? dur - 0.001 : 0, offset || 0));
+        stopFileSource();
+        var src = audioCtx.createBufferSource();
+        src.buffer = fileBuffer;
+        src.loop = fileLoop;
+        routeSource(src, true); // audible: this is the user's own track
+        // Not looping? Park the transport at the end when the track runs out
+        // so the UI shows a finished (not ghost-playing) state.
+        src.onended = function () {
+            if (src !== sourceNode || fileLoop || filePaused) return;
+            filePaused = true;
+            fileOffset = fileBuffer ? fileBuffer.duration : 0;
+            notifySourceChanged();
+        };
+        src.start(0, offset);
+        fileStartedAt = audioCtx.currentTime - offset;
+        sourceNode = src;
+        filePaused = false;
+        return true;
+    }
+    // Seconds into the track right now, whether playing or paused.
+    function fileTime() {
+        if (!audioCtx || !fileBuffer) return 0;
+        var dur = fileBuffer.duration || 0;
+        if (filePaused) return Math.max(0, Math.min(dur, fileOffset));
+        var t = audioCtx.currentTime - fileStartedAt;
+        if (!dur) return 0;
+        return fileLoop ? (t % dur) : Math.max(0, Math.min(dur, t));
+    }
+    function pauseFile() {
+        if (!fileBuffer || filePaused) return false;
+        fileOffset = fileTime();
+        stopFileSource();
+        filePaused = true;
+        notifySourceChanged();
+        return true;
+    }
+    function resumeFile() {
+        if (!fileBuffer || !filePaused) return false;
+        // Finished (non-loop) → play again from the top rather than sitting
+        // at the end doing nothing.
+        var at = (fileOffset >= (fileBuffer.duration || 0) - 0.01) ? 0 : fileOffset;
+        playFileFrom(at);
+        notifySourceChanged();
+        return true;
+    }
+    function seekFile(t) {
+        if (!fileBuffer) return false;
+        var dur = fileBuffer.duration || 0;
+        t = Math.max(0, Math.min(dur, Number(t) || 0));
+        if (filePaused) { fileOffset = t; notifySourceChanged(); return true; }
+        playFileFrom(t);
+        return true;
+    }
     // Restart the loaded track from its beginning — the practical way to line
     // a take up with a video export (the loop otherwise runs from whenever
     // the file happened to load).
     function restartFile() {
-        if (!audioCtx || !fileBuffer) return false;
-        if (sourceNode) { try { sourceNode.stop(); } catch (_) {} try { sourceNode.disconnect(); } catch (_) {} }
-        var src = audioCtx.createBufferSource();
-        src.buffer = fileBuffer;
-        src.loop = true;
-        routeSource(src, true);
-        src.start(0);
-        fileStartedAt = audioCtx.currentTime;
-        sourceNode = src;
-        return true;
+        if (!fileBuffer) return false;
+        if (filePaused) { fileOffset = 0; notifySourceChanged(); return true; }
+        return playFileFrom(0);
+    }
+    function setFileLoop(on) {
+        fileLoop = !!on;
+        // Apply to the live source without interrupting playback.
+        if (sourceNode && !filePaused) { try { sourceNode.loop = fileLoop; } catch (_) {} }
+        return fileLoop;
     }
 
     function ensureContext() {
@@ -360,20 +434,18 @@
 
     function stopAudio() {
         if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
-        if (sourceNode) {
-            // Buffer sources must be STOPPED, not just unpatched — a
-            // disconnected source keeps running and would still be playing
-            // (silently) if it were ever re-patched.
-            try { if (sourceNode.stop) sourceNode.stop(); } catch (_) {}
-            try { sourceNode.disconnect(); } catch (_) {}
-            sourceNode = null;
-        }
+        // Buffer sources must be STOPPED, not just unpatched — a disconnected
+        // source keeps running and would still be playing (silently) if it
+        // were ever re-patched. stopFileSource also clears onended so a
+        // teardown can't fire the finished-track handler.
+        stopFileSource();
         if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
         fileBuffer = null;
+        fileName = '';
+        filePaused = false;
+        fileOffset = 0;
         srcKind = null;
-        if (typeof window.__onAudioSourceChanged === 'function') {
-            try { window.__onAudioSourceChanged(null); } catch (_) {}
-        }
+        notifySourceChanged();
         restoreOriginals();
     }
 
@@ -899,13 +971,23 @@
             return monitorVolume;
         },
         setMuted: function (m) { monitorMuted = !!m; applyMonitorGain(); return monitorMuted; },
+
+        // ── File transport ──
         restart: restartFile,
-        // Seconds into the current loop pass (files only) — for UI readouts.
+        pause: pauseFile,
+        resume: resumeFile,
+        togglePlay: function () { return filePaused ? resumeFile() : pauseFile(); },
+        isPaused: function () { return filePaused; },
+        seek: seekFile,
+        setLoop: setFileLoop,
+        isLooping: function () { return fileLoop; },
+        fileName: function () { return fileName; },
+        // Playhead + duration (files only) — for the transport UI.
         position: function () {
             if (!audioCtx || !fileBuffer) return null;
             var d = fileBuffer.duration || 0;
             if (!d) return null;
-            return { time: (audioCtx.currentTime - fileStartedAt) % d, duration: d };
+            return { time: fileTime(), duration: d, paused: filePaused, loop: fileLoop };
         },
         // Live MediaStream of whatever is being analysed, for the video
         // exporter to mux in. Mic is withheld: recording someone's room by

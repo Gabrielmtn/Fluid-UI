@@ -1518,9 +1518,37 @@ select option {
     background-color: var(--ground-950, #0b0f14);
     color: var(--ink-100, #e6edf3);
 }
-/* Playback row: shown only while a FILE is the source (it is the only
-   source routed to the speakers — mic/system would feed back or echo). */
-.audio-play-row { margin: 6px 0 2px; }
+/* File transport: shown only while a FILE is the source (the only source
+   routed to the speakers — mic/system would feed back or echo). Travels
+   with the enable row into the drawer / scene box. */
+.audio-transport {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 6px 0 2px;
+    padding: 7px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 6px;
+}
+.audio-clock {
+    margin-left: auto;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-300, #b9bec7);
+    white-space: nowrap;
+}
+.audio-seek { width: 100%; display: block; }
+.audio-filename {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 10px;
+    color: var(--ink-500, #7b828e);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+}
 .audio-play-btn {
     flex: 0 0 auto;
     width: 30px; height: 26px; padding: 0;

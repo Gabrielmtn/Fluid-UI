@@ -2976,13 +2976,24 @@
                     '<option value="mic">Mic</option><option value="system">System</option><option value="file">File</option>' +
                 '</select>' +
             '</div>' +
-            // Playback row (2026-08-16): a loaded file plays out loud now, so
-            // it needs a volume/mute and a restart. Hidden unless a FILE is
-            // the source \u2014 mic/system are never monitored (feedback/echo).
-            '<div class="audio-mini-row audio-play-row" id="audioPlayRow" style="display:none;">' +
-                '<button id="audioMuteBtn" class="audio-play-btn" title="Mute playback (visuals keep reacting)">\ud83d\udd0a</button>' +
-                '<input type="range" id="audioVolume" class="audio-vol" min="0" max="1" step="0.01" value="0.85" title="Playback volume" data-no-scale="1">' +
-                '<button id="audioRestartBtn" class="audio-play-btn" title="Restart the track from the beginning">\u23ee</button>' +
+            // Transport (2026-08-16): a loaded file plays out loud, so it gets
+            // real controls \u2014 play/pause, restart, loop, a draggable playhead
+            // and a clock. Hidden unless a FILE is the source (mic/system are
+            // never monitored \u2014 feedback/echo) and RELOCATED alongside the
+            // enable row so it is present in mini, scene and drawer modes.
+            '<div id="audioPlayRow" class="audio-transport" style="display:none;">' +
+                '<div class="audio-mini-row">' +
+                    '<button id="audioPlayBtn" class="audio-play-btn" title="Play / Pause (the visuals follow the audio)">\u23f8</button>' +
+                    '<button id="audioRestartBtn" class="audio-play-btn" title="Back to the start">\u23ee</button>' +
+                    '<button id="audioLoopBtn" class="audio-play-btn active" title="Loop the track">\ud83d\udd01</button>' +
+                    '<span id="audioClock" class="audio-clock">0:00 / 0:00</span>' +
+                '</div>' +
+                '<input type="range" id="audioSeek" class="audio-seek" min="0" max="1000" step="1" value="0" title="Playhead \u2014 drag to scrub" data-no-scale="1">' +
+                '<div class="audio-mini-row">' +
+                    '<button id="audioMuteBtn" class="audio-play-btn" title="Mute playback (visuals keep reacting)">\ud83d\udd0a</button>' +
+                    '<input type="range" id="audioVolume" class="audio-vol" min="0" max="1" step="0.01" value="0.85" title="Playback volume" data-no-scale="1">' +
+                    '<span id="audioFileName" class="audio-filename"></span>' +
+                '</div>' +
             '</div>' +
             '<canvas id="audioMiniTimeline" class="audio-mini-timeline" title="Composer segments"></canvas>' +
             '<button id="audioOpenFullBtn" class="audio-mini-full" title="Open full audio panel">\u2b06\ufe0f Full Audio</button>';
@@ -3024,15 +3035,59 @@
             fileInput.value = '';
         });
 
-        // ── Playback controls (file source only) ──
+        // ── Transport (file source only) ──
         var playRow = mini.querySelector('#audioPlayRow');
+        var playBtn = mini.querySelector('#audioPlayBtn');
         var muteBtn = mini.querySelector('#audioMuteBtn');
         var volSlider = mini.querySelector('#audioVolume');
         var restartBtn = mini.querySelector('#audioRestartBtn');
+        var loopBtn = mini.querySelector('#audioLoopBtn');
+        var seekBar = mini.querySelector('#audioSeek');
+        var clockEl = mini.querySelector('#audioClock');
+        var nameEl = mini.querySelector('#audioFileName');
+        var seekDragging = false;
+
+        function fmtClock(s) {
+            s = Math.max(0, Math.floor(s || 0));
+            var m = Math.floor(s / 60);
+            var r = s % 60;
+            return m + ':' + (r < 10 ? '0' : '') + r;
+        }
+        // Playhead + clock, driven by the mini loop (and one immediate call on
+        // every state change). Skipped while the user is dragging the scrub
+        // bar, or the thumb would fight the cursor.
+        function syncPlayhead() {
+            var ar = window.audioReactive;
+            if (!ar || !ar.position) return;
+            var p = ar.position();
+            if (!p) return;
+            if (!seekDragging && seekBar) {
+                seekBar.value = String(Math.round((p.time / p.duration) * 1000));
+                seekBar.style.setProperty('--val', seekBar.value);
+            }
+            if (clockEl) clockEl.textContent = fmtClock(p.time) + ' / ' + fmtClock(p.duration);
+            if (playBtn) {
+                playBtn.textContent = p.paused ? '▶' : '⏸';
+                playBtn.title = p.paused ? 'Play' : 'Pause (the visuals follow the audio)';
+            }
+        }
+        window.__syncAudioPlayhead = syncPlayhead;
+
+        // The playhead needs its own tick: the mini-timeline loop only runs in
+        // 'min' mode and bails when that canvas is hidden, but the transport
+        // is visible in scene and Full modes too. 200 ms — the clock ticks in
+        // seconds and the bar reads as moving; cheaper than an rAF.
+        var playTick = null;
+        function ensurePlayTick(on) {
+            if (on && !playTick) playTick = setInterval(syncPlayhead, 200);
+            else if (!on && playTick) { clearInterval(playTick); playTick = null; }
+        }
+
         function syncPlayRow() {
             var ar = window.audioReactive;
             var on = !!(ar && ar.isMonitorable && ar.isMonitorable());
             if (playRow) playRow.style.display = on ? '' : 'none';
+            ensurePlayTick(on);
             if (!on || !ar) return;
             if (volSlider) volSlider.value = ar.getMonitorVolume();
             if (muteBtn) {
@@ -3041,10 +3096,17 @@
                 muteBtn.classList.toggle('muted', m);
                 muteBtn.title = m ? 'Unmute playback' : 'Mute playback (visuals keep reacting)';
             }
+            if (loopBtn) loopBtn.classList.toggle('active', ar.isLooping());
+            if (nameEl) nameEl.textContent = ar.fileName ? ar.fileName() : '';
+            syncPlayhead();
         }
-        // 22-audio-reactive fires this whenever the source changes (or stops),
-        // including the async file-decode completion.
+        // 22-audio-reactive fires this whenever the source or transport state
+        // changes, including the async file-decode completion.
         window.__onAudioSourceChanged = function () { syncPlayRow(); };
+
+        if (playBtn) playBtn.addEventListener('click', function () {
+            if (window.audioReactive) { window.audioReactive.togglePlay(); syncPlayRow(); }
+        });
         if (muteBtn) muteBtn.addEventListener('click', function () {
             if (!window.audioReactive) return;
             window.audioReactive.setMuted(!window.audioReactive.isMuted());
@@ -3056,8 +3118,35 @@
             if (window.audioReactive.isMuted()) { window.audioReactive.setMuted(false); syncPlayRow(); }
         });
         if (restartBtn) restartBtn.addEventListener('click', function () {
-            if (window.audioReactive && window.audioReactive.restart) window.audioReactive.restart();
+            if (window.audioReactive && window.audioReactive.restart) {
+                window.audioReactive.restart();
+                syncPlayRow();
+            }
         });
+        if (loopBtn) loopBtn.addEventListener('click', function () {
+            if (!window.audioReactive) return;
+            window.audioReactive.setLoop(!window.audioReactive.isLooping());
+            syncPlayRow();
+        });
+        if (seekBar) {
+            // Scrub live on drag: seeking a playing track restarts the source
+            // at the new offset, so the sound (and the visuals it drives)
+            // follow the thumb.
+            var doSeek = function () {
+                var ar = window.audioReactive;
+                if (!ar || !ar.position) return;
+                var p = ar.position();
+                if (!p) return;
+                ar.seek((parseFloat(seekBar.value) / 1000) * p.duration);
+                syncPlayhead();
+            };
+            seekBar.addEventListener('pointerdown', function () { seekDragging = true; });
+            seekBar.addEventListener('input', function () { seekDragging = true; doSeek(); });
+            var endSeek = function () { if (seekDragging) { seekDragging = false; doSeek(); } };
+            seekBar.addEventListener('change', endSeek);
+            seekBar.addEventListener('pointerup', endSeek);
+            seekBar.addEventListener('pointercancel', endSeek);
+        }
         syncPlayRow();
 
         mini.querySelector('#audioOpenFullBtn').addEventListener('click', function () {
@@ -3067,7 +3156,10 @@
 
         function applyAudioMode(mode, userInitiated) {
             var isScene = !!(window.AudioScenes && window.AudioScenes.isScene(mode));
-            // Park the shared enable row where the active mode can reach it
+            // Park the shared enable row where the active mode can reach it —
+            // and keep the file transport docked directly beneath it, or the
+            // playback controls would stay behind in the hidden mini widget
+            // (no play/pause at all in Full or scene modes).
             var enableHost = document.getElementById('audioDrawerEnableHost');
             if (mode === 'full' && enableHost && enableRow) {
                 enableHost.appendChild(enableRow);
@@ -3075,6 +3167,9 @@
                 sceneBox.insertBefore(enableRow, sceneBox.firstChild);
             } else if (enableRow && enableRow.parentElement !== mini) {
                 mini.insertBefore(enableRow, mini.firstChild);
+            }
+            if (playRow && enableRow && enableRow.parentElement) {
+                enableRow.parentElement.insertBefore(playRow, enableRow.nextSibling);
             }
             // Scene lifecycle: activate on scene modes, tear down otherwise
             if (window.AudioScenes) {
