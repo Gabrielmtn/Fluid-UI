@@ -119,12 +119,97 @@
                 if (typeof s === 'number') sensitivity = s;
                 var bt = window.settingsManager.get('audio.beatThreshold');
                 if (typeof bt === 'number') beatThreshold = bt;
+                var mv = window.settingsManager.get('audio.monitorVolume');
+                if (typeof mv === 'number') monitorVolume = Math.max(0, Math.min(1, mv));
             }
         } catch (_) {}
     }
 
+    // ── Playback / monitoring (2026-08-16) ────────────────────────────
+    // A loaded FILE used to be analysed silently: it drove the visuals but
+    // came out of no speaker, so users had to line the track up by hand in a
+    // video editor afterwards. Files now route to the speakers through a
+    // gain node, and every source feeds a MediaStream tap the video exporter
+    // can mux in. Mic/system are deliberately NOT monitored — echoing a mic
+    // to the speakers is feedback, and system audio is already audible.
+    var monitorGain = null;      // → audioCtx.destination (file playback)
+    var monitorVolume = 0.85;
+    var monitorMuted = false;
+    var exportTap = null;        // MediaStreamAudioDestinationNode for export
+    var srcKind = null;          // 'mic' | 'system' | 'file'
+    var fileBuffer = null;       // decoded file, kept so playback can restart
+    var fileStartedAt = 0;       // audioCtx time the current pass began
+    // Transport. An AudioBufferSourceNode cannot be paused or seeked — it is
+    // one-shot — so "pause" means stop it and remember the offset, and
+    // resume/seek means build a fresh source and start(0, offset). Every
+    // rebuild re-runs routeSource, so the analyser, monitor and export tap
+    // stay attached across transport moves.
+    var filePaused = false;
+    var fileOffset = 0;          // seconds into the buffer while paused
+    var fileLoop = true;
+    var fileName = '';
+    // Generation token. Starting a source is ASYNC (file decode, getUserMedia,
+    // getDisplayMedia) and those completions used to attach unconditionally —
+    // so turning audio off mid-decode left the finished decode starting
+    // playback anyway: engine "disabled", checkbox clear, transport hidden,
+    // and a track audibly playing with no control to stop it. Every enable()
+    // and disable() bumps this; a completion whose token is stale cleans up
+    // after itself and attaches nothing.
+    var startToken = 0;
+
+    // One-shot: resume the context on the next real user interaction, for the
+    // case where the policy refused an ungestured resume(). A source already
+    // scheduled with start(0) begins playing the moment the clock runs, and
+    // fileStartedAt was computed from the (frozen) context clock, so the
+    // playhead stays consistent — nothing needs restarting.
+    var _gestureResumeArmed = false;
+    function armGestureResume() {
+        if (_gestureResumeArmed) return;
+        _gestureResumeArmed = true;
+        var events = ['pointerdown', 'keydown', 'touchstart'];
+        var go = function () {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                try { audioCtx.resume().then(notifySourceChanged, function () {}); } catch (_) {}
+            }
+            _gestureResumeArmed = false;
+            events.forEach(function (e) { document.removeEventListener(e, go, true); });
+        };
+        events.forEach(function (e) { document.addEventListener(e, go, true); });
+    }
+
+    function ensureMonitor() {
+        if (!audioCtx) return null;
+        if (!monitorGain) {
+            monitorGain = audioCtx.createGain();
+            monitorGain.gain.value = monitorMuted ? 0 : monitorVolume;
+            monitorGain.connect(audioCtx.destination);
+        }
+        return monitorGain;
+    }
+    function ensureExportTap() {
+        if (!audioCtx) return null;
+        if (!exportTap && audioCtx.createMediaStreamDestination) {
+            exportTap = audioCtx.createMediaStreamDestination();
+        }
+        return exportTap;
+    }
+    // Fan a freshly created source out to the analysers + taps.
+    function routeSource(src, monitorable) {
+        src.connect(analyser);
+        if (hiRes) { try { src.connect(hiRes.analyser); } catch (_) {} }
+        var tap = ensureExportTap();
+        if (tap) { try { src.connect(tap); } catch (_) {} }
+        if (monitorable) {
+            var mon = ensureMonitor();
+            if (mon) { try { src.connect(mon); } catch (_) {} }
+        }
+    }
+    function applyMonitorGain() {
+        if (monitorGain) monitorGain.gain.value = monitorMuted ? 0 : monitorVolume;
+    }
+
     // ─── AUDIO SETUP ────────────────────────────────────────────
-    function startMic() {
+    function startMic(token) {
         return navigator.mediaDevices.getUserMedia({
             audio: {
                 echoCancellation: false,
@@ -132,24 +217,24 @@
                 autoGainControl: false
             },
             video: false
-        }).then(function (s) { connectStream(s); });
+        }).then(function (s) { connectStream(s, token); });
     }
 
-    function startSystemAudio() {
+    function startSystemAudio(token) {
         // Electron path: use desktopCapturer for reliable system audio capture
         try {
             var remote = require('@electron/remote');
             var desktopCapturer = remote.desktopCapturer;
             if (desktopCapturer) {
-                return startSystemAudioElectron(desktopCapturer);
+                return startSystemAudioElectron(desktopCapturer, token);
             }
         } catch (_) {}
 
         // Browser fallback: getDisplayMedia
-        return startSystemAudioBrowser();
+        return startSystemAudioBrowser(token);
     }
 
-    function startSystemAudioElectron(desktopCapturer) {
+    function startSystemAudioElectron(desktopCapturer, token) {
         return desktopCapturer.getSources({ types: ['screen'] }).then(function (sources) {
             if (!sources || !sources.length) {
                 return Promise.reject(new Error('No screen sources available'));
@@ -179,11 +264,11 @@
             }
             // Stop video tracks — in Electron getUserMedia the audio survives
             s.getVideoTracks().forEach(function (t) { t.stop(); });
-            connectStream(s);
+            connectStream(s, token);
         });
     }
 
-    function startSystemAudioBrowser() {
+    function startSystemAudioBrowser(token) {
         // getDisplayMedia: audio constraints must be simple boolean, not getUserMedia-style
         return navigator.mediaDevices.getDisplayMedia({
             audio: true,
@@ -196,36 +281,182 @@
             }
             // Keep the full stream — createMediaStreamSource ignores video tracks
             // but the video track must stay alive to keep the stream active
-            connectStream(s);
+            connectStream(s, token);
         });
     }
 
-    function startFile(file) {
+    // Brief on-canvas notice, reusing the shared #export-toast element so
+    // there is one toast look/slot in the app (24-video-export owns the
+    // original; this creates it only if that module hasn't yet).
+    function audioNotice(message, type) {
+        try {
+            var el = document.getElementById('export-toast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'export-toast';
+                el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);' +
+                    'padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;z-index:99999;' +
+                    'color:#e6edf3;pointer-events:none;display:none;' +
+                    'background:rgba(13,17,23,0.95);border:1px solid rgba(255,255,255,0.1);';
+                document.body.appendChild(el);
+            }
+            var colors = { info: '#58a6ff', success: '#3fb950', warn: '#d29922', error: '#f85149' };
+            el.style.borderColor = colors[type] || colors.info;
+            el.textContent = message;
+            el.style.display = 'block';
+            clearTimeout(el._t);
+            el._t = setTimeout(function () { el.style.display = 'none'; }, 3000);
+        } catch (_) {}
+    }
+
+    function startFile(file, token) {
         return new Promise(function (resolve, reject) {
             var reader = new FileReader();
+            var fail = function (err) {
+                var name = (file && file.name) ? ' "' + file.name + '"' : '';
+                audioNotice('Could not read that audio file' + name + ' — try MP3, WAV, OGG or M4A', 'error');
+                reject(err || new Error('audio decode failed'));
+            };
+            // Without this the promise never settles when the file can't be
+            // read at all, and enable() sits with enabled=true forever while
+            // nothing plays — the state drift this whole pass is about.
+            reader.onerror = fail;
+            reader.onabort = fail;
             reader.onload = function () {
                 ensureContext();
-                audioCtx.decodeAudioData(reader.result, function (buffer) {
+                var p = audioCtx.decodeAudioData(reader.result, function (buffer) {
+                    // Audio was turned off (or re-sourced) while we decoded —
+                    // attach nothing, or it plays on with the UI showing off.
+                    if (token !== startToken) { resolve(); return; }
                     if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
-                    var src = audioCtx.createBufferSource();
-                    src.buffer = buffer;
-                    src.loop = true;
-                    src.connect(analyser);
-                    if (hiRes) { try { src.connect(hiRes.analyser); } catch (_) {} }
-                    src.start(0);
-                    sourceNode = src;
+                    fileBuffer = buffer;
+                    srcKind = 'file';
+                    fileName = (file && file.name) || '';
+                    filePaused = false;
+                    fileOffset = 0;
+                    playFileFrom(0);
+                    // Autoplay policy can still leave the clock parked; say so
+                    // rather than looking broken (the armed gesture handler in
+                    // ensureContext starts it on the next interaction).
+                    if (audioCtx.state === 'suspended') {
+                        audioNotice('Click anywhere to start audio playback', 'warn');
+                    }
+                    notifySourceChanged();
                     resolve();
-                }, reject);
+                }, fail);
+                // decodeAudioData honours the callbacks AND returns a promise;
+                // the returned one rejects too, and unhandled it surfaced as
+                // "Uncaught (in promise) EncodingError" for any bad file.
+                if (p && p.catch) p.catch(function () {});
             };
             reader.readAsArrayBuffer(file);
         });
+    }
+
+    function notifySourceChanged() {
+        if (typeof window.__onAudioSourceChanged === 'function') {
+            try { window.__onAudioSourceChanged(srcKind); } catch (_) {}
+        }
+    }
+    function stopFileSource() {
+        if (!sourceNode) return;
+        try { sourceNode.onended = null; } catch (_) {}
+        try { if (sourceNode.stop) sourceNode.stop(); } catch (_) {}
+        try { sourceNode.disconnect(); } catch (_) {}
+        sourceNode = null;
+    }
+    // Build and start a source at `offset` seconds. The single place playback
+    // begins, so pause/resume/seek/restart/loop-change all share one path.
+    function playFileFrom(offset) {
+        if (!audioCtx || !fileBuffer) return false;
+        var dur = fileBuffer.duration || 0;
+        offset = Math.max(0, Math.min(dur ? dur - 0.001 : 0, offset || 0));
+        stopFileSource();
+        var src = audioCtx.createBufferSource();
+        src.buffer = fileBuffer;
+        src.loop = fileLoop;
+        routeSource(src, true); // audible: this is the user's own track
+        // Not looping? Park the transport at the end when the track runs out
+        // so the UI shows a finished (not ghost-playing) state.
+        src.onended = function () {
+            if (src !== sourceNode || fileLoop || filePaused) return;
+            filePaused = true;
+            fileOffset = fileBuffer ? fileBuffer.duration : 0;
+            notifySourceChanged();
+        };
+        src.start(0, offset);
+        fileStartedAt = audioCtx.currentTime - offset;
+        sourceNode = src;
+        filePaused = false;
+        return true;
+    }
+    // Seconds into the track right now, whether playing or paused.
+    function fileTime() {
+        if (!audioCtx || !fileBuffer) return 0;
+        var dur = fileBuffer.duration || 0;
+        if (filePaused) return Math.max(0, Math.min(dur, fileOffset));
+        var t = audioCtx.currentTime - fileStartedAt;
+        if (!dur) return 0;
+        return fileLoop ? (t % dur) : Math.max(0, Math.min(dur, t));
+    }
+    function pauseFile() {
+        if (!fileBuffer || filePaused) return false;
+        fileOffset = fileTime();
+        stopFileSource();
+        filePaused = true;
+        notifySourceChanged();
+        return true;
+    }
+    function resumeFile() {
+        if (!fileBuffer || !filePaused) return false;
+        // Finished (non-loop) → play again from the top rather than sitting
+        // at the end doing nothing.
+        var at = (fileOffset >= (fileBuffer.duration || 0) - 0.01) ? 0 : fileOffset;
+        playFileFrom(at);
+        notifySourceChanged();
+        return true;
+    }
+    function seekFile(t) {
+        if (!fileBuffer) return false;
+        var dur = fileBuffer.duration || 0;
+        t = Math.max(0, Math.min(dur, Number(t) || 0));
+        if (filePaused) { fileOffset = t; notifySourceChanged(); return true; }
+        playFileFrom(t);
+        return true;
+    }
+    // Restart the loaded track from its beginning — the practical way to line
+    // a take up with a video export (the loop otherwise runs from whenever
+    // the file happened to load).
+    function restartFile() {
+        if (!fileBuffer) return false;
+        if (filePaused) { fileOffset = 0; notifySourceChanged(); return true; }
+        return playFileFrom(0);
+    }
+    function setFileLoop(on) {
+        fileLoop = !!on;
+        // Apply to the live source without interrupting playback.
+        if (sourceNode && !filePaused) { try { sourceNode.loop = fileLoop; } catch (_) {} }
+        return fileLoop;
     }
 
     function ensureContext() {
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-        if (audioCtx.state === 'suspended') audioCtx.resume();
+        // Autoplay policy: a context created without user activation starts
+        // SUSPENDED, and its clock does not advance — a buffer source started
+        // on it is scheduled but silent, and the analyser reads zeros. That is
+        // the "I loaded a file and nothing happens until I uncheck/recheck"
+        // report: the re-check was simply another user gesture. resume() is
+        // fire-and-forget and can be refused, so also arm a one-shot gesture
+        // fallback that resumes on the user's next interaction.
+        if (audioCtx.state === 'suspended') {
+            try {
+                var r = audioCtx.resume();
+                if (r && r.catch) r.catch(function () { armGestureResume(); });
+            } catch (_) {}
+            armGestureResume();
+        }
         if (!analyser) {
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = FFT_SIZE;
@@ -264,30 +495,53 @@
         return hiRes;
     }
 
-    function connectStream(s) {
+    function connectStream(s, token) {
+        // Stale permission grant (user turned audio off, or switched source,
+        // while the browser prompt was up): drop the stream instead of
+        // attaching it — otherwise the mic stays hot with the UI showing off.
+        if (typeof token === 'number' && token !== startToken) {
+            try { s.getTracks().forEach(function (t) { t.stop(); }); } catch (_) {}
+            return;
+        }
         stream = s;
         ensureContext();
         if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
+        fileBuffer = null;
         sourceNode = audioCtx.createMediaStreamSource(s);
-        sourceNode.connect(analyser);
-        if (hiRes) { try { sourceNode.connect(hiRes.analyser); } catch (_) {} }
+        // NOT monitored: a mic echoed to the speakers is a feedback loop, and
+        // system audio is already coming out of them.
+        routeSource(sourceNode, false);
+        if (typeof window.__onAudioSourceChanged === 'function') {
+            try { window.__onAudioSourceChanged(srcKind); } catch (_) {}
+        }
 
         // Handle stream ending unexpectedly (user revokes permission, etc.)
         s.addEventListener('inactive', function () {
             if (enabled) {
                 console.warn('Audio reactive: stream ended');
+                // disable() → stopAudio() → notifySourceChanged(), and the UI
+                // re-reads isEnabled() from there. (It used to set the
+                // checkbox by hand from in here, which is the pattern that
+                // let the box and the engine disagree.)
                 disable();
-                // Notify UI
-                var cb = document.getElementById('audioReactToggle');
-                if (cb) cb.checked = false;
             }
         });
     }
 
     function stopAudio() {
         if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
-        if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} sourceNode = null; }
+        // Buffer sources must be STOPPED, not just unpatched — a disconnected
+        // source keeps running and would still be playing (silently) if it
+        // were ever re-patched. stopFileSource also clears onended so a
+        // teardown can't fire the finished-track handler.
+        stopFileSource();
         if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+        fileBuffer = null;
+        fileName = '';
+        filePaused = false;
+        fileOffset = 0;
+        srcKind = null;
+        notifySourceChanged();
         restoreOriginals();
     }
 
@@ -763,28 +1017,48 @@
     function enable(source, fileObj) {
         if (enabled) disable();
         enabled = true;
+        var myToken = ++startToken;
 
         var p;
+        // srcKind drives monitoring (files are audible) and what the video
+        // exporter is allowed to mux in.
         if (source === 'file' && fileObj) {
-            p = startFile(fileObj);
+            srcKind = 'file';
+            p = startFile(fileObj, myToken);
         } else if (source === 'system') {
-            p = startSystemAudio();
+            srcKind = 'system';
+            p = startSystemAudio(myToken);
         } else {
-            p = startMic();
+            srcKind = 'mic';
+            p = startMic(myToken);
         }
 
         p.then(function () {
+            // Superseded while we were starting (audio turned off, or a
+            // different source chosen) — the start path attached nothing, so
+            // don't spin the analysis loop up over it either.
+            if (myToken !== startToken) return;
             startLoop();
+            // Success is also a state change (the file path resolves async,
+            // long after the click) — let the UI mirror reality.
+            notifySourceChanged();
         }).catch(function (err) {
+            if (myToken !== startToken) return; // a newer start owns the state
             console.warn('Audio reactive: failed to start', err);
             enabled = false;
-            var cb = document.getElementById('audioReactToggle');
-            if (cb) cb.checked = false;
+            srcKind = null;
+            // Don't reach into the DOM from here: notify and let the UI
+            // re-read isEnabled(). Poking the checkbox directly was how the
+            // two could drift apart in the first place.
+            notifySourceChanged();
         });
     }
 
     function disable() {
         enabled = false;
+        // Invalidate any in-flight start (decode / permission prompt) so it
+        // can't attach a source after we've torn everything down.
+        startToken++;
         stopAudio();
     }
 
@@ -794,6 +1068,49 @@
         enable: enable,
         disable: disable,
         isEnabled: function () { return enabled; },
+
+        // ── Playback / monitoring (2026-08-16) ──
+        sourceKind: function () { return srcKind; },
+        // 'running' | 'suspended' | 'closed' | null — a suspended context is
+        // loaded-but-silent (autoplay policy); the UI can say so.
+        contextState: function () { return audioCtx ? audioCtx.state : null; },
+        // Only a loaded file plays through the speakers (see routeSource).
+        isMonitorable: function () { return srcKind === 'file' && !!fileBuffer; },
+        getMonitorVolume: function () { return monitorVolume; },
+        isMuted: function () { return monitorMuted; },
+        setMonitorVolume: function (v) {
+            monitorVolume = Math.max(0, Math.min(1, Number(v) || 0));
+            applyMonitorGain();
+            try { if (window.settingsManager) window.settingsManager.set('audio.monitorVolume', monitorVolume); } catch (_) {}
+            return monitorVolume;
+        },
+        setMuted: function (m) { monitorMuted = !!m; applyMonitorGain(); return monitorMuted; },
+
+        // ── File transport ──
+        restart: restartFile,
+        pause: pauseFile,
+        resume: resumeFile,
+        togglePlay: function () { return filePaused ? resumeFile() : pauseFile(); },
+        isPaused: function () { return filePaused; },
+        seek: seekFile,
+        setLoop: setFileLoop,
+        isLooping: function () { return fileLoop; },
+        fileName: function () { return fileName; },
+        // Playhead + duration (files only) — for the transport UI.
+        position: function () {
+            if (!audioCtx || !fileBuffer) return null;
+            var d = fileBuffer.duration || 0;
+            if (!d) return null;
+            return { time: fileTime(), duration: d, paused: filePaused, loop: fileLoop };
+        },
+        // Live MediaStream of whatever is being analysed, for the video
+        // exporter to mux in. Mic is withheld: recording someone's room by
+        // side effect of enabling mic-reactive visuals is a nasty surprise.
+        getOutputStream: function () {
+            if (!enabled || !audioCtx || srcKind === 'mic') return null;
+            var tap = ensureExportTap();
+            return tap ? tap.stream : null;
+        },
         getBands: function () {
             return {
                 bass: bass, mid: mid, treble: treble, overall: overall,

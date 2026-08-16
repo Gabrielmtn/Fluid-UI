@@ -305,12 +305,20 @@
                     // still resolve on top either way).
                     var repCol = (window.replayLiveColors && window.pointer && window.pointer.color)
                         ? window.pointer.color.slice() : ev.color;
-                    if (typeof window.applyMultiSplatWith === 'function') {
-                        window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, repCol,
-                            ev.mult || 1, (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS);
-                    } else {
-                        multiSplat(ev.x, ev.y, ev.dx, ev.dy, repCol, false);
-                    }
+                    // Replayed strokes are not live viewer strokes: the
+                    // viewer's active custom stamp must not restyle them —
+                    // events carry no shape info, so "current active shape"
+                    // was arbitrary (and printed broken stamps everywhere).
+                    // Built-in tips still apply (05i gate).
+                    window.__remoteStroke = true;
+                    try {
+                        if (typeof window.applyMultiSplatWith === 'function') {
+                            window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, repCol,
+                                ev.mult || 1, (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS);
+                        } else {
+                            multiSplat(ev.x, ev.y, ev.dx, ev.dy, repCol, false);
+                        }
+                    } finally { window.__remoteStroke = false; }
                     if (typeof recRecordInteraction === 'function' && recEnabled) {
                         try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}
                     }
@@ -543,13 +551,13 @@
                 if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
                 archiveCurrentStroke();
                 advanceColor();
-                // Defer arm color advance until splatOut easing finishes
-                // so random/step colors don't change mid-easing
-                if (splatOutActive) {
-                    pendingArmAdvance = true;
-                } else {
-                    advanceArmColors();
-                }
+                // Defer arm color advance until ALL painting settles — the
+                // splat-out tail AND the stabilizer's queued catch-up dabs
+                // (05j flushes on full engine idle). Advancing at release
+                // repainted the still-draining tail dabs in next-stroke
+                // colors while arm 0 kept the old pointer color: the
+                // "three colors at stroke end" flash.
+                pendingArmAdvance = true;
             }
         }
         // Listened on WINDOW so a captured pointer's release is caught wherever it
@@ -707,7 +715,10 @@
                     v = Math.max(parseFloat(s.min), Math.min(parseFloat(s.max), Math.round(v * 10) / 10));
                     s.value = v;
                     s.style.setProperty('--val', v);
-                    config.SPLAT_RADIUS = v / 1000; // same drive as the 05h wheel path
+                    // Drive it like a user drag (matches the brush-preset apply
+                    // idiom): 05h's input binding sets SPLAT_RADIUS and the strip
+                    // label updates instantly instead of on its 2s fallback poll.
+                    s.dispatchEvent(new Event('input', { bubbles: true }));
                     toast('🖌 Brush ' + v.toFixed(1));
                 } else {
                     let v = Math.round(period0 + (cy0 - m.cy) / 25); // drag up = longer
@@ -837,11 +848,9 @@
                 if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
                 archiveCurrentStroke();
                 advanceColor();
-                if (splatOutActive) {
-                    pendingArmAdvance = true;
-                } else {
-                    advanceArmColors();
-                }
+                // Same deferred advance as finishLeftStroke: flush on full
+                // paint idle in 05j, never at release.
+                pendingArmAdvance = true;
                 if (typeof broadcastPointerUp === 'function') {
                     broadcastPointerUp();
                 }

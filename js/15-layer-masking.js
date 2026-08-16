@@ -137,6 +137,9 @@
         maskState.activeMaskLayerId = null;
         maskState.shapes = [];
         maskState.selectedShapeIndex = null;
+        // maskState persists across editor sessions — leftover Magic Mask
+        // points from this one must not wedge a later session's Apply button.
+        resetSamSessionState();
 
         // Refresh UI
         if (typeof window.recRenderUI === 'function') {
@@ -153,6 +156,9 @@
         }
         overlay.style.display = 'flex';
         updateStampMenuDisplay();
+        // The overlay persists across editor sessions — reset the Apply
+        // button from whatever busy state the last session left it in.
+        samSyncApplyBusy();
     }
 
     // Hide mask editor overlay
@@ -273,6 +279,24 @@
                             <span>Hide Areas</span>
                         </label>
                     </div>
+                    <!-- Collider painting (2026-08-16): shown only when the
+                         editor was opened on a mask-sourced collision layer.
+                         Strokes go straight into that collider's mask, so
+                         walls can be tweaked where you can see them. -->
+                    <div id="colliderTools" class="mask-collider-tools" style="display:none;">
+                        <div class="mask-collider-row">
+                            <button id="colliderDrawBtn" class="mask-mode-btn collider-tool-btn active" title="Add collider area — paint walls the fluid flows around">🖌️ Draw</button>
+                            <button id="colliderEraseBtn" class="mask-mode-btn collider-tool-btn" title="Remove collider area — erase walls back out">🧽 Erase</button>
+                            <!-- Same units as the Brush Size fader (1-30 → SPLAT_RADIUS/1000) -->
+                            <label class="collider-size-label">Size
+                                <input type="range" id="colliderSize" min="1" max="30" step="0.5" value="11" data-no-scale="1">
+                                <span id="colliderSizeVal">11</span>
+                            </label>
+                            <button id="colliderUndoBtn" class="mask-mode-btn collider-tool-btn" title="Undo the last collider stroke (Ctrl+Z)">↶</button>
+                            <button id="colliderRedoBtn" class="mask-mode-btn collider-tool-btn" title="Redo (Ctrl+Shift+Z)">↷</button>
+                        </div>
+                        <div class="mask-collider-hint">Paint directly on the artwork — the collider and its thumbnail update as you go. Shift+drag pans, scroll zooms.</div>
+                    </div>
                     <div class="mask-tools-row" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
                         <button id="smartSelectBtn" class="mask-mode-btn magic-mask-btn" onclick="window.toggleSmartSelect()" title="AI-powered object masking&#10;Click objects and the model cuts them out for you&#10;First use: downloads a ~40 MB model (cached locally)">
                             <span style="font-size: 18px;">🪄</span> Magic Mask Objects
@@ -357,6 +381,37 @@
 
     // Setup mask editor event listeners
     function setupMaskEditorEvents(overlay) {
+        // ── Collider tools (draw / erase / size / undo / redo) ──
+        const cDraw = overlay.querySelector('#colliderDrawBtn');
+        const cErase = overlay.querySelector('#colliderEraseBtn');
+        const setTool = (t) => {
+            maskState.colliderTool = t;
+            if (cDraw) cDraw.classList.toggle('active', t === 'draw');
+            if (cErase) cErase.classList.toggle('active', t === 'erase');
+        };
+        if (cDraw) cDraw.addEventListener('click', () => setTool('draw'));
+        if (cErase) cErase.addEventListener('click', () => setTool('erase'));
+        const cSize = overlay.querySelector('#colliderSize');
+        if (cSize) {
+            cSize.addEventListener('input', (e) => {
+                maskState.colliderSize = parseFloat(e.target.value);
+                const out = overlay.querySelector('#colliderSizeVal');
+                if (out) out.textContent = String(maskState.colliderSize);
+            });
+        }
+        const cUndo = overlay.querySelector('#colliderUndoBtn');
+        const cRedo = overlay.querySelector('#colliderRedoBtn');
+        // The mask stamp pushes onto the shared sketch/mask history ring, so
+        // these are the same undo the canvas uses — just reachable in here.
+        if (cUndo) cUndo.addEventListener('click', () => {
+            if (typeof window.__sketchUndo === 'function') window.__sketchUndo();
+            scheduleColliderFilm();
+        });
+        if (cRedo) cRedo.addEventListener('click', () => {
+            if (typeof window.__sketchRedo === 'function') window.__sketchRedo();
+            scheduleColliderFilm();
+        });
+
         // Mode toggle
         const modeRadios = overlay.querySelectorAll('input[name="maskMode"]');
         modeRadios.forEach(radio => {
@@ -557,6 +612,27 @@
         );
         const x = _p.x, y = _p.y;
 
+        // Collider mode: left-drag paints (or erases) the collider's mask;
+        // Shift+drag still pans. Right-drag pans too — the shape tools that
+        // owned right-click aren't in this mode.
+        if (colliderModeActive()) {
+            if (e.shiftKey || e.button === 2 || e.button === 1) {
+                maskState.isPanning = true;
+                maskState.panStartX = screenX - maskState.panX;
+                maskState.panStartY = screenY - maskState.panY;
+                e.preventDefault();
+                return;
+            }
+            if (e.button !== 0) return;
+            maskState.colliderPainting = true;
+            maskState.colliderLastX = x;
+            maskState.colliderLastY = y;
+            colliderStamp(x, y);
+            scheduleColliderFilm();
+            e.preventDefault();
+            return;
+        }
+
         // Smart select mode - add points for SAM
         if (maskState.smartSelectMode) {
             // Right-click for exclude points, left-click for include
@@ -580,12 +656,16 @@
                 if (maskState.samDebounceTimer) {
                     clearTimeout(maskState.samDebounceTimer);
                 }
-                // Run shortly after the last click so multiple rapid clicks coalesce
+                // Run shortly after the last click so multiple rapid clicks
+                // coalesce. Null the handle when it fires — a stale truthy id
+                // would read as "still pending" to samCutoutPending forever.
                 maskState.samDebounceTimer = setTimeout(() => {
+                    maskState.samDebounceTimer = null;
                     autoRunSAMSegmentation();
                 }, 200);
             }
-            
+            samSyncApplyBusy();
+
             e.preventDefault();
             return;
         }
@@ -654,6 +734,25 @@
         );
         const x = _p.x, y = _p.y;
 
+        if (colliderModeActive()) {
+            if (!maskState.colliderPainting) { canvas.style.cursor = 'crosshair'; return; }
+            // Interpolate along the drag so fast strokes stay continuous
+            // (the mask stamp is per-dab, like the canvas brush).
+            const lx = maskState.colliderLastX, ly = maskState.colliderLastY;
+            const dist = Math.hypot(x - lx, y - ly);
+            // Spacing ~1/4 of the stamp footprint, floored so a huge brush
+            // still steps and a tiny one doesn't emit thousands of dabs.
+            const step = Math.max(2, ((maskState.colliderSize || 11) / 1000) * canvas.width * 0.25);
+            const n = Math.min(64, Math.floor(dist / step));
+            for (let i = 1; i <= n; i++) {
+                colliderStamp(lx + (x - lx) * (i / n), ly + (y - ly) * (i / n));
+            }
+            if (n > 0) { maskState.colliderLastX = x; maskState.colliderLastY = y; }
+            else colliderStamp(x, y);
+            scheduleColliderFilm();
+            return;
+        }
+
         if (maskState.isDragging && maskState.selectedShapeIndex !== null) {
             const dx = x - maskState.dragStartX;
             const dy = y - maskState.dragStartY;
@@ -694,6 +793,12 @@
 
     // Handle canvas mouse up
     function handleMaskCanvasMouseUp(e) {
+        if (maskState.colliderPainting) {
+            maskState.colliderPainting = false;
+            // Close the undo boundary so ↶ steps back one STROKE, not one dab
+            if (typeof window.__sketchStrokeEnd === 'function') window.__sketchStrokeEnd();
+            scheduleColliderFilm();
+        }
         maskState.isDragging = false;
         maskState.isResizing = false;
         maskState.isPanning = false;
@@ -772,8 +877,16 @@
     function getLayerViewMatrix(canvas) {
         if (typeof DOMMatrix === 'undefined' || !canvas) return null;
         const id = maskState.activeMaskLayerId;
-        if (typeof id !== 'string' || !id.startsWith('image-')) return null;
-        const layer = (window.layers || []).find(l => l.index === parseInt(id.slice(6), 10));
+        // 'collider-' rides the same path: a moved/scaled collision layer
+        // must map editor strokes back through its transform, exactly like
+        // an image layer's shapes.
+        let idx = null;
+        if (typeof id === 'string') {
+            if (id.startsWith('image-')) idx = parseInt(id.slice(6), 10);
+            else if (id.startsWith('collider-')) idx = parseInt(id.slice(9), 10);
+        }
+        if (idx === null || isNaN(idx)) return null;
+        const layer = (window.layers || []).find(l => l.index === idx);
         if (!layer) return null;
 
         const sx = (typeof layer.scaleX === 'number') ? layer.scaleX : 1;
@@ -881,6 +994,27 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             });
             drawMaskShapesWithTransform(ctx);
+            return;
+        }
+        if (colliderModeActive()) {
+            // Collider editing: the artwork underneath (so walls can be
+            // placed against what's actually on the canvas), dimmed, with
+            // the collider's own coverage as a red film on top — the same
+            // reading as the on-canvas film while painting colliders.
+            if (displayCanvas) {
+                drawWithTransform(() => {
+                    ctx.drawImage(displayCanvas, 0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                });
+            }
+            if (maskState.colliderFilmTinted) {
+                drawWithTransform(() => {
+                    ctx.globalAlpha = 0.72;
+                    ctx.drawImage(maskState.colliderFilmTinted, 0, 0, canvas.width, canvas.height);
+                    ctx.globalAlpha = 1;
+                });
+            }
             return;
         }
         if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
@@ -1357,6 +1491,10 @@
                 if (!window.samSegmenter.isReady) {
                     if (statusEl) statusEl.textContent = '⚠ Failed to load';
                     smartSelectBtn.disabled = false; // Re-enable button
+                    // Points placed while preparing will never segment now —
+                    // drop them so they can't hold Apply in its busy state.
+                    maskState.smartSelectPoints = [];
+                    samSyncApplyBusy();
                     alert('Failed to load AI model. Please refresh and try again.');
                     return;
                 }
@@ -1408,18 +1546,43 @@
                             segmentBtn.title = 'Click to run AI segmentation on selected points';
                         }
                         smartSelectBtn.disabled = false;
+                        // Points placed while the model/image was preparing
+                        // scheduled no inference (the click debounce requires
+                        // isReady) — run them now, so the busy Apply state
+                        // self-resolves into a preview instead of showing
+                        // '⏳ Cutting out…' forever with nothing running.
+                        if (maskState.smartSelectPoints.length) {
+                            autoRunSAMSegmentation();
+                        }
                     } else {
                         if (statusEl) statusEl.textContent = '⚠ Image load failed';
                         smartSelectBtn.disabled = false;
+                        // Nothing will ever segment these points — stand down.
+                        maskState.smartSelectPoints = [];
+                        samSyncApplyBusy();
                     }
                 } else {
                     smartSelectBtn.disabled = false;
+                    // No image to segment against — placed points are inert.
+                    maskState.smartSelectPoints = [];
+                    samSyncApplyBusy();
                 }
             }
         } else {
             smartSelectBtn.classList.remove('engaged');
             smartControls.style.display = 'none';
             maskState.smartSelectPoints = [];
+            // Leaving Magic Mask must stand the busy machinery down too: a
+            // pending debounce would fire into autoRun's zero-points early
+            // return (before its resync), and stale busy state would keep
+            // the Apply button disabled while the user draws manual shapes.
+            // The preview (if one landed) is kept — Apply still converts it,
+            // same as before.
+            if (maskState.samDebounceTimer) {
+                clearTimeout(maskState.samDebounceTimer);
+                maskState.samDebounceTimer = null;
+            }
+            samSyncApplyBusy();
             updateStampMenuDisplay();
 
             if (hintDiv) {
@@ -1464,17 +1627,60 @@
         if (loadingIndicator) {
             loadingIndicator.style.display = 'none';
         }
-        
+
+        // No points, no timers → Apply is available again
+        samSyncApplyBusy();
         renderMaskEditor();
     };
-    
+
+    // Magic Mask is a slow async chain: first-use model download → image
+    // embed → 200ms click debounce → CPU-only inference. While a cutout is
+    // still on its way for the placed points, Apply must not fall through to
+    // buildAdhocResultCanvas's whole-image fallback — that authors a stamp
+    // covering the full file rect (the "giant square" brush bug).
+    function samCutoutPending() {
+        return !!(maskState.isProcessingSAM || maskState.samDebounceTimer ||
+            (maskState.smartSelectPoints.length && !maskState.samPreviewMask &&
+                !maskState.shapes.length));
+    }
+
+    // Reflect the pending state on the ✓ Apply button so the user can see
+    // why Apply is waiting (also covers the model-still-downloading window,
+    // where clicks schedule nothing at all).
+    function samSyncApplyBusy() {
+        const btn = document.querySelector('.mask-apply-btn');
+        if (!btn) return;
+        const busy = samCutoutPending();
+        btn.disabled = busy;
+        btn.textContent = busy ? '⏳ Cutting out…' : '✓ Apply Mask';
+    }
+
+    // Fully stand down this session's Magic Mask state — points, preview,
+    // candidates, pending debounce — and resync the Apply button. Every
+    // editor exit path must call this: maskState and the overlay both
+    // persist across editor sessions, so a cancelled session's leftover
+    // points would otherwise hold a LATER session's Apply button in its
+    // busy state (samCutoutPending's points-without-preview clause).
+    function resetSamSessionState() {
+        maskState.smartSelectPoints = [];
+        maskState.samPreviewMask = null;
+        maskState.samCandidates = [];
+        maskState.samSelectedCandidateIndex = 0;
+        if (maskState.samDebounceTimer) {
+            clearTimeout(maskState.samDebounceTimer);
+            maskState.samDebounceTimer = null;
+        }
+        samSyncApplyBusy();
+    }
+
     // Auto-run SAM segmentation (live preview)
     async function autoRunSAMSegmentation() {
         if (maskState.isProcessingSAM) return;
         if (maskState.smartSelectPoints.length === 0) return;
         if (!window.samSegmenter || !window.samSegmenter.isReady) return;
-        
+
         maskState.isProcessingSAM = true;
+        samSyncApplyBusy();
         
         // Show loading indicator
         const loadingIndicator = document.getElementById('samLoadingIndicator');
@@ -1511,7 +1717,8 @@
             console.error('❌ Auto-segmentation error:', error);
         } finally {
             maskState.isProcessingSAM = false;
-            
+            samSyncApplyBusy();
+
             // Hide loading indicator
             if (loadingIndicator) {
                 loadingIndicator.style.display = 'none';
@@ -1736,6 +1943,171 @@
     }
 
     // Enter mask editing mode for an image layer
+    // ── Collider mask mode (2026-08-16) ───────────────────────────────
+    // Editing a PAINTED collider used to open the shape-mask editor, which
+    // masks the layer — a second, unrelated pass over a collider whose real
+    // shape lives in a GPU mask buffer. This mode edits that buffer itself:
+    // draw/erase strokes land in the collider's mask, so the obstacle, the
+    // panel thumbnail and the film here all move together.
+    function colliderModeActive() {
+        return typeof maskState.activeMaskLayerId === 'string'
+            && maskState.activeMaskLayerId.startsWith('collider-');
+    }
+    function colliderMaskId() {
+        var l = colliderLayer();
+        return (l && l.collisionSource) ? l.collisionSource.id : null;
+    }
+    function colliderLayer() {
+        if (!colliderModeActive()) return null;
+        var idx = parseInt(maskState.activeMaskLayerId.slice(9), 10);
+        return (window.layers || []).find(function (l) { return l.index === idx; }) || null;
+    }
+    // Which layers this mode can serve: a collision layer whose shape comes
+    // from a live/bound Mask buffer (what Paint Collider builds).
+    window.isPaintedColliderLayer = function (layer) {
+        return !!(layer && layer.isCollision && layer.collisionSource
+            && layer.collisionSource.kind === 'mask'
+            && window.Masks && window.Masks.getFBO(layer.collisionSource.id));
+    };
+
+    // Re-read the collider from its mask and repaint the film (debounced —
+    // one GPU readback per stroke burst, same cadence as the live binding).
+    function scheduleColliderFilm() {
+        if (maskState.colliderFilmPending) return;
+        maskState.colliderFilmPending = true;
+        setTimeout(function () {
+            maskState.colliderFilmPending = false;
+            if (!colliderModeActive()) return;
+            var url = null;
+            try {
+                if (window.collisionLayers && window.collisionLayers.refreshColliderFromSource) {
+                    url = window.collisionLayers.refreshColliderFromSource(colliderLayer().index);
+                }
+            } catch (e) { console.warn('collider refresh failed', e); }
+            if (!url) { renderMaskEditor(); return; }
+            var img = new Image();
+            img.onload = function () {
+                maskState.colliderFilm = img;
+                maskState.colliderFilmTinted = tintColliderFilm(img);
+                renderMaskEditor();
+            };
+            img.src = url;
+        }, 90);
+    }
+
+    // The coverage preview is white-on-transparent; paint it red so it reads
+    // as the same "wall" film the canvas shows while collider painting.
+    function tintColliderFilm(img) {
+        var c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        var cx = c.getContext('2d');
+        cx.drawImage(img, 0, 0);
+        cx.globalCompositeOperation = 'source-in';
+        cx.fillStyle = '#ff3b30';
+        cx.fillRect(0, 0, c.width, c.height);
+        return c;
+    }
+
+    // One dab into the collider's mask. The mask stamp reads the GLOBAL
+    // brush size/eraser, so swap them for the editor's own tool settings and
+    // put them back — editing walls must not rewrite the user's brush.
+    function colliderStamp(x, y) {
+        if (typeof window.__maskStamp !== 'function' || !window.config) return;
+        var cfg = window.config;
+        var savedR = cfg.SPLAT_RADIUS, savedE = cfg.BRUSH_ERASER;
+        // Slider is in Brush Size units (1-30); SPLAT_RADIUS is that /1000.
+        cfg.SPLAT_RADIUS = maskState.colliderSize / 1000;
+        cfg.BRUSH_ERASER = (maskState.colliderTool === 'erase');
+        try { window.__maskStamp(x, y, 1); }
+        finally { cfg.SPLAT_RADIUS = savedR; cfg.BRUSH_ERASER = savedE; }
+    }
+
+    window.enterColliderMaskMode = function (layerIndex) {
+        var layer = (window.layers || []).find(function (l) { return l.index === layerIndex; });
+        if (!window.isPaintedColliderLayer(layer)) {
+            // Not a painted collider — fall back to the shape editor.
+            return window.enterImageLayerMaskMode(layerIndex);
+        }
+        var maskId = layer.collisionSource.id;
+        maskState.activeMaskLayerId = 'collider-' + layerIndex;
+        maskState.shapes = [];
+        maskState.selectedShapeIndex = null;
+        maskState.isDragging = false;
+        maskState.isResizing = false;
+        maskState.zoom = 1.0;
+        maskState.panX = 0;
+        maskState.panY = 0;
+        maskState.isPanning = false;
+        maskState.colliderTool = maskState.colliderTool || 'draw';
+        maskState.colliderSize = (typeof maskState.colliderSize === 'number') ? maskState.colliderSize : 11;
+        maskState.colliderFilm = null;
+        maskState.colliderFilmTinted = null;
+        maskState.colliderPainting = false;
+        // Route __maskStamp at THIS collider's mask for the session, and put
+        // the user's previous active mask back on the way out.
+        maskState.colliderPrevMask = (window.Masks && window.Masks.activeId) ? window.Masks.activeId() : null;
+        try { if (window.Masks && window.Masks.setActive) window.Masks.setActive(maskId); } catch (_) {}
+
+        showMaskEditor();
+        setTimeout(function () {
+            setColliderChromeVisible(true);
+            var hdr = document.querySelector('.mask-editor-header h3');
+            if (hdr) hdr.textContent = '🧱 Edit Collider — ' + (layer.title || 'Collision');
+            var hint = document.getElementById('maskHint');
+            if (hint) {
+                hint.innerHTML = '<strong style="color:#ff7b72;">🧱 Collider:</strong> '
+                    + 'Draw to add walls • Erase to carve them back • Shift+Drag to pan • Scroll to zoom';
+            }
+            updateZoomDisplay();
+            scheduleColliderFilm();
+            renderMaskEditor();
+        }, 10);
+    };
+
+    // Show the collider toolbar and hide the shape/Magic-Mask chrome (they
+    // author layer.mask.shapes — a different feature that would only confuse
+    // things here), restoring it on the way out.
+    function setColliderChromeVisible(on) {
+        var overlay = document.getElementById('maskEditorOverlay');
+        if (!overlay) return;
+        var tools = document.getElementById('colliderTools');
+        if (tools) tools.style.display = on ? '' : 'none';
+        ['.mask-mode-toggle', '.mask-tools-row', '#stampMenu', '#smartSelectControls', '#maskRotationControl']
+            .forEach(function (sel) {
+                var el = overlay.querySelector(sel);
+                if (el) el.style.display = on ? 'none' : '';
+            });
+        // Live edits — there is nothing to "apply", and Cancel cannot undo
+        // GPU strokes (the ↶ button does that).
+        var cancelBtn = overlay.querySelector('.mask-cancel-btn');
+        if (cancelBtn) cancelBtn.style.display = on ? 'none' : '';
+        var applyBtn = overlay.querySelector('.mask-apply-btn');
+        if (applyBtn && on) applyBtn.textContent = '✓ Done';
+    }
+
+    function exitColliderMaskMode() {
+        setColliderChromeVisible(false);
+        hideMaskEditor();
+        // One last refresh so the thumbnail/obstacle match the final state
+        try {
+            var l = colliderLayer();
+            if (l && window.collisionLayers && window.collisionLayers.refreshColliderFromSource) {
+                window.collisionLayers.refreshColliderFromSource(l.index);
+            }
+        } catch (_) {}
+        try {
+            if (window.Masks && window.Masks.setActive && maskState.colliderPrevMask != null) {
+                window.Masks.setActive(maskState.colliderPrevMask);
+            }
+        } catch (_) {}
+        maskState.activeMaskLayerId = null;
+        maskState.colliderFilm = null;
+        maskState.colliderFilmTinted = null;
+        maskState.colliderPainting = false;
+        maskState.colliderPrevMask = null;
+        if (typeof window.renderLayers === 'function') window.renderLayers();
+    }
+
     window.enterImageLayerMaskMode = function(layerIndex) {
         if (!window.layers) {
             console.error('❌ window.layers is not defined!');
@@ -1895,6 +2267,13 @@
 
     function exitAdhocMaskMode(save = true) {
         const src = maskState.adhocSource;
+        // Applying while the cutout is still in flight would build the
+        // whole-image fallback stamp — the full-file-rect "giant square".
+        // Hold the editor open instead; Cancel is always available.
+        if (save && samCutoutPending()) {
+            alert('Magic Mask is still cutting out your object — wait for the green preview, or Cancel.');
+            return;
+        }
         // Same Apply nicety as image layers: a pending SAM preview with no
         // finalized shape converts on Apply.
         if (save && src && !maskState.shapes.length && maskState.samPreviewMask
@@ -1909,10 +2288,8 @@
         maskState.selectedShapeIndex = null;
         maskState.adhocSource = null;
         // Never leak this session's SAM preview into a later editor
-        maskState.smartSelectPoints = [];
-        maskState.samPreviewMask = null;
-        maskState.samCandidates = [];
-        maskState.samSelectedCandidateIndex = 0;
+        // (also clears any pending debounce and resyncs the Apply button)
+        resetSamSessionState();
         if (result && src && typeof src.onApply === 'function') {
             try { src.onApply(result, src.name); } catch (e) { console.error('adhoc mask onApply failed', e); }
         }
@@ -1921,6 +2298,12 @@
     // Exit mask mode for image layer
     function exitImageLayerMaskMode(save = true) {
         if (!maskState.activeMaskLayerId || !maskState.activeMaskLayerId.startsWith('image-')) return;
+        // Same in-flight guard as the adhoc editor: applying before the
+        // cutout lands would save an empty/incomplete mask.
+        if (save && samCutoutPending()) {
+            alert('Magic Mask is still cutting out your object — wait for the green preview, or Cancel.');
+            return;
+        }
 
         const layerIndex = parseInt(maskState.activeMaskLayerId.replace('image-', ''));
         const layer = window.layers?.find(l => l.index === layerIndex);
@@ -1948,6 +2331,9 @@
         maskState.activeMaskLayerId = null;
         maskState.shapes = [];
         maskState.selectedShapeIndex = null;
+        // Same anti-leak reset as the adhoc/recording exits: stale points
+        // from a cancelled session would disable Apply on the next open.
+        resetSamSessionState();
 
         // Apply mask to layer immediately
         if (save && layer && typeof window.applyLayerMask === 'function') {
@@ -1980,7 +2366,11 @@
     // Override exitMaskMode to handle every target type
     const originalExitMaskMode = window.exitMaskMode;
     window.exitMaskMode = function(save = true) {
-        if (maskState.activeMaskLayerId === 'adhoc') {
+        if (colliderModeActive()) {
+            // Edits already live in the collider's mask — closing is all
+            // there is to do (undo lives on the ↶ button / Ctrl+Z).
+            exitColliderMaskMode();
+        } else if (maskState.activeMaskLayerId === 'adhoc') {
             exitAdhocMaskMode(save);
         } else if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
             exitImageLayerMaskMode(save);

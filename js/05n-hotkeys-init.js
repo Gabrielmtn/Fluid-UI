@@ -9,9 +9,36 @@
         // Hotkeys modal + Undo/Redo implementation
         const hotkeyOverlay = document.getElementById('hotkeyOverlay');
         const hotkeyClose = document.getElementById('hotkeyClose');
-        function showHotkeys() { if (hotkeyOverlay) hotkeyOverlay.style.display = 'flex'; }
+        // Key-chip pass (2026-08-15): the modal's <li>s are authored as
+        // "Keys — Description" prose; on first open, wrap the key half in
+        // <kbd> + the rest in .hk-desc so the CSS renders real key caps.
+        // Lines without the ' — ' separator are left untouched.
+        let hotkeysChipped = false;
+        function chipHotkeyList() {
+            if (hotkeysChipped || !hotkeyOverlay) return;
+            hotkeysChipped = true;
+            hotkeyOverlay.querySelectorAll('.hotkey-body li').forEach((li) => {
+                const t = li.textContent;
+                const i = t.indexOf(' — ');
+                if (i <= 0) return;
+                const kbd = document.createElement('kbd');
+                kbd.textContent = t.slice(0, i);
+                const d = document.createElement('span');
+                d.className = 'hk-desc';
+                d.textContent = t.slice(i + 3);
+                li.textContent = '';
+                li.appendChild(kbd);
+                li.appendChild(d);
+            });
+        }
+        function showHotkeys() { if (hotkeyOverlay) { chipHotkeyList(); hotkeyOverlay.style.display = 'flex'; } }
         function hideHotkeys() { if (hotkeyOverlay) hotkeyOverlay.style.display = 'none'; }
-        function toggleHotkeys() { if (!hotkeyOverlay) return; hotkeyOverlay.style.display = (hotkeyOverlay.style.display === 'flex' ? 'none' : 'flex'); }
+        function toggleHotkeys() { if (!hotkeyOverlay) return; chipHotkeyList(); hotkeyOverlay.style.display = (hotkeyOverlay.style.display === 'flex' ? 'none' : 'flex'); }
+        // Exposed for the two non-keyboard openers: 13-mobile-mode's '?'
+        // button (toggle) and 17-hotkey-reminder's 'F1 — ALL HOTKEYS' pill
+        // (show) — both must route through here so the chip pass runs.
+        window.toggleHotkeys = toggleHotkeys;
+        window.showHotkeys = showHotkeys;
         if (hotkeyClose) hotkeyClose.addEventListener('click', hideHotkeys);
         if (hotkeyOverlay) hotkeyOverlay.addEventListener('click', (e) => { if (e.target === hotkeyOverlay) hideHotkeys(); });
         let undoStack = [];
@@ -221,17 +248,31 @@
             if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
         }
         window.stepPaletteOnce = stepPaletteOnce;
-        function cycleSelect(el, dir) {
-            if (!el) return;
-            const opts = el.options;
-            if (!opts || !opts.length) return;
-            let idx = el.selectedIndex;
-            idx = Math.min(opts.length - 1, Math.max(0, idx + dir));
-            if (idx !== el.selectedIndex) {
-                pushUndo();
-                el.selectedIndex = idx;
-                el.dispatchEvent(new Event('change'));
+        // Step a numeric-valued select toward a HIGHER (dir=+1) or LOWER
+        // (dir=-1) value. Deliberately value-based, not index-based: the
+        // resolution lists are ordered high→low, so index stepping ran
+        // backwards (Alt+↓ made things sharper), and setResolutionDropdown
+        // APPENDS injected '(custom)' options at the end, which breaks index
+        // order outright — from a custom value, ±1 index jumped somewhere
+        // arbitrary. Picking the nearest value in the requested direction is
+        // correct regardless of how the list is ordered.
+        function stepNumericSelect(el, dir) {
+            if (!el || !el.options || !el.options.length) return;
+            const curOpt = el.options[el.selectedIndex];
+            const cur = curOpt ? parseFloat(curOpt.value) : NaN;
+            if (isNaN(cur)) return;
+            let bestIdx = -1, bestVal = null;
+            for (let i = 0; i < el.options.length; i++) {
+                const v = parseFloat(el.options[i].value);
+                if (isNaN(v)) continue;
+                if (dir > 0 ? v <= cur : v >= cur) continue;
+                // nearest in that direction
+                if (bestVal === null || (dir > 0 ? v < bestVal : v > bestVal)) { bestVal = v; bestIdx = i; }
             }
+            if (bestIdx < 0) return; // already at the extreme
+            pushUndo();
+            el.selectedIndex = bestIdx;
+            el.dispatchEvent(new Event('change'));
         }
         document.addEventListener('keydown', (e) => {
             if (isTypingTarget(e.target)) return;
@@ -392,8 +433,10 @@
             if (e.altKey && !ctrlOrMeta) {
                 if (key === 'ArrowUp' || key === 'ArrowDown') {
                     e.preventDefault();
-                    if (e.shiftKey) cycleSelect(document.getElementById('physicsResolution'), key === 'ArrowUp' ? 1 : -1);
-                    else cycleSelect(document.getElementById('visualResolution'), key === 'ArrowUp' ? 1 : -1);
+                    // Up = more (sharper / finer), down = less. Was inverted.
+                    const _dir = key === 'ArrowUp' ? 1 : -1;
+                    if (e.shiftKey) stepNumericSelect(document.getElementById('physicsResolution'), _dir);
+                    else stepNumericSelect(document.getElementById('visualResolution'), _dir);
                     return;
                 }
             }

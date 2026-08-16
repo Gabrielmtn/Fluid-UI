@@ -218,7 +218,11 @@
       if (row.querySelector('input[type="checkbox"]')) return;
       var el = rowRange(row);
       if (!el || el.disabled || !el.offsetParent) return;
-      if (el.dataset && el.dataset.noScale === '1') return;
+      /* data-no-scale only suppresses the printed scale (ensureStack) — it
+         must not also kill row-drag, or a scale-less .control-group slider
+         (Mutate Strength) silently loses the forwarding it moved rows to
+         get. Rows that want no forwarding opt out with data-no-row-drag. */
+      if (el.dataset && el.dataset.noRowDrag === '1') return;
       dragEl = el;
       dragId = e.pointerId;
       e.preventDefault();

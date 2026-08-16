@@ -390,13 +390,17 @@
                 const cMode = layer.colorMode || 'original';
                 let genMode = null, genPalette = null, liveSolid = null;
                 if (cMode === 'original') {
-                    if (/^(random|rainbow|step)$/.test(layer.recordMode || '')) {
+                    // 'rainbow' dropped from the generative set (removed
+                    // 2026-08-15, photosensitivity): old rainbow recordings
+                    // fall through to the non-generative baked-color path —
+                    // still colorful, but no fresh random color per splat.
+                    if (/^(random|step)$/.test(layer.recordMode || '')) {
                         genMode = layer.recordMode;
                         genPalette = layer.recordStepPalette || null;
                     }
                 } else if (cMode === 'live') {
                     const cm = (window.multiArmColors && window.multiArmColors[0] && window.multiArmColors[0].mode) || 'main';
-                    if (/^(random|rainbow|step)$/.test(cm)) {
+                    if (/^(random|step)$/.test(cm)) {
                         genMode = cm; // current palette (recGenerativeColor reads it live)
                     } else if (cm === 'fixed' && window.multiArmColors[0].color) {
                         liveSolid = recHexToRgb(window.multiArmColors[0].color);
@@ -798,11 +802,11 @@
         }
 
         // Fresh replay color for a generative record/live mode (1.3 rework):
-        // random/rainbow → a new vibrant color; step → the next palette entry
+        // random → a new vibrant color; step → the next palette entry
         // (record-time palette for 'original', current for 'live'). Non-
         // generative modes never call this. Per-layer step index on the layer.
         function recGenerativeColor(mode, palette, layer) {
-            if (mode === 'random' || mode === 'rainbow') {
+            if (mode === 'random') {
                 return window.generateVibrantColor ? window.generateVibrantColor()
                     : [Math.random(), Math.random(), Math.random()];
             }
@@ -1059,8 +1063,17 @@
                 if (cb) cb.checked = true;
                 if (typeof initMultiplayer === 'function') initMultiplayer();
             } else {
+                // One unguarded click here used to close the socket outright —
+                // the relay drops you from the Take Turns rotation and passes
+                // the brush on, and (for stranger rooms) there's no way back.
+                // Confirm before leaving, and keep the room for Reconnect.
+                const inTurns = !!window.turnsOn;
+                const msg = inTurns
+                    ? 'Leave the multiplayer room?\n\nTake Turns is on — leaving gives up your spot in the rotation.'
+                    : 'Leave the multiplayer room?';
+                if (!window.confirm(msg)) { recRenderUI(); return; }
                 if (cb) cb.checked = false;
-                if (typeof disconnectMultiplayer === 'function') disconnectMultiplayer();
+                if (typeof disconnectMultiplayer === 'function') disconnectMultiplayer(true);
             }
             // Let connection events update state, but refresh UI immediately for button highlight
             recRenderUI();

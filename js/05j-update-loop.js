@@ -265,6 +265,18 @@
                     && typeof window.__sketchStrokeEnd === 'function') {
                     window.__sketchStrokeEnd();
                 }
+                // Arm-color advance deferred from stroke end (05d): flush only
+                // once EVERYTHING has stopped painting — no splat-out tail AND
+                // no queued stabilizer catch-up dabs. Advancing any earlier
+                // painted the stroke's late-draining dabs in next-stroke
+                // colors while arm 0 still held the old pointer color
+                // (the mixed-color flash at stroke end).
+                if (pendingArmAdvance && !splatOutActive &&
+                    (!window.BrushEngine ||
+                        (!window.BrushEngine.isActive() && !window.BrushEngine.pending()))) {
+                    advanceArmColors();
+                    pendingArmAdvance = false;
+                }
                 // Splat-out: a trailing tail along the release velocity, tapering
                 // in size over splatOutDist of travel. Ends when the size taper
                 // completes OR the velocity has effectively died (so it can never
@@ -273,11 +285,10 @@
                     const outMult = getSplatOutMult();
                     const outVel2 = splatOutDx * splatOutDx + splatOutDy * splatOutDy;
                     if (outMult <= 0.001 || outVel2 < 0.0002) {
+                        // Arm-color advance no longer flushes here: the tail
+                        // can die while stabilizer dabs still drain. The
+                        // full-idle gate above owns the flush.
                         splatOutActive = false;
-                        if (pendingArmAdvance) {
-                            advanceArmColors();
-                            pendingArmAdvance = false;
-                        }
                     } else {
                         // Tail dye honors the Flow slider like the stroke it ends
                         const tailFlow = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
@@ -761,8 +772,8 @@
                 }
                 blit(density.write.fbo);
                 density.swap();
-                // 8b. Attractor field (6.2 ferrofluid) — dye-transport gather
-                // toward the scene's magnet layout. Runs on the advected dye,
+                // 8b. Attractor field — dye-transport gather toward a
+                // caller-published magnet layout. Runs on the advected dye,
                 // moves the DYE only (never velocity → cannot destabilize the
                 // sim). No-op with zero cost unless a scene set
                 // window.__attractorField. See attractorFrag for the design.

@@ -275,6 +275,9 @@ class DepthEstimator {
         setMaskLive: setMaskLive,       // D3/D4: bind the active Mask live
         isSketchLive: isSketchLive,
         boundColliderSource: boundColliderSource,
+        // Re-read one source-bound collider from its source (collider mask
+        // editor); returns its coverage preview data-URL.
+        refreshColliderFromSource: refreshColliderFromSource,
 
         // Refresh depth estimation for a layer
         refreshDepth: refreshLayerDepth,
@@ -855,11 +858,14 @@ class DepthEstimator {
     // Returns {depth, previewUrl, any} or null; allowEmpty=true returns a
     // zeroed mask for an empty sketch (live mode: erasing everything must
     // CLEAR the bound collider, not freeze its last state).
-    function buildSketchDepth(allowEmpty) {
+    // fboOverride: read THAT buffer instead of the bound one (the collider
+    // mask editor refreshes one specific layer's source, which may not be
+    // the live-bound surface at all).
+    function buildSketchDepth(allowEmpty, fboOverride) {
         // D3/D4: read the BOUND source's buffer (raster layer OR mask;
         // falls back to the active paint layer) — switching the active
         // surface must not silently re-target an existing live binding.
-        var sk = _resolveBoundFBO();
+        var sk = fboOverride || _resolveBoundFBO();
         var canvasEl = document.getElementById('canvas');
         if (!sk || !sk.texture || !canvasEl || typeof gl === 'undefined') {
             console.warn('Sketch layer not available');
@@ -1000,25 +1006,42 @@ class DepthEstimator {
         if (_boundSrc && _resolveBoundFBO()) {
             layer.collisionSource = { kind: _boundSrc.kind, id: _boundSrc.id };
             updateObstacleFromLayers();
+            // The GPU reads the bound source directly, so physics needs
+            // nothing more from us — but the SEEN surfaces (panel thumbnail,
+            // on-canvas film, and the mask editor's backdrop, which draws
+            // layer.originalData) were left frozen at the snapshot taken when
+            // the layer was created: painting a Paint-Collider mask showed a
+            // blank thumbnail and an empty Edit Mask canvas. Refresh them
+            // from the source here — one readback per coalesced 120ms
+            // stroke-end refresh, the same cost the non-bound path below has
+            // always paid.
+            var srcBuilt = buildSketchDepth(true);
+            if (srcBuilt) _applyColliderPreview(layer, srcBuilt);
             return;
         }
         var built = buildSketchDepth(true); // empty sketch → zeroed collider
         if (!built) return;
         updateLayerDepthMask(_sketchColliderIndex, built.depth);
-        // Keep every visible surface in sync with what now collides, using
-        // the SAME opaque-grayscale convention addCollisionLayer uses for
-        // layer.data (the transparent alpha=coverage preview went blank on
-        // dark thumbnails — the painted shape never showed in the Layers
-        // panel, and full renderLayers() re-renders showed nothing at all).
+        _applyColliderPreview(layer, built);
+    }
+
+    // Keep every visible surface in sync with what now collides, using the
+    // SAME opaque-grayscale convention addCollisionLayer uses for layer.data
+    // (the transparent alpha=coverage preview went blank on dark thumbnails —
+    // the painted shape never showed in the Layers panel, and full
+    // renderLayers() re-renders showed nothing at all). originalData keeps
+    // the alpha-coverage version: that's what the mask editor draws.
+    function _applyColliderPreview(layer, built) {
+        if (!layer || !built) return;
         var opaqueUrl = _depthToOpaqueUrl(built.depth);
-        layer.data = opaqueUrl;              // panel thumbnail source
+        layer.data = opaqueUrl;                // panel thumbnail source
         layer.originalData = built.previewUrl; // alpha-coverage mask (data)
-        var layerDiv = document.getElementById('layer' + _sketchColliderIndex);
+        var layerDiv = document.getElementById('layer' + layer.index);
         if (layerDiv) layerDiv.style.backgroundImage = 'url(' + opaqueUrl + ')';
         // Update the Layers-panel thumbnail IN PLACE (no full re-render per
         // stroke — renderLayers rebuilds the whole panel and would fight
         // scroll position / drag state at painting cadence).
-        var thumb = document.querySelector('.layer-item[data-layer-index="' + _sketchColliderIndex + '"] .layer-thumbnail');
+        var thumb = document.querySelector('.layer-item[data-layer-index="' + layer.index + '"] .layer-thumbnail');
         if (thumb) thumb.style.backgroundImage = 'url(' + opaqueUrl + ')';
         else if (typeof window.renderLayers === 'function') window.renderLayers();
     }
@@ -1039,6 +1062,22 @@ class DepthEstimator {
         return pc.toDataURL('image/png');
     }
 
+    // Re-read ONE source-bound collision layer from its own source, whether
+    // or not it is the live-bound one: refreshes the physics obstacle, the
+    // panel thumbnail and the on-canvas film, and hands back the coverage
+    // preview so a caller (the collider mask editor) can show it. Returns
+    // null if the layer isn't source-bound or its source is gone.
+    function refreshColliderFromSource(layerIndex) {
+        var layer = (window.layers || []).find(function (l) { return l.index === layerIndex; });
+        if (!layer || !layer.collisionSource) return null;
+        var fbo = _resolveSourceFBO(layer.collisionSource);
+        if (!fbo) return null;
+        var built = buildSketchDepth(true, fbo);
+        if (built) _applyColliderPreview(layer, built);
+        updateObstacleFromLayers();
+        return built ? built.previewUrl : null;
+    }
+
     function scheduleSketchRefresh(kind, id) {
         if (!_sketchLive || _sketchRefreshPending) return;
         // D3/D4: mutations on surfaces other than the bound one are ignored
@@ -1056,8 +1095,21 @@ class DepthEstimator {
     // Live binding: the collider keeps tracking its source surface.
     // kind (optional) = 'raster' | 'mask': which ACTIVE surface a fresh
     // binding should read; re-enabling with no kind keeps the old source.
-    function setSketchLive(on, kind) {
+    // opts.rebind: start a FRESH binding on the currently ACTIVE surface of
+    // `kind`, leaving any existing live collider behind as a static-bound
+    // collision layer. Load-bearing for the Paint Collider button: without
+    // it, the on-branch below only rebinds when the source KIND differs —
+    // never the id — and scheduleSketchRefresh filters mutations to the
+    // bound id, so painting a NEWLY created mask would refresh nothing.
+    function setSketchLive(on, kind, opts) {
         on = !!on;
+        if (on && opts && opts.rebind) {
+            _sketchLive = false;
+            _boundSrc = null;
+            // The old live layer keeps its collisionSource and stays a
+            // collider; it just stops being THE live slot.
+            _sketchColliderIndex = null;
+        }
         if (on === _sketchLive && (!on || !kind || (_boundSrc && _boundSrc.kind === kind))) return _sketchLive;
         if (on) {
             if (!_boundSrc || (kind && _boundSrc.kind !== kind)) {
@@ -1095,7 +1147,7 @@ class DepthEstimator {
         if (typeof window.__onSketchLiveChanged === 'function') window.__onSketchLiveChanged(_sketchLive, _boundSrc);
         return _sketchLive;
     }
-    function setMaskLive(on) { return setSketchLive(on, 'mask'); }
+    function setMaskLive(on, opts) { return setSketchLive(on, 'mask', opts); }
 
     function isSketchLive() { return _sketchLive; }
     function boundColliderSource() { return _boundSrc ? { kind: _boundSrc.kind, id: _boundSrc.id } : null; }

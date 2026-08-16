@@ -262,6 +262,42 @@
         }
     }
 
+    // One shared disclosure affordance (user-test 2026-08-15): Brush Size,
+    // Fluid, and Multi-Brush each hid extra controls behind a DIFFERENT
+    // secret handshake — a clickable label with an 8px chevron, a select
+    // disguised as a label, a clickable value cell. None read as
+    // interactive. Every channel with more-settings now also carries an
+    // explicit gear button in its header; the original triggers stay
+    // clickable for muscle memory.
+    function makeChGear(title) {
+        var g = document.createElement('button');
+        g.type = 'button';
+        g.className = 'ch-gear';
+        g.title = title;
+        // U+2699 + VS15 forces the monochrome TEXT gear glyph (no emoji
+        // coloring), so currentColor styling applies like any icon font.
+        g.textContent = '⚙︎';
+        return g;
+    }
+
+    // Delegate the gear to an existing trigger element and mirror its
+    // active state (set/cleared by the panel handlers AND the outside-click
+    // closers — a MutationObserver keeps the gear honest either way). The
+    // delegated .click() raises a fresh event targeting the trigger, which
+    // every outside-click closer already exempts.
+    function wireGearToTrigger(gear, trigger) {
+        if (!trigger) { gear.disabled = true; return; }
+        gear.addEventListener('click', function (e) {
+            e.stopPropagation();
+            trigger.click();
+        });
+        try {
+            new MutationObserver(function () {
+                gear.classList.toggle('active', trigger.classList.contains('active'));
+            }).observe(trigger, { attributes: true, attributeFilter: ['class'] });
+        } catch (_) {}
+    }
+
     // ─── MIXER STRIP ─────────────────────────────────────────────
     function buildMixerStrip(controls) {
         const strip = document.createElement('div');
@@ -278,16 +314,40 @@
         // panel — too common to bury in the sidebar. The sidebar Brush section
         // keeps the rarer replay + splat-ramp controls.
         buildBrushPanel(sizeChannel.querySelector('.ch-label'));
+        var sizeGear = makeChGear('Brush settings & presets');
+        wireGearToTrigger(sizeGear, sizeChannel.querySelector('.ch-label'));
+        sizeChannel.querySelector('.ch-header').appendChild(sizeGear);
         strip.appendChild(sizeChannel);
-        strip.appendChild(faderChannel('Fluid', 'blue', 'curl', 'curlValue'));
+
+        var fluidChannel = faderChannel('Fluid', 'blue', 'curl', 'curlValue');
+        // The Fluid gear opens the material picker (the disguised
+        // #materialMode select). showPicker needs Chromium 121+; older
+        // builds at least get focus so the arrow keys work.
+        var fluidGear = makeChGear('Material mode — Fluid / Paint-Wet / Paint-Thick');
+        fluidGear.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var sel = document.getElementById('materialMode');
+            if (!sel) return;
+            if (typeof sel.showPicker === 'function') {
+                try { sel.showPicker(); return; } catch (_) {}
+            }
+            sel.focus();
+        });
+        fluidChannel.querySelector('.ch-header').appendChild(fluidGear);
+        strip.appendChild(fluidChannel);
+
         strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
         var brushChannel = faderChannel('Multi-Brush', 'yellow', 'multiplier', 'multiplierValue');
         // The multiplier value ("1x") IS the brush-colors trigger — click it to
-        // open the per-arm brush color controls (no separate icon button).
+        // open the per-arm brush color controls; the gear is the discoverable
+        // second door to the same popup.
         // Query from the (detached) channel: faderChannel already re-parented
         // the value element, so document.getElementById would miss it here.
         buildArmColorsDropdown(brushChannel.querySelector('#multiplierValue'));
+        var armGear = makeChGear('Multi-brush arm colors & symmetry');
+        wireGearToTrigger(armGear, brushChannel.querySelector('#multiplierValue'));
+        brushChannel.querySelector('.ch-header').appendChild(armGear);
         strip.appendChild(brushChannel);
         strip.appendChild(faderChannel('Time', 'pink', 'timeScale', 'timeScaleValue'));
         strip.appendChild(faderChannel('Density', 'cyan', 'densityDissipation', 'densityValue'));
@@ -313,11 +373,11 @@
 
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
-        'Brush Size': 'Brush size for painting fluid — click the label for brush settings & presets',
-        'Fluid': 'Material mode (Fluid / Paint-Wet / Paint-Thick) + amount — vorticity in fluid mode',
+        'Brush Size': 'Brush size for painting fluid — the ⚙ opens brush settings & presets',
+        'Fluid': 'Material mode (Fluid / Paint-Wet / Paint-Thick) + amount — the ⚙ opens the material picker',
         'Viscosity': 'Sharpness/detail enhancement',
         'Isolation': 'Motion isolation - how much color follows velocity',
-        'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — click the value for arm colors',
+        'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — the ⚙ opens arm colors & symmetry',
         'Time': 'Simulation time scale',
         'Density': 'How fast color fades',
         'Velocity': 'How fast motion fades',
@@ -390,7 +450,7 @@
         // modes / ignite) and drove the strip's height.
         const picker = document.getElementById('colorPicker');
 
-        // --- Toggle row: [Rnd|Step|🌈 segmented switch] + gap + [Gate] ---
+        // --- Toggle row: [Rnd|Cycle segmented switch] + gap + [Cap] ---
         // Rnd/Step/Rainbow are mutually exclusive -> ONE gapless segmented
         // switch; Gate is an independent toggle drawn separately with its own
         // border (design handoff Task 6: touching cells mean pick one,
@@ -446,24 +506,30 @@
         if (stepEl) {
             stepEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
             ch.appendChild(stepEl);
-            makeColorModeChip('Step', 'step', 'step', 'Step through the palette each stroke',
+            // 'Palette' (renamed from 'Step' 2026-08-15, Gabriel's pick):
+            // advances one palette colour per stroke. The mode key/checkbox
+            // id stay 'step'; the carousel label became 'Palettes' to
+            // disambiguate.
+            makeColorModeChip('Palette', 'step', 'step', 'Palette mode — advance one palette colour each stroke',
                 stepEl.checked || arm0Mode() === 'step');
         }
-        // Rainbow has NO backing checkbox — it lives only in arm0.mode, which
-        // already persists (multiArmColors) and is understood by recording.
-        makeColorModeChip('🌈', 'rainbow', 'rainbow', 'Rainbow — a new colour every splat',
-            arm0Mode() === 'rainbow');
+        // Rainbow chip removed 2026-08-15 (photosensitivity: a new random
+        // colour every splat strobes while painting). Stale saved 'rainbow'
+        // modes coerce to 'fixed' at every ingest (05g allowlist + 12's
+        // preset/autoload sanitizers).
 
-        // Gate chip (independent of Rnd/Step exclusivity): clamps dye at the
-        // stroke's own color so repeated paint can't overflow into white.
+        // Cap Color chip (renamed from 'Gate' 2026-08-15 — user-test copy
+        // pass; the id colorGate and all persisted keys stay). Independent of
+        // Rnd/Cycle exclusivity: clamps dye at the stroke's own color so
+        // repeated paint can't overflow into white.
         var gateEl = document.getElementById('colorGate');
         if (gateEl) {
             gateEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
             var gateBtn = document.createElement('button');
             gateBtn.type = 'button';
             gateBtn.className = 'ch-text-toggle ch-gate-toggle' + (gateEl.checked ? ' active' : '');
-            gateBtn.textContent = 'Gate';
-            gateBtn.title = 'Lock max to original color — repeated strokes can\'t overflow into white';
+            gateBtn.textContent = 'Cap';
+            gateBtn.title = 'Cap Color — lock the max at the stroke\'s original color so repeated strokes can\'t blow out to white';
             gateBtn.addEventListener('click', function () {
                 gateEl.checked = !gateEl.checked;
                 gateEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -496,7 +562,7 @@
         igniteBtnColor.className = 'ch-text-toggle ch-nudge-btn';
         igniteBtnColor.textContent = '🔥 Ignite';
         igniteBtnColor.title = 'Hold to perk the fluid up — faded dye is pulled back to the colour it was '
-            + 'painted at, and past the Gate cap. Slide right onto the lock to keep it on. '
+            + 'painted at, past even the Cap Color limit. Slide right onto the lock to keep it on. '
             + 'Your density decay setting is untouched.';
 
         // Latch cell (Task 7): permanently visible so the second mode is
@@ -918,9 +984,15 @@
         // options as a themeable list header on open (the native <optgroup>
         // popup can't be dark-themed in this build — white OS frame — so we
         // drive a hidden native <select> from a custom list instead).
-        [['visualResolution', 'Visual Quality'], ['physicsResolution', 'Physics Detail']].forEach(function (pair) {
+        // Copy pass 2026-08-15: 'Visual Quality'/'Physics Detail' said
+        // nothing. Honest names + a one-line mechanism caption in the open
+        // list, and a permanent micro-label above each resting pill so the
+        // two aren't just two unlabeled numbers at the bottom of the screen.
+        [['visualResolution', 'Image Sharpness', 'Resolution of the paint itself — sharper costs GPU'],
+         ['physicsResolution', 'Motion Detail', 'Resolution of the motion sim — finer swirls cost GPU']
+        ].forEach(function (pair) {
             const sel = document.getElementById(pair[0]);
-            if (sel) bar.appendChild(makeQubDropdown(sel, pair[1]));
+            if (sel) bar.appendChild(makeQubDropdown(sel, pair[1], pair[2]));
         });
         document.body.appendChild(bar);
         // Trim the right edge to #canvas-area's right — the drawing region's
@@ -948,14 +1020,21 @@
     // Custom themeable dropdown that drives a hidden native <select> (so all
     // existing change bindings + save/load keep working by id). Opens UPWARD
     // with a label header on top — the fix for the unstylable native popup.
-    function makeQubDropdown(sel, labelText) {
+    function makeQubDropdown(sel, labelText, captionText) {
         sel.classList.add('qub-native-hidden');
         const wrap = document.createElement('div');
         wrap.className = 'qub-dd';
+        // Permanent micro-label above the resting pill — without it the bar
+        // reads as two bare numbers ("2048 ▾ 512 ▾") with no clue which is
+        // which until hover.
+        const cap = document.createElement('div');
+        cap.className = 'qub-dd-cap';
+        cap.textContent = labelText;
+        wrap.appendChild(cap);
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'qub-dd-btn';
-        btn.title = labelText;
+        btn.title = captionText ? (labelText + ' — ' + captionText) : labelText;
         const val = document.createElement('span');
         val.className = 'qub-dd-val';
         btn.appendChild(val);
@@ -966,6 +1045,14 @@
         hdr.className = 'qub-dd-hdr';
         hdr.textContent = labelText;
         list.appendChild(hdr);
+        if (captionText) {
+            // One-line mechanism caption under the open-list header — the
+            // custom list makes this possible where native <option> can't.
+            const sub = document.createElement('div');
+            sub.className = 'qub-dd-sub';
+            sub.textContent = captionText;
+            list.appendChild(sub);
+        }
 
         const syncVal = function () {
             const o = sel.options[sel.selectedIndex];
@@ -1023,26 +1110,57 @@
         const controlsRow = document.createElement('div');
         controlsRow.className = 'mutation-controls';
 
-        // Scope
+        // Scope — a binary choice (engine contract: strictly 'basic'|'all'),
+        // so a two-cell segmented toggle instead of a dropdown hiding two
+        // options. The hidden native select stays as the state-holder:
+        // getOptions() keeps reading #mutationScope by id, unchanged (the
+        // codebase's established hidden-native-control pattern).
         const scopeWrap = document.createElement('div');
         scopeWrap.className = 'mutation-field';
         scopeWrap.innerHTML = '<label>Scope</label>';
         const scopeSel = document.createElement('select');
         scopeSel.id = 'mutationScope';
         scopeSel.innerHTML = '<option value="basic">Basic</option><option value="all">All</option>';
+        scopeSel.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
+        const scopeSeg = document.createElement('div');
+        scopeSeg.className = 'ch-seg-switch mutation-scope-seg';
+        [['basic', 'Basic', 'Mutate the everyday look params only'],
+         ['all',   'All',   'Mutate everything mutable, including rarely-touched params']
+        ].forEach(function (m) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ch-text-toggle' + (scopeSel.value === m[0] ? ' active' : '');
+            b.textContent = m[1];
+            b.title = m[2];
+            b.addEventListener('click', function () {
+                scopeSel.value = m[0];
+                Array.prototype.forEach.call(
+                    scopeSeg.querySelectorAll('.ch-text-toggle'),
+                    function (x) { x.classList.remove('active'); });
+                b.classList.add('active');
+            });
+            scopeSeg.appendChild(b);
+        });
+        scopeWrap.appendChild(scopeSeg);
         scopeWrap.appendChild(scopeSel);
         controlsRow.appendChild(scopeWrap);
 
-        // Strength
+        // Strength — a standard sidebar row (.control-group: sidebar
+        // typography + the full-row drag forwarding, which the bespoke
+        // .mutation-field row missed), shown as a percentage. data-no-scale
+        // skips the auto-printed 0.05/0.53/1 stops — arbitrary-looking
+        // numbers for a subjective subtle→wild control.
         const strWrap = document.createElement('div');
-        strWrap.className = 'mutation-field mutation-field-wide';
-        strWrap.innerHTML = '<label>Strength <span id="mutationStrengthVal" class="value-display">0.30</span></label>';
+        strWrap.className = 'control-group';
+        strWrap.innerHTML = '<label>Strength <span id="mutationStrengthVal" class="value-display">30%</span></label>';
         const strSlider = document.createElement('input');
         strSlider.type = 'range'; strSlider.id = 'mutationStrength';
         strSlider.min = '0.05'; strSlider.max = '1'; strSlider.step = '0.05'; strSlider.value = '0.3';
+        strSlider.setAttribute('data-no-scale', '1');
+        strSlider.title = 'How far each mutation may push a param — subtle nudges left, wild swings right';
         strSlider.addEventListener('input', function () {
             var disp = document.getElementById('mutationStrengthVal');
-            if (disp) disp.textContent = parseFloat(this.value).toFixed(2);
+            if (disp) disp.textContent = Math.round(parseFloat(this.value) * 100) + '%';
         });
         strWrap.appendChild(strSlider);
         controlsRow.appendChild(strWrap);
@@ -1175,7 +1293,7 @@
                       'shadingIntensity', 'displayShadingToggle',
                       'lightShiftSpeed', 'lightShiftThreshold', 'lightShiftIntensity', 'lightShiftSaturation',
                       'lightPos', 'lightShiftPath'],
-            animations: ['ascendToggle', 'ascendRandomness', 'shootingStarToggle',
+            animations: ['shootingStarToggle',
                          'ssFrequency', 'ssAngle', 'ssLength', 'ssSize', 'ssVariance', 'ssGravity', 'ssOrigin'],
             audio: ['audioReactToggle', 'arMapAutoSplat', 'arMapSize', 'arMapKaleido', 'arMapColor',
                     'audioSensitivity', 'audioBeatThreshold']
@@ -1581,7 +1699,6 @@
         body.appendChild(grid);
 
         // Toggle animations (full-width, with collapsible settings)
-        moveEl('ascendToggleWrap', body);
         moveEl('shootingStarWrap', body);
 
         return sec;
@@ -1614,7 +1731,7 @@
     function buildSimulationSection() {
         const { sec, body } = makeSection('⚙️ Simulation', 'blue', true);
 
-        // UX-9.1: Visual Quality + Physics Detail live in the top-right quality
+        // UX-9.1: Image Sharpness + Motion Detail live in the quality
         // underbar (buildQualityUnderbar) for always-visible quick access.
         moveControlGroup('fpsCap', body);
         moveControlGroup('pressureDissipation', body);
@@ -2287,34 +2404,65 @@
             if (e.key === 'Escape') { e.preventDefault(); cancelPresetSave(); }
         });
 
-        // ── Paint target: fluid splats vs raster paint layer vs mask ──
+        // ── Paint target: fluid splats vs collider painting ──
+        // 2026-08-16 user-test simplification (Gabriel): the Sketch/Mask
+        // buttons and the entire Sketch Layer + Mask sections below them
+        // collapsed into ONE 'Paint Collider' action — the old controls
+        // were 'complex and a little overwhelming'. The sketch/mask ROUTES
+        // survive untouched underneath: the Layers panel's per-layer 🖌️
+        // still paints raster layers (BRUSH_TARGET 'sketch'), brush presets
+        // with target:'sketch'/'mask' still apply via SETTERS.target, and
+        // collision layers keep their controls in the Layers panel.
         sLabel('Paint Into');
         var targetRow = document.createElement('div');
         targetRow.className = 'brush-mode-row';
         var fluidBtn = document.createElement('button');
         fluidBtn.type = 'button'; fluidBtn.className = 'brush-mode-btn active'; fluidBtn.textContent = 'Fluid';
         fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
-        var sketchBtn = document.createElement('button');
-        sketchBtn.type = 'button'; sketchBtn.className = 'brush-mode-btn'; sketchBtn.textContent = 'Sketch';
-        sketchBtn.title = 'Strokes paint the active paint layer — normal-control drawing that never decays or flows (backgrounds, guides, colliders)';
-        var maskBtn = document.createElement('button');
-        maskBtn.type = 'button'; maskBtn.className = 'brush-mode-btn'; maskBtn.textContent = 'Mask';
-        maskBtn.title = 'Strokes paint coverage into the active Mask (shown as a red film) — bind it as a collider or clip (D3)';
-        targetRow.appendChild(fluidBtn); targetRow.appendChild(sketchBtn); targetRow.appendChild(maskBtn);
+        var colliderBtn = document.createElement('button');
+        colliderBtn.type = 'button'; colliderBtn.className = 'brush-mode-btn'; colliderBtn.textContent = '🧱 Paint Collider';
+        colliderBtn.title = 'Paint walls with your brush: strokes build a live collider layer (see the Layers panel) that the fluid flows around — shown as a red film while painting. Click Fluid to paint dye again.';
+        targetRow.appendChild(fluidBtn); targetRow.appendChild(colliderBtn);
         panel.appendChild(targetRow);
         var VALID_TARGETS = { fluid: 1, sketch: 1, mask: 1 };
         function setBrushTarget(t) {
             if (!VALID_TARGETS[t]) t = 'fluid';
             if (window.config) window.config.BRUSH_TARGET = t;
             fluidBtn.classList.toggle('active', t === 'fluid');
-            sketchBtn.classList.toggle('active', t === 'sketch');
-            maskBtn.classList.toggle('active', t === 'mask');
+            // 'mask' IS collider painting; 'sketch' (entered from the Layers
+            // panel's per-layer paint button) lights neither option here.
+            colliderBtn.classList.toggle('active', t === 'mask');
             try { if (window.settingsManager) window.settingsManager.set('brush.target', t); } catch (_) {}
         }
         SETTERS.target = setBrushTarget;
         fluidBtn.addEventListener('click', function () { setBrushTarget('fluid'); markDirty(); });
-        sketchBtn.addEventListener('click', function () { setBrushTarget('sketch'); markDirty(); });
-        maskBtn.addEventListener('click', function () { setBrushTarget('mask'); markDirty(); });
+        function enterColliderPainting() {
+            var cl = window.collisionLayers;
+            if (!window.Masks || !cl || typeof cl.setMaskLive !== 'function') {
+                setBrushTarget('mask'); // the paint route works even if binding can't
+                return;
+            }
+            var src = cl.boundColliderSource && cl.boundColliderSource();
+            var liveOnMask = typeof cl.isSketchLive === 'function' && cl.isSketchLive()
+                && src && src.kind === 'mask';
+            if (liveOnMask) {
+                // A live mask collider already exists — re-enter painting
+                // into ITS mask (imports may have activated a different
+                // one). Starting over = delete the collision layer in the
+                // Layers panel and press this again.
+                try { if (window.Masks.setActive) window.Masks.setActive(src.id); } catch (_) {}
+            } else {
+                // Fresh collider: create-and-activate a new mask, then bind
+                // a NEW live collision layer to it. rebind is load-bearing:
+                // plain setMaskLive(true) keeps any previous binding (the
+                // on-branch only rebinds when the source KIND differs) and
+                // the button would silently paint into nothing.
+                window.Masks.create('Collider');
+                cl.setMaskLive(true, { rebind: true });
+            }
+            setBrushTarget('mask');
+        }
+        colliderBtn.addEventListener('click', function () { enterColliderPainting(); markDirty(); });
         try {
             var savedTarget = window.settingsManager && window.settingsManager.get('brush.target');
             setBrushTarget(savedTarget);
@@ -2506,191 +2654,19 @@
             setSplatMode(saved);
         })();
 
-        // ── Sketch layer ──
-        sLabel('Sketch Layer');
-        // D2: which raster layer the Sketch route paints into + quick-add.
-        // Layers are managed in the sidebar Layers panel (🖌️ per row).
-        var activeLayerRow = document.createElement('div');
-        activeLayerRow.className = 'brush-mode-row';
-        var activeLayerLabel = document.createElement('div');
-        activeLayerLabel.className = 'arm-colors-hint';
-        activeLayerLabel.style.flex = '1';
-        activeLayerLabel.style.alignSelf = 'center';
-        function syncActiveRasterLabel() {
-            var nm = '—';
-            try {
-                if (window.rasterLayers) {
-                    var rid = window.rasterLayers.activeId();
-                    var rl = (window.layers || []).find(function (x) { return x.index === rid; });
-                    if (rl) nm = rl.title;
-                }
-            } catch (_) {}
-            activeLayerLabel.textContent = 'Paints into: ' + nm;
-        }
-        window.__onActiveRasterChanged = function () { syncActiveRasterLabel(); };
-        syncActiveRasterLabel();
-        var newLayerBtn = document.createElement('button');
-        newLayerBtn.type = 'button'; newLayerBtn.className = 'brush-mode-btn';
-        newLayerBtn.textContent = '+ Layer';
-        newLayerBtn.title = 'Add a new paint layer and make it the brush target (reorder it in the Layers panel — above or below the fluid)';
-        newLayerBtn.addEventListener('click', function () {
-            if (window.rasterLayers) { window.rasterLayers.create(); syncActiveRasterLabel(); }
-        });
-        activeLayerRow.appendChild(activeLayerLabel);
-        activeLayerRow.appendChild(newLayerBtn);
-        panel.appendChild(activeLayerRow);
-        pCheckbox('brushEraser', 'Eraser (Sketch/Mask)', 'BRUSH_ERASER', 'eraser');
-        pSlider('brushHardness', 'Hardness', 0, 1, 0.01, 'BRUSH_HARDNESS', pct, 'hardness');
-        pCheckbox('sketchVisible', 'Show Paint Layers', 'SKETCH_VISIBLE');
-        var sketchBtnRow = document.createElement('div');
-        sketchBtnRow.className = 'brush-mode-row';
-        var clearSketchBtn = document.createElement('button');
-        clearSketchBtn.type = 'button'; clearSketchBtn.className = 'brush-mode-btn';
-        clearSketchBtn.textContent = 'Clear Sketch';
-        clearSketchBtn.addEventListener('click', function () {
-            if (typeof window.__clearSketch === 'function') window.__clearSketch();
-        });
-        var sketchColliderBtn = document.createElement('button');
-        sketchColliderBtn.type = 'button'; sketchColliderBtn.className = 'brush-mode-btn';
-        sketchColliderBtn.textContent = '→ Collider';
-        sketchColliderBtn.title = 'Turn the sketch layer into a collision layer — the fluid flows around what you drew';
-        sketchColliderBtn.addEventListener('click', function () {
-            if (window.collisionLayers && typeof window.collisionLayers.createFromSketch === 'function') {
-                window.collisionLayers.createFromSketch();
-            }
-        });
-        // D3/D4: live binding — the collider tracks the sketch as you draw
-        var liveColliderBtn = document.createElement('button');
-        liveColliderBtn.type = 'button'; liveColliderBtn.className = 'brush-mode-btn';
-        liveColliderBtn.textContent = '⟳ Live';
-        liveColliderBtn.title = 'Live collider: the collision layer keeps tracking the sketch — draw, erase, or undo and the fluid reacts after every stroke';
-        liveColliderBtn.addEventListener('click', function () {
-            if (!window.collisionLayers || typeof window.collisionLayers.setSketchLive !== 'function') return;
-            window.collisionLayers.setSketchLive(!window.collisionLayers.isSketchLive());
-        });
-        // Reflect state changes from either direction (click or auto-disable
-        // when the bound source gets deleted). One live-binding slot exists;
-        // src says whether it currently tracks a paint layer or a mask.
-        window.__onSketchLiveChanged = function (on, src) {
-            var isMask = !!(src && src.kind === 'mask');
-            liveColliderBtn.classList.toggle('active', !!on && !isMask);
-            if (window.__maskLiveBtn) window.__maskLiveBtn.classList.toggle('active', !!on && isMask);
-        };
-        sketchBtnRow.appendChild(clearSketchBtn);
-        sketchBtnRow.appendChild(sketchColliderBtn);
-        sketchBtnRow.appendChild(liveColliderBtn);
-        panel.appendChild(sketchBtnRow);
-
-        // D2 bridges: sketch ↔ fluid
-        var bridgeRow = document.createElement('div');
-        bridgeRow.className = 'brush-mode-row';
-        var igniteBtn = document.createElement('button');
-        igniteBtn.type = 'button'; igniteBtn.className = 'brush-mode-btn';
-        // "Ignite Sketch", not "Ignite": the Color channel's Ignite is a
-        // momentary density nudge on existing dye. This one is the D2 raster
-        // bridge and does nothing at all when the sketch layer is empty.
-        igniteBtn.textContent = '🔥 Ignite Sketch';
-        igniteBtn.title = 'Pour the sketch into the fluid as dye — the sim takes it from there (sketch is untouched)';
-        igniteBtn.addEventListener('click', function () {
-            if (typeof window.__igniteSketch === 'function') window.__igniteSketch(1);
-        });
-        var captureBtn = document.createElement('button');
-        captureBtn.type = 'button'; captureBtn.className = 'brush-mode-btn';
-        captureBtn.textContent = '❄ Capture';
-        captureBtn.title = 'Freeze the current fluid dye into the sketch layer (composited over what\'s there; undoable)';
-        captureBtn.addEventListener('click', function () {
-            if (typeof window.__captureToSketch === 'function') window.__captureToSketch();
-        });
-        bridgeRow.appendChild(igniteBtn);
-        bridgeRow.appendChild(captureBtn);
-        panel.appendChild(bridgeRow);
-
-        // D6: sketch stroke undo/redo (also Ctrl+Z / Ctrl+Shift+Z in Sketch mode)
-        var undoRow = document.createElement('div');
-        undoRow.className = 'brush-mode-row';
-        var undoBtn = document.createElement('button');
-        undoBtn.type = 'button'; undoBtn.className = 'brush-mode-btn';
-        undoBtn.textContent = '↶ Undo';
-        undoBtn.title = 'Undo the last sketch stroke / Clear / Capture (Ctrl+Z while painting into Sketch)';
-        undoBtn.addEventListener('click', function () {
-            if (typeof window.__sketchUndo === 'function') window.__sketchUndo();
-        });
-        var redoBtn = document.createElement('button');
-        redoBtn.type = 'button'; redoBtn.className = 'brush-mode-btn';
-        redoBtn.textContent = '↷ Redo';
-        redoBtn.title = 'Redo (Ctrl+Shift+Z or Ctrl+Y while painting into Sketch)';
-        redoBtn.addEventListener('click', function () {
-            if (typeof window.__sketchRedo === 'function') window.__sketchRedo();
-        });
-        undoRow.appendChild(undoBtn);
-        undoRow.appendChild(redoBtn);
-        panel.appendChild(undoRow);
-
-        // ── D3: Masks — paint coverage, bind it as a collider ──
-        sLabel('Mask');
-        var maskInfoRow = document.createElement('div');
-        maskInfoRow.className = 'brush-mode-row';
-        var maskInfoLabel = document.createElement('div');
-        maskInfoLabel.className = 'arm-colors-hint';
-        maskInfoLabel.style.flex = '1';
-        maskInfoLabel.style.alignSelf = 'center';
-        function syncActiveMaskLabel() {
-            var nm = '—';
-            try {
-                if (window.Masks) {
-                    var mid = window.Masks.activeId();
-                    var m = window.Masks.list().find(function (x) { return x.id === mid; });
-                    if (m) nm = m.name;
-                }
-            } catch (_) {}
-            maskInfoLabel.textContent = 'Active mask: ' + nm;
-        }
-        window.__onActiveMaskChanged = function () { syncActiveMaskLabel(); };
-        syncActiveMaskLabel();
-        var newMaskBtn = document.createElement('button');
-        newMaskBtn.type = 'button'; newMaskBtn.className = 'brush-mode-btn';
-        newMaskBtn.textContent = '+ Mask';
-        newMaskBtn.title = 'Create a new mask and make it the paint target';
-        newMaskBtn.addEventListener('click', function () {
-            if (window.Masks) { window.Masks.create(); setBrushTarget('mask'); syncActiveMaskLabel(); }
-        });
-        maskInfoRow.appendChild(maskInfoLabel);
-        maskInfoRow.appendChild(newMaskBtn);
-        panel.appendChild(maskInfoRow);
-        pCheckbox('maskOverlayVisible', 'Show Mask Film', 'MASK_OVERLAY');
-        var maskBtnRow = document.createElement('div');
-        maskBtnRow.className = 'brush-mode-row';
-        var clearMaskBtn = document.createElement('button');
-        clearMaskBtn.type = 'button'; clearMaskBtn.className = 'brush-mode-btn';
-        clearMaskBtn.textContent = 'Clear Mask';
-        clearMaskBtn.title = 'Erase the active mask\'s coverage (undoable)';
-        clearMaskBtn.addEventListener('click', function () {
-            if (window.Masks) window.Masks.clear();
-        });
-        var maskColliderBtn = document.createElement('button');
-        maskColliderBtn.type = 'button'; maskColliderBtn.className = 'brush-mode-btn';
-        maskColliderBtn.textContent = '→ Collider';
-        maskColliderBtn.title = 'Turn the active mask into a collision layer — the fluid flows around the painted coverage';
-        maskColliderBtn.addEventListener('click', function () {
-            if (window.collisionLayers && typeof window.collisionLayers.createFromMask === 'function') {
-                window.collisionLayers.createFromMask();
-            }
-        });
-        var maskLiveBtn = document.createElement('button');
-        maskLiveBtn.type = 'button'; maskLiveBtn.className = 'brush-mode-btn';
-        maskLiveBtn.textContent = '⟳ Live';
-        maskLiveBtn.title = 'Live collider: the collision layer keeps tracking the active mask — paint, erase, or undo and the fluid reacts after every stroke';
-        maskLiveBtn.addEventListener('click', function () {
-            if (!window.collisionLayers || typeof window.collisionLayers.setMaskLive !== 'function') return;
-            var src = window.collisionLayers.boundColliderSource && window.collisionLayers.boundColliderSource();
-            var onAsMask = window.collisionLayers.isSketchLive() && src && src.kind === 'mask';
-            window.collisionLayers.setMaskLive(!onAsMask);
-        });
-        window.__maskLiveBtn = maskLiveBtn;
-        maskBtnRow.appendChild(clearMaskBtn);
-        maskBtnRow.appendChild(maskColliderBtn);
-        maskBtnRow.appendChild(maskLiveBtn);
-        panel.appendChild(maskBtnRow);
+        // ── Sketch Layer + Mask sections REMOVED 2026-08-16 (user-test:
+        // "complex and a little overwhelming") — replaced by the Paint
+        // Collider button above. What each control became:
+        //  · Paints-into/+Layer → the Layers panel per-layer 🖌️ button
+        //  · Eraser/Hardness/Show Paint Layers/Show Mask Film → config
+        //    defaults now stand (no settings restore; stale saved values
+        //    would be invisible traps with no UI to clear them)
+        //  · Clear/→Collider/⟳ Live (both sections) → collision layers
+        //    are managed in the Layers panel; Paint Collider binds live
+        //  · Ignite Sketch / Capture → removed (Gabriel's call)
+        //  · Sketch Undo/Redo buttons → Ctrl+Z / Ctrl+Shift+Z still work
+        // window.__onActiveRasterChanged/__onActiveMaskChanged are no
+        // longer assigned here; every caller is typeof-guarded (05l/05o).
 
         // Size fader tweaks also diverge from an applied preset
         var sizeFader = document.getElementById('brushSize');
@@ -2971,7 +2947,6 @@
         modeSel.innerHTML =
             '<option value="off" selected>Off</option>' +
             '<option value="tunnel">🌀 Tunnel</option>' +
-            '<option value="ferro">🧲 Ferrofluid</option>' +
             '<option value="min">Minimized</option>' +
             '<option value="full">Full</option>';
         modeGroup.appendChild(modeLbl);
@@ -3001,6 +2976,25 @@
                     '<option value="mic">Mic</option><option value="system">System</option><option value="file">File</option>' +
                 '</select>' +
             '</div>' +
+            // Transport (2026-08-16): a loaded file plays out loud, so it gets
+            // real controls \u2014 play/pause, restart, loop, a draggable playhead
+            // and a clock. Hidden unless a FILE is the source (mic/system are
+            // never monitored \u2014 feedback/echo) and RELOCATED alongside the
+            // enable row so it is present in mini, scene and drawer modes.
+            '<div id="audioPlayRow" class="audio-transport" style="display:none;">' +
+                '<div class="audio-mini-row">' +
+                    '<button id="audioPlayBtn" class="audio-play-btn" title="Play / Pause (the visuals follow the audio)">\u23f8</button>' +
+                    '<button id="audioRestartBtn" class="audio-play-btn" title="Back to the start">\u23ee</button>' +
+                    '<button id="audioLoopBtn" class="audio-play-btn active" title="Loop the track">\ud83d\udd01</button>' +
+                    '<span id="audioClock" class="audio-clock">0:00 / 0:00</span>' +
+                '</div>' +
+                '<input type="range" id="audioSeek" class="audio-seek" min="0" max="1000" step="1" value="0" title="Playhead \u2014 drag to scrub" data-no-scale="1">' +
+                '<div class="audio-mini-row">' +
+                    '<button id="audioMuteBtn" class="audio-play-btn" title="Mute playback (visuals keep reacting)">\ud83d\udd0a</button>' +
+                    '<input type="range" id="audioVolume" class="audio-vol" min="0" max="1" step="0.01" value="0.85" title="Playback volume" data-no-scale="1">' +
+                    '<span id="audioFileName" class="audio-filename"></span>' +
+                '</div>' +
+            '</div>' +
             '<canvas id="audioMiniTimeline" class="audio-mini-timeline" title="Composer segments"></canvas>' +
             '<button id="audioOpenFullBtn" class="audio-mini-full" title="Open full audio panel">\u2b06\ufe0f Full Audio</button>';
         body.appendChild(mini);
@@ -3020,26 +3014,183 @@
         // so there's exactly one control and zero state-sync problems. Without
         // this, Full mode had no enable control at all (the mini is hidden).
         var enableRow = mini.querySelector('.audio-mini-row');
+        // The Enable checkbox is a REFLECTION of engine state, never a claim
+        // about it (2026-08-16). It used to latch checked the moment it was
+        // clicked: with source=File that happens BEFORE the file picker even
+        // opens, so cancelling the picker — or a decode/permission failure —
+        // left the box checked with nothing running. The box then had to be
+        // un- and re-checked to actually start anything, which is exactly the
+        // 'load a file and it won't play' report.
+        function syncEnableCheckbox() {
+            if (!enableCb || !window.audioReactive) return;
+            var on = !!window.audioReactive.isEnabled();
+            if (enableCb.checked !== on) enableCb.checked = on;
+        }
+        window.__syncAudioEnable = syncEnableCheckbox;
+
         function enableFromSource() {
             if (!window.audioReactive) return;
             var src = srcSel.value;
-            if (src === 'file') fileInput.click();
-            else window.audioReactive.enable(src);
+            if (src === 'file') {
+                // Nothing is enabled until a file actually arrives; the box
+                // goes on in the change handler below (via the state sync).
+                syncEnableCheckbox();
+                fileInput.click();
+            } else {
+                window.audioReactive.enable(src);
+            }
         }
         enableCb.addEventListener('change', function () {
             if (!window.audioReactive) return;
             if (enableCb.checked) enableFromSource();
             else window.audioReactive.disable();
+            syncEnableCheckbox();
         });
         srcSel.addEventListener('change', function () {
-            if (enableCb.checked && window.audioReactive) { window.audioReactive.disable(); enableFromSource(); }
+            // Switching source while running: tear the old one down, then ask
+            // for the new one. If that ask is the file picker and the user
+            // cancels, the sync leaves the box unchecked — honest, because
+            // nothing is running any more.
+            if (window.audioReactive && window.audioReactive.isEnabled()) {
+                window.audioReactive.disable();
+                enableFromSource();
+            }
+            syncEnableCheckbox();
         });
         fileInput.addEventListener('change', function (e) {
             var f = e.target.files && e.target.files[0];
             if (f && window.audioReactive) window.audioReactive.enable('file', f);
-            else enableCb.checked = false;
             fileInput.value = '';
+            // enable() resolves async (decode) and notifies on both success
+            // and failure; this covers the no-file case immediately.
+            syncEnableCheckbox();
         });
+        // Picker dismissed with no selection (Chrome/Firefox fire 'cancel').
+        // Older engines fire nothing — the sync above already left the box
+        // unchecked, so those degrade to the same honest state.
+        fileInput.addEventListener('cancel', function () {
+            fileInput.value = '';
+            syncEnableCheckbox();
+        });
+
+        // ── Transport (file source only) ──
+        var playRow = mini.querySelector('#audioPlayRow');
+        var playBtn = mini.querySelector('#audioPlayBtn');
+        var muteBtn = mini.querySelector('#audioMuteBtn');
+        var volSlider = mini.querySelector('#audioVolume');
+        var restartBtn = mini.querySelector('#audioRestartBtn');
+        var loopBtn = mini.querySelector('#audioLoopBtn');
+        var seekBar = mini.querySelector('#audioSeek');
+        var clockEl = mini.querySelector('#audioClock');
+        var nameEl = mini.querySelector('#audioFileName');
+        var seekDragging = false;
+
+        function fmtClock(s) {
+            s = Math.max(0, Math.floor(s || 0));
+            var m = Math.floor(s / 60);
+            var r = s % 60;
+            return m + ':' + (r < 10 ? '0' : '') + r;
+        }
+        // Playhead + clock, driven by the mini loop (and one immediate call on
+        // every state change). Skipped while the user is dragging the scrub
+        // bar, or the thumb would fight the cursor.
+        function syncPlayhead() {
+            var ar = window.audioReactive;
+            if (!ar || !ar.position) return;
+            var p = ar.position();
+            if (!p) return;
+            if (!seekDragging && seekBar) {
+                seekBar.value = String(Math.round((p.time / p.duration) * 1000));
+                seekBar.style.setProperty('--val', seekBar.value);
+            }
+            if (clockEl) clockEl.textContent = fmtClock(p.time) + ' / ' + fmtClock(p.duration);
+            if (playBtn) {
+                playBtn.textContent = p.paused ? '▶' : '⏸';
+                playBtn.title = p.paused ? 'Play' : 'Pause (the visuals follow the audio)';
+            }
+        }
+        window.__syncAudioPlayhead = syncPlayhead;
+
+        // The playhead needs its own tick: the mini-timeline loop only runs in
+        // 'min' mode and bails when that canvas is hidden, but the transport
+        // is visible in scene and Full modes too. 200 ms — the clock ticks in
+        // seconds and the bar reads as moving; cheaper than an rAF.
+        var playTick = null;
+        function ensurePlayTick(on) {
+            if (on && !playTick) playTick = setInterval(syncPlayhead, 200);
+            else if (!on && playTick) { clearInterval(playTick); playTick = null; }
+        }
+
+        function syncPlayRow() {
+            var ar = window.audioReactive;
+            var on = !!(ar && ar.isMonitorable && ar.isMonitorable());
+            if (playRow) playRow.style.display = on ? '' : 'none';
+            ensurePlayTick(on);
+            if (!on || !ar) return;
+            if (volSlider) volSlider.value = ar.getMonitorVolume();
+            if (muteBtn) {
+                var m = ar.isMuted();
+                muteBtn.textContent = m ? '🔇' : '🔊';
+                muteBtn.classList.toggle('muted', m);
+                muteBtn.title = m ? 'Unmute playback' : 'Mute playback (visuals keep reacting)';
+            }
+            if (loopBtn) loopBtn.classList.toggle('active', ar.isLooping());
+            if (nameEl) nameEl.textContent = ar.fileName ? ar.fileName() : '';
+            syncPlayhead();
+        }
+        // 22-audio-reactive fires this whenever the source or transport state
+        // changes — including the async file-decode completion and any
+        // start FAILURE — so it is the one place both the Enable checkbox and
+        // the transport re-read the truth.
+        window.__onAudioSourceChanged = function () {
+            if (typeof window.__syncAudioEnable === 'function') window.__syncAudioEnable();
+            syncPlayRow();
+        };
+
+        if (playBtn) playBtn.addEventListener('click', function () {
+            if (window.audioReactive) { window.audioReactive.togglePlay(); syncPlayRow(); }
+        });
+        if (muteBtn) muteBtn.addEventListener('click', function () {
+            if (!window.audioReactive) return;
+            window.audioReactive.setMuted(!window.audioReactive.isMuted());
+            syncPlayRow();
+        });
+        if (volSlider) volSlider.addEventListener('input', function () {
+            if (!window.audioReactive) return;
+            window.audioReactive.setMonitorVolume(parseFloat(volSlider.value));
+            if (window.audioReactive.isMuted()) { window.audioReactive.setMuted(false); syncPlayRow(); }
+        });
+        if (restartBtn) restartBtn.addEventListener('click', function () {
+            if (window.audioReactive && window.audioReactive.restart) {
+                window.audioReactive.restart();
+                syncPlayRow();
+            }
+        });
+        if (loopBtn) loopBtn.addEventListener('click', function () {
+            if (!window.audioReactive) return;
+            window.audioReactive.setLoop(!window.audioReactive.isLooping());
+            syncPlayRow();
+        });
+        if (seekBar) {
+            // Scrub live on drag: seeking a playing track restarts the source
+            // at the new offset, so the sound (and the visuals it drives)
+            // follow the thumb.
+            var doSeek = function () {
+                var ar = window.audioReactive;
+                if (!ar || !ar.position) return;
+                var p = ar.position();
+                if (!p) return;
+                ar.seek((parseFloat(seekBar.value) / 1000) * p.duration);
+                syncPlayhead();
+            };
+            seekBar.addEventListener('pointerdown', function () { seekDragging = true; });
+            seekBar.addEventListener('input', function () { seekDragging = true; doSeek(); });
+            var endSeek = function () { if (seekDragging) { seekDragging = false; doSeek(); } };
+            seekBar.addEventListener('change', endSeek);
+            seekBar.addEventListener('pointerup', endSeek);
+            seekBar.addEventListener('pointercancel', endSeek);
+        }
+        syncPlayRow();
 
         mini.querySelector('#audioOpenFullBtn').addEventListener('click', function () {
             modeSel.value = 'full';
@@ -3048,7 +3199,10 @@
 
         function applyAudioMode(mode, userInitiated) {
             var isScene = !!(window.AudioScenes && window.AudioScenes.isScene(mode));
-            // Park the shared enable row where the active mode can reach it
+            // Park the shared enable row where the active mode can reach it —
+            // and keep the file transport docked directly beneath it, or the
+            // playback controls would stay behind in the hidden mini widget
+            // (no play/pause at all in Full or scene modes).
             var enableHost = document.getElementById('audioDrawerEnableHost');
             if (mode === 'full' && enableHost && enableRow) {
                 enableHost.appendChild(enableRow);
@@ -3056,6 +3210,9 @@
                 sceneBox.insertBefore(enableRow, sceneBox.firstChild);
             } else if (enableRow && enableRow.parentElement !== mini) {
                 mini.insertBefore(enableRow, mini.firstChild);
+            }
+            if (playRow && enableRow && enableRow.parentElement) {
+                enableRow.parentElement.insertBefore(playRow, enableRow.nextSibling);
             }
             // Scene lifecycle: activate on scene modes, tear down otherwise
             if (window.AudioScenes) {
@@ -3079,7 +3236,10 @@
                 // the engine from the selected source. Restored sessions (synthetic
                 // change events) skip this so page load never pops a mic prompt.
                 if (userInitiated && window.audioReactive && !window.audioReactive.isEnabled()) {
-                    enableCb.checked = true;
+                    // Ask the engine to start; the checkbox follows from the
+                    // resulting state (pre-checking it here would re-create
+                    // the lie when the source is File and the picker is
+                    // cancelled, or when mic permission is denied).
                     enableFromSource();
                 }
             } else if (mode === 'min') {
@@ -4079,7 +4239,15 @@
             if (saved && Array.isArray(saved) && saved.length) {
                 arr.length = 0;
                 saved.forEach(function(c) {
-                    arr.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                    // 'rainbow' (removed 2026-08-15) must be coerced HERE
+                    // too: this ingest runs LAST at boot — 12's sanitized
+                    // autoload is discarded when deferred 05g re-creates
+                    // multiArmColors, then this re-reads raw localStorage.
+                    // Without the coercion a pre-removal save resurrected
+                    // the dead mode every launch (row showed no active
+                    // mode, arm painted fallback).
+                    var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
+                    arr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
                 });
             } else {
                 // No saved per-arm config: import the active brush's mode from the
@@ -4119,8 +4287,8 @@
             var slider = document.getElementById('multiplier');
             var count = slider ? parseInt(slider.value, 10) || 1 : 1;
             // Brush controls exist at EVERY arm count (2026-07-13) — at 1x the
-            // single row IS the brush's color mode (follow/fixed/rainbow/
-            // random/step). The old "set multiplier to 2+" hint gated the
+            // single row IS the brush's color mode (follow/fixed/random/
+            // step). The old "set multiplier to 2+" hint gated the
             // whole panel behind multi-arm mode.
             count = Math.max(1, count);
             updateSymNote();   // arm count feeds the dab-count hint
@@ -4141,16 +4309,33 @@
                     var picker = document.createElement('input');
                     picker.type = 'color';
                     picker.className = 'arm-picker';
-                    picker.value = cfg.color || '#ffffff';
+                    // 'main' arms paint the live default color (resolveArmColor
+                    // defers to pointer.color), so show THAT — not the arm's
+                    // stored custom hex. Display-only: cfg.color is untouched,
+                    // and .value is set by property so the picker's input
+                    // handler (which flips the arm to 'fixed' and persists)
+                    // never fires. Rebuilds re-run this on every default-color
+                    // change while the popup is open, so it tracks live.
+                    if (cfg.mode === 'main') {
+                        var mainPk = document.getElementById('colorPicker');
+                        picker.value = (mainPk && mainPk.value) || cfg.color || '#ffffff';
+                    } else {
+                        picker.value = cfg.color || '#ffffff';
+                    }
                     picker.disabled = cfg.mode !== 'fixed';
-                    if (cfg.mode !== 'fixed') picker.style.opacity = '0.35';
+                    // Generative modes (random/step) dim the swatch —
+                    // no single color is "the" color. A 'main' arm's swatch is
+                    // accurate (it IS the default color), so keep it readable.
+                    if (cfg.mode !== 'fixed') {
+                        picker.style.opacity = (cfg.mode === 'main') ? '0.8' : '0.35';
+                    }
 
                     var modes = [
                         { key: 'main',    text: '\u25CF', title: 'Follow pointer color' },
                         { key: 'fixed',   text: '\u25C6', title: 'Fixed color' },
-                        { key: 'rainbow', text: '\uD83C\uDF08', title: 'Rainbow — new color every splat' },
+                        // 'rainbow' removed 2026-08-15 (photosensitivity)
                         { key: 'random',  text: 'R',      title: 'Random — new color each stroke' },
-                        { key: 'step',    text: 'S',      title: 'Step through palette each stroke' }
+                        { key: 'step',    text: 'S',      title: 'Palette mode — new palette colour each stroke' }
                     ];
 
                     var modeWrap = document.createElement('div');

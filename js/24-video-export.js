@@ -431,25 +431,41 @@
             _stream = recCanvas.captureStream(0);
             var track = _stream.getVideoTracks()[0];
 
-            // Prefer MP4 (inherently seekable) → fall back to WebM
+            // Audio (2026-08-16): mux the reactive audio in so an exported
+            // video ARRIVES with its soundtrack — the whole point of driving
+            // visuals from a track is not having to line it up by hand
+            // afterwards. This loop is realtime (rAF, wall-clock duration),
+            // so the audio stays in sync. audioReactive withholds mic input;
+            // file/system come through.
+            var hasAudio = false;
+            try {
+                var aStream = window.audioReactive && window.audioReactive.getOutputStream
+                    && window.audioReactive.getOutputStream();
+                if (aStream) {
+                    aStream.getAudioTracks().forEach(function (t) { _stream.addTrack(t); hasAudio = true; });
+                }
+            } catch (e) { console.warn('[Export] audio track unavailable:', e && e.message); }
+
+            // Prefer MP4 (inherently seekable) → fall back to WebM. With an
+            // audio track present only codec strings that CARRY audio are
+            // valid — a video-only mimeType would make MediaRecorder throw.
             var mimeType = ''; var ext = 'webm';
-            var mpTests = [
-                'video/mp4;codecs=avc1,opus',
-                'video/mp4;codecs=avc1',
-                'video/mp4'
-            ];
+            var mpTests = hasAudio
+                ? ['video/mp4;codecs=avc1,opus', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4']
+                : ['video/mp4;codecs=avc1,opus', 'video/mp4;codecs=avc1', 'video/mp4'];
             for (var mi = 0; mi < mpTests.length; mi++) {
                 if (MediaRecorder.isTypeSupported(mpTests[mi])) {
                     mimeType = mpTests[mi]; ext = 'mp4'; break;
                 }
             }
             if (!mimeType) {
-                if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9'))
-                    mimeType = 'video/webm;codecs=vp9';
-                else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8'))
-                    mimeType = 'video/webm;codecs=vp8';
-                else
-                    mimeType = 'video/webm';
+                var wmTests = hasAudio
+                    ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+                    : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+                for (var wi = 0; wi < wmTests.length; wi++) {
+                    if (MediaRecorder.isTypeSupported(wmTests[wi])) { mimeType = wmTests[wi]; break; }
+                }
+                if (!mimeType) mimeType = 'video/webm';
             }
 
             // Electron + MP4 + output folder → stream chunks to disk as they
@@ -469,10 +485,9 @@
                     streamPath = null;
                 }
             }
-            _recorder = new MediaRecorder(_stream, {
-                mimeType: mimeType,
-                videoBitsPerSecond: cfg.videoBitrate
-            });
+            var recOpts = { mimeType: mimeType, videoBitsPerSecond: cfg.videoBitrate };
+            if (hasAudio) recOpts.audioBitsPerSecond = 128000;
+            _recorder = new MediaRecorder(_stream, recOpts);
             _recorder.ondataavailable = function (e) {
                 if (!(e.data && e.data.size > 0)) return;
                 if (streamPath) {

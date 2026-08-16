@@ -565,7 +565,9 @@
                 if (typeof renderLayers === 'function') renderLayers();
                 return id;
             }
-            function ensureDefault() {
+            // createIfMissing=false: adopt an existing paint layer but never
+            // mint one (boot — see the boot block at the bottom of this IIFE).
+            function ensureDefault(createIfMissing) {
                 if (layers.some(l => l.isRaster)) {
                     if (_activeRasterId == null || !_layerFor(_activeRasterId) || !rasterStore[_activeRasterId]) {
                         const first = layers.find(l => l.isRaster && rasterStore[l.index]);
@@ -573,7 +575,10 @@
                     }
                     return _activeRasterId;
                 }
-                return create('Sketch');
+                if (createIfMissing === false) return null;
+                // Default title ('Paint N'): the "Sketch" name belonged to the
+                // retired Paint Into > Sketch UI.
+                return create();
             }
             function _onDeleted(id) {
                 if (!rasterStore[id]) return;
@@ -769,11 +774,16 @@
                 syncData: syncData,
                 _onDeleted: _onDeleted
             };
-            // Boot: create the default Sketch layer once the whole chain is
-            // up (renderLayers/applyLayerMask live in later chunks — poll,
-            // the same pattern 23-depth-collision uses for deleteLayer).
+            // Boot: adopt a restored paint layer if a project brought one,
+            // but do NOT mint an empty one (2026-08-16) — the brush's Paint
+            // Into > Sketch UI is gone, so a "Sketch" layer nobody asked for
+            // was just clutter at the top of the Layers panel. Paint layers
+            // are created on demand: the panel's '➕ Paint Layer' button, or
+            // lazily by the first sketch-route dab (05i stampSketchDab).
+            // Zero raster layers is an already-supported state — it's what
+            // deleting them all leaves behind (compositor slots go null).
             (function boot() {
-                if (window.__scriptsReady) { ensureDefault(); }
+                if (window.__scriptsReady) { ensureDefault(false); }
                 else setTimeout(boot, 120);
             })();
         })();

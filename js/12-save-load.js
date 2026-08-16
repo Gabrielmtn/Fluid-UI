@@ -57,7 +57,7 @@
     // Frozen fallbacks — used ONLY if ParamRegistry failed to load (in which
     // case apply-side clamping is broken anyway). Mirrors pre-registry coverage.
     var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','swirl','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','clarity','vibrance','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','shadingIntensity'];
-    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','macCormackToggle','multigridToggle','ascendToggle','ascendRandomness','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
+    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','macCormackToggle','multigridToggle','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
     var FALLBACK_SELECT_IDS = ['visualResolution','physicsResolution','kaleidoMode','fpsCap','lightMode','lightShiftMode','recMode','recPlaybackSpeed','audioMode','audioReactSource','audioAutoSplatMode','splatInMode','splatOutMode'];
 
     var _PR = window.ParamRegistry;
@@ -309,7 +309,11 @@
             if (Array.isArray(savedArm) && savedArm.length) {
                 arm.length = 0;
                 savedArm.forEach(function(c) {
-                    arm.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                    // 'rainbow' (removed 2026-08-15, photosensitivity): stale
+                    // saved modes land as 'fixed' so the row shows a real
+                    // active mode instead of nothing.
+                    var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
+                    arm.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
                 });
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             } else {
@@ -897,6 +901,14 @@
                     // clobbers the preset's sliders (also guards old snapshots
                     // saved before PRESET_SKIP excluded it at capture time).
                     if (id === 'preserveFluidOpacity' || id === 'autoloadSettings') return;
+                    // Remote look-mirror applies must not touch sketch/mask
+                    // workflow prefs: setCheck dispatches 'change', whose
+                    // handler persists to settingsManager — a peer's snapshot
+                    // would overwrite the local user's saved eraser/paint-layer
+                    // state (guards old clients that still send these keys;
+                    // new senders already exclude them via MP_PERF_LOCAL_KEYS).
+                    if (window.__mpApplyingRemote &&
+                        (id === 'brushEraser' || id === 'sketchVisible')) return;
                     if (reg && reg.coerceCheckbox(id, snapshot.checkboxes[id]) === null) {
                         console.warn('[Preset] skipping unknown checkbox', id); return;
                     }
@@ -944,10 +956,18 @@
                 if (!armArr) { armArr = []; window.multiArmColors = armArr; }
                 armArr.length = 0;
                 snapshot.armColors.forEach(function(c) {
-                    armArr.push({ mode: c.mode || 'main', color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                    // 'rainbow' (removed 2026-08-15, photosensitivity): old
+                    // presets and stale peers' snapshots coerce to 'fixed'.
+                    var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
+                    armArr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
                 });
                 if (window.settingsManager) {
-                    window.settingsManager.set('brush.armColors', snapshot.armColors);
+                    // Persist the SANITIZED arms, not the raw snapshot — an
+                    // old preset's 'rainbow' would otherwise reseed
+                    // localStorage and resurrect on the next launch.
+                    window.settingsManager.set('brush.armColors', armArr.map(function (a) {
+                        return { mode: a.mode, color: a.color, stepIndex: a.stepIndex };
+                    }));
                 }
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             }
@@ -1063,8 +1083,11 @@
                 var bs = snapshot.brushState;
                 if (bs.replayMode) {
                     window.replayMode = bs.replayMode;
-                    // Update UI buttons
-                    var strokeBtns = document.querySelectorAll('.brush-mode-btn');
+                    // Update UI buttons — [data-mode] scopes this to the Replay Mode
+                    // Stroke/Time pair; ~19 other buttons share .brush-mode-btn without
+                    // dataset.mode (Paint Into, On Move/Constant, ⟳ Live…) and an
+                    // unscoped query strips their active state on every snapshot apply.
+                    var strokeBtns = document.querySelectorAll('.brush-mode-btn[data-mode]');
                     strokeBtns.forEach(function(b) {
                         b.classList.toggle('active', b.dataset.mode === bs.replayMode);
                     });
@@ -1454,14 +1477,24 @@
                 var bt = snapshot.brushTip;
                 if (typeof bt.tip === 'number') {
                     window.config.BRUSH_TIP = Math.max(0, Math.min(4, bt.tip | 0));
-                    try { if (window.settingsManager) window.settingsManager.set('brush.tip', window.config.BRUSH_TIP); } catch (_) {}
+                    // Mirror the painter's tip live, but never let a REMOTE
+                    // snapshot rewrite the local user's saved tip preference.
+                    if (!window.__mpApplyingRemote) {
+                        try { if (window.settingsManager) window.settingsManager.set('brush.tip', window.config.BRUSH_TIP); } catch (_) {}
+                    }
                 }
                 if (typeof bt.angle === 'number' && isFinite(bt.angle)) {
                     window.config.BRUSH_ANGLE = Math.max(0, Math.min(360, bt.angle));
                     var angEl = $('brushAngle');
                     if (angEl) { angEl.value = window.config.BRUSH_ANGLE; angEl.style.setProperty('--val', angEl.value); }
                 }
-                if (window.BrushShapes && window.BrushShapes.setActive) {
+                // Custom-shape selection is viewer-LOCAL: remote strokes never
+                // render with custom stamps (05i __remoteStroke gate), so a
+                // remote snapshot has no business driving it — and setActive
+                // PERSISTS, so the old unconditional apply wiped the watcher's
+                // own shape selection (usually to null) across reloads on
+                // every look-mirror tick.
+                if (window.BrushShapes && window.BrushShapes.setActive && !window.__mpApplyingRemote) {
                     var wantShape = (typeof bt.shapeId === 'string' && bt.shapeId) ? bt.shapeId : null;
                     var have = wantShape && (window.BrushShapes.list() || []).some(function (s) { return s.id === wantShape; });
                     window.BrushShapes.setActive(have ? wantShape : null);

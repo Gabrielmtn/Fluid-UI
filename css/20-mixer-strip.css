@@ -51,6 +51,79 @@
     position: relative;
     display: inline-block;
 }
+/* Permanent micro-label above each resting pill (copy pass 2026-08-15):
+   without it the bar was two unlabeled numbers. Ghost treatment matches the
+   pill; transition-free (Electron transparent-window compositor rule). */
+#quality-underbar .qub-dd-cap {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(200, 205, 212, 0.6);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    padding: 0 8px 1px;
+    pointer-events: none;
+    user-select: none;
+}
+/* Take Turns presence chip (06-multiplayer updateTurnChip): whose turn it
+   is, always on screen. Lives in the underbar when that's visible; floats
+   fixed top-center (the old banner's spot) when the bar is hidden or not
+   built yet — the media queries below hide the whole bar on mobile/short
+   windows, and turn state must never be invisible. Unscoped selector so
+   both parents style identically. Transition-free per the Electron
+   transparent-window compositor rule. */
+#mpTurnChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 1px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: transparent;
+    color: #ffb347;
+    border: 1px solid rgba(255, 178, 71, 0.45);
+    border-radius: 11px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    cursor: pointer;
+    align-self: flex-end;
+    white-space: nowrap;
+    pointer-events: auto;
+}
+#mpTurnChip:hover {
+    background: rgba(24, 27, 32, 0.86);
+    text-shadow: none;
+}
+#mpTurnChip.you {
+    color: #3fb950;
+    border-color: rgba(63, 185, 80, 0.55);
+}
+#mpTurnChip.floating {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10002;
+    height: 26px;
+    background: rgba(15, 20, 27, 0.92);
+    text-shadow: none;
+}
+/* One-line mechanism caption under the open-list header (the header's own
+   divider steps aside so the pair reads as one block) */
+#quality-underbar .qub-dd-hdr:has(+ .qub-dd-sub) {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 1px;
+}
+#quality-underbar .qub-dd-sub {
+    font-size: 9px;
+    color: #8b93a0;
+    padding: 4px 8px 6px;
+    margin-bottom: 3px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    white-space: normal;
+    max-width: 220px;
+}
 #quality-underbar .qub-dd-btn {
     display: flex;
     align-items: center;
@@ -224,10 +297,48 @@ body > .controls {
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+    /* Grow so the value (+ optional gear) group stays pinned right even
+       when a third header child exists. */
+    flex: 1 1 auto;
 }
 .ch-header .ch-value {
     text-align: right;
     flex-shrink: 0;
+}
+/* Shared more-settings gear (Brush Size / Fluid / Multi-Brush). Flat square
+   icon button; active = accent fill like .arm-colors-trigger.active.
+   Transition-free per the Electron transparent-window compositor rule. */
+.ch-gear {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-size: 12px;
+    line-height: 1;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 3px;
+    cursor: pointer;
+}
+.ch-gear:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+.ch-gear.active {
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
+    color: #fff;
+}
+@media (pointer: coarse) {
+    .ch-gear {
+        width: 26px;
+        height: 26px;
+        font-size: 14px;
+    }
 }
 
 .ch-fader {
@@ -235,6 +346,12 @@ body > .controls {
     display: flex;
     align-items: center;
     flex: 0 0 auto;
+    /* The strip scrolls horizontally (overflow-x:auto) — without this a
+       touch/pen drag starting on a fader was claimed as a strip pan and
+       the slider only ever saw taps. Strip channels get no row-drag
+       forwarding (it's .control-group-scoped), so the CSS must carry it.
+       pan-y keeps vertical drawer scrolling alive in mobile mode. */
+    touch-action: pan-y;
 }
 /* No printed scale in the strip: the channel already shows its value in
    the header, and the extra row per channel is what grew the bar. The
@@ -288,7 +405,7 @@ body > .controls {
 
 /* ── Color channel ── */
 .mixer-channel.ch-wide {
-    /* wide enough that RND / STEP / 🌈 / GATE all read at full length */
+    /* wide enough that RND / CYCLE / CAP all read at full length */
     min-width: 200px;
     max-width: 210px;
     gap: 3px;

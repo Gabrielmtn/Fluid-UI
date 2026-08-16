@@ -228,6 +228,21 @@
             overscroll-behavior: none;
         }
 
+        /* Accidental page-zoom guard, CSS half (JS half: 13-mobile-mode.js
+           pinch guards). manipulation keeps pan/scroll but kills double-tap
+           zoom on the UI chrome — the canvas is already touch-action:none,
+           and faders carry their own stricter pan-y (slider-styles.css).
+           touch-action does not inherit, so list the tap surfaces. */
+        body,
+        button,
+        select,
+        label,
+        #mixer-strip,
+        #sidebar-right,
+        #quality-underbar {
+            touch-action: manipulation;
+        }
+
         .resize-handle {
             position: absolute;
             background: rgba(100, 200, 255, 0.3);
@@ -431,6 +446,11 @@
 
         .control-group {
             margin-bottom: 15px;
+            /* Keep pen full-row drags (06-slider-updater forwarding) from
+               being claimed as container pans mid-drag — preventDefault on
+               pointerdown can't stop panning, only touch-action can.
+               pan-y so vertical drawer scrolling still starts here. */
+            touch-action: pan-y;
         }
         
         .control-group label {
@@ -1196,9 +1216,40 @@
         .hotkey-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); position: sticky; top: 0; background: inherit; z-index: 1; }
         .hotkey-header h2 { margin: 0; font-size: 16px; font-weight: 600; }
         .hotkey-header .close-btn { background: rgba(255,255,255,0.08); color: #e6edf3; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; }
-        .hotkey-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 16px; font-size: 13px; }
+        /* auto-fit: the old repeat(3,1fr) squeezed three ~110px columns of
+           ragged prose at narrow widths (no breakpoint at all). Now columns
+           drop to 2/1 as the modal narrows. Transition-free per the
+           compositor rule below. */
+        .hotkey-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; padding: 16px; font-size: 13px; }
         .hotkey-body h3 { margin: 0 0 8px 0; font-size: 13px; color: #9ab; }
-        .hotkey-body ul { margin: 0; padding-left: 18px; line-height: 1.6; }
+        .hotkey-body ul { margin: 0; padding: 0; list-style: none; line-height: 1.5; }
+        /* Key-chip rows: 05n wraps each li's "Keys — Description" prose into
+           <kbd> + .hk-desc on first open. */
+        .hotkey-body li { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; }
+        .hotkey-body li kbd {
+            flex: 0 0 auto;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            color: #cdd5de;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.16);
+            border-bottom-width: 2px;
+            border-radius: 4px;
+            padding: 1px 6px;
+            white-space: nowrap;
+        }
+        .hotkey-body li .hk-desc { flex: 1 1 auto; min-width: 0; }
+        .hotkey-footer {
+            padding: 8px 16px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            font-size: 11px;
+            opacity: 0.55;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
         
         /* Kaleidoscope Panel */
         #kaleidoPanel {
@@ -1487,6 +1538,32 @@ body.mobile-mode #mobileMenuToggle {
 
 body.mobile-mode .controls.visible ~ #mobileMenuToggle::after {
     content: '✕';
+}
+
+/* Mobile '?' → hotkeys modal (created by 13-mobile-mode; the only mobile
+   entry point — F1 is keyboard-only and the reminder row is hidden <768px).
+   Sits under the ☰ pill, same ghost treatment. */
+#mobileHotkeysBtn {
+    display: none;
+    position: fixed;
+    top: 68px;
+    right: 15px;
+    z-index: 9998;
+    width: 44px;
+    height: 40px;
+    font-size: 18px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(11, 14, 20, 0.92);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+body.mobile-mode #mobileHotkeysBtn {
+    display: block;
+}
+body.focus-mode #mobileHotkeysBtn {
+    display: none;
 }
 
 .mobile-menu-close {

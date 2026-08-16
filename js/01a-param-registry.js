@@ -126,8 +126,10 @@
         macCormackToggle: {def: true, mutScope: null},
         multigridToggle: {def: true, mutScope: null},
         glowToggle: {def: false, mutScope: "extended"},
-        ascendToggle: {def: false, mutScope: "extended"},
-        ascendRandomness: {def: false, mutScope: "extended"},
+        // ascendToggle/ascendRandomness removed 2026-08-15 (photosensitivity):
+        // deleting the entries is load-bearing — old presets/snapshots that
+        // carry them skip-with-warn (12-save-load coerceCheckbox null path)
+        // and Mutate's extended scope can no longer flip Ascend on.
         shootingStarToggle: {def: false, mutScope: "extended"},
         hoverCaptureToggle: {def: false, mutScope: null},
         detachCaptureToggle: {def: false, mutScope: null},
@@ -154,7 +156,10 @@
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
         recMode: {options: ["off", "min", "full"], def: "off", mut: null},
         recPlaybackSpeed: {options: ["0.25", "0.5", "1", "2", "4"], def: "0.25", mut: null},
-        audioMode: {options: ["off", "tunnel", "ferro", "min", "full"], def: "off", mut: null},
+        // 'ferro' removed 2026-08-16 — dropping it from options is what makes
+        // a saved/mirrored audioMode:'ferro' coerce to the default instead of
+        // selecting a scene that no longer exists.
+        audioMode: {options: ["off", "tunnel", "min", "full"], def: "off", mut: null},
         audioReactSource: {options: null, def: null, mut: null},
         audioAutoSplatMode: {options: null, def: null, mut: null},
         splatInMode: {options: null, def: null, mut: null},

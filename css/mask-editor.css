@@ -412,3 +412,56 @@
 }
 
 
+
+/* ── Collider painting tools (2026-08-16) ──────────────────────────────
+   Shown only when the editor opens on a painted collider (a collision
+   layer bound to a Mask buffer): draw/erase straight into that buffer. */
+.mask-collider-tools {
+    background: rgba(255, 59, 48, 0.07);
+    border: 1px solid rgba(255, 59, 48, 0.22);
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 8px;
+}
+
+.mask-collider-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.collider-tool-btn.active {
+    background: linear-gradient(180deg, #b3271e, #8f1d16);
+    border-color: rgba(255, 120, 110, 0.55);
+    color: #fff;
+}
+
+.collider-size-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #8b949e;
+    flex: 1 1 180px;
+    min-width: 140px;
+}
+
+.collider-size-label input[type="range"] {
+    flex: 1 1 auto;
+    min-width: 90px;
+}
+
+.collider-size-label span {
+    min-width: 34px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #c9d1d9;
+}
+
+.mask-collider-hint {
+    font-size: 11px;
+    color: #8b949e;
+    margin-top: 8px;
+    line-height: 1.4;
+}

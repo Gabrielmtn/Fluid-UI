@@ -1117,21 +1117,73 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     cursor: pointer;
     margin-bottom: 8px;
 }
-/* Rotation wheel: who's in the round and whose turn it is */
+/* Turn queue (2026-08-15, replaces the SVG wheel): Now / Next / 2nd / 3rd
+   as a plain ordered list — no arrows. Transition-free (Electron rule). */
 .mp-turn-wheel {
-    padding: 10px 6px 6px;
+    padding: 6px;
     margin: 2px 0 10px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--ground-500, #2a2e37);
 }
-.mp-turn-wheel svg {
-    display: block;
-    width: 100%;
-    height: auto;
+.mp-turn-queue {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
-.mp-turn-wheel text {
-    font-family: inherit;
-    user-select: none;
+.mp-turn-qrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 4px;
+}
+.mp-turn-qrow.now {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.mp-turn-qpos {
+    flex: 0 0 34px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-500, #7b828e);
+    text-align: right;
+}
+.mp-turn-qrow.now .mp-turn-qpos { color: #fff; }
+.mp-turn-qdot {
+    flex: 0 0 10px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.35);
+}
+.mp-turn-qrow.now .mp-turn-qdot { flex-basis: 12px; width: 12px; height: 12px; }
+.mp-turn-qname {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 11px;
+    color: var(--ink-300, #b9bec7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mp-turn-qrow.now .mp-turn-qname { color: #fff; font-weight: 700; }
+.mp-turn-qname.you { font-weight: 700; }
+.mp-turn-qwait { color: var(--ink-500, #7b828e); font-style: italic; }
+.mp-turn-qbrush { flex: 0 0 auto; font-size: 12px; }
+.mp-turn-qclock {
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffb347;
+}
+.mp-turn-qclock.you { color: #3fb950; }
+.mp-turn-qhint {
+    font-size: 10px;
+    color: var(--ink-500, #7b828e);
+    text-align: center;
+    padding: 6px 0 2px;
 }
 /* Rotation status line ("🖌 Artist-QT painting · 3 artists in rotation") */
 .mp-turn-status {
@@ -1442,6 +1494,71 @@ body.rec-open #sidebar-right {
 }
 .audio-mini-enable input { margin: 0; cursor: pointer; }
 .audio-mini-src { flex: 1; min-width: 0; }
+/* Readable dropdown list (2026-08-16). Chromium paints a native <option>
+   popup from the control's background-COLOR — a gradient background-IMAGE
+   is ignored — so a select whose colour is transparent drops its list onto
+   the platform's light surface, where our light option text reads as grey
+   on white (that was Mic/System/File: only the blue-highlighted row was
+   legible). #sidebar-right's select rules fixed this for the sidebar, but
+   the audio enable row TRAVELS — into the studio drawer for Full mode and
+   into the scene box for scene modes — so it must be styled by its own
+   class, not by where it currently lives. Same treatment for every select
+   in the drawer, which sits outside the sidebar entirely. */
+.audio-mini-src,
+#recDrawer select {
+    background-color: var(--ground-950, #0b0f14);
+    color: var(--ink-100, #e6edf3);
+    color-scheme: dark;
+}
+/* Baseline for options app-wide: they are never used as disguised labels
+   (unlike the material-mode select), so an opaque dark row is always right,
+   and any future relocated control inherits a readable popup. The
+   material-mode option rule above is more specific and still wins. */
+select option {
+    background-color: var(--ground-950, #0b0f14);
+    color: var(--ink-100, #e6edf3);
+}
+/* File transport: shown only while a FILE is the source (the only source
+   routed to the speakers — mic/system would feed back or echo). Travels
+   with the enable row into the drawer / scene box. */
+.audio-transport {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 6px 0 2px;
+    padding: 7px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 6px;
+}
+.audio-clock {
+    margin-left: auto;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-300, #b9bec7);
+    white-space: nowrap;
+}
+.audio-seek { width: 100%; display: block; }
+.audio-filename {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 10px;
+    color: var(--ink-500, #7b828e);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+}
+.audio-play-btn {
+    flex: 0 0 auto;
+    width: 30px; height: 26px; padding: 0;
+    font-size: 13px; line-height: 1; cursor: pointer;
+    background: var(--ground-600, #232830); color: var(--ink-100, #f2f3f5);
+    border: 1px solid var(--ground-500, #2a2e37); border-radius: 4px;
+}
+.audio-play-btn:hover { border-color: rgba(236, 48, 19, 0.6); color: #fff; }
+.audio-play-btn.muted { color: #ff7b72; border-color: rgba(255, 123, 114, 0.5); }
+.audio-vol { flex: 1 1 auto; min-width: 60px; }
 .audio-mini-timeline {
     width: 100%; height: 54px; display: block;
     border-radius: 6px; background: #000;
@@ -1456,7 +1573,7 @@ body.rec-open #sidebar-right {
 }
 .audio-mini-full:hover { border-color: rgba(236, 48, 19, 0.6); color: #fff; }
 
-/* Audio scene quick controls (Tunnel / EQ Bars / Ferrofluid) */
+/* Audio scene quick controls (Tunnel) */
 #audioSceneControls { display: flex; flex-direction: column; gap: 6px; }
 .audio-scene-ctl {
     display: flex; align-items: center; gap: 8px;

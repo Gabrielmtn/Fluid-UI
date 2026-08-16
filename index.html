@@ -268,10 +268,10 @@
             </div>
             <div class="control-group checkbox-group" style="margin-top: 8px;">
                 <input type="checkbox" id="colorGate">
-                <label for="colorGate" style="margin: 0" title="Lock max to original color — repeated strokes can't overflow into white">Gate</label>
+                <label for="colorGate" style="margin: 0" title="Cap Color — lock the max at the stroke's original color so repeated strokes can't blow out to white">Cap Color</label>
             </div>
             <div style="margin-top: 10px;">
-                <label>Palette <span id="paletteImportStatus" class="import-status"></span></label>
+                <label>Palettes <span id="paletteImportStatus" class="import-status"></span></label>
                 <div class="palette-carousel" id="paletteCarousel"></div>
                 <div class="palette-row-split">
                     <div class="palette-left">
@@ -304,32 +304,34 @@
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="stepPalette">
-            <label for="stepPalette" style="margin: 0">Step through palette</label>
+            <label for="stepPalette" style="margin: 0">Palette mode (new colour each stroke)</label>
         </div>
         <div class="control-group">
-            <label for="visualResolution">Visual Quality</label>
+            <label for="visualResolution">Image Sharpness</label>
+            <!-- Option VALUES are load-bearing (registry-validated, presets
+                 match numerically, undo snapshots store them) — text only. -->
             <select id="visualResolution">
-                <option value="4096">Cinematic (4K)</option>
-                <option value="2048" selected>Ultra (2K)</option>
-                <option value="1536">Very High (1.5K)</option>
-                <option value="1024">High (1K)</option>
-                <option value="512">Medium (512)</option>
-                <option value="256">Low (256)</option>
+                <option value="4096">4096 — Sharpest (heavy GPU)</option>
+                <option value="2048" selected>2048 — Sharp (default)</option>
+                <option value="1536">1536 — Medium</option>
+                <option value="1024">1024 — Soft (fast)</option>
+                <option value="512">512 — Softer (faster)</option>
+                <option value="256">256 — Softest (fastest)</option>
             </select>
         </div>
         <div class="control-group">
-            <label for="physicsResolution">Physics Detail</label>
+            <label for="physicsResolution">Motion Detail</label>
             <select id="physicsResolution">
-                <option value="2048">Ultra Extreme (2K)</option>
-                <option value="1536">Extreme+ (1.5K)</option>
-                <option value="1024">Extreme (1K)</option>
-                <option value="512" selected>Ultra (512)</option>
-                <option value="384">High (384)</option>
-                <option value="256">Standard (256)</option>
-                <option value="192">Balanced (192)</option>
-                <option value="128">Medium (128)</option>
-                <option value="64">Low (64)</option>
-                <option value="32">Minimum (32)</option>
+                <option value="2048">2048 — Ultra-fine (heavy GPU)</option>
+                <option value="1536">1536 — Extra-fine</option>
+                <option value="1024">1024 — Very fine</option>
+                <option value="512" selected>512 — Fine (default)</option>
+                <option value="384">384 — Medium-fine</option>
+                <option value="256">256 — Medium</option>
+                <option value="192">192 — Medium-coarse</option>
+                <option value="128">128 — Coarse</option>
+                <option value="64">64 — Very coarse (fast)</option>
+                <option value="32">32 — Coarsest (fastest)</option>
             </select>
         </div>
         <div class="control-group">
@@ -861,21 +863,7 @@
             <div style="font-size: 1.1em; margin-bottom: 2px;">🐉 Chimera</div>
             <div style="font-size: 0.7em; opacity: 0.7;">Three sine strokes × 8 arms</div>
         </button>
-        <!-- Toggle animations -->
-        <div id="ascendToggleWrap">
-            <div class="anim-toggle-row" style="background:rgba(150,255,200,0.1);">
-                <span class="anim-toggle-label">⬆️ Ascend</span>
-                <label class="anim-switch"><input type="checkbox" id="ascendToggle"><span class="anim-switch-track"></span></label>
-            </div>
-            <div class="anim-settings" id="ascendSettings">
-                <div class="anim-settings-inner">
-                    <div class="control-group checkbox-group" style="margin-top:4px;">
-                        <input type="checkbox" id="ascendRandomness">
-                        <label for="ascendRandomness" style="margin:0;text-transform:none;opacity:1;font-size:11px;">Randomness</label>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Toggle animations (Ascend removed 2026-08-15 — photosensitivity) -->
         <div id="shootingStarWrap">
             <div class="anim-toggle-row" style="background:rgba(255,220,100,0.1);">
                 <span class="anim-toggle-label">🌠 Shooting Star</span>
@@ -948,7 +936,7 @@
                     <div class="rec-square-content">
                         <div class="row top3">
                             <button id="recMiniRecordBtn" class="action-record">⏺ Record</button>
-                            <button id="recMiniMultiBtn" class="action-multi">⏺ Multi</button>
+                            <button id="recMiniMultiBtn" class="action-multi" title="Join or leave the shared multiplayer room">🌐 Multi</button>
                             <input type="text" id="recMiniMaxDuration" class="time-input action-max" value="00:10:000" placeholder="mm:ss:ms">
                         </div>
                         <div class="row bottom2">
@@ -1017,7 +1005,7 @@
         <div class="rec-header" style="gap:6px;">
             <div class="rec-left" style="gap:6px;">
                 <button id="recRecordBtn">⏺ Record</button>
-                <button id="recMultiRecordBtn">⏺ Multi Artist Record</button>
+                <button id="recMultiRecordBtn" title="Join or leave the shared multiplayer room">🌐 Multiplayer</button>
                 <button id="recPlayBtn">▶ Play Layer</button>
                 <button id="recPlayAllBtn">▶▶ Play All</button>
                 <button id="recStopBtn">⏹ Stop</button>
@@ -1116,7 +1104,7 @@
                     <h3>Colors & Palettes</h3>
                     <ul>
                         <li>R — Toggle Random Colors</li>
-                        <li>A — Toggle Step Through Palette</li>
+                        <li>A — Toggle Palette Mode (new colour each stroke)</li>
                         <li>N — Next Color</li>
                         <li>Shift+S — Save Color</li>
                         <li>Shift+X — Clear Colors</li>
@@ -1126,8 +1114,8 @@
                 <div>
                     <h3>Resolution</h3>
                     <ul>
-                        <li>Alt+↑ / Alt+↓ — Visual Quality + / −</li>
-                        <li>Alt+Shift+↑ / Alt+Shift+↓ — Physics + / −</li>
+                        <li>Alt+↑ / Alt+↓ — Image Sharpness + / −</li>
+                        <li>Alt+Shift+↑ / Alt+Shift+↓ — Motion Detail + / −</li>
                     </ul>
                 </div>
                 <div>
@@ -1152,7 +1140,7 @@
                     </ul>
                 </div>
             </div>
-            <div class="hotkey-footer" style="padding:8px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;opacity:.55;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div class="hotkey-footer">
                 <span>A Small Good Thing <span id="app-version"></span> · GPU: <span id="app-gpu-info">detecting…</span></span>
                 <span>Fluid sim after Pavel Dobryakov (MIT) · AI imports: Transformers.js (Apache-2.0) · Built on Electron</span>
             </div>

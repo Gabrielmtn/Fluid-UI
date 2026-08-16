@@ -313,9 +313,13 @@ window.__mpApplyingRemote = false; // lets the host's snapshot through the gate
 // Perf-tier + local-workflow controls that never ride the lock snapshot:
 // resolution/governor/fps stay local (the governor's look-preserving
 // ladder is the precedent), recording/stats/autoload are per-user UI.
+// brushEraser/sketchVisible are sketch/mask *workflow* state, not look —
+// mirroring them let a painter's snapshot silently rewrite the watcher's
+// saved eraser/paint-layer prefs (pCheckbox persists on 'change').
 var MP_PERF_LOCAL_KEYS = [
     'visualResolution', 'physicsResolution', 'fpsCap',
-    'recMode', 'recPlaybackSpeed', 'statsToggle', 'autoloadSettings'
+    'recMode', 'recPlaybackSpeed', 'statsToggle', 'autoloadSettings',
+    'brushEraser', 'sketchVisible'
 ];
 
 function captureLookSnapshot() {
@@ -651,8 +655,10 @@ function resetTurnState() {
     stopTurnTick();
     syncTurnGates(); // clears BOTH gates (turnsOn is false)
     syncLookMirror();
-    var banner = document.getElementById('mpTurnBanner');
+    var banner = document.getElementById('mpTurnBanner'); // legacy top-center banner
     if (banner) banner.remove();
+    var chip = document.getElementById('mpTurnChip');
+    if (chip) chip.remove();
     var wheel = document.getElementById('turnWheel');
     if (wheel) { wheel.style.display = 'none'; wheel.innerHTML = ''; }
     _wheelKey = '';
@@ -679,77 +685,131 @@ function ensureTurnTick() {
     if (turnTickTimer) return;
     turnTickTimer = setInterval(function () {
         if (!turnsOn || !turnDeadlineLocal) { stopTurnTick(); return; }
-        updateTurnBanner();
+        updateTurnChip();
         updateTurnStatusLine();
         var clock = document.getElementById('turnWheelClock');
         if (clock) clock.textContent = fmtRemaining();
     }, 500);
 }
 
-// Fixed banner while turns are running (mirrors the settings-lock banner).
-function updateTurnBanner() {
-    var banner = document.getElementById('mpTurnBanner');
+// Current-artist presence, bubbled onto the screen: a compact chip in the
+// quality underbar (2026-08-15 user-test — replaces the fixed top-center
+// banner, so turn state lives in exactly two places: the queue in the panel
+// and this chip). The "settings mirror" explanation moved into the tooltip.
+function updateTurnChip() {
+    var legacy = document.getElementById('mpTurnBanner');
+    if (legacy) legacy.remove();
+    var chip = document.getElementById('mpTurnChip');
     if (!turnsOn || !isMultiplayerEnabled) {
-        if (banner) banner.remove();
+        if (chip) chip.remove();
         return;
     }
-    if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'mpTurnBanner';
-        banner.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10002;' +
-            'padding:6px 14px;border-radius:8px;background:rgba(15,20,27,0.92);' +
-            'font-size:12px;font-weight:600;pointer-events:none;';
-        document.body.appendChild(banner);
+    // Underbar lookup at CALL time, null-guarded: 06 (deferred loader) and
+    // the underbar build (DCL+800ms+rAF) race in both directions. When the
+    // bar is missing OR hidden (mobile/short-window media queries hide
+    // #quality-underbar entirely), the chip floats fixed top-center on
+    // <body> instead — the old banner's spot — so turn state is never
+    // invisible; the placement is re-evaluated on every render/tick.
+    var bar = document.getElementById('quality-underbar');
+    var barVisible = false;
+    if (bar) { try { barVisible = getComputedStyle(bar).display !== 'none'; } catch (_) {} }
+    var wantParent = barVisible ? bar : document.body;
+    if (!chip) {
+        chip = document.createElement('button');
+        chip.id = 'mpTurnChip';
+        chip.type = 'button';
+        chip.addEventListener('click', function () {
+            // Bring the rotation into view. On mobile the sidebar is a
+            // closed drawer — open it first; and the Multi Artist section
+            // collapses to zero height, so expand it or the scroll lands
+            // on nothing visible.
+            var controls = document.getElementById('sidebar-right');
+            if (document.body.classList.contains('mobile-mode') && controls &&
+                !controls.classList.contains('visible')) {
+                var mt = document.getElementById('mobileMenuToggle');
+                if (mt) mt.click(); else controls.classList.add('visible');
+            }
+            var t = document.getElementById('turnWheel') || document.getElementById('turnsBtn');
+            if (!t) return;
+            var sec = t.closest ? t.closest('.sidebar-section') : null;
+            if (sec) sec.classList.remove('collapsed');
+            if (t.scrollIntoView) {
+                try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+                catch (_) { t.scrollIntoView(); }
+            }
+        });
     }
+    if (chip.parentElement !== wantParent) wantParent.appendChild(chip);
+    chip.classList.toggle('floating', !barVisible);
     var t = fmtRemaining();
-    var clock = t ? ' (' + t + ')' : '';
+    var clock = t ? ' · ' + t : '';
     if (isMyTurn()) {
-        banner.textContent = '🖌 Your turn' + clock + ' — everyone sees your settings';
-        banner.style.border = '1px solid rgba(63,185,80,0.55)';
-        banner.style.color = '#3fb950';
+        chip.textContent = '🖌 Your turn' + clock;
+        chip.title = 'Your turn — everyone sees your settings. Click to open the rotation.';
+        chip.classList.add('you');
     } else if (turnHolderId) {
-        banner.textContent = '👀 ' + shortName(turnHolderId) + ' is painting' + clock + ' — your settings mirror theirs';
-        banner.style.border = '1px solid rgba(255,178,71,0.5)';
-        banner.style.color = '#ffb347';
+        chip.textContent = '🖌 ' + shortName(turnHolderId) + clock;
+        chip.title = shortName(turnHolderId) + ' is painting — your settings mirror theirs. Click to open the rotation.';
+        chip.classList.remove('you');
     } else {
-        banner.textContent = '⏳ Waiting for the next painter…';
-        banner.style.border = '1px solid rgba(255,178,71,0.5)';
-        banner.style.color = '#ffb347';
+        chip.textContent = '⏳ Next painter…';
+        chip.title = 'Waiting for the next painter. Click to open the rotation.';
+        chip.classList.remove('you');
     }
 }
 
 // ── Rotation display ────────────────────────────────────────────────
-// One layout for every room size (the old polygon got cramped and unclear
-// past two artists): the ACTIVE painter is always the big node on top, a
-// vertical arrow leads down to the WAITERS row, and waiters render in pass
-// order — the leftmost dot is next up. Node colors match the artists'
-// remote-cursor colors; your own node says "(you)".
+// A plain ordered queue (2026-08-15 user-test — replaces the SVG wheel and
+// its arrows): "Now" is the active painter, then Next / 2nd / 3rd… in exact
+// pass order. Rows render from a generic {kind:'artist'|'phase'} list so a
+// future prepare-phase row slots in without another rewrite. Dot colors
+// match the artists' remote-cursor colors; your own row says "(you)".
 var _wheelKey = '';
 
-function wheelNode(cx, cy, r, id, isHolder) {
-    var col = colorForClient(id);
-    var s = '';
-    if (isHolder) {
-        s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r + 4.5) + '" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.9"/>';
-    }
-    s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + col + '" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>';
-    if (isHolder) {
-        s += '<text x="' + cx + '" y="' + (cy + 4.5) + '" text-anchor="middle" font-size="13">🖌</text>';
-    }
-    return s;
+function turnPosLabel(i) {
+    if (i === 0) return 'Now';
+    if (i === 1) return 'Next';
+    return i + (i === 2 ? 'nd' : i === 3 ? 'rd' : 'th');
 }
 
-var WHEEL_W = 224; // viewBox width shared by every layout
-
-function wheelLabel(x, y, id, isHolder) {
-    var name = shortName(id) + (id === clientId ? ' (you)' : '');
-    // Clamp horizontally so side labels never run off the frame (~5.8px/char
-    // at font-size 10, centered) — clipped names were half the cramped look.
-    var half = name.length * 2.9 + 4;
-    x = Math.max(half, Math.min(WHEEL_W - half, x));
-    var fill = isHolder ? '#ffffff' : '#b9bec7';
-    var weight = (id === clientId || isHolder) ? '700' : '400';
-    return '<text x="' + x + '" y="' + y + '" text-anchor="middle" font-size="10" font-weight="' + weight + '" fill="' + fill + '">' + name + '</text>';
+function turnQueueRow(item, posText, isNow) {
+    var row = document.createElement('div');
+    row.className = 'mp-turn-qrow' + (isNow ? ' now' : '');
+    var pos = document.createElement('span');
+    pos.className = 'mp-turn-qpos';
+    pos.textContent = posText;
+    row.appendChild(pos);
+    if (item.kind === 'artist' && item.id) {
+        var dot = document.createElement('span');
+        dot.className = 'mp-turn-qdot';
+        dot.style.background = colorForClient(item.id);
+        row.appendChild(dot);
+        var name = document.createElement('span');
+        name.className = 'mp-turn-qname' + (item.id === clientId ? ' you' : '');
+        name.textContent = shortName(item.id) + (item.id === clientId ? ' (you)' : '');
+        row.appendChild(name);
+        if (isNow) {
+            var brush = document.createElement('span');
+            brush.className = 'mp-turn-qbrush';
+            brush.textContent = '🖌';
+            row.appendChild(brush);
+        }
+    } else {
+        var ph = document.createElement('span');
+        ph.className = 'mp-turn-qname mp-turn-qwait';
+        ph.textContent = item.label || 'waiting…';
+        row.appendChild(ph);
+    }
+    if (isNow) {
+        // Keeps the id contract with ensureTurnTick — the 500ms tick only
+        // rewrites this node's text; rotation changes rebuild the list.
+        var clock = document.createElement('span');
+        clock.id = 'turnWheelClock';
+        clock.className = 'mp-turn-qclock' + (isMyTurn() ? ' you' : '');
+        clock.textContent = fmtRemaining();
+        row.appendChild(clock);
+    }
+    return row;
 }
 
 function renderTurnWheel() {
@@ -770,70 +830,32 @@ function renderTurnWheel() {
         return;
     }
     _wheelKey = key;
-    var n = ids.length;
-    var clockText = fmtRemaining();
-    var clockFill = isMyTurn() ? '#3fb950' : '#ffb347';
-    var svg = '';
 
-    if (n <= 1) {
-        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' 104" xmlns="http://www.w3.org/2000/svg">';
-        if (n === 1) {
-            svg += wheelNode(112, 36, 15, ids[0], ids[0] === turnHolderId);
-            svg += wheelLabel(112, 70, ids[0], ids[0] === turnHolderId);
-        }
-        svg += '<text x="112" y="92" text-anchor="middle" font-size="10" fill="#7b828e">waiting for another artist…</text>';
-        svg += '</svg>';
-    } else {
-        // Active-on-top layout: the painter is the big node, a vertical arrow
-        // hands down to the waiters row (pass order, leftmost = next up).
-        var holderId2 = (turnHolderId && ids.indexOf(turnHolderId) !== -1) ? turnHolderId : null;
-        var hIdx = holderId2 ? ids.indexOf(holderId2) : -1;
-        // Waiters in the order the brush will reach them
-        var waiters = hIdx === -1 ? ids.slice()
-            : ids.slice(hIdx + 1).concat(ids.slice(0, hIdx));
-        // Waiters wrap to extra rows when the room is big
-        var PER_ROW = 6;
-        var wRows = Math.max(1, Math.ceil(waiters.length / PER_ROW));
-        var waiterTop = 96;           // y of the first waiters row
-        var rowH = 50;                // dot + staggered labels per row
-        var H = waiterTop + wRows * rowH + 2;
-        svg = '<svg viewBox="0 0 ' + WHEEL_W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+    var holder = (turnHolderId && ids.indexOf(turnHolderId) !== -1) ? turnHolderId : null;
+    var hIdx = holder ? ids.indexOf(holder) : -1;
+    // Waiters in the order the brush will reach them
+    var waiters = hIdx === -1 ? ids.slice()
+        : ids.slice(hIdx + 1).concat(ids.slice(0, hIdx));
 
-        // Active painter, centered on top (or a waiting slot if no holder)
-        if (holderId2) {
-            svg += wheelNode(112, 26, 16, holderId2, true);
-            svg += wheelLabel(112, 55, holderId2, true);
-        } else {
-            svg += '<circle cx="112" cy="26" r="16" fill="none" stroke="#7b828e" stroke-width="1.6" stroke-dasharray="4 3"/>';
-            svg += '<text x="112" y="55" text-anchor="middle" font-size="10" fill="#7b828e">waiting…</text>';
-        }
-        if (clockText) {
-            svg += '<text id="turnWheelClock" x="150" y="31" text-anchor="start" font-size="14" font-weight="700" fill="' + clockFill + '">' + clockText + '</text>';
-        }
-        // Vertical hand-down arrow between active and waiters
-        svg += '<line x1="112" y1="62" x2="112" y2="80" stroke="#7b828e" stroke-width="2"/>' +
-               '<path d="M112,88 l-5,-9 h10 z" fill="#7b828e"/>';
-        // "next" cue over the first waiter
-        for (var i = 0; i < waiters.length; i++) {
-            var row = Math.floor(i / PER_ROW);
-            var inRow = Math.min(PER_ROW, waiters.length - row * PER_ROW);
-            var col = i - row * PER_ROW;
-            var spacing = Math.min(64, (WHEEL_W - 24) / Math.max(1, inRow));
-            var rowLeft = 112 - ((inRow - 1) * spacing) / 2;
-            var nx = rowLeft + col * spacing;
-            var ny = waiterTop + row * rowH;
-            svg += wheelNode(nx, ny, 10, waiters[i], false);
-            // Labels get crowded fast: stagger adjacent baselines so neighbors
-            // never collide; in packed rows name only YOU and the next-up.
-            var showLabel = inRow <= 4 || waiters[i] === clientId || i === 0;
-            if (showLabel) svg += wheelLabel(nx, ny + 20 + (col % 2) * 12, waiters[i], false);
-            if (i === 0) {
-                svg += '<text x="' + nx + '" y="' + (ny - 16) + '" text-anchor="middle" font-size="8" font-weight="700" fill="#9db8ff" letter-spacing="1">NEXT</text>';
-            }
-        }
-        svg += '</svg>';
+    // Generic row items: artists today; a 'phase' row (prepare etc.) later.
+    var items = [];
+    items.push(holder ? { kind: 'artist', id: holder }
+                      : { kind: 'phase', label: 'waiting for a painter…' });
+    for (var i = 0; i < waiters.length; i++) items.push({ kind: 'artist', id: waiters[i] });
+
+    host.innerHTML = '';
+    var list = document.createElement('div');
+    list.className = 'mp-turn-queue';
+    for (var j = 0; j < items.length; j++) {
+        list.appendChild(turnQueueRow(items[j], turnPosLabel(j), j === 0));
     }
-    host.innerHTML = svg;
+    host.appendChild(list);
+    if (ids.length <= 1) {
+        var hint = document.createElement('div');
+        hint.className = 'mp-turn-qhint';
+        hint.textContent = 'waiting for another artist…';
+        host.appendChild(hint);
+    }
 }
 
 // Countdown + rotation-size line under the wheel (refreshed by the tick).
@@ -856,7 +878,7 @@ function updateTurnStatusLine() {
 // rotation wheel, the countdown line, and the Pass/Skip button (painter
 // passes; host can skip an AFK painter).
 function updateTurnUI() {
-    updateTurnBanner();
+    updateTurnChip();
     var isHost = myRole === 'host';
     // Stranger pairs have no meaningful host, so both painters drive turns:
     // either may ask (consent flow) and either may stop.
@@ -1124,13 +1146,18 @@ function initMultiplayer() {
     if (!currentRoom) createRoom();
 }
 
-function disconnectMultiplayer() {
+// rememberRoom: keep the room for the Reconnect button (used by the record
+// drawer's Multiplayer toggle so a misclick-leave isn't a one-way door).
+// Default callers leave lastRoom alone — a deliberate panel disconnect
+// stays a clean exit.
+function disconnectMultiplayer(rememberRoom) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
     stopPing();
     closeMatchmaking();
     stopStrangerKeepAlive();
     _dabQueue.length = 0; // never carry one room's dabs into the next
+    if (rememberRoom && currentRoom) lastRoom = currentRoom;
     currentRoom = null;
     myRole = 'guest';
     roomLocked = false;
@@ -1149,6 +1176,12 @@ function disconnectMultiplayer() {
     // Clear URL hash
     history.replaceState(null, '', window.location.pathname + window.location.search);
     showDisconnectedUI();
+    // showDisconnectedUI hides the Reconnect button; re-show it when this
+    // disconnect asked to keep the door open (same pattern as giveUpConnection).
+    if (rememberRoom && lastRoom) {
+        var rc = document.getElementById('reconnectBtn');
+        if (rc) rc.style.display = '';
+    }
 }
 
 // ── Liveness heartbeat ──────────────────────────────────────────────
@@ -1591,6 +1624,9 @@ function handleRemoteSplat(data) {
         }
 
         isProcessingRemoteEvent = true;
+        // Peer strokes must not pick up THIS client's custom stamp (05i gates
+        // getActiveStamp on this flag); built-in tips still render for them.
+        window.__remoteStroke = true;
         try {
             // 1.3 parity path: the sender's real dab train. Each dab is applied
             // with ITS OWN full velocity, verbatim — no gap-fill invention and
@@ -1651,6 +1687,7 @@ function handleRemoteSplat(data) {
             remoteLastPositions.set(data.clientId, { x: canvasX, y: canvasY });
         } finally {
             isProcessingRemoteEvent = false;
+            window.__remoteStroke = false;
         }
     }
 }
@@ -1982,7 +2019,10 @@ function initMultiplayerUI() {
     });
 
     var discBtn = document.getElementById('disconnectBtn');
-    if (discBtn) discBtn.addEventListener('click', disconnectMultiplayer);
+    // Wrapped: registering the function directly would pass the MouseEvent
+    // as the rememberRoom param — a deliberate Disconnect is a clean exit
+    // and must NOT offer Reconnect or overwrite lastRoom.
+    if (discBtn) discBtn.addEventListener('click', function () { disconnectMultiplayer(); });
 
     var strangerBtn = document.getElementById('strangerBtn');
     if (strangerBtn) strangerBtn.addEventListener('click', paintWithStranger);

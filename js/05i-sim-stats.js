@@ -103,8 +103,13 @@
             // same __brushTipOn gate as the tips. The shader block lives in the
             // dye branch, so the velocity pass stays gaussian by construction.
             // An active shape overrides the built-in tips (incl. Ring below).
+            // __remoteStroke exempts peer strokes and replays: the stamp is
+            // viewer-LOCAL (its bitmap can't ride the wire), so without the
+            // gate a peer's stroke printed in whatever shape THIS client had
+            // selected. Built-in tips still apply — they mirror by design.
             let stampTex = null;
-            if (window.__brushTipOn && window.BrushShapes && typeof window.BrushShapes.getActiveStamp === 'function') {
+            if (window.__brushTipOn && !window.__remoteStroke &&
+                window.BrushShapes && typeof window.BrushShapes.getActiveStamp === 'function') {
                 stampTex = window.BrushShapes.getActiveStamp(); // {texture, aspect} | null
             }
             gl.uniform1f(splatProg.uniforms.stampTexOn, stampTex ? 1 : 0);

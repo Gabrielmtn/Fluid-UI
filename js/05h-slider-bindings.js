@@ -472,7 +472,10 @@
                 newValue = Math.round(newValue * prec) / prec;
                 brushSizeSlider.value = newValue;
                 brushSizeSlider.style.setProperty('--val', newValue);
-                config.SPLAT_RADIUS = newValue / 1000;
+                // Drive it like a user drag (matches the brush-preset apply
+                // idiom): the input binding above sets SPLAT_RADIUS and the
+                // strip label updates instantly instead of on its 2s poll.
+                brushSizeSlider.dispatchEvent(new Event('input', { bubbles: true }));
             }
         }, { passive: false });
         // Magnetic snap state for density slider
