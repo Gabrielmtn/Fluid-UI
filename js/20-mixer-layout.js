@@ -4143,7 +4143,14 @@
         panel.style.position = 'fixed';
         document.body.appendChild(panel);
 
+        // Once the user has dragged the panel somewhere, it stays there for the
+        // rest of that opening — re-anchoring under the trigger would undo the
+        // move on the next resize. Reset on close, so each fresh open starts
+        // predictably under the trigger.
+        var userMoved = false;
+
         function positionPanel() {
+            if (userMoved) return;
             // Panel is zoomed via --ui-scale; fixed left/top are interpreted in the
             // zoomed coordinate space, so compute in screen px then divide by zoom.
             var z = window.UIScale ? window.UIScale.get() : 1;
@@ -4160,7 +4167,30 @@
         var header = document.createElement('div');
         header.className = 'arm-colors-header';
         header.textContent = 'Brush Colors';
+        // Explicit close, because the panel now survives canvas clicks (below)
+        var closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'arm-colors-close';
+        closeBtn.textContent = '✕';
+        closeBtn.title = 'Close';
+        closeBtn.style.cssText = 'float:right;background:none;border:0;color:inherit;' +
+            'font-size:12px;line-height:1;cursor:pointer;padding:0 2px;opacity:0.7';
+        header.appendChild(closeBtn);
         panel.appendChild(header);
+
+        // Drag by the header so the panel can be moved off whatever you are
+        // trying to look at — the whole point being to pick a colour against
+        // the art underneath it. Draggable handles pointer capture, viewport
+        // clamping and the --ui-scale zoom conversion this panel needs.
+        try {
+            if (typeof Draggable !== 'undefined') {
+                new Draggable(panel, {
+                    handle: header,
+                    constrainToViewport: true,
+                    onDragStart: function () { userMoved = true; }
+                });
+            }
+        } catch (_) {}
 
         // Symmetry leads the panel: this dropdown IS the Multi-Brush panel, and
         // the mode decides what the arms listed below actually are. The element
@@ -4400,12 +4430,17 @@
             }
         }
 
+        function closePanel() {
+            panel.style.display = 'none';
+            toggle.classList.remove('active');
+            userMoved = false;   // next open re-anchors under the trigger
+        }
+
         toggle.addEventListener('click', function(e) {
             e.stopPropagation();
             var open = panel.style.display !== 'none';
             if (open) {
-                panel.style.display = 'none';
-                toggle.classList.remove('active');
+                closePanel();
             } else {
                 panel.style.display = 'block';
                 toggle.classList.add('active');
@@ -4414,12 +4449,18 @@
             }
         });
 
-        // Close when clicking outside
+        closeBtn.addEventListener('click', function(e) { e.stopPropagation(); closePanel(); });
+
+        // Close when clicking elsewhere in the UI — but NOT on the canvas. Any
+        // canvas click used to dismiss this, so you could never hold a colour
+        // open while working against the art you were picking for, which is
+        // most of the reason to move the panel at all.
         document.addEventListener('click', function(e) {
-            if (panel.style.display !== 'none' && !panel.contains(e.target) && e.target !== toggle) {
-                panel.style.display = 'none';
-                toggle.classList.remove('active');
-            }
+            if (panel.style.display === 'none' || panel.contains(e.target) || e.target === toggle) return;
+            var onCanvas = e.target && e.target.closest &&
+                (e.target.id === 'canvas' || e.target.closest('#canvas, #canvas-wrapper, #canvas-area'));
+            if (onCanvas) return;
+            closePanel();
         });
         panel.addEventListener('click', function(e) { e.stopPropagation(); });
 
