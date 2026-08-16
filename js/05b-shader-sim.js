@@ -1044,6 +1044,7 @@
             uniform int hasObstacle;
             uniform float uObsMax;
             uniform float uCapSpd; // M1: Max Speed cap in cells/s (0 = gate off)
+            uniform float uEdgeGate; // >0.5 = fade confinement at the canvas border
             void main() {
                 vec2 cL = clamp(vL, 0.0, 1.0);
                 vec2 cR = clamp(vR, 0.0, 1.0);
@@ -1088,6 +1089,25 @@
                     o = max(o, texture(uObstacle, cB).r);
                     float cov = clamp(o / max(uObsMax, 0.05), 0.0, 1.0);
                     gate *= 1.0 - smoothstep(0.05, 0.5, cov);
+                }
+                // Domain-edge apron (2026-08-16): the canvas border is a shear
+                // wall exactly like a collider — mirrored velocity in the
+                // divergence pass, hard no-penetration clamp at the outermost
+                // texels — but it never got the apron the obstacle branch above
+                // has, so the same kick → projection → sharper shear → bigger
+                // kick loop ran freely along the edges. Painting into the border
+                // was the reported "dye explodes at the edge". Same rationale as
+                // the wall apron: confinement is a bulk-fluid effect, it has no
+                // business at a boundary. Texel size comes from the existing
+                // neighbour varyings, so no new uniform. The smoothstep saturates
+                // ~2 texels in, so THIS PASS leaves interior texels untouched —
+                // but the pressure solve is global, so the evolved field still
+                // differs everywhere over time (no bit-identical A/B here, same
+                // as the wall apron). uEdgeGate = 0 disables.
+                if (uEdgeGate > 0.5) {
+                    vec2 tsz = vec2(abs(vR.x - vUv.x), abs(vT.y - vUv.y));
+                    gate *= smoothstep(0.0, 2.0 * tsz.x, min(vUv.x, 1.0 - vUv.x))
+                          * smoothstep(0.0, 2.0 * tsz.y, min(vUv.y, 1.0 - vUv.y));
                 }
                 // M1 source gate (2026-07-17): confinement is an energy
                 // INJECTOR — gate it by speed headroom so it stops pumping

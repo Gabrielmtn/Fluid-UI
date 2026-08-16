@@ -368,6 +368,10 @@
                 gl.uniform1f(vorticityProg.uniforms.uCapSpd,
                     config.VEL_SOURCE_GATE === false ? 0.0 :
                     ((typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0));
+                // Domain-edge apron: the canvas border is a wall too. Kill switch
+                // for A/B feel-testing — config.CURL_EDGE_GATE = false.
+                gl.uniform1f(vorticityProg.uniforms.uEdgeGate,
+                    config.CURL_EDGE_GATE === false ? 0.0 : 1.0);
                 gl.uniform1i(vorticityProg.uniforms.hasObstacle,
                     (obsActive && config.CURL_WALL_GATE !== false) ? 1 : 0);
                 gl.uniform1f(vorticityProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
