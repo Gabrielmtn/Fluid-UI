@@ -1521,7 +1521,7 @@ body.rec-open #sidebar-right {
 }
 .audio-mini-full:hover { border-color: rgba(236, 48, 19, 0.6); color: #fff; }
 
-/* Audio scene quick controls (Tunnel / EQ Bars / Ferrofluid) */
+/* Audio scene quick controls (Tunnel) */
 #audioSceneControls { display: flex; flex-direction: column; gap: 6px; }
 .audio-scene-ctl {
     display: flex; align-items: center; gap: 8px;

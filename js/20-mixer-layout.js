@@ -2947,7 +2947,6 @@
         modeSel.innerHTML =
             '<option value="off" selected>Off</option>' +
             '<option value="tunnel">🌀 Tunnel</option>' +
-            '<option value="ferro">🧲 Ferrofluid</option>' +
             '<option value="min">Minimized</option>' +
             '<option value="full">Full</option>';
         modeGroup.appendChild(modeLbl);

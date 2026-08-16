@@ -772,8 +772,8 @@
                 }
                 blit(density.write.fbo);
                 density.swap();
-                // 8b. Attractor field (6.2 ferrofluid) — dye-transport gather
-                // toward the scene's magnet layout. Runs on the advected dye,
+                // 8b. Attractor field — dye-transport gather toward a
+                // caller-published magnet layout. Runs on the advected dye,
                 // moves the DYE only (never velocity → cannot destabilize the
                 // sim). No-op with zero cost unless a scene set
                 // window.__attractorField. See attractorFrag for the design.

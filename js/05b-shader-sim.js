@@ -1104,16 +1104,16 @@
                 fragColor = vec4(vel + force * dt, 0.0, 1.0);
             }
         `;
-        // ── Attractor field (6.2 ferrofluid, 2026-07-18) ────────────────
+        // ── Attractor field (analytic dye-gather force, 2026-07-18) ─────
         // A DYE-TRANSPORT gather that captures the fluid toward a set of
-        // "magnet" points — the sacred-geometry attractor layout the ferro
+        // "magnet" points — a sacred-geometry attractor layout the caller
         // scene drives (hex rings / flower-of-life). Runs after dye
         // advection, moving the DYE itself (a semi-Lagrangian resample),
         // NOT the velocity field. Why not a velocity body force: a radial
         // pull is pure divergence, so the incompressible pressure solve
         // fights it and throws an oscillating return flow (measured: blob
         // velocity flips sign frame-to-frame, dye churns outward) — that IS
-        // the "shreds / glitches out" failure of the old ferro. Transporting
+        // the "shreds / glitches out" failure of velocity-pull. Transporting
         // dye directly (exactly how the Swirl feature offsets the dye
         // backtrace, never the velocity) pools cleanly and CAN'T destabilize
         // the sim: "capture, never shred" by construction.
@@ -1167,7 +1167,7 @@
                 vec2 src = clamp(vUv - transport * dt, 0.0, 1.0);
                 // Carry alpha through the gather: it is pigment memory now, and
                 // writing a constant here would erase it everywhere the
-                // ferrofluid field runs (and read as full-strength memory over
+                // attractor field runs (and read as full-strength memory over
                 // the whole canvas, so Ignite would blow the pool out).
                 fragColor = texture(uDensity, src);
             }
