@@ -275,6 +275,9 @@ class DepthEstimator {
         setMaskLive: setMaskLive,       // D3/D4: bind the active Mask live
         isSketchLive: isSketchLive,
         boundColliderSource: boundColliderSource,
+        // Re-read one source-bound collider from its source (collider mask
+        // editor); returns its coverage preview data-URL.
+        refreshColliderFromSource: refreshColliderFromSource,
 
         // Refresh depth estimation for a layer
         refreshDepth: refreshLayerDepth,
@@ -855,11 +858,14 @@ class DepthEstimator {
     // Returns {depth, previewUrl, any} or null; allowEmpty=true returns a
     // zeroed mask for an empty sketch (live mode: erasing everything must
     // CLEAR the bound collider, not freeze its last state).
-    function buildSketchDepth(allowEmpty) {
+    // fboOverride: read THAT buffer instead of the bound one (the collider
+    // mask editor refreshes one specific layer's source, which may not be
+    // the live-bound surface at all).
+    function buildSketchDepth(allowEmpty, fboOverride) {
         // D3/D4: read the BOUND source's buffer (raster layer OR mask;
         // falls back to the active paint layer) — switching the active
         // surface must not silently re-target an existing live binding.
-        var sk = _resolveBoundFBO();
+        var sk = fboOverride || _resolveBoundFBO();
         var canvasEl = document.getElementById('canvas');
         if (!sk || !sk.texture || !canvasEl || typeof gl === 'undefined') {
             console.warn('Sketch layer not available');
@@ -1054,6 +1060,22 @@ class DepthEstimator {
         }
         ctx.putImageData(img, 0, 0);
         return pc.toDataURL('image/png');
+    }
+
+    // Re-read ONE source-bound collision layer from its own source, whether
+    // or not it is the live-bound one: refreshes the physics obstacle, the
+    // panel thumbnail and the on-canvas film, and hands back the coverage
+    // preview so a caller (the collider mask editor) can show it. Returns
+    // null if the layer isn't source-bound or its source is gone.
+    function refreshColliderFromSource(layerIndex) {
+        var layer = (window.layers || []).find(function (l) { return l.index === layerIndex; });
+        if (!layer || !layer.collisionSource) return null;
+        var fbo = _resolveSourceFBO(layer.collisionSource);
+        if (!fbo) return null;
+        var built = buildSketchDepth(true, fbo);
+        if (built) _applyColliderPreview(layer, built);
+        updateObstacleFromLayers();
+        return built ? built.previewUrl : null;
     }
 
     function scheduleSketchRefresh(kind, id) {

@@ -190,7 +190,11 @@
                             <button class="layer-btn layer-mask-btn ${hasMask ? 'has-mask' : ''} ${layer.mask?.enabled ? 'active' : ''}" onclick="toggleImageLayerMask(${layer.index})" title="${hasMask ? (layer.mask?.enabled ? 'Disable Mask' : 'Enable Mask') : 'No mask defined'}">✂️</button>
                             <button class="layer-btn" onclick="deleteLayer(${layer.index})">🗑️</button>
                         </div>
-                        ${hasMask ? `
+                        ${window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer) ? `
+                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
+                            <button class="mask-control-btn" onclick="window.enterColliderMaskMode(${layer.index})" title="Draw and erase this collider's walls over the artwork">🧱 Edit Collider</button>
+                        </div>
+                        ` : hasMask ? `
                         <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
                             <button class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">✏️ Edit Mask</button>
                             <button class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">🗑️ Clear</button>
