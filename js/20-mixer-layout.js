@@ -3014,25 +3014,63 @@
         // so there's exactly one control and zero state-sync problems. Without
         // this, Full mode had no enable control at all (the mini is hidden).
         var enableRow = mini.querySelector('.audio-mini-row');
+        // The Enable checkbox is a REFLECTION of engine state, never a claim
+        // about it (2026-08-16). It used to latch checked the moment it was
+        // clicked: with source=File that happens BEFORE the file picker even
+        // opens, so cancelling the picker — or a decode/permission failure —
+        // left the box checked with nothing running. The box then had to be
+        // un- and re-checked to actually start anything, which is exactly the
+        // 'load a file and it won't play' report.
+        function syncEnableCheckbox() {
+            if (!enableCb || !window.audioReactive) return;
+            var on = !!window.audioReactive.isEnabled();
+            if (enableCb.checked !== on) enableCb.checked = on;
+        }
+        window.__syncAudioEnable = syncEnableCheckbox;
+
         function enableFromSource() {
             if (!window.audioReactive) return;
             var src = srcSel.value;
-            if (src === 'file') fileInput.click();
-            else window.audioReactive.enable(src);
+            if (src === 'file') {
+                // Nothing is enabled until a file actually arrives; the box
+                // goes on in the change handler below (via the state sync).
+                syncEnableCheckbox();
+                fileInput.click();
+            } else {
+                window.audioReactive.enable(src);
+            }
         }
         enableCb.addEventListener('change', function () {
             if (!window.audioReactive) return;
             if (enableCb.checked) enableFromSource();
             else window.audioReactive.disable();
+            syncEnableCheckbox();
         });
         srcSel.addEventListener('change', function () {
-            if (enableCb.checked && window.audioReactive) { window.audioReactive.disable(); enableFromSource(); }
+            // Switching source while running: tear the old one down, then ask
+            // for the new one. If that ask is the file picker and the user
+            // cancels, the sync leaves the box unchecked — honest, because
+            // nothing is running any more.
+            if (window.audioReactive && window.audioReactive.isEnabled()) {
+                window.audioReactive.disable();
+                enableFromSource();
+            }
+            syncEnableCheckbox();
         });
         fileInput.addEventListener('change', function (e) {
             var f = e.target.files && e.target.files[0];
             if (f && window.audioReactive) window.audioReactive.enable('file', f);
-            else enableCb.checked = false;
             fileInput.value = '';
+            // enable() resolves async (decode) and notifies on both success
+            // and failure; this covers the no-file case immediately.
+            syncEnableCheckbox();
+        });
+        // Picker dismissed with no selection (Chrome/Firefox fire 'cancel').
+        // Older engines fire nothing — the sync above already left the box
+        // unchecked, so those degrade to the same honest state.
+        fileInput.addEventListener('cancel', function () {
+            fileInput.value = '';
+            syncEnableCheckbox();
         });
 
         // ── Transport (file source only) ──
@@ -3101,8 +3139,13 @@
             syncPlayhead();
         }
         // 22-audio-reactive fires this whenever the source or transport state
-        // changes, including the async file-decode completion.
-        window.__onAudioSourceChanged = function () { syncPlayRow(); };
+        // changes — including the async file-decode completion and any
+        // start FAILURE — so it is the one place both the Enable checkbox and
+        // the transport re-read the truth.
+        window.__onAudioSourceChanged = function () {
+            if (typeof window.__syncAudioEnable === 'function') window.__syncAudioEnable();
+            syncPlayRow();
+        };
 
         if (playBtn) playBtn.addEventListener('click', function () {
             if (window.audioReactive) { window.audioReactive.togglePlay(); syncPlayRow(); }
@@ -3193,7 +3236,10 @@
                 // the engine from the selected source. Restored sessions (synthetic
                 // change events) skip this so page load never pops a mic prompt.
                 if (userInitiated && window.audioReactive && !window.audioReactive.isEnabled()) {
-                    enableCb.checked = true;
+                    // Ask the engine to start; the checkbox follows from the
+                    // resulting state (pre-checking it here would re-create
+                    // the lie when the source is File and the picker is
+                    // cancelled, or when mic permission is denied).
                     enableFromSource();
                 }
             } else if (mode === 'min') {

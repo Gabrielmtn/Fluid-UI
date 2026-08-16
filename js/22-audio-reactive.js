@@ -149,6 +149,26 @@
     var fileLoop = true;
     var fileName = '';
 
+    // One-shot: resume the context on the next real user interaction, for the
+    // case where the policy refused an ungestured resume(). A source already
+    // scheduled with start(0) begins playing the moment the clock runs, and
+    // fileStartedAt was computed from the (frozen) context clock, so the
+    // playhead stays consistent — nothing needs restarting.
+    var _gestureResumeArmed = false;
+    function armGestureResume() {
+        if (_gestureResumeArmed) return;
+        _gestureResumeArmed = true;
+        var events = ['pointerdown', 'keydown', 'touchstart'];
+        var go = function () {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                try { audioCtx.resume().then(notifySourceChanged, function () {}); } catch (_) {}
+            }
+            _gestureResumeArmed = false;
+            events.forEach(function (e) { document.removeEventListener(e, go, true); });
+        };
+        events.forEach(function (e) { document.addEventListener(e, go, true); });
+    }
+
     function ensureMonitor() {
         if (!audioCtx) return null;
         if (!monitorGain) {
@@ -257,12 +277,46 @@
         });
     }
 
+    // Brief on-canvas notice, reusing the shared #export-toast element so
+    // there is one toast look/slot in the app (24-video-export owns the
+    // original; this creates it only if that module hasn't yet).
+    function audioNotice(message, type) {
+        try {
+            var el = document.getElementById('export-toast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'export-toast';
+                el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);' +
+                    'padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;z-index:99999;' +
+                    'color:#e6edf3;pointer-events:none;display:none;' +
+                    'background:rgba(13,17,23,0.95);border:1px solid rgba(255,255,255,0.1);';
+                document.body.appendChild(el);
+            }
+            var colors = { info: '#58a6ff', success: '#3fb950', warn: '#d29922', error: '#f85149' };
+            el.style.borderColor = colors[type] || colors.info;
+            el.textContent = message;
+            el.style.display = 'block';
+            clearTimeout(el._t);
+            el._t = setTimeout(function () { el.style.display = 'none'; }, 3000);
+        } catch (_) {}
+    }
+
     function startFile(file) {
         return new Promise(function (resolve, reject) {
             var reader = new FileReader();
+            var fail = function (err) {
+                var name = (file && file.name) ? ' "' + file.name + '"' : '';
+                audioNotice('Could not read that audio file' + name + ' — try MP3, WAV, OGG or M4A', 'error');
+                reject(err || new Error('audio decode failed'));
+            };
+            // Without this the promise never settles when the file can't be
+            // read at all, and enable() sits with enabled=true forever while
+            // nothing plays — the state drift this whole pass is about.
+            reader.onerror = fail;
+            reader.onabort = fail;
             reader.onload = function () {
                 ensureContext();
-                audioCtx.decodeAudioData(reader.result, function (buffer) {
+                var p = audioCtx.decodeAudioData(reader.result, function (buffer) {
                     if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
                     fileBuffer = buffer;
                     srcKind = 'file';
@@ -270,9 +324,19 @@
                     filePaused = false;
                     fileOffset = 0;
                     playFileFrom(0);
+                    // Autoplay policy can still leave the clock parked; say so
+                    // rather than looking broken (the armed gesture handler in
+                    // ensureContext starts it on the next interaction).
+                    if (audioCtx.state === 'suspended') {
+                        audioNotice('Click anywhere to start audio playback', 'warn');
+                    }
                     notifySourceChanged();
                     resolve();
-                }, reject);
+                }, fail);
+                // decodeAudioData honours the callbacks AND returns a promise;
+                // the returned one rejects too, and unhandled it surfaced as
+                // "Uncaught (in promise) EncodingError" for any bad file.
+                if (p && p.catch) p.catch(function () {});
             };
             reader.readAsArrayBuffer(file);
         });
@@ -368,7 +432,20 @@
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-        if (audioCtx.state === 'suspended') audioCtx.resume();
+        // Autoplay policy: a context created without user activation starts
+        // SUSPENDED, and its clock does not advance — a buffer source started
+        // on it is scheduled but silent, and the analyser reads zeros. That is
+        // the "I loaded a file and nothing happens until I uncheck/recheck"
+        // report: the re-check was simply another user gesture. resume() is
+        // fire-and-forget and can be refused, so also arm a one-shot gesture
+        // fallback that resumes on the user's next interaction.
+        if (audioCtx.state === 'suspended') {
+            try {
+                var r = audioCtx.resume();
+                if (r && r.catch) r.catch(function () { armGestureResume(); });
+            } catch (_) {}
+            armGestureResume();
+        }
         if (!analyser) {
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = FFT_SIZE;
@@ -424,10 +501,11 @@
         s.addEventListener('inactive', function () {
             if (enabled) {
                 console.warn('Audio reactive: stream ended');
+                // disable() → stopAudio() → notifySourceChanged(), and the UI
+                // re-reads isEnabled() from there. (It used to set the
+                // checkbox by hand from in here, which is the pattern that
+                // let the box and the engine disagree.)
                 disable();
-                // Notify UI
-                var cb = document.getElementById('audioReactToggle');
-                if (cb) cb.checked = false;
             }
         });
     }
@@ -938,11 +1016,17 @@
 
         p.then(function () {
             startLoop();
+            // Success is also a state change (the file path resolves async,
+            // long after the click) — let the UI mirror reality.
+            notifySourceChanged();
         }).catch(function (err) {
             console.warn('Audio reactive: failed to start', err);
             enabled = false;
-            var cb = document.getElementById('audioReactToggle');
-            if (cb) cb.checked = false;
+            srcKind = null;
+            // Don't reach into the DOM from here: notify and let the UI
+            // re-read isEnabled(). Poking the checkbox directly was how the
+            // two could drift apart in the first place.
+            notifySourceChanged();
         });
     }
 
@@ -960,6 +1044,9 @@
 
         // ── Playback / monitoring (2026-08-16) ──
         sourceKind: function () { return srcKind; },
+        // 'running' | 'suspended' | 'closed' | null — a suspended context is
+        // loaded-but-silent (autoplay policy); the UI can say so.
+        contextState: function () { return audioCtx ? audioCtx.state : null; },
         // Only a loaded file plays through the speakers (see routeSource).
         isMonitorable: function () { return srcKind === 'file' && !!fileBuffer; },
         getMonitorVolume: function () { return monitorVolume; },
