@@ -3412,9 +3412,12 @@
         // Mapping checkboxes
         var mappings = [
             { id: 'arMapAutoSplat', label: 'Bass \u2192 Auto Splat', key: 'bassAutoSplat', def: true },
-            { id: 'arMapSize', label: 'Energy \u2192 Brush Size', key: 'overallToSize', def: true },
+            // Defaults must track the engine's (22-audio-reactive.js): these two
+            // reach into the brush itself, so they are opt-in. A checked box the
+            // engine disagrees with would lie until the user toggled it.
+            { id: 'arMapSize', label: 'Energy \u2192 Brush Size', key: 'overallToSize', def: false },
             { id: 'arMapKaleido', label: 'Mid \u2192 Kaleido Rotation', key: 'midToKaleido', def: true },
-            { id: 'arMapColor', label: 'Treble \u2192 Color Cycle', key: 'trebleToColor', def: true }
+            { id: 'arMapColor', label: 'Treble \u2192 Color Cycle', key: 'trebleToColor', def: false }
         ];
 
         mappings.forEach(function (m) {

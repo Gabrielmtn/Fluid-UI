@@ -72,12 +72,14 @@
     // Sensitivity
     var sensitivity = 1.5;
 
-    // Mapping toggles
+    // Mapping toggles. The two that reach into the paintbrush itself —
+    // brush size and brush colour — are OFF unless the user routes them;
+    // audio drives the canvas by default, never the tool in your hand.
     var mapBassToSplat = true;
     var mapBassAutoSplat = true;
     var mapMidToKaleido = true;
-    var mapTrebleToColor = true;
-    var mapOverallToSize = true;
+    var mapTrebleToColor = false;
+    var mapOverallToSize = false;
 
     // Auto-splat config
     var autoSplatMode = 'center'; // center, random, circular
@@ -736,13 +738,36 @@
         sizeEnv = beatPulse = 0; _lastTickMs = 0;
     }
 
+    // A stroke in progress owns the brush. The engine reads SPLAT_RADIUS live
+    // for dab spacing at emit and again for size at drain, and the palette
+    // stepper rewrites pointer.color — so modulating either mid-stroke prints
+    // width lumps and colour breaks into the line the user is drawing. Hold
+    // both while the brush is down; the envelope re-engages on release.
+    function paintInProgress() {
+        try {
+            return !!(window.BrushEngine &&
+                (window.BrushEngine.isActive() ||
+                    (window.BrushEngine.pending && window.BrushEngine.pending())));
+        } catch (_) { return false; }
+    }
+
     function applyMappings(now) {
         var s = sensitivity;
+        var painting = paintInProgress();
 
         // Overall energy → Brush size modulation (EASED). A continuous loudness
         // envelope makes the brush breathe; a soft beat pulse adds a gentle bump
         // on hits. Both attack-fast / release-slow, so it never snaps.
-        if (mapOverallToSize && window.config) {
+        if (mapOverallToSize && painting) {
+            // Park the brush at the user's base size for the whole stroke,
+            // same restore the mapping's off-switch performs mid-pulse.
+            if (origSplatRadius !== null && window.config &&
+                lastWrittenSplatRadius !== null &&
+                window.config.SPLAT_RADIUS === lastWrittenSplatRadius) {
+                try { window.config.SPLAT_RADIUS = origSplatRadius; } catch (_) {}
+                lastWrittenSplatRadius = null;
+            }
+        } else if (mapOverallToSize && window.config) {
             try {
                 // Re-base on foreign writes: if SPLAT_RADIUS isn't the value we
                 // wrote last tick, the user (or a preset/oscillator) changed it —
@@ -780,7 +805,7 @@
         // Treble → Color cycling + sparkle splats
         if (mapTrebleToColor) {
             // Color step at rate proportional to treble energy
-            if (treble * s > 0.15) {
+            if (treble * s > 0.15 && !painting) {
                 var stepInterval = Math.max(60, 350 - treble * s * 300);
                 if (now - lastColorStepTime > stepInterval) {
                     lastColorStepTime = now;
