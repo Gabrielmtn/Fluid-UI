@@ -248,17 +248,31 @@
             if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
         }
         window.stepPaletteOnce = stepPaletteOnce;
-        function cycleSelect(el, dir) {
-            if (!el) return;
-            const opts = el.options;
-            if (!opts || !opts.length) return;
-            let idx = el.selectedIndex;
-            idx = Math.min(opts.length - 1, Math.max(0, idx + dir));
-            if (idx !== el.selectedIndex) {
-                pushUndo();
-                el.selectedIndex = idx;
-                el.dispatchEvent(new Event('change'));
+        // Step a numeric-valued select toward a HIGHER (dir=+1) or LOWER
+        // (dir=-1) value. Deliberately value-based, not index-based: the
+        // resolution lists are ordered high→low, so index stepping ran
+        // backwards (Alt+↓ made things sharper), and setResolutionDropdown
+        // APPENDS injected '(custom)' options at the end, which breaks index
+        // order outright — from a custom value, ±1 index jumped somewhere
+        // arbitrary. Picking the nearest value in the requested direction is
+        // correct regardless of how the list is ordered.
+        function stepNumericSelect(el, dir) {
+            if (!el || !el.options || !el.options.length) return;
+            const curOpt = el.options[el.selectedIndex];
+            const cur = curOpt ? parseFloat(curOpt.value) : NaN;
+            if (isNaN(cur)) return;
+            let bestIdx = -1, bestVal = null;
+            for (let i = 0; i < el.options.length; i++) {
+                const v = parseFloat(el.options[i].value);
+                if (isNaN(v)) continue;
+                if (dir > 0 ? v <= cur : v >= cur) continue;
+                // nearest in that direction
+                if (bestVal === null || (dir > 0 ? v < bestVal : v > bestVal)) { bestVal = v; bestIdx = i; }
             }
+            if (bestIdx < 0) return; // already at the extreme
+            pushUndo();
+            el.selectedIndex = bestIdx;
+            el.dispatchEvent(new Event('change'));
         }
         document.addEventListener('keydown', (e) => {
             if (isTypingTarget(e.target)) return;
@@ -419,8 +433,10 @@
             if (e.altKey && !ctrlOrMeta) {
                 if (key === 'ArrowUp' || key === 'ArrowDown') {
                     e.preventDefault();
-                    if (e.shiftKey) cycleSelect(document.getElementById('physicsResolution'), key === 'ArrowUp' ? 1 : -1);
-                    else cycleSelect(document.getElementById('visualResolution'), key === 'ArrowUp' ? 1 : -1);
+                    // Up = more (sharper / finer), down = less. Was inverted.
+                    const _dir = key === 'ArrowUp' ? 1 : -1;
+                    if (e.shiftKey) stepNumericSelect(document.getElementById('physicsResolution'), _dir);
+                    else stepNumericSelect(document.getElementById('visualResolution'), _dir);
                     return;
                 }
             }
