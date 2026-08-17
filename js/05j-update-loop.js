@@ -193,18 +193,48 @@
                         }
                     } else {
                         window.__contFlowLast = null;
-                        // Time-based splat-in needs the ramp re-evaluated while
-                        // the brush is held STILL — the whole point is that a
-                        // click blooms instead of stamping, and a stationary
-                        // press produces no dabs to hang that off. Emit one
-                        // zero-velocity dab per frame (dye only, no momentum)
-                        // until the ramp tops out; after that the stroke is at
-                        // full size and there is nothing left to animate.
-                        if (window.splatInMode === 'time' && pointer.down && !_dabs.length &&
+                        // Fill in the RAMP REGION. The spacing walker lays a dab
+                        // every ~0.35 brush diameters, which at default size is
+                        // ~73 canvas px — so the whole splat-in ramp is spanned by
+                        // two or three dabs and arrives as separate blobs that
+                        // step in size and brightness. That is the "stuttery on
+                        // small movements" report: a movement shorter than one
+                        // spacing paints the press stamp and nothing else at all.
+                        //
+                        // While the ramp is still climbing, top up any frame the
+                        // walker left empty with one dab at the live pointer, so
+                        // the entrance is continuous the way constant-flow is.
+                        // Once the ramp tops out the walker owns the stroke again
+                        // and normal spacing (and its texture) is unchanged.
+                        //
+                        // Distance modes require actual movement: without that a
+                        // stationary press would pump dabs forever at a ramp value
+                        // that can never advance. Time mode is the opposite — a
+                        // still press is exactly the case it exists for.
+                        if (pointer.down && !_dabs.length &&
+                            window.splatInMode && window.splatInMode !== 'instant' &&
                             config.BRUSH_TARGET === 'fluid' &&
                             window.BrushEngine && window.BrushEngine.isActive() &&
                             getSplatInMult() < 0.999) {
-                            _dabs = [{ x: pointer.x, y: pointer.y, dx: 0, dy: 0, p: 1 }];
+                            // Travel comes from the engine, which resets it at
+                            // begin(). Compare against splatStrokeDist — the ramp's
+                            // own progress, also reset per stroke — so "has the
+                            // pointer moved past where the ramp is?" needs no
+                            // extra state of its own. A private high-water mark
+                            // here would survive into the next stroke and suppress
+                            // its opening frames, which is exactly the bug this
+                            // shape avoids.
+                            var _bt = (window.BrushEngine.travel ? window.BrushEngine.travel() : 0) /
+                                      Math.max(1, canvas.width);
+                            // A distance ramp advances only with movement; a time
+                            // ramp is exactly the stationary case, so it always
+                            // fills. Zero velocity either way: these are the gaps
+                            // BETWEEN walker dabs, and the walker already carries
+                            // the stroke's momentum.
+                            if (window.splatInMode === 'time' || _bt > splatStrokeDist + 0.0005) {
+                                _dabs = [{ x: pointer.x, y: pointer.y, dx: 0, dy: 0, p: 1,
+                                           travel: _bt * Math.max(1, canvas.width) }];
+                            }
                         }
                     }
                     if (_dabs.length) window.__lastPaintMs = nowMs;
@@ -225,8 +255,23 @@
                             if (typeof window.__maskStamp === 'function') window.__maskStamp(d.x, d.y, d.p);
                             continue;
                         }
-                        // splat-in ramp stays distance-based (same accumulator)
-                        splatStrokeDist += Math.hypot(d.dx, d.dy) / 10 / Math.max(1, canvas.width);
+                        // Splat-in ramp progress. Prefer the dab's OWN cumulative
+                        // path length (05d0 stamps it): the old line derived it
+                        // from |velocity|, which the walker sets to exactly
+                        // 10 x spacing, so it advanced one fixed step per dab no
+                        // matter how far the pointer actually moved — a dab
+                        // counter, not a distance. At default spacing that gave
+                        // the entire ramp 2-3 samples, which is what read as
+                        // stepped/stuttery (and, since the ramp also drives dye,
+                        // as 2-3 brightness bands). Synthesized dabs from the
+                        // constant-flow and ramp-catchup branches carry no travel,
+                        // so they keep the accumulator path with their real
+                        // per-frame delta.
+                        if (typeof d.travel === 'number') {
+                            splatStrokeDist = d.travel / Math.max(1, canvas.width);
+                        } else {
+                            splatStrokeDist += Math.hypot(d.dx, d.dy) / 10 / Math.max(1, canvas.width);
+                        }
                         const inMult = getSplatInMult();
                         // Flow = the Flow slider, scaling deposited dye, baked into
                         // the recorded color so stroke replay stays faithful.

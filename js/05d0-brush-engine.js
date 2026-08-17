@@ -31,8 +31,9 @@
     var sx = 0, sy = 0;          // stabilized position (chases raw input)
     var lastEmitX = 0, lastEmitY = 0; // last emitted dab position
     var residual = 0;             // distance carried between segments
+    var strokeTravel = 0;         // total path length walked since begin()
     var lastP = 1;                // last pressure seen
-    var queue = [];               // pending dabs: {x, y, dx, dy, p}
+    var queue = [];               // pending dabs: {x, y, dx, dy, p, travel}
     var MAX_QUEUE = 512;          // spike safety — oldest dabs drop first
 
     function cfg(key, def) {
@@ -109,13 +110,23 @@
                     x: lastEmitX + dx * t + jx,
                     y: lastEmitY + dy * t + jy,
                     dx: vx, dy: vy,
-                    p: p0 + (p1 - p0) * t
+                    p: p0 + (p1 - p0) * t,
+                    // Cumulative path length from the press to THIS dab. The
+                    // splat-in ramp used to derive its progress from each dab's
+                    // velocity, but |v| is exactly 10 x spacing by construction
+                    // — so it was counting dabs, not measuring travel, and the
+                    // whole ramp resolved into 2-3 samples however far you drew.
+                    // Carrying real distance makes each dab's ramp value belong
+                    // to its own position on the path, immune to drain order
+                    // and to the coalescing spacing bump above.
+                    travel: strokeTravel + offset
                 });
             }
             emitted++;
             offset += spacing;
         }
         residual = residual + dist - emitted * spacing;
+        strokeTravel += dist;
         lastEmitX = x; // the anchor is the raw sample chain; interpolation
         lastEmitY = y; // is per segment, so it always advances to the sample
         lastP = p1;
@@ -130,9 +141,17 @@
             sx = x; sy = y;
             lastEmitX = x; lastEmitY = y;
             residual = 0;
+            strokeTravel = 0;
             lastP = 1;
             queue.length = 0;
         },
+
+        // Total path length walked since begin(), in canvas px. The splat-in
+        // ramp needs this for frames where the walker emits nothing: without a
+        // dab there is no travel stamp to read, and deriving it from a
+        // remembered pointer position goes wrong the moment that memory
+        // survives into the next stroke.
+        travel: function () { return strokeTravel; },
 
         // Feed one raw sample (call per pointermove AND per coalesced event).
         move: function (x, y) {
