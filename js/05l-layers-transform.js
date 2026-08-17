@@ -85,6 +85,49 @@
             if (removed.isCollision && window.collisionLayers && window.collisionLayers.updateObstacleFromLayers) window.collisionLayers.updateObstacleFromLayers();
             if (typeof window.reapplyImageLayerClips === 'function') window.reapplyImageLayerClips();
         }
+        // D6: record a layer creation (paste / drop / upload) as ONE undoable
+        // action, however many layers it produced — a Ctrl+Shift+V paste makes
+        // two (the keyed image and its collider) and has to come back as one.
+        //
+        // Returns a handle whose .add(index) folds a later-arriving layer into
+        // the SAME entry: the collider is baked asynchronously, and pushing its
+        // own entry would cost two Ctrl+Z presses for one paste. The entry is
+        // pushed immediately so the paste is undoable even if that second layer
+        // never materialises.
+        window.__recordLayerCreate = function (indices, label) {
+            if (!window.__layerHistory || window.__layerHistory.isApplying()) return null;
+            const ids = [];
+            const add = (i) => { if (typeof i === 'number' && ids.indexOf(i) < 0) ids.push(i); };
+            (indices || []).forEach(add);
+            if (!ids.length) return null;
+            let snaps = null; // captured when the undo actually runs
+            window.__layerHistory.push({
+                label: label || 'add layer',
+                undo: function () {
+                    snaps = [];
+                    ids.forEach(function (i) {
+                        const layer = window.layers.find(l => l.index === i);
+                        if (!layer) return;
+                        const orderIdx = window.layerOrder.findIndex(it => it.type === 'layer' && it.id === i);
+                        snaps.push({
+                            layer: layer,
+                            orderIdx: orderIdx,
+                            orderEntry: orderIdx >= 0 ? window.layerOrder[orderIdx] : { type: 'layer', id: i }
+                        });
+                        window.deleteLayer(i); // its own undo push is suppressed while applying
+                    });
+                },
+                redo: function () {
+                    // Reverse order: each snapshot's slot was measured against the
+                    // array as it stood at ITS deletion, so undoing them
+                    // last-first rebuilds those positions exactly.
+                    (snaps || []).slice().reverse().forEach(function (s) {
+                        __restoreDeletedLayer(s.layer, s.orderIdx, s.orderEntry);
+                    });
+                }
+            });
+            return { add: add };
+        };
         window.deleteLayer = (index) => {
             // D6: snapshot for undo BEFORE anything is freed
             const _removed = layers.find(l => l.index === index);
@@ -140,9 +183,9 @@
                 window.enterImageLayerMaskMode(index);
             }
         };
-        window.collisionFromMask = (index) => {
+        window.collisionFromMask = (index, createOpts) => {
             if (window.collisionLayers && typeof window.collisionLayers.createFromLayerMask === 'function') {
-                window.collisionLayers.createFromLayerMask(index);
+                window.collisionLayers.createFromLayerMask(index, createOpts);
             } else {
                 console.warn('Collision system not available');
             }

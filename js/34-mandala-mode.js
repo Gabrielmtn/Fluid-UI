@@ -119,12 +119,34 @@
     // carries the rounded value for display while window.kAngle takes the
     // exact one — a rounded 0.5° would visibly misregister at the rim.
     let pinning = false;
+
+    // 05f's angle slider sticks to 0 for 1.5s after any near-zero write, and
+    // rewrites the input's own value when it does — a nicety for dragging past
+    // the detent, but it silently swallows a programmatic angle. The pin then
+    // landed on the slider as 0 while window.kAngle held the real pin (so the
+    // slider read a lie), and on the way out it could zero the very angle being
+    // restored. Whether it bit depended on how recently the angle passed 0,
+    // which is what made leaving the mode unreliable rather than broken.
+    // So every angle write from this file lands on BOTH: dispatch first, so
+    // 05f and the guides run, then say what we actually meant.
+    function writeAngle(deg) {
+        const d = Number(deg) || 0;
+        setRange(kAngleEl, d);
+        if (kAngleEl) {
+            kAngleEl.value = String(d);
+            try { kAngleEl.style.setProperty('--val', d); } catch (_) {}
+        }
+        const lbl = document.getElementById('kAngleValue');
+        if (lbl) lbl.textContent = d + '°';
+        window.kAngle = d * Math.PI / 180;
+    }
+
     function pinAngle() {
         const exact = Math.PI / wedgeCount();          // segAngle/2 in radians
         pinning = true;
         try {
-            setRange(kAngleEl, Math.round(exact * 180 / Math.PI));
-            window.kAngle = exact;
+            writeAngle(Math.round(exact * 180 / Math.PI));
+            window.kAngle = exact;                     // the exact pin, not the rounded slider
             const lbl = document.getElementById('kAngleValue');
             if (lbl) lbl.textContent = (exact * 180 / Math.PI).toFixed(1) + '°';
         } finally { pinning = false; }
@@ -355,7 +377,12 @@
 
     function enterMandala() {
         ensureWrapped();
-        saved = {
+        // Only snapshot on the way IN. A second 'change' on an already-checked
+        // toggle would otherwise record the rig's own settings as "before" —
+        // and exit would then restore mandala over mandala, kaleido included,
+        // so the mirroring never turned off. Re-applying the rig below is
+        // harmless and keeps a repeat enable self-correcting.
+        if (!saved) saved = {
             kaleidoOn: !!(kToggle && kToggle.checked),
             mode: kMode ? kMode.value : '1',
             segments: kSegments ? kSegments.value : '12',
@@ -369,7 +396,10 @@
             density: densityEl ? densityEl.value : null,
             isolation: isolationEl ? isolationEl.value : null,
             wetInf: wetInfEl ? wetInfEl.value : null,
-            wetDry: wetDryEl ? wetDryEl.value : null
+            wetDry: wetDryEl ? wetDryEl.value : null,
+            // Restored on the way out too, so using this mode once doesn't
+            // permanently suppress Kaleido's own first-enable behaviour.
+            bootstrapped: window._kaleidoBootstrapped
         };
         // Suppress 05f's first-enable bootstrap — it forces 16 segments and
         // an 8× multiplier, both of which fight this rig.
@@ -396,16 +426,20 @@
         syncGuides();
     }
 
-    function exitMandala() {
-        // Fill is a mandala-only framing; leaving the mode must not strand
-        // the canvas zoomed into a wedge that no longer exists.
+    // Fill is a mandala-only framing; leaving the mode by ANY route must not
+    // strand the canvas magnified into a wedge that no longer exists.
+    function clearFill() {
         const off = document.querySelector('input[name="mandalaFill"][value="off"]');
         if (off) { off.checked = true; }
         if (window.ZoomView) window.ZoomView.reset();
+    }
+
+    function exitMandala() {
+        clearFill();
         if (saved) {
             setSelect(kMode, saved.mode);
             setRange(kSegments, saved.segments);
-            setRange(kAngleEl, saved.angle);
+            writeAngle(saved.angle);
             setRange(kTwistEl, saved.twist);
             setRange(kZoomEl, saved.zoom);
             setRange(kBlendEl, saved.blend);
@@ -417,6 +451,7 @@
             if (saved.wetInf != null) setRange(wetInfEl, saved.wetInf);
             if (saved.wetDry != null) setRange(wetDryEl, saved.wetDry);
             setCheck(kToggle, saved.kaleidoOn);
+            window._kaleidoBootstrapped = saved.bootstrapped;
             saved = null;
         }
         syncGuides();
@@ -437,12 +472,29 @@
 
     // Turning raw Kaleido off underneath the mode drops out of it cleanly
     // rather than leaving guides over an unmirrored canvas.
+    //
+    // This fires far more often than it looks: kaleidoToggle is preset-backed
+    // (mandala's own toggle is not), and a preset apply re-dispatches 'change'
+    // on every checkbox — so every preset that lands with Kaleido off kicks
+    // the mode out from under the user. It used to drop the flag and nothing
+    // else, leaving the canvas magnified into a wedge, the Fill radio lit, a
+    // 0.05 detail brush and the painterly sim — and, because `saved` was gone,
+    // the Mandala toggle could no longer restore any of it.
     if (kToggle) kToggle.addEventListener('change', function (e) {
-        if (!e.target.checked && active() && saved) {
-            saved = null;                     // don't restore over an explicit choice
-            toggleEl.checked = false;
-            showPanel(false);
+        if (e.target.checked || !active() || !saved) return;
+        saved.kaleidoOn = false;              // an explicit off stays off
+        toggleEl.checked = false;
+        showPanel(false);
+        if (window._profileApplying) {
+            // The preset owns the sliders now; restoring the pre-mandala ones
+            // over the top would fight the thing the user just picked. Give
+            // back only what belongs to this mode: the framing and the guides.
+            window._kaleidoBootstrapped = saved.bootstrapped;
+            saved = null;
+            clearFill();
             syncGuides();
+        } else {
+            exitMandala();                    // a hand-thrown switch gets the full unwind
         }
     });
 

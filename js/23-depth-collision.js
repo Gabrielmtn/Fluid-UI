@@ -317,7 +317,11 @@ class DepthEstimator {
     //   1. Layer has mask shapes → rasterize shapes (+ optional feather)
     //   2. No shapes but threshold > 0 → luminance-based alpha from image
     //   3. No shapes and threshold 0 → full-image solid collision
-    function createCollisionFromLayerMask(layerIndex) {
+    // `createOpts` passes creation options straight to addCollisionLayer —
+    // currently only `visible:false`, which Ctrl+Shift+V paste (32-file-drop)
+    // uses to get the wall without its on-canvas film. The 🧱 button passes
+    // nothing and keeps the film, since seeing the mask is the point there.
+    function createCollisionFromLayerMask(layerIndex, createOpts) {
         if (!window.layers) { console.warn('Layer system not available'); return; }
         var layer = null;
         for (var li = 0; li < window.layers.length; li++) {
@@ -329,16 +333,36 @@ class DepthEstimator {
         var threshold = typeof layer.threshold === 'number' ? layer.threshold : 0;
 
         if (hasShapes) {
-            _collisionFromShapes(layer);
+            _collisionFromShapes(layer, createOpts);
         } else if (threshold > 0) {
-            _collisionFromThreshold(layer);
+            _collisionFromThreshold(layer, createOpts);
         } else {
-            _collisionFromFullImage(layer);
+            _collisionFromFullImage(layer, createOpts);
         }
     }
 
+    // Fold caller options into the opts each mode builds for addCollisionLayer.
+    // `onCreated(index)` reports the slot the (asynchronously baked) collider
+    // landed in — Ctrl+Shift+V paste needs it to put the collider and its
+    // source image into a single undo entry.
+    // Modes 2 and 3 bake off an image decode, so the source layer can be
+    // deleted — or undone, which is the same thing — while the bake is in
+    // flight. Adding the collider anyway would strand a wall with nothing
+    // behind it, and a Ctrl+Shift+V collider is invisible, so it would be a
+    // wall the user cannot see OR find.
+    function _sourceGone(layer) {
+        return !!(window.layers && !window.layers.some(function (l) { return l.index === layer.index; }));
+    }
+
+    function _withCreateOpts(base, createOpts) {
+        if (!createOpts) return base;
+        if (createOpts.visible === false) base.visible = false;
+        if (typeof createOpts.onCreated === 'function') base.onCreated = createOpts.onCreated;
+        return base;
+    }
+
     // ── Mode 1: Rasterize mask shapes into collision data ──────────
-    function _collisionFromShapes(layer) {
+    function _collisionFromShapes(layer, createOpts) {
         var canvasEl = document.getElementById('canvas');
         var cw = canvasEl ? canvasEl.width : 1920;
         var ch = canvasEl ? canvasEl.height : 1080;
@@ -383,7 +407,8 @@ class DepthEstimator {
 
         var depth = { width: tw, height: th, data: collisionData };
         var thumbUrl = layer.originalData || layer.data;
-        addCollisionLayer(depth, thumbUrl, (layer.title || 'Layer') + ' Collision', _transformOf(layer));
+        addCollisionLayer(depth, thumbUrl, (layer.title || 'Layer') + ' Collision',
+            _withCreateOpts(_transformOf(layer), createOpts));
     }
 
     // Copy a source layer's transform so the generated collision layer
@@ -407,7 +432,7 @@ class DepthEstimator {
     // Binarizing here was the jagged-collider bug: a 0/255 cut leaves the AA
     // band nothing to smooth over, and re-thresholding binary data makes the
     // collision Threshold slider a no-op.
-    function _collisionFromThreshold(layer) {
+    function _collisionFromThreshold(layer, createOpts) {
         var imgSrc = layer.originalData || layer.data;
         if (!imgSrc) { console.warn('Layer has no image data'); return; }
 
@@ -437,8 +462,9 @@ class DepthEstimator {
                 collisionData[i] = (lum + 0.5) | 0;
             }
 
+            if (_sourceGone(layer)) return;
             var depth = { width: tw, height: th, data: collisionData };
-            var opts = _transformOf(layer);
+            var opts = _withCreateOpts(_transformOf(layer), createOpts);
             opts.threshold = Math.round((layer.threshold / 100) * 255);
             addCollisionLayer(depth, imgSrc, (layer.title || 'Layer') + ' Collision', opts);
         };
@@ -446,7 +472,7 @@ class DepthEstimator {
     }
 
     // ── Mode 3: Full image as solid collision ─────────────────────
-    function _collisionFromFullImage(layer) {
+    function _collisionFromFullImage(layer, createOpts) {
         var imgSrc = layer.originalData || layer.data;
         if (!imgSrc) { console.warn('Layer has no image data'); return; }
 
@@ -474,8 +500,10 @@ class DepthEstimator {
                 collisionData[i] = data[i * 4 + 3]; // alpha channel
             }
 
+            if (_sourceGone(layer)) return;
             var depth = { width: tw, height: th, data: collisionData };
-            addCollisionLayer(depth, imgSrc, (layer.title || 'Layer') + ' Collision', _transformOf(layer));
+            addCollisionLayer(depth, imgSrc, (layer.title || 'Layer') + ' Collision',
+                _withCreateOpts(_transformOf(layer), createOpts));
         };
         img.src = imgSrc;
     }
@@ -790,6 +818,7 @@ class DepthEstimator {
         updateObstacleFromLayers();
 
         console.log('🧱 Collision layer added:', name, 'index:', newIndex);
+        if (typeof opts.onCreated === 'function') opts.onCreated(newIndex, layer);
         return newIndex;
     }
 
