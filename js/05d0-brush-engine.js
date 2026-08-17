@@ -18,9 +18,18 @@
 // travelled matches the legacy one-dab-per-frame path at normal speeds —
 // fast strokes no longer under-inject, slow strokes are unchanged.
 //
+// Dye normalization (2026-08-17): each dab carries `k`, its share of the
+// reference dye (spacing / BRUSH_SPACING_REF, capped at 1). Dabs are impulses,
+// so dye-per-travel was flow/spacing — density and darkness were the same knob,
+// which is why the default spacing could never be lowered for smoothness. With
+// k, halving spacing doubles the dab count and halves each deposit: identical
+// stroke, finer sampling. 05j applies it via window.__normalizePaintFlow, which
+// is exact for additive AND Gate. At spacing == REF, k == 1 and nothing changes.
+//
 // Config (04a defaults; controls in the strip's Brush panel):
 //   BRUSH_STABILIZER   0..1   (0 = raw input, no lag)
 //   BRUSH_SPACING      0.001..1 dab spacing as a fraction of brush diameter
+//   BRUSH_SPACING_REF  dye-per-travel anchor for k (default 0.35)
 //   BRUSH_JITTER       0..1   per-dab scatter, fraction of brush diameter
 // ═══════════════════════════════════════════════════════════════════
 (function () {
@@ -86,13 +95,44 @@
         return Math.min(cap, 1 / s);
     }
 
+    // Spacing as the slider asks for it, in px, BEFORE the low-Time spread.
+    // 0.25px floor (was 1): the Spacing slider now reaches 0.1%, and the
+    // 1px floor made everything below ~1% indistinguishable — sub-pixel
+    // spacing is what dissolves the grainy dab-train look at slow speeds.
+    // The drain budget and MAX_QUEUE still bound the cost of a fast flick.
+    function baseSpacingPx() {
+        return Math.max(0.25, cfg('BRUSH_SPACING', 0.05) * brushDiameterPx());
+    }
+
     function spacingPx() {
-        // 0.25px floor (was 1): the Spacing slider now reaches 0.1%, and the
-        // 1px floor made everything below ~1% indistinguishable — sub-pixel
-        // spacing is what dissolves the grainy dab-train look at slow speeds.
-        // The drain cap (64 dabs/frame) and MAX_QUEUE still bound the cost
-        // of a fast flick.
-        return Math.max(0.25, cfg('BRUSH_SPACING', 0.35) * brushDiameterPx()) * timeCompensation();
+        return baseSpacingPx() * timeCompensation();
+    }
+
+    // Dye normalization on the DISTANCE axis (2026-08-17). Dabs are impulses, so
+    // dye-per-travel = flow / spacing — lowering spacing for smoothness used to
+    // darken the stroke in exact proportion, which is why the default was stuck
+    // at a value calibrated for a much smaller tip. Scaling each dab by
+    // spacing/REF holds dye-per-pixel-travelled constant, so Spacing becomes a
+    // texture control: 7x the dabs, 1/7 the dye each, same stroke.
+    //
+    // `used` is the spacing this dab was actually laid at, which folds in the
+    // 0.25px floor and the coalescing bump below — both are sampling artefacts
+    // and both must be compensated, or a fast segment would silently lighten.
+    //
+    // timeCompensation is deliberately NOT compensated: spreading spacing at low
+    // Time exists precisely to deposit LESS dye per simulated second (the flat
+    // over-saturated middle), so cancelling it here would undo that fix. Hence
+    // the ratio is taken against baseSpacingPx, not spacingPx.
+    //
+    // Clamped to 1: a dab can't deposit more than full flow, so spacings above
+    // REF thin the stroke exactly as they always did.
+    function dabFlowShare(used) {
+        var ref = cfg('BRUSH_SPACING_REF', 0.35) * brushDiameterPx();
+        var tc = timeCompensation();
+        if (!(ref > 0) || !(tc > 0)) return 1;
+        // used already carries floor x timeComp x coalescing bump; dividing the
+        // timeComp back out leaves exactly the artefacts we DO want to cancel.
+        return Math.min(1, used / (tc * ref));
     }
 
     // Emit dabs along the segment from the last processed sample toward
@@ -114,9 +154,19 @@
         // spacing so the dabs still span the whole segment: continuity is
         // preserved, density (not coverage) is what yields at speed. The
         // momentum rule self-adjusts (vx scales with the effective spacing).
-        var segBudget = Math.max(8, Math.min(64, MAX_QUEUE - queue.length));
+        // The drain budget is published per frame by 05j and scales with the
+        // frame's simulated step (BRUSH_DAB_BUDGET per simulated second), so a
+        // 33ms frame retires twice what a 16ms one does. It used to be a flat 64
+        // per frame, which made this bump — and therefore stroke density —
+        // frame-rate dependent at dense spacing.
+        var drainBudget = (typeof window.__dabDrainBudget === 'number' && window.__dabDrainBudget > 0)
+            ? window.__dabDrainBudget : 64;
+        var segBudget = Math.max(8, Math.min(drainBudget, MAX_QUEUE - queue.length));
         var expected = (dist + residual) / spacing;
         if (expected > segBudget) spacing = (dist + residual) / segBudget;
+        // Normalized AFTER the coalescing bump so a thinned-out fast segment
+        // deposits the same dye per pixel as an unthinned one.
+        var flowShare = dabFlowShare(spacing);
         var ux = dx / dist, uy = dy / dist;
         // Per-dab velocity: momentum-per-distance matches the legacy path
         // (see header). 10 = the legacy delta→velocity gain in 05d.
@@ -153,7 +203,10 @@
                     // Carrying real distance makes each dab's ramp value belong
                     // to its own position on the path, immune to drain order
                     // and to the coalescing spacing bump above.
-                    travel: strokeTravel + offset
+                    travel: strokeTravel + offset,
+                    // Share of the reference dye this dab carries — see
+                    // dabFlowShare. 05j hands it to window.__normalizePaintFlow.
+                    k: flowShare
                 });
             }
             emitted++;

@@ -3034,7 +3034,7 @@
         onMoveBtn.title = 'Dabs are laid down along pointer travel — paint flows only while moving (Spacing applies)';
         var constantBtn = document.createElement('button');
         constantBtn.type = 'button'; constantBtn.className = 'brush-mode-btn'; constantBtn.textContent = 'Constant';
-        constantBtn.title = 'Paint flows every frame while the pointer is held, even standing still — Spacing does not apply';
+        constantBtn.title = 'Paint flows at a steady rate while the pointer is held, even standing still — same on any monitor; Spacing does not apply';
         flowModeRow.appendChild(onMoveBtn); flowModeRow.appendChild(constantBtn);
         panel.appendChild(flowModeRow);
         var spacingGroup; // assigned below — setSplatMode can run before it exists
@@ -3060,6 +3060,27 @@
         // dabs at the default brush, which reads grainy at slow speeds — the
         // sub-1% band plus the walker's lowered floor (05d0) is the true
         // dense "ink line" range.
+        //
+        // One-time migration to the 2026-08-17 default. The old 0.35 was
+        // calibrated for a far smaller tip than this app's ~150px brush — it
+        // laid THREE deposits per second at 200px/s, which is the "stuttery at
+        // low speeds" report — but it is persisted per user, so a default change
+        // alone reaches nobody who has already opened the app (every user test
+        // participant included). Rewrite ONLY a saved value still sitting exactly
+        // on the old default: anyone who moved the slider chose their number and
+        // keeps it. Flagged so it can never run twice — if you deliberately set
+        // 0.35 after this, it stays 0.35. Must run before the pSlider below,
+        // which is what reads the saved value.
+        try {
+            var _sm = window.settingsManager;
+            if (_sm && !_sm.get('brush.spacingNormalizedV2')) {
+                var _savedSp = _sm.get('brush.brushSpacing');
+                if (typeof _savedSp === 'number' && Math.abs(_savedSp - 0.35) < 1e-6) {
+                    _sm.set('brush.brushSpacing', (window.config && window.config.BRUSH_SPACING) || 0.05);
+                }
+                _sm.set('brush.spacingNormalizedV2', true);
+            }
+        } catch (_) {}
         spacingGroup = pSlider('brushSpacing', 'Spacing', 0.001, 1, 0.001, 'BRUSH_SPACING', pctFine, 'spacing');
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
         (function restoreSplatMode() {
