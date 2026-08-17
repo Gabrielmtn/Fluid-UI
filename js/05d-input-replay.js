@@ -146,6 +146,36 @@
                 : [color[0] * flowMul, color[1] * flowMul, color[2] * flowMul];
         }
         window.__applyPaintFlow = applyPaintFlow;
+        // Sampling-density normalization (2026-08-17). Every dab is an IMPULSE —
+        // splat() takes no dt — so "how much paint" and "how many dabs" were the
+        // same number, and any change to dab density silently changed how dark a
+        // stroke came out. That coupling is why the deposition rate could never be
+        // raised for smoothness: constant flow was stuck at one dab per frame
+        // (making dye-per-second literally the frame rate) and On Move was stuck at
+        // a spacing calibrated for a much smaller tip.
+        //
+        // k = this dab's share of the reference sampling density (0..1]. Emit 1/k
+        // times as many dabs at the normalized flow and the total lands exactly
+        // where the reference would have — so density becomes a pure texture and
+        // smoothness control, and rate/spacing can be set for feel alone.
+        //
+        // Exact in BOTH flow models, which is the whole reason this is a shared
+        // helper rather than a multiply at each call site:
+        //   additive  result = base + shape*color      — linear, so k scales it.
+        //   Gate      result = mix(base, color, c)     — a CONVERGENCE: n dabs of
+        //             convergence c reach 1-(1-c)^n, so the share belongs in the
+        //             EXPONENT. c = 1-(1-f)^k satisfies 1-(1-c)^(1/k) = f exactly.
+        // (At f = 1 Gate is idempotent — one dab already lands the full colour —
+        // and the formula correctly returns 1 for any k.)
+        function normalizePaintFlow(flowMul, k) {
+            if (typeof k !== 'number' || !(k > 0) || k >= 1) return flowMul;
+            if (config.COLOR_GATE) {
+                var f = Math.max(0, Math.min(1, flowMul));
+                return 1 - Math.pow(1 - f, k);
+            }
+            return flowMul * k;
+        }
+        window.__normalizePaintFlow = normalizePaintFlow;
         // Flow at the press stamp: just the Flow slider (no pen pressure).
         function pressFlowMul() {
             return (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;

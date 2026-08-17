@@ -73,10 +73,42 @@
             if (window.cosOscillator) window.cosOscillator.tick(nowMs / 1000);
             // Physics timestep: Cap at 16ms to prevent instability at low FPS
             // Without this cap, 30 FPS = 33ms timestep = simulation explodes!
-            const rawDt = Math.min((nowMs - lastTime) / 1000, 0.016);
+            const wallDt = Math.min((nowMs - lastTime) / 1000, 1.0);
             lastTime = nowMs;
-            // Time scale: dilate physics without changing equations
+            // ── Sub-stepping (2026-08-17) ───────────────────────────────────
+            // That clamp buys stability by letting the SIM fall behind the wall
+            // clock: on a 30Hz panel the fluid advanced 16ms per 33ms frame, so
+            // it ran at 48% speed and updated 30x/s. That slow motion is most of
+            // what "janky on a low-fps monitor" actually is, and no amount of
+            // dab-timing work can touch it — the fluid itself is behind.
+            //
+            // N shorter steps cover the whole wall interval at N times the
+            // physics cost, so the GATE matters more than the mechanism: engage
+            // only while we are keeping up with the display — a vsync-limited
+            // low-refresh panel, which has headroom by definition — and never
+            // when we are at 30fps because the machine is struggling, where
+            // tripling physics is the last thing that would help.
+            //
+            // Reading measured fps against the panel makes this self-limiting:
+            // if sub-stepping itself costs us the refresh rate, the condition
+            // goes false on the very next frame and we fall back. The 20ms floor
+            // keeps 60Hz (16.7ms frames) on exactly one step, bit-for-bit as
+            // before — only genuinely sub-50Hz displays ever sub-step.
+            let subSteps = 1;
+            if (config.SIM_SUBSTEP && wallDt > 0.020) {
+                const _panelHz = cap > 0 ? Math.min(cap, displayHz) : displayHz;
+                const _st = window.__stats;
+                if (_panelHz > 0 && _st && _st.fps >= 0.85 * _panelHz) {
+                    subSteps = Math.max(1, Math.min(
+                        (config.SIM_SUBSTEP_MAX | 0) || 4,
+                        Math.ceil(wallDt / 0.016)));
+                }
+            }
+            const rawDt = Math.min(wallDt / subSteps, 0.016);
+            // Time scale: dilate physics without changing equations.
+            // dt is ONE STEP; frameDt is everything this frame simulates.
             const dt = rawDt * (window.timeScale || 1.0);
+            const frameDt = dt * subSteps;
             // ── The sim clock (2026-08-16) ──────────────────────────────────
             // dt is the ONE authority on how much simulated time this frame
             // advanced: it already carries both the 16ms stability clamp and
@@ -90,7 +122,9 @@
             // carried away, and the stroke saturates into a flat slab. That is
             // the over-saturated middle at low Time, and (via the 16ms clamp)
             // the same thing a sub-60fps frame does even at Time 1.
-            window.__simDtMs = dt * 1000;
+            // Everything this frame simulates, sub-steps included — this is what
+            // dye sources pace themselves against, not one step's worth.
+            window.__simDtMs = frameDt * 1000;
             // Wall-clock deposition credit, for the sources that deposit once
             // per FRAME instead of once per unit of travel (constant-flow
             // splat mode, the splat-out tail). Those are frame-rate deposition
@@ -106,7 +140,7 @@
             if (depositCredit) _depDebt = Math.min(_depDebt - 1.0, 1.0);
             window.__depositDebt = _depDebt;
             if (window.kAnimateRot && window.kSpinSpeed) {
-                window.kAngle = (window.kAngle || 0) + dt * window.kSpinSpeed * Math.PI / 180;
+                window.kAngle = (window.kAngle || 0) + frameDt * window.kSpinSpeed * Math.PI / 180;
             }
             const targetWidth = canvasWrapper.clientWidth;
             const targetHeight = canvasWrapper.clientHeight;
@@ -177,7 +211,16 @@
                 // then make the FIRST frame of the next click compute dx from
                 // the previous stroke's position (a phantom velocity kick).
                 // Clear it any frame the pointer is up.
-                if (!pointer.down) window.__contFlowLast = null;
+                if (!pointer.down) { window.__contFlowLast = null; window.__contFlowCredit = 0; }
+                // Dab budget for this frame, in dabs — BRUSH_DAB_BUDGET is per
+                // SIMULATED second, so a 33ms frame retires twice what a 16ms one
+                // does. The old flat 64/frame was itself a frame-rate dependence:
+                // at 30fps a fast dense stroke measured 54 of 64 used, ~10 dabs
+                // from silently thinning the line. 05d0 reads this for its
+                // coalescing bump so both ends agree.
+                const _dabBudget = Math.max(8, Math.ceil(
+                    ((typeof config.BRUSH_DAB_BUDGET === 'number' ? config.BRUSH_DAB_BUDGET : 4000)) * frameDt));
+                window.__dabDrainBudget = _dabBudget;
                 if (window.BrushEngine && (window.BrushEngine.isActive() || window.BrushEngine.pending()) && !isReplayActive) {
                     // D1 brush engine: drain this frame's dab train (distance-
                     // parameterized spacing + stabilizer + gap-fill, built in
@@ -186,60 +229,99 @@
                     // one dab per frame. Dab velocity already carries the
                     // momentum-per-distance rule, so total injected energy
                     // matches the legacy feel.
-                    let _dabs = window.BrushEngine.drain(64);
+                    let _dabs = window.BrushEngine.drain(_dabBudget);
                     // Constant-flow splat mode: while the pointer is held on the
-                    // fluid target, ignore the spacing walker's train and emit
-                    // exactly one dab per frame at the pointer — paint keeps
-                    // flowing while standing still (the classic hose feel).
-                    // dx/dy carry the real per-frame motion (×10, the legacy
-                    // delta→velocity gain) so moving strokes still inject
-                    // momentum; a stationary hold injects dye only, like the
-                    // press stamp. Sketch/mask targets keep the spaced train.
+                    // fluid target, ignore the spacing walker's train and run the
+                    // hose off a CLOCK — paint keeps flowing while standing still
+                    // (the classic hose feel). Sketch/mask targets keep the
+                    // spaced train.
                     if (config.BRUSH_CONTINUOUS && config.BRUSH_TARGET === 'fluid') {
-                        // depositCredit meters the hose on the sim clock: at
-                        // Time 1 every frame is credited (unchanged), at Time
-                        // 0.25 one frame in four. Skipped frames deliberately
-                        // leave __contFlowLast alone so the next credited dab's
-                        // dx/dy spans the whole skipped interval — the hose
-                        // still injects the same momentum per unit of travel,
-                        // it just stops injecting four times the dye per
-                        // simulated second.
+                        // ── The dab clock (2026-08-17) ──────────────────────
+                        // This used to emit exactly one dab per frame, which made
+                        // the deposition rate literally the frame rate: measured
+                        // 30 / 60 / 144 dabs per wall second on 30 / 60 / 144Hz.
+                        // Above 60fps nothing compensates that (the 16ms clamp is
+                        // not active up there), so a 144Hz panel laid 2.3x the dye
+                        // per SIMULATED second that a 60Hz one did — the same
+                        // gesture, a different painting, decided by the monitor.
+                        //
+                        // Now: accrue BRUSH_DAB_RATE dabs per simulated second and
+                        // emit whole ones, carrying the fraction. Each dab is
+                        // normalized to REF/RATE of the reference dye (05d's
+                        // __normalizePaintFlow), so the RATE buys smoothness and
+                        // the total deposit per second stays put. With REF = 1 dab
+                        // per 16ms — exactly what one-per-frame delivered at 60fps
+                        // — a 60Hz display is unchanged, 144Hz stops over-painting,
+                        // and a sub-stepped 30Hz panel now matches both.
+                        //
+                        // frameDt (not the wall delta) keeps the Time slider's
+                        // metering intact: a dab is an impulse, so pacing it on
+                        // anything but the sim clock deposits 1/timeScale times too
+                        // much dye into a field that advected 1/timeScale as far.
                         if (pointer.down && window.BrushEngine.isActive()) {
-                            // An uncredited frame emits nothing and, crucially,
-                            // does NOT touch __contFlowLast — so the next
-                            // credited dab's dx/dy spans the whole skipped
-                            // interval and the hose injects the same momentum
-                            // per unit of travel as before. Only the dye rate
-                            // is metered. (The release branch below still owns
-                            // clearing __contFlowLast; doing it here would zero
-                            // the carried motion every skipped frame.)
                             _dabs = [];
-                            if (depositCredit) {
+                            const _rate = (typeof config.BRUSH_DAB_RATE === 'number' && config.BRUSH_DAB_RATE > 0)
+                                ? config.BRUSH_DAB_RATE : 125;
+                            const _rateRef = (typeof config.BRUSH_DAB_RATE_REF === 'number' && config.BRUSH_DAB_RATE_REF > 0)
+                                ? config.BRUSH_DAB_RATE_REF : 62.5;
+                            // Share of the reference dye each dab carries. Clamped
+                            // to 1 so a rate BELOW the reference can never boost a
+                            // dab past full flow — it just deposits less, as it
+                            // should.
+                            const _k = Math.min(1, _rateRef / _rate);
+                            let _credit = (window.__contFlowCredit || 0) + _rate * frameDt;
+                            let _n = Math.floor(_credit);
+                            if (_n > _dabBudget) _n = _dabBudget;   // spike guard
+                            window.__contFlowCredit = _credit - _n;
+                            if (_n > 0) {
                                 const cx = pointer.x, cy = pointer.y;
-                                let cdx = 0, cdy = 0;
-                                if (window.__contFlowLast) {
-                                    cdx = (cx - window.__contFlowLast.x) * 10;
-                                    cdy = (cy - window.__contFlowLast.y) * 10;
+                                const last = window.__contFlowLast;
+                                const px = last ? last.x : cx, py = last ? last.y : cy;
+                                // Momentum per unit of travel is preserved: the
+                                // frame's whole delta is split across the n dabs,
+                                // so n x (delta/n) is the single dab's old kick.
+                                const cdx = (cx - px) * 10 / _n, cdy = (cy - py) * 10 / _n;
+                                // Lay them ALONG the path travelled this frame
+                                // rather than stacking every one at the live
+                                // pointer. At 30fps that is the difference between
+                                // a bead every 40.8px and a continuous line — the
+                                // single-point version simply could not draw the
+                                // interior of a fast low-fps segment.
+                                const _interp = config.BRUSH_DAB_INTERP !== false;
+                                for (let ci = 1; ci <= _n; ci++) {
+                                    const t = _interp ? (ci / _n) : 1;
+                                    _dabs.push({
+                                        x: px + (cx - px) * t,
+                                        y: py + (cy - py) * t,
+                                        dx: cdx, dy: cdy, p: 1, k: _k
+                                    });
                                 }
                                 window.__contFlowLast = { x: cx, y: cy };
-                                _dabs = [{ x: cx, y: cy, dx: cdx, dy: cdy, p: 1 }];
                                 // Recording taps raw pointer events, which don't fire
                                 // while stationary — capture the hold here. Frames
                                 // that moved ≥0.1px were already recorded by the
                                 // pointermove handler (same gate as 05d's).
                                 if (recEnabled && typeof recRecordInteraction === 'function'
-                                    && (cdx * cdx + cdy * cdy) < 1.0) {
+                                    && ((cx - px) * (cx - px) + (cy - py) * (cy - py)) < 0.01) {
                                     recRecordInteraction(cx, cy, 0, 0, pointer.color);
                                 }
                             }
+                            // A frame that emits nothing deliberately leaves
+                            // __contFlowLast alone, so the next dab's dx/dy spans
+                            // the whole skipped interval and momentum per unit of
+                            // travel is unchanged. (The release branch below owns
+                            // clearing it; doing it here would zero the carried
+                            // motion on every fractional frame.)
                         } else {
                             // Released (or between strokes): drop any walker
                             // leftovers so no spaced tail paints after the hold.
                             window.__contFlowLast = null;
+                            window.__contFlowCredit = 0;
                             _dabs = [];
                         }
                     } else {
                         window.__contFlowLast = null;
+                        window.__contFlowCredit = 0;
                         // Fill in the RAMP REGION. The spacing walker lays a dab
                         // every ~0.35 brush diameters, which at default size is
                         // ~73 canvas px — so the whole splat-in ramp is spanned by
@@ -335,7 +417,18 @@
                         // radius-independent, so a size-only ramp still stamped
                         // full-strength colour on the first dab.
                         const inFlow = window.__splatInFlowMul ? window.__splatInFlowMul() : 1;
-                        const col = window.__applyPaintFlow(pointer.color, flowMul * inFlow);
+                        // Sampling-density normalization (2026-08-17). d.k is this
+                        // dab's share of the reference dye — spacing/REF from the
+                        // walker, RATE_REF/RATE from the hose. Applied to the whole
+                        // flow product so the ramp rides it too, and applied HERE
+                        // (not at emit) because only this site knows whether Gate
+                        // or additive is live, and the exact compensation differs:
+                        // additive is linear, Gate is a convergence. Dabs with no
+                        // k (tail, ramp top-up, replay) pass through untouched.
+                        const col = window.__applyPaintFlow(pointer.color,
+                            window.__normalizePaintFlow
+                                ? window.__normalizePaintFlow(flowMul * inFlow, d.k)
+                                : flowMul * inFlow);
                         // Publish the true painted radius so recording captures the
                         // actual (splat-in ramped) brush size, not the base.
                         window.__lastPaintRadius = config.SPLAT_RADIUS * inMult;
@@ -458,6 +551,26 @@
                 if (recEnabled) {
                     recUpdatePlayback();
                 }
+                // ── Physics sub-step loop (2026-08-17) ──────────────────────
+                // subSteps is 1 on every display at 50Hz and above, so this is a
+                // plain wrapper there — same passes, same order, same dt, and the
+                // block below is untouched. On a genuinely low-refresh panel it
+                // runs the physics N times at dt = wallDt/N so simulated time
+                // tracks the wall clock instead of falling to 48% of it.
+                //
+                // Safe as a bare loop because nothing declared inside the block is
+                // read after it (verified) and every accumulator it touches —
+                // dyeDecayAccum, velDecayAccum, wetDryAccum — is a debt in
+                // SECONDS that already sums per call, so N calls at dt each land
+                // exactly where one call at N*dt would.
+                //
+                // Dabs are deposited before this loop, not interleaved between its
+                // steps, so a low-fps frame still lays its dab train into one
+                // instant of fluid rather than advecting between dabs. That is a
+                // second-order difference next to the sim running at half speed,
+                // and interleaving would mean threading the splat path through
+                // here — worth doing only if it still reads wrong afterwards.
+                for (let _ss = 0; _ss < subSteps; _ss++) {
                 // Disable blend for physics passes (pure overwrite, no alpha needed)
                 gl.disable(gl.BLEND);
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
@@ -806,10 +919,20 @@
                     gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                     gl.activeTexture(gl.TEXTURE1);
                     gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
-                    if (obsActive) {
-                        gl.activeTexture(gl.TEXTURE2);
-                        gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-                    }
+                    // Bind unit 2 UNCONDITIONALLY — the third time this file has
+                    // learned this lesson (see the two notes below the mac block).
+                    // The correction pass leaves `sharpened` on unit 2, and with
+                    // no obstacle this pass used to inherit it while RENDERING
+                    // INTO sharpened.fbo: a texture bound as both sampler and
+                    // render target, which is a feedback loop (INVALID_OPERATION,
+                    // undefined output). Post-FX happened to overwrite unit 2
+                    // between frames, which is the only reason it stayed hidden —
+                    // sub-stepping runs this block twice with nothing in between
+                    // and exposed it immediately. hasObstacle=0 means the shader
+                    // never samples it; WebGL still requires something complete
+                    // and non-aliasing to be there at draw time.
+                    gl.activeTexture(gl.TEXTURE2);
+                    gl.bindTexture(gl.TEXTURE_2D, obsActive ? obstacle.texture : velocity.read.texture);
                     blit(sharpened.fbo); // φ̂ⁿ⁺¹ (forward estimate)
                     macCorrectProg.bind();
                     gl.uniform2f(macCorrectProg.uniforms.texelSize, 1.0, 1.0);
@@ -829,10 +952,9 @@
                     gl.uniform1f(macCorrectProg.uniforms.deband, config.DEBAND || 0.0);
                     gl.activeTexture(gl.TEXTURE2);
                     gl.bindTexture(gl.TEXTURE_2D, sharpened.texture);
-                    if (obsActive) {
-                        gl.activeTexture(gl.TEXTURE3);
-                        gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-                    }
+                    // Unconditional for the same reason as the forward pass above.
+                    gl.activeTexture(gl.TEXTURE3);
+                    gl.bindTexture(gl.TEXTURE_2D, obsActive ? obstacle.texture : velocity.read.texture);
                     blit(detailed.fbo); // corrected+limited φⁿ⁺¹ (pre-decay)
                 }
                 // Bind UNCONDITIONALLY. The plain (macMode 0) path used to rely
@@ -958,6 +1080,7 @@
                     blit(density.write.fbo);
                     density.swap();
                 }
+                } // ── end physics sub-step loop ──
             }
             // Post-FX passes (sharpen, micro-detail, lighting, light shift,
             // glow) are full-quad rewrites into persistent FBOs — they must

@@ -588,9 +588,46 @@
             BRUSH_STABILIZER: 0,      // D1 stroke stabilizer (weighted lag): 0 = raw input,
                                       // 1 = heavy Krita-style smoothing. Brush section slider.
 
-            BRUSH_SPACING: 0.35,      // D1 dab spacing as a fraction of brush diameter —
+            BRUSH_SPACING: 0.05,      // D1 dab spacing as a fraction of brush diameter —
                                       // distance-parameterized stroke density (speed-
-                                      // independent; kills the 1-dab-per-frame gaps)
+                                      // independent; kills the 1-dab-per-frame gaps).
+                                      // 0.35 → 0.05 (2026-08-17): 0.35 was calibrated for a
+                                      // far smaller tip than this app's ~150px default brush,
+                                      // so a 200px/s stroke laid THREE deposits per second and
+                                      // read as a chain of blobs at any frame rate. Safe to
+                                      // lower only because dye is now normalized per unit of
+                                      // travel (BRUSH_SPACING_REF), so density is a texture
+                                      // control and no longer changes how dark a stroke is.
+            BRUSH_SPACING_REF: 0.35,  // Dye-per-travel anchor. Each dab's flow is scaled by
+                                      // spacing/REF, so a stroke deposits the same dye per
+                                      // pixel travelled at ANY spacing. At spacing == REF the
+                                      // factor is exactly 1 — the pre-2026-08-17 behaviour,
+                                      // bit-for-bit. Never boosts above 1 (a dab can't deposit
+                                      // more than full flow), so spacings above REF still
+                                      // thin out the way they always did.
+            BRUSH_DAB_RATE: 125,      // Constant-flow deposition rate, dabs per SIMULATED
+                                      // second (05j). Replaces "one dab per frame", which made
+                                      // the deposition rate literally the frame rate: measured
+                                      // 30/60/144 dabs per wall second on 30/60/144Hz, i.e. a
+                                      // 144Hz panel laid 2.3x the dye per simulated second that
+                                      // a 60Hz one did. A fixed rate + per-dab normalization
+                                      // makes the stroke identical on every display.
+            BRUSH_DAB_RATE_REF: 62.5, // Dye-per-second anchor = 1 dab per 16ms of sim time,
+                                      // which is exactly what one-dab-per-frame delivered at
+                                      // 60fps (measured 62.5 dabs/sim-sec at both 30 and 60fps,
+                                      // because the 16ms dt clamp is what set it). Keep this
+                                      // tied to the clamp: 1/0.016. Per-dab flow is scaled by
+                                      // REF/RATE, so raising BRUSH_DAB_RATE buys smoothness at
+                                      // zero cost to how dark the stroke is.
+            BRUSH_DAB_BUDGET: 4000,   // Max dabs per SIMULATED second, for both the engine
+                                      // drain and the constant-flow emitter. Was a flat 64 per
+                                      // FRAME, which is itself a frame-rate dependence: at
+                                      // 30fps a fast dense stroke measured 54 of those 64 used,
+                                      // so it was ~10 dabs from silently thinning. 4000/s is
+                                      // the same 64 at a 16ms step and scales with the step.
+            BRUSH_DAB_INTERP: true,   // Constant flow places its dabs along the path travelled
+                                      // this frame instead of stacking them all at the live
+                                      // pointer. false restores the single-point behaviour.
             BRUSH_TIME_COMP: 4,       // Sim-clock deposition compensation cap (05d0). A dab is
                                       // an impulse, so a distance-spaced walker deposits
                                       // 1/timeScale times as much dye per SIMULATED second at
@@ -608,10 +645,27 @@
                                       // the timeline's seconds are simulated seconds.
             BRUSH_CONTINUOUS: false,  // Splat mode: false = dabs spaced along travel
                                       // ("on move", the classic feel); true = constant
-                                      // flow — one dab per frame while the pointer is
-                                      // held, even standing still (05j synthesizes the
-                                      // dab; the spacing walker is bypassed, fluid
-                                      // target only). Brush panel segmented row.
+                                      // flow — dye keeps flowing while the pointer is
+                                      // held, even standing still, at BRUSH_DAB_RATE per
+                                      // simulated second (05j synthesizes the dabs; the
+                                      // spacing walker is bypassed, fluid target only).
+                                      // Brush panel segmented row.
+
+            SIM_SUBSTEP: true,        // Run several physics steps per frame when the display
+                                      // refresh is below ~50Hz. The dt clamp below caps a
+                                      // step at 16ms for stability, so on a 30Hz panel the
+                                      // fluid only advanced 16ms per 33ms frame — it ran at
+                                      // 48% speed, which is most of what "janky on a low-fps
+                                      // monitor" actually is. Sub-stepping restores real-time
+                                      // evolution at N times the physics cost, so it engages
+                                      // ONLY when the frame rate is keeping up with the panel
+                                      // (a vsync-limited 30Hz display with headroom), never
+                                      // when we are at 30fps because the machine is
+                                      // struggling. Self-disengaging: if sub-stepping itself
+                                      // costs us the refresh rate, the gate closes next frame.
+            SIM_SUBSTEP_MAX: 4,       // Ceiling on steps per frame. Bounds the worst case on a
+                                      // very long frame (tab return, hitch) — below ~15fps the
+                                      // sim goes back to running slow rather than spiralling.
 
             BRUSH_TARGET: 'fluid',    // D2/D3 stroke routing: 'fluid' (splats), 'sketch'
                                       // (the active raster paint layer — normal-control
@@ -652,6 +706,26 @@
                                       // arm — this is what stops it whipping. 0 disables.
             SYM_RAKE_SPACING: 1.0,    // 'rake' bristle gap in brush diameters, so the rake
                                       // opens and closes with the Size fader
+
+            // ── Perceptual fader curves (Density, Time) ────────────────────
+            // These shape the VISIBLE Density and Time faders only. The
+            // underlying values, their ids, ranges and stored form are
+            // untouched — see the curve block in 20-mixer-layout.js. Dial any
+            // of these from the console, then call refreshFaderCurves() to
+            // re-seat the thumbs.
+            DENSITY_FADER_TAU_MIN: 0.12,  // dye half-life in seconds at the bottom of the
+                                          // Density fader. Stays clear of the < 0.88
+                                          // instant-wipe zone, which is deliberately out
+                                          // of the fader's reach (it maps to d ≈ 0.908).
+            DENSITY_FADER_TAU_MAX: 60,    // half-life at the top of the log-spaced region,
+                                          // just below the 1.0 detent.
+            DENSITY_FADER_HOLD_A: 0.86,   // fader fraction where the "never fades" detent
+            DENSITY_FADER_HOLD_B: 0.92,   // starts and ends — it parks on EXACTLY 1.0, the
+                                          // value people want most and could never reliably
+                                          // land on. Above HOLD_B is the growth zone (>1).
+            TIME_FADER_HOLD_A: 0.70,      // same idea for Time: everything below 1× gets
+            TIME_FADER_HOLD_B: 0.76,      // 70% of the travel instead of the ~15% a linear
+                                          // 0.01–3 scale gave it, with a detent on 1×.
 
             SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
                                       // Painterly sub-grid wisps on moving paint; dies with

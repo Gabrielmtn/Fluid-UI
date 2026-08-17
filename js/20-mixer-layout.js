@@ -610,6 +610,183 @@
         'Color': 'Current brush color'
     };
 
+    // ── Perceptual fader curves (Density, Time) ──────────────────────────
+    // Both faders were linear in a number whose PERCEIVED effect is not.
+    //
+    // Density is the per-frame decay base d, applied as pow(d, dt*60). What
+    // you see is the dye's half-life, and that is hyperbolic in d:
+    //
+    //     d           0.85    0.95     0.99    0.993    0.999
+    //     half-life   71ms    225ms    1.15s   1.6s     11.5s
+    //
+    // The bottom two thirds of the travel all read as "vanishes instantly",
+    // everything usable is in the top ~18%, and all eight built-in presets
+    // sit in the top ~7% (the 0.993 default lands at 92% of travel). Time is
+    // a plain dt multiplier over 0.01–3, so everything below 1× — the half
+    // people actually reach for — gets ~15% of the fader.
+    //
+    // The fix leaves the canonical <input> completely alone: same id, same
+    // min/max/step, same stored value, same events, same registry entry. It
+    // is hidden inside the channel and a visible proxy — deliberately NOT
+    // registered in ParamRegistry, because the persistence format IS the
+    // canonical element's value — maps fader position through the curve and
+    // drives it with a dispatched 'input'. Presets, the multiplayer mirror,
+    // COS, undo and save/load all still read the same element and cannot
+    // tell the difference.
+    //
+    // Reflection runs one way only, FROM the canonical, via its 'input' plus
+    // a poll: Ctrl+scroll and the COS oscillator both write .value with no
+    // event at all, and if the proxy ever pushed back the two would fight.
+
+    function curveCfg(key, fallback) {
+        const v = (window.config || {})[key];
+        return (typeof v === 'number' && isFinite(v)) ? v : fallback;
+    }
+    // The sim decays dye by pow(d, dt*60) per step, so a half-life of t
+    // seconds is d = 0.5^(1/(60t)). Only meaningful below 1.
+    function baseOfHalfLife(t) { return Math.exp(Math.log(0.5) / (60 * t)); }
+    function halfLifeOfBase(d) { return Math.log(0.5) / (60 * Math.log(d)); }
+
+    // Each curve maps fader fraction p ∈ [0,1] to the canonical value and
+    // back. Ranges come from the element so the curve can never drift from
+    // the DOM/registry pair the way a copied constant would.
+    const FADER_CURVES = {
+        densityDissipation: {
+            toCanonical: function (p, el) {
+                const a = curveCfg('DENSITY_FADER_HOLD_A', 0.86);
+                const b = curveCfg('DENSITY_FADER_HOLD_B', 0.92);
+                const lo = curveCfg('DENSITY_FADER_TAU_MIN', 0.12);
+                const hi = curveCfg('DENSITY_FADER_TAU_MAX', 60);
+                const max = parseFloat(el.max);
+                if (p >= b) return 1 + (p - b) / (1 - b) * (max - 1);
+                if (p >= a) return 1;                       // the detent
+                return baseOfHalfLife(lo * Math.pow(hi / lo, p / a));
+            },
+            fromCanonical: function (v, el) {
+                const a = curveCfg('DENSITY_FADER_HOLD_A', 0.86);
+                const b = curveCfg('DENSITY_FADER_HOLD_B', 0.92);
+                const lo = curveCfg('DENSITY_FADER_TAU_MIN', 0.12);
+                const hi = curveCfg('DENSITY_FADER_TAU_MAX', 60);
+                const max = parseFloat(el.max);
+                if (v >= 1) return (v <= 1 || max <= 1) ? a : b + (v - 1) / (max - 1) * (1 - b);
+                const tau = Math.min(hi, Math.max(lo, halfLifeOfBase(v)));
+                return a * Math.log(tau / lo) / Math.log(hi / lo);
+            }
+        },
+        timeScale: {
+            toCanonical: function (p, el) {
+                const a = curveCfg('TIME_FADER_HOLD_A', 0.70);
+                const b = curveCfg('TIME_FADER_HOLD_B', 0.76);
+                const lo = parseFloat(el.min), max = parseFloat(el.max);
+                if (p >= b) return Math.pow(max, (p - b) / (1 - b));
+                if (p >= a) return 1;                       // the detent
+                return lo * Math.pow(1 / lo, p / a);
+            },
+            fromCanonical: function (v, el) {
+                const a = curveCfg('TIME_FADER_HOLD_A', 0.70);
+                const b = curveCfg('TIME_FADER_HOLD_B', 0.76);
+                const lo = parseFloat(el.min), max = parseFloat(el.max);
+                if (v >= 1) return (v <= 1 || max <= 1) ? a : b + Math.log(v) / Math.log(max) * (1 - b);
+                return a * Math.log(Math.max(lo, v) / lo) / Math.log(1 / lo);
+            }
+        }
+    };
+
+    // Snap to the canonical's own grid, so the value the proxy computes is
+    // byte-identical to the one the input would have stored anyway — the
+    // round trip below depends on it.
+    function quantizeTo(el, v) {
+        const min = parseFloat(el.min), max = parseFloat(el.max);
+        const step = parseFloat(el.step) || 0.0001;
+        const snapped = min + Math.round((v - min) / step) * step;
+        const dec = (String(el.step).split('.')[1] || '').length;
+        return Math.min(max, Math.max(min, parseFloat(snapped.toFixed(dec))));
+    }
+
+    const _faderProxies = [];
+
+    function attachPerceptualProxy(fader, canonical) {
+        const curve = FADER_CURVES[canonical.id];
+        if (!curve) return null;
+
+        // The canonical keeps living inside .ch-fader — COS finds its host
+        // with slider.closest('.ch-fader') and would lose its button if the
+        // element moved elsewhere. Hiding it via a wrapper (rather than the
+        // input itself) also hides the printed scale the slider updater
+        // wraps around it, whenever it gets around to doing that.
+        const vault = document.createElement('div');
+        vault.className = 'ch-canonical';
+        vault.style.display = 'none';
+        vault.appendChild(canonical);
+        fader.appendChild(vault);
+
+        const proxy = document.createElement('input');
+        proxy.type = 'range';
+        proxy.min = 0; proxy.max = 1; proxy.step = 0.001;
+        proxy.id = canonical.id + 'Perceptual';
+        proxy.className = 'ch-perceptual';
+        // A 0–1 scale would print numbers that mean nothing; the channel's
+        // value readout already shows the real figure.
+        proxy.dataset.noScale = '1';
+        proxy.setAttribute('aria-label', canonical.id + ' (perceptual)');
+        fader.appendChild(proxy);
+
+        let selfWrite = false;
+        proxy.addEventListener('input', function () {
+            // Same gate the canonical sim sliders use: a multiplayer host
+            // holding the settings lock owns these, and the proxy is a
+            // second door into the same value.
+            if (window.__mpSettingsLocked && !window.__mpApplyingRemote) {
+                reflect();
+                return;
+            }
+            const v = quantizeTo(canonical, curve.toCanonical(parseFloat(proxy.value), canonical));
+            selfWrite = true;
+            canonical.value = v;
+            canonical.style.setProperty('--val', v);
+            canonical.dispatchEvent(new Event('input', { bubbles: true }));
+            selfWrite = false;
+        });
+
+        // Move the thumb to wherever the canonical actually is — but only if
+        // it is not already showing that value. Without the tolerance test a
+        // drag inside the detent (many fader positions, one canonical value)
+        // would be yanked back to the detent's edge under the finger.
+        function reflect() {
+            if (selfWrite) return;
+            const v = parseFloat(canonical.value);
+            if (!isFinite(v)) return;
+            const shown = quantizeTo(canonical, curve.toCanonical(parseFloat(proxy.value), canonical));
+            const step = parseFloat(canonical.step) || 0.0001;
+            if (Math.abs(shown - v) <= step * 0.5) return;
+            const p = Math.min(1, Math.max(0, curve.fromCanonical(v, canonical)));
+            proxy.value = p;
+            proxy.style.setProperty('--val', p);
+        }
+
+        canonical.addEventListener('input', reflect);
+        canonical.addEventListener('change', reflect);
+        reflect();
+        _faderProxies.push(reflect);
+        return proxy;
+    }
+
+    // Ctrl+scroll and the COS oscillator write canonical.value directly with
+    // no event, so an event listener alone would leave the thumb stale. One
+    // shared low-rate poll covers every proxy.
+    function startPerceptualFaderPoll() {
+        if (window.__perceptualFaderPoll) return;
+        window.__perceptualFaderPoll = setInterval(function () {
+            for (let i = 0; i < _faderProxies.length; i++) _faderProxies[i]();
+        }, 250);
+    }
+
+    // Console hook: re-seat every thumb after dialling the curve constants.
+    window.refreshFaderCurves = function () {
+        for (let i = 0; i < _faderProxies.length; i++) _faderProxies[i]();
+        return _faderProxies.length + ' fader(s) re-seated';
+    };
+
     function faderChannel(label, accent, sliderId, existingValueId, newValueId) {
         const ch = document.createElement('div');
         ch.className = 'mixer-channel';
@@ -659,7 +836,14 @@
         if (slider) {
             const fader = document.createElement('div');
             fader.className = 'ch-fader';
-            fader.appendChild(slider);
+            if (FADER_CURVES[sliderId]) {
+                // Hides the canonical inside the channel and mounts the
+                // perceptual proxy in its place.
+                attachPerceptualProxy(fader, slider);
+                startPerceptualFaderPoll();
+            } else {
+                fader.appendChild(slider);
+            }
             ch.appendChild(fader);
         }
 
@@ -2850,7 +3034,7 @@
         onMoveBtn.title = 'Dabs are laid down along pointer travel — paint flows only while moving (Spacing applies)';
         var constantBtn = document.createElement('button');
         constantBtn.type = 'button'; constantBtn.className = 'brush-mode-btn'; constantBtn.textContent = 'Constant';
-        constantBtn.title = 'Paint flows every frame while the pointer is held, even standing still — Spacing does not apply';
+        constantBtn.title = 'Paint flows at a steady rate while the pointer is held, even standing still — same on any monitor; Spacing does not apply';
         flowModeRow.appendChild(onMoveBtn); flowModeRow.appendChild(constantBtn);
         panel.appendChild(flowModeRow);
         var spacingGroup; // assigned below — setSplatMode can run before it exists
@@ -2876,6 +3060,27 @@
         // dabs at the default brush, which reads grainy at slow speeds — the
         // sub-1% band plus the walker's lowered floor (05d0) is the true
         // dense "ink line" range.
+        //
+        // One-time migration to the 2026-08-17 default. The old 0.35 was
+        // calibrated for a far smaller tip than this app's ~150px brush — it
+        // laid THREE deposits per second at 200px/s, which is the "stuttery at
+        // low speeds" report — but it is persisted per user, so a default change
+        // alone reaches nobody who has already opened the app (every user test
+        // participant included). Rewrite ONLY a saved value still sitting exactly
+        // on the old default: anyone who moved the slider chose their number and
+        // keeps it. Flagged so it can never run twice — if you deliberately set
+        // 0.35 after this, it stays 0.35. Must run before the pSlider below,
+        // which is what reads the saved value.
+        try {
+            var _sm = window.settingsManager;
+            if (_sm && !_sm.get('brush.spacingNormalizedV2')) {
+                var _savedSp = _sm.get('brush.brushSpacing');
+                if (typeof _savedSp === 'number' && Math.abs(_savedSp - 0.35) < 1e-6) {
+                    _sm.set('brush.brushSpacing', (window.config && window.config.BRUSH_SPACING) || 0.05);
+                }
+                _sm.set('brush.spacingNormalizedV2', true);
+            }
+        } catch (_) {}
         spacingGroup = pSlider('brushSpacing', 'Spacing', 0.001, 1, 0.001, 'BRUSH_SPACING', pctFine, 'spacing');
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
         (function restoreSplatMode() {

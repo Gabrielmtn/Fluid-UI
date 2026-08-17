@@ -446,19 +446,49 @@
     font-weight: 600;
 }
 
-/* Drop zone polish */
+/* Drop zone polish — the two reorder targets are permanent fixtures, but
+   they only mean anything mid-drag. At 32px + 6px each they were spending
+   76px of a 340px list on nothing, which is most of why a single layer row
+   (277px) could not fit. Idle they are a thin dashed hint; a drag brings
+   them back to full size, and the active target still grows to 50px.
+   No transitions here — they'd composite over the WebGL canvas in
+   Electron (see the note near styles.css:1516). */
 #sidebar-right .drop-zone {
-    height: 32px;
+    height: 8px;
     border-radius: 6px;
-    font-size: calc(9px * var(--ui-scale));
-    margin-bottom: 6px;
+    font-size: 0;
+    margin-bottom: 4px;
     border-width: 1px;
     border-style: dashed;
+    overflow: hidden;
+}
+#sidebar-right #layersPanel.layers-dragging .drop-zone {
+    height: 32px;
+    font-size: calc(9px * var(--ui-scale));
+    margin-bottom: 6px;
+}
+#sidebar-right #layersPanel.layers-dragging .drop-zone.drag-over {
+    height: 50px;
 }
 
-/* Layers panel scrollable area */
+/* Layers panel scrollable area.
+   The flat 340px cap left less than one expanded layer visible: 76px of it
+   went to the drop zones and a captured-layer row measures ~312px rendered.
+   Grow with the window instead.
+
+   The division by --ui-scale is load-bearing, not decoration. #sidebar-right
+   carries `zoom: var(--ui-scale)` (see above), and inside a zoomed subtree
+   100vh still resolves to the FULL viewport in layout px — which then renders
+   --ui-scale times larger. A plain `calc(100vh - Npx)` therefore overshoots
+   the screen by the scale factor (measured: 22px past the viewport bottom at
+   scale 1.12). Dividing puts the subtraction back in real screen pixels, so
+   480px is what it looks like: the chrome above the list plus a tail that
+   keeps the sections below discoverable.
+
+   max() keeps the old 340px on short windows (under ~860px tall), so
+   laptops and mobile are untouched. */
 #sidebar-right .layers-panel {
-    max-height: 340px;
+    max-height: max(340px, calc((100vh - 480px) / var(--ui-scale, 1)));
     margin-top: 4px;
     padding-right: 2px;
 }
