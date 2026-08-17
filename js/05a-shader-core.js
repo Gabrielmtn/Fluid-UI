@@ -441,52 +441,6 @@
                     color.rgb += spec * warmKey * (displayShading * shadeGloss) * shadeFade;
                     color.rgb = max(color.rgb, vec3(0.0));
                 }
-                // Glow (HDR bloom): add the mip-chain halo of the overbright
-                // dye ON TOP of the tone-mapped image — additive light, so hot
-                // cores bleed outward instead of just sitting bright. Sampled
-                // at both raw and kaleido UVs so the halo follows the warped
-                // image; gamma-lifted (1/2.2) so the faint outer halo stays
-                // visible — the classic wide-soft falloff. Runs BEFORE Light
-                // Shift (which recolors the final displayed pixel) and before
-                // raster compositing (sketch layers never glow).
-                if (glowEnabled > 0.5) {
-                    vec3 glowC = mix(texture(uGlow, vUv).rgb, texture(uGlow, kUv).rgb,
-                                     doK ? clamp(kBlend, 0.0, 1.0) : 0.0);
-                    glowC = pow(max(glowC, vec3(0.0)), vec3(1.0 / 2.2));
-                    // Glow and Light Shift aim at the same pixels: overbright
-                    // dye. The halo carries that dye's own near-white hue, so
-                    // summing it raw both washed the recolor out (the mix below
-                    // starts from a base near 2.0 and clamps back to white) and
-                    // painted original white around the region LS had just
-                    // recolored. The glow texture holds only over-threshold
-                    // energy, and LS exists to say what colour that energy
-                    // takes -- so tint the halo the same way, luminance
-                    // preserved, scaled by the user's Intensity. Untouched when
-                    // Light Shift is off.
-                    if (lightShiftEnabled > 0.5) {
-                        float glum = dot(glowC, vec3(0.299, 0.587, 0.114));
-                        glowC = mix(glowC, lightShiftColor * glum,
-                                    clamp(lightShiftIntensity, 0.0, 1.0));
-                    }
-                    vec3 gsum = color.rgb + glowC;
-                    if (gateWhite > 0.0) {
-                        // Gate on: the ceiling's whole promise is "never blow
-                        // out to white", so the halo must not undo it. Soft-
-                        // limit the SUM hue-preservingly: compress the max
-                        // channel into a shoulder→1.0 asymptote with channel
-                        // RATIOS (the picked colour's chroma) intact — hot
-                        // cores read lit-from-within at full vividness, never
-                        // clipped white. Gate off keeps the raw additive
-                        // white-out: that IS the classic luminous look.
-                        float gm = max(gsum.r, max(gsum.g, gsum.b));
-                        float gsh = 0.85;
-                        if (gm > gsh) {
-                            float gt = (gm - gsh) / (1.0 - gsh);
-                            gsum *= (gsh + (1.0 - gsh) * gt / (1.0 + gt)) / gm;
-                        }
-                    }
-                    color.rgb = gsum;
-                }
                 // â”€â”€ Light Shift â”€â”€ recolor overblown/white areas of the fluid.
                 // Keyed on the DISPLAYED color: brightness weighted by whiteness
                 // (desaturated bright = the real target), so pure white always
@@ -539,6 +493,59 @@
                         }
                         color.rgb = clamp(res, 0.0, 1.0);
                     }
+                }
+                // Glow (HDR bloom): add the mip-chain halo of the overbright dye
+                // ON TOP of the tone-mapped image — additive light, so hot cores
+                // bleed outward instead of just sitting bright. Sampled at both
+                // raw and kaleido UVs so the halo follows the warped image;
+                // gamma-lifted (1/2.2) so the faint outer halo stays visible —
+                // the classic wide-soft falloff. Still before raster compositing
+                // (sketch layers never glow).
+                //
+                // Runs AFTER Light Shift, and that ordering is the whole point.
+                // Glow used to be summed in first, which meant Light Shift mixed
+                // from a base already near 2.0 and the clamp put it straight back
+                // to white — the recolor was erased arithmetically, whatever the
+                // Intensity said. Recoloring first and blooming second lets the
+                // shift survive; the halo is itself tinted through the shift, so
+                // it adds light in the shift's colour instead of repainting the
+                // dye's original white over the region LS just recolored. Both
+                // effects target the same pixels — overbright dye — so this is
+                // the only order in which they can both mean something.
+                if (glowEnabled > 0.5) {
+                    vec3 glowC = mix(texture(uGlow, vUv).rgb, texture(uGlow, kUv).rgb,
+                                     doK ? clamp(kBlend, 0.0, 1.0) : 0.0);
+                    glowC = pow(max(glowC, vec3(0.0)), vec3(1.0 / 2.2));
+                    if (lightShiftEnabled > 0.5) {
+                        // FULLY the shift colour, not scaled by Intensity. The
+                        // halo routinely carries luminance well above 1.0, so
+                        // leaving even half of it untinted put enough white into
+                        // every channel to saturate the recolor back out — the
+                        // core measured [231,201,201] with glow off and a flat
+                        // [255,255,255] with it on. Intensity governs how far the
+                        // CORE shifts; the halo is bloom OF that already-shifted
+                        // light, so it takes the colour outright.
+                        float glum = dot(glowC, vec3(0.299, 0.587, 0.114));
+                        glowC = lightShiftColor * glum;
+                    }
+                    vec3 gsum = color.rgb + glowC;
+                    if (gateWhite > 0.0) {
+                        // Gate on: the ceiling's whole promise is "never blow
+                        // out to white", so the halo must not undo it. Soft-
+                        // limit the SUM hue-preservingly: compress the max
+                        // channel into a shoulder→1.0 asymptote with channel
+                        // RATIOS (the picked colour's chroma) intact — hot
+                        // cores read lit-from-within at full vividness, never
+                        // clipped white. Gate off keeps the raw additive
+                        // white-out: that IS the classic luminous look.
+                        float gm = max(gsum.r, max(gsum.g, gsum.b));
+                        float gsh = 0.85;
+                        if (gm > gsh) {
+                            float gt = (gm - gsh) / (1.0 - gsh);
+                            gsum *= (gsh + (1.0 - gsh) * gt / (1.0 + gt)) / gm;
+                        }
+                    }
+                    color.rgb = gsum;
                 }
                 // D2 raster layer stack: paint layers composited around the
                 // fluid, AFTER tone-map/shading/glow (fluid effects never
