@@ -371,6 +371,88 @@ body > .controls {
     --input-py: 4px;
 }
 
+/* ── Brush tip swatch: the square appended to the Brush Size fader ──
+   It shows the loaded tip (built-in glyph, or a custom stamp's thumbnail)
+   and opens the tip menu. Sharing the fader's row is the point — tip and
+   size are the two halves of "what am I painting with". The channel pays
+   for it with ~30px of min-width so the fader keeps a usable travel. */
+.mixer-channel.ch-has-tip {
+    min-width: 122px;
+}
+.ch-has-tip .ch-fader input[type="range"] {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+}
+.ch-tip-swatch {
+    all: unset;
+    box-sizing: border-box;
+    position: relative;
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
+    margin-left: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--ground-600, #232830);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 0;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+}
+.ch-tip-swatch:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(236, 48, 19, 0.6);
+    color: #fff;
+}
+.ch-tip-swatch.active {
+    background-color: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
+    color: #fff;
+}
+/* Corner notch — the one mark that says this square opens something */
+.ch-tip-swatch::after {
+    content: '';
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    border-left: 4px solid transparent;
+    border-bottom: 4px solid rgba(255, 255, 255, 0.45);
+}
+.ch-tip-swatch:hover::after,
+.ch-tip-swatch.active::after {
+    border-bottom-color: rgba(255, 255, 255, 0.9);
+}
+.ch-tip-face {
+    display: block;
+    width: 100%;
+    height: 100%;
+    line-height: 24px;
+    text-align: center;
+    font-size: 13px;
+    /* Custom stamps arrive as a background-image on this span; keep the
+       longhands here so no state rule's `background:` shorthand can reset
+       them and blow the thumbnail up to its natural PNG size. */
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+@media (pointer: coarse) {
+    .mixer-channel.ch-has-tip {
+        min-width: 128px;
+    }
+    .ch-tip-swatch {
+        flex: 0 0 30px;
+        width: 30px;
+        height: 30px;
+    }
+    .ch-tip-face {
+        line-height: 28px;
+        font-size: 15px;
+    }
+}
+
 .ch-value {
     font-family: 'Courier New', monospace;
     font-size: 13px;
@@ -1074,6 +1156,58 @@ body > .controls {
 }
 .brush-shape-add {
     font-size: 14px;
+}
+
+/* ── Tip menu (the strip swatch's dropdown) ──
+   Wears the shared .arm-colors-panel skin; the shapes row below reuses the
+   drawer's .brush-shape-btn tiles verbatim. Named rows rather than the
+   drawer's icon-only strip — a dropdown is where the tips get to say what
+   they are. */
+.brush-tip-menu .brush-tip-menu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 10px;
+}
+.brush-tip-item {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 26px;
+    padding: 0 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0;
+    color: rgba(255, 255, 255, 0.62);
+    cursor: pointer;
+}
+.brush-tip-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+.brush-tip-item.active {
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
+    color: #fff;
+}
+.brush-tip-item-glyph {
+    flex: 0 0 14px;
+    text-align: center;
+    font-size: 12px;
+}
+.brush-tip-menu .brush-tip-row {
+    margin-bottom: 0;
+}
+@media (pointer: coarse) {
+    .brush-tip-item {
+        height: 32px;
+        font-size: 12px;
+    }
 }
 
 /* Brush preset chips */
