@@ -653,6 +653,26 @@
             SYM_RAKE_SPACING: 1.0,    // 'rake' bristle gap in brush diameters, so the rake
                                       // opens and closes with the Size fader
 
+            // ── Perceptual fader curves (Density, Time) ────────────────────
+            // These shape the VISIBLE Density and Time faders only. The
+            // underlying values, their ids, ranges and stored form are
+            // untouched — see the curve block in 20-mixer-layout.js. Dial any
+            // of these from the console, then call refreshFaderCurves() to
+            // re-seat the thumbs.
+            DENSITY_FADER_TAU_MIN: 0.12,  // dye half-life in seconds at the bottom of the
+                                          // Density fader. Stays clear of the < 0.88
+                                          // instant-wipe zone, which is deliberately out
+                                          // of the fader's reach (it maps to d ≈ 0.908).
+            DENSITY_FADER_TAU_MAX: 60,    // half-life at the top of the log-spaced region,
+                                          // just below the 1.0 detent.
+            DENSITY_FADER_HOLD_A: 0.86,   // fader fraction where the "never fades" detent
+            DENSITY_FADER_HOLD_B: 0.92,   // starts and ends — it parks on EXACTLY 1.0, the
+                                          // value people want most and could never reliably
+                                          // land on. Above HOLD_B is the growth zone (>1).
+            TIME_FADER_HOLD_A: 0.70,      // same idea for Time: everything below 1× gets
+            TIME_FADER_HOLD_B: 0.76,      // 70% of the travel instead of the ~15% a linear
+                                          // 0.01–3 scale gave it, with a detent on 1×.
+
             SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
                                       // Painterly sub-grid wisps on moving paint; dies with
                                       // motion so settled artwork stays bit-stable
