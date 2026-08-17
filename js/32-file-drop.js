@@ -255,11 +255,29 @@
     // handed across and consumed by the paste it belongs to.
     var repeatPaste = false;
 
-    // Nor does the paste event carry modifier state, so the keydown hands the
-    // mode across the same way: 'collider' for Ctrl+Shift+V, 'layer' for
-    // Ctrl+V. A paste with no keydown behind it (right-click ▸ Paste,
-    // Shift+Insert) finds nothing pending and lands as a plain layer.
-    var pendingMode = null;
+    // Ctrl+Shift+V is handled entirely in the keydown below, so a paste event
+    // Chromium still manages to raise for it has to be ignored here — if its
+    // payload DID survive, this handler would paste a second, plain copy.
+    var swallowPasteAt = 0;
+
+    // Last resort for Ctrl+Shift+V when the clipboard can't be read directly:
+    // arm the next plain paste to become a collider, and say so. The user's own
+    // Ctrl+V then carries the full payload that the stripped Ctrl+Shift+V event
+    // never had — no permission, no async clipboard API, so this is also the
+    // only route in browsers that don't implement navigator.clipboard.read()
+    // (Firefox) or where the user declined the prompt.
+    var ARM_MS = 6000;
+    var armedUntil = 0;
+
+    function pasteChord() {
+        return /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '') ? 'Cmd+V' : 'Ctrl+V';
+    }
+
+    function armColliderPaste() {
+        armedUntil = Date.now() + ARM_MS;
+        swallowPasteAt = 0; // the paste we're now waiting for must NOT be swallowed
+        flash('Press ' + pasteChord() + ' now to paste it as a collider');
+    }
 
     function pasteMessage(n, mode) {
         if (mode === 'collider') {
@@ -279,31 +297,24 @@
 
     document.addEventListener('paste', function (e) {
         pasteSeq++;
+        if (swallowPasteAt && Date.now() - swallowPasteAt < 400) { swallowPasteAt = 0; return; }
         if (isTyping(e.target)) return; // text fields keep their normal paste
         var repeat = repeatPaste; repeatPaste = false;
-        var mode = pendingMode || 'layer'; pendingMode = null;
         if (repeat) return;
+        var mode = 'layer';
+        if (armedUntil && Date.now() < armedUntil) { mode = 'collider'; armedUntil = 0; }
         var files = clipboardImages(e.clipboardData);
         if (!files.length) { flash(NO_IMAGE); return; }
         e.preventDefault();
         intake(files, mode);
     }, false);
 
-    // Watchdog for a keypress that never became a paste event.
+    // Reading the clipboard without a paste event.
     //
-    // Chromium raises `paste` on the focused element for Ctrl+V anywhere in
-    // the page — but a packaged Electron build runs with NO application menu
-    // (electron-main nulls it), and on some platforms the menu is what routes
-    // the paste accelerator into the page. Ctrl+Shift+V is shakier still: it
-    // is "paste and match style" in Chromium's editor, which a non-editable
-    // page may never be handed at all.
-    //
-    // So: if a Ctrl+V keydown isn't followed by a paste event, read the
-    // clipboard directly. Electron's module first — it needs no permission.
-    // On the web that route doesn't exist, and navigator.clipboard.read()
-    // raises a permission prompt, so it is used ONLY for Ctrl+Shift+V, the
-    // one shortcut that may have no other way in. Plain Ctrl+V always
-    // arrives as a paste event on the web and never reaches the prompt.
+    // Electron's module first: synchronous, and it needs no permission. On the
+    // web the only route is navigator.clipboard.read(), which asks the user for
+    // clipboard permission — acceptable for a shortcut that has no other way
+    // in, which is why plain Ctrl+V never comes through here on the web.
     function electronClipboard() {
         try {
             if (typeof require !== 'function') return null;
@@ -312,7 +323,7 @@
     }
 
     function asyncClipboardImage(mode) {
-        if (!navigator.clipboard || !navigator.clipboard.read) { flash(NO_IMAGE); return; }
+        if (!navigator.clipboard || !navigator.clipboard.read) { armColliderPaste(); return; }
         navigator.clipboard.read().then(function (items) {
             for (var i = 0; i < items.length; i++) {
                 var types = items[i].types || [];
@@ -321,10 +332,24 @@
                     return items[i].getType(types[t]).then(function (blob) { intake([blob], mode); });
                 }
             }
+            // Read worked and there is genuinely no image on the clipboard —
+            // a plain paste wouldn't find one either, so don't send the user
+            // chasing one.
             flash(NO_IMAGE);
-        }).catch(function () {
-            flash('Clipboard access blocked — allow it, then press the keys again');
-        });
+        }).catch(armColliderPaste); // blocked or declined → hand it to Ctrl+V
+    }
+
+    function clipboardFallback(mode) {
+        var clip = electronClipboard();
+        if (clip) {
+            var img = null;
+            try { img = clip.readImage(); } catch (_) { return; }
+            if (!img || img.isEmpty()) { flash(NO_IMAGE); return; }
+            if (!admitCount(1)) return;
+            if (toLayer(img.toDataURL(), 'Pasted', mode)) flash(pasteMessage(1, mode));
+            return;
+        }
+        if (mode === 'collider') asyncClipboardImage(mode);
     }
 
     document.addEventListener('keydown', function (e) {
@@ -333,22 +358,36 @@
         if (isTyping(e.target)) return;
         if (e.repeat) { repeatPaste = true; return; }
         repeatPaste = false;
-        var mode = e.shiftKey ? 'collider' : 'layer';
-        pendingMode = mode;
-        var clip = electronClipboard();
+
+        // Ctrl+Shift+V — ours outright, never Chromium's.
+        //
+        // Chromium binds this to "paste and match style", and that command
+        // strips the clipboard to text before raising its paste event: the
+        // image is simply not in the payload, which read as "no image in the
+        // clipboard" even with a bitmap sitting right there. Worse, the event
+        // firing at all made the watchdog below stand down, so the direct read
+        // that WOULD have found the image never ran.
+        //
+        // preventDefault stops that command, so no paste event is raised and
+        // this is the only route. Reading here also runs inside the keypress
+        // itself, which is the strongest context navigator.clipboard.read()
+        // can be given.
+        if (e.shiftKey) {
+            e.preventDefault();
+            armedUntil = 0;              // a fresh press supersedes any armed one
+            swallowPasteAt = Date.now(); // belt and braces if a paste still lands
+            clipboardFallback('collider');
+            return;
+        }
+
+        // Ctrl+V — Chromium's paste event is the route that works everywhere.
+        // The watchdog only covers a packaged Electron build, which runs with
+        // NO application menu (electron-main nulls it), and on some platforms
+        // the menu is what routes the paste accelerator into the page.
         var seq = pasteSeq;
         setTimeout(function () {
             if (pasteSeq !== seq) return; // a real paste event already handled it
-            pendingMode = null;           // nothing consumed it — don't let it go stale
-            if (clip) {
-                var img = null;
-                try { img = clip.readImage(); } catch (_) { return; }
-                if (!img || img.isEmpty()) { flash(NO_IMAGE); return; }
-                if (!admitCount(1)) return;
-                if (toLayer(img.toDataURL(), 'Pasted', mode)) flash(pasteMessage(1, mode));
-                return;
-            }
-            if (mode === 'collider') asyncClipboardImage(mode);
+            clipboardFallback('layer');
         }, 200);
     }, false);
 })();
