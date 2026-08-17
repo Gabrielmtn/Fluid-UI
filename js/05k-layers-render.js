@@ -37,6 +37,23 @@
             topZone.addEventListener('drop', handleDropZoneDrop);
             topZone.addEventListener('dragleave', handleDragLeave);
             panel.appendChild(topZone);
+            // Rows default to COLLAPSED. An expanded row measures ~277px
+            // against a list only a few hundred tall, so leaving every layer
+            // open is what made it impossible to see more than one at a time
+            // (collapsed a row is ~84px). The layer you're painting into stays
+            // open so the thing you're working on is never the hidden one.
+            //
+            // `collapsed` is runtime-only — nothing serialises it — so the
+            // undefined case below is the normal one on every load, and an
+            // explicit boolean only ever comes from the user's own ▲/▼ click.
+            // That's why this tests the type rather than truthiness: `false`
+            // has to mean "they opened it", not "never asked".
+            const collapsedByDefault = (layer) => {
+                if (!layer) return false;
+                if (typeof layer.collapsed === 'boolean') return layer.collapsed;
+                const activeRaster = window.rasterLayers ? window.rasterLayers.activeId() : null;
+                return !(layer.isRaster && layer.index === activeRaster);
+            };
             // Render all items in layerOrder
             layerOrder.forEach((item, idx) => {
                 const element = document.createElement('div');
@@ -44,8 +61,7 @@
                 // Only header is draggable; the whole item is NOT draggable to avoid slider conflicts
                 element.draggable = false;
                 element.dataset.orderIndex = idx; // Store position in order array
-                // Check if layer is collapsed (stored in layer object or default to false)
-                const isCollapsed = item.type === 'sim' ? false : (layers.find(l => l.index === item.id)?.collapsed || false);
+                const isCollapsed = item.type === 'sim' ? false : collapsedByDefault(layers.find(l => l.index === item.id));
                 if (isCollapsed) element.classList.add('collapsed');
                 if (item.type === 'sim') {
                     element.dataset.layerType = 'sim';
@@ -90,7 +106,7 @@
                                            onchange="updateLayerTitle(${layer.index}, this.value)">
                                 </div>
                                 <div class="layer-controls">
-                                    <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${layer.collapsed ? 'Expand' : 'Collapse'}">${layer.collapsed ? '▼' : '▲'}</button>
+                                    <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${isCollapsed ? 'Expand' : 'Collapse'}">${isCollapsed ? '▼' : '▲'}</button>
                                 </div>
                             </div>
                             <div class="layer-item-body">
@@ -176,7 +192,7 @@
                                        onchange="updateLayerTitle(${layer.index}, this.value)">
                             </div>
                             <div class="layer-controls">
-                                <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${layer.collapsed ? 'Expand' : 'Collapse'}">${layer.collapsed ? '▼' : '▲'}</button>
+                                <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${isCollapsed ? 'Expand' : 'Collapse'}">${isCollapsed ? '▼' : '▲'}</button>
                             </div>
                         </div>
                         <div class="layer-item-body">
@@ -378,10 +394,15 @@
                         const layerIdx = parseInt(collapseBtn.dataset.layer, 10);
                         const layer = layers.find(l => l.index === layerIdx);
                         if (layer) {
-                            layer.collapsed = !layer.collapsed;
-                            element.classList.toggle('collapsed', layer.collapsed);
-                            collapseBtn.textContent = layer.collapsed ? '▼' : '▲';
-                            collapseBtn.title = layer.collapsed ? 'Expand' : 'Collapse';
+                            // Flip from what's ON SCREEN, not from layer.collapsed —
+                            // that starts undefined, and `!undefined` is true, so a
+                            // row rendered collapsed by default would "collapse"
+                            // again on the first click and appear stuck.
+                            const next = !element.classList.contains('collapsed');
+                            layer.collapsed = next;
+                            element.classList.toggle('collapsed', next);
+                            collapseBtn.textContent = next ? '▼' : '▲';
+                            collapseBtn.title = next ? 'Expand' : 'Collapse';
                         }
                     });
                 }
