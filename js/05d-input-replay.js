@@ -24,7 +24,7 @@
         let splatOutX = 0, splatOutY = 0, splatOutDx = 0, splatOutDy = 0;
         let splatOutColor = [1, 0, 0];
         let pendingArmAdvance = false;
-        // Distance-based envelope: the brush grows from SPLAT_START_FLOOR to full
+        // Distance-based envelope: the brush grows from nothing to full
         // size over splatInDist of cursor travel (speed-independent), and on
         // release trails off, tapering over splatOutDist. Distances are fractions
         // of the canvas width; accumulated in the update loop (05j).
@@ -32,7 +32,13 @@
         let splatTailDist = 0;     // travel of the post-release tail (drives splat-out)
         let splatReleaseInMult = 1.0; // brush size fraction at release (so splat-out
                                       // tapers from the current size, not a jump to full)
-        const SPLAT_START_FLOOR = 0.12; // initial brush fraction at the very start
+        // Smallest radius multiplier the ramp will hand the shader. Not a
+        // perceptual floor — the splat footprint is exp(-d/radius) and a
+        // literal zero divides by zero. Dye is zero here, so nothing shows.
+        // (This replaced SPLAT_START_FLOOR = 0.12, which made every eased
+        // stroke open at 12% of full size and, once dye rode the ramp too,
+        // 12% strength — a mark that still arrived all at once.)
+        const SPLAT_MIN_MULT = 0.0004;
         window.splatInMode = window.splatInMode || 'instant';
         window.splatOutMode = window.splatOutMode || 'instant';
         // Ramp distances (fraction of canvas width). 0 ⇒ behaves like instant.
@@ -41,23 +47,75 @@
         function smoothstep(t) {
             return t * t * (3.0 - 2.0 * t);
         }
+        // 'time' mode: ramp over SECONDS since the press rather than travel.
+        // The distance modes are deliberately speed-independent, which is right
+        // for a stroke — but it means a CLICK that never moves cannot ramp at
+        // all: t stays 0 and the dab is pinned at the floor forever. Ramping on
+        // elapsed time is what lets a press bloom in. splatDownTime/splatUpTime
+        // were already being stamped on every press and release and never read
+        // by anything; they finally have a job.
+        if (typeof window.splatInMs !== 'number') window.splatInMs = 350;
+        if (typeof window.splatOutMs !== 'number') window.splatOutMs = 350;
+        function rampShape(mode, t) {
+            return (mode === 'linear') ? t : smoothstep(t);
+        }
+        // The ramp's 0..1 curve, before it is turned into a size or a dye
+        // amount. It starts at ZERO. An eased stroke has to grow out of
+        // nothing: starting at a fraction of the final value means the first
+        // mark still appears all at once, just smaller — which reads as a jolt
+        // however long the ramp is, in On Move and Constant alike.
+        function getSplatInShape() {
+            const mode = window.splatInMode;
+            if (mode === 'instant') return 1.0;
+            let t;
+            if (mode === 'time') {
+                const ms = window.splatInMs || 0;
+                if (ms <= 1) return 1.0;
+                t = Math.min((Date.now() - splatDownTime) / ms, 1.0);
+            } else {
+                const D = window.splatInDist || 0;
+                if (D <= 0.0001) return 1.0;
+                t = Math.min(splatStrokeDist / D, 1.0);
+            }
+            return rampShape(mode === 'time' ? 'easing' : mode, t);
+        }
         function getSplatInMult() {
-            if (window.splatInMode === 'instant') return 1.0;
-            const D = window.splatInDist || 0;
-            if (D <= 0.0001) return 1.0;
-            const t = Math.min(splatStrokeDist / D, 1.0);
-            const shape = (window.splatInMode === 'linear') ? t : smoothstep(t);
-            return SPLAT_START_FLOOR + (1.0 - SPLAT_START_FLOOR) * shape;
+            const shape = getSplatInShape();
+            // Radius keeps a hair above zero purely for the shader: the splat
+            // footprint is exp(-d/radius), so a literal 0 divides by zero. At
+            // this floor the dab is ~2px across and carries zero dye, so it is
+            // invisible — the perceptual start is still zero.
+            return Math.max(SPLAT_MIN_MULT, shape);
         }
         function getSplatOutMult() {
-            if (window.splatOutMode === 'instant') return 0.0;
-            const D = window.splatOutDist || 0;
-            if (D <= 0.0001) return 0.0;
-            const t = Math.min(splatTailDist / D, 1.0);
+            const mode = window.splatOutMode;
+            if (mode === 'instant') return 0.0;
+            let t;
+            if (mode === 'time') {
+                const ms = window.splatOutMs || 0;
+                if (ms <= 1) return 0.0;
+                t = Math.min((Date.now() - splatUpTime) / ms, 1.0);
+            } else {
+                const D = window.splatOutDist || 0;
+                if (D <= 0.0001) return 0.0;
+                t = Math.min(splatTailDist / D, 1.0);
+            }
             if (t >= 1.0) return 0.0;
             const remaining = 1.0 - t;
-            return (window.splatOutMode === 'linear') ? remaining : smoothstep(remaining);
+            return rampShape(mode === 'time' ? 'easing' : mode, remaining);
         }
+        // The ramp scales the dab's RADIUS, but the splat shader's centre
+        // deposit is exp(0) = 1 whatever the radius — so a size-only ramp still
+        // laid down full-saturation colour in the first frame. That is the
+        // "flashes in like a camera" part. Dye rides the same curve, and unlike
+        // radius it takes the shape RAW: dye genuinely starts at zero, so the
+        // stroke fades up out of nothing instead of appearing at a fraction of
+        // itself. Returns a multiplier to fold into the Flow slider's.
+        function splatInFlowMul() {
+            if (window.splatInMode === 'instant') return 1.0;
+            return Math.max(0, Math.min(1, getSplatInShape()));
+        }
+        window.__splatInFlowMul = splatInFlowMul;
         function splatWithRadius(x, y, dx, dy, color, radius) {
             const saved = config.SPLAT_RADIUS;
             config.SPLAT_RADIUS = radius;
@@ -299,12 +357,11 @@
                     // "use current live settings" behavior meant a stroke
                     // painted small replayed at whatever the slider says now —
                     // and remote strokes replayed at the RECEIVER's brush size.
-                    // 1.1 Live colors (opt-in): repaint the stroke with the
-                    // CURRENT brush color instead of the recorded one — the
-                    // faithful-replay default stays (recorded color, arm modes
-                    // still resolve on top either way).
-                    var repCol = (window.replayLiveColors && window.pointer && window.pointer.color)
-                        ? window.pointer.color.slice() : ev.color;
+                    // Replay is faithful: the colour that was painted. (The
+                    // "use current colour" opt-in was removed 2026-08-16 — arm
+                    // modes resolve on top of this value, and arm 0's usual
+                    // 'fixed' mode discarded the live colour anyway.)
+                    var repCol = ev.color;
                     // Replayed strokes are not live viewer strokes: the
                     // viewer's active custom stamp must not restyle them —
                     // events carry no shape info, so "current active shape"
@@ -389,6 +446,10 @@
             if (e.button === 2) {
                 e.preventDefault();
                 isRightMouseDown = true;
+                // Capture, like the paint path does: without it a release that
+                // happens off-window is never delivered here and the hold
+                // strands. (The paint branch below captures; this one never did.)
+                try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
                 if (pointer.down) {
                     // Left/tip is held — enter pause-only mode.
                     // Snapshot velocity for the fast-brush easter egg on release.
@@ -431,19 +492,30 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
-            // D2 routing: sketch strokes are plain raster paint — no fluid
-            // replay events, no recording timelines, no multiplayer
-            // broadcast (local-only until D7's unified schema)
+            // D2/D3 routing: sketch and mask strokes are surface paint — no
+            // fluid replay events, no recording timelines, no multiplayer
+            // broadcast (local-only until D7's unified schema). The gate used
+            // to test 'sketch' only, so collider painting ('mask') pressed a
+            // DYE splat into the fluid — locally AND broadcast to peers, who
+            // saw phantom colour blobs while the painter drew invisible-to-
+            // them walls (found by the 2026-08-16 multiplayer fidelity audit).
             const _sketchTarget = config.BRUSH_TARGET === 'sketch';
+            const _maskTarget = config.BRUSH_TARGET === 'mask';
             if (_sketchTarget) {
                 if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
+            } else if (_maskTarget) {
+                // Press lands in the mask, same as the 05j dab route.
+                if (typeof window.__maskStamp === 'function') window.__maskStamp(coords.x, coords.y, 1);
             } else {
                 // Begin stroke recording and include the initial splat.
+                // Radius FIRST: pushStrokeEvent reads __lastPaintRadius, so
+                // computing it after meant every stroke's press event recorded
+                // the PREVIOUS stroke's size.
                 startStroke(pointer.x, pointer.y);
-                const _pcol = applyPaintFlow(pointer.color, pressFlowMul());
-                pushStrokeEvent(pointer.x, pointer.y, 0, 0, _pcol);
                 const inMult = getSplatInMult();
                 window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
+                const _pcol = applyPaintFlow(pointer.color, pressFlowMul() * splatInFlowMul());
+                pushStrokeEvent(pointer.x, pointer.y, 0, 0, _pcol);
                 if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, _pcol);
                 multiSplatWithRadius(pointer.x, pointer.y, 0, 0, _pcol, config.SPLAT_RADIUS * inMult);
                 window.__splatFlow = 1; // reset so the engine/tail/programmatic splats stay full-flow
@@ -452,7 +524,7 @@
             // the engine (fed from the pointermove listener below, drained in
             // 05j). The immediate press stamp above stays for latency.
             if (window.BrushEngine) window.BrushEngine.begin(coords.x, coords.y);
-            if (!_sketchTarget && typeof broadcastSplat === 'function') {
+            if (!_sketchTarget && !_maskTarget && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
                     coords.y / canvas.height,
@@ -460,7 +532,8 @@
                     0,
                     pointer.color,
                     (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
-                    config.SPLAT_RADIUS
+                    config.SPLAT_RADIUS,
+                    true   // stroke-opening press: no gap-fill from the last stroke
                 );
             }
         });
@@ -474,6 +547,17 @@
         // arriving even when the pen drifts off-canvas, so the stroke never freezes.
         canvas.addEventListener('pointermove', (e) => {
             if (e.pointerType === 'touch') return; // touchmove owns touch
+            // Self-heal a stranded replay hold. A hovering pen streams moves with
+            // no buttons held, so the first move after a missed barrel release
+            // clears it and painting comes back immediately — instead of staying
+            // dead until the app restarts. A genuine mouse right-hold and a
+            // barrel-held hover both still report bit 2, so a deliberate replay
+            // hold is untouched.
+            if (isRightMouseDown && (e.buttons & 2) === 0) {
+                isRightMouseDown = false;
+                isReplayActive = false;
+                window._activeReplayEvents = null;
+            }
             if (isPaused || isReplayActive) return;
             // Engine feed: replay every coalesced sub-frame sample (position)
             // while a stroke is live. Density is governed by BRUSH_SPACING.
@@ -532,7 +616,11 @@
             if (wasDown && typeof broadcastPointerUp === 'function') {
                 broadcastPointerUp();
             }
-            if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
+            // Tail is a FLUID effect: sketch and mask (collider) strokes must
+            // not arm it — the sketch-only test let a collider stroke's lift
+            // squirt a dye tail into the fluid at the wall's end, locally and
+            // (once tails rode the wire) on every peer. Audit 2026-08-16.
+            if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid') {
                 splatUpTime = Date.now();
                 splatOutActive = true;
                 splatTailDist = 0;
@@ -568,6 +656,18 @@
             if (window.__paintPointerId != null) {
                 try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
                 window.__paintPointerId = null;
+            }
+            // Trust the buttons BITMASK, not just which button this event names.
+            // A pen barrel press arrives as button 2 and latches the replay hold;
+            // if its release never comes back as a button-2 pointerup — released
+            // while hovering, released off-window, or swallowed by the OS
+            // press-and-hold gesture — the hold stuck forever. A stuck hold
+            // re-launches the last stroke's replay every pass, which both sprays
+            // dye where you were painting and gates all further painting down to
+            // press dots: "the stylus stopped working". It also rebroadcast every
+            // pass, so one stuck client locked painting for the whole room.
+            if (isRightMouseDown && (e.buttons & 2) === 0 && e.button !== 2) {
+                isRightMouseDown = false;
             }
             if (e.button === 2) {
                 isRightMouseDown = false;
@@ -766,9 +866,14 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             applyPickerColor();
+            // Same sketch/mask routing as the pointerdown press (see the
+            // audit note there): mask presses stamp the mask, never the fluid.
             const _sketchTargetT = config.BRUSH_TARGET === 'sketch';
+            const _maskTargetT = config.BRUSH_TARGET === 'mask';
             if (_sketchTargetT) {
                 if (typeof window.__sketchStamp === 'function') window.__sketchStamp(coords.x, coords.y, 1);
+            } else if (_maskTargetT) {
+                if (typeof window.__maskStamp === 'function') window.__maskStamp(coords.x, coords.y, 1);
             } else {
                 const inMult = getSplatInMult();
                 window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
@@ -781,7 +886,7 @@
             if (window.BrushEngine) {
                 window.BrushEngine.begin(coords.x, coords.y);
             }
-            if (!_sketchTargetT && typeof broadcastSplat === 'function') {
+            if (!_sketchTargetT && !_maskTargetT && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     coords.x / canvas.width,
                     coords.y / canvas.height,
@@ -789,7 +894,8 @@
                     0,
                     pointer.color,
                     (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
-                    config.SPLAT_RADIUS
+                    config.SPLAT_RADIUS,
+                    true   // stroke-opening press: no gap-fill from the last stroke
                 );
             }
         }, { passive: false });
@@ -832,7 +938,8 @@
         window.addEventListener('touchend', (e) => {
             TouchGestures.end(e);
             if (pointer.down) {
-                if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET !== 'sketch') {
+                // Same fluid-only tail gate as finishLeftStroke (audit note there)
+                if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid') {
                     splatUpTime = Date.now();
                     splatOutActive = true;
                     splatTailDist = 0;

@@ -322,6 +322,37 @@ var MP_PERF_LOCAL_KEYS = [
     'brushEraser', 'sketchVisible'
 ];
 
+// A freehand light-shift path stores one full-precision point per ~2px of
+// drag — ~117 bytes each, so a normal path is ~12KB on its own and pushed the
+// whole snapshot past the shed threshold below. The path was then deleted
+// SILENTLY, and a watcher ran with Light Shift "enabled" but no path at all:
+// their overexposed whites stayed white while the host's took the path's
+// colours. That asymmetry is what "theirs looked more blown out" was.
+//
+// A mirror doesn't need every sample — resample to at most MIRROR_PATH_POINTS
+// (keeping both endpoints) and round to 1 decimal. ~4KB, comfortably inside
+// the budget. Presets keep the full-fidelity path: only this mirror copy is
+// compacted, and the wire shape is unchanged so old clients still apply it.
+var MIRROR_PATH_POINTS = 64;
+function compactLightShiftPath(path) {
+    if (!path || !path.length) return path || null;
+    var r1 = function (v) { return (typeof v === 'number') ? Math.round(v * 10) / 10 : v; };
+    var src = path;
+    if (src.length > MIRROR_PATH_POINTS) {
+        var out = [];
+        var step = (src.length - 1) / (MIRROR_PATH_POINTS - 1);
+        for (var i = 0; i < MIRROR_PATH_POINTS; i++) {
+            out.push(src[Math.round(i * step)]);
+        }
+        src = out;
+    }
+    return src.map(function (p) {
+        if (!p || typeof p !== 'object') return p;
+        return { x: r1(p.x), y: r1(p.y), hue: r1(p.hue),
+                 saturation: r1(p.saturation), lightness: r1(p.lightness) };
+    });
+}
+
 function captureLookSnapshot() {
     if (typeof window.capturePresetSnapshot !== 'function') return null;
     var full;
@@ -346,7 +377,7 @@ function captureLookSnapshot() {
         savedColors: full.savedColors || null,
         userPalettes: full.userPalettes || null,
         lightPos: full.lightPos || null,
-        lightShiftPath: full.lightShiftPath || null,
+        lightShiftPath: compactLightShiftPath(full.lightShiftPath),
         brushState: full.brushState || null,
         material: full.material || null,
         brushTip: full.brushTip || null,
@@ -392,6 +423,9 @@ function fitLookSnapshot(snap) {
     var SHED = ['userPalettes', 'savedColors', 'lightShiftPath', 'ssOrigin', 'brushState'];
     for (var i = 0; i < SHED.length; i++) {
         try { if (JSON.stringify(out).length <= 14000) break; } catch (_) { break; }
+        // Shedding used to be completely silent, which is why a dropped
+        // lightShiftPath took a user test to find. Say what went overboard.
+        if (out[SHED[i]] != null) console.warn('[mp] look snapshot over budget — dropping ' + SHED[i]);
         delete out[SHED[i]];
     }
     var len = 0;
@@ -720,7 +754,7 @@ function updateTurnChip() {
         chip.type = 'button';
         chip.addEventListener('click', function () {
             // Bring the rotation into view. On mobile the sidebar is a
-            // closed drawer — open it first; and the Multi Artist section
+            // closed drawer — open it first; and the Multiplayer section
             // collapses to zero height, so expand it or the scroll lands
             // on nothing visible.
             var controls = document.getElementById('sidebar-right');
@@ -1464,7 +1498,9 @@ function onMultiplayerError(error) {
     console.error('Multiplayer error:', error);
 }
 
-function broadcastSplat(x, y, dx, dy, color, mult, radius) {
+// down=true marks a stroke-opening press stamp so the receiver starts a fresh
+// segment instead of interpolating from the previous stroke's end.
+function broadcastSplat(x, y, dx, dy, color, mult, radius, down) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN || isProcessingRemoteEvent) {
         return;
     }
@@ -1483,7 +1519,13 @@ function broadcastSplat(x, y, dx, dy, color, mult, radius) {
 
     partySocket.send(JSON.stringify({
         type: 'splat',
-        data: { x, y, dx, dy, color, mult, radius: effRadius },
+        // sym (2026-08-16 fidelity audit): the painter's symmetry layout
+        // decides WHERE the arms land; without it peers applied dabs under
+        // their OWN mode and the paint landed elsewhere. Additive field —
+        // old receivers ignore it.
+        data: { x, y, dx, dy, color, mult, radius: effRadius,
+                sym: (window.config && window.config.SYMMETRY_MODE) || 'radial',
+                down: !!down },
         timestamp: now
     }));
     broadcastSplat.lastSent = now;
@@ -1519,7 +1561,15 @@ function queueDab(xNorm, yNorm, dxAbs, dyAbs, radius) {
         +dxAbs.toFixed(3), +dyAbs.toFixed(3),
         +(radius || 0).toFixed(5)
     ]);
-    if (_dabQueue.length >= DAB_MAX_PER_MSG) flushDabs(null, 1, true);
+    // Arm count is stamped per message, so a forced flush must carry the real
+    // multiplier — hardcoding 1 here collapsed dense strokes to a single arm on
+    // every peer. Read the lexical binding, not window.animationMultiplier:
+    // 04e-anim-portal assigns the former without mirroring the latter.
+    if (_dabQueue.length >= DAB_MAX_PER_MSG) flushDabs(null, currentArmMult(), true);
+}
+
+function currentArmMult() {
+    return (typeof animationMultiplier === 'number') ? animationMultiplier : 1;
 }
 
 function flushDabs(color, mult, force) {
@@ -1545,6 +1595,8 @@ function flushDabs(color, mult, force) {
             color: color || window.__mpLastDabColor || [1, 0, 0],
             mult: mult || 1,
             radius: last[4] || undefined,
+            // Painter's arm layout — see broadcastSplat's sym note.
+            sym: (window.config && window.config.SYMMETRY_MODE) || 'radial',
             dabs: dabs
         },
         timestamp: now
@@ -1572,7 +1624,7 @@ function broadcastPointerUp() {
     }
     // Push the stroke's tail dabs before the peer is told the stroke ended,
     // or the last sub-flush-interval dabs would be stranded in the queue.
-    flushDabs(window.__mpLastDabColor, 1, true);
+    flushDabs(window.__mpLastDabColor, currentArmMult(), true);
 
     console.log('[Multiplayer] Broadcasting pointer-up');
     partySocket.send(JSON.stringify({
@@ -1627,6 +1679,27 @@ function handleRemoteSplat(data) {
         // Peer strokes must not pick up THIS client's custom stamp (05i gates
         // getActiveStamp on this flag); built-in tips still render for them.
         window.__remoteStroke = true;
+        // Apply the SENDER's symmetry layout when the message carries it
+        // (2026-08-16 fidelity audit: a mirrorX painter measured as radial on
+        // the peer — the arms are positions, not styling). Unknown strings
+        // old senders omit the field and keep the viewer's own mode, as before.
+        // The value is COERCED through the registry before it touches config: a
+        // peer on a cached bundle can still send a retired mode ('spiral'), and
+        // writing that raw let the 2s mirror poll re-persist and re-broadcast it
+        // — the same way a retired arm-colour mode came back from the dead once.
+        var _symPrev = null;
+        if (data.data && typeof data.data.sym === 'string' && window.config) {
+            var _sym = data.data.sym;
+            try {
+                if (window.ParamRegistry && window.ParamRegistry.coerceSelect) {
+                    _sym = window.ParamRegistry.coerceSelect('symmetryMode', _sym) || 'radial';
+                }
+            } catch (_) {}
+            if (_sym !== window.config.SYMMETRY_MODE) {
+                _symPrev = window.config.SYMMETRY_MODE;
+                window.config.SYMMETRY_MODE = _sym;
+            }
+        }
         try {
             // 1.3 parity path: the sender's real dab train. Each dab is applied
             // with ITS OWN full velocity, verbatim — no gap-fill invention and
@@ -1651,6 +1724,13 @@ function handleRemoteSplat(data) {
             }
 
             // Legacy path — a peer on the previous build, or the press stamp.
+            // A press stamp OPENS a stroke, so it must never gap-fill from
+            // wherever the last one ended: measured (2026-08-16 audit) as 8
+            // phantom dabs painting a straight line from the end of the
+            // previous stroke to the start of the next. pointer-up clears the
+            // position, but the release TAIL now streams dabs after it and
+            // re-seeds it, so the flag is what makes this reliable.
+            if (data.data.down) remoteLastPositions.delete(data.clientId);
             const lastPos = remoteLastPositions.get(data.clientId);
             // Gap-fill between network messages at ~12px spacing (matching how
             // densely local mousemove events deposit dabs), splitting the
@@ -1688,6 +1768,7 @@ function handleRemoteSplat(data) {
         } finally {
             isProcessingRemoteEvent = false;
             window.__remoteStroke = false;
+            if (_symPrev !== null) window.config.SYMMETRY_MODE = _symPrev;
         }
     }
 }

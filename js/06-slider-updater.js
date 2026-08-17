@@ -171,7 +171,13 @@
      Scoped to .control-group rows only — strip headers carry their own
      click affordances (brush drawer trigger, material select). */
 
-  var INTERACTIVE = 'input, select, button, a, textarea, [contenteditable], .fader-scale';
+  /* label/.value-display are in here because the row forwarder maps a press to
+     the click's X fraction: clicking a row's NAME used to jump its slider to
+     wherever the word sat and persist that value. Reading a label is not an
+     input gesture, and the words sit at the low end of the track, so the usual
+     casualty was a setting silently pinned near its minimum. The track, the
+     row background and the input itself all still forward. */
+  var INTERACTIVE = 'input, select, button, a, textarea, [contenteditable], .fader-scale, label, .value-display';
 
   function rowRange(row) {
     var inputs = row.querySelectorAll('input[type="range"]');

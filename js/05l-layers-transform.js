@@ -70,10 +70,16 @@
             if (removed.isRaster) {
                 if (window.rasterLayers && window.rasterLayers.reconcile) window.rasterLayers.reconcile();
             } else if (div) {
-                const src = removed.data || removed.originalData;
+                // Colliders restore the tinted coverage film, not the opaque map
+                // (see _depthToFilmUrl in 23-depth-collision) — otherwise undo
+                // brought the black veil back after a delete.
+                const src = (removed.isCollision && removed.filmData) || removed.data || removed.originalData;
                 if (src) div.style.backgroundImage = 'url(' + src + ')';
                 div.style.display = removed.visible === false ? 'none' : 'block';
-                if (removed.isCollision) { div.style.backgroundSize = '100% 100%'; div.style.opacity = '0.55'; }
+                if (removed.isCollision) {
+                    div.style.backgroundSize = '100% 100%';
+                    div.style.opacity = removed.filmData ? '0.3' : '0.55';
+                }
             }
             if (typeof renderLayers === 'function') renderLayers();
             if (removed.isCollision && window.collisionLayers && window.collisionLayers.updateObstacleFromLayers) window.collisionLayers.updateObstacleFromLayers();

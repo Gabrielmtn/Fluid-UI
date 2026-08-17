@@ -536,7 +536,10 @@
         window.lightShift.colorPath = JSON.parse(JSON.stringify(path || []));
         currentPathIndex = 0;
         if (canvas) drawColorPicker();
-        saveSettings();
+        // A remote look-mirror apply is somebody else's path passing through.
+        // Persisting it would overwrite the watcher's own saved path — their
+        // work, gone after a session as a guest. Local edits still save.
+        if (!window.__mpApplyingRemote) saveSettings();
     };
 
     function saveSettings() {

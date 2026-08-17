@@ -21,6 +21,19 @@
         if (kaleidoToggleEl) {
             kaleidoToggleEl.addEventListener('change', (e) => {
                 window.kaleidoEnabled = e.target.checked;
+                // Snapshot applies re-dispatch 'change' on every checkbox, even
+                // when the value did not move — so this handler used to fire on
+                // every preset, Scene, Mutate variant and multiplayer mirror tick
+                // and overwrite the arm count the snapshot had JUST restored,
+                // either with a stale _prevMultiplier or the first-enable 8x.
+                // That is "presets don't work with multibrush consistently".
+                // During an apply, record the enabled state and nothing else:
+                // multiplier and segments come from the snapshot itself.
+                if (window._profileApplying) {
+                    // Keep the restore target current for a later MANUAL toggle-off.
+                    if (e.target.checked) window._prevMultiplier = animationMultiplier;
+                    return;
+                }
                 if (e.target.checked) {
                     window._prevMultiplier = animationMultiplier;
                     if (!window._kaleidoBootstrapped) {

@@ -274,7 +274,10 @@
             // Ignore when typing in inputs/textareas or contenteditable
             const t = e.target;
             const tag = t && t.tagName ? t.tagName.toUpperCase() : '';
-            const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable);
+            // Sliders are INPUTs and hold focus after a drag; blocking on them
+            // is what made these hotkeys stop responding mid-session.
+            const isEditable = window.__isTypingTarget ? window.__isTypingTarget(t)
+                : (tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable));
             if (isEditable) return;
             const code = e.code;
             if (code && (code.startsWith('Digit') || code.startsWith('Numpad'))) {

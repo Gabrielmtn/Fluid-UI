@@ -51,7 +51,15 @@
         // previously-saved value (11, 3, 0.1 …) stays on-step and survives a
         // preset round-trip. Mutation keeps the old 0.1 floor — mutating to a
         // hairline would just look like the brush stopped working.
-        brushSize: {configKey: null, ui: {min: 0.001, max: 30, step: 0.001}, hard: {min: 0.001, max: 30}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
+        // Ceiling raised 30 -> 100 (2026-08-16): 30 capped the dab at ~35% of
+        // canvas height, too small for a full-canvas gesture; 100 reaches ~63%.
+        // Must stay in lockstep with the index.html attr — verifyDom flags drift,
+        // and the loader clamps against the registry while the DOM clamps against
+        // the attr. Everything downstream derives: CONFIG_BOUNDS.SPLAT_RADIUS is
+        // hard.max/1000, and wheel-zoom, row-drag, the printed scale and brush
+        // presets all read the live attrs. Mutation keeps the old 30 ceiling — a
+        // random jump to a canvas-swallowing brush is not a style.
+        brushSize: {configKey: null, ui: {min: 0.001, max: 100, step: 0.001}, hard: {min: 0.001, max: 100}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
         // No mut (Gabriel 2026-08-06): a mutated timeScale can slow the whole
         // sim to near-frozen, which reads as "mutate broke it", not a style.
@@ -150,7 +158,11 @@
         // Multi-Brush arm layout. No `mut`: symmetry only shapes FUTURE
         // strokes, so a mutation would leave the preview frame identical
         // and then silently change how the user's next stroke lands.
-        symmetryMode: {options: ["radial", "mirrorX", "mirrorY", "mirrorQuad", "spiral", "rake"], def: "radial", mut: null},
+        // 'spiral' retired 2026-08-16. It MUST stay out of this list: coerceSelect
+        // only maps a value to the default when the list rejects it, so leaving it
+        // here would let a stale 'spiral' through, fail the DOM option check, and
+        // make preset apply skip the select silently.
+        symmetryMode: {options: ["radial", "mirrorX", "mirrorY", "mirrorQuad", "rake"], def: "radial", mut: null},
         fpsCap: {options: ["30", "60", "120", "144", "165", "240", "native", "0"], def: "30", mut: null},
         lightMode: {options: ["manual", "random"], def: "manual", mut: {options: null, scope: "extended"}},
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
@@ -333,6 +345,32 @@
         }
         return issues;
     }
+
+    // Does this element actually want the keystroke? Every hotkey handler in
+    // the app needs to answer that, and every one of them used to answer it
+    // with "is it an INPUT?" — which is wrong, because most inputs here are
+    // SLIDERS. Drag any fader and focus stays on it, so Z, F and the whole
+    // hotkey set went silently dead until you clicked the canvas again. A range
+    // (or checkbox, colour swatch, button) has no use for a letter key; only
+    // text-entry controls do. Lives here because 01a loads before every hotkey
+    // owner; call sites still fall back to their own check if it is missing.
+    var TYPING_INPUT_TYPES = {
+        text: 1, search: 1, url: 1, tel: 1, email: 1, password: 1,
+        number: 1, date: 1, month: 1, week: 1, time: 1,
+        'datetime-local': 1
+    };
+    function isTypingTarget(el) {
+        if (!el) return false;
+        if (el.isContentEditable) return true;
+        var tag = (el.tagName || '').toLowerCase();
+        if (tag === 'textarea') return true;
+        // A focused <select> consumes letters to jump between options.
+        if (tag === 'select') return true;
+        if (tag !== 'input') return false;
+        var type = (el.type || 'text').toLowerCase();
+        return !!TYPING_INPUT_TYPES[type];
+    }
+    window.__isTypingTarget = isTypingTarget;
 
     window.ParamRegistry = {
         SLIDERS: SLIDERS,

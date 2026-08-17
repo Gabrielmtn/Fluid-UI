@@ -711,20 +711,22 @@ class DepthEstimator {
             var layersHost = document.getElementById('layers-container') || canvasWrapper;
             layersHost.appendChild(layerDiv);
         }
-        layerDiv.style.backgroundImage = 'url(' + depthDataUrl + ')';
+        var filmDataUrl = _depthToFilmUrl(depth);
+        layerDiv.style.backgroundImage = 'url(' + filmDataUrl + ')';
         // Stretch to the div (which fills the wrapper) — same mapping the
         // obstacle compositor uses, so preview and collision stay aligned.
         layerDiv.style.backgroundSize = '100% 100%';
         layerDiv.style.backgroundPosition = 'center';
         var startVisible = opts.visible !== false; // visible by default so the mask can be seen/aligned
         layerDiv.style.display = startVisible ? 'block' : 'none';
-        layerDiv.style.opacity = '0.55';
+        layerDiv.style.opacity = COLLIDER_FILM_OPACITY;
 
         // Add to layers array
         var layer = {
             index: newIndex,
             data: depthDataUrl,
             originalData: thumbnailUrl || depthDataUrl,
+            filmData: filmDataUrl,   // on-canvas film; see _depthToFilmUrl
             title: '🧱 ' + (name || 'Collision'),
             visible: startVisible,
             active: false,
@@ -1036,8 +1038,8 @@ class DepthEstimator {
         var opaqueUrl = _depthToOpaqueUrl(built.depth);
         layer.data = opaqueUrl;                // panel thumbnail source
         layer.originalData = built.previewUrl; // alpha-coverage mask (data)
-        var layerDiv = document.getElementById('layer' + layer.index);
-        if (layerDiv) layerDiv.style.backgroundImage = 'url(' + opaqueUrl + ')';
+        layer.filmData = _depthToFilmUrl(built.depth); // on-canvas film (tinted coverage)
+        _setColliderFilm(layer.index, layer.filmData);
         // Update the Layers-panel thumbnail IN PLACE (no full re-render per
         // stroke — renderLayers rebuilds the whole panel and would fight
         // scroll position / drag state at painting cadence).
@@ -1045,6 +1047,43 @@ class DepthEstimator {
         if (thumb) thumb.style.backgroundImage = 'url(' + opaqueUrl + ')';
         else if (typeof window.renderLayers === 'function') window.renderLayers();
     }
+
+    // ── The on-canvas collider film ────────────────────────────────────
+    // The thumbnail wants an OPAQUE image (a transparent mask vanishes against
+    // a dark panel), but the on-canvas div is a different job: it lies over the
+    // artwork, full-bleed. Feeding it the opaque map painted black across every
+    // pixel that ISN'T wall, at 0.55 — a 55% black veil over the whole picture,
+    // with the wall reading as a grey sticker sitting ON TOP of the paint. That
+    // is most of why colliders "didn't feel right".
+    //
+    // The film is now alpha=coverage (fully transparent off the wall) tinted the
+    // same red the mask editor uses, so the wall reads as a marking ON the
+    // surface rather than a sheet over it. One helper, so every path that paints
+    // this div agrees — creation, live stroke refresh, preset load and undo all
+    // used to set it separately and only one of them was ever fixed.
+    var COLLIDER_FILM_OPACITY = '0.3';
+    function _depthToFilmUrl(depth) {
+        var pc = document.createElement('canvas');
+        pc.width = depth.width; pc.height = depth.height;
+        var ctx = pc.getContext('2d');
+        var img = ctx.createImageData(depth.width, depth.height);
+        for (var i = 0, m = depth.width * depth.height; i < m; i++) {
+            var v = depth.data[i], o = i << 2;
+            img.data[o] = 255; img.data[o + 1] = 59; img.data[o + 2] = 48; // #ff3b30
+            img.data[o + 3] = v;                                            // coverage
+        }
+        ctx.putImageData(img, 0, 0);
+        return pc.toDataURL('image/png');
+    }
+    // Point a collider layer's on-canvas div at the film. url may be a prebuilt
+    // coverage PNG (preset/undo restore, where only the stored image survives).
+    function _setColliderFilm(layerIndex, url) {
+        var d = document.getElementById('layer' + layerIndex);
+        if (!d) return;
+        d.style.backgroundImage = 'url(' + url + ')';
+        d.style.opacity = COLLIDER_FILM_OPACITY;
+    }
+    window.__setColliderFilm = _setColliderFilm;
 
     // Opaque grayscale data-URL from a depth map — matches the conversion
     // addCollisionLayer performs internally for layer.data.

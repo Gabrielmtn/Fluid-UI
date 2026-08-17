@@ -77,6 +77,34 @@
             lastTime = nowMs;
             // Time scale: dilate physics without changing equations
             const dt = rawDt * (window.timeScale || 1.0);
+            // ── The sim clock (2026-08-16) ──────────────────────────────────
+            // dt is the ONE authority on how much simulated time this frame
+            // advanced: it already carries both the 16ms stability clamp and
+            // the Time slider. Every dye source has to pace itself off THIS,
+            // not off Date.now(), because a splat is an IMPULSE, not a rate —
+            // splat() takes no dt, it deposits a fixed amount of dye per
+            // event. Fire those events on the wall clock while the fluid runs
+            // on a dilated clock and you inject 1/timeScale times as much dye
+            // per simulated second, into a field that has advected 1/timeScale
+            // as far: the deposits stack on top of each other instead of being
+            // carried away, and the stroke saturates into a flat slab. That is
+            // the over-saturated middle at low Time, and (via the 16ms clamp)
+            // the same thing a sub-60fps frame does even at Time 1.
+            window.__simDtMs = dt * 1000;
+            // Wall-clock deposition credit, for the sources that deposit once
+            // per FRAME instead of once per unit of travel (constant-flow
+            // splat mode, the splat-out tail). Those are frame-rate deposition
+            // rates, so they get metered at the Time-scaled frame rate: one
+            // credit per frame at Time ≥ 1 — bit-identical to the old
+            // unconditional emit, existing frame-rate quirks included — and
+            // one every 1/timeScale frames below it. The distance-parameterized
+            // walker needs none of this; it is metered in 05d0 instead, by
+            // spreading spacing, because its rate is set by the hand not the
+            // frame. Leftover is clamped so Time > 1 can't run the debt away.
+            let _depDebt = (window.__depositDebt || 0) + (window.timeScale || 1.0);
+            const depositCredit = _depDebt >= 1.0;
+            if (depositCredit) _depDebt = Math.min(_depDebt - 1.0, 1.0);
+            window.__depositDebt = _depDebt;
             if (window.kAnimateRot && window.kSpinSpeed) {
                 window.kAngle = (window.kAngle || 0) + dt * window.kSpinSpeed * Math.PI / 180;
             }
@@ -168,22 +196,41 @@
                     // momentum; a stationary hold injects dye only, like the
                     // press stamp. Sketch/mask targets keep the spaced train.
                     if (config.BRUSH_CONTINUOUS && config.BRUSH_TARGET === 'fluid') {
+                        // depositCredit meters the hose on the sim clock: at
+                        // Time 1 every frame is credited (unchanged), at Time
+                        // 0.25 one frame in four. Skipped frames deliberately
+                        // leave __contFlowLast alone so the next credited dab's
+                        // dx/dy spans the whole skipped interval — the hose
+                        // still injects the same momentum per unit of travel,
+                        // it just stops injecting four times the dye per
+                        // simulated second.
                         if (pointer.down && window.BrushEngine.isActive()) {
-                            const cx = pointer.x, cy = pointer.y;
-                            let cdx = 0, cdy = 0;
-                            if (window.__contFlowLast) {
-                                cdx = (cx - window.__contFlowLast.x) * 10;
-                                cdy = (cy - window.__contFlowLast.y) * 10;
-                            }
-                            window.__contFlowLast = { x: cx, y: cy };
-                            _dabs = [{ x: cx, y: cy, dx: cdx, dy: cdy, p: 1 }];
-                            // Recording taps raw pointer events, which don't fire
-                            // while stationary — capture the hold here. Frames
-                            // that moved ≥0.1px were already recorded by the
-                            // pointermove handler (same gate as 05d's).
-                            if (recEnabled && typeof recRecordInteraction === 'function'
-                                && (cdx * cdx + cdy * cdy) < 1.0) {
-                                recRecordInteraction(cx, cy, 0, 0, pointer.color);
+                            // An uncredited frame emits nothing and, crucially,
+                            // does NOT touch __contFlowLast — so the next
+                            // credited dab's dx/dy spans the whole skipped
+                            // interval and the hose injects the same momentum
+                            // per unit of travel as before. Only the dye rate
+                            // is metered. (The release branch below still owns
+                            // clearing __contFlowLast; doing it here would zero
+                            // the carried motion every skipped frame.)
+                            _dabs = [];
+                            if (depositCredit) {
+                                const cx = pointer.x, cy = pointer.y;
+                                let cdx = 0, cdy = 0;
+                                if (window.__contFlowLast) {
+                                    cdx = (cx - window.__contFlowLast.x) * 10;
+                                    cdy = (cy - window.__contFlowLast.y) * 10;
+                                }
+                                window.__contFlowLast = { x: cx, y: cy };
+                                _dabs = [{ x: cx, y: cy, dx: cdx, dy: cdy, p: 1 }];
+                                // Recording taps raw pointer events, which don't fire
+                                // while stationary — capture the hold here. Frames
+                                // that moved ≥0.1px were already recorded by the
+                                // pointermove handler (same gate as 05d's).
+                                if (recEnabled && typeof recRecordInteraction === 'function'
+                                    && (cdx * cdx + cdy * cdy) < 1.0) {
+                                    recRecordInteraction(cx, cy, 0, 0, pointer.color);
+                                }
                             }
                         } else {
                             // Released (or between strokes): drop any walker
@@ -193,6 +240,51 @@
                         }
                     } else {
                         window.__contFlowLast = null;
+                        // Fill in the RAMP REGION. The spacing walker lays a dab
+                        // every ~0.35 brush diameters, which at default size is
+                        // ~73 canvas px — so the whole splat-in ramp is spanned by
+                        // two or three dabs and arrives as separate blobs that
+                        // step in size and brightness. That is the "stuttery on
+                        // small movements" report: a movement shorter than one
+                        // spacing paints the press stamp and nothing else at all.
+                        //
+                        // While the ramp is still climbing, top up any frame the
+                        // walker left empty with one dab at the live pointer, so
+                        // the entrance is continuous the way constant-flow is.
+                        // Once the ramp tops out the walker owns the stroke again
+                        // and normal spacing (and its texture) is unchanged.
+                        //
+                        // Distance modes require actual movement: without that a
+                        // stationary press would pump dabs forever at a ramp value
+                        // that can never advance. Time mode is the opposite — a
+                        // still press is exactly the case it exists for.
+                        // depositCredit: the top-up is one dab per empty FRAME,
+                        // so it is metered on the sim clock like the hose above.
+                        if (pointer.down && !_dabs.length && depositCredit &&
+                            window.splatInMode && window.splatInMode !== 'instant' &&
+                            config.BRUSH_TARGET === 'fluid' &&
+                            window.BrushEngine && window.BrushEngine.isActive() &&
+                            getSplatInMult() < 0.999) {
+                            // Travel comes from the engine, which resets it at
+                            // begin(). Compare against splatStrokeDist — the ramp's
+                            // own progress, also reset per stroke — so "has the
+                            // pointer moved past where the ramp is?" needs no
+                            // extra state of its own. A private high-water mark
+                            // here would survive into the next stroke and suppress
+                            // its opening frames, which is exactly the bug this
+                            // shape avoids.
+                            var _bt = (window.BrushEngine.travel ? window.BrushEngine.travel() : 0) /
+                                      Math.max(1, canvas.width);
+                            // A distance ramp advances only with movement; a time
+                            // ramp is exactly the stationary case, so it always
+                            // fills. Zero velocity either way: these are the gaps
+                            // BETWEEN walker dabs, and the walker already carries
+                            // the stroke's momentum.
+                            if (window.splatInMode === 'time' || _bt > splatStrokeDist + 0.0005) {
+                                _dabs = [{ x: pointer.x, y: pointer.y, dx: 0, dy: 0, p: 1,
+                                           travel: _bt * Math.max(1, canvas.width) }];
+                            }
+                        }
                     }
                     if (_dabs.length) window.__lastPaintMs = nowMs;
                     const _toSketch = config.BRUSH_TARGET === 'sketch';
@@ -212,8 +304,23 @@
                             if (typeof window.__maskStamp === 'function') window.__maskStamp(d.x, d.y, d.p);
                             continue;
                         }
-                        // splat-in ramp stays distance-based (same accumulator)
-                        splatStrokeDist += Math.hypot(d.dx, d.dy) / 10 / Math.max(1, canvas.width);
+                        // Splat-in ramp progress. Prefer the dab's OWN cumulative
+                        // path length (05d0 stamps it): the old line derived it
+                        // from |velocity|, which the walker sets to exactly
+                        // 10 x spacing, so it advanced one fixed step per dab no
+                        // matter how far the pointer actually moved — a dab
+                        // counter, not a distance. At default spacing that gave
+                        // the entire ramp 2-3 samples, which is what read as
+                        // stepped/stuttery (and, since the ramp also drives dye,
+                        // as 2-3 brightness bands). Synthesized dabs from the
+                        // constant-flow and ramp-catchup branches carry no travel,
+                        // so they keep the accumulator path with their real
+                        // per-frame delta.
+                        if (typeof d.travel === 'number') {
+                            splatStrokeDist = d.travel / Math.max(1, canvas.width);
+                        } else {
+                            splatStrokeDist += Math.hypot(d.dx, d.dy) / 10 / Math.max(1, canvas.width);
+                        }
                         const inMult = getSplatInMult();
                         // Flow = the Flow slider, scaling deposited dye, baked into
                         // the recorded color so stroke replay stays faithful.
@@ -223,7 +330,12 @@
                         // (gateFlow) with the colour kept TRUE; additive bakes flow
                         // into the colour value. Keeping press + drag on one helper
                         // is what stops splat-one and the drag from diverging.
-                        const col = window.__applyPaintFlow(pointer.color, flowMul);
+                        // The splat-in ramp scales dye as well as radius (05d
+                        // __splatInFlowMul): the shader's centre deposit is
+                        // radius-independent, so a size-only ramp still stamped
+                        // full-strength colour on the first dab.
+                        const inFlow = window.__splatInFlowMul ? window.__splatInFlowMul() : 1;
+                        const col = window.__applyPaintFlow(pointer.color, flowMul * inFlow);
                         // Publish the true painted radius so recording captures the
                         // actual (splat-in ramped) brush size, not the base.
                         window.__lastPaintRadius = config.SPLAT_RADIUS * inMult;
@@ -281,7 +393,16 @@
                 // in size over splatOutDist of travel. Ends when the size taper
                 // completes OR the velocity has effectively died (so it can never
                 // stall splatting at a fixed point).
-                if (splatOutActive) {
+                //
+                // The tail is a per-FRAME process — one dab, one position step,
+                // one velocity decay per frame — so it rides depositCredit like
+                // the constant-flow hose: unchanged at Time ≥ 1, and at Time
+                // 0.25 it advances one frame in four. Uncredited frames freeze
+                // it entirely (position, decay, taper and the termination test
+                // together), so the tail keeps its exact shape and simply takes
+                // four times as long to lay down — instead of stamping its whole
+                // length into a fluid that has barely moved.
+                if (splatOutActive && depositCredit) {
                     const outMult = getSplatOutMult();
                     const outVel2 = splatOutDx * splatOutDx + splatOutDy * splatOutDy;
                     if (outMult <= 0.001 || outVel2 < 0.0002) {
@@ -289,6 +410,16 @@
                         // can die while stabilizer dabs still drain. The
                         // full-idle gate above owns the flush.
                         splatOutActive = false;
+                        // Wire flush: the tail queues dabs AFTER
+                        // broadcastPointerUp already force-flushed, so its
+                        // final sub-interval dabs would sit in the queue until
+                        // the NEXT stroke pushed them — measured as a stray dab
+                        // from the previous stroke landing out of order at the
+                        // start of the next one. End of tail = end of stroke.
+                        if (typeof window.flushDabs === 'function') {
+                            window.flushDabs(window.__mpLastDabColor,
+                                (typeof animationMultiplier === 'number' ? animationMultiplier : 1), true);
+                        }
                     } else {
                         // Tail dye honors the Flow slider like the stroke it ends
                         const tailFlow = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
@@ -300,7 +431,21 @@
                         // softly — no abrupt stop.
                         const outProgress = 1.0 - outMult; // 0 at start → 1 at end
                         const decayRate = 0.96 - 0.06 * outProgress; // 0.96 → 0.90
-                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * decayRate, splatOutDy * decayRate, tailCol, config.SPLAT_RADIUS * splatReleaseInMult * outMult);
+                        const tailRadius = config.SPLAT_RADIUS * splatReleaseInMult * outMult;
+                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * decayRate, splatOutDy * decayRate, tailCol, tailRadius);
+                        // 2026-08-16 fidelity audit: the release tail is part of
+                        // the stroke the painter sees — peers used to watch
+                        // strokes stop dead at lift while the painter's eased
+                        // out. The tail rides the same dab wire as the stroke.
+                        if (typeof window.queueDab === 'function') {
+                            window.__mpLastDabColor = tailCol;
+                            window.queueDab(splatOutX / canvas.width, splatOutY / canvas.height,
+                                splatOutDx * decayRate, splatOutDy * decayRate, tailRadius);
+                        }
+                        if (typeof window.flushDabs === 'function') {
+                            window.flushDabs(tailCol,
+                                (typeof animationMultiplier === 'number' ? animationMultiplier : 1), false);
+                        }
                         // Advance the tail along the decaying velocity + accumulate
                         // its travel for the distance-based taper.
                         splatOutX += splatOutDx / 10;
@@ -344,6 +489,10 @@
                 gl.uniform1f(vorticityProg.uniforms.uCapSpd,
                     config.VEL_SOURCE_GATE === false ? 0.0 :
                     ((typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0));
+                // Domain-edge apron: the canvas border is a wall too. Kill switch
+                // for A/B feel-testing — config.CURL_EDGE_GATE = false.
+                gl.uniform1f(vorticityProg.uniforms.uEdgeGate,
+                    config.CURL_EDGE_GATE === false ? 0.0 : 1.0);
                 gl.uniform1i(vorticityProg.uniforms.hasObstacle,
                     (obsActive && config.CURL_WALL_GATE !== false) ? 1 : 0);
                 gl.uniform1f(vorticityProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);

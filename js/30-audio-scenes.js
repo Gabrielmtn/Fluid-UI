@@ -307,8 +307,8 @@
             // back and breaking the tunnel illusion
             this._prevAbsorb = window.__edgeAbsorb || 0;
             window.__edgeAbsorb = o.overflow ? 1 : 0;
-            // Keep the brush breathing with loudness for the user's own strokes
-            if (window.audioReactive) window.audioReactive.setMapping('overallToSize', true);
+            // The scene animates the canvas; it does not touch the user's brush.
+            // (This used to force overallToSize back on, overriding the checkbox.)
         },
         exit: function () {
             window.__edgeAbsorb = this._prevAbsorb || 0;

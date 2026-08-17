@@ -252,7 +252,7 @@
         <button id="mobileMenuClose" class="mobile-menu-close" aria-label="Close Menu">✕</button>
         <div class="control-group">
             <label for="brushSize">Brush Size</label>
-            <input type="range" id="brushSize" min="0.001" max="30" value="11" step="0.001">
+            <input type="range" id="brushSize" min="0.001" max="100" value="11" step="0.001">
         </div>
         <div class="control-group">
             <label for="colorPicker">Fluid Color</label>
@@ -487,13 +487,12 @@
              runs; buildArmColorsDropdown moves this group into the Multi-Brush
              dropdown, next to the per-arm colour rows it governs. -->
         <div class="control-group" id="symmetryModeGroup">
-            <label for="symmetryMode">🪞 Symmetry</label>
+            <label for="symmetryMode">Symmetry</label>
             <select id="symmetryMode">
                 <option value="radial">Radial</option>
                 <option value="mirrorX">Mirror L↔R</option>
                 <option value="mirrorY">Mirror U↕D</option>
                 <option value="mirrorQuad">Mirror Quad</option>
-                <option value="spiral">Spiral</option>
                 <option value="rake">Rake</option>
             </select>
         </div>

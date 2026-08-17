@@ -197,6 +197,12 @@
         // the legacy checkboxes + color.brush programmatically, and the 05g
         // handlers must not hijack arm0.mode — the reconcile in 6b owns it.
         window.__brushColorRestoring = true;
+        // Same reason applyPresetSnapshot raises this: the checkbox pass below
+        // dispatches 'change' on every restored checkbox, and handlers that
+        // rewrite OTHER controls (kaleido → multiplier) would clobber values
+        // this very function just restored. Without it, a session saved with
+        // kaleido on booted at 8 arms no matter what multiplier was saved.
+        window._profileApplying = true;
 
         // ── 1. Palettes (must happen before other UI that references them) ──
         try {
@@ -326,6 +332,10 @@
         } catch(_) {}
         window.__brushColorRestoring = false;
         if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI();
+        // Release on the next tick, matching applyPresetSnapshot: any change
+        // handlers queued by this load still see the flag, manual edits after
+        // boot do not.
+        setTimeout(function () { window._profileApplying = false; }, 0);
 
         // ── 7. Canvas wrapper rect ──
         var wr = sm.get('canvas.wrapperRect');
@@ -598,11 +608,13 @@
         } catch(_){}
 
         // ── Brush section runtime ──
+        // replaySpeed/replayLiveColors deliberately absent (2026-08-16): speed is
+        // per-user workflow state like fpsCap — a Scene click resetting your
+        // playback rate is never what you meant — and the live-colour flag is
+        // retired. See applyPresetSnapshot for the matching read side.
         var brushState = {
             replayMode: window.replayMode || 'stroke',
             replayTimePeriod: window.replayTimePeriod || 5,
-            replaySpeed: typeof window.replaySpeed === 'number' ? window.replaySpeed : 1,
-            replayLiveColors: !!window.replayLiveColors,
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
             splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
@@ -673,6 +685,7 @@
                         title: layer.title || ('Layer ' + layer.index),
                         data: layer.data || null,
                         originalData: layer.originalData || layer.data || null,
+                        filmData: layer.filmData || null,   // collider on-canvas film
                         visible: layer.visible !== false,
                         active: !!layer.active,
                         threshold: layer.threshold || 0,
@@ -1054,7 +1067,17 @@
         try {
             if (snapshot.lightShiftPath) {
                 if (window.lightShift && window.lightShift.setPath) {
-                    window.lightShift.setPath(snapshot.lightShiftPath);
+                    // setPath restarts the playhead at index 0. The multiplayer
+                    // mirror re-applies this snapshot as often as every 400ms, so
+                    // re-setting an unchanged path pinned a watcher's colour cycle
+                    // at its first stop while the painter's animated. Only set when
+                    // the path actually differs.
+                    var _lsSame = false;
+                    try {
+                        _lsSame = window.lightShift.getPath &&
+                            JSON.stringify(snapshot.lightShiftPath) === JSON.stringify(window.lightShift.getPath());
+                    } catch (_) {}
+                    if (!_lsSame) window.lightShift.setPath(snapshot.lightShiftPath);
                 } else if (typeof window.lightShiftWaypoints !== 'undefined') {
                     window.lightShiftWaypoints = JSON.parse(JSON.stringify(snapshot.lightShiftPath));
                 }
@@ -1099,18 +1122,13 @@
                     var tInput = document.getElementById('replayTimePeriod');
                     if (tInput) tInput.value = bs.replayTimePeriod;
                 }
-                if (typeof bs.replaySpeed === 'number') {
-                    window.replaySpeed = bs.replaySpeed;
-                    var spSlider = document.getElementById('replaySpeed');
-                    if (spSlider) spSlider.value = bs.replaySpeed;
-                    var spVal = document.getElementById('replaySpeedValue');
-                    if (spVal) spVal.textContent = bs.replaySpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
-                }
-                if (typeof bs.replayLiveColors === 'boolean') {
-                    window.replayLiveColors = bs.replayLiveColors;
-                    var lcCb = document.getElementById('replayLiveColors');
-                    if (lcCb) lcCb.checked = bs.replayLiveColors;
-                }
+                // bs.replaySpeed / bs.replayLiveColors (older snapshots): both
+                // retired 2026-08-16 and intentionally ignored. Speed used to be
+                // rewritten here on every preset, Scene, .fluid import and
+                // multiplayer mirror tick — eventlessly, so the fader's fill
+                // never repainted and the value never persisted: it looked broken
+                // and came back wrong at the next boot. It is now owned solely by
+                // its own slider. Old snapshots carrying these keys are harmless.
                 // bs.refreshRate (older snapshots): the Splat Rate throttle was
                 // removed 2026-08-06 (replay always honored the recorded rate;
                 // the live-paint throttle was superseded by BRUSH_SPACING) —
@@ -1256,12 +1274,16 @@
                             var layersHost = document.getElementById('layers-container') || canvasWrapper;
                             if (layersHost) layersHost.appendChild(layerDiv);
                         }
-                        layerDiv.style.backgroundImage = 'url(' + ld.data + ')';
+                        // Prefer the tinted coverage film; ld.data is the OPAQUE
+                        // map (black off-wall) and painting that full-bleed over
+                        // the canvas is the veil described in 23-depth-collision.
+                        // Presets saved before filmData existed fall back to it.
+                        layerDiv.style.backgroundImage = 'url(' + (ld.filmData || ld.data) + ')';
                         // Stretch — matches the obstacle compositor's mapping (see 23-depth-collision.js)
                         layerDiv.style.backgroundSize = '100% 100%';
                         layerDiv.style.backgroundPosition = 'center';
                         layerDiv.style.display = ld.visible ? 'block' : 'none';
-                        layerDiv.style.opacity = '0.55';
+                        layerDiv.style.opacity = ld.filmData ? '0.3' : '0.55';
                     } else {
                         // Regular image layers use pre-existing layerN divs
                         layerDiv = document.getElementById('layer' + ld.index);
@@ -1277,6 +1299,7 @@
                         title: ld.title || ('Layer ' + ld.index),
                         data: ld.data,
                         originalData: ld.originalData || ld.data,
+                        filmData: ld.filmData || null,
                         visible: ld.visible !== false,
                         active: false,
                         threshold: ld.threshold || 0,
@@ -1553,8 +1576,8 @@
             paletteIndex: 0,
             armColors: [{ mode: 'main', color: '#ffffff', stepIndex: 0 }],
             lightPos: { x: 0.5, y: 0.5 },
-            brushState: { replayMode: 'stroke', replayTimePeriod: 5, replaySpeed: 1,
-                replayLiveColors: false, splatInMode: 'instant', splatOutMode: 'instant',
+            brushState: { replayMode: 'stroke', replayTimePeriod: 5,
+                splatInMode: 'instant', splatOutMode: 'instant',
                 splatInDist: 0.15, splatOutDist: 0.15 },
             material: { mode: 'fluid', amount: null, shape: 0 },
             brushTip: { tip: 0, shapeId: null, angle: 0 }

@@ -360,7 +360,33 @@
         
         function recUpdatePlayback() {
             const now = Date.now();
-            const delta = now - recLastPlaybackTime;
+            // ── Sim-clock playhead (2026-08-16) ─────────────────────────────
+            // The playhead used to advance on the WALL clock while the fluid it
+            // feeds advances on dt = min(rawDt, 16ms) × timeScale. Those are
+            // two different clocks, and a recorded interaction is an impulse of
+            // dye, not a rate — so at Time 0.25 the timeline handed the sim four
+            // seconds of splats for every simulated second, piling deposits on
+            // top of each other faster than the (now four-times-slower) field
+            // could carry them away. That is the flat, over-saturated middle:
+            // the outer structure was laid down at Time 1 and kept its detail,
+            // the middle was drowned at low Time.
+            //
+            // Riding the sim's own dt puts every recorded splat back at the
+            // simulated instant it was captured at, so a recording plays out
+            // the SAME evolution at any Time setting — just slower in wall
+            // time. It also stops a sub-60fps frame from over-depositing: the
+            // physics clamps its step to 16ms, so a 33ms frame used to feed the
+            // sim twice the dye it had time to move, at any Time setting.
+            //
+            // The cost is deliberate: playback wall-duration now stretches by
+            // 1/timeScale (and under frame-rate load), because the timeline's
+            // seconds are simulated seconds. config.REC_SIM_CLOCK = false
+            // restores the old wall-clock playhead.
+            const wallDelta = now - recLastPlaybackTime;
+            const delta = ((window.config && window.config.REC_SIM_CLOCK === false)
+                || typeof window.__simDtMs !== 'number')
+                ? wallDelta
+                : window.__simDtMs;
             let anyPlaying = false;
             let anyRecording = false;
             

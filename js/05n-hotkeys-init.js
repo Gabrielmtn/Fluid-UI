@@ -46,6 +46,9 @@
         let applyingState = false;
         function isTypingTarget(el) {
             if (!el) return false;
+            // Range/checkbox/colour inputs do not consume letter keys, so they
+            // must not block hotkeys — focus lands on them constantly.
+            if (window.__isTypingTarget) return window.__isTypingTarget(el);
             const tag = (el.tagName || '').toLowerCase();
             return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
         }

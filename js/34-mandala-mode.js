@@ -294,6 +294,24 @@
     // Guides live inside the transformed wrapper, so they scale for free —
     // but line weights should not balloon, and the overlay re-reads the box.
     window.__onZoomViewChange = function () { refresh(); };
+    // Zooming or panning by hand leaves the Fill radio describing a framing
+    // that is no longer on screen (it kept reading "Full" at 5.9x). Fill is a
+    // preset view, so once you move the view yourself it is simply no longer
+    // the active one — say so rather than lying. Guarded so clearing the radio
+    // cannot recurse back through applyFill.
+    var _clearingFill = false;
+    window.__onZoomViewUserChange = function () {
+        if (_clearingFill) return;
+        var picked = document.querySelector('input[name="mandalaFill"]:checked');
+        if (!picked || picked.value === 'off') return;
+        var off = document.querySelector('input[name="mandalaFill"][value="off"]');
+        if (!off) return;
+        _clearingFill = true;
+        // checked only — dispatching change would run applyFill and reset the
+        // very view the user just set.
+        off.checked = true;
+        _clearingFill = false;
+    };
 
     function guidesVisible() { return active() && !(hideGuidesEl && hideGuidesEl.checked); }
     function syncGuides() {

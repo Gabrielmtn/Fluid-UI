@@ -31,8 +31,9 @@
     var sx = 0, sy = 0;          // stabilized position (chases raw input)
     var lastEmitX = 0, lastEmitY = 0; // last emitted dab position
     var residual = 0;             // distance carried between segments
+    var strokeTravel = 0;         // total path length walked since begin()
     var lastP = 1;                // last pressure seen
-    var queue = [];               // pending dabs: {x, y, dx, dy, p}
+    var queue = [];               // pending dabs: {x, y, dx, dy, p, travel}
     var MAX_QUEUE = 512;          // spike safety — oldest dabs drop first
 
     function cfg(key, def) {
@@ -51,13 +52,47 @@
         return Math.max(4, 2 * Math.sqrt(cfg('SPLAT_RADIUS', 0.011)) * h);
     }
 
+    // Sim-clock deposition compensation (2026-08-16).
+    //
+    // The walker is distance-parameterized, which makes it speed-independent
+    // in HAND terms — and that is exactly what goes wrong when Time is low.
+    // A dab is an impulse of dye (splat() takes no dt), so laying one every
+    // `spacing` px of travel means the number of dabs per SIMULATED second
+    // scales as 1/timeScale: at Time 0.25 your hand delivers four times the
+    // dye per second of fluid evolution, into a field that has advected a
+    // quarter as far. The deposits stack instead of being carried off and the
+    // stroke saturates into a flat slab.
+    //
+    // Put another way: slowing time is exactly equivalent to speeding your
+    // hand up — a 4× faster stroke at Time 1 muddies for the same reason —
+    // and the cure is the same one. Spreading spacing by 1/timeScale restores
+    // dabs-per-simulated-second to what it is at Time 1, so the fluid gets the
+    // same interval to work between deposits and the stroke keeps its
+    // structure. The engine's momentum rule (vx = 10 × spacing) rescales with
+    // it, so total momentum per unit of travel is unchanged — the stroke
+    // pushes the fluid exactly as hard as before. Only the dye rate moves.
+    //
+    // Capped because the Time slider floors at 0.01, and an uncapped 100×
+    // would bead a stroke into isolated dots. config.BRUSH_TIME_COMP is that
+    // cap (a spacing multiplier); 1 or below disables the compensation.
+    // Deliberately inert at Time ≥ 1: fast time already spreads deposits out
+    // on its own, and densifying there would multiply the per-frame dab cost.
+    function timeCompensation() {
+        var c = window.config;
+        var cap = (c && typeof c.BRUSH_TIME_COMP === 'number') ? c.BRUSH_TIME_COMP : 4;
+        if (!(cap > 1)) return 1;
+        var s = window.timeScale;
+        if (typeof s !== 'number' || !(s > 0) || s >= 1) return 1;
+        return Math.min(cap, 1 / s);
+    }
+
     function spacingPx() {
         // 0.25px floor (was 1): the Spacing slider now reaches 0.1%, and the
         // 1px floor made everything below ~1% indistinguishable — sub-pixel
         // spacing is what dissolves the grainy dab-train look at slow speeds.
         // The drain cap (64 dabs/frame) and MAX_QUEUE still bound the cost
         // of a fast flick.
-        return Math.max(0.25, cfg('BRUSH_SPACING', 0.35) * brushDiameterPx());
+        return Math.max(0.25, cfg('BRUSH_SPACING', 0.35) * brushDiameterPx()) * timeCompensation();
     }
 
     // Emit dabs along the segment from the last processed sample toward
@@ -109,13 +144,23 @@
                     x: lastEmitX + dx * t + jx,
                     y: lastEmitY + dy * t + jy,
                     dx: vx, dy: vy,
-                    p: p0 + (p1 - p0) * t
+                    p: p0 + (p1 - p0) * t,
+                    // Cumulative path length from the press to THIS dab. The
+                    // splat-in ramp used to derive its progress from each dab's
+                    // velocity, but |v| is exactly 10 x spacing by construction
+                    // — so it was counting dabs, not measuring travel, and the
+                    // whole ramp resolved into 2-3 samples however far you drew.
+                    // Carrying real distance makes each dab's ramp value belong
+                    // to its own position on the path, immune to drain order
+                    // and to the coalescing spacing bump above.
+                    travel: strokeTravel + offset
                 });
             }
             emitted++;
             offset += spacing;
         }
         residual = residual + dist - emitted * spacing;
+        strokeTravel += dist;
         lastEmitX = x; // the anchor is the raw sample chain; interpolation
         lastEmitY = y; // is per segment, so it always advances to the sample
         lastP = p1;
@@ -130,9 +175,17 @@
             sx = x; sy = y;
             lastEmitX = x; lastEmitY = y;
             residual = 0;
+            strokeTravel = 0;
             lastP = 1;
             queue.length = 0;
         },
+
+        // Total path length walked since begin(), in canvas px. The splat-in
+        // ramp needs this for frames where the walker emits nothing: without a
+        // dab there is no travel stamp to read, and deriving it from a
+        // remembered pointer position goes wrong the moment that memory
+        // survives into the next stroke.
+        travel: function () { return strokeTravel; },
 
         // Feed one raw sample (call per pointermove AND per coalesced event).
         move: function (x, y) {

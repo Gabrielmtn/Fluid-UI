@@ -122,9 +122,13 @@
     // ─── HOTKEY ─────────────────────────────────────────────────
     function bindHotkey() {
         document.addEventListener('keydown', function (e) {
-            // Skip if typing in an input
-            var tag = e.target.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
+            // Skip if typing — but a focused SLIDER is not typing, and focus
+            // sits on one after every fader drag (this killed F silently).
+            if (window.__isTypingTarget) { if (window.__isTypingTarget(e.target)) return; }
+            else {
+                var tag = e.target.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
+            }
             // 'F' without any modifiers = focus mode (CapsLock-proof)
             if ((e.key === 'f' || e.key === 'F') && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
                 e.preventDefault();
