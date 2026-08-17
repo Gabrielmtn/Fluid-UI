@@ -228,7 +228,7 @@
     // Display-toggling only, no CSS transitions (they corrupt the WebGL
     // canvas in the Electron build).
     var flashEl = null, flashTimer = null;
-    function flash(text) {
+    function flash(text, ms) {
         if (!flashEl) {
             flashEl = document.createElement('div');
             flashEl.id = 'pasteIndicator';
@@ -241,7 +241,7 @@
         flashEl.textContent = text;
         flashEl.style.display = 'block';
         if (flashTimer) clearTimeout(flashTimer);
-        flashTimer = setTimeout(function () { flashEl.style.display = 'none'; }, 1400);
+        flashTimer = setTimeout(function () { flashEl.style.display = 'none'; }, ms || 1400);
     }
 
     var NO_IMAGE = 'Nothing to paste — copy an image first';
@@ -276,7 +276,9 @@
     function armColliderPaste() {
         armedUntil = Date.now() + ARM_MS;
         swallowPasteAt = 0; // the paste we're now waiting for must NOT be swallowed
-        flash('Press ' + pasteChord() + ' now to paste it as a collider');
+        // On screen for exactly as long as it is true — a confirmation can
+        // flick past, but an instruction the user has to act on cannot.
+        flash('Press ' + pasteChord() + ' now to paste it as a collider', ARM_MS);
     }
 
     function pasteMessage(n, mode) {
