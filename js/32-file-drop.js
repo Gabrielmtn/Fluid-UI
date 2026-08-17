@@ -334,21 +334,63 @@
                     return items[i].getType(types[t]).then(function (blob) { intake([blob], mode); });
                 }
             }
-            // Read worked and there is genuinely no image on the clipboard —
-            // a plain paste wouldn't find one either, so don't send the user
-            // chasing one.
-            flash(NO_IMAGE);
-        }).catch(armColliderPaste); // blocked or declined → hand it to Ctrl+V
+            // Read worked but exposed no image. That does NOT mean there is
+            // none: a file copied in Explorer reaches a paste event as a File
+            // and is invisible to this API entirely. Hand it to Ctrl+V.
+            armColliderPaste();
+        }).catch(armColliderPaste); // blocked or declined → same handoff
+    }
+
+    // Windows puts a file REFERENCE on the clipboard when you copy a file in
+    // Explorer — no bitmap at all, so readImage() comes back empty even though
+    // Ctrl+V pastes it fine (Chromium synthesizes a File for the paste event).
+    // Read the path off the clipboard and load it from disk so the chord stays
+    // one gesture. The format name is undocumented, so every step is failure-
+    // tolerant: anything unexpected falls through to the armed-paste handoff.
+    function electronClipboardFile(clip) {
+        try {
+            if (typeof clip.readBuffer !== 'function') return null;
+            var raw = clip.readBuffer('FileNameW');
+            if (!raw || !raw.length) return null;
+            // The path comes back UTF-16LE and NUL-terminated. The terminator is
+            // spelled out rather than escaped: a literal NUL in source makes the
+            // whole file read as binary to grep, diffs and review tools.
+            var NUL = String.fromCharCode(0);
+            var file = Buffer.from(raw).toString('ucs2').split(NUL)[0].trim();
+            var dot = file.lastIndexOf('.');
+            if (dot < 0) return null;
+            var ext = file.slice(dot + 1).toLowerCase();
+            if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].indexOf(ext) < 0) return null;
+            var bytes = require('fs').readFileSync(file);
+            if (!bytes || !bytes.length) return null;
+            var sep = Math.max(file.lastIndexOf('/'), file.lastIndexOf(String.fromCharCode(92)));
+            return {
+                url: 'data:image/' + (ext === 'jpg' ? 'jpeg' : ext) + ';base64,' + bytes.toString('base64'),
+                title: file.slice(sep + 1, dot) || 'Pasted'
+            };
+        } catch (_) { return null; }
     }
 
     function clipboardFallback(mode) {
         var clip = electronClipboard();
         if (clip) {
-            var img = null;
-            try { img = clip.readImage(); } catch (_) { return; }
-            if (!img || img.isEmpty()) { flash(NO_IMAGE); return; }
-            if (!admitCount(1)) return;
-            if (toLayer(img.toDataURL(), 'Pasted', mode)) flash(pasteMessage(1, mode));
+            var url = null, title = 'Pasted';
+            try { var img = clip.readImage(); if (img && !img.isEmpty()) url = img.toDataURL(); } catch (_) {}
+            if (!url) {
+                var f = electronClipboardFile(clip); // Explorer file copy
+                if (f) { url = f.url; title = f.title; }
+            }
+            if (url) {
+                if (!admitCount(1)) return;
+                if (toLayer(url, title, mode)) flash(pasteMessage(1, mode));
+                return;
+            }
+            // Nothing readable directly. If the clipboard holds ANYTHING at
+            // all, a plain paste may still carry it — only call it empty when
+            // the clipboard really is.
+            var formats = [];
+            try { formats = clip.availableFormats() || []; } catch (_) {}
+            if (formats.length) armColliderPaste(); else flash(NO_IMAGE);
             return;
         }
         if (mode === 'collider') asyncClipboardImage(mode);
