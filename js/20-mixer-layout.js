@@ -298,6 +298,224 @@
         } catch (_) {}
     }
 
+    // ─── BRUSH TIP: one vocabulary, two doors ────────────────────
+    // These five glyphs are the app's whole visual language for the splat
+    // stamp. The brush drawer's Tip row and the square swatch beside the
+    // Brush Size fader both read this list, so a tip can never be drawn as
+    // one shape in one place and another shape somewhere else.
+    var BRUSH_TIPS = [
+        { v: 0, glyph: '◌', name: 'Soft',   title: 'Soft — the classic gaussian dab' },
+        { v: 1, glyph: '⬤', name: 'Blob',   title: 'Blob — noise-notched round stamp' },
+        { v: 2, glyph: '■', name: 'Chisel', title: 'Chisel — squared press' },
+        { v: 3, glyph: '▬', name: 'Streak', title: 'Streak — elongated smear' },
+        { v: 4, glyph: '◯', name: 'Ring',   title: 'Ring — thin dye band, hollow center' }
+    ];
+
+    // The drawer owns the tip's commit path (config + persistence + the
+    // Texture slider's enabled state + preset-dirty). The strip swatch is a
+    // second DOOR onto those setters, never a second copy of them.
+    var BrushTipCtl = null;     // {setTip, markDirty, openImport} — set by buildBrushPanel
+    var tipSwatchSync = null;   // set by buildTipSwatch — repaints the swatch (+ an open menu)
+    function syncTipSwatch() { if (tipSwatchSync) tipSwatchSync(); }
+
+    function activeShapeEntry() {
+        if (!window.BrushShapes) return null;
+        var id = window.BrushShapes.activeId();
+        if (!id) return null;
+        var lst = window.BrushShapes.list() || [];
+        for (var i = 0; i < lst.length; i++) if (lst[i].id === id) return lst[i];
+        return null;
+    }
+
+    // Custom stamp swatches (33-brush-shapes) + the import tile, shared by
+    // the drawer's shapes row and the strip's tip menu — one renderer, so a
+    // shape selects, deletes and highlights identically wherever it's clicked.
+    function renderShapeTiles(row, opts) {
+        opts = opts || {};
+        row.innerHTML = '';
+        var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
+        var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
+        lst.forEach(function (s) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'brush-tip-btn brush-shape-btn' + (s.id === act ? ' active' : '');
+            b.style.backgroundImage = 'url("' + s.dataURL + '")';
+            // Pin the sizing longhands inline: every .brush-tip-btn state
+            // rule (:hover, .active) uses the `background:` shorthand,
+            // which resets size/repeat/position — inline always wins, so
+            // the thumbnail can never blow up to natural size in a state
+            // whose CSS override was missed.
+            b.style.backgroundSize = 'contain';
+            b.style.backgroundRepeat = 'no-repeat';
+            b.style.backgroundPosition = 'center';
+            b.title = s.name + ' — click to paint with this shape · right-click to delete';
+            b.addEventListener('click', function () {
+                if (!window.BrushShapes) return;
+                window.BrushShapes.setActive(window.BrushShapes.activeId() === s.id ? null : s.id);
+                if (BrushTipCtl) BrushTipCtl.markDirty();
+                if (opts.onPick) opts.onPick();
+            });
+            b.addEventListener('contextmenu', function (e) {
+                e.preventDefault();
+                if (window.BrushShapes && confirm('Delete brush shape "' + s.name + '"?')) {
+                    window.BrushShapes.remove(s.id);
+                }
+            });
+            row.appendChild(b);
+        });
+        var addB = document.createElement('button');
+        addB.type = 'button';
+        addB.className = 'brush-tip-btn brush-shape-add';
+        addB.textContent = '＋';
+        addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Magic Mask Objects). You can also drop an image anywhere on this row.';
+        addB.addEventListener('click', function () { if (opts.onImport) opts.onImport(); });
+        row.appendChild(addB);
+    }
+
+    // The square appended to the Brush Size fader: it SHOWS the tip you are
+    // painting with (built-in glyph, or the custom stamp's own thumbnail) and
+    // opens a tip menu. Until now the tip lived only inside the brush drawer —
+    // nothing anywhere on screen said which tip was loaded, and changing it
+    // meant opening a drawer from the fader that sets its size.
+    function buildTipSwatch() {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ch-tip-swatch';
+
+        // The stamp thumbnail rides an inner span so the button's own
+        // background stays free for the hover/active fills.
+        var face = document.createElement('span');
+        face.className = 'ch-tip-face';
+        btn.appendChild(face);
+
+        var menu = document.createElement('div');
+        menu.className = 'arm-colors-panel brush-tip-menu';
+        menu.style.display = 'none';
+        menu.style.position = 'fixed';   // the strip is overflow-x:auto — a popup inside it would clip
+        document.body.appendChild(menu);
+        menu.addEventListener('click', function (e) { e.stopPropagation(); });
+
+        var head = document.createElement('div');
+        head.className = 'arm-colors-header';
+        head.textContent = 'Brush Tip';
+        menu.appendChild(head);
+
+        var list = document.createElement('div');
+        list.className = 'brush-tip-menu-list';
+        menu.appendChild(list);
+
+        var itemBtns = [];
+        BRUSH_TIPS.forEach(function (t) {
+            var it = document.createElement('button');
+            it.type = 'button';
+            it.className = 'brush-tip-item';
+            it.dataset.tip = String(t.v);
+            it.title = t.title;
+            var g = document.createElement('span');
+            g.className = 'brush-tip-item-glyph';
+            g.textContent = t.glyph;
+            var n = document.createElement('span');
+            n.className = 'brush-tip-item-name';
+            n.textContent = t.name;
+            it.appendChild(g);
+            it.appendChild(n);
+            it.addEventListener('click', function () {
+                // Same order as the drawer's tip row: a built-in tip dismisses
+                // any custom shape override first, then commits.
+                if (window.BrushShapes && window.BrushShapes.activeId()) window.BrushShapes.setActive(null);
+                if (BrushTipCtl) { BrushTipCtl.setTip(t.v); BrushTipCtl.markDirty(); }
+                closeMenu();
+            });
+            itemBtns.push(it);
+            list.appendChild(it);
+        });
+
+        var shapesLabel = document.createElement('label');
+        shapesLabel.className = 'brush-section-label';
+        shapesLabel.textContent = 'Shapes';
+        menu.appendChild(shapesLabel);
+
+        var shapesRow = document.createElement('div');
+        // brush-shapes-area is 32-file-drop's hook: dropping an image on the
+        // menu's shapes row imports it, exactly as it does on the drawer's.
+        shapesRow.className = 'brush-tip-row brush-shapes-row brush-shapes-area';
+        menu.appendChild(shapesRow);
+
+        function renderTiles() {
+            renderShapeTiles(shapesRow, {
+                onImport: function () {
+                    closeMenu();  // the mask editor takes the screen from here
+                    if (BrushTipCtl) BrushTipCtl.openImport();
+                },
+                onPick: closeMenu
+            });
+        }
+
+        function positionMenu() {
+            // Fixed left/top are read in the --ui-scale zoomed space: measure in
+            // screen px, divide by zoom (same math as the arm-colors popup).
+            var z = window.UIScale ? window.UIScale.get() : 1;
+            var rect = btn.getBoundingClientRect();
+            var w = 172;
+            var left = rect.left + rect.width / 2 - (w * z) / 2;
+            left = Math.max(4, Math.min(left, window.innerWidth - w * z - 4));
+            menu.style.left = (left / z) + 'px';
+            menu.style.top = ((rect.bottom + 4) / z) + 'px';
+            menu.style.width = w + 'px';
+            menu.style.maxHeight = Math.max(180, (window.innerHeight - rect.bottom - 16) / z) + 'px';
+            menu.style.overflowY = 'auto';
+        }
+
+        function openMenu() {
+            renderTiles();
+            positionMenu();   // position BEFORE it paints
+            menu.style.display = 'block';
+            btn.classList.add('active');
+        }
+        function closeMenu() {
+            menu.style.display = 'none';
+            btn.classList.remove('active');
+        }
+
+        function refresh() {
+            var entry = activeShapeEntry();
+            var tip = (window.config && window.config.BRUSH_TIP) | 0;
+            if (tip < 0 || tip >= BRUSH_TIPS.length) tip = 0;
+            if (entry) {
+                // A custom stamp overrides the built-in tip — show the stamp.
+                face.textContent = '';
+                face.style.backgroundImage = 'url("' + entry.dataURL + '")';
+                btn.title = 'Brush tip: ' + entry.name + ' (custom shape) — click to change';
+            } else {
+                face.style.backgroundImage = '';
+                face.textContent = BRUSH_TIPS[tip].glyph;
+                btn.title = 'Brush tip: ' + BRUSH_TIPS[tip].name + ' — click to change';
+            }
+            itemBtns.forEach(function (b) {
+                b.classList.toggle('active', !entry && parseInt(b.dataset.tip, 10) === tip);
+            });
+            if (menu.style.display !== 'none') renderTiles();
+        }
+        tipSwatchSync = refresh;
+
+        // No stopPropagation on the swatch: letting the click bubble lets the
+        // brush drawer's own outside-click closer retire the drawer, so the
+        // two never sit stacked on top of each other.
+        btn.addEventListener('click', function () {
+            if (menu.style.display === 'none') openMenu(); else closeMenu();
+        });
+        document.addEventListener('click', function (e) {
+            if (menu.style.display !== 'none' && !menu.contains(e.target)
+                && e.target !== btn && !btn.contains(e.target)) closeMenu();
+        });
+        window.addEventListener('resize', function () {
+            if (menu.style.display !== 'none') positionMenu();
+        });
+
+        refresh();
+        return btn;
+    }
+
     // ─── MIXER STRIP ─────────────────────────────────────────────
     function buildMixerStrip(controls) {
         const strip = document.createElement('div');
@@ -317,6 +535,14 @@
         var sizeGear = makeChGear('Brush settings & presets');
         wireGearToTrigger(sizeGear, sizeChannel.querySelector('.ch-label'));
         sizeChannel.querySelector('.ch-header').appendChild(sizeGear);
+        // The tip swatch rides the FADER row, not the header: tip and size are
+        // the two halves of one answer to "what am I painting with", and the
+        // header already carries the label, the value and the gear.
+        var sizeFaderRow = sizeChannel.querySelector('.ch-fader');
+        if (sizeFaderRow) {
+            sizeFaderRow.appendChild(buildTipSwatch());
+            sizeChannel.classList.add('ch-has-tip');   // buys the fader back its width
+        }
         strip.appendChild(sizeChannel);
 
         var fluidChannel = faderChannel('Fluid', 'blue', 'curl', 'curlValue');
@@ -2509,13 +2735,6 @@
         sLabel('Tip');
         var tipRow = document.createElement('div');
         tipRow.className = 'brush-tip-row';
-        var TIPS = [
-            { v: 0, glyph: '◌', name: 'Soft',   title: 'Soft — the classic gaussian dab' },
-            { v: 1, glyph: '⬤', name: 'Blob',   title: 'Blob — noise-notched round stamp' },
-            { v: 2, glyph: '■', name: 'Chisel', title: 'Chisel — squared press' },
-            { v: 3, glyph: '▬', name: 'Streak', title: 'Streak — elongated smear' },
-            { v: 4, glyph: '◯', name: 'Ring',   title: 'Ring — thin dye band, hollow center' }
-        ];
         var tipBtns = [];
         function setBrushTip(v) {
             v = v | 0;
@@ -2525,10 +2744,11 @@
                 b.classList.toggle('active', parseInt(b.dataset.tip, 10) === v);
             });
             syncTexState();
+            syncTipSwatch();   // the strip swatch is the other face of this control
             try { if (window.settingsManager) window.settingsManager.set('brush.tip', v); } catch (_) {}
         }
         SETTERS.tip = setBrushTip;
-        TIPS.forEach(function (t) {
+        BRUSH_TIPS.forEach(function (t) {
             var b = document.createElement('button');
             b.type = 'button';
             b.className = 'brush-tip-btn';
@@ -2566,44 +2786,16 @@
             if (f && window.BrushShapes) window.BrushShapes.beginImportFile(f);
             shapeFileInput.value = '';
         });
+        // Hand the strip's tip swatch this drawer's commit path — it must not
+        // grow its own copy of the tip setter, the preset-dirty flag or the
+        // import flow (the file input lives here).
+        BrushTipCtl = {
+            setTip: setBrushTip,
+            markDirty: markDirty,
+            openImport: function () { shapeFileInput.click(); }
+        };
         function renderBrushShapes() {
-            shapesRow.innerHTML = '';
-            var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
-            var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
-            lst.forEach(function (s) {
-                var b = document.createElement('button');
-                b.type = 'button';
-                b.className = 'brush-tip-btn brush-shape-btn' + (s.id === act ? ' active' : '');
-                b.style.backgroundImage = 'url("' + s.dataURL + '")';
-                // Pin the sizing longhands inline: every .brush-tip-btn state
-                // rule (:hover, .active) uses the `background:` shorthand,
-                // which resets size/repeat/position — inline always wins, so
-                // the thumbnail can never blow up to natural size in a state
-                // whose CSS override was missed.
-                b.style.backgroundSize = 'contain';
-                b.style.backgroundRepeat = 'no-repeat';
-                b.style.backgroundPosition = 'center';
-                b.title = s.name + ' — click to paint with this shape · right-click to delete';
-                b.addEventListener('click', function () {
-                    if (!window.BrushShapes) return;
-                    window.BrushShapes.setActive(window.BrushShapes.activeId() === s.id ? null : s.id);
-                    markDirty();
-                });
-                b.addEventListener('contextmenu', function (e) {
-                    e.preventDefault();
-                    if (window.BrushShapes && confirm('Delete brush shape "' + s.name + '"?')) {
-                        window.BrushShapes.remove(s.id);
-                    }
-                });
-                shapesRow.appendChild(b);
-            });
-            var addB = document.createElement('button');
-            addB.type = 'button';
-            addB.className = 'brush-tip-btn brush-shape-add';
-            addB.textContent = '＋';
-            addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Magic Mask Objects). You can also drop an image anywhere on this row.';
-            addB.addEventListener('click', function () { shapeFileInput.click(); });
-            shapesRow.appendChild(addB);
+            renderShapeTiles(shapesRow, { onImport: function () { shapeFileInput.click(); } });
         }
         SETTERS.shape = function (v) {
             if (!window.BrushShapes) return;
@@ -2618,6 +2810,7 @@
                 tb.classList.toggle('active', !act && parseInt(tb.dataset.tip, 10) === curTip);
             });
             syncTexState();
+            syncTipSwatch();
         };
         renderBrushShapes();
         var texGroup = pSlider('brushTipTexture', 'Texture', 0, 1, 0.01, 'BRUSH_TIP_TEXTURE', pct, 'tipTexture');
@@ -4214,20 +4407,21 @@
             panel.style.left = (left / z) + 'px';
             panel.style.top = ((rect.bottom + 4) / z) + 'px';
             panel.style.width = panelW + 'px';
+            // 8 arms + the arm-count fader outgrows a short viewport: cap to the
+            // space under the trigger and scroll the overflow (same guard the
+            // brush drawer needs).
+            panel.style.maxHeight = Math.max(180, (window.innerHeight - rect.bottom - 16) / z) + 'px';
+            panel.style.overflowY = 'auto';
         }
 
+        // A silent drag strip where the "Brush Colors" title bar used to be
+        // (2026-08-16): the title only restated the control you just clicked,
+        // and the ✕ was a fourth way to close a panel the trigger, the gear and
+        // any click outside the canvas already close. The strip itself stays —
+        // something has to be grabbable (see the drag note below).
         var header = document.createElement('div');
-        header.className = 'arm-colors-header';
-        header.textContent = 'Brush Colors';
-        // Explicit close, because the panel now survives canvas clicks (below)
-        var closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.className = 'arm-colors-close';
-        closeBtn.textContent = '✕';
-        closeBtn.title = 'Close';
-        closeBtn.style.cssText = 'float:right;background:none;border:0;color:inherit;' +
-            'font-size:12px;line-height:1;cursor:pointer;padding:0 2px;opacity:0.7';
-        header.appendChild(closeBtn);
+        header.className = 'arm-colors-header arm-colors-grip';
+        header.title = 'Drag to move';
         panel.appendChild(header);
 
         // Drag by the header so the panel can be moved off whatever you are
@@ -4244,18 +4438,75 @@
             }
         } catch (_) {}
 
-        // Symmetry leads the panel: this dropdown IS the Multi-Brush panel, and
-        // the mode decides what the arms listed below actually are. The element
-        // is authored in index.html and MOVED here, not cloned — a clone would
-        // leave the persisted #symmetryMode id pointing at a stale hidden copy.
+        // Arm count leads the panel: this IS the Multi-Brush panel, so the
+        // number of arms belongs next to the symmetry and per-arm colors it
+        // governs — reaching back out to the strip fader to change it, then
+        // back in here, was the whole complaint. A duplicate slider, NOT a
+        // moved one: #multiplier stays in the strip and stays the single source
+        // of truth. This proxy writes it and dispatches 'input', so every
+        // existing listener (05e's animationMultiplier, the strip's value cell,
+        // the arm rows below) runs exactly as it does for a direct drag.
+        // Query through the channel, not the document: faderChannel has already
+        // re-parented #multiplier into the Multi-Brush channel and that channel
+        // is still DETACHED at this point, so document.getElementById returns
+        // null here — the same trap the trigger lookup above documents. (The
+        // "rebuild when multiplier changes" listener at the foot of this
+        // function had been silently dead on that null since the strip was
+        // built; it shares this handle now.)
+        var multHost = toggle.closest ? toggle.closest('.mixer-channel') : null;
+        var mainMult = (multHost && multHost.querySelector('#multiplier'))
+            || document.getElementById('multiplier');
+        var multGroup = document.createElement('div');
+        multGroup.className = 'control-group';
+        var multLbl = document.createElement('label');
+        multLbl.setAttribute('for', 'multiplierPanel');
+        multLbl.innerHTML = 'Multi-Brush <span class="value-display" id="multiplierPanelValue">1x</span>';
+        var multVal = multLbl.querySelector('.value-display');
+        var multSlider = document.createElement('input');
+        multSlider.type = 'range';
+        multSlider.id = 'multiplierPanel';
+        multSlider.min = '1';
+        multSlider.max = '8';
+        multSlider.step = '1';
+        multSlider.value = mainMult ? mainMult.value : '1';
+        multGroup.appendChild(multLbl);
+        multGroup.appendChild(multSlider);
+        panel.appendChild(multGroup);
+
+        // panel → strip. Setting .value never fires an event on its own, so the
+        // dispatch is what keeps the two honest; the strip's 'input' handler
+        // (registered further down) calls pullMultiplier right back, which is a
+        // no-op when the values already match — no ping-pong.
+        multSlider.addEventListener('input', function () {
+            if (!mainMult) return;
+            mainMult.value = multSlider.value;
+            try { mainMult.style.setProperty('--val', multSlider.value); } catch (_) {}
+            mainMult.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        // strip → panel (also the open-time refresh, for the writers that set
+        // the slider by property without an event: hotkeys 1-8, kaleido, presets)
+        function pullMultiplier() {
+            if (!mainMult) return;
+            if (multSlider.value !== mainMult.value) {
+                multSlider.value = mainMult.value;
+                try { multSlider.style.setProperty('--val', mainMult.value); } catch (_) {}
+            }
+            multVal.textContent = (parseInt(mainMult.value, 10) || 1) + 'x';
+        }
+        pullMultiplier();
+
+        // Symmetry follows: the mode decides what the arms listed below
+        // actually are. The element is authored in index.html and MOVED here,
+        // not cloned — a clone would leave the persisted #symmetryMode id
+        // pointing at a stale hidden copy.
         var symGroup = document.getElementById('symmetryModeGroup');
         if (symGroup) {
-            symGroup.style.padding = '6px 8px 0';
+            symGroup.style.padding = '';
             panel.appendChild(symGroup);
         }
         var symNote = document.createElement('div');
         symNote.className = 'arm-sym-note';
-        symNote.style.cssText = 'padding:2px 8px 6px;font-size:9px;color:rgba(255,255,255,0.45);';
+        symNote.style.cssText = 'padding:2px 0 6px;font-size:9px;color:rgba(255,255,255,0.45);';
         panel.appendChild(symNote);
 
         function updateSymNote() {
@@ -4496,12 +4747,11 @@
             } else {
                 panel.style.display = 'block';
                 toggle.classList.add('active');
+                pullMultiplier();
                 positionPanel();
                 rebuildRows();
             }
         });
-
-        closeBtn.addEventListener('click', function(e) { e.stopPropagation(); closePanel(); });
 
         // Close when clicking elsewhere in the UI — but NOT on the canvas. Any
         // canvas click used to dismiss this, so you could never hold a colour
@@ -4522,9 +4772,9 @@
         });
 
         // Rebuild when multiplier changes
-        var mSlider = document.getElementById('multiplier');
-        if (mSlider) {
-            mSlider.addEventListener('input', function() {
+        if (mainMult) {
+            mainMult.addEventListener('input', function() {
+                pullMultiplier();
                 if (panel.style.display !== 'none') rebuildRows();
             });
         }

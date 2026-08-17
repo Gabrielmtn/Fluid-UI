@@ -371,6 +371,88 @@ body > .controls {
     --input-py: 4px;
 }
 
+/* ── Brush tip swatch: the square appended to the Brush Size fader ──
+   It shows the loaded tip (built-in glyph, or a custom stamp's thumbnail)
+   and opens the tip menu. Sharing the fader's row is the point — tip and
+   size are the two halves of "what am I painting with". The channel pays
+   for it with ~30px of min-width so the fader keeps a usable travel. */
+.mixer-channel.ch-has-tip {
+    min-width: 122px;
+}
+.ch-has-tip .ch-fader input[type="range"] {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+}
+.ch-tip-swatch {
+    all: unset;
+    box-sizing: border-box;
+    position: relative;
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
+    margin-left: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--ground-600, #232830);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 0;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+}
+.ch-tip-swatch:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(236, 48, 19, 0.6);
+    color: #fff;
+}
+.ch-tip-swatch.active {
+    background-color: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
+    color: #fff;
+}
+/* Corner notch — the one mark that says this square opens something */
+.ch-tip-swatch::after {
+    content: '';
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    border-left: 4px solid transparent;
+    border-bottom: 4px solid rgba(255, 255, 255, 0.45);
+}
+.ch-tip-swatch:hover::after,
+.ch-tip-swatch.active::after {
+    border-bottom-color: rgba(255, 255, 255, 0.9);
+}
+.ch-tip-face {
+    display: block;
+    width: 100%;
+    height: 100%;
+    line-height: 24px;
+    text-align: center;
+    font-size: 13px;
+    /* Custom stamps arrive as a background-image on this span; keep the
+       longhands here so no state rule's `background:` shorthand can reset
+       them and blow the thumbnail up to its natural PNG size. */
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+@media (pointer: coarse) {
+    .mixer-channel.ch-has-tip {
+        min-width: 128px;
+    }
+    .ch-tip-swatch {
+        flex: 0 0 30px;
+        width: 30px;
+        height: 30px;
+    }
+    .ch-tip-face {
+        line-height: 28px;
+        font-size: 15px;
+    }
+}
+
 .ch-value {
     font-family: 'Courier New', monospace;
     font-size: 13px;
@@ -904,6 +986,28 @@ body > .controls {
     padding-bottom: 6px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
+/* Title-less variant (Multi-Brush popup): the header carries no text and no
+   close button, only the grab handle the drag needs — a 28px bar, the one
+   mark that says "this moves". */
+.arm-colors-header.arm-colors-grip {
+    height: 10px;
+    margin: -4px 0 4px;
+    padding: 0;
+    border-bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: move;
+}
+.arm-colors-header.arm-colors-grip::before {
+    content: '';
+    width: 28px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.14);
+}
+.arm-colors-header.arm-colors-grip:hover::before {
+    background: rgba(255, 255, 255, 0.32);
+}
 .arm-colors-rows {
     display: flex;
     flex-direction: column;
@@ -979,34 +1083,82 @@ body > .controls {
 .brush-settings-panel .brush-section-label {
     margin-top: 10px;
 }
-.brush-settings-panel .control-group {
+/* Panel rows. Scoped to .arm-colors-panel (the shared popup skin) rather than
+   the brush drawer alone, so every popup built on it — brush drawer, Multi-
+   Brush — renders a .control-group the same way. The drawer carries both
+   classes, so its own look is unchanged. */
+.arm-colors-panel .control-group {
     margin-bottom: 8px;
 }
-.brush-settings-panel .control-group label {
+.arm-colors-panel .control-group label {
     display: block;
     font-size: 10px;
     color: rgba(255, 255, 255, 0.6);
     margin-bottom: 2px;
 }
-.brush-settings-panel .control-group label .value-display {
+.arm-colors-panel .control-group label .value-display {
     float: right;
     font-family: 'Courier New', monospace;
     color: var(--ink-100, #f2f3f5);
 }
-.brush-settings-panel .control-group input[type="range"] {
+.arm-colors-panel .control-group input[type="range"] {
     width: 100%;
     margin: 0;
 }
-.brush-settings-panel .control-group.checkbox-group {
+.arm-colors-panel .control-group.checkbox-group {
     display: flex;
     align-items: center;
     gap: 6px;
     margin-bottom: 6px;
 }
-.brush-settings-panel .control-group.checkbox-group label {
+.arm-colors-panel .control-group.checkbox-group label {
     display: inline;
     margin-bottom: 0;
     cursor: pointer;
+}
+
+/* Panel dropdowns wear the same cell as .mixer-presets-trigger — flat
+   ground-600 fill, square, uppercase label, our own 8px chevron, accent on
+   hover/focus. Left to itself a <select> in a floating panel matches no rule
+   in the app and renders raw OS chrome (grey fill, Arial 13px), which is what
+   the symmetry picker looked like. */
+.arm-colors-panel select {
+    all: unset;
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    height: 24px;
+    padding: 0 24px 0 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ink-100, #f2f3f5);
+    background-color: var(--ground-600, #232830);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5'><path d='M0 0l4 5 4-5z' fill='%23b9bec7'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 0;
+    cursor: pointer;
+    /* The native option list inherits the control's color-scheme; without this
+       Chromium frames it in light-theme white. */
+    color-scheme: dark;
+}
+.arm-colors-panel select:hover,
+.arm-colors-panel select:focus-visible {
+    background-color: rgba(236, 48, 19, 0.12);
+    border-color: rgba(236, 48, 19, 0.45);
+    color: #fff;
+}
+.arm-colors-panel select option {
+    background: var(--ground-900, #0e0f12);
+    color: var(--ink-100, #f2f3f5);
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 /* Tip picker */
@@ -1074,6 +1226,58 @@ body > .controls {
 }
 .brush-shape-add {
     font-size: 14px;
+}
+
+/* ── Tip menu (the strip swatch's dropdown) ──
+   Wears the shared .arm-colors-panel skin; the shapes row below reuses the
+   drawer's .brush-shape-btn tiles verbatim. Named rows rather than the
+   drawer's icon-only strip — a dropdown is where the tips get to say what
+   they are. */
+.brush-tip-menu .brush-tip-menu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 10px;
+}
+.brush-tip-item {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 26px;
+    padding: 0 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0;
+    color: rgba(255, 255, 255, 0.62);
+    cursor: pointer;
+}
+.brush-tip-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+.brush-tip-item.active {
+    background: var(--accent, #ec3013);
+    border-color: var(--accent, #ec3013);
+    color: #fff;
+}
+.brush-tip-item-glyph {
+    flex: 0 0 14px;
+    text-align: center;
+    font-size: 12px;
+}
+.brush-tip-menu .brush-tip-row {
+    margin-bottom: 0;
+}
+@media (pointer: coarse) {
+    .brush-tip-item {
+        height: 32px;
+        font-size: 12px;
+    }
 }
 
 /* Brush preset chips */
