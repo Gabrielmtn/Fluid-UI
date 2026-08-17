@@ -52,13 +52,47 @@
         return Math.max(4, 2 * Math.sqrt(cfg('SPLAT_RADIUS', 0.011)) * h);
     }
 
+    // Sim-clock deposition compensation (2026-08-16).
+    //
+    // The walker is distance-parameterized, which makes it speed-independent
+    // in HAND terms — and that is exactly what goes wrong when Time is low.
+    // A dab is an impulse of dye (splat() takes no dt), so laying one every
+    // `spacing` px of travel means the number of dabs per SIMULATED second
+    // scales as 1/timeScale: at Time 0.25 your hand delivers four times the
+    // dye per second of fluid evolution, into a field that has advected a
+    // quarter as far. The deposits stack instead of being carried off and the
+    // stroke saturates into a flat slab.
+    //
+    // Put another way: slowing time is exactly equivalent to speeding your
+    // hand up — a 4× faster stroke at Time 1 muddies for the same reason —
+    // and the cure is the same one. Spreading spacing by 1/timeScale restores
+    // dabs-per-simulated-second to what it is at Time 1, so the fluid gets the
+    // same interval to work between deposits and the stroke keeps its
+    // structure. The engine's momentum rule (vx = 10 × spacing) rescales with
+    // it, so total momentum per unit of travel is unchanged — the stroke
+    // pushes the fluid exactly as hard as before. Only the dye rate moves.
+    //
+    // Capped because the Time slider floors at 0.01, and an uncapped 100×
+    // would bead a stroke into isolated dots. config.BRUSH_TIME_COMP is that
+    // cap (a spacing multiplier); 1 or below disables the compensation.
+    // Deliberately inert at Time ≥ 1: fast time already spreads deposits out
+    // on its own, and densifying there would multiply the per-frame dab cost.
+    function timeCompensation() {
+        var c = window.config;
+        var cap = (c && typeof c.BRUSH_TIME_COMP === 'number') ? c.BRUSH_TIME_COMP : 4;
+        if (!(cap > 1)) return 1;
+        var s = window.timeScale;
+        if (typeof s !== 'number' || !(s > 0) || s >= 1) return 1;
+        return Math.min(cap, 1 / s);
+    }
+
     function spacingPx() {
         // 0.25px floor (was 1): the Spacing slider now reaches 0.1%, and the
         // 1px floor made everything below ~1% indistinguishable — sub-pixel
         // spacing is what dissolves the grainy dab-train look at slow speeds.
         // The drain cap (64 dabs/frame) and MAX_QUEUE still bound the cost
         // of a fast flick.
-        return Math.max(0.25, cfg('BRUSH_SPACING', 0.35) * brushDiameterPx());
+        return Math.max(0.25, cfg('BRUSH_SPACING', 0.35) * brushDiameterPx()) * timeCompensation();
     }
 
     // Emit dabs along the segment from the last processed sample toward

@@ -77,6 +77,34 @@
             lastTime = nowMs;
             // Time scale: dilate physics without changing equations
             const dt = rawDt * (window.timeScale || 1.0);
+            // ── The sim clock (2026-08-16) ──────────────────────────────────
+            // dt is the ONE authority on how much simulated time this frame
+            // advanced: it already carries both the 16ms stability clamp and
+            // the Time slider. Every dye source has to pace itself off THIS,
+            // not off Date.now(), because a splat is an IMPULSE, not a rate —
+            // splat() takes no dt, it deposits a fixed amount of dye per
+            // event. Fire those events on the wall clock while the fluid runs
+            // on a dilated clock and you inject 1/timeScale times as much dye
+            // per simulated second, into a field that has advected 1/timeScale
+            // as far: the deposits stack on top of each other instead of being
+            // carried away, and the stroke saturates into a flat slab. That is
+            // the over-saturated middle at low Time, and (via the 16ms clamp)
+            // the same thing a sub-60fps frame does even at Time 1.
+            window.__simDtMs = dt * 1000;
+            // Wall-clock deposition credit, for the sources that deposit once
+            // per FRAME instead of once per unit of travel (constant-flow
+            // splat mode, the splat-out tail). Those are frame-rate deposition
+            // rates, so they get metered at the Time-scaled frame rate: one
+            // credit per frame at Time ≥ 1 — bit-identical to the old
+            // unconditional emit, existing frame-rate quirks included — and
+            // one every 1/timeScale frames below it. The distance-parameterized
+            // walker needs none of this; it is metered in 05d0 instead, by
+            // spreading spacing, because its rate is set by the hand not the
+            // frame. Leftover is clamped so Time > 1 can't run the debt away.
+            let _depDebt = (window.__depositDebt || 0) + (window.timeScale || 1.0);
+            const depositCredit = _depDebt >= 1.0;
+            if (depositCredit) _depDebt = Math.min(_depDebt - 1.0, 1.0);
+            window.__depositDebt = _depDebt;
             if (window.kAnimateRot && window.kSpinSpeed) {
                 window.kAngle = (window.kAngle || 0) + dt * window.kSpinSpeed * Math.PI / 180;
             }
@@ -168,22 +196,41 @@
                     // momentum; a stationary hold injects dye only, like the
                     // press stamp. Sketch/mask targets keep the spaced train.
                     if (config.BRUSH_CONTINUOUS && config.BRUSH_TARGET === 'fluid') {
+                        // depositCredit meters the hose on the sim clock: at
+                        // Time 1 every frame is credited (unchanged), at Time
+                        // 0.25 one frame in four. Skipped frames deliberately
+                        // leave __contFlowLast alone so the next credited dab's
+                        // dx/dy spans the whole skipped interval — the hose
+                        // still injects the same momentum per unit of travel,
+                        // it just stops injecting four times the dye per
+                        // simulated second.
                         if (pointer.down && window.BrushEngine.isActive()) {
-                            const cx = pointer.x, cy = pointer.y;
-                            let cdx = 0, cdy = 0;
-                            if (window.__contFlowLast) {
-                                cdx = (cx - window.__contFlowLast.x) * 10;
-                                cdy = (cy - window.__contFlowLast.y) * 10;
-                            }
-                            window.__contFlowLast = { x: cx, y: cy };
-                            _dabs = [{ x: cx, y: cy, dx: cdx, dy: cdy, p: 1 }];
-                            // Recording taps raw pointer events, which don't fire
-                            // while stationary — capture the hold here. Frames
-                            // that moved ≥0.1px were already recorded by the
-                            // pointermove handler (same gate as 05d's).
-                            if (recEnabled && typeof recRecordInteraction === 'function'
-                                && (cdx * cdx + cdy * cdy) < 1.0) {
-                                recRecordInteraction(cx, cy, 0, 0, pointer.color);
+                            // An uncredited frame emits nothing and, crucially,
+                            // does NOT touch __contFlowLast — so the next
+                            // credited dab's dx/dy spans the whole skipped
+                            // interval and the hose injects the same momentum
+                            // per unit of travel as before. Only the dye rate
+                            // is metered. (The release branch below still owns
+                            // clearing __contFlowLast; doing it here would zero
+                            // the carried motion every skipped frame.)
+                            _dabs = [];
+                            if (depositCredit) {
+                                const cx = pointer.x, cy = pointer.y;
+                                let cdx = 0, cdy = 0;
+                                if (window.__contFlowLast) {
+                                    cdx = (cx - window.__contFlowLast.x) * 10;
+                                    cdy = (cy - window.__contFlowLast.y) * 10;
+                                }
+                                window.__contFlowLast = { x: cx, y: cy };
+                                _dabs = [{ x: cx, y: cy, dx: cdx, dy: cdy, p: 1 }];
+                                // Recording taps raw pointer events, which don't fire
+                                // while stationary — capture the hold here. Frames
+                                // that moved ≥0.1px were already recorded by the
+                                // pointermove handler (same gate as 05d's).
+                                if (recEnabled && typeof recRecordInteraction === 'function'
+                                    && (cdx * cdx + cdy * cdy) < 1.0) {
+                                    recRecordInteraction(cx, cy, 0, 0, pointer.color);
+                                }
                             }
                         } else {
                             // Released (or between strokes): drop any walker
@@ -211,7 +258,9 @@
                         // stationary press would pump dabs forever at a ramp value
                         // that can never advance. Time mode is the opposite — a
                         // still press is exactly the case it exists for.
-                        if (pointer.down && !_dabs.length &&
+                        // depositCredit: the top-up is one dab per empty FRAME,
+                        // so it is metered on the sim clock like the hose above.
+                        if (pointer.down && !_dabs.length && depositCredit &&
                             window.splatInMode && window.splatInMode !== 'instant' &&
                             config.BRUSH_TARGET === 'fluid' &&
                             window.BrushEngine && window.BrushEngine.isActive() &&
@@ -344,7 +393,16 @@
                 // in size over splatOutDist of travel. Ends when the size taper
                 // completes OR the velocity has effectively died (so it can never
                 // stall splatting at a fixed point).
-                if (splatOutActive) {
+                //
+                // The tail is a per-FRAME process — one dab, one position step,
+                // one velocity decay per frame — so it rides depositCredit like
+                // the constant-flow hose: unchanged at Time ≥ 1, and at Time
+                // 0.25 it advances one frame in four. Uncredited frames freeze
+                // it entirely (position, decay, taper and the termination test
+                // together), so the tail keeps its exact shape and simply takes
+                // four times as long to lay down — instead of stamping its whole
+                // length into a fluid that has barely moved.
+                if (splatOutActive && depositCredit) {
                     const outMult = getSplatOutMult();
                     const outVel2 = splatOutDx * splatOutDx + splatOutDy * splatOutDy;
                     if (outMult <= 0.001 || outVel2 < 0.0002) {

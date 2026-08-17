@@ -591,6 +591,21 @@
             BRUSH_SPACING: 0.35,      // D1 dab spacing as a fraction of brush diameter —
                                       // distance-parameterized stroke density (speed-
                                       // independent; kills the 1-dab-per-frame gaps)
+            BRUSH_TIME_COMP: 4,       // Sim-clock deposition compensation cap (05d0). A dab is
+                                      // an impulse, so a distance-spaced walker deposits
+                                      // 1/timeScale times as much dye per SIMULATED second at
+                                      // low Time — the flat over-saturated middle. Spacing is
+                                      // spread by 1/timeScale, up to this multiplier, which
+                                      // restores dabs-per-sim-second (momentum per distance is
+                                      // unchanged — the momentum rule rescales with spacing).
+                                      // Inert at Time ≥ 1; 1 disables. Console-tunable.
+            REC_SIM_CLOCK: true,      // Recording playhead rides the sim clock (03-recording).
+                                      // false = the old wall-clock playhead, which fed splats
+                                      // 1/timeScale times too fast for the physics consuming
+                                      // them (and over-deposited on sub-60fps frames, where the
+                                      // sim step clamps to 16ms but the wall delta does not).
+                                      // On, playback wall-duration stretches by 1/timeScale —
+                                      // the timeline's seconds are simulated seconds.
             BRUSH_CONTINUOUS: false,  // Splat mode: false = dabs spaced along travel
                                       // ("on move", the classic feel); true = constant
                                       // flow — one dab per frame while the pointer is
