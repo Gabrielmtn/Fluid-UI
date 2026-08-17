@@ -34,6 +34,7 @@
             // A scaled wrapper would otherwise spill over the sidebar/underbar.
             area.style.overflow = 'hidden';
         }
+        if (typeof syncBadge === 'function') syncBadge();
         if (typeof window.__onZoomViewChange === 'function') window.__onZoomViewChange();
     }
 
@@ -109,11 +110,45 @@
     let zoomMode = false;
     const modeEl = document.getElementById('zoomModeToggle');
 
+    // A zoomed view with no on-screen sign of it is the whole reason this felt
+    // broken: painting is suppressed in Zoom Mode, so you leave the mode to
+    // paint and then nothing tells you the canvas is still at 3x — or how to
+    // get back. The badge shows the live scale, names the two keys, and is
+    // itself a reset button. No CSS transition (transitions on overlay elements
+    // corrupt the GL canvas in the Electron build).
+    var badge = null;
+    function ensureBadge() {
+        if (badge) return badge;
+        badge = document.createElement('div');
+        badge.id = 'zoomBadge';
+        badge.style.cssText = 'position:absolute;top:10px;left:50%;transform:translateX(-50%);' +
+            'z-index:60;pointer-events:auto;cursor:pointer;user-select:none;' +
+            'padding:4px 10px;border-radius:999px;font:600 11px/1.4 "Segoe UI",sans-serif;' +
+            'letter-spacing:0.3px;color:#f2f3f5;background:rgba(18,20,24,0.82);' +
+            'border:1px solid rgba(255,255,255,0.14);display:none';
+        badge.title = 'Click to reset the view (0)';
+        badge.addEventListener('click', function (e) {
+            e.preventDefault(); e.stopPropagation();
+            ZoomView.reset();
+        });
+        (area || document.body).appendChild(badge);
+        return badge;
+    }
+    function syncBadge() {
+        var b = ensureBadge();
+        var zoomed = scale !== 1;
+        if (!zoomed && !zoomMode) { b.style.display = 'none'; return; }
+        b.style.display = 'block';
+        b.textContent = (zoomed ? Math.round(scale * 100) + '%' : 'Zoom Mode')
+            + (zoomMode ? ' · drag to pan · Z to paint' : ' · 0 to reset');
+    }
+
     function setZoomMode(on) {
         zoomMode = !!on;
         if (modeEl && modeEl.checked !== zoomMode) modeEl.checked = zoomMode;
         document.body.classList.toggle('zoom-mode', zoomMode);
         canvas.style.cursor = zoomMode ? 'grab' : '';
+        syncBadge();
     }
     window.setZoomMode = setZoomMode;
     if (modeEl) modeEl.addEventListener('change', function (e) { setZoomMode(e.target.checked); });
@@ -160,7 +195,10 @@
     // Hotkeys: Z toggles, 0 resets the view. Skipped while typing.
     document.addEventListener('keydown', function (e) {
         const t = e.target;
-        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        // Sliders are inputs. Treating every input as "typing" meant Z stopped
+        // working the moment you touched a fader, with no clue why.
+        if (window.__isTypingTarget ? window.__isTypingTarget(t)
+            : (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable))) return;
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); setZoomMode(!zoomMode); }
         // Reset works whenever the view is transformed, NOT only inside Zoom

@@ -346,6 +346,32 @@
         return issues;
     }
 
+    // Does this element actually want the keystroke? Every hotkey handler in
+    // the app needs to answer that, and every one of them used to answer it
+    // with "is it an INPUT?" — which is wrong, because most inputs here are
+    // SLIDERS. Drag any fader and focus stays on it, so Z, F and the whole
+    // hotkey set went silently dead until you clicked the canvas again. A range
+    // (or checkbox, colour swatch, button) has no use for a letter key; only
+    // text-entry controls do. Lives here because 01a loads before every hotkey
+    // owner; call sites still fall back to their own check if it is missing.
+    var TYPING_INPUT_TYPES = {
+        text: 1, search: 1, url: 1, tel: 1, email: 1, password: 1,
+        number: 1, date: 1, month: 1, week: 1, time: 1,
+        'datetime-local': 1
+    };
+    function isTypingTarget(el) {
+        if (!el) return false;
+        if (el.isContentEditable) return true;
+        var tag = (el.tagName || '').toLowerCase();
+        if (tag === 'textarea') return true;
+        // A focused <select> consumes letters to jump between options.
+        if (tag === 'select') return true;
+        if (tag !== 'input') return false;
+        var type = (el.type || 'text').toLowerCase();
+        return !!TYPING_INPUT_TYPES[type];
+    }
+    window.__isTypingTarget = isTypingTarget;
+
     window.ParamRegistry = {
         SLIDERS: SLIDERS,
         CHECKBOXES: CHECKBOXES,
