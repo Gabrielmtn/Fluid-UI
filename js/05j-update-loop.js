@@ -285,7 +285,7 @@
                         // __splatInFlowMul): the shader's centre deposit is
                         // radius-independent, so a size-only ramp still stamped
                         // full-strength colour on the first dab.
-                        const inFlow = window.__splatInFlowMul ? window.__splatInFlowMul(inMult) : 1;
+                        const inFlow = window.__splatInFlowMul ? window.__splatInFlowMul() : 1;
                         const col = window.__applyPaintFlow(pointer.color, flowMul * inFlow);
                         // Publish the true painted radius so recording captures the
                         // actual (splat-in ramped) brush size, not the base.

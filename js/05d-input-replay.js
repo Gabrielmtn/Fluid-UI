@@ -24,7 +24,7 @@
         let splatOutX = 0, splatOutY = 0, splatOutDx = 0, splatOutDy = 0;
         let splatOutColor = [1, 0, 0];
         let pendingArmAdvance = false;
-        // Distance-based envelope: the brush grows from SPLAT_START_FLOOR to full
+        // Distance-based envelope: the brush grows from nothing to full
         // size over splatInDist of cursor travel (speed-independent), and on
         // release trails off, tapering over splatOutDist. Distances are fractions
         // of the canvas width; accumulated in the update loop (05j).
@@ -32,7 +32,13 @@
         let splatTailDist = 0;     // travel of the post-release tail (drives splat-out)
         let splatReleaseInMult = 1.0; // brush size fraction at release (so splat-out
                                       // tapers from the current size, not a jump to full)
-        const SPLAT_START_FLOOR = 0.12; // initial brush fraction at the very start
+        // Smallest radius multiplier the ramp will hand the shader. Not a
+        // perceptual floor — the splat footprint is exp(-d/radius) and a
+        // literal zero divides by zero. Dye is zero here, so nothing shows.
+        // (This replaced SPLAT_START_FLOOR = 0.12, which made every eased
+        // stroke open at 12% of full size and, once dye rode the ramp too,
+        // 12% strength — a mark that still arrived all at once.)
+        const SPLAT_MIN_MULT = 0.0004;
         window.splatInMode = window.splatInMode || 'instant';
         window.splatOutMode = window.splatOutMode || 'instant';
         // Ramp distances (fraction of canvas width). 0 ⇒ behaves like instant.
@@ -53,7 +59,12 @@
         function rampShape(mode, t) {
             return (mode === 'linear') ? t : smoothstep(t);
         }
-        function getSplatInMult() {
+        // The ramp's 0..1 curve, before it is turned into a size or a dye
+        // amount. It starts at ZERO. An eased stroke has to grow out of
+        // nothing: starting at a fraction of the final value means the first
+        // mark still appears all at once, just smaller — which reads as a jolt
+        // however long the ramp is, in On Move and Constant alike.
+        function getSplatInShape() {
             const mode = window.splatInMode;
             if (mode === 'instant') return 1.0;
             let t;
@@ -66,8 +77,15 @@
                 if (D <= 0.0001) return 1.0;
                 t = Math.min(splatStrokeDist / D, 1.0);
             }
-            const shape = rampShape(mode === 'time' ? 'easing' : mode, t);
-            return SPLAT_START_FLOOR + (1.0 - SPLAT_START_FLOOR) * shape;
+            return rampShape(mode === 'time' ? 'easing' : mode, t);
+        }
+        function getSplatInMult() {
+            const shape = getSplatInShape();
+            // Radius keeps a hair above zero purely for the shader: the splat
+            // footprint is exp(-d/radius), so a literal 0 divides by zero. At
+            // this floor the dab is ~2px across and carries zero dye, so it is
+            // invisible — the perceptual start is still zero.
+            return Math.max(SPLAT_MIN_MULT, shape);
         }
         function getSplatOutMult() {
             const mode = window.splatOutMode;
@@ -87,16 +105,15 @@
             return rampShape(mode === 'time' ? 'easing' : mode, remaining);
         }
         // The ramp scales the dab's RADIUS, but the splat shader's centre
-        // deposit is exp(0) = 1 whatever the radius — so every mode still laid
-        // down full-saturation colour in the first frame. That is the "flashes
-        // in like a camera" part, and no radius-only ramp can fix it. Ease the
-        // dye with the same shape: at the floor a dab is faint AND small, and
-        // it builds. Returns a flow multiplier to fold into the Flow slider's.
-        function splatInFlowMul(inMult) {
+        // deposit is exp(0) = 1 whatever the radius — so a size-only ramp still
+        // laid down full-saturation colour in the first frame. That is the
+        // "flashes in like a camera" part. Dye rides the same curve, and unlike
+        // radius it takes the shape RAW: dye genuinely starts at zero, so the
+        // stroke fades up out of nothing instead of appearing at a fraction of
+        // itself. Returns a multiplier to fold into the Flow slider's.
+        function splatInFlowMul() {
             if (window.splatInMode === 'instant') return 1.0;
-            // Map the radius multiplier back onto its 0..1 shape so flow starts
-            // at the floor too rather than at full.
-            return Math.max(0, Math.min(1, inMult));
+            return Math.max(0, Math.min(1, getSplatInShape()));
         }
         window.__splatInFlowMul = splatInFlowMul;
         function splatWithRadius(x, y, dx, dy, color, radius) {
@@ -497,7 +514,7 @@
                 startStroke(pointer.x, pointer.y);
                 const inMult = getSplatInMult();
                 window.__lastPaintRadius = config.SPLAT_RADIUS * inMult; // recording captures the true painted size
-                const _pcol = applyPaintFlow(pointer.color, pressFlowMul() * splatInFlowMul(inMult));
+                const _pcol = applyPaintFlow(pointer.color, pressFlowMul() * splatInFlowMul());
                 pushStrokeEvent(pointer.x, pointer.y, 0, 0, _pcol);
                 if (recEnabled) recRecordInteraction(coords.x, coords.y, 0, 0, _pcol);
                 multiSplatWithRadius(pointer.x, pointer.y, 0, 0, _pcol, config.SPLAT_RADIUS * inMult);
