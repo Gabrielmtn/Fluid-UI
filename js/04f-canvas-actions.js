@@ -320,7 +320,17 @@
         // this so the user gets ONE aggregate message, not an alert per file)
         window.layerSlotsFree = () => Math.max(0, MAX_LAYERS - layers.length - _pendingLayerSlots.size);
 
-        window.createLayerFromDataUrl = (dataUrl, title) => {
+        // `onCreated(layer)` fires once the image has decoded and the layer
+        // object exists — the slot isn't known before that, and the decode is
+        // what sets the aspect fit. Ctrl+Shift+V paste (32-file-drop) uses it
+        // to key and collide the layer it just made.
+        //
+        // D6: a caller that supplies onCreated OWNS the undo record, because it
+        // may go on to build more layers that belong to the same action (that
+        // paste records the image and its collider as one). Without a callback
+        // — the upload button, an OS drop, a plain Ctrl+V — the layer records
+        // itself here, so Ctrl+Z takes it back.
+        window.createLayerFromDataUrl = (dataUrl, title, onCreated) => {
 
             if (layers.length + _pendingLayerSlots.size >= MAX_LAYERS) {
 
@@ -468,6 +478,9 @@
                 
 
                 renderLayers();
+
+                if (typeof onCreated === 'function') onCreated(layer);
+                else if (typeof window.__recordLayerCreate === 'function') window.__recordLayerCreate([layer.index], 'add layer');
 
                 };
 
