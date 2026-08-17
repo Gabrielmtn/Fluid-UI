@@ -110,6 +110,16 @@
     let zoomMode = false;
     const modeEl = document.getElementById('zoomModeToggle');
 
+    // Fired only when the USER moves the view (wheel/drag), never by a
+    // programmatic frame like Mandala Fill. Fill is a preset framing, so once
+    // you zoom or pan away from it the radio is describing a view that is no
+    // longer on screen — it says "Full" at 5.9x. Mandala listens and clears it.
+    function userChangedView() {
+        if (typeof window.__onZoomViewUserChange === 'function') {
+            try { window.__onZoomViewUserChange(); } catch (_) {}
+        }
+    }
+
     // A zoomed view with no on-screen sign of it is the whole reason this felt
     // broken: painting is suppressed in Zoom Mode, so you leave the mode to
     // paint and then nothing tells you the canvas is still at 3x — or how to
@@ -166,6 +176,7 @@
         // so one notch there zoomed AND resized the brush.
         e.stopImmediatePropagation();
         ZoomView.zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.clientX, e.clientY);
+        userChangedView();
     }, { capture: true, passive: false });
 
     let dragging = false, lastX = 0, lastY = 0;
@@ -182,6 +193,7 @@
         e.preventDefault(); e.stopPropagation();
         ZoomView.panBy(e.clientX - lastX, e.clientY - lastY);
         lastX = e.clientX; lastY = e.clientY;
+        userChangedView();
     }, true);
     function endDrag(e) {
         if (!dragging) return;
