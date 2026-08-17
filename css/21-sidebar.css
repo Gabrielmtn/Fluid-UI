@@ -1279,11 +1279,9 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     padding: 6px 2px;
 }
 
-/* Layers panel in sidebar */
-#sidebar-right .layers-panel {
-    max-height: 300px;
-    margin-top: 4px;
-}
+/* Layers panel in sidebar — the max-height/margin-top pair that used to sit
+   here was dead: init-responsive.css loads last and redeclares both on an
+   identical selector. It now owns the list's height entirely. */
 #sidebar-right .layer-item {
     padding: 6px 8px;
     margin-bottom: 5px;
