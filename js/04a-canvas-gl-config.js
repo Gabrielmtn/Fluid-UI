@@ -620,20 +620,37 @@
                                       // bit-for-bit. Never boosts above 1 (a dab can't deposit
                                       // more than full flow), so spacings above REF still
                                       // thin out the way they always did.
-            BRUSH_DAB_RATE: 125,      // Constant-flow deposition rate, dabs per SIMULATED
-                                      // second (05j). Replaces "one dab per frame", which made
-                                      // the deposition rate literally the frame rate: measured
-                                      // 30/60/144 dabs per wall second on 30/60/144Hz, i.e. a
-                                      // 144Hz panel laid 2.3x the dye per simulated second that
-                                      // a 60Hz one did. A fixed rate + per-dab normalization
-                                      // makes the stroke identical on every display.
+            BRUSH_DAB_INTERVAL_MS: 8, // Constant-flow: SIMULATED milliseconds between dabs —
+                                      // the time-axis twin of Spacing, and the only thing that
+                                      // decides whether the hose reads as a line or as separate
+                                      // pulses. Minimum is the fine smooth hose (8ms = 125
+                                      // dabs/sim-sec, ~2 per frame at 60fps, which is finer
+                                      // than a display can resolve); every step UP is fewer,
+                                      // further-apart deposits you can actually see.
+                                      //
+                                      // Stored as an INTERVAL rather than a rate so the slider
+                                      // reads like Spacing does — minimum = finest — and so the
+                                      // slider value, the config value and the persisted value
+                                      // are all the same number, with no reciprocal in between
+                                      // for a preset or the mirror to get backwards.
+                                      //
+                                      // Replaces the old fixed BRUSH_DAB_RATE (125): same
+                                      // default behaviour, now a control. Note dye is anchored
+                                      // to BRUSH_DAB_RATE_REF, so past a 16ms interval the
+                                      // per-dab share clamps at full flow and the stroke thins
+                                      // — exactly what Spacing does past its own reference.
+            BRUSH_DAB_FLOOR_RATE: 125,// Cap on On Move's slow-speed floor, dabs per simulated
+                                      // second. Deliberately NOT the constant-flow interval
+                                      // above: turning the hose down to visible pulses must not
+                                      // also coarsen a slow On Move stroke, which is a
+                                      // different mode with its own control (Spacing).
             BRUSH_DAB_RATE_REF: 62.5, // Dye-per-second anchor = 1 dab per 16ms of sim time,
                                       // which is exactly what one-dab-per-frame delivered at
                                       // 60fps (measured 62.5 dabs/sim-sec at both 30 and 60fps,
                                       // because the 16ms dt clamp is what set it). Keep this
                                       // tied to the clamp: 1/0.016. Per-dab flow is scaled by
-                                      // REF/RATE, so raising BRUSH_DAB_RATE buys smoothness at
-                                      // zero cost to how dark the stroke is.
+                                      // REF/rate, so SHORTENING BRUSH_DAB_INTERVAL_MS buys
+                                      // smoothness at zero cost to how dark the stroke is.
             BRUSH_DAB_BUDGET: 4000,   // Max dabs per SIMULATED second, for both the engine
                                       // drain and the constant-flow emitter. Was a flat 64 per
                                       // FRAME, which is itself a frame-rate dependence: at
@@ -684,8 +701,9 @@
             BRUSH_CONTINUOUS: false,  // Splat mode: false = dabs spaced along travel
                                       // ("on move", the classic feel); true = constant
                                       // flow — dye keeps flowing while the pointer is
-                                      // held, even standing still, at BRUSH_DAB_RATE per
-                                      // simulated second (05j synthesizes the dabs; the
+                                      // held, even standing still, one dab every
+                                      // BRUSH_DAB_INTERVAL_MS of simulated time (05j
+                                      // synthesizes the dabs; the
                                       // spacing walker is bypassed, fluid target only).
                                       // Brush panel segmented row.
 

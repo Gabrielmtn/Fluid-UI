@@ -253,7 +253,7 @@
                         // per SIMULATED second that a 60Hz one did — the same
                         // gesture, a different painting, decided by the monitor.
                         //
-                        // Now: accrue BRUSH_DAB_RATE dabs per simulated second and
+                        // Now: accrue one dab per BRUSH_DAB_INTERVAL_MS of simulated time and
                         // emit whole ones, carrying the fraction. Each dab is
                         // normalized to REF/RATE of the reference dye (05d's
                         // __normalizePaintFlow), so the RATE buys smoothness and
@@ -268,8 +268,11 @@
                         // much dye into a field that advected 1/timeScale as far.
                         if (pointer.down && window.BrushEngine.isActive()) {
                             _dabs = [];
-                            const _rate = (typeof config.BRUSH_DAB_RATE === 'number' && config.BRUSH_DAB_RATE > 0)
-                                ? config.BRUSH_DAB_RATE : 125;
+                            // Interval -> rate. The control is an interval so its slider reads
+                            // like Spacing (minimum = finest); the clock below wants a rate.
+                            const _ivl = (typeof config.BRUSH_DAB_INTERVAL_MS === 'number' && config.BRUSH_DAB_INTERVAL_MS > 0)
+                                ? config.BRUSH_DAB_INTERVAL_MS : 8;
+                            const _rate = 1000 / _ivl;
                             const _rateRef = (typeof config.BRUSH_DAB_RATE_REF === 'number' && config.BRUSH_DAB_RATE_REF > 0)
                                 ? config.BRUSH_DAB_RATE_REF : 62.5;
                             // Share of the reference dye each dab carries. Clamped

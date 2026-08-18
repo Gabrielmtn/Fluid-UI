@@ -183,7 +183,7 @@
         // is the point, so leave it alone; at or below it the intent is a
         // continuous line and the floor keeps it continuous.
         if (cfg('BRUSH_SPACING', 0.001) > cfg('BRUSH_DAB_FLOOR_MAX_SPACING', 0.001)) return;
-        var rate = cfg('BRUSH_DAB_RATE', 125);
+        var rate = cfg('BRUSH_DAB_FLOOR_RATE', 125);
         if (!(rate > 0) || !(residual > 0)) return;
         var now = simNowMs();
         if (now - lastEmitSimMs < 1000 / rate) return;
