@@ -129,6 +129,10 @@
             // Everything this frame simulates, sub-steps included — this is what
             // dye sources pace themselves against, not one step's worth.
             window.__simDtMs = frameDt * 1000;
+            // Monotonic simulated-time clock. The brush engine's slow-speed dab
+            // floor (05d0) needs "how much sim time has passed", and it runs on
+            // the input-sample callback where no frame timing is available.
+            window.__simTimeMs = (window.__simTimeMs || 0) + frameDt * 1000;
             // Wall-clock deposition credit, for the sources that deposit once
             // per FRAME instead of once per unit of travel (constant-flow
             // splat mode, the splat-out tail). Those are frame-rate deposition

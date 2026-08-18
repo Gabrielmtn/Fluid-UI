@@ -631,6 +631,15 @@
                                       // 30fps a fast dense stroke measured 54 of those 64 used,
                                       // so it was ~10 dabs from silently thinning. 4000/s is
                                       // the same 64 at a 16ms step and scales with the step.
+            BRUSH_DAB_FLOOR: true,    // On Move keeps depositing at very slow hand speeds.
+                                      // The walker's rate is speed/spacing, so it falls to
+                                      // zero as the hand slows: measured 41 dabs/s at
+                                      // 400px/s but 5 at 50px/s and 2 at 25px/s, and up to
+                                      // 4x worse below Time 1. When a segment is too short
+                                      // to reach one spacing, 05d0 emits a dab for the
+                                      // distance actually travelled, carrying dye in exact
+                                      // proportion — same paint per pixel, finer sampling.
+                                      // false restores the pure distance walker.
             BRUSH_DAB_INTERP: true,   // Constant flow places its dabs along the path travelled
                                       // this frame instead of stacking them all at the live
                                       // pointer. false restores the single-point behaviour.
