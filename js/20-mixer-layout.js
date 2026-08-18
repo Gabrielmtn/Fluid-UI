@@ -3218,13 +3218,22 @@
         constantBtn.title = 'Paint flows at a steady rate while the pointer is held, even standing still — same on any monitor; Spacing does not apply';
         flowModeRow.appendChild(onMoveBtn); flowModeRow.appendChild(constantBtn);
         panel.appendChild(flowModeRow);
-        var spacingGroup; // assigned below — setSplatMode can run before it exists
+        // Each mode owns exactly one texture control, and they are twins: Spacing
+        // is the gap along TRAVEL, Interval is the gap in TIME. Minimum on either
+        // is the fine continuous stroke; every step up is deposits you can see.
+        // Whichever belongs to the inactive mode is greyed rather than hidden, so
+        // the panel never reflows when you switch modes.
+        var spacingGroup, intervalGroup; // assigned below — setSplatMode can run first
+        function setGroupEnabled(g, on) {
+            if (!g) return;
+            g.style.opacity = on ? '1' : '0.4';
+            var sl = g.querySelector('input');
+            if (sl) sl.disabled = !on;
+        }
         function syncSpacingState() {
-            if (!spacingGroup) return;
             var cont = !!(window.config && window.config.BRUSH_CONTINUOUS);
-            spacingGroup.style.opacity = cont ? '0.4' : '1';
-            var sl = spacingGroup.querySelector('input');
-            if (sl) sl.disabled = cont;
+            setGroupEnabled(spacingGroup, !cont);
+            setGroupEnabled(intervalGroup, cont);
         }
         function setSplatMode(m) {
             if (m !== 'constant') m = 'move';
@@ -3279,6 +3288,17 @@
             }
         } catch (_) {}
         spacingGroup = pSlider('brushSpacing', 'Spacing', 0.001, 1, 0.001, 'BRUSH_SPACING', pctFine, 'spacing');
+        // Constant flow's twin of Spacing (2026-08-18). Was a fixed 125 dabs/sec;
+        // the hose could only ever be smooth. Expressed as an interval so the
+        // slider reads the same way Spacing does — minimum = finest — and so the
+        // slider value, config value and stored value are one number with no
+        // reciprocal for a preset to get backwards. 8ms = 125/sim-sec = the old
+        // fixed behaviour, ~2 dabs a frame at 60fps.
+        intervalGroup = pSlider('brushDabInterval', 'Interval', 4, 250, 1, 'BRUSH_DAB_INTERVAL_MS',
+            function (v) { return Math.round(v) + ' ms · ' + Math.round(1000 / Math.max(1, v)) + '/s'; },
+            'dabInterval');
+        intervalGroup.title = 'Constant flow: simulated time between dabs. Minimum is a smooth ' +
+            'continuous hose; higher lays visibly separate pulses. Spacing is the same idea along travel.';
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
         (function restoreSplatMode() {
             var saved = null;

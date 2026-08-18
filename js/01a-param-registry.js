@@ -100,6 +100,7 @@
         brushSpacing: {configKey: "BRUSH_SPACING", ui: null, hard: {min: 0.001, max: 1}, def: null, decimals: 3, category: "brush", perfTier: 0, simSlider: false},
         brushHardness: {configKey: "BRUSH_HARDNESS", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushFlow: {configKey: "BRUSH_FLOW", ui: null, hard: {min: 0.05, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushDabInterval: {configKey: "BRUSH_DAB_INTERVAL_MS", ui: null, hard: {min: 4, max: 250}, def: null, decimals: 0, category: "brush", perfTier: 0, simSlider: false},
         brushJitter: {configKey: "BRUSH_JITTER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushTipTexture: {configKey: "BRUSH_TIP_TEXTURE", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         shadingIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.1, scope: "extended"}},
