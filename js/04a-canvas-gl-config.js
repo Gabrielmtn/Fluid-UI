@@ -594,9 +594,18 @@
             BRUSH_STABILIZER: 0,      // D1 stroke stabilizer (weighted lag): 0 = raw input,
                                       // 1 = heavy Krita-style smoothing. Brush section slider.
 
-            BRUSH_SPACING: 0.05,      // D1 dab spacing as a fraction of brush diameter —
+            BRUSH_SPACING: 0.001,     // D1 dab spacing as a fraction of brush diameter —
                                       // distance-parameterized stroke density (speed-
                                       // independent; kills the 1-dab-per-frame gaps).
+                                      // 0.05 → 0.001 (2026-08-18): Spacing is the ONLY thing
+                                      // that decides whether a slow stroke reads as a line or
+                                      // as separate dabs, so the default sits at the bottom
+                                      // where the walker alone stays continuous at any speed
+                                      // (measured 100 dabs/s at 25px/s vs 2 at 5%), and every
+                                      // move UP the slider adds visible separation. The
+                                      // slow-speed floor only assists at or below
+                                      // BRUSH_DAB_FLOOR_MAX_SPACING, so raising Spacing gives
+                                      // back the dab texture — including its stutter — intact.
                                       // 0.35 → 0.05 (2026-08-17): 0.35 was calibrated for a
                                       // far smaller tip than this app's ~150px default brush,
                                       // so a 200px/s stroke laid THREE deposits per second and
@@ -640,6 +649,20 @@
                                       // distance actually travelled, carrying dye in exact
                                       // proportion — same paint per pixel, finer sampling.
                                       // false restores the pure distance walker.
+            BRUSH_SPACING_MIN_PX: 1,  // Smallest dab gap in px, whatever Spacing asks for.
+                                      // Guards the drain budget: below ~1px a fast stroke
+                                      // demands more dabs per second than the queue can
+                                      // retire, and the overflow is DROPPED silently, taking
+                                      // its dye with it (measured -52% at 2000px/s with a
+                                      // 0.25px floor). Low-speed smoothness comes from the
+                                      // dab floor, not from sub-pixel spacing.
+            BRUSH_DAB_FLOOR_MAX_SPACING: 0.001,
+                                      // Spacing at or below which the slow-speed floor is
+                                      // allowed to fill gaps. Above it, Spacing is
+                                      // authoritative and a slow stroke keeps the dab
+                                      // separation you asked for — the floor only ever fires
+                                      // when the walker emitted nothing, i.e. exactly the
+                                      // slow-hand case where that separation is visible.
             BRUSH_DAB_INTERP: true,   // Constant flow places its dabs along the path travelled
                                       // this frame instead of stacking them all at the live
                                       // pointer. false restores the single-point behaviour.
