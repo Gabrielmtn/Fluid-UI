@@ -128,6 +128,34 @@
     100% { opacity: 1; }
 }
 
+/* ── DESKTOP LAUNCH: the window itself is the entrance ──
+   js/00a-boot.js keeps the Electron window invisible for the whole boot and
+   then ramps its native opacity up to 1. Anything in here that animates on its own
+   would either play out invisibly and be missed, or be caught halfway by the
+   reveal — both are the "stutter" the fade exists to remove. So on the
+   desktop build the splash is a STATIC title card (shown only when
+   Boot.titleCard is on) and nothing else moves. The web build has no window
+   to fade and keeps the splash/stagger flow below, unchanged. */
+html.boot-fade .splash-title,
+html.boot-fade .splash-subtitle {
+    animation: none;
+    opacity: 1;
+    transform: none;
+}
+/* The load bar measures a load nobody can see. */
+html.boot-fade .splash-progress { display: none; }
+
+/* While the window is still invisible, no transition may be in flight — the
+   reveal must never catch one mid-way. Dropping the class at reveal changes
+   no property, so removing this cannot itself start an animation. */
+html.boot-fade.booting #splash-screen,
+html.boot-fade.booting #custom-titlebar,
+html.boot-fade.booting #mixer-strip,
+html.boot-fade.booting #sidebar-right,
+html.boot-fade.booting #canvas-area {
+    transition: none !important;
+}
+
 /* ── UI ENTRANCE ANIMATIONS ── */
 
 /* Initial hidden states — applied by JS before first paint */

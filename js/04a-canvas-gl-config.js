@@ -243,6 +243,12 @@
 
             window.__fatalGpu = true;
 
+            // No GL context means the boot's "frame" gate can never clear, so
+            // the desktop build would hold its window invisible until the
+            // watchdog fires. Show this screen now instead of twelve seconds
+            // of nothing (js/00a-boot.js).
+            try { if (window.Boot) window.Boot.revealNow('webgl-unavailable'); } catch (_) {}
+
             throw new Error('WebGL2 unavailable — cannot initialize');
 
         }

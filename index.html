@@ -123,6 +123,12 @@
         });
     })();
     </script>
+    <!-- Launch choreography. Deliberately ABOVE the stylesheets: it puts the
+         boot classes on <html> before the first style resolution (so nothing
+         can animate a frame it should not) and raises the boot
+         cursor before anything else on screen. Desktop build only — on the
+         web it is inert and the splash flow below runs unchanged. -->
+    <script src="js/00a-boot.js"></script>
     <link rel="stylesheet" href="css/00-tokens.css">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/slider-styles.css">
@@ -1203,6 +1209,7 @@
                 // Signal to orchestrateEntrance that we're ready
                 window.__scriptsReady = true;
                 if (window.__onScriptsReady) window.__onScriptsReady();
+                if (window.Boot) window.Boot.done('scripts');
                 return;
             }
             var s = document.createElement('script');
@@ -1224,9 +1231,13 @@
             };
             document.body.appendChild(s);
         }
-        // Start loading after initial animations begin (quick start)
+        // Start loading after initial animations begin (quick start).
+        // The desktop build has no initial animation to stay out of the way
+        // of — the window is invisible — so that 400ms is pure launch latency
+        // there and the chunks start immediately instead.
         updateProgress(5); // Show immediate feedback
-        setTimeout(loadNext, 400);
+        var _fadeBoot = window.Boot && window.Boot.usesWindowFade;
+        if (_fadeBoot) loadNext(); else setTimeout(loadNext, 400);
     })();
     </script>
     <script src="js/09-settings-manager.js"></script>

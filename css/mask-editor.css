@@ -465,3 +465,324 @@
     margin-top: 8px;
     line-height: 1.4;
 }
+
+/* ── Mask wizard (2026-08-18) ──────────────────────────────────────────────
+   Step rail under the header, plus the two steps that did not exist before:
+   touch up (2) and soften & finish (3). The rail is chrome, so it stays quiet
+   until a step is current. */
+.mask-wizard-rail {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding: clamp(6px, 1vh, 10px) clamp(12px, 2vw, 20px);
+    background: rgba(13, 17, 23, 0.75);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+}
+
+.mask-wizard-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #8b949e;
+    font-size: clamp(11px, 1.4vh, 13px);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.mask-wizard-step:hover {
+    color: #c9d1d9;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.mask-wizard-step.active {
+    color: #fff;
+    background: rgba(88, 166, 255, 0.14);
+    border-color: rgba(88, 166, 255, 0.45);
+}
+
+.mask-wizard-step.done { color: #3fb950; }
+
+.mask-wizard-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    font-size: 11px;
+    line-height: 1;
+}
+
+.mask-wizard-step.active .mask-wizard-num {
+    background: #1f6feb;
+    border-color: rgba(88, 166, 255, 0.8);
+    color: #fff;
+}
+
+.mask-wizard-step.done .mask-wizard-num {
+    background: rgba(63, 185, 80, 0.18);
+    border-color: rgba(63, 185, 80, 0.5);
+    color: #3fb950;
+}
+
+.mask-wizard-sep {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 14px;
+}
+
+/* Step 2 — touch up. Same row layout as the collider tools, greened so the
+   two brushes in this editor are never mistaken for one another. */
+#touchUpTools {
+    background: rgba(63, 185, 80, 0.07);
+    border-color: rgba(63, 185, 80, 0.22);
+}
+
+#touchUpTools .collider-tool-btn.active {
+    background: linear-gradient(180deg, #238636, #1a7f37);
+    border-color: rgba(63, 185, 80, 0.55);
+    color: #fff;
+}
+
+#touchUpTools .collider-tool-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+#touchUpDespeckBtn { flex: 0 0 auto; }
+
+/* Step 3 — soften & finish */
+.mask-feather-step {
+    background: rgba(210, 168, 255, 0.07);
+    border: 1px solid rgba(210, 168, 255, 0.22);
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 8px;
+}
+
+.mask-feather-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #c9d1d9;
+}
+
+.mask-feather-label { min-width: 92px; }
+
+.mask-feather-row input[type="range"] { flex: 1 1 auto; min-width: 120px; }
+
+.mask-feather-value {
+    min-width: 46px;
+    text-align: right;
+    font-weight: 600;
+    color: #d2a8ff;
+    font-variant-numeric: tabular-nums;
+}
+
+.mask-feather-hint {
+    font-size: 11px;
+    color: #8b949e;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+.mask-collider-opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    font-size: 12px;
+    color: #ffb37a;
+    cursor: pointer;
+}
+
+/* Footer navigation */
+.mask-footer-spacer { flex: 1 1 auto; }
+
+.mask-back-btn,
+.mask-next-btn {
+    padding: clamp(8px, 1.2vh, 12px) clamp(16px, 2vw, 24px);
+    border-radius: 10px;
+    font-size: clamp(13px, 1.5vh, 15px);
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid;
+}
+
+.mask-back-btn {
+    background: linear-gradient(#2a2f3a, #1f2430);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #c9d1d9;
+}
+
+.mask-next-btn {
+    background: linear-gradient(135deg, #58a6ff, #1f6feb);
+    border-color: rgba(88, 166, 255, 0.5);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(31, 111, 235, 0.28);
+}
+
+.mask-next-btn:disabled,
+.mask-apply-btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+    box-shadow: none;
+}
+
+/* ── Step 1 tool tabs: Magic Mask · Stamps · Filter ────────────────────────
+   One panel below, one selected tab above. The tabs sit on the panel rather
+   than floating over it, so the group reads as a single control. */
+.mask-tool-tabs {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    margin-bottom: 0;
+    padding: 0 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-wrap: wrap;
+}
+
+.mask-tool-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    background: transparent;
+    color: #8b949e;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-bottom: -1px;
+}
+
+.mask-tool-tab:hover {
+    color: #c9d1d9;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.mask-tool-tab.active {
+    color: #fff;
+    background: rgba(88, 166, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(26, 31, 42, 0);
+}
+
+.mask-tool-tab:disabled { opacity: 0.5; cursor: default; }
+
+.mask-tool-tab-icon { font-size: 16px; line-height: 1; }
+
+/* The panels the tabs switch between */
+.mask-tool-panel {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+}
+
+/* Filter */
+.mask-filter-panel {
+    background: rgba(88, 166, 255, 0.06);
+    padding: 12px;
+    margin-bottom: 8px;
+}
+
+.mask-filter-hint {
+    font-size: 11px;
+    color: #8b949e;
+    line-height: 1.4;
+    margin-bottom: 10px;
+}
+
+.mask-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #c9d1d9;
+    margin-bottom: 8px;
+}
+
+.mask-filter-label { min-width: 92px; }
+
+.mask-filter-row input[type="range"] { flex: 1 1 auto; min-width: 120px; }
+
+.mask-filter-row input[type="color"] {
+    width: 40px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.mask-filter-value {
+    min-width: 46px;
+    text-align: right;
+    font-weight: 600;
+    color: #58a6ff;
+    font-variant-numeric: tabular-nums;
+}
+
+#filterPickBtn.active {
+    background: linear-gradient(180deg, #1f6feb, #1158c7);
+    border-color: rgba(88, 166, 255, 0.6);
+    color: #fff;
+}
+
+.mask-filter-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #8b949e;
+    cursor: pointer;
+}
+
+/* Each tool keeps its own accent so the tabs stay recognisable at a glance
+   (Magic Mask has always read green in this editor). */
+.mask-tool-tab[data-tool="magic"] { color: #3fb950; }
+.mask-tool-tab[data-tool="magic"]:hover:not(:disabled) { color: #56d364; background: rgba(63, 185, 80, 0.08); }
+.mask-tool-tab[data-tool="magic"].active {
+    color: #fff;
+    background: rgba(63, 185, 80, 0.16);
+    border-color: rgba(63, 185, 80, 0.5);
+}
+
+.mask-tool-tab[data-tool="filter"].active {
+    background: rgba(88, 166, 255, 0.14);
+    border-color: rgba(88, 166, 255, 0.45);
+}
+
+/* The Magic Mask panel predates the tab strip and carries inline styling;
+   square off its top corners so it reads as the selected tab's panel. */
+#smartSelectControls.mask-tool-panel {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+/* .mask-editor-controls is a gapped flex column, which pushed the panel a
+   gap's width away from its own tabs. Cancel exactly that gap so the tab
+   strip and the panel it controls read as one piece. */
+.mask-tool-panel { margin-top: calc(0px - clamp(6px, 1vh, 10px)); }
+
+/* Step 1 already carries the mode toggle, tabs, actions and zoom — keep the
+   panel compact so the artwork keeps the height. */
+.mask-filter-panel { padding: 10px 12px; }
+.mask-filter-hint { margin-bottom: 8px; }
+.mask-filter-row { margin-bottom: 6px; }
+.mask-filter-row input[type="color"] { height: 26px; }

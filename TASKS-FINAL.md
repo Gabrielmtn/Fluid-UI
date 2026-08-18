@@ -22,6 +22,7 @@
 | UX-6.3 | **Mini audio composer editing** — mini timeline (27) is draw-only; add segment hit-test / drag-resize / overlap layout / playhead in the sidebar form factor. (Cheap early wins: playhead indicator + duration numeric input.) | L | open | |
 | UX-6.4 | **Full audio-tab UX** — input sizing, onboarding/guidance, clearer segment layout. | L | open | |
 | UX-9.1 | **Underbar component** — ✅ **v1 SHIPPED** (`pre-usertest`): `#quality-underbar` top-right hosts Visual Quality + Physics Detail. Remaining: generalize into the Stage-4 component library; optionally reposition on sidebar open (today z-index keeps it on top). | M | v1 done | |
+| UX-10.1 | **Hotkey surfacing — redesign** — how the app shows which keys apply to what. Two mechanisms were REMOVED 2026-08-17 rather than kept as-is (PRs #37, #38): the appended reminder bar (a 38px row in normal flow, so every Ctrl hold shoved the canvas down and back), and the dim pass (a held combo greyed 89 of 92 rows to 0.35 to spotlight one binding). What survives is the passive layer: 92 key caps beside their controls, visible at rest, with the caps a held combo reaches lighting in accent. **Gap this leaves:** desktop has no VISIBLE route into the full reference any more — F1 / Shift+? are keyboard-only there (mobile keeps 13-mobile-mode's ? button); `05n` still exports `showHotkeys` as the entry point for whatever replaces it. **Design question:** surface the right bindings without shifting layout or dulling the whole surface. | M | design | |
 
 ---
 

@@ -1365,3 +1365,58 @@ body > .controls {
     transform: translateZ(0);
     contain: layout style;
 }
+
+/* ── Brush shape actions (20-mixer-layout openShapeMenu) ──────────────────
+   Body-mounted at the cursor, so it clears the drawer's and the tip menu's
+   overflow/stacking. Above the mask editor is not needed — picking Edit
+   opens that editor and this closes first — but it must clear the strip. */
+.brush-shape-menu {
+    position: fixed;
+    z-index: 10020;
+    min-width: 168px;
+    padding: 4px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #1a1f2a, #0f141b);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+    color: #e6edf3;
+    font-size: 12px;
+}
+
+.brush-shape-menu-head {
+    padding: 6px 10px 7px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #8b949e;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 240px;
+}
+
+.brush-shape-menu-item {
+    display: block;
+    width: 100%;
+    padding: 7px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #e6edf3;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.brush-shape-menu-item:hover { background: rgba(255, 255, 255, 0.09); }
+
+.brush-shape-menu-item.danger { color: #ff8f8f; }
+.brush-shape-menu-item.danger:hover { background: rgba(255, 107, 107, 0.16); }
+
+/* Styled confirm — sits above the mask editor (10003) and the strip so it is
+   answerable from wherever it was raised. */
+.app-confirm-modal { z-index: 10060; }
+.app-confirm-modal .delete-modal-content { max-width: 420px; }
+.app-confirm-modal .delete-modal-confirm.app-confirm-safe { background: #3fb950; }
+.app-confirm-modal button:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }

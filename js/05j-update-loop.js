@@ -47,6 +47,10 @@
             if (1.0 - cand >= 0.002 || accum >= 1.0) return { dryMul: cand, accum: 0 };
             return { dryMul: 1.0, accum };
         }
+        // The desktop build holds its window invisible until one frame has
+        // actually been drawn — that is the only proof the context, the
+        // programs and every framebuffer are real (js/00a-boot.js).
+        let _firstFrameDrawn = false;
         function update() {
             const nowMs = performance.now();
             const cpuStart = nowMs;
@@ -1308,5 +1312,9 @@
             };
             // [GOVERNOR HOOK] feed the adaptive quality governor
             if (window.QualityGovernor) window.QualityGovernor.onFrame(nowMs, cpuMs);
+            if (!_firstFrameDrawn) {
+                _firstFrameDrawn = true;
+                if (window.Boot) window.Boot.done('frame');
+            }
             requestAnimationFrame(update);
         }

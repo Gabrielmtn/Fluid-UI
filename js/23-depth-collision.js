@@ -1246,6 +1246,103 @@ class DepthEstimator {
         _obsRafId = requestAnimationFrame(_doUpdateObstacle);
     }
 
+    // ── Non-depth mask shapes → obstacle ──────────────────────────────
+    // The per-shape loop above only understands 'depth-mask'. Everything
+    // else in a collision layer's mask — stamped rects/circles/stars, SAM
+    // cutouts, the mask editor's Filter output, and the single soft
+    // 'sam-mask' the editor's Touch up step flattens a mask into — used to
+    // composite NOTHING, so editing a collider's mask silently deleted its
+    // wall (measured 2026-08-18: obstacle 11704 solid texels → 0 after
+    // erasing a bite out of one).
+    //
+    // Rasterized per LAYER rather than per shape, because 'hide' mode and
+    // the feather are layer-level: this mirrors _collisionFromShapes, which
+    // is what baked these colliders in the first place, so re-compositing an
+    // edited mask lands where the original bake landed.
+    function _compositeShapeCollider(layer, ctx, obsW, obsH, canvasEl) {
+        if (typeof window._drawMaskShape !== 'function') return false;
+        var shapes = (layer.mask.shapes || []).filter(function (s) {
+            return s && s.type !== 'depth-mask';
+        });
+        if (!shapes.length) return false;
+
+        var bufW = canvasEl.width || 1, bufH = canvasEl.height || 1;
+        var mode = layer.mask.mode || 'show';
+        var feather = (typeof layer.threshold === 'number') ? layer.threshold : 0;
+        // Re-rasterizing on every recomposite would fire per frame while a
+        // collision layer is dragged. The shapes array is replaced wholesale
+        // on every save (cloneMaskShapes), so its identity is a sound key;
+        // the layer transform is applied at draw time and never invalidates.
+        var key = [shapes.length, mode, feather, bufW, bufH].join(':');
+        var memo = layer.__shapeColliderMemo;
+        var cov;
+        if (memo && memo.key === key && memo.shapes === layer.mask.shapes) {
+            cov = memo.canvas;
+        } else {
+            var scale = Math.min(1, COLLISION_MAP_MAX / Math.max(bufW, bufH));
+            var tw = Math.max(1, Math.round(bufW * scale));
+            var th = Math.max(1, Math.round(bufH * scale));
+            cov = document.createElement('canvas');
+            cov.width = tw; cov.height = th;
+            var cctx = cov.getContext('2d', { willReadFrequently: true });
+            cctx.scale(scale, scale);
+            var drawAll = function () {
+                shapes.forEach(function (s) {
+                    var rot = s.rotation || 0;
+                    if (rot) {
+                        cctx.save();
+                        var rcx = s.x + s.width / 2, rcy = s.y + s.height / 2;
+                        cctx.translate(rcx, rcy);
+                        cctx.rotate((rot * Math.PI) / 180);
+                        cctx.translate(-rcx, -rcy);
+                    }
+                    cctx.fillStyle = '#fff';
+                    try { window._drawMaskShape(cctx, s); } catch (_) {}
+                    if (rot) cctx.restore();
+                });
+            };
+            if (mode === 'show') {
+                drawAll();
+            } else {
+                // 'hide' = the shapes are holes in an otherwise solid layer
+                cctx.fillStyle = '#fff';
+                cctx.fillRect(0, 0, bufW, bufH);
+                cctx.globalCompositeOperation = 'destination-out';
+                drawAll();
+                cctx.globalCompositeOperation = 'source-over';
+            }
+            cctx.setTransform(1, 0, 0, 1, 0, 0);
+            if (feather > 0 && typeof window._featherMaskAlpha === 'function') {
+                var fr = Math.max(1, Math.round((feather / 100) * 20 * scale));
+                try { window._featherMaskAlpha(cctx, tw, th, fr); } catch (_) {}
+            }
+            layer.__shapeColliderMemo = { key: key, shapes: layer.mask.shapes, canvas: cov };
+        }
+
+        // Same CSS-transform mapping as the depth-mask branch, over the full
+        // canvas rect (these shapes are stored in canvas-buffer space).
+        var wrap = document.getElementById('canvas-wrapper');
+        var cssW = (wrap && wrap.clientWidth) || canvasEl.clientWidth || bufW;
+        var cssH = (wrap && wrap.clientHeight) || canvasEl.clientHeight || bufH;
+        var lx = (layer.x || 0) * (obsW / cssW);
+        var ly = (layer.y || 0) * (obsH / cssH);
+        var cx = obsW * 0.5, cy = obsH * 0.5;
+        var strength = (layer.collisionStrength !== undefined) ? layer.collisionStrength : 0.7;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        // Alpha carries coverage*strength, exactly like alphaVal above — the
+        // shaders divide __obsStrengthMax back out to recover coverage.
+        ctx.globalAlpha = Math.max(0, Math.min(1, strength));
+        ctx.translate(cx + lx, cy + ly);
+        ctx.rotate((layer.rotation || 0) * Math.PI / 180);
+        ctx.scale(layer.scaleX || 1, layer.scaleY || 1);
+        ctx.translate(-cx, -cy);
+        ctx.drawImage(cov, 0, 0, obsW, obsH);
+        ctx.restore();
+        return true;
+    }
+
     function _doUpdateObstacle() {
         _obsDirty = false;
         if (!window.layers && !proceduralDraw) return;
@@ -1428,6 +1525,10 @@ class DepthEstimator {
                 );
                 obstacleCtx.restore();
             });
+
+            // Everything in this mask that ISN'T a depth-mask (stamps, SAM
+            // cutouts, Filter output, a flattened touch-up) composites here.
+            if (_compositeShapeCollider(layer, obstacleCtx, obsW, obsH, canvasEl)) hasAny = true;
         });
 
         // Composite the procedural source (e.g. EQ lane walls) over the layers

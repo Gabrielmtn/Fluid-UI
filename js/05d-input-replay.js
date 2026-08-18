@@ -204,10 +204,22 @@
             // actual brush size. The paint path publishes it to __lastPaintRadius.
             const effR = (typeof window.__lastPaintRadius === 'number' && window.__lastPaintRadius > 0)
                 ? window.__lastPaintRadius : config.SPLAT_RADIUS;
-            strokeEvents.push({ t, x, y, dx, dy, color: color.slice(), mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1), radius: effR });
+            // The FOOTPRINT the dab was painted with, alongside its size: the
+            // built-in tip and, if one was loaded, the custom stamp's id.
+            // Without these, replay had no idea what it was reproducing and
+            // fell back to suppressing custom stamps entirely — you painted
+            // with your own brush and the replay came out in a different one.
+            strokeEvents.push({
+                t, x, y, dx, dy, color: color.slice(),
+                mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
+                radius: effR,
+                tip: config.BRUSH_TIP | 0,
+                shape: config.BRUSH_SHAPE_ID || null
+            });
         }
         function deepCopyEvent(ev) {
-            return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(), mult: ev.mult, radius: ev.radius };
+            return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(),
+                     mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape };
         }
         function buildTimeReplayEvents() {
             var period = (window.replayTimePeriod || 5) * 1000;
@@ -287,6 +299,18 @@
             if (!eventsToReplay || !eventsToReplay.length) { isReplayActive = false; return; }
             // Store the active replay events for processReplay
             window._activeReplayEvents = eventsToReplay;
+            // Warm every stamp this replay will ask for. The GL upload is lazy
+            // and async, so without this the opening dabs of every replay come
+            // out untextured while the texture decodes.
+            try {
+                if (window.BrushShapes && typeof window.BrushShapes.warm === 'function') {
+                    var seen = {};
+                    for (var wi = 0; wi < eventsToReplay.length; wi++) {
+                        var sid = eventsToReplay[wi].shape;
+                        if (sid && !seen[sid]) { seen[sid] = 1; window.BrushShapes.warm(sid); }
+                    }
+                }
+            } catch (_) {}
             replayIndex = 0;
             replayStartTime = Date.now();
             isReplayActive = true;
@@ -392,12 +416,24 @@
                     // modes resolve on top of this value, and arm 0's usual
                     // 'fixed' mode discarded the live colour anyway.)
                     var repCol = ev.color;
-                    // Replayed strokes are not live viewer strokes: the
-                    // viewer's active custom stamp must not restyle them —
-                    // events carry no shape info, so "current active shape"
-                    // was arbitrary (and printed broken stamps everywhere).
-                    // Built-in tips still apply (05i gate).
-                    window.__remoteStroke = true;
+                    // Footprint, same rule as size and colour: reproduce what
+                    // was RECORDED. 05i reads the tip and the active stamp
+                    // straight off config, so pinning them for the dab is what
+                    // makes the replay wear the brush the stroke was painted
+                    // with. A stamp we cannot draw — a peer's (its bitmap
+                    // can't ride the wire), or one since deleted — falls back
+                    // to __remoteStroke, which suppresses the viewer's own
+                    // stamp rather than printing the stroke in some arbitrary
+                    // shape the user happens to have selected now.
+                    var evShape = ev.shape || null;
+                    var haveStamp = !!(evShape && window.BrushShapes
+                        && typeof window.BrushShapes.has === 'function'
+                        && window.BrushShapes.has(evShape));
+                    var savedTip = config.BRUSH_TIP;
+                    var savedShape = config.BRUSH_SHAPE_ID;
+                    if (typeof ev.tip === 'number') config.BRUSH_TIP = ev.tip;
+                    config.BRUSH_SHAPE_ID = haveStamp ? evShape : null;
+                    window.__remoteStroke = !haveStamp;
                     try {
                         if (typeof window.applyMultiSplatWith === 'function') {
                             window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, repCol,
@@ -405,7 +441,11 @@
                         } else {
                             multiSplat(ev.x, ev.y, ev.dx, ev.dy, repCol, false);
                         }
-                    } finally { window.__remoteStroke = false; }
+                    } finally {
+                        window.__remoteStroke = false;
+                        config.BRUSH_TIP = savedTip;
+                        config.BRUSH_SHAPE_ID = savedShape;
+                    }
                     if (typeof recRecordInteraction === 'function' && recEnabled) {
                         try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}
                     }

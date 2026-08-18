@@ -557,9 +557,16 @@
                     window.addEventListener('pointerdown', dismiss, true);
                     setTimeout(dismiss, 12000);
                 };
-                // Wait for the splash to be gone / scripts ready
-                var poll = setInterval(function () {
-                    if (window.__scriptsReady) { clearInterval(poll); setTimeout(show, 1200); }
-                }, 300);
+                // Wait for the splash to be gone / scripts ready. On the
+                // desktop build __scriptsReady fires while the window is still
+                // invisible, so the hint would burn its 12s dwell behind a
+                // black screen — hang it off the reveal instead.
+                if (window.Boot && window.Boot.afterReveal) {
+                    window.Boot.afterReveal(show, 1200);
+                } else {
+                    var poll = setInterval(function () {
+                        if (window.__scriptsReady) { clearInterval(poll); setTimeout(show, 1200); }
+                    }, 300);
+                }
             } catch (_) {}
         })();

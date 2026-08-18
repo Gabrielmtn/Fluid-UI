@@ -511,9 +511,16 @@
                     } catch (err) { console.warn('[ContextLoss] restore failed', err); }
                     finally { try { window.settingsManager.remove('app.contextLossSnapshot'); } catch (_) {} }
                 };
-                const poll = setInterval(() => {
-                    if (window.__scriptsReady) { clearInterval(poll); setTimeout(offerRestore, 300); }
-                }, 250);
+                // A window.confirm() raised while the desktop build is still
+                // invisible blocks the boot it is waiting on — wait for the
+                // reveal, not just for the scripts.
+                if (window.Boot && window.Boot.afterReveal) {
+                    window.Boot.afterReveal(offerRestore, 300);
+                } else {
+                    const poll = setInterval(() => {
+                        if (window.__scriptsReady) { clearInterval(poll); setTimeout(offerRestore, 300); }
+                    }, 250);
+                }
             } else if (rec) {
                 try { window.settingsManager.remove('app.contextLossSnapshot'); } catch (_) {}
             }
@@ -1889,16 +1896,48 @@
                 };
                 if (brushPresets) env.brushPresets = brushPresets;
                 if (brushShapes && brushShapes.length) env.brushShapes = brushShapes;
-                var blob = new Blob([JSON.stringify(env)], { type: 'application/json' });
+                var json = JSON.stringify(env);
+                var fileName = name.replace(/\s+/g, '-').toLowerCase() + '.fluid';
+
+                // ── Electron: write the file for real (Steam plan S6-1) ─────
+                // The <a download> path below SILENTLY DOES NOTHING in the
+                // desktop app — measured 2026-08-18: export returned true and
+                // no file was ever written anywhere. A "save" that reports
+                // success and saves nothing is how a painting gets lost, and
+                // the close-confirmation prompt (04f) offers this as the way
+                // to keep your work, so it has to be true. fs.writeFileSync
+                // also gives a REAL success/failure to report.
+                if (window.IS_ELECTRON) {
+                    try {
+                        var remote = require('@electron/remote');
+                        var fs = require('fs');
+                        var path = require('path');
+                        var dir = '';
+                        try { dir = remote.app.getPath('documents'); } catch (_) { dir = ''; }
+                        var target = remote.dialog.showSaveDialogSync(remote.getCurrentWindow(), {
+                            title: 'Save project',
+                            defaultPath: dir ? path.join(dir, fileName) : fileName,
+                            filters: [{ name: 'Fluid project', extensions: ['fluid'] }]
+                        });
+                        if (!target) return false; // cancelled — still unsaved
+                        fs.writeFileSync(target, json, 'utf8');
+                        console.log('[Project] saved', target);
+                        try { window.__unsavedWork = false; } catch (_) {}
+                        return true;
+                    } catch (e) {
+                        // Never silently swallow it: fall through to the
+                        // browser path rather than claiming a save happened.
+                        console.warn('[Project] Electron save failed', e);
+                    }
+                }
+
+                var blob = new Blob([json], { type: 'application/json' });
                 var url = URL.createObjectURL(blob);
                 var a = document.createElement('a');
-                a.href = url; a.download = name.replace(/\s+/g, '-').toLowerCase() + '.fluid';
+                a.href = url; a.download = fileName;
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-                // Optimistic: a.click() only STARTS the download; a failed write
-                // leaves the flag cleared. Acceptable until the Steam-plan S6-1
-                // native save dialog (fs.writeFileSync + real error) replaces
-                // this path in Electron.
+                // Optimistic: a.click() only STARTS the download.
                 try { window.__unsavedWork = false; } catch (_) {}
                 return true;
             } catch (e) { console.warn('[Project] export failed', e); return false; }

@@ -20,6 +20,14 @@
     var shapes = null;      // in-memory copy of the persisted list
     var TEX = {};           // id → {texture, aspect} (lazy GL upload)
 
+    // Errors here used to raise window.alert() — the OS box titled with the
+    // app's internal hostname. Route them through the app's own dialog,
+    // falling back only if it has not been defined yet.
+    function say(title, message) {
+        if (typeof window.appAlert === 'function') { window.appAlert(title, message); return; }
+        alert(title + '\n\n' + message);
+    }
+
     function sm() { return window.settingsManager || null; }
 
     function load() {
@@ -133,7 +141,8 @@
     function add(name, stampCanvas) {
         var stamp = processStamp(stampCanvas);
         if (!stamp) {
-            alert('That shape came out empty — mask an area (or use an image with transparency) and Apply again.');
+            say('Nothing to stamp',
+                'That shape came out empty — mask an area (or use an image with transparency) and Apply again.');
             return null;
         }
         var id = 'bs' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -142,7 +151,8 @@
         if (shapes.length > 24) shapes.length = 24;
         if (!store()) {
             // Quota: the shape works this session but won't survive a reload.
-            alert('Brush shape added, but it could not be saved (storage full) — it will be lost on reload. Free space by deleting presets or shapes.');
+            say('Saved only for this session',
+                'The shape works now, but storage is full so it will be lost on reload. Free space by deleting presets or shapes.');
         }
         setActive(id); // notify() rides along
         return id;
@@ -152,16 +162,59 @@
         load();
         shapes = shapes.filter(function (s) { return s.id !== id; });
         store();
-        if (TEX[id]) {
-            try { if (TEX[id].texture && typeof gl !== 'undefined' && gl) gl.deleteTexture(TEX[id].texture); } catch (_) {}
-            delete TEX[id];
-        }
+        dropTexture(id);
         if (activeId() === id) setActive(null); else notify();
+    }
+
+    function dropTexture(id) {
+        if (!TEX[id]) return;
+        try { if (TEX[id].texture && typeof gl !== 'undefined' && gl) gl.deleteTexture(TEX[id].texture); } catch (_) {}
+        delete TEX[id];
+    }
+
+    // Re-stamp an existing shape IN PLACE: same id, same slot in the list, so
+    // editing never reorders the library or drops the active selection (which
+    // remove+add would, and mid-stroke that changes what you are painting
+    // with). The GL texture is dropped so the next dab re-uploads the new art.
+    function replace(id, name, stampCanvas) {
+        var entry = findEntry(id);
+        if (!entry) return null;
+        var stamp = processStamp(stampCanvas);
+        if (!stamp) {
+            say('Nothing left to stamp', 'That edit came out empty, so the shape was left as it was.');
+            return null;
+        }
+        entry.dataURL = stamp.toDataURL('image/png');
+        if (name) entry.name = name;
+        if (!store()) {
+            say('Saved only for this session',
+                'The edit applies now, but storage is full so it will be lost on reload.');
+        }
+        dropTexture(id);
+        if (activeId() === id) ensureTexture(entry);
+        notify();
+        return id;
+    }
+
+    // Reopen the mask editor on a saved shape. It edits the STAMP, not the
+    // image it came from — originals are deliberately not kept (stamps are
+    // ≤128px so they ride presets/quota; originals are megabytes) — so this
+    // trims and re-cuts what is there rather than restoring lost area.
+    function beginEdit(id) {
+        var entry = findEntry(id);
+        if (!entry) return;
+        if (typeof window.enterAdhocMaskMode !== 'function') {
+            say('One moment', 'The mask editor is still loading — try again in a moment.');
+            return;
+        }
+        window.enterAdhocMaskMode(entry.dataURL, entry.name || 'Brush Shape', function (resultCanvas, nm) {
+            replace(id, nm, resultCanvas);
+        });
     }
 
     function beginImportDataUrl(dataURL, name) {
         if (typeof window.enterAdhocMaskMode !== 'function') {
-            alert('The mask editor is still loading — try again in a moment.');
+            say('One moment', 'The mask editor is still loading — try again in a moment.');
             return;
         }
         window.enterAdhocMaskMode(dataURL, name || 'Brush Shape', function (resultCanvas, nm) {
@@ -171,7 +224,7 @@
 
     function beginImportFile(file) {
         if (!file || !/^image\/(png|jpe?g|webp)$/i.test(file.type || '')) {
-            alert('Please use a PNG, JPG, or WebP image.');
+            say('Unsupported image', 'Please use a PNG, JPG, or WebP image.');
             return;
         }
         var reader = new FileReader();
@@ -233,6 +286,12 @@
         getActiveStamp: getActiveStamp,
         add: add,
         remove: remove,
+        replace: replace,
+        beginEdit: beginEdit,
+        // Replay asks these per dab: is this recorded stamp one we can draw,
+        // and please start its GL upload now rather than mid-stroke (05d).
+        has: function (id) { return !!(id && findEntry(id)); },
+        warm: function (id) { ensureTexture(findEntry(id)); },
         beginImportFile: beginImportFile,
         beginImportDataUrl: beginImportDataUrl,
         exportList: exportList,

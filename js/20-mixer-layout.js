@@ -14,9 +14,14 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         // PERF: Defer heavy DOM restructuring until after splash animation starts
-        // This prevents jitter during the title fadein
+        // This prevents jitter during the title fadein.
+        // The desktop build has no splash animation to protect (the window is
+        // invisible until everything is built), so that 800ms is pure launch
+        // latency there — build straight away instead.
         var splash = document.getElementById('splash-screen');
-        if (splash) {
+        if (window.Boot && window.Boot.usesWindowFade) {
+            requestAnimationFrame(initMixerLayout);
+        } else if (splash) {
             // Wait for splash animations to complete their initial render
             // then do heavy DOM work during the "hold" phase before fadeout
             setTimeout(function() {
@@ -41,10 +46,16 @@
         const strip = buildMixerStrip(controls);
         const sidebar = buildSidebar(controls);
 
-        // Add entrance animation classes
-        strip.classList.add('ui-enter');
-        sidebar.classList.add('ui-enter');
-        canvasArea.classList.add('ui-enter');
+        // Add entrance animation classes. The staggered slide-in is the WEB
+        // build's entrance; on the desktop build the window fade is the
+        // entrance, and starting these off-screen would mean the panels are
+        // still flying in after the window has materialized (see
+        // orchestrateEntrance below and js/00a-boot.js).
+        if (!(window.Boot && window.Boot.usesWindowFade)) {
+            strip.classList.add('ui-enter');
+            sidebar.classList.add('ui-enter');
+            canvasArea.classList.add('ui-enter');
+        }
 
         // Create main-area wrapper
         const mainArea = document.createElement('div');
@@ -216,6 +227,43 @@
         var splash = document.getElementById('splash-screen');
         var titlebar = document.getElementById('custom-titlebar');
 
+        // ── Desktop: the WINDOW fade is the entrance (js/00a-boot.js) ──
+        // Everything must already be in its final position when the window
+        // materializes — a panel still sliding in afterwards is exactly the
+        // stutter the fade exists to remove. So: settle now, report the
+        // layout gate, and let the fade do the rest.
+        if (window.Boot && window.Boot.usesWindowFade) {
+            [titlebar, strip, sidebar, canvasArea].forEach(function (el) {
+                if (el) el.classList.remove('ui-enter', 'ui-ready');
+            });
+            if (window.Boot.titleCard && splash) {
+                // Title card rides in with the window, then dissolves off the
+                // already-running app underneath it.
+                window.Boot.onReveal(function (info) {
+                    setTimeout(function () {
+                        splash.classList.add('ready');
+                        setTimeout(function () {
+                            splash.classList.add('fade-out');
+                            setTimeout(function () {
+                                if (splash.parentNode) splash.parentNode.removeChild(splash);
+                            }, 700);
+                        }, 260);
+                    }, (info.fadeMs || 0) + (info.titleHoldMs || 0));
+                });
+            } else if (splash && splash.parentNode) {
+                // No title card: drop it before the reveal so what fades up
+                // is the finished, running app.
+                splash.parentNode.removeChild(splash);
+            }
+            window.Boot.done('layout');
+            return;
+        }
+
+        // Web build below. Boot's reveal callbacks (first-run hint, restore
+        // prompt) are shared with the desktop path, so the layout gate is
+        // reported here too — there it just resolves without a window fade.
+        if (window.Boot) window.Boot.done('layout');
+
         // If no splash screen, just show UI immediately
         if (!splash) {
             if (titlebar) titlebar.classList.remove('ui-enter');
@@ -327,6 +375,133 @@
         return null;
     }
 
+    // ── Styled confirm (2026-08-18) ───────────────────────────────────────
+    // window.confirm() renders the OS/Chromium dialog — a white box titled
+    // with the app's internal hostname, sitting outside everything this app
+    // looks like. Same shape as the native call (a promise of yes/no) so a
+    // call site swaps over in one line.
+    window.appConfirm = function appConfirm(opts) {
+        opts = opts || {};
+        return new Promise(function (resolve) {
+            var modal = document.getElementById('appConfirmModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'appConfirmModal';
+                modal.className = 'delete-modal app-confirm-modal';
+                modal.innerHTML =
+                    '<div class="delete-modal-content">' +
+                        '<div class="delete-modal-title" id="appConfirmTitle"></div>' +
+                        '<div class="delete-modal-message" id="appConfirmMessage"></div>' +
+                        '<div class="delete-modal-actions">' +
+                            '<button type="button" class="delete-modal-cancel" id="appConfirmCancel"></button>' +
+                            '<button type="button" class="delete-modal-confirm" id="appConfirmOk"></button>' +
+                        '</div>' +
+                    '</div>';
+                document.body.appendChild(modal);
+            }
+            var titleEl = modal.querySelector('#appConfirmTitle');
+            var msgEl = modal.querySelector('#appConfirmMessage');
+            var okEl = modal.querySelector('#appConfirmOk');
+            var cancelEl = modal.querySelector('#appConfirmCancel');
+            titleEl.textContent = opts.title || 'Are you sure?';
+            msgEl.textContent = opts.message || '';
+            msgEl.style.display = opts.message ? '' : 'none';
+            okEl.textContent = opts.confirmLabel || 'OK';
+            cancelEl.textContent = opts.cancelLabel || 'Cancel';
+            // cancelLabel: null → one button, i.e. an alert rather than a question
+            cancelEl.style.display = (opts.cancelLabel === null) ? 'none' : '';
+            okEl.classList.toggle('app-confirm-safe', opts.danger === false);
+
+            var done = function (val) {
+                modal.classList.remove('show');
+                okEl.onclick = cancelEl.onclick = modal.onmousedown = null;
+                document.removeEventListener('keydown', onKey, true);
+                resolve(val);
+            };
+            var onKey = function (e) {
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+                else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(true); }
+            };
+            okEl.onclick = function () { done(true); };
+            cancelEl.onclick = function () { done(false); };
+            // Backdrop click is the safe answer, same as Esc
+            modal.onmousedown = function (e) { if (e.target === modal) done(false); };
+            document.addEventListener('keydown', onKey, true);
+            modal.classList.add('show');
+            (opts.cancelLabel === null ? okEl : cancelEl).focus();
+        });
+    };
+
+    // Same dialog, one button — the styled stand-in for window.alert().
+    window.appAlert = function appAlert(title, message, okLabel) {
+        return window.appConfirm({
+            title: title, message: message,
+            confirmLabel: okLabel || 'OK', cancelLabel: null, danger: false
+        });
+    };
+
+    // ── Per-shape actions (edit / delete) ─────────────────────────────────
+    // Right-click used to go straight to a delete confirm, which made the
+    // only thing you could do to a saved shape destroy it. It opens this
+    // instead, so editing one is a normal thing to do.
+    var _shapeMenuEl = null;
+    function closeShapeMenu() {
+        if (!_shapeMenuEl) return;
+        _shapeMenuEl.remove();
+        _shapeMenuEl = null;
+        document.removeEventListener('mousedown', _onShapeMenuOutside, true);
+        document.removeEventListener('keydown', _onShapeMenuKey, true);
+        window.removeEventListener('resize', closeShapeMenu);
+    }
+    function _onShapeMenuOutside(e) { if (_shapeMenuEl && !_shapeMenuEl.contains(e.target)) closeShapeMenu(); }
+    function _onShapeMenuKey(e) { if (e.key === 'Escape') closeShapeMenu(); }
+
+    function openShapeMenu(shape, x, y) {
+        closeShapeMenu();
+        var m = document.createElement('div');
+        m.className = 'brush-shape-menu';
+        var mk = function (label, cls, fn) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'brush-shape-menu-item' + (cls ? ' ' + cls : '');
+            b.textContent = label;
+            b.addEventListener('click', function () { closeShapeMenu(); fn(); });
+            m.appendChild(b);
+        };
+        var head = document.createElement('div');
+        head.className = 'brush-shape-menu-head';
+        head.textContent = shape.name;
+        head.title = shape.name;
+        m.appendChild(head);
+        mk('✏️ Edit shape', '', function () {
+            if (window.BrushShapes && window.BrushShapes.beginEdit) window.BrushShapes.beginEdit(shape.id);
+        });
+        mk('🗑 Delete', 'danger', function () {
+            window.appConfirm({
+                title: 'Delete brush shape?',
+                message: '"' + shape.name + '" will be removed from your brush shapes. This cannot be undone.',
+                confirmLabel: 'Delete',
+                cancelLabel: 'Keep'
+            }).then(function (ok) {
+                if (ok && window.BrushShapes) window.BrushShapes.remove(shape.id);
+            });
+        });
+        // Body-mounted so it escapes the drawer/tip-menu overflow and stacking
+        document.body.appendChild(m);
+        var r = m.getBoundingClientRect();
+        var px = Math.min(x, window.innerWidth - r.width - 8);
+        var py = Math.min(y, window.innerHeight - r.height - 8);
+        m.style.left = Math.max(8, px) + 'px';
+        m.style.top = Math.max(8, py) + 'px';
+        _shapeMenuEl = m;
+        // Deferred so the click that opened it doesn't immediately close it
+        setTimeout(function () {
+            document.addEventListener('mousedown', _onShapeMenuOutside, true);
+            document.addEventListener('keydown', _onShapeMenuKey, true);
+            window.addEventListener('resize', closeShapeMenu);
+        }, 0);
+    }
+
     // Custom stamp swatches (33-brush-shapes) + the import tile, shared by
     // the drawer's shapes row and the strip's tip menu — one renderer, so a
     // shape selects, deletes and highlights identically wherever it's clicked.
@@ -348,7 +523,7 @@
             b.style.backgroundSize = 'contain';
             b.style.backgroundRepeat = 'no-repeat';
             b.style.backgroundPosition = 'center';
-            b.title = s.name + ' — click to paint with this shape · right-click to delete';
+            b.title = s.name + ' — click to paint with this shape · right-click to edit or delete';
             b.addEventListener('click', function () {
                 if (!window.BrushShapes) return;
                 window.BrushShapes.setActive(window.BrushShapes.activeId() === s.id ? null : s.id);
@@ -357,9 +532,9 @@
             });
             b.addEventListener('contextmenu', function (e) {
                 e.preventDefault();
-                if (window.BrushShapes && confirm('Delete brush shape "' + s.name + '"?')) {
-                    window.BrushShapes.remove(s.id);
-                }
+                e.stopPropagation();
+                if (!window.BrushShapes) return;
+                openShapeMenu(s, e.clientX, e.clientY);
             });
             row.appendChild(b);
         });
@@ -2920,13 +3095,24 @@
         var tipRow = document.createElement('div');
         tipRow.className = 'brush-tip-row';
         var tipBtns = [];
+        // ONE rule for "which tip reads as selected", because a custom stamp
+        // overrides the built-in tips: with a stamp loaded, NO glyph is the
+        // active tip. Three places used to decide this and this one forgot the
+        // stamp, so applying a preset (or any SETTERS.tip write) while a shape
+        // was loaded lit a glyph AND the shape at once — two active brushes on
+        // screen, only one of them real.
+        function syncTipActive() {
+            var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
+            var cur = (window.config && window.config.BRUSH_TIP) | 0;
+            tipBtns.forEach(function (b) {
+                b.classList.toggle('active', !act && parseInt(b.dataset.tip, 10) === cur);
+            });
+        }
         function setBrushTip(v) {
             v = v | 0;
             if (v < 0 || v > 4) v = 0;
             if (window.config) window.config.BRUSH_TIP = v;
-            tipBtns.forEach(function (b) {
-                b.classList.toggle('active', parseInt(b.dataset.tip, 10) === v);
-            });
+            syncTipActive();
             syncTexState();
             syncTipSwatch();   // the strip swatch is the other face of this control
             try { if (window.settingsManager) window.settingsManager.set('brush.tip', v); } catch (_) {}
@@ -2987,12 +3173,7 @@
         };
         window.__onBrushShapeChanged = function () {
             renderBrushShapes();
-            // An active shape overrides the built-in tips — dim their state
-            var act = (window.BrushShapes && window.BrushShapes.activeId()) || null;
-            var curTip = (window.config && window.config.BRUSH_TIP) | 0;
-            tipBtns.forEach(function (tb) {
-                tb.classList.toggle('active', !act && parseInt(tb.dataset.tip, 10) === curTip);
-            });
+            syncTipActive();   // an active stamp overrides the built-in tips
             syncTexState();
             syncTipSwatch();
         };

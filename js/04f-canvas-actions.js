@@ -546,6 +546,15 @@
         // canvas with no warning. Dirty = any paint gesture since launch;
         // cleared by .fluid save/load (12-save-load). Context-restore reload
         // above bypasses it deliberately.
+        //
+        // Electron asks through the main process (electron-main.js holds the
+        // window's `close` open and pings us) and answers in an in-app modal.
+        // The old renderer-side native dialog had two UX faults: it was
+        // UNPARENTED, so on a frameless maximized window it could sit BEHIND
+        // the app — every click then rang the Windows blocked-window beep and
+        // nothing appeared to respond — and its `type: 'question'` rang the
+        // message-box chime on open. A DOM modal has neither problem, and it
+        // can offer "save first", which a two-button native box could not.
         (function setupUnsavedWorkGuard(){
             try {
                 window.__unsavedWork = false;
@@ -553,25 +562,203 @@
                     window.__unsavedWork = true;
                 }, { passive: true });
 
-                window.onbeforeunload = function (e) {
-                    if (!window.__unsavedWork) return undefined;
-                    if (window.IS_ELECTRON) {
-                        // Chromium shows no native beforeunload dialog for
-                        // win.close() under file:// — ask via a real dialog.
-                        // Wording is unload-neutral: this same prompt guards
-                        // quit AND dev reloads (F5 etc. in --dev builds).
+                var ipc = null;
+                if (window.IS_ELECTRON) {
+                    try { ipc = require('electron').ipcRenderer; } catch (_) { ipc = null; }
+                }
+
+                var modal = null;      // lazily built DOM
+                var onModalKey = null; // Esc handler while it is up
+                var askKind = 'close'; // which question is currently on screen
+                var pendingReply = null; // how to answer whatever main last asked
+
+                function els() {
+                    return {
+                        title: modal.querySelector('#appCloseTitle'),
+                        msg: modal.querySelector('#appCloseMessage'),
+                        keep: modal.querySelector('#appCloseKeep'),
+                        save: modal.querySelector('#appCloseSave'),
+                        quit: modal.querySelector('#appCloseQuit')
+                    };
+                }
+
+                function answer(go) {
+                    hideModal();
+                    var reply = pendingReply;
+                    pendingReply = null;
+                    if (reply) reply(go);              // answers the id main asked with
+                    else if (go) window.__closeApproved = true;
+                }
+
+                function hideModal() {
+                    if (!modal) return;
+                    modal.classList.remove('show');
+                    if (onModalKey) {
+                        document.removeEventListener('keydown', onModalKey, true);
+                        onModalKey = null;
+                    }
+                }
+
+                function saveFromModal() {
+                    var e = els();
+                    var stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+                    var ok = false;
+                    try { ok = !!(window.projectFile && window.projectFile.export('painting-' + stamp)); }
+                    catch (_) { ok = false; }
+                    if (ok) {
+                        // Deliberately does NOT go through on its own: the save
+                        // can still be settling (and on the web it is a download
+                        // that has only just started), so the user gets an
+                        // explicit "safe now" instead of a race. The save clears
+                        // __unsavedWork, so the next attempt is silent anyway.
+                        var reloading = (askKind === 'reload' || askKind === 'hard-reload');
+                        e.title.textContent = '✓ Project saved';
+                        e.msg.textContent = 'Saved as a .fluid project. It is safe to '
+                            + (reloading ? 'reload' : 'close') + ' now.';
+                        e.save.style.display = 'none';
+                        e.quit.textContent = reloading ? 'Reload' : 'Close';
+                        e.quit.classList.add('app-close-safe');
+                        e.quit.focus();
+                    } else if (window.__unsavedWork) {
+                        // Cancelled the save dialog, or the write failed —
+                        // either way the work is still unsaved, and saying so
+                        // is the whole point of this prompt.
+                        e.msg.textContent = 'Not saved — the save was cancelled or failed. '
+                            + 'This painting still has unsaved work.';
+                    }
+                }
+
+                function buildModal() {
+                    var el = document.createElement('div');
+                    el.id = 'appCloseModal';
+                    el.className = 'delete-modal app-close-modal';
+                    el.innerHTML =
+                        '<div class="delete-modal-content">' +
+                            '<div class="delete-modal-title" id="appCloseTitle">Close without saving?</div>' +
+                            '<div class="delete-modal-message" id="appCloseMessage">' +
+                                'This painting has unsaved work. Painting is not autosaved — closing now loses it.' +
+                            '</div>' +
+                            '<div class="delete-modal-actions">' +
+                                '<button type="button" class="delete-modal-cancel" id="appCloseKeep">Keep painting</button>' +
+                                '<button type="button" class="app-close-save" id="appCloseSave">💾 Save project</button>' +
+                                '<button type="button" class="delete-modal-confirm" id="appCloseQuit">Close anyway</button>' +
+                            '</div>' +
+                        '</div>';
+                    document.body.appendChild(el);
+                    el.querySelector('#appCloseKeep').addEventListener('click', function () { answer(false); });
+                    el.querySelector('#appCloseQuit').addEventListener('click', function () { answer(true); });
+                    el.querySelector('#appCloseSave').addEventListener('click', saveFromModal);
+                    // Backdrop click = the safe answer, same as Esc
+                    el.addEventListener('mousedown', function (ev) { if (ev.target === el) answer(false); });
+                    return el;
+                }
+
+                // What each thing the main process can ask looks like. Reload
+                // and close are the same question — "this painting is not
+                // saved" — so they wear the same prompt with the right verb.
+                var ASKS = {
+                    close: {
+                        title: 'Close without saving?',
+                        msg: 'This painting has unsaved work. Painting is not autosaved — closing now loses it.',
+                        go: 'Close anyway', offerSave: true
+                    },
+                    reload: {
+                        title: 'Reload without saving?',
+                        msg: 'This painting has unsaved work. Reloading starts from a blank canvas — '
+                            + 'painting is not autosaved.',
+                        go: 'Reload anyway', offerSave: true
+                    },
+                    'hard-reload': {
+                        title: 'Hard reload without saving?',
+                        msg: 'This painting has unsaved work. Reloading starts from a blank canvas — '
+                            + 'painting is not autosaved.',
+                        go: 'Reload anyway', offerSave: true
+                    },
+                    nuclear: {
+                        title: 'Clear all local data?',
+                        msg: 'This wipes settings and the in-app preset list, and reloads. Presets saved to '
+                            + 'your Preset Vault folder survive and come back on next launch — anything not '
+                            + 'in the vault is lost.',
+                        go: 'Reset everything', offerSave: false
+                    }
+                };
+
+                function showModal(kind) {
+                    if (!modal) modal = buildModal();
+                    var spec = ASKS[kind] || ASKS.close;
+                    var e = els();
+                    // Reset from a previous (possibly already-saved) session
+                    e.title.textContent = spec.title;
+                    e.msg.textContent = spec.msg;
+                    e.save.style.display = spec.offerSave ? '' : 'none';
+                    e.quit.textContent = spec.go;
+                    e.quit.classList.remove('app-close-safe');
+                    modal.classList.add('show');
+                    e.keep.focus();
+                    onModalKey = function (ev) {
+                        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); answer(false); }
+                    };
+                    document.addEventListener('keydown', onModalKey, true);
+                }
+
+                // Quiet, PARENTED native fallback — used when the in-app modal
+                // cannot be built, and for Electron reload paths (dev F5) that
+                // unload without going through the main-process close protocol.
+                // type:'none' is deliberate: 'question'/'info'/'warning' all ring
+                // the Windows message-box chime.
+                function askNatively() {
+                    var remote = require('@electron/remote');
+                    var choice = remote.dialog.showMessageBoxSync(remote.getCurrentWindow(), {
+                        type: 'none',
+                        buttons: ['Keep painting', 'Discard unsaved work'],
+                        defaultId: 0,
+                        cancelId: 0,
+                        noLink: true,
+                        title: 'Unsaved work',
+                        message: 'Discard unsaved work?',
+                        detail: 'This painting has not been saved. Save a project (.fluid) or export first '
+                            + 'if you want to keep it.'
+                    });
+                    return choice === 1;
+                }
+
+                if (ipc) {
+                    ipc.on('app-ask', function (evt, req) {
+                        var id = req && req.id;
+                        var kind = (req && req.kind) || 'close';
+                        var reply = function (ok) {
+                            if (ok) window.__closeApproved = true; // keep beforeunload quiet
+                            try { ipc.send('app-ask-response', { id: id, ok: !!ok }); } catch (_) {}
+                        };
+                        askKind = kind;
+                        pendingReply = reply;
+                        // Losing an unsaved painting is the only thing worth
+                        // interrupting for — a wipe always asks, but a close or
+                        // reload with nothing at stake just goes through.
+                        if (kind !== 'nuclear' && !window.__unsavedWork) { reply(true); return; }
                         try {
-                            const { dialog } = require('@electron/remote');
-                            const choice = dialog.showMessageBoxSync({
-                                type: 'question',
-                                buttons: ['Discard and continue', 'Keep painting'],
-                                defaultId: 1,
-                                cancelId: 1,
-                                title: 'Unsaved work',
-                                message: 'Discard unsaved work?',
-                                detail: 'The canvas has unsaved work. Save a project (.fluid) or export first if you want to keep it.'
-                            });
-                            if (choice === 0) { window.__unsavedWork = false; return undefined; }
+                            showModal(kind);
+                            // Ack only once the question is actually on screen —
+                            // main's watchdog goes ahead without an answer, and
+                            // that must stay true if this throws.
+                            ipc.send('app-ask-ack', id);
+                        } catch (err) {
+                            console.warn('[ask] in-app prompt failed, falling back to a dialog', err);
+                            var go = true;
+                            try { ipc.send('app-ask-ack', id); go = askNatively(); } catch (_) {}
+                            reply(go);
+                        }
+                    });
+                }
+
+                window.onbeforeunload = function (e) {
+                    // Nothing to lose, or the user already answered "close" above
+                    if (!window.__unsavedWork || window.__closeApproved) return undefined;
+                    if (window.IS_ELECTRON) {
+                        // Only reachable for reloads now — the close path is
+                        // answered over IPC before any unload starts.
+                        try {
+                            if (askNatively()) { window.__unsavedWork = false; return undefined; }
                             e.returnValue = false;
                             return false;
                         } catch (err) { /* remote unavailable — fall through to the generic prompt (fail closed) */ }

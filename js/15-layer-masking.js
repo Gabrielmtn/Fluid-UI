@@ -25,7 +25,34 @@
         isProcessingSAM: false,
         // SAM multi-proposal UX
         samCandidates: [],        // Array of processed mask candidates from SAM
-        samSelectedCandidateIndex: 0
+        samSelectedCandidateIndex: 0,
+        // ── Wizard (2026-08-18) ────────────────────────────────────────
+        // The editor runs as three steps — 1 Select, 2 Touch up, 3 Soften &
+        // finish — so a mask (and the collider made from it) is one guided
+        // pass instead of "find the right buttons, then remember to feather
+        // the layer afterwards".
+        wizardActive: false,      // false for collider paint mode (own UI)
+        wizardStep: 1,
+        touchUp: null,            // {canvas, ctx, w, h, dirty, undo[], redo[]}
+        touchUpTool: 'erase',     // strays are the common case — start there
+        touchUpSize: 14,          // same units as the collider brush (÷1000 × width)
+        touchUpPainting: false,
+        touchUpAlt: false,        // right-drag = the other tool
+        touchUpCursor: null,      // {x, y} in stored space, for the brush ring
+        feather: 0,               // 0-100, mirrors layer.threshold
+        featherBase: null,        // cached un-blurred coverage for the preview
+        featherPrev: null,        // cached blurred+tinted preview {f, canvas}
+        makeCollider: false,      // step 3 opt-in: build the collision layer too
+        // Step 1 Filter tab — the layer panel's Mask slider with a background
+        // colour instead of an assumed black one.
+        filterMode: false,
+        filterBg: { r: 0, g: 0, b: 0 },
+        filterBgPicked: false,    // has this session chosen/guessed a colour yet
+        filterThreshold: 0,       // 0-100; 0 = filter off
+        filterInvert: false,
+        filterPicking: false,     // eyedropper armed
+        filterShape: null,        // the shape this filter baked, if it is live
+        filterPrev: null          // cached tinted preview {sig, canvas}
     };
 
     // Helper to deep-clone mask shapes while preserving typed arrays
@@ -97,6 +124,7 @@
 
         // Show mask editor overlay
         showMaskEditor();
+        wizardBegin();
         updateMaskEditorTitle();
         renderMaskEditor();
 
@@ -268,6 +296,22 @@
                     <h3>✂️ Mask Editor</h3>
                     <button class="mask-close-btn" onclick="window.exitMaskMode(false)">✕</button>
                 </div>
+                <!-- Wizard rail: the three steps of making a mask. Clickable,
+                     so it doubles as navigation for anyone who already knows
+                     the flow. Hidden in collider paint mode. -->
+                <div class="mask-wizard-rail" id="maskWizardRail">
+                    <button type="button" class="mask-wizard-step" data-step="1" title="Pick what to mask — Magic Mask or stamped shapes">
+                        <span class="mask-wizard-num">1</span> Select
+                    </button>
+                    <span class="mask-wizard-sep">›</span>
+                    <button type="button" class="mask-wizard-step" data-step="2" title="Brush away strays and paint in anything the AI missed">
+                        <span class="mask-wizard-num">2</span> Touch up
+                    </button>
+                    <span class="mask-wizard-sep">›</span>
+                    <button type="button" class="mask-wizard-step" data-step="3" title="Soften the edge, then apply — no need to feather the layer afterwards">
+                        <span class="mask-wizard-num">3</span> Soften &amp; finish
+                    </button>
+                </div>
                 <div class="mask-editor-controls">
                     <div class="mask-mode-toggle">
                         <label>
@@ -297,16 +341,23 @@
                         </div>
                         <div class="mask-collider-hint">Paint directly on the artwork — the collider and its thumbnail update as you go. Shift+drag pans, scroll zooms.</div>
                     </div>
-                    <div class="mask-tools-row" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
-                        <button id="smartSelectBtn" class="mask-mode-btn magic-mask-btn" onclick="window.toggleSmartSelect()" title="AI-powered object masking&#10;Click objects and the model cuts them out for you&#10;First use: downloads a ~40 MB model (cached locally)">
-                            <span style="font-size: 18px;">🪄</span> Magic Mask Objects
+                    <!-- Step 1's three ways to make a selection, as tabs over
+                         one panel. #smartSelectBtn / #stampMenuBtn keep their
+                         ids: toggleSmartSelect and updateStampMenuDisplay
+                         drive them by id and are unchanged. -->
+                    <div class="mask-tools-row mask-tool-tabs" role="tablist">
+                        <button id="smartSelectBtn" class="mask-tool-tab" data-tool="magic" onclick="window.setMaskTool('magic')" title="AI-powered object masking&#10;Click objects and the model cuts them out for you&#10;First use: downloads a ~40 MB model (cached locally)">
+                            <span class="mask-tool-tab-icon">🪄</span> Magic Mask
                         </button>
-                        <button id="stampMenuBtn" class="mask-mode-btn stamp-menu-btn" onclick="window.toggleStampMenu()" title="Stamp shapes onto the mask&#10;Rectangles, circles, stars and more — drag to place, resize with the handle">
-                            <span style="font-size: 16px;">▦</span> Stamps <span class="stamp-caret">▾</span>
+                        <button id="stampMenuBtn" class="mask-tool-tab" data-tool="stamps" onclick="window.setMaskTool('stamps')" title="Stamp shapes onto the mask&#10;Rectangles, circles, stars and more — drag to place, resize with the handle">
+                            <span class="mask-tool-tab-icon">▦</span> Stamps
+                        </button>
+                        <button id="filterToolBtn" class="mask-tool-tab" data-tool="filter" onclick="window.setMaskTool('filter')" title="Key out a solid background&#10;Pick the background colour, drag the cut up — the shape falls out of it">
+                            <span class="mask-tool-tab-icon">🎚️</span> Filter
                         </button>
                         <span id="samLoadingStatus" style="font-size: 12px; color: #8b949e; align-self: center;"></span>
                     </div>
-                    <div id="stampMenu" class="mask-stamp-menu" style="display: none;">
+                    <div id="stampMenu" class="mask-stamp-menu mask-tool-panel" style="display: none;">
                         <div class="mask-stamp-hint">Click a shape to stamp it onto the mask — drag to move it, grab the handle to resize.</div>
                         <div id="manualShapeTools" class="mask-shape-tools">
                             <button class="mask-tool-btn" data-shape="rect" title="Stamp a Rectangle">▭</button>
@@ -319,7 +370,29 @@
                             <button class="mask-tool-btn" data-shape="star" title="Stamp a Star">★</button>
                         </div>
                     </div>
-                    <div id="smartSelectControls" style="display: none; background: rgba(63, 185, 80, 0.08); padding: 12px; border-radius: 6px; margin-bottom: 8px; border: 1px solid rgba(63, 185, 80, 0.2);">
+                    <!-- Filter: the layer panel's Mask slider, brought into the
+                         flow and given the background control it always needed
+                         (that slider keys against BLACK — real photos aren't). -->
+                    <div id="filterPanel" class="mask-filter-panel mask-tool-panel" style="display: none;">
+                        <div class="mask-filter-hint">
+                            For a subject on a flat background: set the background colour, then raise the cut until only the shape is left.
+                        </div>
+                        <div class="mask-filter-row">
+                            <span class="mask-filter-label">Background</span>
+                            <input type="color" id="filterBgColor" value="#000000" title="The colour being cut away">
+                            <button type="button" id="filterPickBtn" class="mask-action-btn" title="Then click the background on the image">💧 Pick</button>
+                            <button type="button" id="filterAutoBtn" class="mask-action-btn" title="Guess it from the edges of the image">✨ Auto</button>
+                        </div>
+                        <label class="mask-filter-row">
+                            <span class="mask-filter-label">Cut amount</span>
+                            <input type="range" id="filterThreshold" min="0" max="100" step="1" value="0" data-no-scale="1">
+                            <span id="filterThresholdValue" class="mask-filter-value">0%</span>
+                        </label>
+                        <label class="mask-filter-check">
+                            <input type="checkbox" id="filterInvert"> Invert — keep the background, drop the subject
+                        </label>
+                    </div>
+                    <div id="smartSelectControls" class="mask-tool-panel" style="display: none; background: rgba(63, 185, 80, 0.08); padding: 12px; margin-bottom: 8px; border: 1px solid rgba(63, 185, 80, 0.2);">
                         <div style="font-size: 13px; color: #3fb950; margin-bottom: 8px; font-weight: 600;">
                             🪄 Click the objects you want masked:
                         </div>
@@ -341,6 +414,38 @@
                             <span class="sam-spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(88, 166, 255, 0.3); border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px;"></span>
                             Magic Mask is cutting out your object...
                         </div>
+                    </div>
+                    <!-- Step 2: touch up. Brushes the flattened mask coverage
+                         directly — the fix for "the AI left a stray blob /
+                         missed the handle". -->
+                    <div id="touchUpTools" class="mask-collider-tools" style="display:none;">
+                        <div class="mask-collider-row">
+                            <button id="touchUpEraseBtn" class="mask-mode-btn collider-tool-btn active" title="Erase mask — wipe away stray bits the AI included">🧽 Erase</button>
+                            <button id="touchUpDrawBtn" class="mask-mode-btn collider-tool-btn" title="Add mask — paint in a piece the AI missed">🖌️ Add</button>
+                            <label class="collider-size-label">Size
+                                <input type="range" id="touchUpSize" min="2" max="60" step="1" value="14" data-no-scale="1">
+                                <span id="touchUpSizeVal">14</span>
+                            </label>
+                            <button id="touchUpUndoBtn" class="mask-mode-btn collider-tool-btn" title="Undo the last touch-up stroke">↶</button>
+                            <button id="touchUpRedoBtn" class="mask-mode-btn collider-tool-btn" title="Redo">↷</button>
+                            <button id="touchUpDespeckBtn" class="mask-mode-btn collider-tool-btn" title="Delete every disconnected speck smaller than a twentieth of the main shape">✨ Remove specks</button>
+                        </div>
+                        <div class="mask-collider-hint" id="touchUpHint">Right-drag does the opposite of the selected tool. Shift+drag pans, scroll zooms.</div>
+                    </div>
+                    <!-- Step 3: soften (the layer's Feather, brought into the
+                         flow) + the optional collider hand-off. -->
+                    <div id="featherStep" class="mask-feather-step" style="display:none;">
+                        <label class="mask-feather-row">
+                            <span class="mask-feather-label">Soften edge</span>
+                            <input type="range" id="maskFeatherSlider" min="0" max="100" step="1" value="0" data-no-scale="1">
+                            <span id="maskFeatherValue" class="mask-feather-value">0%</span>
+                        </label>
+                        <div class="mask-feather-hint" id="maskFeatherHint">
+                            0% is a hard cut-out. Raise it for a soft edge — the same Feather that lives on the layer, set here so you never have to go back for it.
+                        </div>
+                        <label class="mask-collider-opt" id="maskColliderOpt" style="display:none;">
+                            <input type="checkbox" id="maskMakeCollider"> 🧱 Also make this a collision layer the fluid flows around
+                        </label>
                     </div>
                     <div class="mask-rotation-control" id="maskRotationControl" style="display: none; padding: 8px 12px; background: rgba(88, 166, 255, 0.05); border-radius: 6px; margin-top: 8px;">
                         <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #c9d1d9;">
@@ -368,6 +473,9 @@
                 </div>
                 <div class="mask-editor-footer">
                     <button class="mask-cancel-btn" onclick="window.exitMaskMode(false)">Cancel</button>
+                    <span class="mask-footer-spacer"></span>
+                    <button class="mask-back-btn" id="maskWizardBack" style="display:none;" onclick="window.maskWizardBack()">← Back</button>
+                    <button class="mask-next-btn" id="maskWizardNext" style="display:none;" onclick="window.maskWizardNext()">Next →</button>
                     <button class="mask-apply-btn" onclick="window.exitMaskMode(true)">✓ Apply Mask</button>
                 </div>
             </div>
@@ -412,6 +520,112 @@
             scheduleColliderFilm();
         });
 
+        // ── Wizard rail + step controls ──
+        overlay.querySelectorAll('.mask-wizard-step').forEach(btn => {
+            btn.addEventListener('click', () => {
+                wizardGoTo(parseInt(btn.getAttribute('data-step'), 10) || 1);
+            });
+        });
+
+        // ── Touch-up tools (step 2) ──
+        const tErase = overlay.querySelector('#touchUpEraseBtn');
+        const tDraw = overlay.querySelector('#touchUpDrawBtn');
+        const setTouchTool = (t) => {
+            maskState.touchUpTool = t;
+            if (tDraw) tDraw.classList.toggle('active', t === 'draw');
+            if (tErase) tErase.classList.toggle('active', t === 'erase');
+        };
+        if (tDraw) tDraw.addEventListener('click', () => setTouchTool('draw'));
+        if (tErase) tErase.addEventListener('click', () => setTouchTool('erase'));
+        const tSize = overlay.querySelector('#touchUpSize');
+        if (tSize) {
+            tSize.addEventListener('input', (e) => {
+                maskState.touchUpSize = parseFloat(e.target.value);
+                const out = overlay.querySelector('#touchUpSizeVal');
+                if (out) out.textContent = String(maskState.touchUpSize);
+                scheduleMaskRender(); // the brush ring tracks the slider
+            });
+        }
+        const tUndo = overlay.querySelector('#touchUpUndoBtn');
+        const tRedo = overlay.querySelector('#touchUpRedoBtn');
+        if (tUndo) tUndo.addEventListener('click', () => touchUpHistory('undo'));
+        if (tRedo) tRedo.addEventListener('click', () => touchUpHistory('redo'));
+        const tDespeck = overlay.querySelector('#touchUpDespeckBtn');
+        if (tDespeck) tDespeck.addEventListener('click', removeMaskSpecks);
+
+        // ── Filter tab (step 1) ──
+        const fBg = overlay.querySelector('#filterBgColor');
+        if (fBg) {
+            fBg.addEventListener('input', (e) => {
+                const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(e.target.value || '');
+                if (!m) return;
+                maskState.filterBg = { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+                maskState.filterBgPicked = true;
+                invalidateFilterPreview();
+                scheduleMaskRender();
+            });
+        }
+        const fPick = overlay.querySelector('#filterPickBtn');
+        if (fPick) {
+            fPick.addEventListener('click', () => {
+                maskState.filterPicking = !maskState.filterPicking;
+                filterSyncControls();
+                setStepHint(maskState.filterPicking
+                    ? '<strong style="color:#58a6ff;">💧 Click the background</strong> on the image to key that colour out.'
+                    : STEP_HINTS[1]);
+            });
+        }
+        const fAuto = overlay.querySelector('#filterAutoBtn');
+        if (fAuto) {
+            fAuto.addEventListener('click', () => {
+                if (autoPickFilterBackground()) {
+                    maskState.filterBgPicked = true;
+                    invalidateFilterPreview();
+                    filterSyncControls();
+                    scheduleMaskRender();
+                } else {
+                    setStepHint('<strong style="color:#8b949e;">Could not read the image edges</strong> — pick the colour by hand.', 3000);
+                }
+            });
+        }
+        const fThr = overlay.querySelector('#filterThreshold');
+        if (fThr) {
+            fThr.addEventListener('input', (e) => {
+                maskState.filterThreshold = parseInt(e.target.value, 10) || 0;
+                const out = overlay.querySelector('#filterThresholdValue');
+                if (out) out.textContent = maskState.filterThreshold + '%';
+                invalidateFilterPreview();
+                scheduleMaskRender();
+            });
+        }
+        const fInv = overlay.querySelector('#filterInvert');
+        if (fInv) {
+            fInv.addEventListener('change', (e) => {
+                maskState.filterInvert = !!e.target.checked;
+                invalidateFilterPreview();
+                scheduleMaskRender();
+            });
+        }
+
+        // ── Feather + finish (step 3) ──
+        const fSlider = overlay.querySelector('#maskFeatherSlider');
+        if (fSlider) {
+            fSlider.addEventListener('input', (e) => {
+                maskState.feather = parseInt(e.target.value, 10) || 0;
+                const out = overlay.querySelector('#maskFeatherValue');
+                if (out) out.textContent = maskState.feather + '%';
+                // The preview re-runs the real box blur — coalesce a drag's
+                // worth of input events into one frame.
+                scheduleMaskRender();
+            });
+        }
+        const mkCollider = overlay.querySelector('#maskMakeCollider');
+        if (mkCollider) {
+            mkCollider.addEventListener('change', (e) => {
+                maskState.makeCollider = !!e.target.checked;
+            });
+        }
+
         // Mode toggle
         const modeRadios = overlay.querySelectorAll('input[name="maskMode"]');
         modeRadios.forEach(radio => {
@@ -452,9 +666,10 @@
             canvas.addEventListener('mouseup', handleMaskCanvasMouseUp);
             canvas.addEventListener('mouseleave', handleMaskCanvasMouseUp);
             
-            // Prevent context menu in smart select mode
+            // Prevent context menu where right-click is a tool: SAM exclude
+            // points, and the touch-up brush's "other tool" drag.
             canvas.addEventListener('contextmenu', (e) => {
-                if (maskState.smartSelectMode) {
+                if (maskState.smartSelectMode || touchUpActive()) {
                     e.preventDefault();
                     return false;
                 }
@@ -476,7 +691,7 @@
                 maskState.panY = mouseY - (mouseY - maskState.panY) * (maskState.zoom / oldZoom);
                 
                 updateZoomDisplay();
-                renderMaskEditor();
+                scheduleMaskRender();
             }, { passive: false });
         }
     }
@@ -589,6 +804,7 @@
 
     // Clear all mask shapes
     window.clearMaskShapes = function() {
+        maskState.filterShape = null; // whatever it baked is going with them
         maskState.shapes = [];
         maskState.selectedShapeIndex = null;
         updateMaskEditorTitle();
@@ -629,6 +845,51 @@
             maskState.colliderLastY = y;
             colliderStamp(x, y);
             scheduleColliderFilm();
+            e.preventDefault();
+            return;
+        }
+
+        // Eyedropper: one click anywhere on the artwork sets the colour the
+        // filter keys out. Takes precedence over shape hit-testing while armed.
+        if (filterActive() && maskState.filterPicking && e.button === 0 && !e.shiftKey) {
+            const picked = sampleFilterColorAt(x, y);
+            maskState.filterPicking = false;
+            if (picked) {
+                maskState.filterBg = picked;
+                maskState.filterBgPicked = true;
+                invalidateFilterPreview();
+                setStepHint('<strong style="color:#3fb950;">Background set</strong> — raise Cut amount to key it out.', 2600);
+            } else {
+                setStepHint('<strong style="color:#8b949e;">Could not read that pixel</strong> — set the colour by hand.', 3000);
+            }
+            filterSyncControls();
+            scheduleMaskRender();
+            e.preventDefault();
+            return;
+        }
+
+        // Touch-up mode (wizard step 2): left-drag runs the selected tool,
+        // right-drag runs the other one (the painter's reflex), shift/middle
+        // still pan.
+        if (touchUpActive()) {
+            if (e.shiftKey || e.button === 1) {
+                maskState.isPanning = true;
+                maskState.panStartX = screenX - maskState.panX;
+                maskState.panStartY = screenY - maskState.panY;
+                e.preventDefault();
+                return;
+            }
+            if (e.button !== 0 && e.button !== 2) return;
+            const tu = ensureTouchUpBuffer();
+            if (!tu) return;
+            touchUpPushUndo(tu);
+            maskState.touchUpPainting = true;
+            maskState.touchUpAlt = (e.button === 2);
+            maskState.touchUpLastX = x;
+            maskState.touchUpLastY = y;
+            maskState.touchUpCursor = { x: x, y: y };
+            touchUpStamp(tu, x, y);
+            scheduleMaskRender();
             e.preventDefault();
             return;
         }
@@ -721,7 +982,7 @@
         if (maskState.isPanning) {
             maskState.panX = screenX - maskState.panStartX;
             maskState.panY = screenY - maskState.panStartY;
-            renderMaskEditor();
+            scheduleMaskRender();
             return;
         }
         
@@ -753,6 +1014,29 @@
             return;
         }
 
+        if (touchUpActive()) {
+            maskState.touchUpCursor = { x: x, y: y };
+            if (!maskState.touchUpPainting) {
+                canvas.style.cursor = 'none'; // the drawn ring IS the cursor
+                scheduleMaskRender();
+                return;
+            }
+            const tu = ensureTouchUpBuffer();
+            if (tu) {
+                // Interpolate along the drag so a fast stroke stays continuous
+                const lx = maskState.touchUpLastX, ly = maskState.touchUpLastY;
+                const dist = Math.hypot(x - lx, y - ly);
+                const step = Math.max(1, touchUpRadius() * 0.3);
+                const n = Math.min(256, Math.floor(dist / step));
+                for (let i = 1; i <= n; i++) {
+                    touchUpStamp(tu, lx + (x - lx) * (i / n), ly + (y - ly) * (i / n));
+                }
+                if (n > 0) { maskState.touchUpLastX = x; maskState.touchUpLastY = y; }
+            }
+            scheduleMaskRender();
+            return;
+        }
+
         if (maskState.isDragging && maskState.selectedShapeIndex !== null) {
             const dx = x - maskState.dragStartX;
             const dy = y - maskState.dragStartY;
@@ -763,7 +1047,7 @@
             
             maskState.dragStartX = x;
             maskState.dragStartY = y;
-            renderMaskEditor();
+            scheduleMaskRender();
         } else if (maskState.isResizing && maskState.selectedShapeIndex !== null) {
             const shape = maskState.shapes[maskState.selectedShapeIndex];
             const dx = x - maskState.dragStartX;
@@ -773,7 +1057,7 @@
             
             maskState.dragStartX = x;
             maskState.dragStartY = y;
-            renderMaskEditor();
+            scheduleMaskRender();
         } else {
             // Update cursor based on hover
             let cursor = 'default';
@@ -793,6 +1077,16 @@
 
     // Handle canvas mouse up
     function handleMaskCanvasMouseUp(e) {
+        if (maskState.touchUpPainting) {
+            maskState.touchUpPainting = false;
+            maskState.touchUpAlt = false;
+            touchUpSyncButtons();
+        }
+        // Leaving the canvas takes the brush ring with it
+        if (e && e.type === 'mouseleave') {
+            maskState.touchUpCursor = null;
+            if (touchUpActive()) scheduleMaskRender();
+        }
         if (maskState.colliderPainting) {
             maskState.colliderPainting = false;
             // Close the undo boundary so ↶ steps back one STROKE, not one dab
@@ -954,6 +1248,42 @@
     }
 
     // Render mask editor canvas
+    // ── Editor paint scheduling ───────────────────────────────────────────
+    // The editor redraws from mouse moves (hover ring, drags, pans, zoom),
+    // which fire far above frame rate. Coalescing to one paint per frame is
+    // the difference between a steady image and a canvas that visibly churns.
+    let _maskRenderPending = false;
+    function scheduleMaskRender() {
+        if (_maskRenderPending) return;
+        _maskRenderPending = true;
+        requestAnimationFrame(function () {
+            _maskRenderPending = false;
+            renderMaskEditor();
+        });
+    }
+
+    // Background decoded once per source. Returns null while a new source is
+    // still decoding (the load re-renders itself); callers draw the rest of
+    // the frame regardless, so nothing blanks waiting on it.
+    let _bgCache = { src: null, img: null, ready: false };
+    function maskBackgroundImage(src) {
+        if (_bgCache.src === src) return _bgCache.ready ? _bgCache.img : null;
+        const img = new Image();
+        _bgCache = { src: src, img: img, ready: false };
+        img.onload = function () {
+            if (_bgCache.img !== img) return; // a later source superseded this one
+            _bgCache.ready = true;
+            scheduleMaskRender();
+        };
+        img.onerror = function () {
+            if (_bgCache.img === img) _bgCache = { src: null, img: null, ready: false };
+        };
+        img.src = src;
+        // A cached data: URL is often already decodable by the time we get here
+        if (img.complete && img.naturalWidth) { _bgCache.ready = true; return img; }
+        return null;
+    }
+
     function renderMaskEditor() {
         const canvas = document.getElementById('maskEditorCanvas');
         if (!canvas) return;
@@ -961,14 +1291,20 @@
         // Size canvas to match display canvas — except in adhoc mode (brush
         // shapes), where the editor works in the IMAGE's own space so nothing
         // is aspect-stretched and the applied result is WYSIWYG.
+        // ONLY on a real change: assigning canvas.width resets the whole
+        // drawing buffer even when the value is identical, so doing it every
+        // render wiped the canvas ~100×/second while the mouse moved.
         const displayCanvas = document.getElementById('canvas');
+        let wantW = 0, wantH = 0;
         if (maskState.activeMaskLayerId === 'adhoc' && maskState.adhocSource) {
-            canvas.width = maskState.adhocSource.width;
-            canvas.height = maskState.adhocSource.height;
+            wantW = maskState.adhocSource.width;
+            wantH = maskState.adhocSource.height;
         } else if (displayCanvas) {
-            canvas.width = displayCanvas.width;
-            canvas.height = displayCanvas.height;
+            wantW = displayCanvas.width;
+            wantH = displayCanvas.height;
         }
+        if (wantW && canvas.width !== wantW) canvas.width = wantW;
+        if (wantH && canvas.height !== wantH) canvas.height = wantH;
 
         const ctx = canvas.getContext('2d');
         
@@ -1032,22 +1368,22 @@
                 if (bgImage && bgImage !== 'none') imgSrc = bgImage.slice(5, -2); // strip 'url("' and '")'
             }
             if (imgSrc) {
-                const img = new Image();
-                img.onload = () => {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+                // Decoded ONCE per source (see maskBackgroundImage): this used
+                // to build a fresh Image() per call and draw from its async
+                // onload, so every mouse move left the canvas blank until the
+                // decode landed — a flash per move once hovering started
+                // redrawing for the brush ring.
+                const img = maskBackgroundImage(imgSrc);
+                if (img) {
                     drawWithTransform(() => {
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                         // Add semi-transparent overlay to make shapes more visible
                         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                     });
-
-                    // Redraw shapes after image loads
-                    drawMaskShapesWithTransform(ctx);
-                };
-                img.src = imgSrc;
-                return; // Exit early, will redraw when image loads
+                }
+                // Fall through either way — the mask overlay draws now, and the
+                // first decode re-renders itself when it arrives.
             }
         } else {
             // For recording layers, draw the fluid simulation canvas
@@ -1069,6 +1405,12 @@
     function drawMaskShapesWithTransform(ctx) {
         const canvas = document.getElementById('maskEditorCanvas');
         if (!canvas) return;
+
+        // Wizard steps 2 and 3 draw the mask as COVERAGE (a pixel film), not
+        // as movable shapes: step 2 because the brush owns the pixels, step 3
+        // because the softened edge is the thing being judged.
+        if (touchUpActive()) { drawTouchUpOverlay(ctx, canvas); return; }
+        if (maskState.wizardActive && maskState.wizardStep === 3) { drawFeatherOverlay(ctx, canvas); return; }
 
         // Apply zoom and pan transformation
         ctx.save();
@@ -1140,6 +1482,11 @@
         // Restore zoom/pan transformation
         ctx.restore();
         
+        // Live filter coverage, over the shapes it will be baked alongside
+        if (filterActive() && filterHasCut()) {
+            drawFilterOverlay(ctx, canvas);
+        }
+
         // Draw SAM preview mask overlay if available
         if (maskState.samPreviewMask && maskState.smartSelectMode) {
             const mask = maskState.samPreviewMask;
@@ -1330,22 +1677,21 @@
             let nonZeroPixels = 0;
             for (let i = 0; i < shape.samMask.length; i++) {
                 const idx = i * 4;
-                if (shape.samMask[i] > 0) {
+                const v = shape.samMask[i];
+                if (v > 0) {
                     nonZeroPixels++;
                     data[idx] = r;
                     data[idx + 1] = g;
                     data[idx + 2] = b;
-                    data[idx + 3] = Math.floor(a * 255);
+                    // Soft masks (SAM's antialiased edge, and anything the
+                    // touch-up brush made) carry 0-255 coverage — show it, or
+                    // a feathered edge reads as a hard one back on step 1.
+                    data[idx + 3] = shape.samSoft
+                        ? Math.floor(a * v)
+                        : Math.floor(a * 255);
                 }
             }
-            
-            console.log('🎨 Drawing SAM mask:', {
-                totalPixels: shape.samMask.length,
-                nonZeroPixels,
-                coverage: (nonZeroPixels / shape.samMask.length * 100).toFixed(1) + '%',
-                dimensions: [shape.samMaskWidth, shape.samMaskHeight]
-            });
-            
+
             tempCtx.putImageData(imageData, 0, 0);
             
             // Draw the cropped mask at the shape's position
@@ -1443,8 +1789,12 @@
         if (stampMenu) stampMenu.style.display = open ? 'block' : 'none';
         if (stampBtn) {
             stampBtn.classList.toggle('open', open);
-            stampBtn.style.display = maskState.smartSelectMode ? 'none' : '';
+            // A tab stays put when another tool is active — it used to be
+            // hidden outright while Magic Mask was engaged, which is fine for a
+            // button and wrong for a tab strip (the row would reflow).
+            stampBtn.style.display = '';
         }
+        syncMaskToolTabs();
     }
 
     // Toggle the Stamps submenu (shape tools)
@@ -1585,7 +1935,9 @@
             samSyncApplyBusy();
             updateStampMenuDisplay();
 
-            if (hintDiv) {
+            if (maskState.wizardActive) {
+                wizardHint(); // back to the step's own guidance
+            } else if (hintDiv) {
                 hintDiv.innerHTML = '<strong style="color: #58a6ff;">💡 Tip:</strong> Scroll to zoom • Middle-click to pan • Shift+Drag for fine positioning';
             }
 
@@ -1648,11 +2000,18 @@
     // why Apply is waiting (also covers the model-still-downloading window,
     // where clicks schedule nothing at all).
     function samSyncApplyBusy() {
-        const btn = document.querySelector('.mask-apply-btn');
-        if (!btn) return;
         const busy = samCutoutPending();
-        btn.disabled = busy;
-        btn.textContent = busy ? '⏳ Cutting out…' : '✓ Apply Mask';
+        const btn = document.querySelector('.mask-apply-btn');
+        if (btn) {
+            btn.disabled = busy;
+            btn.textContent = busy ? '⏳ Cutting out…' : '✓ Apply Mask';
+        }
+        // Leaving step 1 finalizes the cutout, so Next waits on it too
+        const next = document.getElementById('maskWizardNext');
+        if (next) {
+            next.disabled = busy;
+            next.textContent = busy ? '⏳ Cutting out…' : 'Next →';
+        }
     }
 
     // Fully stand down this session's Magic Mask state — points, preview,
@@ -1764,7 +2123,7 @@
                 maskState.samPreviewMask = maskState.samCandidates[i];
                 maskState.samSelectedCandidateIndex = i;
                 samUpdateCandidateControls();
-                renderMaskEditor();
+                scheduleMaskRender();
             };
 
             btn.onclick = () => {
@@ -1942,7 +2301,910 @@
         }
     }
 
-    // Enter mask editing mode for an image layer
+    // ══ Mask wizard (2026-08-18) ══════════════════════════════════════════
+    // The editor used to be one wall of controls with no order to it, and the
+    // two steps that matter most were missing or elsewhere: there was nowhere
+    // to clean up the strays Magic Mask leaves behind, and softening the edge
+    // meant knowing to go back and drag the layer's Feather slider BEFORE
+    // generating a collider. Now it runs as three steps:
+    //   1 Select      — Magic Mask / stamps (unchanged tools)
+    //   2 Touch up    — brush the coverage: erase strays, add what was missed
+    //   3 Soften      — feather with a live preview, then Apply (and, for an
+    //                   image layer, hand straight off to a collider)
+    // Steps 2 and 3 work on rasterized COVERAGE rather than shapes, using
+    // 05m's canonical `_drawMaskShape` / `_featherMaskAlpha`, so what the
+    // editor shows is what Apply stores and what the collider bakes.
+
+    const TOUCHUP_HISTORY = 6; // full-canvas snapshots — deep enough to fix a slip
+
+    const STEP_HINTS = {
+        1: '<strong style="color:#58a6ff;">Step 1 — Select:</strong> 🪄 Magic Mask clicks an object out for you, or stamp shapes by hand • Scroll to zoom • Middle-click to pan',
+        2: '<strong style="color:#3fb950;">Step 2 — Touch up:</strong> Erase the strays, add anything missed • Right-drag = the other tool • Shift+drag pans',
+        3: '<strong style="color:#d2a8ff;">Step 3 — Soften &amp; finish:</strong> Blue shows what the mask covers • Set the edge softness, then Apply'
+    };
+
+    function wizardKind() {
+        const id = maskState.activeMaskLayerId;
+        if (!id) return 'none';
+        if (id === 'adhoc') return 'adhoc';
+        if (String(id).indexOf('collider-') === 0) return 'collider';
+        if (String(id).indexOf('image-') === 0) return 'image';
+        return 'recording';
+    }
+
+    // Feather is stored per consumer: image layers keep it LIVE on
+    // layer.threshold (the panel slider, applyLayerMask and the collider bake
+    // all already read it), adhoc brush shapes bake it into the stamp.
+    // Recorded-layer masks are hard-tested per point (checkMaskPoint), so a
+    // soft edge there would be a promise the renderer doesn't keep.
+    function wizardSupportsFeather() {
+        const k = wizardKind();
+        return k === 'image' || k === 'adhoc';
+    }
+
+    function wizardLayerIndex() {
+        if (wizardKind() !== 'image') return -1;
+        return parseInt(String(maskState.activeMaskLayerId).replace('image-', ''), 10);
+    }
+
+    function wizardLayer() {
+        const idx = wizardLayerIndex();
+        if (idx < 0) return null;
+        return (window.layers || []).find(l => l.index === idx) || null;
+    }
+
+    // The space shapes and coverage live in — the same one renderMaskEditor
+    // sizes the editor canvas to.
+    function maskExtent() {
+        if (maskState.activeMaskLayerId === 'adhoc' && maskState.adhocSource) {
+            return { w: maskState.adhocSource.width, h: maskState.adhocSource.height };
+        }
+        const c = document.getElementById('canvas');
+        return { w: (c && c.width) || 1920, h: (c && c.height) || 1080 };
+    }
+
+    // Rasterize the current shapes as white coverage through the CANONICAL
+    // renderer, with the same rotation wrap applyLayerMask uses.
+    function rasterizeShapes(cx) {
+        if (!maskState.shapes.length || typeof window._drawMaskShape !== 'function') return;
+        maskState.shapes.forEach(function (s) {
+            const rot = s.rotation || 0;
+            if (rot) {
+                cx.save();
+                const ccx = s.x + s.width / 2, ccy = s.y + s.height / 2;
+                cx.translate(ccx, ccy);
+                cx.rotate((rot * Math.PI) / 180);
+                cx.translate(-ccx, -ccy);
+            }
+            cx.fillStyle = '#fff';
+            try { window._drawMaskShape(cx, s); } catch (_) {}
+            if (rot) cx.restore();
+        });
+    }
+
+    // ── Step 1 · Filter: key a flat background out in one pass ────────────
+    // This is the layer panel's "Mask" slider (05m applyRudimentaryMask)
+    // brought into the flow, with the control it was always missing: that
+    // slider keys against BLACK, so it only ever worked on black backdrops.
+    // Here the background is a COLOUR you pick, and the key is the luminance
+    // of the per-channel difference from it — which reduces to exactly the
+    // old luminance cut when the background is black, so the behaviour people
+    // already rely on is unchanged. The edge cut reuses the same fwidth-style
+    // adaptive band as applyRudimentaryMask and the depth/collider paths, so
+    // a filtered edge lands where every other edge in the app lands.
+
+    function filterActive() {
+        return !!(maskState.wizardActive && maskState.wizardStep === 1 && maskState.filterMode);
+    }
+
+    function filterHasCut() {
+        return !!(maskState.filterThreshold > 0);
+    }
+
+    // The image the filter keys against, in whatever form is already decoded:
+    // image layers reuse the editor's cached backdrop, adhoc its own decoded
+    // source, recorded layers the live artwork.
+    function filterSourceElement() {
+        const id = maskState.activeMaskLayerId;
+        if (id === 'adhoc' && maskState.adhocSource) return maskState.adhocSource.image;
+        if (typeof id === 'string' && id.indexOf('image-') === 0) {
+            const idx = parseInt(id.slice(6), 10);
+            const layer = (window.layers || []).find(l => l.index === idx);
+            const src = layer ? (layer.originalData || layer.data) : null;
+            return src ? maskBackgroundImage(src) : null; // null while decoding
+        }
+        return document.getElementById('canvas');
+    }
+
+    // Sample the source STRETCHED to stored space — the same mapping
+    // applyLayerMask bakes with, so coverage lines up with every shape.
+    function filterPixels(w, h) {
+        const el = filterSourceElement();
+        if (!el) return null;
+        try {
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const cx = c.getContext('2d', { willReadFrequently: true });
+            cx.drawImage(el, 0, 0, w, h);
+            return cx.getImageData(0, 0, w, h);
+        } catch (_) { return null; }
+    }
+
+    function computeFilterCoverage(w, h) {
+        const img = filterPixels(w, h);
+        if (!img) return null;
+        const data = img.data;
+        const n = w * h;
+        const bg = maskState.filterBg || { r: 0, g: 0, b: 0 };
+        const key = new Uint8ClampedArray(n);
+        for (let i = 0, j = 0; i < n; i++, j += 4) {
+            key[i] = 0.299 * Math.abs(data[j] - bg.r)
+                   + 0.587 * Math.abs(data[j + 1] - bg.g)
+                   + 0.114 * Math.abs(data[j + 2] - bg.b);
+        }
+        const thresholdValue = Math.round((maskState.filterThreshold / 100) * 255);
+        let bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+            ? window.config.DEPTH_EDGE_BAND : 12;
+        if (bandCap < 0.5) bandCap = 0.5;
+        bandCap = Math.min(bandCap * 8, 127); // preview cap, as in 05m
+        const invert = !!maskState.filterInvert;
+        const out = new Uint8ClampedArray(n);
+        for (let i = 0; i < n; i++) {
+            const xI = i - ((i / w) | 0) * w;
+            const gx = Math.abs(key[i + (xI < w - 1 ? 1 : 0)] - key[i - (xI > 0 ? 1 : 0)]) * 0.5;
+            const gy = Math.abs(key[i + (i < n - w ? w : 0)] - key[i - (i >= w ? w : 0)]) * 0.5;
+            let band = (gx > gy ? gx : gy) * 0.75;
+            if (band < 0.5) band = 0.5;
+            if (band > bandCap) band = bandCap;
+            let t = (key[i] - (thresholdValue - band)) / (band * 2);
+            if (t < 0) t = 0; else if (t > 1) t = 1;
+            let cov = t * t * (3 - 2 * t);
+            if (invert) cov = 1 - cov;
+            // Transparent source pixels can never become subject
+            out[i] = (cov * data[i * 4 + 3] + 0.5) | 0;
+        }
+        return { data: out, w: w, h: h };
+    }
+
+    // Guess the backdrop from the border ring: the MODE of coarsely quantized
+    // edge pixels, not their mean — a mean of "sky at the top, grass at the
+    // bottom" is a colour that appears nowhere in the image.
+    function autoPickFilterBackground() {
+        const el = filterSourceElement();
+        if (!el) return false;
+        const S = 64;
+        let d;
+        try {
+            const c = document.createElement('canvas');
+            c.width = S; c.height = S;
+            const cx = c.getContext('2d', { willReadFrequently: true });
+            cx.drawImage(el, 0, 0, S, S);
+            d = cx.getImageData(0, 0, S, S).data;
+        } catch (_) { return false; }
+        const buckets = new Map();
+        const push = (x, y) => {
+            const j = (y * S + x) * 4;
+            if (d[j + 3] < 8) return; // fully transparent border = nothing to key
+            const k = ((d[j] >> 3) << 10) | ((d[j + 1] >> 3) << 5) | (d[j + 2] >> 3);
+            const b = buckets.get(k);
+            if (b) { b.r += d[j]; b.g += d[j + 1]; b.b += d[j + 2]; b.n++; }
+            else buckets.set(k, { r: d[j], g: d[j + 1], b: d[j + 2], n: 1 });
+        };
+        for (let x = 0; x < S; x++) { push(x, 0); push(x, S - 1); }
+        for (let y = 1; y < S - 1; y++) { push(0, y); push(S - 1, y); }
+        let best = null;
+        buckets.forEach(function (b) { if (!best || b.n > best.n) best = b; });
+        if (!best) return false;
+        maskState.filterBg = {
+            r: Math.round(best.r / best.n),
+            g: Math.round(best.g / best.n),
+            b: Math.round(best.b / best.n)
+        };
+        return true;
+    }
+
+    // One source pixel, for the eyedropper
+    function sampleFilterColorAt(x, y) {
+        const el = filterSourceElement();
+        if (!el) return null;
+        const sw = el.naturalWidth || el.width || 0;
+        const sh = el.naturalHeight || el.height || 0;
+        if (!sw || !sh) return null;
+        const ext = maskExtent();
+        const sx = Math.max(0, Math.min(sw - 1, Math.round((x / ext.w) * sw)));
+        const sy = Math.max(0, Math.min(sh - 1, Math.round((y / ext.h) * sh)));
+        try {
+            const c = document.createElement('canvas');
+            c.width = 1; c.height = 1;
+            const cx = c.getContext('2d', { willReadFrequently: true });
+            cx.drawImage(el, sx, sy, 1, 1, 0, 0, 1, 1);
+            const d = cx.getImageData(0, 0, 1, 1).data;
+            return { r: d[0], g: d[1], b: d[2] };
+        } catch (_) { return null; }
+    }
+
+    function filterHex() {
+        const bg = maskState.filterBg || { r: 0, g: 0, b: 0 };
+        const h = (v) => ('0' + Math.max(0, Math.min(255, v | 0)).toString(16)).slice(-2);
+        return '#' + h(bg.r) + h(bg.g) + h(bg.b);
+    }
+
+    function filterSyncControls() {
+        const sw = document.getElementById('filterBgColor');
+        if (sw) sw.value = filterHex();
+        const sl = document.getElementById('filterThreshold');
+        if (sl) sl.value = String(maskState.filterThreshold);
+        const val = document.getElementById('filterThresholdValue');
+        if (val) val.textContent = maskState.filterThreshold + '%';
+        const inv = document.getElementById('filterInvert');
+        if (inv) inv.checked = !!maskState.filterInvert;
+        const pick = document.getElementById('filterPickBtn');
+        if (pick) pick.classList.toggle('active', !!maskState.filterPicking);
+    }
+
+    function invalidateFilterPreview() { maskState.filterPrev = null; }
+
+    // Tinted coverage film, cached on everything that changes it
+    function filterPreviewCanvas() {
+        const ext = maskExtent();
+        const scale = Math.min(1, 900 / Math.max(ext.w, ext.h));
+        const w = Math.max(1, Math.round(ext.w * scale));
+        const h = Math.max(1, Math.round(ext.h * scale));
+        const bg = maskState.filterBg || { r: 0, g: 0, b: 0 };
+        const sig = [w, h, bg.r, bg.g, bg.b, maskState.filterThreshold, maskState.filterInvert ? 1 : 0,
+            maskState.maskMode].join(':');
+        if (maskState.filterPrev && maskState.filterPrev.sig === sig) return maskState.filterPrev.canvas;
+        const cov = computeFilterCoverage(w, h);
+        if (!cov) return null;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const cx = c.getContext('2d');
+        const img = cx.createImageData(w, h);
+        const px = img.data;
+        const keep = maskState.maskMode === 'show';
+        const cr = keep ? 100 : 255, cg = keep ? 200 : 120, cb = keep ? 255 : 120;
+        for (let i = 0; i < cov.data.length; i++) {
+            const a = cov.data[i];
+            if (!a) continue;
+            const j = i * 4;
+            px[j] = cr; px[j + 1] = cg; px[j + 2] = cb; px[j + 3] = a;
+        }
+        cx.putImageData(img, 0, 0);
+        maskState.filterPrev = { sig: sig, canvas: c };
+        return c;
+    }
+
+    function drawFilterOverlay(ctx, canvas) {
+        let prev = null;
+        try { prev = filterPreviewCanvas(); } catch (_) { return; }
+        if (!prev) return;
+        const ext = maskExtent();
+        ctx.save();
+        ctx.translate(maskState.panX, maskState.panY);
+        ctx.scale(maskState.zoom, maskState.zoom);
+        applyLayerView(ctx, canvas);
+        ctx.globalAlpha = 0.6;
+        ctx.drawImage(prev, 0, 0, ext.w, ext.h);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    // Bake the live filter into a real shape so steps 2 and 3 (and every
+    // existing save/apply/collider path) treat it like any other selection.
+    function applyFilterToShapes() {
+        dropFilterShape();
+        if (!filterHasCut()) return;
+        const ext = maskExtent();
+        const cov = computeFilterCoverage(ext.w, ext.h);
+        if (!cov) return;
+        const w = cov.w, h = cov.h, d = cov.data;
+        let minX = w, minY = h, maxX = -1, maxY = -1;
+        for (let y = 0; y < h; y++) {
+            const row = y * w;
+            for (let x = 0; x < w; x++) {
+                if (d[row + x] > 0) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+        if (maxX < 0) return; // cut everything away — nothing to add
+        const bw = maxX - minX + 1, bh = maxY - minY + 1;
+        const out = new Uint8Array(bw * bh);
+        for (let y = 0; y < bh; y++) {
+            for (let x = 0; x < bw; x++) {
+                out[y * bw + x] = d[(minY + y) * w + (minX + x)];
+            }
+        }
+        const shape = {
+            type: 'sam-mask',
+            x: minX, y: minY, width: bw, height: bh, rotation: 0,
+            samMask: out, samMaskWidth: bw, samMaskHeight: bh,
+            samSoft: true
+        };
+        maskState.shapes.push(shape);
+        maskState.filterShape = shape;
+        updateMaskEditorTitle();
+    }
+
+    // Pull a previously baked filter shape back out, so re-opening the tab
+    // edits the same selection instead of stacking a second copy on it.
+    function dropFilterShape() {
+        const s = maskState.filterShape;
+        maskState.filterShape = null;
+        if (!s) return;
+        const i = maskState.shapes.indexOf(s);
+        if (i < 0) return; // already flattened by a touch-up — leave it baked
+        maskState.shapes.splice(i, 1);
+        if (maskState.selectedShapeIndex === i) maskState.selectedShapeIndex = null;
+        updateMaskEditorTitle();
+    }
+
+    function setFilterMode(on) {
+        if (on === maskState.filterMode) return;
+        maskState.filterMode = !!on;
+        maskState.filterPicking = false;
+        if (maskState.filterMode) {
+            dropFilterShape();                 // go live on the same selection
+            if (!maskState.filterBgPicked) {   // first open: guess the backdrop
+                if (autoPickFilterBackground()) maskState.filterBgPicked = true;
+            }
+            invalidateFilterPreview();
+            filterSyncControls();
+        } else {
+            applyFilterToShapes();
+            invalidateFilterPreview();
+        }
+    }
+
+    // ── Step 1 tool tabs ──────────────────────────────────────────────────
+    function currentMaskTool() {
+        if (maskState.smartSelectMode) return 'magic';
+        if (maskState.filterMode) return 'filter';
+        if (maskState.stampMenuOpen) return 'stamps';
+        return 'none';
+    }
+
+    // Clicking the open tab closes it — with no tool selected the canvas is
+    // just shapes to drag, which is a state worth being able to get back to.
+    window.setMaskTool = function (tool) {
+        const next = (currentMaskTool() === tool) ? 'none' : tool;
+        // Stand the outgoing tool down first (Magic Mask owns async model
+        // loading, so it goes through its own toggle either way).
+        if (next !== 'magic' && maskState.smartSelectMode) {
+            try { window.toggleSmartSelect(); } catch (_) {}
+        }
+        if (next !== 'filter' && maskState.filterMode) setFilterMode(false);
+        maskState.stampMenuOpen = (next === 'stamps');
+        if (next === 'filter') setFilterMode(true);
+        if (next === 'magic' && !maskState.smartSelectMode) {
+            try { window.toggleSmartSelect(); } catch (_) {}
+        }
+        updateStampMenuDisplay();
+        syncMaskToolTabs();
+        scheduleMaskRender();
+    };
+
+    function syncMaskToolTabs() {
+        const overlay = document.getElementById('maskEditorOverlay');
+        if (!overlay) return;
+        const tool = currentMaskTool();
+        overlay.querySelectorAll('.mask-tool-tab').forEach(function (b) {
+            b.classList.toggle('active', b.getAttribute('data-tool') === tool);
+        });
+        const panel = overlay.querySelector('#filterPanel');
+        if (panel) panel.style.display = (tool === 'filter' && maskState.wizardStep === 1) ? '' : 'none';
+        if (tool === 'filter') filterSyncControls();
+    }
+
+    // ── Step 2: touch-up brush ────────────────────────────────────────────
+
+    function touchUpActive() {
+        return !!(maskState.wizardActive && maskState.wizardStep === 2);
+    }
+
+    function touchUpRadius() {
+        // Same units as the collider brush (slider ÷ 1000 × width) so the two
+        // brushes in this editor feel like one brush.
+        const ext = maskExtent();
+        return Math.max(2, (maskState.touchUpSize / 1000) * ext.w);
+    }
+
+    function ensureTouchUpBuffer() {
+        if (maskState.touchUp) return maskState.touchUp;
+        const ext = maskExtent();
+        let c, cx;
+        try {
+            c = document.createElement('canvas');
+            c.width = ext.w; c.height = ext.h;
+            cx = c.getContext('2d', { willReadFrequently: true });
+            if (!cx) return null;
+        } catch (_) { return null; }
+        rasterizeShapes(cx);
+        maskState.touchUp = {
+            canvas: c, ctx: cx, w: ext.w, h: ext.h,
+            dirty: false, undo: [], redo: [], tint: null
+        };
+        return maskState.touchUp;
+    }
+
+    function touchUpStamp(tu, x, y) {
+        const r = touchUpRadius();
+        // Right-drag inverts the tool
+        const erase = ((maskState.touchUpTool === 'erase') !== !!maskState.touchUpAlt);
+        const g = tu.ctx.createRadialGradient(x, y, r * 0.55, x, y, r);
+        g.addColorStop(0, 'rgba(255,255,255,1)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        tu.ctx.save();
+        tu.ctx.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
+        tu.ctx.fillStyle = g;
+        tu.ctx.beginPath();
+        tu.ctx.arc(x, y, r, 0, Math.PI * 2);
+        tu.ctx.fill();
+        tu.ctx.restore();
+        tu.dirty = true;
+        tu.tint = null;
+    }
+
+    function touchUpSnapshot(tu) {
+        const s = document.createElement('canvas');
+        s.width = tu.w; s.height = tu.h;
+        s.getContext('2d').drawImage(tu.canvas, 0, 0);
+        return s;
+    }
+
+    function touchUpPushUndo(tu) {
+        try {
+            tu.undo.push(touchUpSnapshot(tu));
+            if (tu.undo.length > TOUCHUP_HISTORY) tu.undo.shift();
+            tu.redo.length = 0;
+        } catch (_) {}
+        touchUpSyncButtons();
+    }
+
+    function touchUpHistory(dir) {
+        const tu = maskState.touchUp;
+        if (!tu) return;
+        const from = dir === 'undo' ? tu.undo : tu.redo;
+        const to = dir === 'undo' ? tu.redo : tu.undo;
+        const snap = from.pop();
+        if (!snap) return;
+        try {
+            to.push(touchUpSnapshot(tu));
+            tu.ctx.save();
+            tu.ctx.setTransform(1, 0, 0, 1, 0, 0);
+            tu.ctx.globalCompositeOperation = 'copy';
+            tu.ctx.drawImage(snap, 0, 0);
+            tu.ctx.restore();
+        } catch (_) {}
+        // Undone all the way back to the rasterized original = nothing was
+        // touched up, so the shapes stay editable instead of being flattened.
+        if (dir === 'undo' && !tu.undo.length) tu.dirty = false;
+        else tu.dirty = true;
+        tu.tint = null;
+        touchUpSyncButtons();
+        renderMaskEditor();
+    }
+
+    function touchUpSyncButtons() {
+        const tu = maskState.touchUp;
+        const u = document.getElementById('touchUpUndoBtn');
+        const r = document.getElementById('touchUpRedoBtn');
+        if (u) u.disabled = !(tu && tu.undo.length);
+        if (r) r.disabled = !(tu && tu.redo.length);
+    }
+
+    function setStepHint(html, revertMs) {
+        const el = document.getElementById('maskHint');
+        if (!el) return;
+        el.innerHTML = html;
+        if (revertMs) setTimeout(function () {
+            if (maskState.wizardActive) wizardHint();
+        }, revertMs);
+    }
+
+    function wizardHint() {
+        if (!maskState.wizardActive) return;
+        setStepHint(STEP_HINTS[maskState.wizardStep] || STEP_HINTS[1]);
+    }
+
+    // One-click strays killer: label the connected components of the coverage
+    // and drop every island smaller than a twentieth of the biggest one. This
+    // is the single most common Magic Mask cleanup ("it grabbed the object AND
+    // three specks of background"), and it is undoable like any stroke.
+    function removeMaskSpecks() {
+        const tu = ensureTouchUpBuffer();
+        if (!tu) return;
+        let img;
+        try { img = tu.ctx.getImageData(0, 0, tu.w, tu.h); } catch (_) { return; }
+        const d = img.data, w = tu.w, h = tu.h, n = w * h;
+        // Any non-zero coverage counts as part of an island, antialiased
+        // fringe included. Labelling from a higher floor left every speck's
+        // 1-8 alpha halo unowned, so removing the speck left an invisible
+        // ghost behind — and clearing those unowned pixels instead ate the
+        // same near-zero ring off the shape being KEPT.
+        const ON = 0;
+        const label = new Int32Array(n).fill(-1);
+        const stack = new Int32Array(n);
+        const areas = [];
+        for (let i = 0; i < n; i++) {
+            if (label[i] !== -1 || d[i * 4 + 3] <= ON) continue;
+            const id = areas.length;
+            let area = 0, sp = 0;
+            stack[sp++] = i; label[i] = id;
+            while (sp > 0) {
+                const p = stack[--sp];
+                area++;
+                const px = p % w;
+                let q;
+                if (px > 0)      { q = p - 1; if (label[q] === -1 && d[q * 4 + 3] > ON) { label[q] = id; stack[sp++] = q; } }
+                if (px < w - 1)  { q = p + 1; if (label[q] === -1 && d[q * 4 + 3] > ON) { label[q] = id; stack[sp++] = q; } }
+                if (p >= w)      { q = p - w; if (label[q] === -1 && d[q * 4 + 3] > ON) { label[q] = id; stack[sp++] = q; } }
+                if (p < n - w)   { q = p + w; if (label[q] === -1 && d[q * 4 + 3] > ON) { label[q] = id; stack[sp++] = q; } }
+            }
+            areas.push(area);
+        }
+        if (areas.length <= 1) {
+            setStepHint('<strong style="color:#8b949e;">Nothing to remove</strong> — the mask is already a single piece.', 2600);
+            return;
+        }
+        let max = 0;
+        for (let i = 0; i < areas.length; i++) if (areas[i] > max) max = areas[i];
+        const cut = Math.max(16, max * 0.05);
+        let removed = 0;
+        for (let i = 0; i < areas.length; i++) if (areas[i] < cut) removed++;
+        if (!removed) {
+            setStepHint('<strong style="color:#8b949e;">Nothing to remove</strong> — every piece is big enough to look deliberate. Erase by hand if you want one gone.', 3200);
+            return;
+        }
+        touchUpPushUndo(tu);
+        // Keep only the islands that survived the cut; everything else goes,
+        // fringe and all (unlabelled pixels are already fully transparent).
+        for (let i = 0; i < n; i++) {
+            const id = label[i];
+            if (!(id >= 0 && areas[id] >= cut)) d[i * 4 + 3] = 0;
+        }
+        tu.ctx.putImageData(img, 0, 0);
+        tu.dirty = true;
+        tu.tint = null;
+        renderMaskEditor();
+        setStepHint('<strong style="color:#3fb950;">Removed ' + removed + ' stray ' +
+            (removed === 1 ? 'speck' : 'specks') + '</strong> — ↶ puts them back.', 3200);
+    }
+
+    // Fold the brushed coverage back into maskState.shapes (one soft
+    // sam-mask, cropped to what is actually painted) so every existing save /
+    // apply / collider path keeps working unchanged.
+    function commitTouchUp() {
+        const tu = maskState.touchUp;
+        if (!tu) return;
+        maskState.touchUp = null;
+        maskState.touchUpPainting = false;
+        maskState.touchUpCursor = null;
+        if (!tu.dirty) return; // never painted — leave the shapes editable
+        let img;
+        try { img = tu.ctx.getImageData(0, 0, tu.w, tu.h); } catch (_) { return; }
+        const d = img.data, w = tu.w, h = tu.h;
+        let minX = w, minY = h, maxX = -1, maxY = -1;
+        for (let y = 0; y < h; y++) {
+            const row = y * w;
+            for (let x = 0; x < w; x++) {
+                if (d[(row + x) * 4 + 3] > 0) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+        if (maxX < 0) { // erased to nothing
+            maskState.shapes = [];
+            maskState.selectedShapeIndex = null;
+            updateMaskEditorTitle();
+            return;
+        }
+        const bw = maxX - minX + 1, bh = maxY - minY + 1;
+        const out = new Uint8Array(bw * bh);
+        for (let y = 0; y < bh; y++) {
+            for (let x = 0; x < bw; x++) {
+                out[y * bw + x] = d[((minY + y) * w + (minX + x)) * 4 + 3];
+            }
+        }
+        maskState.shapes = [{
+            type: 'sam-mask',
+            x: minX, y: minY, width: bw, height: bh, rotation: 0,
+            samMask: out, samMaskWidth: bw, samMaskHeight: bh,
+            samSoft: true // brushed edges carry 0-255 coverage
+        }];
+        maskState.selectedShapeIndex = null;
+        invalidateFeatherPreview();
+        updateMaskEditorTitle();
+    }
+
+    function discardTouchUp() {
+        maskState.touchUp = null;
+        maskState.touchUpPainting = false;
+        maskState.touchUpCursor = null;
+    }
+
+    function touchUpTintCanvas(tu) {
+        if (tu.tint) return tu.tint;
+        const c = document.createElement('canvas');
+        c.width = tu.w; c.height = tu.h;
+        const cx = c.getContext('2d');
+        cx.drawImage(tu.canvas, 0, 0);
+        cx.globalCompositeOperation = 'source-in';
+        cx.fillStyle = maskState.maskMode === 'show' ? 'rgb(100,200,255)' : 'rgb(255,120,120)';
+        cx.fillRect(0, 0, tu.w, tu.h);
+        tu.tint = c;
+        return c;
+    }
+
+    function drawTouchUpOverlay(ctx, canvas) {
+        const tu = ensureTouchUpBuffer();
+        if (!tu) return;
+        ctx.save();
+        ctx.translate(maskState.panX, maskState.panY);
+        ctx.scale(maskState.zoom, maskState.zoom);
+        applyLayerView(ctx, canvas);
+        ctx.globalAlpha = 0.55;
+        ctx.drawImage(touchUpTintCanvas(tu), 0, 0, tu.w, tu.h);
+        ctx.globalAlpha = 1;
+        // Brush ring — drawn in STORED space on purpose: where the layer view
+        // squashes an axis the dab is an ellipse too, so the ring is honest.
+        const cur = maskState.touchUpCursor;
+        if (cur) {
+            const vs = layerViewScale(canvas);
+            const vsMean = (vs.sx + vs.sy) / 2;
+            const erase = ((maskState.touchUpTool === 'erase') !== !!maskState.touchUpAlt);
+            ctx.beginPath();
+            ctx.arc(cur.x, cur.y, touchUpRadius(), 0, Math.PI * 2);
+            ctx.strokeStyle = erase ? 'rgba(248,81,73,0.95)' : 'rgba(63,185,80,0.95)';
+            ctx.lineWidth = 2 / (maskState.zoom * vsMean);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    // ── Step 3: feather preview ───────────────────────────────────────────
+
+    function invalidateFeatherPreview() {
+        maskState.featherBase = null;
+        maskState.featherPrev = null;
+    }
+
+    // Coverage at preview resolution. The blur is the real box blur the save
+    // path runs, so the preview matches the result instead of approximating
+    // it; capping the long side keeps a slider drag interactive.
+    function ensureFeatherBase() {
+        if (maskState.featherBase) return maskState.featherBase;
+        const ext = maskExtent();
+        const scale = Math.min(1, 900 / Math.max(ext.w, ext.h));
+        const w = Math.max(1, Math.round(ext.w * scale));
+        const h = Math.max(1, Math.round(ext.h * scale));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const cx = c.getContext('2d', { willReadFrequently: true });
+        cx.scale(scale, scale);
+        rasterizeShapes(cx);
+        cx.setTransform(1, 0, 0, 1, 0, 0);
+        maskState.featherBase = { canvas: c, w: w, h: h, scale: scale };
+        return maskState.featherBase;
+    }
+
+    function featherPreviewCanvas() {
+        const f = maskState.feather | 0;
+        if (maskState.featherPrev && maskState.featherPrev.f === f) return maskState.featherPrev.canvas;
+        const base = ensureFeatherBase();
+        const c = document.createElement('canvas');
+        c.width = base.w; c.height = base.h;
+        const cx = c.getContext('2d', { willReadFrequently: true });
+        cx.drawImage(base.canvas, 0, 0);
+        if (f > 0 && typeof window._featherMaskAlpha === 'function') {
+            // Same radius law as applyLayerMask (05m) and _collisionFromShapes
+            // (23), carried to preview scale.
+            const r = Math.max(1, Math.round((f / 100) * 20 * base.scale));
+            try { window._featherMaskAlpha(cx, base.w, base.h, r); } catch (_) {}
+        }
+        cx.globalCompositeOperation = 'source-in';
+        cx.fillStyle = maskState.maskMode === 'show' ? 'rgb(100,200,255)' : 'rgb(255,120,120)';
+        cx.fillRect(0, 0, base.w, base.h);
+        maskState.featherPrev = { f: f, canvas: c };
+        return c;
+    }
+
+    function drawFeatherOverlay(ctx, canvas) {
+        const ext = maskExtent();
+        let prev = null;
+        try { prev = featherPreviewCanvas(); } catch (_) { return; }
+        if (!prev) return;
+        ctx.save();
+        ctx.translate(maskState.panX, maskState.panY);
+        ctx.scale(maskState.zoom, maskState.zoom);
+        applyLayerView(ctx, canvas);
+        ctx.globalAlpha = 0.6;
+        ctx.drawImage(prev, 0, 0, ext.w, ext.h);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    // ── Step machinery ────────────────────────────────────────────────────
+
+    function wizardGoTo(step) {
+        if (!maskState.wizardActive) return;
+        step = Math.max(1, Math.min(3, parseInt(step, 10) || 1));
+        const from = maskState.wizardStep;
+        if (step === from) { wizardSyncUI(); return; }
+
+        if (from === 1) {
+            // A cutout still in flight would be dropped on the floor
+            if (samCutoutPending()) {
+                setStepHint('<strong style="color:#58a6ff;">⏳ Magic Mask is still cutting out your object</strong> — one moment.', 2600);
+                return;
+            }
+            // Bake the live filter into a shape before anything downstream
+            // reads maskState.shapes
+            if (maskState.filterMode) setFilterMode(false);
+            // Same nicety Apply has: a live preview the user never pressed
+            // "Magic Mask It" on comes along instead of being lost.
+            if (!maskState.shapes.length && maskState.samPreviewMask && typeof window.runSAMSegmentation === 'function') {
+                window.runSAMSegmentation();
+            }
+            if (maskState.smartSelectMode && typeof window.toggleSmartSelect === 'function') {
+                try { window.toggleSmartSelect(); } catch (_) {}
+            }
+            if (maskState.stampMenuOpen) {
+                maskState.stampMenuOpen = false;
+                updateStampMenuDisplay();
+            }
+            maskState.selectedShapeIndex = null;
+        }
+        if (from === 2) commitTouchUp();
+        if (from === 3) invalidateFeatherPreview();
+
+        maskState.wizardStep = step;
+
+        if (step === 2) { ensureTouchUpBuffer(); touchUpSyncButtons(); }
+        if (step === 3) invalidateFeatherPreview();
+
+        wizardSyncUI();
+        renderMaskEditor();
+    }
+
+    window.maskWizardNext = function () { wizardGoTo(maskState.wizardStep + 1); };
+    window.maskWizardBack = function () { wizardGoTo(maskState.wizardStep - 1); };
+
+    function wizardSetDisplay(overlay, sel, on) {
+        const el = overlay.querySelector(sel);
+        if (el) el.style.display = on ? '' : 'none';
+    }
+
+    function wizardSyncUI() {
+        const overlay = document.getElementById('maskEditorOverlay');
+        if (!overlay) return;
+        const active = maskState.wizardActive;
+        const step = maskState.wizardStep;
+        wizardSetDisplay(overlay, '#maskWizardRail', active);
+        if (!active) return;
+
+        const inStep1 = step === 1;
+        wizardSetDisplay(overlay, '.mask-mode-toggle', inStep1);
+        wizardSetDisplay(overlay, '.mask-tools-row', inStep1);
+        wizardSetDisplay(overlay, '.mask-actions', inStep1);
+        wizardSetDisplay(overlay, '#stampMenu', inStep1 && maskState.stampMenuOpen);
+        wizardSetDisplay(overlay, '#smartSelectControls', inStep1 && maskState.smartSelectMode);
+        wizardSetDisplay(overlay, '#filterPanel', inStep1 && maskState.filterMode);
+        if (inStep1) syncMaskToolTabs();
+        wizardSetDisplay(overlay, '#touchUpTools', step === 2);
+        wizardSetDisplay(overlay, '#featherStep', step === 3);
+        if (inStep1) updateRotationControl();
+        else wizardSetDisplay(overlay, '#maskRotationControl', false);
+
+        // Feather only exists where a consumer honours it
+        const canFeather = wizardSupportsFeather();
+        wizardSetDisplay(overlay, '.mask-feather-row', canFeather);
+        const fHint = overlay.querySelector('#maskFeatherHint');
+        if (fHint) {
+            fHint.textContent = canFeather
+                ? '0% is a hard cut-out. Raise it for a soft edge — this is the same Feather that lives on the layer, set here so you never have to go back for it.'
+                : 'This mask is tested per point, so it has no soft edge to set. Check the shape below, then apply.';
+        }
+
+        // Collider hand-off: image layers that are not already colliders
+        const layer = wizardLayer();
+        const canCollide = !!(layer && !layer.isCollision && typeof window.collisionFromMask === 'function');
+        wizardSetDisplay(overlay, '#maskColliderOpt', step === 3 && canCollide);
+        const cb = overlay.querySelector('#maskMakeCollider');
+        if (cb) cb.checked = !!maskState.makeCollider;
+
+        overlay.querySelectorAll('.mask-wizard-step').forEach(function (b) {
+            const s = parseInt(b.getAttribute('data-step'), 10);
+            b.classList.toggle('active', s === step);
+            b.classList.toggle('done', s < step);
+        });
+
+        const back = overlay.querySelector('#maskWizardBack');
+        const next = overlay.querySelector('#maskWizardNext');
+        const apply = overlay.querySelector('.mask-apply-btn');
+        if (back) back.style.display = step > 1 ? '' : 'none';
+        if (next) next.style.display = step < 3 ? '' : 'none';
+        if (apply) apply.style.display = step === 3 ? '' : 'none';
+
+        wizardHint();
+        samSyncApplyBusy();
+    }
+
+    // Restore the pre-wizard chrome so a later collider session (or a plain
+    // re-open) does not inherit whatever step the last one ended on.
+    function wizardRestoreChrome() {
+        const overlay = document.getElementById('maskEditorOverlay');
+        if (!overlay) return;
+        wizardSetDisplay(overlay, '#maskWizardRail', false);
+        wizardSetDisplay(overlay, '#touchUpTools', false);
+        wizardSetDisplay(overlay, '#featherStep', false);
+        wizardSetDisplay(overlay, '#filterPanel', false);
+        wizardSetDisplay(overlay, '.mask-mode-toggle', true);
+        wizardSetDisplay(overlay, '.mask-tools-row', true);
+        wizardSetDisplay(overlay, '.mask-actions', true);
+        const back = overlay.querySelector('#maskWizardBack');
+        const next = overlay.querySelector('#maskWizardNext');
+        const apply = overlay.querySelector('.mask-apply-btn');
+        if (back) back.style.display = 'none';
+        if (next) next.style.display = 'none';
+        if (apply) apply.style.display = '';
+    }
+
+    // Open the editor at step 1 with the target's current feather loaded.
+    function wizardBegin() {
+        maskState.wizardActive = true;
+        maskState.wizardStep = 1;
+        maskState.makeCollider = false;
+        discardTouchUp();
+        invalidateFeatherPreview();
+        // The filter keys against THIS target's image — nothing carries over
+        maskState.filterMode = false;
+        maskState.filterPicking = false;
+        maskState.filterThreshold = 0;
+        maskState.filterInvert = false;
+        maskState.filterBg = { r: 0, g: 0, b: 0 };
+        maskState.filterBgPicked = false;
+        maskState.filterShape = null;
+        invalidateFilterPreview();
+        filterSyncControls();
+        syncMaskToolTabs();
+
+        const layer = wizardLayer();
+        maskState.feather = (layer && typeof layer.threshold === 'number')
+            ? Math.max(0, Math.min(100, layer.threshold | 0))
+            : 0;
+
+        const fs = document.getElementById('maskFeatherSlider');
+        if (fs) fs.value = String(maskState.feather);
+        const fv = document.getElementById('maskFeatherValue');
+        if (fv) fv.textContent = maskState.feather + '%';
+        const ts = document.getElementById('touchUpSize');
+        if (ts) ts.value = String(maskState.touchUpSize);
+        const tv = document.getElementById('touchUpSizeVal');
+        if (tv) tv.textContent = String(maskState.touchUpSize);
+        touchUpSyncButtons();
+        wizardSyncUI();
+    }
+
+    function wizardEnd() {
+        maskState.wizardActive = false;
+        maskState.wizardStep = 1;
+        maskState.makeCollider = false;
+        discardTouchUp();
+        invalidateFeatherPreview();
+        maskState.filterMode = false;
+        maskState.filterPicking = false;
+        maskState.filterShape = null;
+        invalidateFilterPreview();
+        wizardRestoreChrome();
+    }
+
     // ── Collider mask mode (2026-08-16) ───────────────────────────────
     // Editing a PAINTED collider used to open the shape-mask editor, which
     // masks the layer — a second, unrelated pass over a collider whose real
@@ -2049,6 +3311,10 @@
         try { if (window.Masks && window.Masks.setActive) window.Masks.setActive(maskId); } catch (_) {}
 
         showMaskEditor();
+        // Collider painting is its own single-purpose tool, not a mask build —
+        // make sure no wizard step from a previous session is still gating the
+        // chrome this mode expects to be there.
+        wizardEnd();
         setTimeout(function () {
             setColliderChromeVisible(true);
             var hdr = document.querySelector('.mask-editor-header h3');
@@ -2072,7 +3338,7 @@
         if (!overlay) return;
         var tools = document.getElementById('colliderTools');
         if (tools) tools.style.display = on ? '' : 'none';
-        ['.mask-mode-toggle', '.mask-tools-row', '#stampMenu', '#smartSelectControls', '#maskRotationControl']
+        ['.mask-mode-toggle', '.mask-tools-row', '#stampMenu', '#smartSelectControls', '#filterPanel', '#maskRotationControl']
             .forEach(function (sel) {
                 var el = overlay.querySelector(sel);
                 if (el) el.style.display = on ? 'none' : '';
@@ -2133,9 +3399,14 @@
         maskState.panY = 0;
         maskState.isPanning = false;
         
+        // Start decoding the backdrop now, so the first frame has it rather
+        // than painting shapes over an empty canvas for a frame.
+        try { maskBackgroundImage(layer.originalData || layer.data); } catch (_) {}
+
         // Show mask editor overlay
         showMaskEditor();
-        
+        wizardBegin();
+
         // Update title and render with fresh state
         setTimeout(() => {
             updateMaskEditorTitleForImageLayer(layer);
@@ -2193,6 +3464,7 @@
             if (maskState.smartSelectMode && typeof window.toggleSmartSelect === 'function') {
                 try { window.toggleSmartSelect(); } catch (_) {}
             }
+            wizardBegin();
             setTimeout(() => {
                 updateMaskEditorTitle();
                 updateZoomDisplay();
@@ -2239,6 +3511,14 @@
                 try { window._drawMaskShape(cctx, s); } catch (_) {}
                 if (rotation !== 0) cctx.restore();
             });
+            // Wizard step 3: a brush shape has no layer to carry a Feather
+            // value, so the softness is baked into the stamp here. Same radius
+            // law as applyLayerMask, carried to this image's scale.
+            if (maskState.wizardActive && maskState.feather > 0
+                && typeof window._featherMaskAlpha === 'function') {
+                const fr = Math.max(1, Math.round((maskState.feather / 100) * 20 * (Math.max(w, h) / 1920)));
+                try { window._featherMaskAlpha(cctx, w, h, fr); } catch (_) {}
+            }
             cov = cctx.getImageData(0, 0, w, h).data;
         }
         const invertCov = maskState.maskMode === 'hide';
@@ -2307,7 +3587,9 @@
 
         const layerIndex = parseInt(maskState.activeMaskLayerId.replace('image-', ''));
         const layer = window.layers?.find(l => l.index === layerIndex);
-        
+        // Read the wizard's opt-ins before the state reset below clears them
+        const wantsCollider = !!(maskState.wizardActive && maskState.makeCollider);
+
         if (save && layer) {
             // If the user clicks Apply while a SAM preview exists but no
             // finalized shapes have been created yet, automatically convert
@@ -2322,6 +3604,17 @@
                 mode: maskState.maskMode,
                 shapes: cloneMaskShapes(maskState.shapes)
             };
+
+            // Wizard step 3 writes the softness where every consumer already
+            // reads it — the layer preview (applyLayerMask), the collider bake
+            // (_collisionFromShapes) and the panel's Feather slider — instead
+            // of baking it into the pixels. Shapes only: on a shape-less layer
+            // `threshold` means something else entirely (the rudimentary
+            // luminance mask), and writing it would mask the layer by accident.
+            if (maskState.wizardActive && wizardSupportsFeather() && maskState.shapes.length) {
+                layer.threshold = Math.max(0, Math.min(100, maskState.feather | 0));
+                layer.__maskDirty = true; // 7.6 reorder-reapply memo
+            }
         }
 
         // Hide mask editor overlay
@@ -2345,6 +3638,15 @@
             window.collisionLayers.updateObstacleFromLayers();
         }
 
+        // Wizard step 3 opt-in: hand the finished mask straight to the
+        // collision system, so "cut this out and make the fluid flow around
+        // it" is one pass instead of mask → feather → find the 🧱 button.
+        if (save && wantsCollider && layer && !layer.isCollision
+            && typeof window.collisionFromMask === 'function') {
+            try { window.collisionFromMask(layerIndex); }
+            catch (e) { console.warn('[mask wizard] collider hand-off failed', e); }
+        }
+
         // Refresh UI
         if (typeof window.renderLayers === 'function') {
             window.renderLayers();
@@ -2366,6 +3668,9 @@
     // Override exitMaskMode to handle every target type
     const originalExitMaskMode = window.exitMaskMode;
     window.exitMaskMode = function(save = true) {
+        // The touch-up brush owns the coverage while step 2 is open — fold it
+        // back into maskState.shapes before any save path reads them.
+        if (save) commitTouchUp(); else discardTouchUp();
         if (colliderModeActive()) {
             // Edits already live in the collider's mask — closing is all
             // there is to do (undo lives on the ↶ button / Ctrl+Z).
@@ -2377,6 +3682,10 @@
         } else {
             originalExitMaskMode(save);
         }
+        // Only tear the wizard down if the editor actually closed — the in-
+        // flight-cutout guards above hold it open and return without saving.
+        const ov = document.getElementById('maskEditorOverlay');
+        if (!ov || ov.style.display === 'none') wizardEnd();
     };
 
     // Update title function to handle every target type

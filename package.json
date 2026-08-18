@@ -76,7 +76,8 @@
       "!index.html.bak.cachebust",
       "!js/07-cos-oscillator.js",
       "!js/14-radial-slider.js",
-      "!steam_appid.txt"
+      "!steam_appid.txt",
+      "!assets/boot-swirl/**"
     ],
     "win": {
       "target": [

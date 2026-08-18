@@ -705,6 +705,15 @@
         .delete-modal-actions button { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; }
         .delete-modal-cancel { background: rgba(255,255,255,0.1); color: #e6edf3; }
         .delete-modal-confirm { background: #ff6b6b; color: white; }
+        /* App-close confirmation (04f-canvas-actions.js) — .delete-modal chrome
+           plus a third "save first" action. Sits above the mask editor (10003)
+           so a close asked mid-edit is still visible. */
+        .app-close-modal { z-index: 10050; }
+        .app-close-modal .delete-modal-content { max-width: 440px; }
+        .app-close-modal .delete-modal-actions { flex-wrap: wrap; }
+        .app-close-save { background: rgba(180,130,255,0.18); color: #c8a2ff; }
+        .app-close-modal .delete-modal-confirm.app-close-safe { background: #3fb950; }
+        .app-close-modal button:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
         .preview-toggle {
             width: 100%;
             padding: 30px 20px;

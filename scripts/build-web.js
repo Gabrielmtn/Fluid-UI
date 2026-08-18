@@ -47,7 +47,10 @@ for (const entry of INCLUDE) {
     continue;
   }
   const dest = path.join(OUT, entry);
-  fs.cpSync(src, dest, { recursive: true, force: true });
+  // assets/boot-swirl/ is the baked sim loop, kept for a future loader that
+  // has its own idle renderer (the boot cursor is the OS spinner now — see
+  // js/00a-boot.js). Nothing loads it, so it has no business in a deploy.
+  fs.cpSync(src, dest, { recursive: true, force: true, filter: (s) => !s.includes("boot-swirl") });
   const stat = fs.statSync(src);
   if (stat.isDirectory()) {
     const n = fs.readdirSync(src).length;
