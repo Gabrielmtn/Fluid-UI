@@ -3252,14 +3252,30 @@
         // keeps it. Flagged so it can never run twice — if you deliberately set
         // 0.35 after this, it stays 0.35. Must run before the pSlider below,
         // which is what reads the saved value.
+        //
+        // V3 (2026-08-18) chains the same rule to the 0.05 -> 0.001 move: Spacing
+        // is now the ONLY control over whether a slow stroke reads as a line or
+        // as separate dabs, so the default belongs at the bottom. Each step
+        // rewrites only a value still sitting exactly on the default it replaced,
+        // and each has its own flag, so a user who lands mid-chain still ends up
+        // current and a deliberate choice at any step is never touched twice.
         try {
             var _sm = window.settingsManager;
+            var _defSp = (window.config && typeof window.config.BRUSH_SPACING === 'number')
+                ? window.config.BRUSH_SPACING : 0.001;
             if (_sm && !_sm.get('brush.spacingNormalizedV2')) {
                 var _savedSp = _sm.get('brush.brushSpacing');
                 if (typeof _savedSp === 'number' && Math.abs(_savedSp - 0.35) < 1e-6) {
-                    _sm.set('brush.brushSpacing', (window.config && window.config.BRUSH_SPACING) || 0.05);
+                    _sm.set('brush.brushSpacing', 0.05);
                 }
                 _sm.set('brush.spacingNormalizedV2', true);
+            }
+            if (_sm && !_sm.get('brush.spacingNormalizedV3')) {
+                var _savedSp3 = _sm.get('brush.brushSpacing');
+                if (typeof _savedSp3 === 'number' && Math.abs(_savedSp3 - 0.05) < 1e-6) {
+                    _sm.set('brush.brushSpacing', _defSp);
+                }
+                _sm.set('brush.spacingNormalizedV3', true);
             }
         } catch (_) {}
         spacingGroup = pSlider('brushSpacing', 'Spacing', 0.001, 1, 0.001, 'BRUSH_SPACING', pctFine, 'spacing');

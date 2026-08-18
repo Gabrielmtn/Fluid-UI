@@ -97,12 +97,21 @@
     }
 
     // Spacing as the slider asks for it, in px, BEFORE the low-Time spread.
-    // 0.25px floor (was 1): the Spacing slider now reaches 0.1%, and the
-    // 1px floor made everything below ~1% indistinguishable — sub-pixel
-    // spacing is what dissolves the grainy dab-train look at slow speeds.
-    // The drain budget and MAX_QUEUE still bound the cost of a fast flick.
+    //
+    // The floor went 1 -> 0.25 when 0.1% was an exotic setting, and back to 1
+    // on 2026-08-18 when 0.1% became the DEFAULT. At 0.25px a stroke demands
+    // speed/0.25 dabs per second, which passes the drain budget around 1000px/s:
+    // the queue then backs up to MAX_QUEUE and `queue.length < MAX_QUEUE` starts
+    // SILENTLY DROPPING dabs, and a dropped dab takes its dye with it — measured
+    // dye per pixel travelled flat at 0.00443 up to 900px/s, then 0.00358 at
+    // 1200 (-19%) and 0.00212 at 2000 (-52%). A fast flick came out half as
+    // dark as a slow one. At 1px the same 2000px/s stroke asks for 2000 dabs/s
+    // (33 per frame against a budget of 64) and stays exact, while 1px gaps on
+    // a ~194px brush are still visually continuous — the smoothness at low speed
+    // comes from the time floor below, not from sub-pixel spacing.
     function baseSpacingPx() {
-        return Math.max(0.25, cfg('BRUSH_SPACING', 0.05) * brushDiameterPx());
+        return Math.max(cfg('BRUSH_SPACING_MIN_PX', 1),
+                        cfg('BRUSH_SPACING', 0.001) * brushDiameterPx());
     }
 
     function spacingPx() {
@@ -166,6 +175,14 @@
     function emitFloorDab(x, y, ux, uy, p) {
         var c = window.config;
         if (c && c.BRUSH_DAB_FLOOR === false) return;
+        // Spacing stays AUTHORITATIVE above the threshold (2026-08-18). The floor
+        // only ever fires on calls where the walker emitted nothing — which is
+        // precisely the slow-hand case where a deliberate spacing is what you
+        // came to see. Filling those gaps in made Spacing look broken at low
+        // speed while still working at pace. Above the threshold the separation
+        // is the point, so leave it alone; at or below it the intent is a
+        // continuous line and the floor keeps it continuous.
+        if (cfg('BRUSH_SPACING', 0.001) > cfg('BRUSH_DAB_FLOOR_MAX_SPACING', 0.001)) return;
         var rate = cfg('BRUSH_DAB_RATE', 125);
         if (!(rate > 0) || !(residual > 0)) return;
         var now = simNowMs();
