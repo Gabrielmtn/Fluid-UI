@@ -1,19 +1,24 @@
 /**
- * Hotkey caps + appended reminder row (design handoff Task 9)
+ * Hotkey caps (design handoff Task 9)
  *
- * Replaces the old floating top-right panel. Three mechanisms:
+ * Replaces the old floating top-right panel. Two mechanisms:
  *  1. IN-PLACE CAPS: control rows/cells carry a small key cap in their
  *     right margin, always visible at rest. Holding a qualified modifier
  *     lights the caps that combo reaches (#fff on accent) and dims rows
  *     it doesn't reach to 0.35 — a binding appears beside its control.
  *     Rows with no binding reserve an EMPTY cap slot (transparent
  *     border) so nothing reflows or misaligns.
- *  2. APPENDED ROW: bindings with no visible control (undo/redo) get one
- *     38px row in strip chrome inserted into normal flow under the mixer
- *     strip — it pushes the canvas down rather than covering anything.
- *  3. RULES: Shift alone NEVER triggers anything (it is a live painting
+ *  2. RULES: Shift alone NEVER triggers anything (it is a live painting
  *     modifier); a combo must be held 250ms before anything shows; the
  *     16-chip default group is gone — F1 opens the full reference.
+ *
+ * REMOVED 2026-08-17: the appended reminder row (#hotkeyReminder), a 38px
+ * strip-chrome bar for bindings with no visible control (undo/redo). It sat
+ * in normal flow, so every Ctrl hold pushed the canvas down and back up
+ * again. Its "F1 — ALL HOTKEYS" pill was also the only VISIBLE way into the
+ * hotkey reference on desktop — F1 and Shift+? are now keyboard-only there
+ * (mobile keeps 13-mobile-mode's ? button). Worth replacing when the way
+ * hotkeys are surfaced gets its rethink.
  *
  * Uses instant display toggling (no CSS transitions) to avoid
  * compositor layer disruption of the WebGL canvas in Electron.
@@ -114,7 +119,7 @@
     ];
     // The caps shipped with macOS modifier glyphs (⌃⌥⇧) on what is mostly a
     // Windows app — glyph soup to anyone who never used a Mac. Everywhere
-    // else in this file already speaks words (MOD_LABEL, titles), so expand
+    // else in this file already speaks words (the entry titles), so expand
     // the glyphs unless we're actually on a Mac.
     if (!/Mac/i.test(navigator.platform || '')) {
         CAPS.forEach(function (c) {
@@ -124,18 +129,6 @@
                 .replace(/⇧/g, 'Shift+');
         });
     }
-
-    // Appended-row content: bindings with NO visible control, keyed by the
-    // exact combo. (Shift alone never triggers, so plain-Shift extras live
-    // in the F1 modal only. Empty combos show no row at all.)
-    var ROW_GROUPS = {
-        ctrl:      [['Z', 'Undo'], ['Y', 'Redo']],
-        ctrlshift: [['Z', 'Redo'], ['N', 'New Layer']]
-    };
-    var MOD_LABEL = {
-        ctrl: 'Ctrl', ctrlshift: 'Ctrl+Shift', alt: 'Alt',
-        altshift: 'Alt+Shift', ctrlalt: 'Ctrl+Alt', ctrlaltshift: 'Ctrl+Alt+Shift'
-    };
 
     function init() {
         if (window.__hkCapsInit) return; // idempotent: one cap set only
@@ -180,59 +173,6 @@
             placed.push({ cap: slot, mod: null, row: (host.closest('.mixer-channel') || row) });
         }
 
-        // ── Appended row (pushes the canvas down, never covers it) ─────
-        var bar = document.createElement('div');
-        bar.id = 'hotkeyReminder';
-        bar.className = 'hotkey-reminder';
-        var modBlock = document.createElement('span');
-        modBlock.className = 'hk-row-mod';
-        var chipWrap = document.createElement('span');
-        chipWrap.className = 'hk-row-chips';
-        var f1 = document.createElement('span');
-        f1.className = 'hk-row-f1';
-        f1.textContent = 'F1 — ALL HOTKEYS';
-        f1.title = 'Open the full hotkey reference';
-        f1.addEventListener('click', function () {
-            // Route through 05n's opener so its one-time key-chip pass runs —
-            // setting display directly showed the modal as unchipped prose.
-            if (typeof window.showHotkeys === 'function') { window.showHotkeys(); return; }
-            var ov = document.getElementById('hotkeyOverlay');
-            if (ov) ov.style.display = 'flex';
-        });
-        bar.appendChild(modBlock);
-        bar.appendChild(chipWrap);
-        bar.appendChild(f1);
-
-        // Anchor to the stable #main-area (body flow), NOT the strip's
-        // current parent — mobile mode relocates the strip into the drawer,
-        // which would strand the row inside the sidebar.
-        var mainArea = document.getElementById('main-area');
-        var strip = document.getElementById('mixer-strip');
-        if (mainArea && mainArea.parentElement) {
-            mainArea.parentElement.insertBefore(bar, mainArea);
-        } else if (strip && strip.parentElement) {
-            strip.parentElement.insertBefore(bar, strip.nextSibling);
-        } else {
-            document.body.insertBefore(bar, document.body.firstChild);
-        }
-
-        function fillRow(combo) {
-            var group = ROW_GROUPS[combo];
-            if (!group || !group.length) return false;
-            modBlock.textContent = MOD_LABEL[combo] || combo;
-            chipWrap.textContent = '';
-            for (var i = 0; i < group.length; i++) {
-                var chip = document.createElement('span');
-                chip.className = 'hk-row-chip';
-                var kbd = document.createElement('kbd');
-                kbd.textContent = group[i][0];
-                chip.appendChild(kbd);
-                chip.appendChild(document.createTextNode(' ' + group[i][1]));
-                chipWrap.appendChild(chip);
-            }
-            return true;
-        }
-
         // ── Modifier tracking: capture phase, blur-safe ────────────────
         var shift = false, ctrl = false, alt = false;
         var live = null, holdTimer = null;
@@ -245,8 +185,6 @@
 
         function applyState(combo) {
             live = combo;
-            var anyRowShown = combo ? fillRow(combo) : false;
-            bar.classList.toggle('visible', !!anyRowShown);
             var anyLit = false;
             for (var i = 0; i < placed.length; i++) {
                 var p = placed[i];

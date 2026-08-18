@@ -211,7 +211,6 @@
 /* Mobile: strip + sidebar are drawers — keep the canvas clean */
 @media (max-width: 768px), (max-height: 500px) and (max-width: 1200px) {
     #quality-underbar { display: none; }
-    .hotkey-reminder { display: none !important; }
 }
 
 /* ── BODY LAYOUT: column instead of row ── */

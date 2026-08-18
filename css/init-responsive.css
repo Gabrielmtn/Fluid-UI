@@ -215,9 +215,6 @@
 .delete-modal {
     zoom: var(--ui-scale);
 }
-.hotkey-reminder {
-    zoom: var(--ui-scale);
-}
 #settingsToggleBtn {
     zoom: var(--ui-scale);
 }
