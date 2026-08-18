@@ -41,6 +41,7 @@
     var lastEmitX = 0, lastEmitY = 0; // last emitted dab position
     var residual = 0;             // distance carried between segments
     var strokeTravel = 0;         // total path length walked since begin()
+    var lastEmitSimMs = 0;        // sim-clock stamp of the last dab (slow-speed floor)
     var lastP = 1;                // last pressure seen
     var queue = [];               // pending dabs: {x, y, dx, dy, p, travel}
     var MAX_QUEUE = 512;          // spike safety — oldest dabs drop first
@@ -135,6 +136,57 @@
         return Math.min(1, used / (tc * ref));
     }
 
+    function simNowMs() {
+        var t = window.__simTimeMs;
+        return (typeof t === 'number') ? t : 0;
+    }
+
+    // ── Slow-speed dab floor (2026-08-18) ───────────────────────────────
+    // The walker is distance-parameterized, so its rate is speed / spacing —
+    // which goes to ZERO as the hand slows. Measured at the shipped 0.05
+    // spacing: 41 dabs/s at 400px/s, but 5 at 50px/s and 2 at 25px/s, and
+    // 4x worse again below Time 1 (timeCompensation spreads spacing). Lowering
+    // the default spacing moved that cliff ~7x further down but could never
+    // remove it; a very slow stroke still arrives as isolated deposits.
+    //
+    // The cure is the one the constant-flow hose already uses: stop treating a
+    // dab as a fixed quantum of paint and treat it as a SAMPLE. When a segment
+    // hasn't covered a full spacing yet, emit a dab for the distance actually
+    // travelled, carrying dye in exact proportion (k = travel / reference) —
+    // so total dye per pixel travelled is identical, and only the sampling gets
+    // finer. Consuming `residual` is what keeps it honest: that travel is now
+    // deposited, so the walker cannot bill for it again.
+    //
+    // Gated on the SIM clock, so the Time slider still meters it, and on
+    // residual > 0, so a genuinely stationary pointer still deposits nothing —
+    // On Move keeps its contract. The sim clock only ticks once per frame, so
+    // this lands at most one extra dab per frame: at slow speeds that is the
+    // same "one sample per frame at the true pointer" that makes Constant look
+    // continuous, at a fraction of the dye each.
+    function emitFloorDab(x, y, ux, uy, p) {
+        var c = window.config;
+        if (c && c.BRUSH_DAB_FLOOR === false) return;
+        var rate = cfg('BRUSH_DAB_RATE', 125);
+        if (!(rate > 0) || !(residual > 0)) return;
+        var now = simNowMs();
+        if (now - lastEmitSimMs < 1000 / rate) return;
+        var ref = cfg('BRUSH_SPACING_REF', 0.35) * brushDiameterPx();
+        var tc = timeCompensation();
+        var k = (ref > 0 && tc > 0) ? Math.min(1, residual / (tc * ref)) : 1;
+        if (queue.length < MAX_QUEUE) {
+            queue.push({
+                x: x, y: y,
+                // Same momentum-per-distance rule as a full dab (10 x the
+                // distance this one represents), so a floored stroke pushes the
+                // fluid exactly as hard as a walked one.
+                dx: 10 * residual * ux, dy: 10 * residual * uy,
+                p: p, travel: strokeTravel, k: k
+            });
+        }
+        residual = 0;
+        lastEmitSimMs = now;
+    }
+
     // Emit dabs along the segment from the last processed sample toward
     // (x,y): standard spacing walker — dabs sit at absolute-travel multiples
     // of spacingPx, with `residual` carrying the leftover distance between
@@ -214,6 +266,12 @@
         }
         residual = residual + dist - emitted * spacing;
         strokeTravel += dist;
+        // A segment that cleared at least one spacing has just deposited; only a
+        // segment too short to reach one needs the slow-speed floor (see
+        // emitFloorDab). strokeTravel is updated first so the floor dab's ramp
+        // progress belongs to where the pointer actually is.
+        if (emitted > 0) lastEmitSimMs = simNowMs();
+        else emitFloorDab(x, y, ux, uy, p1);
         lastEmitX = x; // the anchor is the raw sample chain; interpolation
         lastEmitY = y; // is per segment, so it always advances to the sample
         lastP = p1;
@@ -229,6 +287,7 @@
             lastEmitX = x; lastEmitY = y;
             residual = 0;
             strokeTravel = 0;
+            lastEmitSimMs = simNowMs();
             lastP = 1;
             queue.length = 0;
         },
