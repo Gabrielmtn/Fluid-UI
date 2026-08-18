@@ -713,6 +713,24 @@ class DepthEstimator {
         dctx.putImageData(imgData, 0, 0);
         var depthDataUrl = depthCanvas.toDataURL();
 
+        // Panel thumbnail at the SOURCE aspect. The depth map is stretched to
+        // fill the canvas rect and the layer transform squeezes it back on
+        // screen — but a thumbnail has no transform, so showing the map raw
+        // put an ellipse in the panel where the user pasted a circle. Drawing
+        // the fit into the bitmap itself keeps the panel honest, and layers
+        // with no fit (sketch, Mask, webcam) keep the map unchanged.
+        var thumbDataUrl = depthDataUrl;
+        try {
+            var tsx = opts.scaleX || 1, tsy = opts.scaleY || 1;
+            if (tsx !== 1 || tsy !== 1) {
+                var thumbCanvas = document.createElement('canvas');
+                thumbCanvas.width = Math.max(1, Math.round(depth.width * tsx));
+                thumbCanvas.height = Math.max(1, Math.round(depth.height * tsy));
+                thumbCanvas.getContext('2d').drawImage(depthCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+                thumbDataUrl = thumbCanvas.toDataURL();
+            }
+        } catch (_) {}
+
         // Find the next layer index
         var maxIndex = 0;
         window.layers.forEach(function (l) { if (l.index > maxIndex) maxIndex = l.index; });
@@ -753,6 +771,7 @@ class DepthEstimator {
         var layer = {
             index: newIndex,
             data: depthDataUrl,
+            thumb: thumbDataUrl,   // 05k renders `layer.thumb || layer.data`
             originalData: thumbnailUrl || depthDataUrl,
             filmData: filmDataUrl,   // on-canvas film; see _depthToFilmUrl
             title: '🧱 ' + (name || 'Collision'),
