@@ -4,10 +4,9 @@
  * Replaces the old floating top-right panel. Two mechanisms:
  *  1. IN-PLACE CAPS: control rows/cells carry a small key cap in their
  *     right margin, always visible at rest. Holding a qualified modifier
- *     lights the caps that combo reaches (#fff on accent) and dims rows
- *     it doesn't reach to 0.35 — a binding appears beside its control.
- *     Rows with no binding reserve an EMPTY cap slot (transparent
- *     border) so nothing reflows or misaligns.
+ *     lights the caps that combo reaches (#fff on accent) — a binding
+ *     appears beside its control. Rows with no binding reserve an EMPTY
+ *     cap slot (transparent border) so nothing reflows or misaligns.
  *  2. RULES: Shift alone NEVER triggers anything (it is a live painting
  *     modifier); a combo must be held 250ms before anything shows; the
  *     16-chip default group is gone — F1 opens the full reference.
@@ -19,6 +18,10 @@
  * hotkey reference on desktop — F1 and Shift+? are now keyboard-only there
  * (mobile keeps 13-mobile-mode's ? button). Worth replacing when the way
  * hotkeys are surfaced gets its rethink.
+ *
+ * ALSO REMOVED 2026-08-17: the dim pass. A held combo used to drop every
+ * row it did not reach to 0.35 — 89 of 92 rows greyed out to spotlight a
+ * single binding. Holding a modifier now only lights the caps it reaches.
  *
  * Uses instant display toggling (no CSS transitions) to avoid
  * compositor layer disruption of the WebGL canvas in Electron.
@@ -134,15 +137,8 @@
         if (window.__hkCapsInit) return; // idempotent: one cap set only
         window.__hkCapsInit = true;
 
-        var placed = []; // {capEl, mod, rowEl}
+        var placed = []; // {cap, mod}
 
-        function rowFor(target) {
-            return target.closest('.control-group, .ch-header, .color-actions') || target;
-        }
-        function dimTargetFor(target) {
-            // Strip cells dim as whole channels; sidebar rows dim as rows.
-            return target.closest('.mixer-channel') || rowFor(target);
-        }
         function makeCap(entry) {
             var target = entry.where();
             if (!target) return;
@@ -152,7 +148,7 @@
             if (entry.mod) cap.dataset.hkMod = entry.mod;
             if (entry.title) cap.title = entry.title;
             target.appendChild(cap);
-            placed.push({ cap: cap, mod: entry.mod, row: dimTargetFor(target) });
+            placed.push({ cap: cap, mod: entry.mod });
         }
         CAPS.forEach(makeCap);
 
@@ -170,7 +166,7 @@
             var slot = document.createElement('span');
             slot.className = 'hk-cap hk-cap-empty';
             host.appendChild(slot);
-            placed.push({ cap: slot, mod: null, row: (host.closest('.mixer-channel') || row) });
+            placed.push({ cap: slot, mod: null });
         }
 
         // ── Modifier tracking: capture phase, blur-safe ────────────────
@@ -185,28 +181,9 @@
 
         function applyState(combo) {
             live = combo;
-            var anyLit = false;
             for (var i = 0; i < placed.length; i++) {
                 var p = placed[i];
-                var lit = !!combo && p.mod === combo;
-                if (lit) anyLit = true;
-                p.cap.classList.toggle('lit', lit);
-            }
-            // Dim rows the combo doesn't reach (a row is "reached" if any of
-            // its caps is lit) — but only when the combo lights SOMETHING:
-            // an unmapped combo (e.g. Ctrl+Alt+Shift) must not dim the whole
-            // surface with nothing highlighted to explain why.
-            var dimming = !!combo && anyLit;
-            var reached = null;
-            if (dimming) {
-                reached = new Set();
-                for (var j = 0; j < placed.length; j++) {
-                    if (placed[j].cap.classList.contains('lit')) reached.add(placed[j].row);
-                }
-            }
-            for (var k = 0; k < placed.length; k++) {
-                var row = placed[k].row;
-                row.classList.toggle('hk-dim', dimming && !reached.has(row));
+                p.cap.classList.toggle('lit', !!combo && p.mod === combo);
             }
         }
 
