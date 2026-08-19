@@ -248,6 +248,13 @@
             // scenes, animations) stay classic gaussian. splat() reads the
             // flag; cleared in finally so direct splat() callers never
             // inherit it.
+            // Same hold as splat()'s (05i), one level up: a dab whose shape
+            // stamp is still uploading must reach neither the arms nor the
+            // wire. Without the broadcast half, peers would paint a dab this
+            // canvas deliberately skipped.
+            if (!exactColor && !window.__remoteStroke && window.BrushShapes
+                && typeof window.BrushShapes.stampPending === 'function'
+                && window.BrushShapes.stampPending()) return;
             window.__unsavedWork = true; // every dye source funnels through here
             window.__brushTipOn = !exactColor;
             try {
