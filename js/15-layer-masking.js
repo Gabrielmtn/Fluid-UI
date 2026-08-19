@@ -791,6 +791,20 @@
     }
     
     // Update rotation control visibility and value
+    // Assigning .value on a range input does NOT move its fill. The heat bar
+    // is painted from the --val custom property (css/slider-styles.css), and
+    // 06-slider-updater.js only refreshes that on real 'input'/'change'
+    // events — which a programmatic assignment does not fire. So every
+    // sync-from-state left the bar wherever the user last dragged it while
+    // the number beside it read the new value: open the mask editor after
+    // using it once and Cut amount says 0% over a half-filled bar. The CSS
+    // default is --val:50, so a never-touched slider starts half full too.
+    function setRangeValue(el, v) {
+        if (!el) return;
+        el.value = String(v);
+        try { el.style.setProperty('--val', String(v)); } catch (_) {}
+    }
+
     function updateRotationControl() {
         const rotationControl = document.getElementById('maskRotationControl');
         const rotationSlider = document.getElementById('maskRotationSlider');
@@ -803,7 +817,7 @@
             const rotation = shape.rotation || 0;
             
             rotationControl.style.display = 'block';
-            rotationSlider.value = rotation;
+            setRangeValue(rotationSlider, rotation);
             rotationValue.textContent = rotation + '°';
         } else {
             rotationControl.style.display = 'none';
@@ -2552,7 +2566,7 @@
         const sw = document.getElementById('filterBgColor');
         if (sw) sw.value = filterHex();
         const sl = document.getElementById('filterThreshold');
-        if (sl) sl.value = String(maskState.filterThreshold);
+        if (sl) setRangeValue(sl, maskState.filterThreshold);
         const val = document.getElementById('filterThresholdValue');
         if (val) val.textContent = maskState.filterThreshold + '%';
         const inv = document.getElementById('filterInvert');
@@ -3200,11 +3214,11 @@
             : 0;
 
         const fs = document.getElementById('maskFeatherSlider');
-        if (fs) fs.value = String(maskState.feather);
+        if (fs) setRangeValue(fs, maskState.feather);
         const fv = document.getElementById('maskFeatherValue');
         if (fv) fv.textContent = maskState.feather + '%';
         const ts = document.getElementById('touchUpSize');
-        if (ts) ts.value = String(maskState.touchUpSize);
+        if (ts) setRangeValue(ts, maskState.touchUpSize);
         const tv = document.getElementById('touchUpSizeVal');
         if (tv) tv.textContent = String(maskState.touchUpSize);
         touchUpSyncButtons();
