@@ -153,6 +153,17 @@
             const targetWidth = canvasWrapper.clientWidth;
             const targetHeight = canvasWrapper.clientHeight;
             const canvasSizeChanged = canvas.width !== targetWidth || canvas.height !== targetHeight;
+            // Carry the layers with the box. UNCONDITIONAL, not inside the
+            // changed-branch below: the tracker has to learn the box on a
+            // frame where nothing moved, or the FIRST resize of a session
+            // looks like its first sighting and rescales nothing. It returns
+            // on an unchanged size, so the steady-state cost is a comparison.
+            // Per frame rather than at the settle below, too: the layer divs
+            // fill the box and follow it continuously, so a translate
+            // corrected only on settle would drift for 180ms and then snap.
+            // The collider is rebuilt from these same numbers at that settle,
+            // which is what puts it back on top of its layer.
+            if (window.LayerGeometry) window.LayerGeometry.retarget(targetWidth, targetHeight);
             if (canvasSizeChanged) {
                 // Track the wrapper VISUALLY every frame (cheap style writes;
                 // explicit px matches updateCanvasSize — CSS '100%' causes

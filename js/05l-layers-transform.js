@@ -542,6 +542,58 @@
             // Apply mask if enabled
             applyLayerMask(index);
         }
+        // ─── Layer geometry ↔ canvas box ───────────────────────────────────────
+        // layer.x/y are CSS px of the canvas box and mask/collider shape rects
+        // are its buffer px (the same number — the buffer is sized from the
+        // box), so both only mean anything against the box they were authored
+        // in. Every way that box can change size — the window, the sidebar,
+        // a resize-handle drag, focus or mobile mode, a preset restoring a
+        // differently-sized box — therefore has to carry the numbers with it,
+        // or each layer, and every collider built from one, slides off the
+        // composition by the difference. scaleX/scaleY are deliberately NOT
+        // touched: the layer div fills the box, so it already scales with it.
+        //
+        // `box` is the box the CURRENT numbers are expressed in. retarget()
+        // moves them to a new one; assume() just declares where they already
+        // are, for a caller that has done its own conversion (the preset
+        // restore, which converts from the box the SNAPSHOT was saved against).
+        // Keeping both through one tracker is what stops the two from
+        // double-counting the same resize.
+        const _geomBox = { w: 0, h: 0 };
+        window.LayerGeometry = {
+            box: function () { return { w: _geomBox.w, h: _geomBox.h }; },
+            assume: function (w, h) {
+                if (w > 0 && h > 0) { _geomBox.w = w; _geomBox.h = h; }
+            },
+            retarget: function (w, h) {
+                if (!(w > 0 && h > 0)) return;
+                // First sighting (boot): adopt the size, rescale nothing.
+                if (!(_geomBox.w > 0 && _geomBox.h > 0)) { _geomBox.w = w; _geomBox.h = h; return; }
+                if (w === _geomBox.w && h === _geomBox.h) return;
+                const kx = w / _geomBox.w, ky = h / _geomBox.h;
+                _geomBox.w = w; _geomBox.h = h;
+                const ls = window.layers || [];
+                for (let i = 0; i < ls.length; i++) {
+                    const l = ls[i];
+                    if (typeof l.x === 'number') l.x *= kx;
+                    if (typeof l.y === 'number') l.y *= ky;
+                    const shapes = l.mask && l.mask.shapes;
+                    if (shapes) {
+                        for (let j = 0; j < shapes.length; j++) {
+                            const s = shapes[j];
+                            // The rect only. A shape's own bitmap (samMask,
+                            // depthData) is resampled into it, so its
+                            // dimensions stay as they are.
+                            if (typeof s.x === 'number') s.x *= kx;
+                            if (typeof s.y === 'number') s.y *= ky;
+                            if (typeof s.width === 'number') s.width *= kx;
+                            if (typeof s.height === 'number') s.height *= ky;
+                        }
+                    }
+                    updateLayerPosition(l.index);
+                }
+            }
+        };
         // ═══ D2: raster paint layers ════════════════════════════════════
         // GPU-backed persistent paint layers: pixels live in rasterStore
         // (RGBA8 dye-res FBOs, declared in 05c so initFramebuffers can
