@@ -15,19 +15,11 @@
             panel.innerHTML = '';
             // layerOrder is in visual order: index 0 = top (closest to viewer), last = bottom (furthest)
             // We'll assign z-indices in reverse: top items get highest z-index
-            // D2: add-a-paint-layer button (GPU raster layers)
-            const addRow = document.createElement('div');
-            addRow.className = 'layer-add-row';
-            const addBtn = document.createElement('button');
-            addBtn.type = 'button';
-            addBtn.className = 'mask-control-btn';
-            addBtn.style.width = '100%';
-            addBtn.style.marginBottom = '6px';
-            addBtn.textContent = '➕ Paint Layer';
-            addBtn.title = 'Add a persistent paint layer — brush strokes into it never decay or flow';
-            addBtn.addEventListener('click', () => { if (window.rasterLayers) window.rasterLayers.create(); });
-            addRow.appendChild(addBtn);
-            panel.appendChild(addRow);
+            // No add-a-paint-layer button (2026-08-18). Paint layers are
+            // made on demand: the first sketch-route dab mints one (05i
+            // stampSketchDab — rasterLayers.ensureDefault), and a project
+            // that carries one is adopted at boot. The panel listing them
+            // does not also need to advertise minting an empty one.
             // Add top drop zone
             const topZone = document.createElement('div');
             topZone.className = 'drop-zone';
