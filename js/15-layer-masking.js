@@ -661,10 +661,29 @@
         // Canvas interactions
         const canvas = overlay.querySelector('#maskEditorCanvas');
         if (canvas) {
-            canvas.addEventListener('mousedown', handleMaskCanvasMouseDown);
-            canvas.addEventListener('mousemove', handleMaskCanvasMouseMove);
-            canvas.addEventListener('mouseup', handleMaskCanvasMouseUp);
-            canvas.addEventListener('mouseleave', handleMaskCanvasMouseUp);
+            // POINTER events, not compat mouse events (2026-08-18). A stylus
+            // drag on a surface the browser has not been told to keep its hands
+            // off is a candidate pan gesture: Chrome fires pointerdown, decides
+            // it is a scroll, sends pointercancel and SUPPRESSES the compat
+            // mousemove/mouseup — so the touch-up brush got the press and never
+            // the stroke, while a tap (no gesture) worked fine. The pen fix that
+            // moved the paint canvas to pointer events (05d) left this surface
+            // behind; .mask-editor-canvas also carries touch-action: none now,
+            // which is the half that actually stops the gesture.
+            // Capture replaces the old mouseleave-ends-the-drag hack: a stroke
+            // that wanders off the canvas keeps painting and still finishes on
+            // release, and pointercancel finalizes gracefully instead of
+            // leaving the brush stuck down.
+            canvas.addEventListener('pointerdown', (e) => {
+                try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+                handleMaskCanvasMouseDown(e);
+            });
+            canvas.addEventListener('pointermove', handleMaskCanvasMouseMove);
+            canvas.addEventListener('pointerup', handleMaskCanvasMouseUp);
+            canvas.addEventListener('pointercancel', handleMaskCanvasMouseUp);
+            // Boundary events are suppressed while captured, so this only ever
+            // lands between strokes — exactly when the ring should go away.
+            canvas.addEventListener('pointerleave', handleMaskCanvasMouseUp);
             
             // Prevent context menu where right-click is a tool: SAM exclude
             // points, and the touch-up brush's "other tool" drag.
@@ -1083,7 +1102,7 @@
             touchUpSyncButtons();
         }
         // Leaving the canvas takes the brush ring with it
-        if (e && e.type === 'mouseleave') {
+        if (e && (e.type === 'pointerleave' || e.type === 'mouseleave')) {
             maskState.touchUpCursor = null;
             if (touchUpActive()) scheduleMaskRender();
         }

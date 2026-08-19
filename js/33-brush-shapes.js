@@ -19,6 +19,7 @@
 
     var shapes = null;      // in-memory copy of the persisted list
     var TEX = {};           // id → {texture, aspect} (lazy GL upload)
+    var BROKEN = {};        // id → 1 for stamps whose bitmap will not decode
 
     // Errors here used to raise window.alert() — the OS box titled with the
     // app's internal hostname. Route them through the app's own dialog,
@@ -60,7 +61,7 @@
     // Lazy GL upload. `gl` is 04a's lexical global — it exists by the time
     // anyone paints; guard anyway so an early call is just a no-op retry.
     function ensureTexture(entry) {
-        if (!entry || TEX[entry.id]) return;
+        if (!entry || TEX[entry.id] || BROKEN[entry.id]) return;
         var hasGl;
         try { hasGl = (typeof gl !== 'undefined') && !!gl; } catch (_) { hasGl = false; }
         if (!hasGl) return;
@@ -80,10 +81,47 @@
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 slot.texture = t;
                 slot.aspect = (img.naturalWidth || 1) / (img.naturalHeight || 1);
-            } catch (e) { delete TEX[entry.id]; }
+            } catch (e) { delete TEX[entry.id]; markBroken(entry.id); }
         };
-        img.onerror = function () { delete TEX[entry.id]; };
+        img.onerror = function () { delete TEX[entry.id]; markBroken(entry.id); };
         img.src = entry.dataURL;
+    }
+
+    // A stamp whose bitmap never decodes (a dataURL truncated by a full
+    // quota, a bad import) must not be retried on every dab — and must not
+    // hold paint forever, which is what stampPending below would otherwise
+    // do. Say it once, and drop the selection so the tip swatch stops
+    // advertising a shape that can never print: the brush falls back to its
+    // built-in tip deliberately instead of by accident.
+    function markBroken(id) {
+        if (BROKEN[id]) return;
+        BROKEN[id] = 1;
+        // Only the ACTIVE shape is worth a dialog: warm() pre-loads every
+        // stamp a replay mentions, and a corrupt one of those changes nothing
+        // about what the user is painting with right now.
+        if (activeId() !== id) return;
+        setActive(null);
+        say('That brush shape could not be loaded',
+            'Its stored image is damaged, so the brush is back on its built-in tip. Delete the shape and import it again.');
+    }
+
+    // True while a SELECTED shape's stamp is not on the GPU yet — the window
+    // between picking (or importing, or re-editing) a shape and its bitmap
+    // decoding. splat()'s custom-shape branch is gated on the texture being
+    // ready and falls through to the built-in BRUSH_TIP underneath, so a dab
+    // landing in this window prints THAT tip instead: with Chisel selected it
+    // stamps a hard square while the swatch already shows the shape. Callers
+    // hold the dab instead (it is a frame or two), and kicking the upload off
+    // from here keeps the wait as short as it can be.
+    function stampPending() {
+        var id = activeId();
+        if (!id || BROKEN[id]) return false;
+        var t = TEX[id];
+        if (t && t.texture) return false;
+        var entry = findEntry(id);
+        if (!entry) return false;        // stale id — nothing to wait for
+        ensureTexture(entry);
+        return true;
     }
 
     // Hot path — called from splat() per dab. No storage reads, no allocs
@@ -284,6 +322,7 @@
         activeId: activeId,
         setActive: setActive,
         getActiveStamp: getActiveStamp,
+        stampPending: stampPending,
         add: add,
         remove: remove,
         replace: replace,

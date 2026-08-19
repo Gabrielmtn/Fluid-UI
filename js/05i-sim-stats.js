@@ -51,6 +51,20 @@
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
         function splat(x, y, dx, dy, color) {
+            // Hold this dab while a selected brush shape's stamp is still
+            // uploading (2026-08-18). The custom-shape block below only fires
+            // once the texture is ready; until then the dab falls through to
+            // the built-in BRUSH_TIP underneath the shape — and that tip is
+            // whatever was last picked, so a shape sitting on top of Chisel
+            // printed a hard SQUARE for the frame or two after an import, an
+            // edit or a reload, with the swatch already showing the shape.
+            // Dropping those dabs is the right trade: the wait is a frame or
+            // two, and the alternative is a wrong footprint burned into the
+            // canvas. Peer strokes and replay are exempt (__remoteStroke) —
+            // they paint with the built-in tip by design and must not stall.
+            if (window.__brushTipOn && !window.__remoteStroke && window.BrushShapes
+                && typeof window.BrushShapes.stampPending === 'function'
+                && window.BrushShapes.stampPending()) return;
             const aspectRatio = canvas.width / canvas.height;
             const baseRadius = config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1);
             // Dab bounding half-width in p-space (canvas-height-normalized).

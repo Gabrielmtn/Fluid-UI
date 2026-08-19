@@ -651,6 +651,7 @@
 
         // ── Canvas wrapper geometry ──
         var canvasWrapper = null;
+        var canvasBox = null;
         try {
             var wrap = document.getElementById('canvas-wrapper');
             if (wrap) {
@@ -660,6 +661,16 @@
                     width: wrap.style.width || wrap.offsetWidth + 'px',
                     height: wrap.style.height || wrap.offsetHeight + 'px'
                 };
+                // The size the box ACTUALLY is, which is not always the size
+                // the inline style above asks for: CSS caps the wrapper to the
+                // window minus the sidebar, and the restore writes a saved
+                // style back verbatim — so a session that was clamped hands
+                // the next save an inline width the box never had. Every
+                // position in this snapshot (layer.x/y, mask and collider
+                // shape rects) is expressed in THESE pixels, and
+                // applyPresetSnapshot rescales by them, so it has to be the
+                // measured number rather than the requested one.
+                canvasBox = { w: wrap.clientWidth, h: wrap.clientHeight };
             }
         } catch(_){}
 
@@ -853,6 +864,7 @@
             },
             ssOrigin: ssOrigin,
             canvasWrapper: canvasWrapper,
+            canvasBox: canvasBox,
             sidebarSections: sidebarSections,
             layers: layersData,
             layerOrder: layerOrderData,
@@ -1215,6 +1227,40 @@
         } catch(_){}
 
 
+        // ── Canvas-box rescale for restored geometry ──
+        // Everything positional in a preset is stored in the pixels of the
+        // canvas box it was saved against: layer.x/y in that box's CSS px,
+        // mask/collider shape rects in its buffer px (the same number —
+        // updateCanvasSize sizes the buffer from the box). The box restored
+        // above does NOT always come back the size it was saved at: CSS caps
+        // the wrapper to the window minus the sidebar, and
+        // initializeCanvasPosition caps it again above the underbar. A preset
+        // saved on a roomier layout then lands in a SMALLER box with its
+        // offsets still in the old box's pixels — which is the "layers and
+        // colliders come back offset even though they were aligned when I
+        // saved" report: 160px in from the left of a 900px box is 18% in, but
+        // 23% in once that box is clamped to 710. Colliders inherit the error
+        // twice, mapping layer.x through the LIVE css width and drawing shape
+        // rects through the LIVE buffer.
+        // Reading clientWidth flushes layout, so this is what the box actually
+        // BECAME, not what we asked for. The saved side has to be measured the
+        // same way, which is why this reads canvasBox (clientWidth at save
+        // time) and NOT canvasWrapper.width (the inline style, which can name
+        // a size the box never had). Presets saved before canvasBox existed
+        // carry no measurement, so they get 1:1 — exactly today's behaviour,
+        // rather than a guess that could move a preset that lands correctly.
+        var _boxK = (function () {
+            var wrap = document.getElementById('canvas-wrapper');
+            var box = snapshot.canvasBox || null;
+            var savedW = box ? box.w : NaN;
+            var savedH = box ? box.h : NaN;
+            var liveW = wrap ? wrap.clientWidth : 0;
+            var liveH = wrap ? wrap.clientHeight : 0;
+            var kx = (savedW > 0 && liveW > 0) ? liveW / savedW : 1;
+            var ky = (savedH > 0 && liveH > 0) ? liveH / savedH : 1;
+            return { x: kx, y: ky, on: (Math.abs(kx - 1) > 0.002 || Math.abs(ky - 1) > 0.002) };
+        })();
+
         // ── Layers ──
         try {
             if (snapshot.layers && Array.isArray(snapshot.layers) && snapshot.layers.length > 0) {
@@ -1310,8 +1356,10 @@
                         visible: ld.visible !== false,
                         active: false,
                         threshold: ld.threshold || 0,
-                        x: ld.x || 0,
-                        y: ld.y || 0,
+                        // Offsets are CSS px of the box this preset was saved
+                        // against (see _boxK) — carry them into the box we got.
+                        x: (ld.x || 0) * _boxK.x,
+                        y: (ld.y || 0) * _boxK.y,
                         scaleX: ld.scaleX || 1,
                         scaleY: ld.scaleY || 1,
                         rotation: ld.rotation || 0,
@@ -1339,6 +1387,18 @@
                             mode: ld.mask.mode || 'show',
                             shapes: (ld.mask.shapes || []).map(function(s) {
                                 var sc = Object.assign({}, s);
+                                // Shape rects are buffer px of the saved box.
+                                // The bitmaps a shape carries (samMask, depth)
+                                // are RESAMPLED into that rect, so their own
+                                // dimensions stay as they are — only the rect
+                                // moves. A rotated shape is approximate when the
+                                // box ASPECT changed too; square-on it is exact.
+                                if (_boxK.on) {
+                                    if (typeof sc.x === 'number') sc.x *= _boxK.x;
+                                    if (typeof sc.y === 'number') sc.y *= _boxK.y;
+                                    if (typeof sc.width === 'number') sc.width *= _boxK.x;
+                                    if (typeof sc.height === 'number') sc.height *= _boxK.y;
+                                }
                                 // Decode base64 depthData back to Uint8Array (new format)
                                 if (sc._depthDataB64) {
                                     try {
@@ -1426,6 +1486,18 @@
                         window.layerOrder.splice(_oi, 1);
                     }
                 }
+
+                // The numbers now in window.layers are expressed in the LIVE
+                // box — either _boxK converted them into it, or the preset
+                // predates canvasBox and is taken at face value. Say so, so
+                // 05j's resize watch does not read the box change it never saw
+                // and apply it a second time on the next frame.
+                try {
+                    var _wrapNow = document.getElementById('canvas-wrapper');
+                    if (_wrapNow && window.LayerGeometry) {
+                        window.LayerGeometry.assume(_wrapNow.clientWidth, _wrapNow.clientHeight);
+                    }
+                } catch(_){}
 
                 if (typeof window.renderLayers === 'function') window.renderLayers();
 

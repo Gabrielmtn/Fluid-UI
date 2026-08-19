@@ -230,6 +230,10 @@
 }
 
 .mask-editor-canvas {
+    /* A stylus or finger drag must reach the tools, not become a pan gesture:
+       without this the browser cancels the pointer stream mid-stroke and the
+       touch-up brush never gets its moves. Same rule the paint canvas uses. */
+    touch-action: none;
     max-width: 100%;
     max-height: 100%;
     border: 2px solid rgba(255, 255, 255, 0.1);
