@@ -125,15 +125,18 @@ let bootFadeTimer = null;
 let fadeT0 = 0;
 let fadeDriven = false;   // the renderer's rAF has taken the ramp over
 
+// Ramp from the boot alpha, not from 0, so the ends of every fade are
+// continuous with what was already on screen (nothing).
+function setWindowAlpha(eased) {
+    mainWindow.setOpacity(BOOT_HIDDEN_OPACITY + (1 - BOOT_HIDDEN_OPACITY) * eased);
+}
+
 // t is linear progress 0..1; the curve lives here so both drivers share it.
 function applyFadeAlpha(t) {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     // smoothstep: the eye reads a linear alpha ramp as "snapped on at the
     // end", an ease-in-out as something materialising.
-    const eased = t * t * (3 - 2 * t);
-    // Ramp from the boot alpha, not from 0, so the first step is continuous
-    // with what was already on screen (nothing).
-    mainWindow.setOpacity(BOOT_HIDDEN_OPACITY + (1 - BOOT_HIDDEN_OPACITY) * eased);
+    setWindowAlpha(t * t * (3 - 2 * t));
     if (process.env.ASGT_FADE_TRACE) console.log('[fadetrace]', Date.now() - fadeT0, t.toFixed(4));
     if (t >= 1) {
         clearInterval(bootFadeTimer);
@@ -149,6 +152,84 @@ ipcMain.on('boot-fade-step', (_evt, t) => {
     if (!bootRevealed || !BOOT_FADE) return;
     fadeDriven = true;
     applyFadeAlpha(Math.max(0, Math.min(1, Number(t) || 0)));
+});
+
+// ── Restart ────────────────────────────────────────────────────────────────
+// Every restart path — F5, the hard reload, the nuclear reset, a renderer
+// crash, and the WebGL context-loss recovery — used to call reload() straight
+// out on a fully visible window. Chromium holds the last painted frame while
+// the page tears down and the next one boots, so what the user actually saw
+// was the app FREEZE for ~800ms and then hard-cut to the rebooted UI
+// (measured: zero change across two 260ms samples, then a single 16.7 jump).
+// Worse, the reload branch of 'boot-ready' answered fadeMs 0, so the return
+// had no fade at all — the exact snap the launch choreography exists to avoid.
+//
+// A restart is now the launch run backwards and then forwards: dissolve out,
+// reload while invisible, and come back up the same 800ms ramp as a cold
+// start. The freeze happens where nobody can see it.
+const RESTART_FADE_OUT_MS = Math.max(0, Number(process.env.ASGT_RESTART_FADE_MS || 240));
+let restarting = false;
+
+// Deliberately brisker than the way in, and deliberately NOT rAF-driven: the
+// renderer is about to be destroyed (and on the crash path is already dead),
+// so the ramp has to survive without it. A main-process timer asking for 8ms
+// lands on Windows' 15.6ms tick — under one display frame, so DWM still takes
+// a fresh value every frame. See BOOT_FADE_MS for why 16.7 would not.
+function fadeOutThen(done) {
+    if (!BOOT_FADE || !mainWindow || mainWindow.isDestroyed() || RESTART_FADE_OUT_MS <= 0) {
+        done();
+        return;
+    }
+    const t0 = Date.now();
+    clearInterval(bootFadeTimer);
+    bootFadeTimer = setInterval(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) {
+            clearInterval(bootFadeTimer); bootFadeTimer = null;
+            // done() never runs on this path, so release the re-entry guard
+            // here or a window that dies mid-fade leaves every later restart
+            // silently blocked.
+            restarting = false;
+            return;
+        }
+        const t = Math.min(1, (Date.now() - t0) / RESTART_FADE_OUT_MS);
+        setWindowAlpha(1 - (t * t * (3 - 2 * t)));
+        if (t >= 1) {
+            clearInterval(bootFadeTimer); bootFadeTimer = null;
+            done();
+        }
+    }, 8);
+}
+
+// prep runs while the window is already invisible — cache/storage clearing
+// belongs there so its cost is hidden too, not stacked in front of the fade.
+function beginRestart(reason, prep) {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (restarting) return;   // a second F5 mid-restart must not stack ramps
+    restarting = true;
+    console.log('[boot] restarting —', reason);
+    fadeOutThen(() => {
+        Promise.resolve()
+            .then(() => (typeof prep === 'function' ? prep() : null))
+            .catch((e) => console.warn('[boot] restart prep failed', e && e.message))
+            .then(() => {
+                restarting = false;
+                if (!mainWindow || mainWindow.isDestroyed()) return;
+                // Re-arm the cold-launch reveal path so the way back in is the
+                // full ramp, not the fadeMs-0 shortcut the reload branch uses.
+                bootRevealed = false;
+                fadeDriven = false;
+                clearTimeout(bootWatchdog);
+                bootWatchdog = setTimeout(() => revealWindow('watchdog'), BOOT_WATCHDOG_MS);
+                mainWindow.webContents.reload();
+            });
+    });
+}
+
+// The renderer asks for this on WebGL context restore — that recovery used to
+// be a bare location.reload() from inside the page, which is the one restart
+// path that ships AND fires without any dialog in front of it.
+ipcMain.on('request-restart', (_evt, reason) => {
+    beginRestart(String(reason || 'renderer request').slice(0, 60));
 });
 
 function revealWindow(reason) {
@@ -313,7 +394,7 @@ function createWindow() {
         // silently instead of stacking a crash dialog on top.
         if (mainWindow.__expectRendererKill) {
             mainWindow.__expectRendererKill = false;
-            mainWindow.webContents.reload();
+            beginRestart('unresponsive recovery');
             return;
         }
         const choice = dialog.showMessageBoxSync(mainWindow, {
@@ -324,7 +405,7 @@ function createWindow() {
             message: `The app's renderer crashed (${details.reason}).`,
             detail: 'Unsaved work on the canvas is lost. If this keeps happening, update your GPU drivers.'
         });
-        if (choice === 0) mainWindow.webContents.reload();
+        if (choice === 0) beginRestart('renderer crash');
         else app.quit();
     });
     mainWindow.on('unresponsive', () => {
@@ -384,13 +465,13 @@ function createWindow() {
             event.preventDefault();
             askRenderer('nuclear').then((ok) => {
                 if (!ok || !mainWindow || mainWindow.isDestroyed()) return;
-                mainWindow.webContents.session.clearCache().then(() => {
-                    mainWindow.webContents.session.clearStorageData({
-                        storages: ['cookies', 'cachestorage', 'localstorage', 'serviceworkers']
-                    }).then(() => {
-                        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.reload();
-                    });
-                });
+                // The wipe runs as restart prep, i.e. behind the fade — it is
+                // the slowest step here and used to happen in full view.
+                beginRestart('nuclear reset', () =>
+                    mainWindow.webContents.session.clearCache().then(() =>
+                        mainWindow.webContents.session.clearStorageData({
+                            storages: ['cookies', 'cachestorage', 'localstorage', 'serviceworkers']
+                        })));
             });
         }
     });
@@ -490,10 +571,8 @@ ipcMain.on('app-ask-response', (evt, payload) => {
 function guardedReload(hard) {
     askRenderer(hard ? 'hard-reload' : 'reload').then((ok) => {
         if (!ok || !mainWindow || mainWindow.isDestroyed()) return;
-        if (!hard) { mainWindow.webContents.reload(); return; }
-        mainWindow.webContents.session.clearCache().then(() => {
-            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.reload();
-        });
+        beginRestart(hard ? 'hard reload' : 'reload',
+            hard ? () => mainWindow.webContents.session.clearCache() : null);
     });
 }
 

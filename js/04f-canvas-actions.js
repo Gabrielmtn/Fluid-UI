@@ -233,7 +233,26 @@
 
                     try { window.__unsavedWork = false; } catch(_){}
 
-                    try { window.location.reload(); } catch(_){}
+                    // Ask MAIN to restart rather than reloading from in here.
+                    // A bare location.reload() leaves the window fully visible,
+                    // so the recovery reads as the app freezing for ~800ms and
+                    // then hard-cutting — and this is the one restart path that
+                    // ships AND fires with no dialog in front of it. Main
+                    // dissolves the window out first and brings it back up the
+                    // same ramp as a cold launch. The reload stays as the
+                    // fallback for the web build and any shell without ipc.
+
+                    var _restarted = false;
+
+                    try {
+
+                        var _ipc = (typeof require === 'function') && require('electron').ipcRenderer;
+
+                        if (_ipc) { _ipc.send('request-restart', 'webgl context restored'); _restarted = true; }
+
+                    } catch(_){}
+
+                    if (!_restarted) { try { window.location.reload(); } catch(_){} }
 
                 }, false);
 
