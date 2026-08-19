@@ -2150,17 +2150,19 @@
         var collisionBtn = document.createElement('button');
         collisionBtn.type = 'button';
         collisionBtn.textContent = '🧱';
-        collisionBtn.title = 'Add Collision Layer';
+        collisionBtn.title = 'Add Collision Layer — pick a picture, cut the subject out, get a wall';
         collisionBtn.style.cssText = 'font-size:11px;padding:3px 6px;cursor:pointer;position:relative;';
         actions.appendChild(collisionBtn);
 
         var collisionMenu = document.createElement('div');
         collisionMenu.className = 'collision-source-menu';
         collisionMenu.style.display = 'none';
+        // Both entries open the mask wizard on the picture (23-depth-collision
+        // startFrom*), with step 3's collider hand-off pre-checked — the wall
+        // comes from a mask the user cut, not from a depth guess.
         collisionMenu.innerHTML =
-            '<button type="button" data-src="webcam">📷 Webcam</button>' +
-            '<button type="button" data-src="image">📁 Image</button>' +
-            '<button type="button" data-src="snapshot">📸 Snapshot</button>';
+            '<button type="button" data-src="image">📁 From Image…</button>' +
+            '<button type="button" data-src="snapshot">📸 From Canvas</button>';
         collisionBtn.appendChild(collisionMenu);
 
         var collisionFileInput = document.createElement('input');
@@ -2180,19 +2182,17 @@
             if (!src) return;
             collisionMenu.style.display = 'none';
 
-            if (src === 'webcam' && window.collisionLayers) {
-                window.collisionLayers.createFromWebcam();
-            } else if (src === 'image') {
+            if (src === 'image') {
                 collisionFileInput.click();
             } else if (src === 'snapshot' && window.collisionLayers) {
-                window.collisionLayers.createFromSnapshot();
+                window.collisionLayers.startFromCanvas();
             }
         });
 
         collisionFileInput.addEventListener('change', function (e) {
             var file = e.target.files && e.target.files[0];
             if (file && window.collisionLayers) {
-                window.collisionLayers.createFromImage(file);
+                window.collisionLayers.startFromImageFile(file);
             }
             collisionFileInput.value = '';
         });

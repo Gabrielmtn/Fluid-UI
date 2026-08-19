@@ -104,7 +104,14 @@
             if (!layerDiv) return;
             // If mask is not enabled or no shapes, use original image
             if (!layer.mask || !layer.mask.enabled || !layer.mask.shapes || layer.mask.shapes.length === 0) {
-                if (layer.originalData) {
+                // A collision layer IS its mask — its `originalData` is the
+                // picture the wall was cut from, not something to show. With no
+                // mask there is no wall, so there is no film either; restoring
+                // the source image here left an untinted ghost of it on the
+                // canvas after Clear Mask (and after switching collision off).
+                if (layer.isCollision) {
+                    layerDiv.style.backgroundImage = '';
+                } else if (layer.originalData) {
                     layerDiv.style.backgroundImage = `url(${layer.originalData})`;
                 }
                 return;

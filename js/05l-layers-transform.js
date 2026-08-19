@@ -175,6 +175,14 @@
                 layer.mask.enabled = !layer.mask.enabled;
                 layer.__maskDirty = true; // 7.6: reorder-reapply memo
                 applyLayerMask(index);
+                // On a collision layer this button IS the collider's on/off
+                // switch (see its title in 05k) — the obstacle only recomposites
+                // when asked, so without this the wall stayed in the sim after
+                // "Collision OFF" and the fluid kept flowing around nothing.
+                if (layer.isCollision && window.collisionLayers
+                    && typeof window.collisionLayers.updateObstacleFromLayers === 'function') {
+                    window.collisionLayers.updateObstacleFromLayers();
+                }
                 renderLayers();
             }
         };
@@ -192,13 +200,22 @@
         };
         window.clearImageLayerMask = (index) => {
             const layer = layers.find(l => l.index === index);
-            if (layer && layer.mask) {
-                if (confirm('Clear mask for this layer?')) {
-                    layer.mask.shapes = [];
-                    layer.mask.enabled = false;
-                    renderLayers();
-                }
+            if (!layer || !layer.mask) return;
+            if (!confirm('Clear mask for this layer?')) return;
+            layer.mask.shapes = [];
+            layer.mask.enabled = false;
+            // Emptying the model is only half of it: the layer div still holds
+            // the baked mask bitmap, and a collider still holds its wall in the
+            // obstacle texture, until each is told to re-read. Without these the
+            // button looked like a no-op — on a collision layer the fluid kept
+            // flowing around a mask that no longer existed.
+            layer.__maskDirty = true; // 7.6: reorder-reapply memo
+            applyLayerMask(index);
+            if (layer.isCollision && window.collisionLayers
+                && typeof window.collisionLayers.updateObstacleFromLayers === 'function') {
+                window.collisionLayers.updateObstacleFromLayers();
             }
+            renderLayers();
         };
         // Layer positioning functionality
         let activeLayerIndex = null;

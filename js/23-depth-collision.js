@@ -252,7 +252,6 @@ class DepthEstimator {
     // instead of the old 512-wide ~4×, which read as chunky stairs.
     var COLLISION_MAP_MAX = 1024;
     var obstacleCtx = null;
-    var webcamStreams = {};       // layerIndex → { stream, video, intervalId }
     // Procedural obstacle source: a draw(ctx, simW, simH) callback composited
     // over the layer-based obstacles on every recomposite (incl. resize), so
     // code-drawn colliders (e.g. audio-scene EQ lane walls) survive FBO
@@ -264,10 +263,12 @@ class DepthEstimator {
         get enabled() { return collisionEnabled; },
         set enabled(v) { collisionEnabled = !!v; if (!v) clearObstacle(); },
 
+        // Bring a picture in as a layer and open the mask wizard on it, so
+        // the wall comes from a mask the user cut, not a depth guess.
+        startFromImageFile: startColliderWizardFromImageFile,
+        startFromCanvas: startColliderWizardFromCanvas,
+
         // Create a collision layer from a source
-        createFromImage: createCollisionFromImage,
-        createFromWebcam: createCollisionFromWebcam,
-        createFromSnapshot: createCollisionFromSnapshot,
         createFromLayerMask: createCollisionFromLayerMask,
         createFromSketch: createFromSketch,
         createFromMask: createFromMask, // D3: active Mask → collider
@@ -281,9 +282,6 @@ class DepthEstimator {
 
         // Refresh depth estimation for a layer
         refreshDepth: refreshLayerDepth,
-
-        // Remove webcam stream for a layer
-        removeWebcam: removeWebcam,
 
         // Recomposite all collision layers into the obstacle texture
         updateObstacleFromLayers: updateObstacleFromLayers,
@@ -541,144 +539,53 @@ class DepthEstimator {
         }
     }
 
-    // Create collision layer from an image file
-    async function createCollisionFromImage(file) {
-        if (!window.depthEstimator.isReady) {
-            await window.depthEstimator.initialize();
+    // ── Collider sources: an image file, or a snapshot of the canvas ─────
+    // Both used to run a depth estimate and drop the raw depth map straight in
+    // as a collider — a guess at what you meant, leaving a grey depth image on
+    // the canvas and a Threshold slider to argue with. They now do what the
+    // mask wizard was built for: bring the picture in as a LAYER, let you cut
+    // the subject out (Magic Mask / stamps → touch up → soften), and hand that
+    // finished mask to the collision system on Apply. Step 3's "also create a
+    // collision layer" opt-in starts checked, since a wall is why the
+    // 🧱 button was pressed.
+    function startColliderWizardOnDataURL(dataUrl, title) {
+        if (typeof window.createLayerFromDataUrl !== 'function') {
+            console.warn('⚠️ Layer system not available');
+            return false;
         }
-        if (!window.depthEstimator.isReady) return;
-
-        var reader = new FileReader();
-        reader.onload = async function (ev) {
-            var img = new Image();
-            img.onload = async function () {
-                var depth = await window.depthEstimator.estimateDepth(img);
-                if (!depth) return;
-
-                // Aspect-fit (2026-08-06): the collider layer div stretches to
-                // the canvas, so a non-canvas-aspect image distorted both the
-                // preview and the collision shape. Contain-fit via the layer
-                // transform — the compositors already honor scaleX/scaleY.
-                var canvasEl = document.getElementById('canvas');
-                var fitX = 1, fitY = 1;
-                if (canvasEl && img.naturalWidth > 0 && img.naturalHeight > 0) {
-                    var arImg = img.naturalWidth / img.naturalHeight;
-                    var arCanvas = (canvasEl.width || 1) / (canvasEl.height || 1);
-                    if (arImg < arCanvas) fitX = arImg / arCanvas;
-                    else if (arImg > arCanvas) fitY = arCanvas / arImg;
-                }
-                // Create an image layer using the depth as both visual and mask source
-                addCollisionLayer(depth, img.src, file.name || 'Image', { scaleX: fitX, scaleY: fitY });
-            };
-            img.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-
-    // Create collision layer from webcam
-    async function createCollisionFromWebcam() {
-        if (!window.depthEstimator.isReady) {
-            await window.depthEstimator.initialize();
-        }
-        if (!window.depthEstimator.isReady) return;
-
-        try {
-            var stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 640 }, height: { ideal: 480 } }
-            });
-
-            var video = document.createElement('video');
-            video.srcObject = stream;
-            video.muted = true;
-            video.playsInline = true;
-            video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1;';
-            document.body.appendChild(video);
-            await video.play();
-
-            // Wait for video dimensions
-            await new Promise(function (resolve) {
-                if (video.videoWidth > 0) { resolve(); return; }
-                video.addEventListener('loadeddata', resolve, { once: true });
-            });
-
-            // Capture first frame for depth
-            var oc = document.createElement('canvas');
-            oc.width = video.videoWidth;
-            oc.height = video.videoHeight;
-            var octx = oc.getContext('2d');
-            // Mirror horizontally
-            octx.translate(oc.width, 0);
-            octx.scale(-1, 1);
-            octx.drawImage(video, 0, 0);
-            octx.setTransform(1, 0, 0, 1, 0, 0);
-
-            var depth = await window.depthEstimator.estimateDepth(oc);
-            if (!depth) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
-
-            var thumbUrl = oc.toDataURL('image/jpeg', 0.5);
-            var layerIndex = addCollisionLayer(depth, thumbUrl, 'Webcam');
-
-            // Store webcam stream for periodic updates
-            // Uses setTimeout chain (not setInterval) so overlapping async calls can't pile up
-            if (layerIndex !== null) {
-                var updateDelay = 500; // ms between updates (~2 FPS)
-                var timerId = 0;
-                var stopped = false;
-
-                function scheduleNext() {
-                    if (stopped) return;
-                    timerId = setTimeout(doUpdate, updateDelay);
-                }
-
-                async function doUpdate() {
-                    if (stopped || !webcamStreams[layerIndex]) return;
-                    if (!window.depthEstimator.isReady || window.depthEstimator._running) {
-                        scheduleNext();
-                        return;
-                    }
-
-                    octx.save();
-                    octx.translate(oc.width, 0);
-                    octx.scale(-1, 1);
-                    octx.drawImage(video, 0, 0);
-                    octx.restore();
-
-                    var newDepth = await window.depthEstimator.estimateDepth(oc);
-                    if (newDepth && webcamStreams[layerIndex]) {
-                        updateLayerDepthMask(layerIndex, newDepth);
-                    }
-                    scheduleNext();
-                }
-
-                scheduleNext();
-
-                webcamStreams[layerIndex] = {
-                    stream: stream, video: video,
-                    get intervalId() { return timerId; },
-                    stop: function () { stopped = true; clearTimeout(timerId); }
-                };
+        return window.createLayerFromDataUrl(dataUrl, title, function (layer) {
+            // Supplying onCreated means the undo record is ours to push.
+            if (typeof window.__recordLayerCreate === 'function') {
+                window.__recordLayerCreate([layer.index], 'add layer');
             }
-        } catch (error) {
-            console.error('❌ Webcam capture failed:', error);
-            alert('⚠️ Webcam access failed: ' + error.message);
-        }
+            if (typeof window.enterImageLayerMaskMode !== 'function') {
+                console.warn('⚠️ Mask editor not available');
+                return;
+            }
+            window.enterImageLayerMaskMode(layer.index, { makeCollider: true });
+        });
     }
 
-    // Create collision layer from current canvas snapshot
-    async function createCollisionFromSnapshot() {
-        if (!window.depthEstimator.isReady) {
-            await window.depthEstimator.initialize();
-        }
-        if (!window.depthEstimator.isReady) return;
+    function startColliderWizardFromImageFile(file) {
+        if (!file) return false;
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+            startColliderWizardOnDataURL(ev.target.result, file.name || 'Image');
+        };
+        reader.onerror = function () { alert('⚠️ Could not read that image file.'); };
+        reader.readAsDataURL(file);
+        return true;
+    }
 
-        var canvas = document.getElementById('canvas');
-        if (!canvas) return;
-
-        var depth = await window.depthEstimator.estimateDepth(canvas);
-        if (!depth) return;
-
-        var thumbUrl = canvas.toDataURL('image/jpeg', 0.5);
-        addCollisionLayer(depth, thumbUrl, 'Snapshot');
+    function startColliderWizardFromCanvas() {
+        // The GL context is created with preserveDrawingBuffer, so the canvas
+        // reads back outside its own draw call (04a).
+        var canvasEl = document.getElementById('canvas');
+        var url = null;
+        try { url = canvasEl && canvasEl.toDataURL('image/png'); }
+        catch (e) { console.warn('canvas snapshot failed', e); }
+        if (!url) { alert('⚠️ Could not capture the canvas.'); return false; }
+        return startColliderWizardOnDataURL(url, 'Canvas Snapshot');
     }
 
     // Add a collision layer to the layer system.
@@ -718,7 +625,7 @@ class DepthEstimator {
         // screen — but a thumbnail has no transform, so showing the map raw
         // put an ellipse in the panel where the user pasted a circle. Drawing
         // the fit into the bitmap itself keeps the panel honest, and layers
-        // with no fit (sketch, Mask, webcam) keep the map unchanged.
+        // with no fit (sketch, Mask) keep the map unchanged.
         var thumbDataUrl = depthDataUrl;
         try {
             var tsx = opts.scaleX || 1, tsy = opts.scaleY || 1;
@@ -857,27 +764,24 @@ class DepthEstimator {
         updateObstacleFromLayers();
     }
 
-    // Refresh depth estimation for a specific layer
+    // Refresh depth estimation for a specific layer. Used by the 🔄 button on a
+    // depth-sourced collider and by 12-save-load's legacy-preset path (colliders
+    // saved without their base64 depth data). Loads the model on demand — it
+    // used to ride in on whichever create-from-source path the user hit first,
+    // and those now go through the mask wizard instead, so nothing else would.
     async function refreshLayerDepth(layerIndex) {
         if (!window.layers) return;
         var layer = window.layers.find(function (l) { return l.index === layerIndex; });
         if (!layer || !layer.originalData) return;
 
+        if (!window.depthEstimator.isReady) {
+            await window.depthEstimator.initialize();
+            if (!window.depthEstimator.isReady) return;
+        }
+
         var depth = await window.depthEstimator.estimateDepth(layer.originalData);
         if (depth) {
             updateLayerDepthMask(layerIndex, depth);
-        }
-    }
-
-    // Remove webcam stream
-    function removeWebcam(layerIndex) {
-        var wc = webcamStreams[layerIndex];
-        if (wc) {
-            if (typeof wc.stop === 'function') wc.stop(); // stop setTimeout chain
-            else clearInterval(wc.intervalId);             // legacy fallback
-            wc.stream.getTracks().forEach(function (t) { t.stop(); });
-            if (wc.video && wc.video.parentNode) wc.video.parentNode.removeChild(wc.video);
-            delete webcamStreams[layerIndex];
         }
     }
 
@@ -1614,14 +1518,14 @@ class DepthEstimator {
         }
     }
 
-    // Listen for layer deletion to clean up webcam streams + live binding.
+    // Listen for layer deletion to clean up the live binding.
     // MUST poll: this file is a <script type="module"> (deferred) while
     // window.deleteLayer comes from 05l in the dynamic async chain — the
     // eval order is a RACE, and when the module won, the old eval-time
     // `if (typeof deleteLayer === 'function')` wrap silently never
     // installed. Symptom: deleting a collision layer left its wall in the
-    // sim (no updateObstacleFromLayers), webcams kept streaming, and the
-    // ⟳ Live binding stayed lit against a dead layer.
+    // sim (no updateObstacleFromLayers) and the ⟳ Live binding stayed lit
+    // against a dead layer.
     (function installDeleteHook() {
         var origDeleteLayer = window.deleteLayer;
         if (typeof origDeleteLayer !== 'function') {
@@ -1629,7 +1533,6 @@ class DepthEstimator {
             return;
         }
         window.deleteLayer = function (index) {
-            removeWebcam(index);
             // Deleting the live-bound sketch collider unbinds IMMEDIATELY
             // (the ⟳ Live button follows via __onSketchLiveChanged) — the
             // next-mutation auto-disable stays as the fallback.

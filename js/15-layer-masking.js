@@ -3393,7 +3393,10 @@
         if (typeof window.renderLayers === 'function') window.renderLayers();
     }
 
-    window.enterImageLayerMaskMode = function(layerIndex) {
+    // opts.makeCollider pre-arms step 3's collider hand-off, for callers that
+    // opened the editor *because* the user asked for a wall (the Layers panel's
+    // 🧱 button — 23-depth-collision startFrom*).
+    window.enterImageLayerMaskMode = function(layerIndex, opts) {
         if (!window.layers) {
             console.error('❌ window.layers is not defined!');
             return;
@@ -3425,6 +3428,11 @@
         // Show mask editor overlay
         showMaskEditor();
         wizardBegin();
+        // After wizardBegin — it resets the opt-ins to their defaults.
+        if (opts && opts.makeCollider) {
+            maskState.makeCollider = true;
+            wizardSyncUI();
+        }
 
         // Update title and render with fresh state
         setTimeout(() => {
