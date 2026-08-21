@@ -45,20 +45,36 @@ butler uploads only changed bytes; the itch app auto-updates players on the `win
 
 ## 3. Publish to Steam
 
+App **5068940**, depot **5068942** — already filled into `steam/app_build.vdf`
+and `steam/depot_build.vdf`.
+
 **One-time setup**
-1. Register the app in Steamworks (requires the Steam Direct fee). Steam assigns an **App ID** and a **Depot ID**.
-2. Replace `YOUR_STEAM_APP_ID` / `YOUR_STEAM_DEPOT_ID` in `steam/app_build.vdf` and `steam/depot_build.vdf`.
-3. In the Steamworks dashboard, set the app's **launch executable** to `Swirl Together.exe`.
-4. Install **steamcmd** and set the `publish:steam` script's `YOUR_STEAM_BUILDER` to your builder login.
+1. Install **steamcmd** — it comes with the Steamworks SDK at
+   `sdk/tools/ContentBuilder/builder/steamcmd.exe`. Either put it on `PATH` or
+   point the `STEAMCMD` env var at the exe.
+2. Depot **5068942** (confirmed on the partner site 2026-08-21 — the earlier
+   5068941 was an inference from App ID + 1 and was wrong).
+3. Under **SteamPipe → Installation → General Installation**, add a launch
+   option: Executable `Swirl Together.exe`, OS Windows. Without it the depot
+   installs but nothing runs — and the exe name changed with the rename, so a
+   launch option left over from an earlier name ships an app that cannot start.
 
 **Each release**
 ```
 npm run dist:win
-npm run publish:steam       # steamcmd +login ... +run_app_build steam/app_build.vdf +quit
+npm run publish:steam -- <builder-login>
 ```
-This uploads the depot from `dist/win-unpacked`. The build lands unset (`"setlive" ""`) — go to the Steamworks **Builds** page and set it live on a branch (e.g. `default`). To push directly to a branch, set `"setlive"` in `app_build.vdf`.
+`publish:steam` runs `scripts/steam-upload.js`, which refuses to upload a
+`dist/win-unpacked` that is missing or still carries a stale exe name, then
+launches steamcmd from `steam/` so the VDFs' relative `..\dist\win-unpacked`
+resolves. steamcmd prompts for the password and Steam Guard code itself — the
+script never handles credentials. The builder login is a **Steamworks builder
+account**, not a personal Steam login; `STEAM_BUILDER` works instead of the
+argument.
 
-> Path note: if steamcmd can't find the content, change the relative `..\dist\win-unpacked` paths in the two `.vdf` files to absolute paths.
+The build lands unset (`"setlive" ""`) — go to the Steamworks **Builds** page
+and set it live on a branch (e.g. `default`). To push straight to a branch, set
+`"setlive"` in `app_build.vdf`.
 
 ---
 
