@@ -83,6 +83,22 @@
                 if (glowPanel) glowPanel.style.display = on ? '' : 'none';
             });
         }
+        // Scatter (volumetric light shafts) toggle — nested inside glowPanel,
+        // so it hides with Glow for free. Every side effect lives INSIDE the
+        // handler because save/load restores state by replaying synthetic
+        // change/input events into these listeners (12-save-load.js:11-12).
+        const scatterToggle = document.getElementById('scatterToggle');
+        const scatterPanel = document.getElementById('scatterPanel');
+        if (scatterToggle) {
+            scatterToggle.addEventListener('change', (e) => {
+                const on = e.target.checked;
+                config.SCATTER = on;
+                if (scatterPanel) scatterPanel.style.display = on ? '' : 'none';
+                // Drop the eased origin so re-enabling starts aimed at the
+                // current source instead of sweeping in from the stale one.
+                if (!on) window.__scatterOrigin = null;
+            });
+        }
         // Swirl slider (curl-noise micro-swirl in dye advection)
         const swirlSlider = document.getElementById('swirl');
         if (swirlSlider) {
@@ -134,7 +150,8 @@
             glowIntensitySlider.addEventListener('input', (e) => {
                 config.GLOW_INTENSITY = parseFloat(e.target.value);
                 const sp = document.getElementById('glowIntensityValue');
-                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
+                // 3dp: at step 0.005 a 2dp readout showed 0.005 and 0.010 both as "0.01".
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(3);
             });
         }
         const glowThresholdSlider = document.getElementById('glowThreshold');
@@ -143,6 +160,71 @@
                 config.GLOW_THRESHOLD = parseFloat(e.target.value);
                 const sp = document.getElementById('glowThresholdValue');
                 if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
+            });
+        }
+        // Scatter sliders / source
+        const scatterAmountSlider = document.getElementById('scatterAmount');
+        if (scatterAmountSlider) {
+            scatterAmountSlider.addEventListener('input', (e) => {
+                // Square the 0..1 slider into the 0..2 shader gain so the low
+                // end gets the bulk of the travel (see 01a). v=0.1 -> 0.02,
+                // v=0.5 -> 0.5, v=1 -> 2.0.
+                const _v = parseFloat(e.target.value);
+                config.SCATTER_AMOUNT = _v * _v * 2.0;
+                const sp = document.getElementById('scatterAmountValue');
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
+            });
+        }
+        const scatterReachSlider = document.getElementById('scatterReach');
+        if (scatterReachSlider) {
+            scatterReachSlider.addEventListener('input', (e) => {
+                config.SCATTER_DENSITY = parseFloat(e.target.value);
+                const sp = document.getElementById('scatterReachValue');
+                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
+            });
+        }
+        const scatterBlockToggle = document.getElementById('scatterBlockToggle');
+        if (scatterBlockToggle) {
+            scatterBlockToggle.checked = !!config.SCATTER_BLOCK;
+            scatterBlockToggle.addEventListener('change', (e) => {
+                config.SCATTER_BLOCK = e.target.checked;
+            });
+        }
+        const scatterSourceSelect = document.getElementById('scatterSource');
+        if (scatterSourceSelect) {
+            scatterSourceSelect.addEventListener('change', (e) => {
+                config.SCATTER_SOURCE = e.target.value;
+                // Re-aim instantly rather than sweeping the shafts across the
+                // canvas from the previous origin.
+                window.__scatterOrigin = null;
+            });
+        }
+        // Photosensitivity protection (PhotoSafe). Persistence is BESPOKE on
+        // purpose: the toggle sits in 12-save-load's PRESET_SKIP (safety prefs
+        // must never ride presets or the multiplayer look mirror), so its
+        // truth lives in the dedicated 'fluidui.photoSafe' localStorage key —
+        // the same key the first-frame warning modal writes and 04a seeds
+        // config.PHOTOSAFE from. Absent → protected.
+        const photoSafeToggle = document.getElementById('photoSafeToggle');
+        if (photoSafeToggle) {
+            photoSafeToggle.checked = !!config.PHOTOSAFE;
+            document.body.classList.toggle('photosafe-on', !!config.PHOTOSAFE);
+            photoSafeToggle.addEventListener('change', (e) => {
+                const on = e.target.checked;
+                config.PHOTOSAFE = on;
+                // Buffers are allocated lazily (05c skips them when booted
+                // with protection off) — build them before the next frame.
+                if (on && typeof window.__photoSafeEnsure === 'function') window.__photoSafeEnsure();
+                // Persist ONLY on trusted (human) events: synthetic change
+                // events — extensions, automation, replayed snapshots — may
+                // drive the runtime state for this session but can never
+                // disarm protection across a reload. Fail-safe by design.
+                if (e.isTrusted) {
+                    try { localStorage.setItem('fluidui.photoSafe', on ? '1' : '0'); } catch (err) {}
+                }
+                // DOM-side guard rides the same switch: CSS transitions on the
+                // canvas background/opacity so no non-GL path can strobe.
+                document.body.classList.toggle('photosafe-on', on);
             });
         }
         // DEBUG: Pointer leave tracking removed for performance

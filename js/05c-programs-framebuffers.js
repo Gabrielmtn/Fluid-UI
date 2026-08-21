@@ -38,6 +38,11 @@
         const glowPrefilterProg = new Program(baseVert, glowPrefilterFrag);
         const glowBlurProg = new Program(baseVert, glowBlurFrag);
         const glowFinalProg = new Program(baseVert, glowFinalFrag);
+        const scatterProg = new Program(baseVert, scatterFrag);
+        // PhotoSafe (photosensitivity protection) passes — see 05b sources
+        const photoSafeLumaProg = new Program(baseVert, photoSafeLumaFrag);
+        const photoSafeStatsProg = new Program(baseVert, photoSafeStatsFrag);
+        const photoSafeCompositeProg = new Program(baseVert, photoSafeCompositeFrag);
         let dyeTexWidth, dyeTexHeight, simTexWidth, simTexHeight;
         // Expose for stats panel
         function exposeSimStats() {
@@ -57,6 +62,13 @@
         // Harness introspection: obstacle swaps with its scratch on every
         // GPU composite, so expose a getter rather than a snapshot ref.
         window.__getObstacle = function () { return obstacle; };
+        // Same reason: `glow` and `scatter` are reassigned on every resize /
+        // governor reinit, so hand out getters rather than snapshot refs.
+        window.__getGlow = function () { return glow; };
+        window.__getScatter = function () { return scatter; };
+        window.__getPhotoSafe = function () {
+            return { frame: safeFrame, out: safeOut, luma: safeLuma, stats: safeStats };
+        };
         function createFBO(w, h, internalFormat, format, type, filter) {
             const texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -94,6 +106,13 @@
         let maskStore = {};
         let sketch; // alias: the ACTIVE raster layer's FBO (assigned by rasterLayers.setActive)
         let glow, glowFramebuffers = []; // HDR bloom: 256-base target + halving mip chain
+        let scatter; // Volumetric light shafts: same 256-base grid as `glow`
+        // PhotoSafe buffers: safeFrame = the display pass's render target while
+        // protection is on; safeOut = double-buffered PRESENTED frame (write =
+        // this frame, read = history); safeLuma = 16x16 block luminance pair;
+        // safeStats = 2x1 limiter state (texel 0 display: envelope/slew/mean;
+        // texel 1 detector: lastSign/pairTimer/transition-rate).
+        let safeFrame, safeOut, safeLuma, safeStats;
         let shadeForm, shadeFormTemp;
         // Multigrid pressure pyramid: mgRes0 = level-0 residual scratch;
         // mgLevels[i] = level i+1 {w, h, rhs, res, p(double), obs}. Level 0
@@ -139,7 +158,10 @@
                 if (f.fbo) gl.deleteFramebuffer(f.fbo);
             }
             [sharpened, detailed, lit, divergence, curl, obstacle, obstacleScratch,
-             glow, shadeForm, shadeFormTemp].forEach(_deleteFBO);
+             glow, scatter, shadeForm, shadeFormTemp, safeFrame].forEach(_deleteFBO);
+            [safeOut, safeLuma, safeStats].forEach(function (d) {
+                if (d) { _deleteFBO(d.read); _deleteFBO(d.write); }
+            });
             glowFramebuffers.forEach(_deleteFBO);
             glowFramebuffers = [];
             _deleteFBO(mgRes0);
@@ -252,6 +274,26 @@
                 if (gw < 2 || gh < 2) break;
                 glowFramebuffers.push(createFBO(gw, gh, rgba.internalFormat, rgba.format, texType, filter));
             }
+            // Scatter (light shafts) target: same grid as `glow`, because it
+            // marches glow's own prefilter output and the display pass samples
+            // both at the same UVs. Shafts are low-frequency, so 256-base is
+            // ample and the compositor's bilinear upscale is free.
+            scatter = createFBO(glowW, glowH, rgba.internalFormat, rgba.format, texType, filter);
+            // PhotoSafe buffers. safeFrame/safeOut are RGBA8 at the DRAWING
+            // BUFFER size — same quantization as the canvas, so the protected
+            // pass-through stays bit-identical to a direct present. The luma
+            // grid and limiter state are tiny half-float targets.
+            if (config.PHOTOSAFE) {
+                safeFrame = createFBO(displayW, displayH, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, filter);
+                safeOut = createDoubleFBO(displayW, displayH, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, filter);
+                safeLuma = createDoubleFBO(16, 16, rgba.internalFormat, rgba.format, texType, filter);
+                safeStats = createDoubleFBO(2, 1, rgba.internalFormat, rgba.format, texType, gl.NEAREST);
+            } else {
+                // Opted out: skip the ~3x canvas-size RGBA8 allocation. If the
+                // user flips protection on later, window.__photoSafeEnsure
+                // (05i, called by the 05e toggle handler) re-runs this init.
+                safeFrame = null; safeOut = null; safeLuma = null; safeStats = null;
+            }
             // Shading form field: low-res blurred copy of the frame that
             // the display shading derives its normals from. Paint-engine rule
             // (Krita/ArtRage impasto): light a smoothed height field, never
@@ -281,7 +323,11 @@
                 divergence, curl,
                 pressure.read, pressure.write,
                 sharpened, detailed, lit, obstacle, obstacleScratch,
-                glow, shadeForm, shadeFormTemp,
+                glow, scatter, shadeForm, shadeFormTemp,
+                safeFrame,
+                safeOut && safeOut.read, safeOut && safeOut.write,
+                safeLuma && safeLuma.read, safeLuma && safeLuma.write,
+                safeStats && safeStats.read, safeStats && safeStats.write,
                 mgRes0
             ];
             glowFramebuffers.forEach(function (g) { allFBOs.push(g); });

@@ -20,6 +20,10 @@
     let animationFrame = null;
     let currentPathIndex = 0;
     let _baseGradientCache = null; // Cached pixel-by-pixel HSL gradient
+    let activePointerId = null;
+    // Shift held mid-drag lifts the pen: nothing is recorded while it's down,
+    // and the next point starts a fresh stroke instead of continuing this one.
+    let pendingGap = false;
 
     function init() {
         loadSettings();
@@ -139,21 +143,19 @@
         // Draw initial color picker
         drawColorPicker();
 
-        // Mouse/touch events for drawing path
-        canvas.addEventListener('mousedown', startDrawing);
-        canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('mouseup', stopDrawing);
-        canvas.addEventListener('mouseleave', stopDrawing);
-        
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startDrawing(e.touches[0]);
-        }, { passive: false });
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            draw(e.touches[0]);
-        }, { passive: false });
-        canvas.addEventListener('touchend', stopDrawing);
+        // Pointer events + capture: the pointer is allowed to wander off the
+        // swatch mid-drag (or off the window entirely) and the stroke survives.
+        // addPointFromEvent clamps, so the path just hugs the edge until it
+        // comes back. The old mouseleave handler ended the stroke right there.
+        canvas.style.touchAction = 'none';
+        if (!canvas.__lsBound) {
+            canvas.__lsBound = true;
+            canvas.addEventListener('pointerdown', startDrawing);
+            canvas.addEventListener('pointermove', draw);
+            canvas.addEventListener('pointerup', stopDrawing);
+            canvas.addEventListener('pointercancel', stopDrawing);
+            canvas.addEventListener('lostpointercapture', stopDrawing);
+        }
     }
 
     function ensureBaseGradientCache() {
@@ -194,6 +196,23 @@
         return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
     }
 
+    // Stroke helper: a Shift-gap starts a new subpath instead of drawing a
+    // line into it. A point stranded between two gaps still gets its round dot.
+    function tracePath() {
+        const path = window.lightShift.colorPath;
+        ctx.beginPath();
+        for (let i = 0; i < path.length; i++) {
+            const p = path[i];
+            if (i === 0 || p.gap) {
+                ctx.moveTo(p.x, p.y);
+                const next = path[i + 1];
+                if (!next || next.gap) ctx.lineTo(p.x, p.y); // lone point → dot
+            } else {
+                ctx.lineTo(p.x, p.y);
+            }
+        }
+    }
+
     function drawColorPicker() {
         if (!ctx) return;
 
@@ -207,6 +226,25 @@
             // Draw path with gradient based on actual colors along the path
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
+
+            // A Shift-gap is a jump, not a stroke — hint it with a faint dashed
+            // tie so the path still reads as one journey.
+            if (window.lightShift.colorPath.some(p => p.gap)) {
+                ctx.save();
+                ctx.setLineDash([3, 4]);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let i = 1; i < window.lightShift.colorPath.length; i++) {
+                    if (!window.lightShift.colorPath[i].gap) continue;
+                    const from = window.lightShift.colorPath[i - 1];
+                    const to = window.lightShift.colorPath[i];
+                    ctx.moveTo(from.x, from.y);
+                    ctx.lineTo(to.x, to.y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
             
             // Draw multiple passes for glow effect
             // Outer glow
@@ -214,14 +252,7 @@
             ctx.shadowBlur = 12;
             ctx.lineWidth = 8;
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.beginPath();
-            window.lightShift.colorPath.forEach((point, i) => {
-                if (i === 0) {
-                    ctx.moveTo(point.x, point.y);
-                } else {
-                    ctx.lineTo(point.x, point.y);
-                }
-            });
+            tracePath();
             ctx.stroke();
             
             // Draw colored segments
@@ -230,6 +261,7 @@
             for (let i = 0; i < window.lightShift.colorPath.length - 1; i++) {
                 const point1 = window.lightShift.colorPath[i];
                 const point2 = window.lightShift.colorPath[i + 1];
+                if (point2.gap) continue; // Shift-gap: nothing drawn across the jump
                 
                 // Create gradient for this segment
                 const gradient = ctx.createLinearGradient(point1.x, point1.y, point2.x, point2.y);
@@ -249,40 +281,19 @@
             ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
             ctx.lineWidth = 2;
-            ctx.beginPath();
-            window.lightShift.colorPath.forEach((point, i) => {
-                if (i === 0) {
-                    ctx.moveTo(point.x, point.y);
-                } else {
-                    ctx.lineTo(point.x, point.y);
-                }
-            });
+            tracePath();
             ctx.stroke();
             ctx.shadowBlur = 0;
 
             // Draw playhead (animated circle following the path)
             if (window.lightShift.colorPath.length > 0) {
-                // Interpolate position and color between path points
-                const index = Math.floor(currentPathIndex) % window.lightShift.colorPath.length;
-                const nextIndex = (index + 1) % window.lightShift.colorPath.length;
-                const t = currentPathIndex - Math.floor(currentPathIndex); // Fractional part
-                
-                const point1 = window.lightShift.colorPath[index];
-                const point2 = window.lightShift.colorPath[nextIndex];
-                
-                // Interpolate position
-                const x = point1.x * (1 - t) + point2.x * t;
-                const y = point1.y * (1 - t) + point2.y * t;
-                
-                // Interpolate color (handle hue wrapping)
-                let hue1 = point1.hue;
-                let hue2 = point2.hue;
-                if (Math.abs(hue2 - hue1) > 180) {
-                    if (hue2 > hue1) hue1 += 360;
-                    else hue2 += 360;
-                }
-                const hue = (hue1 * (1 - t) + hue2 * t) % 360;
-                const saturation = point1.saturation * (1 - t) + point2.saturation * t;
+                // The exact sample the shader gets, so the ring on the swatch
+                // and the color on the canvas can never disagree.
+                const s = sampleAtPlayhead();
+                const x = s.x;
+                const y = s.y;
+                const hue = s.hue;
+                const saturation = s.saturation;
                 
                 // Outer glow ring
                 ctx.shadowColor = `hsla(${hue}, ${saturation}%, 50%, 0.8)`;
@@ -350,21 +361,41 @@
     }
 
     function startDrawing(e) {
+        if (e.button !== undefined && e.button !== 0) return; // primary button only
+        if (e.preventDefault) e.preventDefault();             // no text-select drag
         isDrawing = true;
+        pendingGap = false;
         window.lightShift.colorPath = []; // Start new path
         currentPathIndex = 0;
+        if (e.pointerId !== undefined && canvas.setPointerCapture) {
+            activePointerId = e.pointerId;
+            try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+        }
         addPointFromEvent(e);
+        drawColorPicker();
     }
 
     function draw(e) {
         if (!isDrawing) return;
+        // Easter egg: hold Shift to lift the pen. Nothing is recorded while
+        // it's down, and the first point after it starts a new stroke — the
+        // playhead cuts to that color instead of sweeping across to it.
+        if (e.shiftKey) {
+            if (window.lightShift.colorPath.length > 0) pendingGap = true;
+            return;
+        }
         addPointFromEvent(e);
         drawColorPicker();
     }
 
     function stopDrawing() {
+        if (activePointerId !== null && canvas && canvas.releasePointerCapture) {
+            try { canvas.releasePointerCapture(activePointerId); } catch (_) {}
+            activePointerId = null;
+        }
         if (isDrawing) {
             isDrawing = false;
+            pendingGap = false;
             saveSettings();
         }
     }
@@ -377,9 +408,12 @@
         const x = ((e.clientX || e.pageX) - rect.left) * scaleX;
         const y = ((e.clientY || e.pageY) - rect.top) * scaleY;
 
-        // Clamp to canvas bounds
-        const clampedX = Math.max(0, Math.min(canvasSize, x));
-        const clampedY = Math.max(0, Math.min(canvasSize, y));
+        // Clamp to canvas bounds — this is what lets the path hug the edge
+        // while the pointer is off wandering. The one-pixel inset keeps the
+        // right border on the gradient's last hue (~358°) instead of 360°,
+        // which would snap the color back to red as you slid out.
+        const clampedX = Math.max(0, Math.min(canvasSize - 1, x));
+        const clampedY = Math.max(0, Math.min(canvasSize - 1, y));
 
         // Calculate color from position
         const hue = (clampedX / canvasSize) * 360;
@@ -390,13 +424,13 @@
         const lastPoint = window.lightShift.colorPath[window.lightShift.colorPath.length - 1];
         if (!lastPoint || Math.abs(lastPoint.x - clampedX) > 2 || Math.abs(lastPoint.y - clampedY) > 2) {
             // Store actual pixel coordinates for drawing
-            window.lightShift.colorPath.push({ 
-                x: clampedX, 
-                y: clampedY, 
-                hue, 
-                saturation, 
-                lightness 
-            });
+            const point = { x: clampedX, y: clampedY, hue, saturation, lightness };
+            // gap = "the link INTO this point is a jump, not a stroke"
+            if (pendingGap && lastPoint) {
+                point.gap = true;
+                pendingGap = false;
+            }
+            window.lightShift.colorPath.push(point);
         }
     }
 
@@ -439,52 +473,27 @@
         animate();
     }
 
-    function getCurrentShiftColor() {
-        if (window.lightShift.colorPath.length === 0) {
-            return { r: 1, g: 1, b: 1 }; // White (no shift)
-        }
+    // One sample of the path at the playhead — position AND color, so the
+    // on-canvas playhead and the shader color are always the same reading.
+    function sampleAtPlayhead() {
+        const path = window.lightShift.colorPath;
+        if (path.length === 0) return null;
+        if (path.length === 1) return path[0];
 
-        // If only one point, use it directly (no interpolation needed)
-        if (window.lightShift.colorPath.length === 1) {
-            const point = window.lightShift.colorPath[0];
-            const h = point.hue / 360;
-            const s = (point.saturation / 100) * window.lightShift.saturation;
-            const l = point.lightness / 100;
-            
-            let r, g, b;
-            if (s === 0) {
-                r = g = b = l;
-            } else {
-                const hue2rgb = (p, q, t) => {
-                    if (t < 0) t += 1;
-                    if (t > 1) t -= 1;
-                    if (t < 1/6) return p + (q - p) * 6 * t;
-                    if (t < 1/2) return q;
-                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                    return p;
-                };
-                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                const p = 2 * l - q;
-                r = hue2rgb(p, q, h + 1/3);
-                g = hue2rgb(p, q, h);
-                b = hue2rgb(p, q, h - 1/3);
-            }
-            return { r, g, b };
-        }
+        const index = Math.floor(currentPathIndex) % path.length;
+        const nextIndex = (index + 1) % path.length;
+        const t = currentPathIndex - Math.floor(currentPathIndex); // Fractional part
 
-        // Get current and next point for interpolation
-        const index = Math.floor(currentPathIndex) % window.lightShift.colorPath.length;
-        const nextIndex = (index + 1) % window.lightShift.colorPath.length;
-        const t = currentPathIndex - Math.floor(currentPathIndex); // Fractional part for interpolation (0-1)
+        const point1 = path[index];
+        const point2 = path[nextIndex];
 
-        const point1 = window.lightShift.colorPath[index];
-        const point2 = window.lightShift.colorPath[nextIndex];
+        // A Shift-gap is a cut, not a crossfade: hold point1 for the length of
+        // the gap segment, then land on point2 — the color jumps.
+        if (point2.gap) return point1;
 
-        // Interpolate between the two points
+        // Interpolate colour (handle hue wrapping — shortest way round)
         let hue1 = point1.hue;
         let hue2 = point2.hue;
-        
-        // Handle hue wrapping (shortest path around color wheel)
         if (Math.abs(hue2 - hue1) > 180) {
             if (hue2 > hue1) {
                 hue1 += 360;
@@ -492,37 +501,46 @@
                 hue2 += 360;
             }
         }
-        
-        const hue = (hue1 * (1 - t) + hue2 * t) % 360;
-        const saturation = point1.saturation * (1 - t) + point2.saturation * t;
-        const lightness = point1.lightness * (1 - t) + point2.lightness * t;
 
-        // Convert HSL to RGB with saturation control
+        return {
+            x: point1.x * (1 - t) + point2.x * t,
+            y: point1.y * (1 - t) + point2.y * t,
+            hue: (hue1 * (1 - t) + hue2 * t) % 360,
+            saturation: point1.saturation * (1 - t) + point2.saturation * t,
+            lightness: point1.lightness * (1 - t) + point2.lightness * t
+        };
+    }
+
+    // HSL (path units) → normalized RGB, with the saturation multiplier applied
+    function hslToRgbNorm(hue, saturation, lightness) {
         const h = hue / 360;
-        const s = (saturation / 100) * window.lightShift.saturation; // Apply saturation multiplier
+        const s = (saturation / 100) * window.lightShift.saturation;
         const l = lightness / 100;
 
-        let r, g, b;
-        if (s === 0) {
-            r = g = b = l;
-        } else {
-            const hue2rgb = (p, q, t) => {
-                if (t < 0) t += 1;
-                if (t > 1) t -= 1;
-                if (t < 1/6) return p + (q - p) * 6 * t;
-                if (t < 1/2) return q;
-                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                return p;
-            };
+        if (s === 0) return { r: l, g: l, b: l };
 
-            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-            const p = 2 * l - q;
-            r = hue2rgb(p, q, h + 1/3);
-            g = hue2rgb(p, q, h);
-            b = hue2rgb(p, q, h - 1/3);
-        }
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
 
-        return { r, g, b };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        return {
+            r: hue2rgb(p, q, h + 1/3),
+            g: hue2rgb(p, q, h),
+            b: hue2rgb(p, q, h - 1/3)
+        };
+    }
+
+    function getCurrentShiftColor() {
+        const sample = sampleAtPlayhead();
+        if (!sample) return { r: 1, g: 1, b: 1 }; // White (no shift)
+        return hslToRgbNorm(sample.hue, sample.saturation, sample.lightness);
     }
 
     // Expose function for shader to get current color

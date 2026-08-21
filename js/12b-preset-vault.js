@@ -11,8 +11,8 @@
  * Web build (no filesystem): PresetVault.available === false and every op is a
  * no-op; presets stay in localStorage and durability is via Export/Import.
  *
- * Layout (default Documents/A Small Good Thing/Presets — legacy
- * Documents/Fluid Simulation/Presets grandfathered — configurable):
+ * Layout (default Documents/Swirl Together/Presets — legacy titles
+ * grandfathered — configurable):
  *   <vault>/<name>.fluidpreset            ← live presets, one file each
  *   <vault>/.history/<name>/<ts>.fluidpreset  ← prior versions on overwrite
  *   <vault>/.trash/<name>-<ts>.fluidpreset    ← deleted presets (recoverable)
@@ -162,14 +162,26 @@
         remote = require('@electron/remote');
         var configured = null;
         try { configured = window.settingsManager && window.settingsManager.get('presetVault.path'); } catch (_) {}
-        // Rebrand 2026-08-06: default vault moved to the new title. Pre-release
-        // installs (dev machines) may already have the old folder — keep using
-        // it rather than silently splitting presets across two vaults.
+        // Renamed twice: Fluid Simulation → A Small Good Thing (2026-08-06) →
+        // Swirl Together (2026-08-20). Pre-release installs may hold presets
+        // under either former title, so the older folders stay adoptable rather
+        // than silently splitting a dev machine's presets across three vaults.
+        // An existing folder wins; the current title is only created when none
+        // is there. Order matters — most recent legacy name first.
+        // NOTE for the next rename: these two strings are HISTORY, not the app
+        // name. A find-and-replace over the title will corrupt them.
         var _docs = remote.app.getPath('documents');
-        var _newDefault = path.join(_docs, 'A Small Good Thing', 'Presets');
-        var _oldDefault = path.join(_docs, 'Fluid Simulation', 'Presets');
-        vaultDir = configured ||
-            (!fs.existsSync(_newDefault) && fs.existsSync(_oldDefault) ? _oldDefault : _newDefault);
+        var _newDefault = path.join(_docs, 'Swirl Together', 'Presets');
+        var _legacy = [
+            path.join(_docs, 'A Small Good Thing', 'Presets'),
+            path.join(_docs, 'Fluid Simulation', 'Presets')
+        ];
+        vaultDir = configured || _newDefault;
+        if (!configured && !fs.existsSync(_newDefault)) {
+            for (var _li = 0; _li < _legacy.length; _li++) {
+                if (fs.existsSync(_legacy[_li])) { vaultDir = _legacy[_li]; break; }
+            }
+        }
         vfs = createVaultFS(fs, path, vaultDir);
         vfs.ensure();
     } catch (e) {

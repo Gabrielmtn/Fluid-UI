@@ -99,17 +99,22 @@
             // splat so consecutive stamps get distinct notch patterns.
             if (brushTip >= 1 && brushTip <= 3) {
                 // Blob/chisel/streak tips reuse the clay stamp machinery:
-                // shape from the tip, grain/blend from the Texture slider.
+                // shape from the tip, roughness from the Texture slider.
                 const tex = (typeof config.BRUSH_TIP_TEXTURE === 'number') ? config.BRUSH_TIP_TEXTURE : 0.7;
                 gl.uniform1f(splatProg.uniforms.stampNoise, Math.max(0, Math.min(1, tex)));
                 gl.uniform1i(splatProg.uniforms.stampShape, brushTip - 1);
+                // The tip's footprint is absolute: Texture roughens it, it never
+                // fades it back to the gaussian circle (splatFrag stampTipOn).
+                gl.uniform1f(splatProg.uniforms.stampTipOn, 1);
             } else {
                 gl.uniform1f(splatProg.uniforms.stampNoise, config.STAMP_NOISE || 0);
                 gl.uniform1i(splatProg.uniforms.stampShape, config.STAMP_SHAPE || 0);
+                gl.uniform1f(splatProg.uniforms.stampTipOn, 0); // material clay stamp: legacy blend
             }
             gl.uniform2f(splatProg.uniforms.stampSeed, Math.random() * 19.7, Math.random() * 23.3);
             // Brush rotation: degrees → radians for chisel/streak stamps (inert on
-            // round shapes and when stampNoise is 0, so it never fights other splats).
+            // round shapes, and on the material clay stamp when stampNoise is 0,
+            // so it never fights other splats).
             gl.uniform1f(splatProg.uniforms.stampAngle, (config.BRUSH_ANGLE || 0) * Math.PI / 180);
             gl.uniform1f(splatProg.uniforms.ringRadius, 0); // classic blob — never inherit a stale ring stamp
             gl.uniform1f(splatProg.uniforms.barHalfW, 0);   // ...or a stale bar stamp
@@ -233,6 +238,7 @@
                 1.0 / Math.max(1, config.VELOCITY_REFERENCE_RESOLUTION || 512));
             gl.uniform1f(splatProg.uniforms.stampNoise, 0);
             gl.uniform1i(splatProg.uniforms.stampShape, 0);
+            gl.uniform1f(splatProg.uniforms.stampTipOn, 0); // no brush-tip footprint on the band
             gl.uniform1f(splatProg.uniforms.stampAngle, 0);
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
             const _ringObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
@@ -671,6 +677,48 @@
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, source);
             blit(glow.fbo);
+            // ── Scatter (volumetric light shafts) ──
+            // Runs HERE, wedged between the prefilter and the blur chain,
+            // because right now `glow` holds the soft-knee-thresholded
+            // overbright frame — precisely "where the canvas is emitting
+            // light" — and the chain is about to consume it. Marching this
+            // instead of the finished halo keeps the shafts crisp, and the
+            // emitter costs nothing extra.
+            // Safe to interleave: blend is off, and the chain re-binds its
+            // own program, viewport and texel size on every iteration below.
+            if (scatter && config.SCATTER && window.__scatterOrigin) {
+                const _so = window.__scatterOrigin;
+                scatterProg.bind();
+                gl.uniform1i(scatterProg.uniforms.uTexture, 0);
+                gl.uniform2f(scatterProg.uniforms.origin, _so.x, _so.y);
+                gl.uniform2f(scatterProg.uniforms.aspect,
+                    canvas.width / Math.max(1, canvas.height), 1.0);
+                gl.uniform1f(scatterProg.uniforms.density,
+                    (config.SCATTER_DENSITY != null) ? config.SCATTER_DENSITY : 0.6);
+                gl.uniform1f(scatterProg.uniforms.decay,
+                    (config.SCATTER_DECAY != null) ? config.SCATTER_DECAY : 0.94);
+                gl.uniform1f(scatterProg.uniforms.weight,
+                    (config.SCATTER_AMOUNT != null) ? config.SCATTER_AMOUNT : 0.7);
+                gl.uniform1f(scatterProg.uniforms.dispersion,
+                    (config.SCATTER_DISPERSION != null) ? config.SCATTER_DISPERSION : 0.03);
+                // Colliders block light (Scatter panel toggle). The whole glow
+                // chain only ever uses unit 0, so unit 1 is free here.
+                // `obstacle` swaps with obstacleScratch on every GPU composite,
+                // so read the live binding each frame \u2014 never cache the texture.
+                const _occlude = !!config.SCATTER_BLOCK
+                    && !!(window.collisionLayers && window.collisionLayers.enabled) && !!obstacle;
+                gl.uniform1i(scatterProg.uniforms.hasObstacle, _occlude ? 1 : 0);
+                gl.uniform1f(scatterProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                gl.uniform1f(scatterProg.uniforms.blockStrength,
+                    (config.SCATTER_BLOCK_STRENGTH != null) ? config.SCATTER_BLOCK_STRENGTH : 1.0);
+                gl.uniform1i(scatterProg.uniforms.uObstacle, 1);
+                gl.viewport(0, 0, scatter.width, scatter.height);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, _occlude ? obstacle.texture : null);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, glow.texture);
+                blit(scatter.fbo);
+            }
             // Downsample chain
             glowBlurProg.bind();
             gl.uniform1i(glowBlurProg.uniforms.uTexture, 0);
@@ -709,3 +757,111 @@
             gl.bindTexture(gl.TEXTURE_2D, last.texture);
             blit(glow.fbo);
         }
+        // PhotoSafe (photosensitivity protection): runs INSTEAD of the direct
+        // present when config.PHOTOSAFE is on. The display pass has already
+        // rendered this frame into safeFrame (05j reroutes its blit target);
+        // this measures it, updates the limiter state, applies the exposure
+        // correction + history blend, and presents the result.
+        //
+        //   safeFrame -> safeLuma.write (16x16 block luminance/redness)
+        //   luma cur+prev + stats.read -> safeStats.write (envelope/slew state)
+        //   safeFrame + safeOut.read (history) + fresh stats -> safeOut.write
+        //   safeOut.write --blitFramebuffer--> canvas; swap all three pairs
+        //
+        // dt is WALL-CLOCK and self-measured: flash physics runs in viewer
+        // time, so it must ignore timeScale, sub-stepping and the fps cap's
+        // sim pacing. NOT governor-sheddable — never consults fxOn().
+        let _psLastNow = 0;
+        function applyPhotoSafe() {
+            if (!safeFrame || !safeOut || !safeLuma || !safeStats) return;
+            const nowS = performance.now() / 1000;
+            let dt = nowS - _psLastNow;
+            _psLastNow = nowS;
+            if (!(dt > 0.0005) || dt > 0.1) dt = 0.0167; // first frame / tab-hidden spike
+            // Harness hook (console-tunable, undefined in production): the
+            // deterministic test suite drives update() synchronously, where
+            // wall-clock dt is dominated by readback stalls — pin dt so the
+            // limiter's windows behave as they would at real frame cadence.
+            if (typeof config.PHOTOSAFE_DT_OVERRIDE === 'number') dt = config.PHOTOSAFE_DT_OVERRIDE;
+            gl.disable(gl.BLEND);
+            // 1. block luminance + redness grid
+            photoSafeLumaProg.bind();
+            gl.uniform1i(photoSafeLumaProg.uniforms.uTexture, 0);
+            gl.viewport(0, 0, 16, 16);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, safeFrame.texture);
+            blit(safeLuma.write.fbo);
+            // 2. limiter state
+            photoSafeStatsProg.bind();
+            gl.uniform1i(photoSafeStatsProg.uniforms.uLumaCur, 0);
+            gl.uniform1i(photoSafeStatsProg.uniforms.uLumaPrev, 1);
+            gl.uniform1i(photoSafeStatsProg.uniforms.uStatsPrev, 2);
+            gl.uniform1f(photoSafeStatsProg.uniforms.dt, dt);
+            gl.uniform1f(photoSafeStatsProg.uniforms.slew,
+                (config.PHOTOSAFE_SLEW != null) ? config.PHOTOSAFE_SLEW : 0.5);
+            gl.uniform1f(photoSafeStatsProg.uniforms.flashDelta,
+                (config.PHOTOSAFE_FLASH_DELTA != null) ? config.PHOTOSAFE_FLASH_DELTA : 0.10);
+            gl.uniform1f(photoSafeStatsProg.uniforms.darkFloor,
+                (config.PHOTOSAFE_DARK_FLOOR != null) ? config.PHOTOSAFE_DARK_FLOOR : 0.80);
+            gl.uniform1f(photoSafeStatsProg.uniforms.redDelta,
+                (config.PHOTOSAFE_RED_DELTA != null) ? config.PHOTOSAFE_RED_DELTA : 0.20);
+            gl.uniform1f(photoSafeStatsProg.uniforms.areaFrac,
+                (config.PHOTOSAFE_AREA != null) ? config.PHOTOSAFE_AREA : 0.10);
+            gl.uniform1f(photoSafeStatsProg.uniforms.releaseTau,
+                (config.PHOTOSAFE_RELEASE != null) ? config.PHOTOSAFE_RELEASE : 1.2);
+            gl.uniform1f(photoSafeStatsProg.uniforms.pairWindow,
+                (config.PHOTOSAFE_PAIR_WINDOW != null) ? config.PHOTOSAFE_PAIR_WINDOW : 0.35);
+            gl.uniform1f(photoSafeStatsProg.uniforms.rateAllow,
+                (config.PHOTOSAFE_RATE != null) ? config.PHOTOSAFE_RATE : 5.0);
+            gl.viewport(0, 0, 2, 1);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, safeLuma.write.texture);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, safeLuma.read.texture);
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, safeStats.read.texture);
+            blit(safeStats.write.fbo);
+            // 3. composite: exposure correction + history blend
+            photoSafeCompositeProg.bind();
+            gl.uniform1i(photoSafeCompositeProg.uniforms.uCur, 0);
+            gl.uniform1i(photoSafeCompositeProg.uniforms.uHist, 1);
+            gl.uniform1i(photoSafeCompositeProg.uniforms.uStats, 2);
+            gl.uniform1f(photoSafeCompositeProg.uniforms.dt, dt);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, safeFrame.texture);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, safeOut.read.texture);
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, safeStats.write.texture);
+            blit(safeOut.write.fbo);
+            // 4. present + rotate history
+            gl.bindFramebuffer(gl.READ_FRAMEBUFFER, safeOut.write.fbo);
+            gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+            gl.blitFramebuffer(0, 0, safeOut.write.width, safeOut.write.height,
+                               0, 0, canvas.width, canvas.height,
+                               gl.COLOR_BUFFER_BIT, gl.NEAREST);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            safeLuma.swap();
+            safeStats.swap();
+            safeOut.swap();
+        }
+        // Clear the limiter's state buffers. Called on the OFF->ON edge (05j):
+        // resuming with stale history/stats would flash-correct against a
+        // scene from minutes ago (exposure dip + a ghost of an old frame).
+        // The stats shader's init sentinel (st.b < 8) then re-seeds cleanly.
+        function resetPhotoSafeState() {
+            if (!safeOut || !safeLuma || !safeStats) return;
+            gl.clearColor(0, 0, 0, 0);
+            [safeLuma.read, safeLuma.write, safeStats.read, safeStats.write,
+             safeOut.read, safeOut.write].forEach(function (f) {
+                if (f && f.fbo) { gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo); gl.clear(gl.COLOR_BUFFER_BIT); }
+            });
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        }
+        // PhotoSafe buffers are only allocated while protection is on at init
+        // time (05c) — flipping the toggle on later must build them. The full
+        // initFramebuffers preserves the artwork, so this is safe mid-session.
+        window.__photoSafeEnsure = function () {
+            if (!safeFrame && typeof initFramebuffers === 'function') initFramebuffers();
+        };

@@ -224,7 +224,7 @@
                     'font:14px/1.6 "Segoe UI",sans-serif;padding:40px';
 
                 _noGl.innerHTML = '<div style="font-size:40px;margin-bottom:12px">🎨</div>' +
-                    '<div style="font-size:20px;font-weight:600;margin-bottom:10px">This GPU can&#39;t run A Small Good Thing</div>' +
+                    '<div style="font-size:20px;font-weight:600;margin-bottom:10px">This GPU can&#39;t run Swirl Together</div>' +
                     '<div style="max-width:520px;opacity:.8">WebGL2 is unavailable &mdash; usually an outdated or broken ' +
                     'graphics driver, or a virtual machine without GPU acceleration.<br><br>' +
                     'Try updating your GPU drivers, then relaunch.</div>';
@@ -285,7 +285,7 @@
                 // change re-warns.
                 try {
                     if (localStorage.getItem('fluidIgpuBannerDismissed') !== _renderer) {
-                        var _appName = window.IS_ELECTRON ? 'A Small Good Thing' : 'this browser';
+                        var _appName = window.IS_ELECTRON ? 'Swirl Together' : 'this browser';
                         var _banner = document.createElement('div');
                         _banner.style.cssText = 'position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:2147483645;' +
                             'max-width:560px;background:#2b2311;color:#f0d47a;border:1px solid #b8860b88;border-radius:8px;' +
@@ -741,7 +741,10 @@
             BRUSH_TIP: 0,             // D1 brush tip on USER strokes (fluid dye only; velocity
                                       // stays gaussian, programmatic splats unaffected):
                                       // 0 = gaussian, 1 = blob, 2 = chisel, 3 = streak, 4 = ring
-            BRUSH_TIP_TEXTURE: 0.7,   // Stamp grain/blend for blob/chisel/streak tips
+            BRUSH_TIP_TEXTURE: 0.7,   // Stamp ROUGHNESS (rim jitter + surface grain + edge
+                                      // softness) for blob/chisel/streak tips and custom
+                                      // shapes. The tip's footprint is absolute — 0 is a
+                                      // hard-edged chisel, not a gaussian circle.
                                       // (splatFrag stampNoise; ring ignores it)
             BRUSH_ANGLE: 0,           // D1 brush rotation in degrees (0-360). Rotates the
                                       // asymmetric stamp shapes (chisel/streak) in the splat
@@ -814,7 +817,125 @@
 
             GLOW_RESOLUTION: 256,     // Glow chain base resolution (long side)
 
-            GLOW_ITERATIONS: 8        // Max mip-chain depth (halvings from base res)
+            GLOW_ITERATIONS: 8,       // Max mip-chain depth (halvings from base res)
+
+            // ── Scatter (volumetric light shafts) ── a CHILD of Glow: it
+            // marches Glow's own prefiltered overbright buffer toward a light
+            // origin, so it costs one extra 256-base pass and does nothing
+            // while Glow is off. Purely additive — unlike the old Sunrays
+            // pass it removed (7246d7d), it can never darken the frame.
+            // Every numeric below MUST be seeded: bd7e62f blacked out the
+            // whole canvas when an unseeded weight reached the shader as NaN.
+
+            SCATTER: false,           // Volumetric light shafts enabled (toggled under Glow)
+
+            SCATTER_AMOUNT: 0.5,      // Shaft gain actually uploaded to the shader.
+                                      // The UI slider is 0..1 and is SQUARED into this
+                                      // (0..2), so slider 0.50 == this 0.5. Keep the two
+                                      // defaults consistent or a fresh load renders at a
+                                      // different strength than the slider reads.
+
+            SCATTER_SOURCE: 'light',  // Ray origin: 'light' (Light Source dot) | 'brush' (cursor)
+
+            SCATTER_DENSITY: 1.0,     // "Reach" slider. Fraction of each pixel's path to the
+                                      // origin that it gathers light along. A pixel only
+                                      // lights up if an emitter falls inside that span, so
+                                      // this is what decides how far from the source a shaft
+                                      // can still reach — at 0.6 rays visibly died before the
+                                      // canvas edge. It also brightens the far field: a longer
+                                      // span means the same emitter sits at a LOWER iteration
+                                      // index, so less decay has accumulated by the time it
+                                      // is sampled. 1.0 marches the whole way to the origin.
+
+            SCATTER_DECAY: 0.94,      // Per-step falloff (console-tunable) — shaft length
+
+            SCATTER_DISPERSION: 0.03, // Per-channel decay spread (console-tunable). THE
+                                      // knob that makes this read as scattering rather
+                                      // than a radial blur: long wavelengths survive more
+                                      // scattering events, so red carries furthest down
+                                      // the shaft and blue drops out first.
+
+            SCATTER_FOLLOW: 0.15,     // Origin lerp per frame (console-tunable). Without it
+                                      // the shafts snap when the origin jumps.
+
+            SCATTER_BLOCK: true,      // Colliders cast shadows in the light shafts.
+                                      // No-op unless BOTH Scatter and a collision layer
+                                      // exist, so ON by default is free where it does
+                                      // not apply and correct where it does.
+
+            SCATTER_BLOCK_STRENGTH: 1.0, // How opaque a collider is TO LIGHT (console-
+                                      // tunable). 1 = full shadow. Deliberately separate
+                                      // from the per-layer Strength slider, which is
+                                      // permeability to FLUID \u2014 a fence blocks light
+                                      // without blocking much air.
+
+            // ── PhotoSafe (photosensitivity protection) ─────────────────────
+            // Display-stage limiter encoding WCAG 2.3.1 / ISO 9241-391: the
+            // dangerous stimulus is >3 flashes/sec, flash = an opposing pair of
+            // luminance transitions ≥10% of max with the darker state <0.80,
+            // over a meaningful screen area (plus a stricter saturated-red
+            // rule). Two mechanisms: (1) a global luminance slew clamp — a
+            // slew-limited signal at frequency f has peak-to-peak amplitude
+            // ≤ SLEW/(2f), so SLEW=0.5 makes a ≥10% pair at ≥3 Hz
+            // arithmetically impossible at the frame level; (2) block-level
+            // flash detection that engages a temporal smoother (flashes become
+            // fade-in/fade-outs) and disengages to EXACT pass-through when
+            // idle. Default ON; the first-frame warning modal and the Display
+            // checkbox both write the 'fluidui.photoSafe' localStorage key.
+            // Deliberately NOT a ParamRegistry-persisted checkbox: safety
+            // preferences must never ride presets or multiplayer look mirrors.
+
+            PHOTOSAFE: (function () {
+                // Absent → protected. Only an explicit '0' disables.
+                try { return localStorage.getItem('fluidui.photoSafe') !== '0'; }
+                catch (e) { return true; }
+            })(),
+
+            PHOTOSAFE_SLEW: 0.5,        // Max global mean-luminance change per second.
+                                        // 0.5/(2·3Hz)=0.083 < the 0.10 flash threshold.
+
+            PHOTOSAFE_FLASH_DELTA: 0.10,// Per-block luminance delta that counts as a
+                                        // flash transition (fraction of max, WCAG 10%)
+
+            PHOTOSAFE_DARK_FLOOR: 0.80, // WCAG: only pairs whose darker state is below
+                                        // 0.80 relative luminance count as flashes
+
+            PHOTOSAFE_RED_DELTA: 0.20,  // Saturated-red transition threshold (stricter
+                                        // rule: red flashes are dangerous at lower deltas)
+
+            PHOTOSAFE_AREA: 0.02,       // Fraction of 16x16 blocks that must flash to
+                                        // engage (~5 blocks). WCAG's area is 25% of a
+                                        // 10-degree field — at desktop viewing that is
+                                        // only ~2% of a fullscreen canvas, so 0.10 was
+                                        // ~8x too lenient (review 2026-08-21).
+
+            PHOTOSAFE_SMOOTH: 0.03,     // Per-frame history blend at FULL suppression.
+                                        // First-order low-pass, fc≈0.29 Hz at 60fps →
+                                        // 3 Hz attenuated to ≈0.097: even a full-scale
+                                        // strobe lands under the 0.10 threshold.
+
+            PHOTOSAFE_RELEASE: 1.2,     // Suppression envelope decay time constant (s)
+
+            PHOTOSAFE_PAIR_WINDOW: 0.18,// An opposing transition within this window (s)
+                                        // completes a "flash pair" → hard engage.
+                                        // 0.18s = half-period of ~2.8 Hz: pairs slower
+                                        // than the 3-flashes/sec danger line (which the
+                                        // standard PERMITS — e.g. 2.5 Hz music pulses)
+                                        // only get the soft attack, not the hard latch.
+
+            PHOTOSAFE_RATE: 5.0,        // Opposing transitions/sec permitted before the
+                                        // history blend engages, ramping to full over the
+                                        // next 4/s. A square-wave flash is TWO transitions,
+                                        // so 6/s is exactly WCAG's 3-flashes-sec line; 5
+                                        // engages just under it. Rate — not per-frame
+                                        // deviation — is what separates a strobe from
+                                        // painting: monotonic change contributes one
+                                        // transition, only real flicker sustains a rate.
+
+            PHOTOSAFE_SPIN_CAP: 90      // Max kaleido spin under protection (deg/s) —
+                                        // the "extreme camera shake" clamp; motion, not
+                                        // luminance, so handled at the animator not the
+                                        // display limiter
 
         };
 

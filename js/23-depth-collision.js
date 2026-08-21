@@ -286,6 +286,30 @@ class DepthEstimator {
         // Recomposite all collision layers into the obstacle texture
         updateObstacleFromLayers: updateObstacleFromLayers,
 
+        // ── Multiplayer (06) ──────────────────────────────────────────
+        // Build a wall straight from a coverage map. This is the receiving
+        // end of a peer's collider: they send the coverage bitmap, we
+        // rasterize it into an obstacle of our own. Physics never resolves
+        // finer than the sim grid, so a peer's map arrives downsampled and
+        // still produces the same wall.
+        addFromDepth: function (depth, opts) {
+            if (!depth || !depth.data || !depth.width || !depth.height) return null;
+            return addCollisionLayer(depth, null, (opts && opts.name) || 'Collision', opts || {});
+        },
+        // The coverage map behind an existing collider, for publishing it.
+        // Source-bound (live sketch/Mask) colliders keep only a preview
+        // snapshot here — their real coverage lives on the GPU — so callers
+        // get what the CPU side holds and nothing more.
+        depthOf: function (layerIndex) {
+            if (!window.layers) return null;
+            var l = window.layers.find(function (x) { return x.index === layerIndex; });
+            if (!l || !l.mask || !Array.isArray(l.mask.shapes)) return null;
+            var s = l.mask.shapes.find(function (x) { return x.type === 'depth-mask'; });
+            if (!s || !s.depthData || !s.depthWidth || !s.depthHeight) return null;
+            return { data: s.depthData, width: s.depthWidth, height: s.depthHeight,
+                     threshold: s.threshold, invert: !!s.invert };
+        },
+
         // Install/remove a procedural obstacle source (draw(ctx, simW, simH)).
         // Pass null to remove; collision auto-disables if no layer obstacles
         // remain either.
@@ -745,7 +769,36 @@ class DepthEstimator {
 
         console.log('🧱 Collision layer added:', name, 'index:', newIndex);
         if (typeof opts.onCreated === 'function') opts.onCreated(newIndex, layer);
+        publishToRoom(newIndex);
         return newIndex;
+    }
+
+    // ── Multiplayer publish hooks ────────────────────────────────────────
+    // A wall changes the SIMULATION, not just the picture, so a peer who
+    // cannot see it runs different physics from this point on. 06 decides
+    // whether there is anyone to tell (and ignores walls that arrived from
+    // a peer in the first place, so a room cannot echo one back and forth).
+    function publishToRoom(layerIndex) {
+        try {
+            if (typeof window.publishCollider === 'function') window.publishCollider(layerIndex);
+        } catch (_) {}
+    }
+
+    // Any change that recomposites the obstacle is a change worth sharing:
+    // Strength / Threshold / Invert, a transform, a re-edited mask. Coalesced
+    // because a slider drag calls this per frame, and 06 additionally drops
+    // resends whose content hash is unchanged.
+    var _pubTimer = null;
+    function schedulePublishAll() {
+        if (typeof window.publishCollider !== 'function') return;
+        if (_pubTimer) return;
+        _pubTimer = setTimeout(function () {
+            _pubTimer = null;
+            if (!window.layers) return;
+            window.layers.forEach(function (l) {
+                if (l && l.isCollision && !l.__peerOwner) publishToRoom(l.index);
+            });
+        }, 400);
     }
 
     // Update depth mask data for an existing layer
@@ -1145,6 +1198,10 @@ class DepthEstimator {
 
     // Throttled entry point — coalesces multiple calls into one rAF
     function updateObstacleFromLayers() {
+        // Whatever moved the obstacle here also moved it away from what peers
+        // are simulating. Coalesced and content-hashed downstream, so a slider
+        // drag costs one transfer at the end rather than one per frame.
+        schedulePublishAll();
         if (_obsDirty) return; // already scheduled
         _obsDirty = true;
         _obsRafId = requestAnimationFrame(_doUpdateObstacle);
@@ -1540,8 +1597,22 @@ class DepthEstimator {
                 setSketchLive(false);
                 _sketchColliderIndex = null;
             }
+            // Tell the room BEFORE the layer goes, while we can still see
+            // that it was a collider at all.
+            var wasCollider = false;
+            try {
+                var l = window.layers && window.layers.find(function (x) { return x.index === index; });
+                wasCollider = !!(l && l.isCollision);
+            } catch (_) {}
             origDeleteLayer(index);
             updateObstacleFromLayers();
+            if (wasCollider) {
+                try {
+                    if (typeof window.broadcastColliderRemove === 'function') {
+                        window.broadcastColliderRemove(index);
+                    }
+                } catch (_) {}
+            }
         };
     })();
 

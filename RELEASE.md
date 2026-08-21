@@ -1,6 +1,6 @@
 # Release & Distribution
 
-A Small Good Thing ships in three forms, all from one codebase:
+Swirl Together ships in three forms, all from one codebase:
 
 | Target | What it is | How it's published |
 |---|---|---|
@@ -19,7 +19,7 @@ npm run dist:win
 ```
 
 Produces, in `dist/` (gitignored):
-- **`dist/win-unpacked/`** — the unpacked app (asar disabled — SteamPipe's 1 MB-chunk delta patching needs loose files; one edited JS inside an asar would force a full redownload). **This is the folder both itch and Steam upload.** Its launch exe is `A Small Good Thing.exe`.
+- **`dist/win-unpacked/`** — the unpacked app (asar disabled — SteamPipe's 1 MB-chunk delta patching needs loose files; one edited JS inside an asar would force a full redownload). **This is the folder both itch and Steam upload.** Its launch exe is `Swirl Together.exe`.
 
 The `portable` target was dropped for Steam prep (self-extracting exes unpack to `%TEMP%`, which AV heuristics flag, and Steam never uses them). For a one-off portable build: `npx electron-builder --win portable`.
 
@@ -48,7 +48,7 @@ butler uploads only changed bytes; the itch app auto-updates players on the `win
 **One-time setup**
 1. Register the app in Steamworks (requires the Steam Direct fee). Steam assigns an **App ID** and a **Depot ID**.
 2. Replace `YOUR_STEAM_APP_ID` / `YOUR_STEAM_DEPOT_ID` in `steam/app_build.vdf` and `steam/depot_build.vdf`.
-3. In the Steamworks dashboard, set the app's **launch executable** to `A Small Good Thing.exe`.
+3. In the Steamworks dashboard, set the app's **launch executable** to `Swirl Together.exe`.
 4. Install **steamcmd** and set the `publish:steam` script's `YOUR_STEAM_BUILDER` to your builder login.
 
 **Each release**

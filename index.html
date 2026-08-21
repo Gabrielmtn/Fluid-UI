@@ -6,7 +6,7 @@
     <!-- Dark UA chrome: native select popups, scrollbars, form controls.
          Without this Chromium frames dropdown option lists in light-theme white. -->
     <meta name="color-scheme" content="dark">
-    <title>A Small Good Thing</title>
+    <title>Swirl Together</title>
     <link rel="icon" type="image/png" href="assets/icon.png">
     <script>
     // Boot-time globals + global error surface. Runs before every other script
@@ -140,9 +140,186 @@
     <link rel="stylesheet" href="css/init-responsive.css">
 </head>
 <body>
+    <!-- Photosensitivity warning: static markup + synchronous inline script so
+         it exists in the FIRST painted frame, before any app script loads.
+         Communicates only through localStorage ('fluidui.photoWarn.ack.v1',
+         'fluidui.photoSafe'); 04a seeds config.PHOTOSAFE from the same key. -->
+    <style>
+      /* Inline so the modal renders even if stylesheet loading is slow; scoped
+         under #photoWarn so nothing leaks into app CSS. */
+      #photoWarn {
+        position: fixed; inset: 0; z-index: 2147483000;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(6, 8, 12, 0.96);
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        color: #e8ecf2;
+      }
+      #photoWarn[hidden] { display: none; }
+      #photoWarn .pw-card {
+        max-width: 430px; max-height: 92vh; overflow-y: auto; margin: 16px; padding: 26px 28px 22px;
+        background: #12161d; border: 1px solid rgba(140, 170, 220, 0.25);
+        border-radius: 10px; box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+      }
+      #photoWarn h1 {
+        margin: 0 0 10px; font-size: 15px; letter-spacing: 0.08em;
+        color: #ffd76a; display: flex; align-items: center; gap: 8px;
+      }
+      #photoWarn p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; color: #c8d0dc; }
+      #photoWarn .pw-check {
+        display: flex; gap: 10px; align-items: flex-start;
+        margin: 14px 0; padding: 10px 12px;
+        background: rgba(100, 150, 255, 0.06);
+        border-left: 2px solid rgba(100, 150, 255, 0.35); border-radius: 4px;
+        cursor: pointer; user-select: none;
+      }
+      #photoWarn .pw-check input { width: 17px; height: 17px; margin-top: 1px; flex: none; cursor: pointer; }
+      #photoWarn .pw-check b { display: block; font-size: 13px; color: #e8ecf2; margin-bottom: 3px; }
+      #photoWarn .pw-check span { font-size: 12px; line-height: 1.4; color: #9aa6b6; }
+      #photoWarn .pw-exit-line { font-size: 12.5px; color: #d9a2a2; }
+      #photoWarn .pw-unprotected { display: none; font-size: 12.5px; color: #ffd76a; margin: 0 0 10px; }
+      #photoWarn.pw-off .pw-unprotected { display: block; }
+      #photoWarn .pw-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+      #photoWarn button {
+        padding: 9px 16px; font-size: 13px; border-radius: 6px; cursor: pointer;
+        border: 1px solid rgba(140, 170, 220, 0.3); background: #1a2029; color: #c8d0dc;
+      }
+      #photoWarn #pwContinue {
+        background: #2c66c9; border-color: #2c66c9; color: #fff; font-weight: 600;
+      }
+      /* Unchecked → caution yellow (not red), per spec */
+      #photoWarn.pw-off #pwContinue {
+        background: #d9a521; border-color: #d9a521; color: #14161a;
+      }
+      #photoWarn button:focus-visible { outline: 2px solid #8ab4ff; outline-offset: 2px; }
+    </style>
+    <div id="photoWarn" role="dialog" aria-modal="true" aria-labelledby="pwTitle" aria-describedby="pwDesc">
+      <div class="pw-card">
+        <h1 id="pwTitle">⚠ PHOTOSENSITIVE SEIZURE WARNING</h1>
+        <p id="pwDesc">This app can produce intense flashing lights and rapidly shifting colors.
+           For your safety, protective visual clamps are turned <b>ON</b> by default.</p>
+        <label class="pw-check">
+          <input type="checkbox" id="pwProtect" checked autocomplete="off">
+          <span><b>Protect with Visual Clamps</b>
+          <span>Eases intense lighting and limits strobe frequencies: rapid flashes of
+          paint or light become smooth fade-ins/fade-outs, and the rate of luminance
+          shift is globally clamped. Changing this checkbox updates your preference in
+          Display settings.</span></span>
+        </label>
+        <p class="pw-unprotected" aria-live="polite">Protection off: flashing will <b>not</b> be limited.</p>
+        <p class="pw-exit-line">If you have photosensitive epilepsy, please exit now.</p>
+        <div class="pw-buttons">
+          <button id="pwExit" type="button">Exit App</button>
+          <button id="pwContinue" type="button" autofocus>Continue with Safety Caps</button>
+        </div>
+      </div>
+    </div>
+    <script>
+    /* Synchronous on purpose: decides visibility BEFORE first paint and wires the
+       buttons long before the deferred app chain loads. No app globals exist yet —
+       communicate through localStorage only. */
+    (function () {
+      'use strict';
+      var KEY_ACK = 'fluidui.photoWarn.ack.v1';
+      var KEY_PROTECT = 'fluidui.photoSafe'; /* '1' | '0'; absent = protected */
+      var modal = document.getElementById('photoWarn');
+      var box = document.getElementById('pwProtect');
+      var cont = document.getElementById('pwContinue');
+      var exitB = document.getElementById('pwExit');
+      var stored = null, acked = false;
+      try { stored = localStorage.getItem(KEY_PROTECT); acked = localStorage.getItem(KEY_ACK) === '1'; } catch (e) {}
+      if (acked) { modal.hidden = true; return; }
+      box.checked = stored !== '0';
+      function sync() {
+        modal.classList.toggle('pw-off', !box.checked);
+        cont.textContent = box.checked ? 'Continue with Safety Caps' : 'I Understand the Risk';
+      }
+      /* Fail-safe against synthetic input: consent-banner auto-decliners and
+         other page automation pattern-match this dialog (checkbox + primary
+         button) and will uncheck-then-confirm it. Visuals follow the checkbox
+         either way, but the PERSISTED choice honors only trusted (human)
+         events — synthetic manipulation always lands on the protected side. */
+      /* A previously stored value WAS a trusted choice — honor it as the
+         baseline so Continue without touching the box keeps the user's prior
+         decision instead of silently flipping an opted-out user back on. */
+      var lastTrustedChoice = (stored === '0') ? false : (stored === '1' ? true : null);
+      box.addEventListener('change', function (ev) {
+        if (ev.isTrusted) lastTrustedChoice = box.checked;
+        sync();
+      });
+      sync();
+      cont.addEventListener('click', function (ev) {
+        /* Effective choice: the checkbox state only counts if a human set it.
+           No trusted interaction recorded -> protected, whatever the box shows. */
+        var protect = (lastTrustedChoice === null) ? true : lastTrustedChoice;
+        try {
+          /* Only a human click acknowledges the warning permanently; a
+             synthetic click dismisses for this session but the warning
+             returns on next load. Protection choice same rule. */
+          if (ev && ev.isTrusted) {
+            localStorage.setItem(KEY_ACK, '1');
+            localStorage.setItem(KEY_PROTECT, protect ? '1' : '0');
+          }
+        } catch (e) {}
+        /* If the app booted while the modal was up, push the choice live. */
+        try {
+          if (window.config) window.config.PHOTOSAFE = protect;
+          var t = document.getElementById('photoSafeToggle');
+          if (t && t.checked !== protect) { t.checked = protect; t.dispatchEvent(new Event('change', { bubbles: true })); }
+        } catch (e) {}
+        teardown();
+      });
+      exitB.addEventListener('click', function () {
+        /* Electron: destroy the window directly — the main process's polite
+           close-interception handshake (electron-main 'close' → askRenderer)
+           is not wired this early in boot and would leave the click dead. */
+        if (window.IS_ELECTRON) {
+          try { require('@electron/remote').getCurrentWindow().destroy(); return; } catch (e) {}
+          try { window.close(); return; } catch (e) {}
+        }
+        try { window.close(); } catch (e) {}
+        /* Browsers may refuse to close a tab the script didn't open — leave
+           the page entirely so nothing renders or runs. */
+        setTimeout(function () {
+          try { location.replace('about:blank'); } catch (e) {}
+        }, 200);
+      });
+      /* Modal guard, document-level CAPTURE while the dialog is open:
+         the app wires hotkeys on document, and a canvas click could move
+         focus outside — a 3-node Tab trap on the modal alone left both
+         paths open. Tab cycles the dialog; Enter/Space operate the focused
+         control natively; everything else stops here. */
+      function keyGuard(ev) {
+        if (modal.hidden) return;
+        var f = [box, exitB, cont];
+        if (ev.key === 'Tab') {
+          ev.preventDefault();
+          var i = f.indexOf(document.activeElement);
+          if (i === -1) i = ev.shiftKey ? 0 : f.length - 1;
+          f[(i + (ev.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+          return;
+        }
+        var onControl = f.indexOf(ev.target) !== -1;
+        var operate = (ev.key === 'Enter' || ev.key === ' ') && onControl;
+        if (!operate) { ev.preventDefault(); }
+        ev.stopPropagation();
+      }
+      function focusGuard() {
+        if (modal.hidden) return;
+        if (!modal.contains(document.activeElement)) cont.focus();
+      }
+      document.addEventListener('keydown', keyGuard, true);
+      document.addEventListener('focusin', focusGuard, true);
+      function teardown() {
+        modal.hidden = true;
+        document.removeEventListener('keydown', keyGuard, true);
+        document.removeEventListener('focusin', focusGuard, true);
+      }
+      cont.focus();
+    })();
+    </script>
     <!-- Splash Screen -->
     <div id="splash-screen">
-        <div class="splash-title">A Small Good Thing</div>
+        <div class="splash-title">Swirl Together</div>
         <div class="splash-subtitle">A playful painting game for two or more</div>
         <div class="splash-version" style="position:absolute;right:14px;bottom:10px;font-size:11px;opacity:.45"></div>
         <div class="splash-progress">
@@ -152,7 +329,7 @@
     <!-- Custom Title Bar for Frameless Window -->
     <div id="custom-titlebar" class="ui-enter">
         <div class="titlebar-drag-region">
-            <span class="titlebar-title">A Small Good Thing</span>
+            <span class="titlebar-title">Swirl Together</span>
         </div>
         <div class="window-controls">
             <button id="min-button" class="titlebar-button" title="Minimize">
@@ -476,12 +653,37 @@
         </div>
         <div id="glowPanel" class="collapsible" style="display:none;">
             <div class="control-group">
-                <label for="glowIntensity">Intensity <span id="glowIntensityValue" class="value-display">0.80</span></label>
-                <input type="range" id="glowIntensity" min="0" max="2" value="0.8" step="0.05">
+                <label for="glowIntensity">Intensity <span id="glowIntensityValue" class="value-display">0.800</span></label>
+                <input type="range" id="glowIntensity" min="0" max="2" value="0.8" step="0.005">
             </div>
             <div class="control-group">
                 <label for="glowThreshold">Threshold <span id="glowThresholdValue" class="value-display">0.60</span></label>
                 <input type="range" id="glowThreshold" min="0" max="3" value="0.6" step="0.05">
+            </div>
+            <div class="control-group checkbox-group">
+                <input type="checkbox" id="scatterToggle">
+                <label for="scatterToggle" style="margin: 0" title="Volumetric light shafts: glow spreads outward from every bright pixel, Scatter sends it travelling from one source across the canvas">Scatter</label>
+            </div>
+            <div id="scatterPanel" class="collapsible" style="display:none;">
+                <div class="control-group">
+                    <label for="scatterAmount">Amount <span id="scatterAmountValue" class="value-display">0.50</span></label>
+                    <input type="range" id="scatterAmount" min="0" max="1" value="0.5" step="0.01">
+                </div>
+                <div class="control-group">
+                    <label for="scatterReach">Reach <span id="scatterReachValue" class="value-display">1.00</span></label>
+                    <input type="range" id="scatterReach" min="0.2" max="1" value="1" step="0.05">
+                </div>
+                <div class="control-group checkbox-group">
+                    <input type="checkbox" id="scatterBlockToggle" checked>
+                    <label for="scatterBlockToggle" style="margin: 0" title="Collision layers cast shadows in the light shafts, so beams break around your colliders instead of passing through them.">Colliders Block Light</label>
+                </div>
+                <div class="control-group">
+                    <label for="scatterSource">Source</label>
+                    <select id="scatterSource" title="Where the shafts radiate from. Light Source follows the draggable light dot; Brush follows your cursor.">
+                        <option value="light">Light Source</option>
+                        <option value="brush">Brush</option>
+                    </select>
+                </div>
             </div>
         </div>
         <div class="control-group">
@@ -624,6 +826,10 @@
             <label for="captureDimming">Background Transparency <span id="dimmingValue" class="value-display">80%</span></label>
             <input type="range" id="captureDimming" min="0" max="100" value="80" step="1">
         </div>
+        <div class="control-group checkbox-group" style="margin-top: 5px;">
+            <input type="checkbox" id="photoSafeToggle" checked>
+            <label for="photoSafeToggle" style="margin: 0" title="Photosensitivity protection: smooths rapid flashes of paint or light into gentle fades and globally clamps how fast brightness can shift (WCAG 2.3.1 thresholds). On by default.">Photosensitivity Protection</label>
+        </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="cursorToggle" checked>
             <label for="cursorToggle" style="margin: 0">Show Cursor</label>
@@ -706,10 +912,10 @@
         <!-- Light Shift Controls -->
         <div id="lightShiftControls" style="display: none; margin-left: 20px; margin-top: 8px; padding: 12px; background: rgba(255, 150, 100, 0.05); border-left: 2px solid rgba(255, 150, 100, 0.3); border-radius: 4px;">
             <div style="text-align: center; margin-bottom: 8px;">
-                <label style="font-size: 11px; color: rgba(255, 255, 255, 0.7);">Draw a path through colors</label>
+                <label style="font-size: 11px; color: rgba(255, 255, 255, 0.7);" title="Draw a path through colors — the playhead loops along it, tinting your brightest areas.&#10;Slide off the edge mid-drag and the path hugs the border until you come back.&#10;✨ Hold Shift while drawing to lift the pen: the path leaves a gap there, and the color jumps instead of blending.">Draw a path through colors</label>
             </div>
             <div style="display: flex; justify-content: center; margin-bottom: 12px;">
-                <canvas id="lightShiftWheel" style="border: 1px solid rgba(255, 150, 100, 0.3); border-radius: 4px; cursor: crosshair;"></canvas>
+                <canvas id="lightShiftWheel" title="Draw a path through colors — the playhead loops along it, tinting your brightest areas.&#10;Slide off the edge mid-drag and the path hugs the border until you come back.&#10;✨ Hold Shift while drawing to lift the pen: the path leaves a gap there, and the color jumps instead of blending." style="border: 1px solid rgba(255, 150, 100, 0.3); border-radius: 4px; cursor: crosshair;"></canvas>
             </div>
             <div class="control-group" style="margin-bottom: 8px;">
                 <label style="font-size: 12px; margin-bottom: 4px;">Blend Mode</label>
@@ -1148,7 +1354,7 @@
                 </div>
             </div>
             <div class="hotkey-footer">
-                <span>A Small Good Thing <span id="app-version"></span> · GPU: <span id="app-gpu-info">detecting…</span></span>
+                <span>Swirl Together <span id="app-version"></span> · GPU: <span id="app-gpu-info">detecting…</span></span>
                 <span>Fluid sim after Pavel Dobryakov (MIT) · AI imports: Transformers.js (Apache-2.0) · Built on Electron</span>
             </div>
         </div>
@@ -1209,6 +1415,10 @@
                 // Signal to orchestrateEntrance that we're ready
                 window.__scriptsReady = true;
                 if (window.__onScriptsReady) window.__onScriptsReady();
+                // __onScriptsReady is a SINGLE slot and 20-mixer-layout.js already
+                // owns it, so anything else needing this signal has nowhere to hook.
+                // Broadcast an event too: multiple listeners, no clobbering.
+                try { document.dispatchEvent(new Event('fluidui:scripts-ready')); } catch (e) {}
                 if (window.Boot) window.Boot.done('scripts');
                 return;
             }

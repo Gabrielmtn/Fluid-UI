@@ -1,0 +1,143 @@
+{
+  "when": "2026-08-21T06-57-10",
+  "gate": "off",
+  "reports": [
+    {
+      "param": "ridges",
+      "results": [
+        {
+          "level": 0,
+          "sim": {
+            "hash": "2323737b",
+            "mean": 0.2193378282669869,
+            "max": 3.099609375,
+            "nan": 0,
+            "coverage": 0.2976570129394531,
+            "velHash": "ff975f55",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "b24344f8",
+            "meanLum": 0.11233195409236524,
+            "maxLum": 0.8474282352941176
+          },
+          "simSameAsOff": true,
+          "lookSameAsOff": true
+        },
+        {
+          "level": 0.6,
+          "sim": {
+            "hash": "2323737b",
+            "mean": 0.2193378282669869,
+            "max": 3.099609375,
+            "nan": 0,
+            "coverage": 0.2976570129394531,
+            "velHash": "ff975f55",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "3e44d1de",
+            "meanLum": 0.1122678550579643,
+            "maxLum": 0.8474282352941176
+          },
+          "simSameAsOff": true,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 1.2,
+          "sim": {
+            "hash": "18a60ee6",
+            "mean": 0.2193378282669869,
+            "max": 3.099609375,
+            "nan": 0,
+            "coverage": 0.2976570129394531,
+            "velHash": "ff975f55",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "9fe17f0a",
+            "meanLum": 0.11220440062401008,
+            "maxLum": 0.8474282352941176
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 1.8,
+          "sim": {
+            "hash": "2323737b",
+            "mean": 0.2193378282669869,
+            "max": 3.099609375,
+            "nan": 0,
+            "coverage": 0.2976570129394531,
+            "velHash": "ff975f55",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "18ec4449",
+            "meanLum": 0.11214487909841729,
+            "maxLum": 0.8474282352941176
+          },
+          "simSameAsOff": true,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 2.4,
+          "sim": {
+            "hash": "2323737b",
+            "mean": 0.2193378282669869,
+            "max": 3.099609375,
+            "nan": 0,
+            "coverage": 0.2976570129394531,
+            "velHash": "ff975f55",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "eca06eb4",
+            "meanLum": 0.11201460493289365,
+            "maxLum": 0.8474282352941176
+          },
+          "simSameAsOff": true,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 6,
+          "sim": {
+            "hash": "2323737b",
+            "mean": 0.2193378282669869,
+            "max": 3.099609375,
+            "nan": 0,
+            "coverage": 0.2976570129394531,
+            "velHash": "ff975f55",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "7ce67c92",
+            "meanLum": 0.11088041255547668,
+            "maxLum": 0.8482619607843137
+          },
+          "simSameAsOff": true,
+          "lookSameAsOff": false
+        }
+      ],
+      "flags": [
+        {
+          "level": 1.8,
+          "flag": "NON-MONOTONIC",
+          "why": "sim state bit-identical to level 0"
+        },
+        {
+          "level": 2.4,
+          "flag": "NON-MONOTONIC",
+          "why": "sim state bit-identical to level 0"
+        },
+        {
+          "level": 6,
+          "flag": "NON-MONOTONIC",
+          "why": "sim state bit-identical to level 0"
+        }
+      ],
+      "pageErrors": []
+    }
+  ]
+}

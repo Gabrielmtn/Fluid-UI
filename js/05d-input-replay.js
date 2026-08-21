@@ -221,63 +221,65 @@
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(),
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape };
         }
+        // Time replay: the last N SECONDS OF WALL CLOCK, exactly as they happened.
+        //
+        // The first version measured the window in "painting time" — it summed each
+        // stroke's own duration until the sum reached N, explicitly treating the
+        // gaps between strokes as irrelevant, then stitched the survivors
+        // back-to-back. That drifts away from what the painter just did, visibly:
+        //   • reach — pausing between strokes walked the window backwards without
+        //     limit, so a 5s replay could pull in strokes from a minute ago (the
+        //     touches that were never in the last 5 seconds), and a tap — one
+        //     event, zero duration — cost nothing at all, so any number of them
+        //     rode along for free.
+        //   • rhythm — collapsing the gaps replays a different performance from the
+        //     one that happened. The pauses are part of the timing.
+        //   • footprint — the stitch rebuilt each event by hand and dropped `tip`
+        //     and `shape`, so processReplay saw no stamp, set __remoteStroke, and
+        //     printed the whole window in the fallback gaussian at the wrong
+        //     apparent size. (Stroke mode kept them via deepCopyEvent; only the
+        //     time path lost them.)
+        // Keeping each event's ABSOLUTE time and cutting a real window out of it
+        // fixes the first two; deep-copying whole events fixes the third.
+        //
+        // The window is anchored at the LAST PAINTED EVENT, not at Date.now():
+        // the replay is triggered by hand after the stroke, and anchoring at "now"
+        // would spend the budget on the seconds it took to reach the right button.
         function buildTimeReplayEvents() {
             var period = (window.replayTimePeriod || 5) * 1000;
-            // Collect all strokes: history + current (if not yet archived)
-            var allStrokes = [];
-            for (var i = 0; i < strokeHistory.length; i++) {
-                allStrokes.push(strokeHistory[i].events);
+            // Flatten history + the in-progress stroke into one absolutely-timed
+            // list. Each stroke's events are relative to that stroke's own start.
+            var flat = [];
+            function collectStroke(events, startTime) {
+                if (!events || !events.length) return;
+                var base = (typeof startTime === 'number') ? startTime : 0;
+                for (var i = 0; i < events.length; i++) {
+                    flat.push({ ev: events[i], abs: base + events[i].t });
+                }
+            }
+            for (var s = 0; s < strokeHistory.length; s++) {
+                collectStroke(strokeHistory[s].events, strokeHistory[s].startTime);
             }
             if (!strokeArchived && strokeEvents.length > 0) {
-                allStrokes.push(strokeEvents);
+                collectStroke(strokeEvents, strokeStartTime);
             }
-            if (allStrokes.length === 0) return [];
-            // Each stroke's duration is its last event's t value (ms since stroke start).
-            // Work backwards from the newest stroke, accumulating painting time
-            // until we fill the budget. Gaps between strokes are irrelevant.
-            var budget = period;
-            var startIdx = allStrokes.length; // will walk backwards
-            var startEventOffset = 0;        // partial-stroke trim point
-            for (var s = allStrokes.length - 1; s >= 0 && budget > 0; s--) {
-                var evs = allStrokes[s];
-                if (evs.length === 0) continue;
-                var dur = evs[evs.length - 1].t; // stroke painting duration
-                if (dur <= budget) {
-                    // Whole stroke fits
-                    budget -= dur;
-                    startIdx = s;
-                    startEventOffset = 0;
-                } else {
-                    // Partial fit — trim the beginning of this stroke
-                    var trimPoint = evs[evs.length - 1].t - budget;
-                    startIdx = s;
-                    startEventOffset = trimPoint;
-                    budget = 0;
-                }
+            if (!flat.length) return [];
+            var cutoff = flat[flat.length - 1].abs - period;
+            var first = -1;
+            for (var i2 = 0; i2 < flat.length; i2++) {
+                if (flat[i2].abs >= cutoff) { first = i2; break; }
             }
-            // Stitch selected strokes back-to-back, collapsing all gaps
-            var allEvents = [];
-            var cursor = 0; // running playback time
-            for (var si = startIdx; si < allStrokes.length; si++) {
-                var evs2 = allStrokes[si];
-                for (var j = 0; j < evs2.length; j++) {
-                    var ev = evs2[j];
-                    // Skip events before the trim point in the first partial stroke
-                    if (si === startIdx && ev.t < startEventOffset) continue;
-                    var localT = ev.t - (si === startIdx ? startEventOffset : 0);
-                    allEvents.push({
-                        t: cursor + localT,
-                        x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy,
-                        color: ev.color.slice(), mult: ev.mult, radius: ev.radius
-                    });
-                }
-                // Advance cursor by this stroke's contributed duration
-                if (evs2.length > 0) {
-                    var strokeDur = evs2[evs2.length - 1].t - (si === startIdx ? startEventOffset : 0);
-                    cursor += strokeDur;
-                }
+            if (first < 0) return [];
+            // Rebase on the first surviving event so playback starts immediately —
+            // only the LEADING idle is dropped; every gap inside the window stays.
+            var t0 = flat[first].abs;
+            var out = [];
+            for (var k = first; k < flat.length; k++) {
+                var copy = deepCopyEvent(flat[k].ev);
+                copy.t = flat[k].abs - t0;
+                out.push(copy);
             }
-            return allEvents;
+            return out;
         }
         function replayStroke(broadcast = true, reuse = false) {
             var eventsToReplay;
@@ -324,7 +326,14 @@
                     dy: ev.dy / canvas.height,
                     color: ev.color,
                     mult: ev.mult,
-                    radius: ev.radius
+                    radius: ev.radius,
+                    // Carry the footprint too. These were recorded per event
+                    // (pushStrokeEvent) and then dropped right here, so a
+                    // broadcast replay reached peers with no idea what brush
+                    // it was reproducing; 06 publishes the stamp bitmaps the
+                    // ids refer to before it sends the events.
+                    tip: ev.tip,
+                    shape: ev.shape || null
                 }));
                 try { broadcastReplayStroke(norm); } catch(_){}
             }
@@ -479,7 +488,14 @@
                 dy: (ev.dy || 0) * canvas.height,
                 color: Array.isArray(ev.color) ? ev.color.slice() : pointer.color.slice(),
                 mult: Math.max(1, Math.round(ev.mult || 1)),
-                radius: (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS
+                radius: (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS,
+                // The sender's footprint. processReplay pins these per event
+                // and checks BrushShapes.has(), which counts a peer's cached
+                // stamp — so a relayed replay keeps the brush it was painted
+                // with, and falls back to the built-in tip if it did not
+                // arrive rather than borrowing this client's shape.
+                tip: (typeof ev.tip === 'number') ? (ev.tip | 0) : undefined,
+                shape: (typeof ev.shape === 'string' && ev.shape) ? ev.shape : null
             }));
             if (!remoteEvents.length) return;
             window._activeReplayEvents = remoteEvents;

@@ -341,15 +341,33 @@ function compactLightShiftPath(path) {
     if (src.length > MIRROR_PATH_POINTS) {
         var out = [];
         var step = (src.length - 1) / (MIRROR_PATH_POINTS - 1);
+        var prevIdx = 0;
         for (var i = 0; i < MIRROR_PATH_POINTS; i++) {
-            out.push(src[Math.round(i * step)]);
+            var idx = Math.round(i * step);
+            var pt = src[idx];
+            // A Shift-gap (a jump in the path) must survive resampling: if any
+            // dropped point between the last kept one and this one was a jump,
+            // this one inherits it, or the mirror draws a line across the gap.
+            if (i > 0 && pt && typeof pt === 'object' && !pt.gap) {
+                for (var j = prevIdx + 1; j < idx; j++) {
+                    if (src[j] && src[j].gap) {
+                        pt = { x: pt.x, y: pt.y, hue: pt.hue, saturation: pt.saturation,
+                               lightness: pt.lightness, gap: true };
+                        break;
+                    }
+                }
+            }
+            prevIdx = idx;
+            out.push(pt);
         }
         src = out;
     }
     return src.map(function (p) {
         if (!p || typeof p !== 'object') return p;
-        return { x: r1(p.x), y: r1(p.y), hue: r1(p.hue),
-                 saturation: r1(p.saturation), lightness: r1(p.lightness) };
+        var q = { x: r1(p.x), y: r1(p.y), hue: r1(p.hue),
+                  saturation: r1(p.saturation), lightness: r1(p.lightness) };
+        if (p.gap) q.gap = true; // the jumps are part of the look
+        return q;
     });
 }
 
@@ -1207,6 +1225,7 @@ function disconnectMultiplayer(rememberRoom) {
     remoteCursors.clear();
     remoteLastPositions.clear();
     clearRemoteCursors();
+    dropPeerAssets();
     // Clear URL hash
     history.replaceState(null, '', window.location.pathname + window.location.search);
     showDisconnectedUI();
@@ -1257,6 +1276,13 @@ function onMultiplayerOpen(event) {
     if (partySocket && partySocket._connectTimeout) clearTimeout(partySocket._connectTimeout);
     isMultiplayerEnabled = true;
     reconnectAttempts = 0;
+    // Fresh socket, fresh audience: republish our stamp to whoever is here
+    // now rather than assuming the last room's members carried over.
+    resetPublishedShapes();
+    resetPublishedColliders();
+    // Walls we already have are ours to contribute to the room we just
+    // joined; a moment's delay lets the layer system finish waking up.
+    setTimeout(function () { try { republishColliders(); } catch (_) {} }, 1200);
     startPing();
     // Sync the hidden toggle
     var toggle = document.getElementById('multiplayerToggle');
@@ -1288,6 +1314,19 @@ function onMultiplayerMessage(event) {
                 break;
 
             case 'client-count':
+                // Someone new arrived, and they hold none of the stamps we
+                // published to the people already here. Clearing the ledger
+                // makes the next stroke republish — one ≤21KB message, versus
+                // a newcomer seeing every shaped stroke as a plain tip for as
+                // long as they stay in the room.
+                if (typeof data.count === 'number' && data.count > connectedClients) {
+                    resetPublishedShapes();
+                    // Same for walls — but a newcomer has no way to ask for
+                    // them, and nothing else would ever resend, so push them
+                    // now rather than waiting for an edit that may never come.
+                    resetPublishedColliders();
+                    republishColliders();
+                }
                 connectedClients = data.count;
                 updateConnectedView();
                 break;
@@ -1310,6 +1349,28 @@ function onMultiplayerMessage(event) {
                 // Receive splat from another client
                 if (data.clientId !== clientId) {
                     handleRemoteSplat(data);
+                }
+                break;
+
+            case 'brush-shape':
+                // A peer's custom stamp bitmap, so their shaped strokes print
+                // as the shape they painted with instead of a built-in tip.
+                if (data.clientId !== clientId) {
+                    handleBrushShape(data);
+                }
+                break;
+
+            case 'collider-add':
+                // A peer's wall: their coverage map, rasterized into our own
+                // obstacle field so the fluid deflects the same way here.
+                if (data.clientId !== clientId) {
+                    handleColliderAdd(data);
+                }
+                break;
+
+            case 'collider-remove':
+                if (data.clientId !== clientId) {
+                    handleColliderRemove(data);
                 }
                 break;
 
@@ -1452,6 +1513,10 @@ function onMultiplayerClose(event) {
     stopPing();
     isMultiplayerEnabled = false;
     clearRemoteCursors();
+    // Peer stamps are room-scoped: their ids mean nothing outside it, and
+    // holding GL textures for people who are gone is pure leak. An auto-
+    // reconnect below simply re-receives what it needs on the next stroke.
+    dropPeerAssets();
     // Server refused the join (locked room / full room) — don't retry in a loop.
     if (event && (event.code === 4001 || event.code === 4002)) {
         currentRoom = null; lastRoom = null;
@@ -1498,6 +1563,398 @@ function onMultiplayerError(error) {
     console.error('Multiplayer error:', error);
 }
 
+// ── Custom brush shapes over the wire (2026-08-21) ───────────────────────
+// A stamp is a ≤128px PNG (measured 5-21KB across a real library), so it is
+// cheap enough to publish ONCE per room and then reference by id on every
+// dab — rather than the old behaviour, where a peer's shaped stroke printed
+// as a plain built-in tip because "its bitmap can't ride the wire".
+//
+// Two ids per shape: the shape's own id, and `rev`, a content hash. replace()
+// re-stamps a shape IN PLACE keeping its id (33-brush-shapes), so without the
+// rev a peer would keep painting with the version it cached first.
+const SHAPE_CHUNK_CHARS = 11000; // + envelope: comfortably under the 16KB cap
+const SHAPE_MAX_CHUNKS = 32;     // ≈350KB — far above any ≤128px stamp
+var _shapePublished = new Map(); // id → rev already sent on THIS socket
+
+// A fresh socket is a fresh audience: whatever we published to the last room
+// says nothing about what this one has.
+function resetPublishedShapes() {
+    _shapePublished.clear();
+}
+
+// Publish the active shape's bitmap unless this socket already sent that exact
+// version. Called immediately BEFORE the dabs that reference it — messages are
+// ordered on one socket, so the definition always lands first and there is no
+// window where a peer sees the id without the art.
+function publishShape(id) {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return null;
+    const BS = window.BrushShapes;
+    if (!BS || typeof BS.exportShape !== 'function') return null;
+    if (!id) return null;
+    const e = BS.exportShape(id);
+    if (!e) return null;                          // stale selection, nothing to send
+    if (_shapePublished.get(id) === e.rev) return e.rev; // peers already have it
+    const url = e.dataURL || '';
+    const total = Math.ceil(url.length / SHAPE_CHUNK_CHARS) || 1;
+    if (total > SHAPE_MAX_CHUNKS) return null;    // absurd stamp: leave peers on the tip
+    for (let i = 0; i < total; i++) {
+        partySocket.send(JSON.stringify({
+            type: 'brush-shape',
+            data: {
+                id: e.id, rev: e.rev, name: e.name, seq: i, total,
+                part: url.slice(i * SHAPE_CHUNK_CHARS, (i + 1) * SHAPE_CHUNK_CHARS)
+            },
+            timestamp: Date.now()
+        }));
+    }
+    _shapePublished.set(id, e.rev);
+    return e.rev;
+}
+
+function publishActiveShape() {
+    return publishShape((window.config && window.config.BRUSH_SHAPE_ID) || null);
+}
+
+// The painter's footprint, stamped on the dabs about to go out. `tip`/`angle`
+// are the built-in stamp — peers used to render remote dabs with their OWN
+// tip in free paint (only the settings-lock/turn-look mirror carried the
+// painter's), so these close that gap too. `shape` rides only when its bitmap
+// has been published.
+function brushWireFields() {
+    const cfg = window.config || {};
+    const f = { tip: (cfg.BRUSH_TIP | 0) || 0 };
+    if (cfg.BRUSH_ANGLE) f.angle = +(+cfg.BRUSH_ANGLE).toFixed(1);
+    const rev = publishActiveShape();
+    if (rev) { f.shape = cfg.BRUSH_SHAPE_ID; f.rev = rev; }
+    return f;
+}
+
+// Reassembly of chunked shape definitions, keyed so two peers sending
+// different shapes — or the same shape at different revs — never interleave.
+const shapeChunkBuffers = new Map(); // clientId|id|rev → {parts, received, total, at}
+function handleBrushShape(data) {
+    const d = data.data || {};
+    if (typeof d.id !== 'string' || typeof d.part !== 'string') return;
+    if (typeof d.seq !== 'number' || typeof d.total !== 'number') return;
+    if (d.total < 1 || d.total > SHAPE_MAX_CHUNKS || d.seq < 0 || d.seq >= d.total) return;
+    if (d.part.length > SHAPE_CHUNK_CHARS) return;
+    const BS = window.BrushShapes;
+    if (!BS || typeof BS.putPeer !== 'function') return;
+
+    const now = Date.now();
+    for (const [k, v] of shapeChunkBuffers) {
+        if (now - v.at > 20000) shapeChunkBuffers.delete(k); // abandoned transfer
+    }
+    const key = data.clientId + '|' + d.id + '|' + d.rev;
+    let buf = shapeChunkBuffers.get(key);
+    if (!buf) {
+        if (shapeChunkBuffers.size >= 8) return;  // too many in flight — drop the newcomer
+        buf = { parts: new Array(d.total), received: 0, total: d.total, at: now };
+        shapeChunkBuffers.set(key, buf);
+    }
+    if (buf.total !== d.total) return;
+    if (buf.parts[d.seq] === undefined) {
+        buf.parts[d.seq] = d.part;
+        buf.received++;
+    }
+    if (buf.received !== buf.total) return;
+    shapeChunkBuffers.delete(key);
+    // putPeer validates the assembled string (PNG dataURL, size, count) before
+    // it ever reaches an <img> — the relay vouches for nothing.
+    try { BS.putPeer(d.id, buf.parts.join(''), d.rev); } catch (_) {}
+}
+
+// ── Colliders over the wire (2026-08-21) ─────────────────────────────────
+// Until now a wall was invisible to everyone but the person who placed it —
+// and because the obstacle field feeds vorticity, pressure and advection
+// every frame, that was not just a missing decoration: the two simulations
+// silently DIVERGED. The same shared stroke curled around a wall on one
+// screen and straight through empty space on the other.
+//
+// What travels is the coverage map, not the source picture. Physics never
+// resolves finer than the sim grid (512 long side on desktop), so a photo-
+// derived wall that is megabytes on disk crosses as a few KB and still
+// produces the same obstacle. Each client rasterizes it into its own
+// obstacle field at its own resolution — visually equivalent walls, locally
+// consistent physics, which is the achievable target when peers run
+// different sim resolutions and aspect ratios.
+const COLLIDER_WIRE_MAX = 512;   // matches the desktop sim grid's long side
+const COLLIDER_CHUNK_CHARS = 11000;
+const COLLIDER_MAX_CHUNKS = 32;  // ≈350KB of coverage PNG
+var _colliderPublished = new Map(); // our layer index → rev last sent
+var peerColliders = new Map();      // "ownerId|theirIndex" → our local layer index
+
+function resetPublishedColliders() {
+    _colliderPublished.clear();
+}
+
+// Send every wall we own. Used when someone joins: unlike a brush shape,
+// which the next stroke would republish anyway, a wall that was placed
+// before they arrived has no natural trigger to resend it — so a late
+// joiner would sit in a room whose obstacles they cannot see and whose
+// physics they cannot reproduce.
+function republishColliders() {
+    if (!window.layers || !isMultiplayerEnabled) return;
+    window.layers.forEach(function (l) {
+        if (l && l.isCollision && !l.__peerOwner) {
+            try { publishCollider(l.index); } catch (_) {}
+        }
+    });
+}
+
+// Coverage map → opaque grayscale PNG. Grayscale-with-opaque-alpha, NOT
+// white-with-alpha: a canvas stores alpha premultiplied, so coverage put in
+// the alpha channel comes back quantized, while a value in RGB round-trips
+// exactly.
+function coverageToPng(depth) {
+    const sw = depth.width, sh = depth.height;
+    const scale = Math.min(1, COLLIDER_WIRE_MAX / Math.max(sw, sh));
+    const dw = Math.max(1, Math.round(sw * scale));
+    const dh = Math.max(1, Math.round(sh * scale));
+    const src = document.createElement('canvas');
+    src.width = sw; src.height = sh;
+    const sctx = src.getContext('2d');
+    const img = sctx.createImageData(sw, sh);
+    for (let i = 0, p = 0; i < depth.data.length; i++, p += 4) {
+        const v = depth.data[i];
+        img.data[p] = v; img.data[p + 1] = v; img.data[p + 2] = v; img.data[p + 3] = 255;
+    }
+    sctx.putImageData(img, 0, 0);
+    if (dw === sw && dh === sh) return { png: src.toDataURL('image/png'), w: dw, h: dh };
+    const out = document.createElement('canvas');
+    out.width = dw; out.height = dh;
+    const octx = out.getContext('2d');
+    octx.imageSmoothingEnabled = true;
+    octx.drawImage(src, 0, 0, dw, dh);
+    return { png: out.toDataURL('image/png'), w: dw, h: dh };
+}
+
+// The inverse, on the receiving side.
+function pngToCoverage(dataURL, w, h) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function () {
+            try {
+                const c = document.createElement('canvas');
+                c.width = img.naturalWidth || w; c.height = img.naturalHeight || h;
+                const ctx = c.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const d = ctx.getImageData(0, 0, c.width, c.height).data;
+                const out = new Uint8Array(c.width * c.height);
+                for (let i = 0, p = 0; i < out.length; i++, p += 4) out[i] = d[p];
+                resolve({ data: out, width: c.width, height: c.height });
+            } catch (_) { resolve(null); }
+        };
+        img.onerror = function () { resolve(null); };
+        img.src = dataURL;
+    });
+}
+
+// Everything a peer needs to reproduce one wall. Geometry rides NORMALIZED
+// (fractions of the sender's canvas box) because layer.x/y are CSS pixels of
+// a box whose size differs per client — the same reason splat positions are
+// normalized.
+function serializeCollider(layerIndex) {
+    const cl = window.collisionLayers;
+    if (!cl || typeof cl.depthOf !== 'function' || !window.layers) return null;
+    const layer = window.layers.find(l => l.index === layerIndex);
+    if (!layer || !layer.isCollision) return null;
+    const depth = cl.depthOf(layerIndex);
+    if (!depth) return null;                 // live source-bound: GPU-only, skip
+    const enc = coverageToPng(depth);
+    if (!enc || !enc.png) return null;
+    const box = document.getElementById('canvas-wrapper') || (window.canvas || {});
+    const bw = box.clientWidth || (window.canvas && canvas.width) || 1;
+    const bh = box.clientHeight || (window.canvas && canvas.height) || 1;
+    return {
+        lid: layerIndex,
+        w: enc.w, h: enc.h, png: enc.png,
+        thr: (typeof depth.threshold === 'number') ? depth.threshold : 128,
+        inv: !!depth.invert,
+        mode: layer.collisionMode || 'block',
+        str: (typeof layer.collisionStrength === 'number') ? layer.collisionStrength : 0.9,
+        x: +((layer.x || 0) / bw).toFixed(4),
+        y: +((layer.y || 0) / bh).toFixed(4),
+        sx: +(layer.scaleX || 1).toFixed(4),
+        sy: +(layer.scaleY || 1).toFixed(4),
+        rot: +(layer.rotation || 0).toFixed(2),
+        vis: layer.visible !== false,
+        // addCollisionLayer prefixes its own 🧱, so send the bare name or the
+        // wall arrives on the peer titled "🧱 🧱 Bar Wall".
+        name: String(layer.title || 'Collision').replace(/^\s*🧱\s*/, '').slice(0, 40)
+    };
+}
+
+// Cheap content hash so an unchanged wall is never re-sent — updateObstacle
+// runs on every slider nudge and on a 120ms cadence while a live collider
+// tracks a stroke, and each resend is a multi-KB chunked transfer.
+function colliderRev(meta) {
+    const s = meta.png.length + '|' + meta.w + 'x' + meta.h + '|' + meta.thr + '|' + meta.inv +
+              '|' + meta.mode + '|' + meta.str + '|' + meta.x + ',' + meta.y +
+              '|' + meta.sx + ',' + meta.sy + '|' + meta.rot + '|' + meta.vis;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0; }
+    // Fold in a sample of the bitmap so a redrawn mask of identical length
+    // still reads as a change.
+    for (let i = 0; i < meta.png.length; i += 997) { h ^= meta.png.charCodeAt(i); h = (h * 16777619) >>> 0; }
+    return h.toString(36);
+}
+
+function publishCollider(layerIndex) {
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    if (isProcessingRemoteEvent) return;               // never echo a peer's wall back
+    if (isPeerCollider(layerIndex)) return;            // ...including later edits to it
+    const meta = serializeCollider(layerIndex);
+    if (!meta) return;
+    const rev = colliderRev(meta);
+    if (_colliderPublished.get(layerIndex) === rev) return;
+    const total = Math.ceil(meta.png.length / COLLIDER_CHUNK_CHARS) || 1;
+    if (total > COLLIDER_MAX_CHUNKS) {
+        console.warn('[Multiplayer] Collider too large to share (' + total + ' chunks) — kept local');
+        return;
+    }
+    for (let i = 0; i < total; i++) {
+        const part = meta.png.slice(i * COLLIDER_CHUNK_CHARS, (i + 1) * COLLIDER_CHUNK_CHARS);
+        const d = Object.assign({}, meta, { rev, seq: i, total, part });
+        delete d.png;                                   // the bitmap rides as `part`
+        partySocket.send(JSON.stringify({ type: 'collider-add', data: d, timestamp: Date.now() }));
+    }
+    _colliderPublished.set(layerIndex, rev);
+}
+
+function broadcastColliderRemove(layerIndex) {
+    _colliderPublished.delete(layerIndex);
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    if (isProcessingRemoteEvent || isPeerCollider(layerIndex)) return;
+    partySocket.send(JSON.stringify({
+        type: 'collider-remove', data: { lid: layerIndex }, timestamp: Date.now()
+    }));
+}
+
+function isPeerCollider(layerIndex) {
+    for (const v of peerColliders.values()) if (v === layerIndex) return true;
+    return false;
+}
+
+// Reassembly + apply for an incoming wall.
+const colliderChunkBuffers = new Map(); // clientId|lid|rev → {parts, received, total, meta, at}
+function handleColliderAdd(data) {
+    const d = data.data || {};
+    if (typeof d.lid !== 'number' || typeof d.part !== 'string') return;
+    if (typeof d.seq !== 'number' || typeof d.total !== 'number') return;
+    if (d.total < 1 || d.total > COLLIDER_MAX_CHUNKS || d.seq < 0 || d.seq >= d.total) return;
+    if (d.part.length > COLLIDER_CHUNK_CHARS) return;
+    if (!(d.w > 0 && d.h > 0 && d.w <= 2048 && d.h <= 2048)) return;
+
+    const now = Date.now();
+    for (const [k, v] of colliderChunkBuffers) {
+        if (now - v.at > 20000) colliderChunkBuffers.delete(k);
+    }
+    const key = data.clientId + '|' + d.lid + '|' + d.rev;
+    let buf = colliderChunkBuffers.get(key);
+    if (!buf) {
+        if (colliderChunkBuffers.size >= 8) return;
+        buf = { parts: new Array(d.total), received: 0, total: d.total, meta: d, at: now };
+        colliderChunkBuffers.set(key, buf);
+    }
+    if (buf.total !== d.total) return;
+    if (buf.parts[d.seq] === undefined) { buf.parts[d.seq] = d.part; buf.received++; }
+    if (buf.received !== buf.total) return;
+    colliderChunkBuffers.delete(key);
+
+    const png = buf.parts.join('');
+    if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(png)) return;
+    applyPeerCollider(data.clientId, buf.meta, png);
+}
+
+function applyPeerCollider(ownerId, meta, png) {
+    const cl = window.collisionLayers;
+    if (!cl || typeof cl.addFromDepth !== 'function') return;
+    pngToCoverage(png, meta.w, meta.h).then(depth => {
+        if (!depth) return;
+        const key = ownerId + '|' + meta.lid;
+        const box = document.getElementById('canvas-wrapper') || (window.canvas || {});
+        const bw = box.clientWidth || (window.canvas && canvas.width) || 1;
+        const bh = box.clientHeight || (window.canvas && canvas.height) || 1;
+        // Replace rather than stack: a peer nudging a slider republishes the
+        // same wall, and without this every edit would leave another copy of
+        // it standing in the room.
+        removePeerCollider(key);
+        // isProcessingRemoteEvent keeps addCollisionLayer's publish hook from
+        // bouncing this straight back to the sender.
+        const wasRemote = isProcessingRemoteEvent;
+        isProcessingRemoteEvent = true;
+        let idx = null;
+        try {
+            idx = cl.addFromDepth(depth, {
+                name: meta.name || 'Collision',
+                visible: meta.vis !== false,
+                threshold: (typeof meta.thr === 'number') ? meta.thr : 128,
+                x: (meta.x || 0) * bw, y: (meta.y || 0) * bh,
+                scaleX: meta.sx || 1, scaleY: meta.sy || 1, rotation: meta.rot || 0
+            });
+        } finally {
+            isProcessingRemoteEvent = wasRemote;
+        }
+        if (idx == null) return;
+        const layer = window.layers && window.layers.find(l => l.index === idx);
+        if (layer) {
+            layer.collisionMode = meta.mode || 'block';
+            if (typeof meta.str === 'number') layer.collisionStrength = meta.str;
+            layer.__peerOwner = ownerId;   // marks it for cleanup when they leave
+        }
+        peerColliders.set(key, idx);
+        try { cl.updateObstacleFromLayers(); } catch (_) {}
+        if (typeof window.renderLayers === 'function') window.renderLayers();
+    });
+}
+
+function removePeerCollider(key) {
+    const idx = peerColliders.get(key);
+    if (idx == null) return;
+    peerColliders.delete(key);
+    const wasRemote = isProcessingRemoteEvent;
+    isProcessingRemoteEvent = true;
+    try {
+        if (typeof window.deleteLayer === 'function') window.deleteLayer(idx);
+    } catch (_) {} finally {
+        isProcessingRemoteEvent = wasRemote;
+    }
+}
+
+function handleColliderRemove(data) {
+    const d = data.data || {};
+    if (typeof d.lid !== 'number') return;
+    removePeerCollider(data.clientId + '|' + d.lid);
+    try { if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers(); } catch (_) {}
+}
+
+// Walls belong to the room. Leaving it takes everyone else's with us, or the
+// user paints alone against obstacles they never placed and cannot explain.
+function dropPeerColliders() {
+    for (const key of Array.from(peerColliders.keys())) removePeerCollider(key);
+    colliderChunkBuffers.clear();
+    try { if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers(); } catch (_) {}
+}
+
+// Everything the room lent us: peer stamps and peer walls. Called from BOTH
+// exit paths — onMultiplayerClose for a dropped socket, and
+// disconnectMultiplayer for a deliberate leave. The deliberate one nulls
+// partySocket before the close event arrives, so onMultiplayerClose bails out
+// of it by design; without this call, leaving a room stranded a stranger's
+// wall in the user's simulation with nothing on screen to explain it.
+function dropPeerAssets() {
+    try {
+        if (window.BrushShapes && typeof window.BrushShapes.dropPeers === 'function') {
+            window.BrushShapes.dropPeers();
+        }
+    } catch (_) {}
+    shapeChunkBuffers.clear();
+    _shapePublished.clear();
+    _colliderPublished.clear();
+    try { dropPeerColliders(); } catch (_) {}
+}
+
 // down=true marks a stroke-opening press stamp so the receiver starts a fresh
 // segment instead of interpolating from the previous stroke's end.
 function broadcastSplat(x, y, dx, dy, color, mult, radius, down) {
@@ -1517,15 +1974,19 @@ function broadcastSplat(x, y, dx, dy, color, mult, radius, down) {
     const effRadius = (typeof window.__lastPaintRadius === 'number' && window.__lastPaintRadius > 0)
         ? window.__lastPaintRadius : radius;
 
+    // Publishes the stamp bitmap first if the room has not seen it (see
+    // brushWireFields) — so this press stamp's `shape` id always resolves.
+    const brush = brushWireFields();
+
     partySocket.send(JSON.stringify({
         type: 'splat',
         // sym (2026-08-16 fidelity audit): the painter's symmetry layout
         // decides WHERE the arms land; without it peers applied dabs under
         // their OWN mode and the paint landed elsewhere. Additive field —
         // old receivers ignore it.
-        data: { x, y, dx, dy, color, mult, radius: effRadius,
+        data: Object.assign({ x, y, dx, dy, color, mult, radius: effRadius,
                 sym: (window.config && window.config.SYMMETRY_MODE) || 'radial',
-                down: !!down },
+                down: !!down }, brush),
         timestamp: now
     }));
     broadcastSplat.lastSent = now;
@@ -1583,12 +2044,16 @@ function flushDabs(color, mult, force) {
     _dabFlushAt = now;
     var dabs = _dabQueue.splice(0, DAB_MAX_PER_MSG);
     var last = dabs[dabs.length - 1];
+    // Footprint for this batch. A stroke paints with one shape, so this rides
+    // per MESSAGE like color/mult/sym rather than per dab (~25 bytes, against
+    // ~30 bytes for a single dab).
+    var brush = brushWireFields();
     // Legacy fields mirror the final dab in the OLD wire units (normalized
     // velocity), so a client running the previous build still renders this
     // stroke through its existing path instead of seeing nothing.
     partySocket.send(JSON.stringify({
         type: 'splat',
-        data: {
+        data: Object.assign({
             x: last[0], y: last[1],
             dx: +(last[2] / Math.max(1, canvas.width)).toFixed(5),
             dy: +(last[3] / Math.max(1, canvas.height)).toFixed(5),
@@ -1598,7 +2063,7 @@ function flushDabs(color, mult, force) {
             // Painter's arm layout — see broadcastSplat's sym note.
             sym: (window.config && window.config.SYMMETRY_MODE) || 'radial',
             dabs: dabs
-        },
+        }, brush),
         timestamp: now
     }));
 }
@@ -1676,9 +2141,42 @@ function handleRemoteSplat(data) {
         }
 
         isProcessingRemoteEvent = true;
-        // Peer strokes must not pick up THIS client's custom stamp (05i gates
-        // getActiveStamp on this flag); built-in tips still render for them.
-        window.__remoteStroke = true;
+        // ── Footprint: paint these dabs with the brush the SENDER used ──
+        // Historically this was a flat "suppress custom stamps" (the bitmap
+        // could not ride the wire), which left peers printing the viewer's own
+        // tip. Now the sender publishes the stamp and names it per message, so
+        // pin their footprint for the dab loop and restore it after — the same
+        // pin-then-restore processReplay uses for recorded strokes (05d).
+        //
+        // __remoteStroke still guards the fallback: a shape we have NOT got
+        // (definition still in flight, or dropped) suppresses stamps entirely
+        // rather than printing the stroke in whatever shape this client has
+        // selected. Peer dabs are never held waiting for an upload — a pinned
+        // peer id is not in the local library, so stampPending() has nothing
+        // to wait for and the dab falls through to the built-in tip.
+        const _rd = data.data || {};
+        let _pinShape = false, _pinTip = false, _pinAng = false;
+        let _shapePrev, _tipPrev, _angPrev;
+        if (window.config) {
+            if (typeof _rd.shape === 'string' && window.BrushShapes
+                && typeof window.BrushShapes.peerReady === 'function'
+                && window.BrushShapes.peerReady(_rd.shape)) {
+                _pinShape = true;
+                _shapePrev = window.config.BRUSH_SHAPE_ID;
+                window.config.BRUSH_SHAPE_ID = _rd.shape;
+            }
+            if (typeof _rd.tip === 'number') {
+                _pinTip = true;
+                _tipPrev = window.config.BRUSH_TIP;
+                window.config.BRUSH_TIP = _rd.tip | 0;
+            }
+            if (typeof _rd.angle === 'number' && isFinite(_rd.angle)) {
+                _pinAng = true;
+                _angPrev = window.config.BRUSH_ANGLE;
+                window.config.BRUSH_ANGLE = _rd.angle;
+            }
+        }
+        window.__remoteStroke = !_pinShape;
         // Apply the SENDER's symmetry layout when the message carries it
         // (2026-08-16 fidelity audit: a mirrorX painter measured as radial on
         // the peer — the arms are positions, not styling). Unknown strings
@@ -1769,6 +2267,13 @@ function handleRemoteSplat(data) {
             isProcessingRemoteEvent = false;
             window.__remoteStroke = false;
             if (_symPrev !== null) window.config.SYMMETRY_MODE = _symPrev;
+            // Restore on explicit flags, not on "was it null": BRUSH_SHAPE_ID
+            // is legitimately null whenever the viewer has no shape selected,
+            // and a null-sentinel check would leave the PEER's id active on
+            // this client — their shape would quietly become the local brush.
+            if (_pinShape) window.config.BRUSH_SHAPE_ID = _shapePrev;
+            if (_pinTip) window.config.BRUSH_TIP = _tipPrev;
+            if (_pinAng) window.config.BRUSH_ANGLE = _angPrev;
         }
     }
 }
@@ -1783,16 +2288,36 @@ function broadcastReplayStroke(events) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
         return;
     }
-    const q = (events || []).map(ev => ({
-        t: Math.round(ev.t || 0),
-        x: +(+ev.x || 0).toFixed(4),
-        y: +(+ev.y || 0).toFixed(4),
-        dx: +(+ev.dx || 0).toFixed(4),
-        dy: +(+ev.dy || 0).toFixed(4),
-        color: (ev.color || [1, 1, 1]).map(c => +(+c).toFixed(3)),
-        mult: ev.mult || 1,
-        radius: +(+ev.radius || 0.01).toFixed(5)
-    }));
+    // Publish every stamp this stroke references before the events that name
+    // them: a replay can span shapes the painter switched between, and the
+    // one selected NOW may not be any of them.
+    const shapeIds = [];
+    (events || []).forEach(ev => {
+        if (typeof ev.shape === 'string' && ev.shape && shapeIds.indexOf(ev.shape) < 0) {
+            shapeIds.push(ev.shape);
+        }
+    });
+    const shapeRevs = {};
+    shapeIds.forEach(id => { const r = publishShape(id); if (r) shapeRevs[id] = r; });
+
+    const q = (events || []).map(ev => {
+        const o = {
+            t: Math.round(ev.t || 0),
+            x: +(+ev.x || 0).toFixed(4),
+            y: +(+ev.y || 0).toFixed(4),
+            dx: +(+ev.dx || 0).toFixed(4),
+            dy: +(+ev.dy || 0).toFixed(4),
+            color: (ev.color || [1, 1, 1]).map(c => +(+c).toFixed(3)),
+            mult: ev.mult || 1,
+            radius: +(+ev.radius || 0.01).toFixed(5)
+        };
+        // The footprint the dab was painted with. Dropping these here was why
+        // a broadcast replay of a shaped stroke came out gaussian on peers
+        // even though the events carried the shape locally (05d).
+        if (typeof ev.tip === 'number') o.tip = ev.tip | 0;
+        if (ev.shape && shapeRevs[ev.shape]) o.shape = ev.shape;
+        return o;
+    });
     if (q.length <= STROKE_CHUNK_EVENTS) {
         partySocket.send(JSON.stringify({ type: 'stroke', data: { events: q }, timestamp: Date.now() }));
         return;
@@ -2146,6 +2671,12 @@ window.broadcastPointerUp = broadcastPointerUp;
 window.broadcastClear = broadcastClear;
 window.broadcastPreset = broadcastPreset;
 window.broadcastReplayStroke = broadcastReplayStroke;
+// 33-brush-shapes calls this when a shape is picked or re-stamped, so peers
+// decode the bitmap before the first dab that references it.
+window.publishBrushShape = publishShape;
+// 23-depth-collision calls these when a wall is built, changed, or deleted.
+window.publishCollider = publishCollider;
+window.broadcastColliderRemove = broadcastColliderRemove;
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
 window.paintWithStranger = paintWithStranger;

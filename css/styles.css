@@ -1773,3 +1773,15 @@ body.mobile-mode .controls.visible .mobile-menu-close {
     accent-color: #a78bfa;
     cursor: pointer;
 }
+
+/* ── PhotoSafe DOM guard ──────────────────────────────────────────────
+   The GL limiter cannot see CSS: background-color and canvas opacity
+   composite in the browser, so a script or setting flipping them rapidly
+   would strobe OUTSIDE the shader pipeline. While protection is on, ease
+   every such change over 0.4s — a 3 Hz square wave through a 0.4s ease
+   cannot complete a full-amplitude opposing pair. */
+body.photosafe-on #canvas-wrapper,
+body.photosafe-on #canvas-area,
+body.photosafe-on canvas {
+    transition: background-color 0.4s ease, opacity 0.4s ease;
+}

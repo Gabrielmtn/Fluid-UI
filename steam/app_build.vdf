@@ -1,7 +1,7 @@
 "appbuild"
 {
 	"appid"	"5068940"
-	"desc"	"A Small Good Thing Windows build"
+	"desc"	"Swirl Together Windows build"
 	"buildoutput"	"..\dist\steam-build-output"
 	"contentroot"	"..\dist\win-unpacked"
 	"setlive"	""

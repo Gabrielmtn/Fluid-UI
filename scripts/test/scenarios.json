@@ -1,0 +1,112 @@
+{
+  "comment": "Deterministic regression scenarios for run-regression.js. Each runs under the shared determinism policy (governor off, test resolution, gate off, fluid material, seeded RNG, frozen clock). Action vocabulary: slider/checkbox/select/preset/material/stroke/pointerStroke/key/step/clear/snapshot/eval. Grow this list one scenario per feature system — the features inventory (inventory/features.json) lists the activation recipes.",
+  "scenarios": [
+    {
+      "name": "plain-stroke",
+      "comment": "The canonical baseline: one seeded stroke, advected 60 frames.",
+      "seed": 48879,
+      "actions": [
+        { "do": "stroke" },
+        { "do": "step", "frames": 60 },
+        { "do": "snapshot", "name": "settled" }
+      ]
+    },
+    {
+      "name": "pointer-stroke",
+      "comment": "Same idea through the REAL input pipeline (05d handlers, brush engine spacing) — catches input-path regressions the splat path cannot.",
+      "seed": 48879,
+      "actions": [
+        { "do": "pointerStroke" },
+        { "do": "step", "frames": 40 },
+        { "do": "snapshot", "name": "settled" }
+      ]
+    },
+    {
+      "name": "materials",
+      "comment": "One stroke per material. setMode must follow any snapshot apply, never precede it (material-vs-snapshot ordering, 29-material-modes).",
+      "seed": 48879,
+      "actions": [
+        { "do": "material", "mode": "acrylic" },
+        { "do": "stroke" },
+        { "do": "step", "frames": 50 },
+        { "do": "snapshot", "name": "acrylic" },
+        { "do": "clear" },
+        { "do": "material", "mode": "clay" },
+        { "do": "stroke" },
+        { "do": "step", "frames": 50 },
+        { "do": "snapshot", "name": "clay" },
+        { "do": "material", "mode": "fluid" }
+      ]
+    },
+    {
+      "name": "builtin-presets",
+      "comment": "Two contrast-extreme built-ins over the same stroke.",
+      "seed": 48879,
+      "actions": [
+        { "do": "preset", "name": "silky" },
+        { "do": "stroke" },
+        { "do": "step", "frames": 50 },
+        { "do": "snapshot", "name": "silky" },
+        { "do": "clear" },
+        { "do": "preset", "name": "electric" },
+        { "do": "stroke" },
+        { "do": "step", "frames": 50 },
+        { "do": "snapshot", "name": "electric" }
+      ]
+    },
+    {
+      "name": "multi-arm-radial",
+      "comment": "Six-arm radial symmetry through the splat multiplier.",
+      "seed": 48879,
+      "actions": [
+        { "do": "select", "id": "symmetryMode", "value": "radial" },
+        { "do": "stroke", "opts": { "mult": 6, "pts": [[0.57, 0.42], [0.63, 0.33], [0.70, 0.26], [0.79, 0.17]] } },
+        { "do": "step", "frames": 50 },
+        { "do": "snapshot", "name": "rosette" }
+      ]
+    },
+    {
+      "name": "collider-lattice",
+      "comment": "Procedural obstacle field, stroke driven through it. setProcedural flips collision on itself; the reset between scenarios clears it via the next scenario's clear (obstacle texture wipe is in the features inventory if this ever leaks).",
+      "seed": 48879,
+      "actions": [
+        { "do": "eval", "js": "window.collisionLayers.setProcedural(function(ctx,w,h){ctx.fillStyle='#fff';for(var i=0;i<4;i++){ctx.beginPath();ctx.arc((0.25+i*0.17)*w,0.5*h,0.04*Math.min(w,h),0,Math.PI*2);ctx.fill();}})" },
+        { "do": "step", "frames": 8 },
+        { "do": "stroke", "opts": { "pts": [[-0.02, 0.5], [0.3, 0.48], [0.7, 0.52], [1.02, 0.5]] } },
+        { "do": "step", "frames": 60 },
+        { "do": "snapshot", "name": "wakes" },
+        { "do": "eval", "js": "window.collisionLayers.setProcedural(null); window.collisionLayers.enabled=false; if(window.clearObstacleTexture)window.clearObstacleTexture()" }
+      ]
+    },
+    {
+      "name": "kaleido-display",
+      "comment": "Kaleidoscope is display-chain: sim hashes should MATCH plain-stroke's physics under identical input while the display hash differs. First-enable side effect: the kaleido toggle bootstraps multiplier to 8 — pinned back to 1 here explicitly.",
+      "seed": 48879,
+      "actions": [
+        { "do": "eval", "js": "window.kaleidoEnabled = true" },
+        { "do": "eval", "js": "var m=document.getElementById('multiplier'); if(m){m.value=1;m.dispatchEvent(new Event('input',{bubbles:true}))}" },
+        { "do": "select", "id": "kaleidoMode", "value": "1" },
+        { "do": "stroke" },
+        { "do": "step", "frames": 60 },
+        { "do": "snapshot", "name": "wedged" },
+        { "do": "eval", "js": "window.kaleidoEnabled = false" }
+      ]
+    },
+    {
+      "name": "hotkey-freeze-toggle",
+      "comment": "Space stops the fluid (toggleFreeze). Snapshot while frozen must equal snapshot after more steps (nothing advances), then unfreeze.",
+      "seed": 48879,
+      "actions": [
+        { "do": "stroke" },
+        { "do": "step", "frames": 20 },
+        { "do": "key", "spec": { "key": " ", "code": "Space" } },
+        { "do": "step", "frames": 2 },
+        { "do": "snapshot", "name": "frozen" },
+        { "do": "step", "frames": 30 },
+        { "do": "snapshot", "name": "still-frozen" },
+        { "do": "key", "spec": { "key": " ", "code": "Space" } },
+        { "do": "step", "frames": 2 }
+      ]
+    }
+  ]
+}

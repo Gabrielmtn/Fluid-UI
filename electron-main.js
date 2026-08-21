@@ -7,7 +7,7 @@ const path = require('path');
 const isDev = !app.isPackaged || process.argv.includes('--dev');
 
 // ── Steamworks (Steam plan S5-1) ───────────────────────────────────────────
-// App ID for "A Small Good Thing" (Steamworks app created 2026-08-06).
+// App ID for "Swirl Together" (Steamworks app created 2026-08-06).
 // Dev testing: drop a steam_appid.txt next to package.json (gitignored and
 // excluded from the depot) and init() reads it with no argument.
 const STEAM_APP_ID = 5068940;
@@ -401,7 +401,7 @@ function createWindow() {
             type: 'error',
             buttons: ['Reload', 'Quit'],
             defaultId: 0,
-            title: 'A Small Good Thing crashed',
+            title: 'Swirl Together crashed',
             message: `The app's renderer crashed (${details.reason}).`,
             detail: 'Unsaved work on the canvas is lost. If this keeps happening, update your GPU drivers.'
         });
@@ -415,7 +415,7 @@ function createWindow() {
             buttons: ['Keep waiting', 'Reload'],
             defaultId: 0,
             title: 'Not responding',
-            message: 'A Small Good Thing is not responding.',
+            message: 'Swirl Together is not responding.',
             detail: 'A heavy export or a very large canvas can take a while. You can keep waiting or reload (unsaved work is lost on reload).'
         });
         if (choice === 1) {

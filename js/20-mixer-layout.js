@@ -1875,6 +1875,7 @@
             effects: ['enableLighting', 'enableLightShift', 'microDetailToggle',
                       'lightIntensity', 'lightAmbient', 'lightSpeed', 'clarity', 'vibrance',
                       'glowToggle', 'glowIntensity', 'glowThreshold',
+                      'scatterToggle', 'scatterAmount', 'scatterReach', 'scatterSource', 'scatterBlockToggle',
                       'shadingIntensity', 'displayShadingToggle',
                       'lightShiftSpeed', 'lightShiftThreshold', 'lightShiftIntensity', 'lightShiftSaturation',
                       'lightPos', 'lightShiftPath'],
@@ -2396,6 +2397,8 @@
 
     function buildDisplaySection(controls) {
         const { sec, body } = makeSection('🖼️ Display', 'green', true);
+        // Photosensitivity protection first — safety leads the section.
+        moveCheckboxGroup('photoSafeToggle', body);
 
         // Window mode (Windowed / Borderless / Fullscreen) — first, because it
         // is the only way back out of a fullscreen mode.
