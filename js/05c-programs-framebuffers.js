@@ -66,6 +66,10 @@
         // governor reinit, so hand out getters rather than snapshot refs.
         window.__getGlow = function () { return glow; };
         window.__getScatter = function () { return scatter; };
+        // Harness/console: rebuild every FBO after changing a fixed-base
+        // resolution (SCATTER_RESOLUTION, GLOW_RESOLUTION). The artwork is
+        // preserved by initFramebuffers' own stash-and-copy path.
+        window.__reinitFramebuffers = function () { initFramebuffers(); };
         window.__getPhotoSafe = function () {
             return { frame: safeFrame, out: safeOut, luma: safeLuma, stats: safeStats };
         };
@@ -274,11 +278,27 @@
                 if (gw < 2 || gh < 2) break;
                 glowFramebuffers.push(createFBO(gw, gh, rgba.internalFormat, rgba.format, texType, filter));
             }
-            // Scatter (light shafts) target: same grid as `glow`, because it
-            // marches glow's own prefilter output and the display pass samples
-            // both at the same UVs. Shafts are low-frequency, so 256-base is
-            // ample and the compositor's bilinear upscale is free.
-            scatter = createFBO(glowW, glowH, rgba.internalFormat, rgba.format, texType, filter);
+            // Scatter (light shafts) target. Marches glow's prefilter output but
+            // is sized INDEPENDENTLY: the shafts themselves are low-frequency,
+            // yet a collider shadow inherits the collider's edges, and at glow's
+            // 256 base the march undersampled the 512-wide obstacle 2:1 before a
+            // 4-8x upscale — every shadow boundary snapped to one coarse texel
+            // and read as stair-steps. Sampling the emitter (still 256) through
+            // LINEAR at the higher rate costs nothing in quality; the shadow is
+            // what gains. Same aspect rule as every other fixed-base buffer.
+            // Never march more texels than the canvas can show — past that the
+            // extra samples are invisible and only cost fill rate.
+            const scatRes = Math.min(config.SCATTER_RESOLUTION || 512,
+                                     Math.max(displayW, displayH));
+            let scatW, scatH;
+            if (displayW >= displayH) {
+                scatW = Math.min(scatRes, maxTextureSize);
+                scatH = Math.max(1, Math.round(scatRes / glowAspect));
+            } else {
+                scatH = Math.min(scatRes, maxTextureSize);
+                scatW = Math.max(1, Math.round(scatRes * glowAspect));
+            }
+            scatter = createFBO(scatW, scatH, rgba.internalFormat, rgba.format, texType, filter);
             // PhotoSafe buffers. safeFrame/safeOut are RGBA8 at the DRAWING
             // BUFFER size — same quantization as the canvas, so the protected
             // pass-through stays bit-identical to a direct present. The luma

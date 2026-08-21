@@ -385,7 +385,9 @@
         "updateObstacleFromLayers() is rAF-COALESCED: window.update() does not pump rAF, so after changing colliders you must await a real animation frame before the obstacle reflects it",
         "collisionLayers.enabled=false calls clearObstacle(), so re-enabling needs a recomposite plus a real rAF frame",
         "Probe the obstacle by reading channel R ONLY — it is R16F, so averaging RGBA reports 1/3 of the true coverage",
-        "Dye decays between harness tool calls; repaint inside the same evaluation or the emitter is gone and every scatter reading collapses to ~0"
+        "Dye decays between harness tool calls; repaint inside the same evaluation or the emitter is gone and every scatter reading collapses to ~0",
+        "Shadow edge sharpness is bounded by config.SCATTER_RESOLUTION (default 512, capped at the canvas long side). Scatter is sized INDEPENDENTLY of GLOW_RESOLUTION: at glow's 256 base the march undersampled the 512-wide obstacle 2:1 and shadow boundaries stair-stepped. Measured edge roughness vs texel size: 256 -> mean 21.4px / p95 224px; 512 -> 11.8 / 8.0; 1024 -> 7.0 / 6.5.",
+        "Benchmarking the scatter pass needs gl.finish() AND a frozen scene (DENSITY_DISSIPATION=1, timeScale~0, no new splats) — dye density drift otherwise swamps the signal and yields non-monotonic/negative costs. Even then the pass is below the noise floor on a 4090."
       ]
     }
   ]

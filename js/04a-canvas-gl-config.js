@@ -858,6 +858,16 @@
             SCATTER_FOLLOW: 0.15,     // Origin lerp per frame (console-tunable). Without it
                                       // the shafts snap when the origin jumps.
 
+            SCATTER_RESOLUTION: 512,  // Scatter's own base resolution (long side),
+                                      // NO LONGER tied to GLOW_RESOLUTION. A bloom halo
+                                      // is low-frequency so 256 is plenty for it, but a
+                                      // collider SHADOW carries the collider's edges: at
+                                      // 256 the march undersampled a 512-wide obstacle by
+                                      // 2x and then upscaled ~4-8x to the canvas, so every
+                                      // shadow boundary quantized to one coarse texel and
+                                      // read as jagged stair-steps (2026-08-21).
+                                      // Console-tunable; cost is O(res^2).
+
             SCATTER_BLOCK: true,      // Colliders cast shadows in the light shafts.
                                       // No-op unless BOTH Scatter and a collision layer
                                       // exist, so ON by default is free where it does
