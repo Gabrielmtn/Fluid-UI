@@ -79,14 +79,12 @@
       "!*.xlsx",
       "!js/07-cos-oscillator.js",
       "!js/14-radial-slider.js",
-      "!steam_appid.txt",
-      "!assets/boot-swirl/**"
+      "!steam_appid.txt"
     ],
     "win": {
       "target": [
         "dir"
-      ],
-      "icon": "build/icon.ico"
+      ]
     }
   }
 }

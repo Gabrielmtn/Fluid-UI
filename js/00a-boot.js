@@ -211,8 +211,7 @@
     //
     // `progress` is the fallback, which Chromium uses until the PNG has
     // decoded — so the OS busy cursor covers the first instants and then the
-    // orb takes over. assets/boot-swirl/ keeps the full 48-frame loop for a
-    // future loader that has its own idle renderer to animate it in.
+    // orb takes over.
     //
     // Set on a dedicated top-most veil rather than on <html>: the cursor
     // property inherits, so a rule on <html> looks like it should be enough —
