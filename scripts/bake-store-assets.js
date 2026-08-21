@@ -720,6 +720,7 @@
     }
 
     // ── Bake ──────────────────────────────────────────────────────────
+    var MARK_SRC = 'build/icon-master-1024.png';   // absent by design; see above
     var wide, portrait, mark, hero, libArt;
     // Resolution is applied; now stop the governor from undoing it.
     if (window.QualityGovernor && window.QualityGovernor.setEnabled) {
@@ -728,7 +729,7 @@
     return bakeWide().then(function (c) { wide = c; return bakePortrait(); })
     .then(function (c) { portrait = c; return bakeLibPortrait(); })
     .then(function (c) { libArt = c; return bakeHero(); })
-    .then(function (c) { hero = c; return loadImage('build/icon-master-1024.png'); })
+    .then(function (c) { hero = c; return loadImage(MARK_SRC).catch(function () { return null; }); })
     .then(function (c) {
         mark = c;
 
@@ -833,18 +834,24 @@
 
         // 1024 icon source + the client icon set — the shipped mark, drawn
         // 1:1 and left transparent so the master's rounded corners survive.
-        s = slot(1024, 1024, true);
-        s.ctx.imageSmoothingQuality = 'high';
-        s.ctx.drawImage(mark, 0, 0, 1024, 1024);
-        write('client_icon_source_1024.png', png(s.c));
-        write('client_icon.ico', ico([16, 24, 32, 48, 64, 128, 256], s.c));
+        // Skipped when MARK_SRC is absent: the vortex master was removed for
+        // unverifiable provenance, and the capsules are worth baking regardless.
+        if (mark) {
+            s = slot(1024, 1024, true);
+            s.ctx.imageSmoothingQuality = 'high';
+            s.ctx.drawImage(mark, 0, 0, 1024, 1024);
+            write('client_icon_source_1024.png', png(s.c));
+            write('client_icon.ico', ico([16, 24, 32, 48, 64, 128, 256], s.c));
+        }
 
         // 184×184 community icon. JPEG has no alpha, so this one gets the
         // ground painted under it rather than transparent corners.
-        var ci = slot(184, 184);
-        ci.ctx.imageSmoothingQuality = 'high';
-        ci.ctx.drawImage(mark, 0, 0, 184, 184);
-        write('community_icon_184x184.jpg', jpg(ci.c, 0.94));
+        if (mark) {
+            var ci = slot(184, 184);
+            ci.ctx.imageSmoothingQuality = 'high';
+            ci.ctx.drawImage(mark, 0, 0, 184, 184);
+            write('community_icon_184x184.jpg', jpg(ci.c, 0.94));
+        }
 
         // Put the canvas box back the way the user left it. The pinned size is
         // only persisted on a resize-handle pointerup (02-palettes.js), so this
@@ -857,7 +864,7 @@
                 written: written,
                 sources: { wide: wide.width + 'x' + wide.height,
                            portrait: portrait.width + 'x' + portrait.height,
-                           mark: mark.width + "x" + mark.height },
+                           mark: mark ? (mark.width + "x" + mark.height) : 'absent' },
                 title: TITLE,
                 tagline: TAG,
                 logoFit: {

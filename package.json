@@ -85,8 +85,7 @@
     "win": {
       "target": [
         "dir"
-      ],
-      "icon": "build/icon.ico"
+      ]
     }
   }
 }
