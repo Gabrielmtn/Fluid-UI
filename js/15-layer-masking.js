@@ -165,7 +165,7 @@
         maskState.activeMaskLayerId = null;
         maskState.shapes = [];
         maskState.selectedShapeIndex = null;
-        // maskState persists across editor sessions — leftover Magic Mask
+        // maskState persists across editor sessions — leftover Instant Roto
         // points from this one must not wedge a later session's Apply button.
         resetSamSessionState();
 
@@ -300,7 +300,7 @@
                      so it doubles as navigation for anyone who already knows
                      the flow. Hidden in collider paint mode. -->
                 <div class="mask-wizard-rail" id="maskWizardRail">
-                    <button type="button" class="mask-wizard-step" data-step="1" title="Pick what to mask — Magic Mask or stamped shapes">
+                    <button type="button" class="mask-wizard-step" data-step="1" title="Pick what to mask — Instant Roto or stamped shapes">
                         <span class="mask-wizard-num">1</span> Select
                     </button>
                     <span class="mask-wizard-sep">›</span>
@@ -347,7 +347,7 @@
                          drive them by id and are unchanged. -->
                     <div class="mask-tools-row mask-tool-tabs" role="tablist">
                         <button id="smartSelectBtn" class="mask-tool-tab" data-tool="magic" onclick="window.setMaskTool('magic')" title="AI-powered object masking&#10;Click objects and the model cuts them out for you&#10;First use: downloads a ~40 MB model (cached locally)">
-                            <span class="mask-tool-tab-icon">🪄</span> Magic Mask
+                            <span class="mask-tool-tab-icon">🪄</span> Instant Roto
                         </button>
                         <button id="stampMenuBtn" class="mask-tool-tab" data-tool="stamps" onclick="window.setMaskTool('stamps')" title="Stamp shapes onto the mask&#10;Rectangles, circles, stars and more — drag to place, resize with the handle">
                             <span class="mask-tool-tab-icon">▦</span> Stamps
@@ -403,7 +403,7 @@
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button id="samSegmentBtn" class="mask-action-btn" onclick="window.runSAMSegmentation()" style="flex: 1; background: linear-gradient(180deg, #238636, #1a7f37);" disabled>
-                                ✨ Magic Mask It
+                                ✨ Instant Roto It
                             </button>
                             <button class="mask-action-btn" onclick="window.clearSAMPoints()">
                                 🗑️ Clear Points
@@ -412,7 +412,7 @@
                         <div id="samCandidateControls" style="display: none; gap: 6px; margin-top: 8px; align-items: center;" title="The AI proposes a few cutouts — hover to preview, click to choose"></div>
                         <div id="samLoadingIndicator" style="display: none; margin-top: 8px; padding: 8px; background: rgba(88, 166, 255, 0.15); border-radius: 4px; font-size: 12px; color: #58a6ff; text-align: center;">
                             <span class="sam-spinner" style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(88, 166, 255, 0.3); border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px;"></span>
-                            Magic Mask is cutting out your object...
+                            Instant Roto is cutting out your object...
                         </div>
                     </div>
                     <!-- Step 2: touch up. Brushes the flattened mask coverage
@@ -1814,7 +1814,7 @@
     }
 
     // Show/hide the Stamps submenu according to maskState (hidden entirely
-    // while Magic Mask mode is engaged)
+    // while Instant Roto mode is engaged)
     function updateStampMenuDisplay() {
         const stampMenu = document.getElementById('stampMenu');
         const stampBtn = document.getElementById('stampMenuBtn');
@@ -1823,7 +1823,7 @@
         if (stampBtn) {
             stampBtn.classList.toggle('open', open);
             // A tab stays put when another tool is active — it used to be
-            // hidden outright while Magic Mask was engaged, which is fine for a
+            // hidden outright while Instant Roto was engaged, which is fine for a
             // button and wrong for a tab strip (the row would reflow).
             stampBtn.style.display = '';
         }
@@ -1836,7 +1836,7 @@
         updateStampMenuDisplay();
     };
 
-    // Toggle Magic Mask Objects mode (AI segmentation)
+    // Toggle Instant Roto mode (AI segmentation)
     window.toggleSmartSelect = async function() {
         maskState.smartSelectMode = !maskState.smartSelectMode;
 
@@ -1851,7 +1851,7 @@
             smartControls.style.display = 'block';
 
             if (hintDiv) {
-                hintDiv.innerHTML = '<strong style="color: #3fb950;">🪄 Magic Mask:</strong> Left-click objects to include • Right-click to exclude • Shift+Click to pan';
+                hintDiv.innerHTML = '<strong style="color: #3fb950;">🪄 Instant Roto:</strong> Left-click objects to include • Right-click to exclude • Shift+Click to pan';
             }
 
             // Hardness slider removed; SAM now uses a fixed default hardness
@@ -1955,7 +1955,7 @@
             smartSelectBtn.classList.remove('engaged');
             smartControls.style.display = 'none';
             maskState.smartSelectPoints = [];
-            // Leaving Magic Mask must stand the busy machinery down too: a
+            // Leaving Instant Roto must stand the busy machinery down too: a
             // pending debounce would fire into autoRun's zero-points early
             // return (before its resync), and stale busy state would keep
             // the Apply button disabled while the user draws manual shapes.
@@ -2018,7 +2018,7 @@
         renderMaskEditor();
     };
 
-    // Magic Mask is a slow async chain: first-use model download → image
+    // Instant Roto is a slow async chain: first-use model download → image
     // embed → 200ms click debounce → CPU-only inference. While a cutout is
     // still on its way for the placed points, Apply must not fall through to
     // buildAdhocResultCanvas's whole-image fallback — that authors a stamp
@@ -2047,7 +2047,7 @@
         }
     }
 
-    // Fully stand down this session's Magic Mask state — points, preview,
+    // Fully stand down this session's Instant Roto state — points, preview,
     // candidates, pending debounce — and resync the Apply button. Every
     // editor exit path must call this: maskState and the overlay both
     // persist across editor sessions, so a cancelled session's leftover
@@ -2229,7 +2229,7 @@
             maskState.smartSelectPoints = [];
             maskState.samPreviewMask = null;
             
-            // Auto-disable Magic Mask mode so user can immediately transform the shape
+            // Auto-disable Instant Roto mode so user can immediately transform the shape
             if (maskState.smartSelectMode) {
                 window.toggleSmartSelect();
             }
@@ -2337,10 +2337,10 @@
     // ══ Mask wizard (2026-08-18) ══════════════════════════════════════════
     // The editor used to be one wall of controls with no order to it, and the
     // two steps that matter most were missing or elsewhere: there was nowhere
-    // to clean up the strays Magic Mask leaves behind, and softening the edge
+    // to clean up the strays Instant Roto leaves behind, and softening the edge
     // meant knowing to go back and drag the layer's Feather slider BEFORE
     // generating a collider. Now it runs as three steps:
-    //   1 Select      — Magic Mask / stamps (unchanged tools)
+    //   1 Select      — Instant Roto / stamps (unchanged tools)
     //   2 Touch up    — brush the coverage: erase strays, add what was missed
     //   3 Soften      — feather with a live preview, then Apply (and, for an
     //                   image layer, hand straight off to a collider)
@@ -2351,7 +2351,7 @@
     const TOUCHUP_HISTORY = 6; // full-canvas snapshots — deep enough to fix a slip
 
     const STEP_HINTS = {
-        1: '<strong style="color:#58a6ff;">Step 1 — Select:</strong> 🪄 Magic Mask clicks an object out for you, or stamp shapes by hand • Scroll to zoom • Middle-click to pan',
+        1: '<strong style="color:#58a6ff;">Step 1 — Select:</strong> 🪄 Instant Roto clicks an object out for you, or stamp shapes by hand • Scroll to zoom • Middle-click to pan',
         2: '<strong style="color:#3fb950;">Step 2 — Touch up:</strong> Erase the strays, add anything missed • Right-drag = the other tool • Shift+drag pans',
         3: '<strong style="color:#d2a8ff;">Step 3 — Soften &amp; finish:</strong> Blue shows what the mask covers • Set the edge softness, then Apply'
     };
@@ -2704,7 +2704,7 @@
     // just shapes to drag, which is a state worth being able to get back to.
     window.setMaskTool = function (tool) {
         const next = (currentMaskTool() === tool) ? 'none' : tool;
-        // Stand the outgoing tool down first (Magic Mask owns async model
+        // Stand the outgoing tool down first (Instant Roto owns async model
         // loading, so it goes through its own toggle either way).
         if (next !== 'magic' && maskState.smartSelectMode) {
             try { window.toggleSmartSelect(); } catch (_) {}
@@ -2845,7 +2845,7 @@
 
     // One-click strays killer: label the connected components of the coverage
     // and drop every island smaller than a twentieth of the biggest one. This
-    // is the single most common Magic Mask cleanup ("it grabbed the object AND
+    // is the single most common Instant Roto cleanup ("it grabbed the object AND
     // three specks of background"), and it is undoable like any stroke.
     function removeMaskSpecks() {
         const tu = ensureTouchUpBuffer();
@@ -3074,14 +3074,14 @@
         if (from === 1) {
             // A cutout still in flight would be dropped on the floor
             if (samCutoutPending()) {
-                setStepHint('<strong style="color:#58a6ff;">⏳ Magic Mask is still cutting out your object</strong> — one moment.', 2600);
+                setStepHint('<strong style="color:#58a6ff;">⏳ Instant Roto is still cutting out your object</strong> — one moment.', 2600);
                 return;
             }
             // Bake the live filter into a shape before anything downstream
             // reads maskState.shapes
             if (maskState.filterMode) setFilterMode(false);
             // Same nicety Apply has: a live preview the user never pressed
-            // "Magic Mask It" on comes along instead of being lost.
+            // "Instant Roto It" on comes along instead of being lost.
             if (!maskState.shapes.length && maskState.samPreviewMask && typeof window.runSAMSegmentation === 'function') {
                 window.runSAMSegmentation();
             }
@@ -3363,7 +3363,7 @@
         }, 10);
     };
 
-    // Show the collider toolbar and hide the shape/Magic-Mask chrome (they
+    // Show the collider toolbar and hide the shape/Instant-Roto chrome (they
     // author layer.mask.shapes — a different feature that would only confuse
     // things here), restoring it on the way out.
     function setColliderChromeVisible(on) {
@@ -3457,7 +3457,7 @@
     };
 
     // ── Ad-hoc mask mode (2026-08-09): run the full editor (stamps +
-    // Magic Mask Objects) against an arbitrary image, no layer involved. Used by
+    // Instant Roto) against an arbitrary image, no layer involved. Used by
     // custom brush shapes (33-brush-shapes). The editor canvas is sized to
     // the IMAGE (capped 2048 long side) so nothing is aspect-stretched;
     // shapes/SAM all operate in that space. On Apply, the caller gets a
@@ -3500,7 +3500,7 @@
             maskState.samCandidates = [];
             maskState.samSelectedCandidateIndex = 0;
             showMaskEditor();
-            // Reset the overlay DOM too if Magic Mask was left engaged
+            // Reset the overlay DOM too if Instant Roto was left engaged
             // (toggleSmartSelect's OFF branch restores the manual tools).
             if (maskState.smartSelectMode && typeof window.toggleSmartSelect === 'function') {
                 try { window.toggleSmartSelect(); } catch (_) {}
@@ -3592,7 +3592,7 @@
         // whole-image fallback stamp — the full-file-rect "giant square".
         // Hold the editor open instead; Cancel is always available.
         if (save && samCutoutPending()) {
-            alert('Magic Mask is still cutting out your object — wait for the green preview, or Cancel.');
+            alert('Instant Roto is still cutting out your object — wait for the green preview, or Cancel.');
             return;
         }
         // Same Apply nicety as image layers: a pending SAM preview with no
@@ -3622,7 +3622,7 @@
         // Same in-flight guard as the adhoc editor: applying before the
         // cutout lands would save an empty/incomplete mask.
         if (save && samCutoutPending()) {
-            alert('Magic Mask is still cutting out your object — wait for the green preview, or Cancel.');
+            alert('Instant Roto is still cutting out your object — wait for the green preview, or Cancel.');
             return;
         }
 

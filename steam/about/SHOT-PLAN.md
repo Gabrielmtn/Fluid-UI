@@ -100,7 +100,7 @@ picker colour.
 
 - **The interface.** No sidebar, no sliders, no room codes. Every one of these
   is canvas pixels edge to edge.
-- **Magic Mask and depth colliders.** The interesting half is a photo, and a
+- **Instant Roto and depth colliders.** The interesting half is a photo, and a
   photo on a store page invites the question of who owns it. `05` carries the
   collider idea without importing anyone's picture.
 - **Presets, export, save.** File management does not photograph.

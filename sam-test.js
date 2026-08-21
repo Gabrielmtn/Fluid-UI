@@ -106,10 +106,10 @@ function log(...args) {
 
         log('[result] masks[0][0] dims:', masks[0][0].dims);
         log('[result] iou_scores:', Array.from(outputs.iou_scores.data));
-        log('[done] Magic Mask (EdgeTAM) test finished successfully');
+        log('[done] Instant Roto (EdgeTAM) test finished successfully');
     } catch (err) {
         console.error(err);
-        log('[error] Magic Mask test failed:', err?.message || err);
+        log('[error] Instant Roto test failed:', err?.message || err);
         if (err?.stack) log('[stack]', err.stack);
     }
 })();
