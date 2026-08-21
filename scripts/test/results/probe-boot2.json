@@ -1,0 +1,54 @@
+{
+  "marks": [
+    {
+      "tag": "post-setup",
+      "dye": "ee5c9dc5",
+      "mean": 0
+    },
+    {
+      "tag": "post-stroke-preframe",
+      "dye": "99c846ae",
+      "mean": 0.21700129
+    },
+    {
+      "tag": "frame-1",
+      "dye": "b15f6b8f",
+      "mean": 0.21759802
+    },
+    {
+      "tag": "frame-2",
+      "dye": "bbab07d1",
+      "mean": 0.215191
+    },
+    {
+      "tag": "frame-3",
+      "dye": "beea60cf",
+      "mean": 0.21583098
+    },
+    {
+      "tag": "frame-5",
+      "dye": "60e855f4",
+      "mean": 0.21344144
+    },
+    {
+      "tag": "frame-10",
+      "dye": "6130e9fb",
+      "mean": 0.20274989
+    },
+    {
+      "tag": "frame-20",
+      "dye": "0033ea0b",
+      "mean": 0.18477934
+    },
+    {
+      "tag": "frame-40",
+      "dye": "b04e61bc",
+      "mean": 0.17217968
+    },
+    {
+      "tag": "frame-60",
+      "dye": "07d05630",
+      "mean": 0.16428838
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 /**
- * Standalone WebSocket relay server for A Small Good Thing multiplayer.
+ * Standalone WebSocket relay server for Swirl Together multiplayer.
  * Replaces PartyKit for local development.
  * 
  * Usage:  node server-relay.js
@@ -16,7 +16,7 @@ const rooms = new Map();
 
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('A Small Good Thing — Relay Server\n');
+    res.end('Swirl Together — Relay Server\n');
 });
 
 const wss = new WebSocketServer({ server });
@@ -105,6 +105,6 @@ function broadcastToRoom(roomCode, msg) {
 }
 
 server.listen(PORT, () => {
-    console.log(`\n🎨 A Small Good Thing relay server running on ws://localhost:${PORT}`);
+    console.log(`\n🎨 Swirl Together relay server running on ws://localhost:${PORT}`);
     console.log(`   Rooms are created on-demand via /parties/fluid/{ROOM_CODE}\n`);
 });

@@ -84,8 +84,27 @@
         lightShiftSaturation: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 1, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
         clarity: {configKey: "CLARITY", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
         vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
-        glowIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.05}, hard: {min: 0, max: 4}, def: 0.8, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 2, step: 0.05, scope: "extended"}},
+        // step 0.05 -> 0.005 (2026-08-21): 0.05 was the smallest halo you could
+        // ask for and it already read as a hard pop off zero. Range, def and
+        // LINEAR meaning are deliberately untouched — this value is stored raw
+        // in every saved preset, so curving it (as scatterAmount does) would
+        // silently reinterpret an existing 0.8 as 1.28. Every previously saved
+        // value is a multiple of 0.05 and so stays exactly on-step.
+        // `mut` keeps the coarse 0.05 — mutation wants visible jumps, not 0.005 nudges.
+        glowIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.005}, hard: {min: 0, max: 4}, def: 0.8, decimals: 3, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 2, step: 0.05, scope: "extended"}},
         glowThreshold: {configKey: null, ui: {min: 0, max: 3, step: 0.05}, hard: {min: 0, max: 6}, def: 0.6, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 3, step: 0.05, scope: "extended"}},
+        // Scatter (light shafts) rides under Glow — see FEATURE_GATES in 25,
+        // which keeps Mutate off this slider while either toggle is off.
+        // Amount is a NORMALISED 0..1 slider, not the shader gain: the bespoke
+        // listener squares it into config.SCATTER_AMOUNT (0..2). A linear gain
+        // slider spent almost all its travel on values that were already blown
+        // out; squaring gives the bottom end most of the track, so 0.01 steps
+        // land ~0.0002 apart down there and ~0.04 apart at the top.
+        scatterAmount: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.5, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.1, max: 1, step: 0.01, scope: "extended"}},
+        // Reach: hard-capped at 1.0 because the march is a fraction of the
+        // pixel→origin distance — past 1.0 it would overshoot the origin and
+        // start gathering mirrored content on the far side.
+        scatterReach: {configKey: null, ui: {min: 0.2, max: 1, step: 0.05}, hard: {min: 0.05, max: 1}, def: 1.0, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.3, max: 1, step: 0.05, scope: "extended"}},
         ssFrequency: {configKey: null, ui: {min: 0.2, max: 8, step: 0.1}, hard: {min: 0.2, max: 8}, def: 2, decimals: 1, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.2, max: 8, step: 0.1, scope: "extended"}},
         ssAngle: {configKey: null, ui: {min: 0, max: 360, step: 1}, hard: {min: 0, max: 360}, def: 120, decimals: 0, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0, max: 360, step: 1, scope: "extended"}},
         ssLength: {configKey: null, ui: {min: 0.1, max: 3, step: 0.05}, hard: {min: 0.1, max: 3}, def: 0.4, decimals: 2, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.05, scope: "extended"}},
@@ -135,6 +154,15 @@
         macCormackToggle: {def: true, mutScope: null},
         multigridToggle: {def: true, mutScope: null},
         glowToggle: {def: false, mutScope: "extended"},
+        scatterToggle: {def: false, mutScope: "extended"},
+        // Colliders block light. mutScope null: with no collision layer it is a
+        // no-op, so mutating it would spend a variation slot on nothing.
+        scatterBlockToggle: {def: true, mutScope: null},
+        // Photosensitivity protection. mutScope null: Mutate must NEVER flip a
+        // safety toggle. Also in 12-save-load's PRESET_SKIP — the preference is
+        // per-user (bespoke localStorage key 'fluidui.photoSafe'), and must not
+        // ride presets or multiplayer look mirrors.
+        photoSafeToggle: {def: true, mutScope: null},
         // ascendToggle/ascendRandomness removed 2026-08-15 (photosensitivity):
         // deleting the entries is load-bearing — old presets/snapshots that
         // carry them skip-with-warn (12-save-load coerceCheckbox null path)
@@ -166,6 +194,9 @@
         symmetryMode: {options: ["radial", "mirrorX", "mirrorY", "mirrorQuad", "rake"], def: "radial", mut: null},
         fpsCap: {options: ["30", "60", "120", "144", "165", "240", "native", "0"], def: "30", mut: null},
         lightMode: {options: ["manual", "random"], def: "manual", mut: {options: null, scope: "extended"}},
+        // Ray origin for Scatter. No `mut`: swapping the origin teleports every
+        // shaft at once, which reads as a glitch rather than a variation.
+        scatterSource: {options: ["light", "brush"], def: "light", mut: null},
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
         recMode: {options: ["off", "min", "full"], def: "off", mut: null},
         recPlaybackSpeed: {options: ["0.25", "0.5", "1", "2", "4"], def: "0.25", mut: null},

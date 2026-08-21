@@ -9,6 +9,58 @@
     function boolEl(id) { const el = $(id); return !!(el && el.checked); }
     function valEl(id) { const el = $(id); return el ? el.value : undefined; }
     function setVal(id, value, evt='input') { const el = $(id); if (!el) return; el.value = value; el.dispatchEvent(new Event(evt, {bubbles:true})); el.style.setProperty('--val', value); }
+
+    // ── Slider truth: config, not the thumb ──────────────────────────────
+    // Capturing el.value was a silent three-way lie, and every consumer of a
+    // snapshot inherited it — saved settings, presets, and the multiplayer
+    // look mirror alike:
+    //   * a control whose panel had not been built yet has NO element, and
+    //     `valEl` returned undefined, so that setting was dropped from the
+    //     snapshot entirely rather than carried at its real value;
+    //   * anything that writes config directly — material modes, Mutate,
+    //     audio reactivity, performance profiles — leaves the thumb behind,
+    //     so the STALE displayed number was captured instead of the live one;
+    //   * a true value outside the input's min/max reads back CLAMPED. That
+    //     is by design, not an edge case: the registry's `hard` range is
+    //     deliberately wider than `ui` wherever something drives a param past
+    //     what the slider exposes (29-material-modes puts VELOCITY_DISSIPATION
+    //     below velocityDissipation's ui.min on purpose).
+    // The registry names a configKey for exactly those sliders that map 1:1.
+    // The other 31 (brushSize → SPLAT_RADIUS/1000, the kaleido and light
+    // controls, …) are scaled or UI-only, and for them the element IS the
+    // source of truth — so they keep reading it.
+    function sliderValue(id) {
+        var reg = (window.ParamRegistry && window.ParamRegistry.SLIDERS)
+            ? window.ParamRegistry.SLIDERS[id] : null;
+        var key = reg && reg.configKey;
+        if (key && window.config) {
+            var cv = window.config[key];
+            if (typeof cv === 'number' && isFinite(cv)) return cv;
+        }
+        var v = valEl(id);
+        return v === undefined ? undefined : num(v);
+    }
+
+    // The inverse, for the same reasons. setVal round-trips through the input,
+    // so the browser clamps anything outside min/max BEFORE the 'input'
+    // handler copies it into config — which would quietly re-narrow every
+    // value the capture side just went to the trouble of telling the truth
+    // about. Only write through when the element actually altered the value
+    // (or does not exist): a normal in-range apply must keep using the
+    // existing event path, which several controls hook (curl delegates to
+    // MaterialModes, densityDissipation can trigger a wipe).
+    function applySliderValue(id, value) {
+        setVal(id, value);
+        var reg = (window.ParamRegistry && window.ParamRegistry.SLIDERS)
+            ? window.ParamRegistry.SLIDERS[id] : null;
+        var key = reg && reg.configKey;
+        if (!key || !window.config) return;
+        var n = Number(value);
+        if (!isFinite(n)) return;
+        var el = $(id);
+        if (!el) { window.config[key] = n; return; }        // no UI to clamp it
+        if (Math.abs(parseFloat(el.value) - n) > 1e-9) window.config[key] = n;
+    }
     function setCheck(id, checked) { const el = $(id); if (!el) return; el.checked = !!checked; el.dispatchEvent(new Event('change', {bubbles:true})); }
 
     // Base64 encode/decode for Uint8Array (collision depthData serialization)
@@ -48,7 +100,13 @@
     // means applying any preset dispatches its change handler, which
     // re-entrantly runs applyFromSettings() mid-apply and clobbers the
     // preset's sliders — and silently rewrites the user's autoload choice.
-    var PRESET_SKIP = { preserveFluidOpacity: true, autoloadSettings: true };
+    // photoSafeToggle: SAFETY preference — per-user, never per-preset. Its
+    // truth lives in the 'fluidui.photoSafe' localStorage key (written by the
+    // first-frame warning modal and the Display checkbox); letting it into
+    // snapshots would mean loading a preset saved with protection off silently
+    // disables a user's protection — and the multiplayer look mirror replays
+    // snapshot checkboxes wholesale, so a PEER could do the same.
+    var PRESET_SKIP = { preserveFluidOpacity: true, autoloadSettings: true, photoSafeToggle: true };
 
     function _registryIds(map, skip) {
         return Object.keys(map).filter(function (id) { return !(skip && skip[id]); });
@@ -94,7 +152,7 @@
 
         // ── Sliders ──
         const sliders = {};
-        SLIDER_IDS.forEach(id => { const v = valEl(id); if (v !== undefined) sliders[id] = num(v); });
+        SLIDER_IDS.forEach(id => { const v = sliderValue(id); if (v !== undefined) sliders[id] = v; });
 
         // ── Checkboxes ──
         const checkboxes = {};
@@ -262,7 +320,7 @@
         var sliderCount = 0;
         SLIDER_IDS.forEach(function(id) {
             var v = sm.get('slider.' + id);
-            if (v !== undefined && v !== null) { setVal(id, v); sliderCount++; }
+            if (v !== undefined && v !== null) { applySliderValue(id, v); sliderCount++; }
         });
 
         // ── 4. Checkboxes ──
@@ -475,14 +533,43 @@
                     try { applyFromSettings(); } catch (err) { console.error('Autoload apply error:', err); }
                 }
             });
-            // Apply on start if enabled
+            // Apply on start if enabled.
+            //
+            // MUST wait for the async chunk chain. Restore works by writing each
+            // control's value and dispatching a real input/change event into the
+            // listener that owns it — but the bespoke listeners (glow, scatter,
+            // surface shading, micro detail, brush...) live in the js/05* chunks,
+            // which index.html loads through a SEQUENTIAL ASYNC loader, while this
+            // file is a plain sync tag near the end of <body>. Its DOMContentLoaded
+            // therefore fires long before those listeners exist — on web the loader
+            // deliberately waits 400ms before even starting the chain.
+            //
+            // The events then landed on nothing: every checkbox came back visually
+            // restored while the engine kept its defaults, so the UI read "Glow on"
+            // with config.GLOW false and the user had to toggle every control by
+            // hand to actually arm it (reported 2026-08-21). Latent since the 05
+            // split; autoload defaulting ON is what made it a every-launch bug.
             if (auto) {
-                try {
-                    if (typeof window.loadDeletedPalettes === 'function') {
-                        window.loadDeletedPalettes();
-                    }
-                    applyFromSettings();
-                } catch (err) { console.error('Autoload startup error:', err); }
+                var _autoApplied = false;
+                var _applyStartup = function () {
+                    if (_autoApplied) return;   // event + fallback must not double-apply
+                    _autoApplied = true;
+                    try {
+                        if (typeof window.loadDeletedPalettes === 'function') {
+                            window.loadDeletedPalettes();
+                        }
+                        applyFromSettings();
+                    } catch (err) { console.error('Autoload startup error:', err); }
+                };
+                if (window.__scriptsReady) {
+                    _applyStartup();
+                } else {
+                    document.addEventListener('fluidui:scripts-ready', _applyStartup, { once: true });
+                    // Safety net: a blocked/failed chunk must not cost the user
+                    // their whole saved session. Losing settings is worse than
+                    // restoring them into a half-built UI.
+                    setTimeout(_applyStartup, 10000);
+                }
             }
         }
 
@@ -542,7 +629,7 @@
 
         // ── Sliders ──
         var sliders = {};
-        SLIDER_IDS.forEach(function(id) { var v = valEl(id); if (v !== undefined) sliders[id] = num(v); });
+        SLIDER_IDS.forEach(function(id) { var v = sliderValue(id); if (v !== undefined) sliders[id] = v; });
 
         // ── Checkboxes ──
         var checkboxes = {};
@@ -914,9 +1001,9 @@
                         var clamped = reg.clampSlider(id, raw);
                         if (clamped === null) { console.warn('[Preset] skipping unknown/invalid slider', id, raw); return; }
                         if (clamped !== Number(raw)) console.warn('[Preset] clamped slider', id, raw, '→', clamped);
-                        setVal(id, clamped);
+                        applySliderValue(id, clamped);
                     } else {
-                        setVal(id, raw);
+                        applySliderValue(id, raw);
                     }
                 });
             }
@@ -933,6 +1020,10 @@
                     // clobbers the preset's sliders (also guards old snapshots
                     // saved before PRESET_SKIP excluded it at capture time).
                     if (id === 'preserveFluidOpacity' || id === 'autoloadSettings') return;
+                    // Safety toggle: guards snapshots captured elsewhere (old
+                    // clients, foreign vault files, peer look-mirrors) — a
+                    // snapshot must never be able to switch protection off.
+                    if (id === 'photoSafeToggle') return;
                     // Remote look-mirror applies must not touch sketch/mask
                     // workflow prefs: setCheck dispatches 'change', whose
                     // handler persists to settingsManager — a peer's snapshot
@@ -1645,7 +1736,7 @@
     // gaps with defaults there would wipe watcher state mid-performance.
     var BASELINE_SKIP = { visualResolution: 1, physicsResolution: 1, fpsCap: 1,
         recMode: 1, recPlaybackSpeed: 1, statsToggle: 1, autoloadSettings: 1,
-        preserveFluidOpacity: 1 };
+        preserveFluidOpacity: 1, photoSafeToggle: 1 };
 
     function baselineLookSnapshot() {
         var base = {

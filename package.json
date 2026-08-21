@@ -27,7 +27,7 @@
   },
   "build": {
     "appId": "com.gabrielmtn.fluidsimulation",
-    "productName": "A Small Good Thing",
+    "productName": "Swirl Together",
     "directories": {
       "output": "dist",
       "buildResources": "build"

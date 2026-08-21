@@ -94,6 +94,8 @@
             uniform sampler2D uTexture;
             uniform sampler2D uGlow;      // Glow (HDR bloom): mip-chain halo of the overbright dye
             uniform float glowEnabled;
+            uniform sampler2D uScatter;   // Scatter: volumetric light shafts marched from an origin
+            uniform float scatterEnabled;
             // D2 raster layer stack: up to 4 visible raster paint layers
             // (premultiplied RGBA8), composited around the fluid. Per-slot
             // params: x=enabled, y=opacity, z=blend mode (0 normal /
@@ -529,6 +531,24 @@
                         glowC = lightShiftColor * glum;
                     }
                     vec3 gsum = color.rgb + glowC;
+                    // Scatter (light shafts) folds into the SAME sum, and it
+                    // lives inside the glow branch on purpose: it marches
+                    // glow's own prefilter buffer, so glow off means there is
+                    // no emitter to march. Summing here (rather than after)
+                    // is what puts it under the Gate shoulder below — two
+                    // additive light terms, one hue-preserving soft-limit.
+                    if (scatterEnabled > 0.5) {
+                        vec3 sc = mix(texture(uScatter, vUv).rgb, texture(uScatter, kUv).rgb,
+                                      doK ? clamp(kBlend, 0.0, 1.0) : 0.0);
+                        sc = pow(max(sc, vec3(0.0)), vec3(1.0 / 2.2));
+                        if (lightShiftEnabled > 0.5) {
+                            // Same rule as the halo above: shafts are light OF
+                            // the already-shifted image, so they take the shift
+                            // colour outright rather than pushing white back in.
+                            sc = lightShiftColor * dot(sc, vec3(0.299, 0.587, 0.114));
+                        }
+                        gsum += sc;
+                    }
                     if (gateWhite > 0.0) {
                         // Gate on: the ceiling's whole promise is "never blow
                         // out to white", so the halo must not undo it. Soft-

@@ -1,4 +1,4 @@
-# A Small Good Thing
+# Swirl Together
 
 A playful painting game for two or more — a beautiful, interactive fluid simulation with comprehensive controls and **real-time multiplayer** support via PartyKit.
 

@@ -1,0 +1,549 @@
+{
+  "meta": {
+    "generated": "2026-08-21",
+    "purpose": "Input-test spec for the Fluid-UI hotkey/wheel/pointer surface. Every entry verified against handler source; file:line refs are the proof.",
+    "sources": {
+      "reference_sheet": "index.html:1049-1155 (F1 modal; marketing copy, not authority)",
+      "main_handler": "js/05n-hotkeys-init.js:282-448 (document keydown, bubble phase)",
+      "typing_guard": "js/01a-param-registry.js:363-374 (window.__isTypingTarget: textarea/select/contenteditable/text-like input types block; range/checkbox/color inputs do NOT block)",
+      "wheel_handler": "js/05h-slider-bindings.js:311-480 (#canvas-area wheel, passive:false, bubble)",
+      "pointer_handler": "js/05d-input-replay.js:490-824 (#canvas pointerdown/move; window pointerup/pointercancel/blur/dragstart)",
+      "other_handlers": [
+        "js/05e-effect-controls.js:273-291 (Digit/Numpad multiplier)",
+        "js/21-focus-mode.js:124-137 (F)",
+        "js/35-zoom-view.js:168-225 (Z, 0, zoom wheel/drag, capture phase)",
+        "js/32-file-drop.js:300-312,399-436 (Ctrl+V, Ctrl+Shift+V)",
+        "js/comfyui-bridge.js:231-238 (Ctrl+Enter)",
+        "js/electron-performance.js:29-38 (Ctrl+Shift+G, unpackaged Electron only)"
+      ]
+    },
+    "synthesis": {
+      "keyboard": "All keyboard handlers read only e.key/e.code/modifiers/e.repeat/e.target — synthetic (untrusted) KeyboardEvent dispatched on document works for every binding. CDP Input.dispatchKeyEvent also works. Dispatch on document so e.target=document (never a typing target).",
+      "wheel": "Dispatch WheelEvent on #canvas-area (or #canvas, it bubbles) with {deltaY, bubbles:true, cancelable:true, clientX/clientY over the canvas} plus modifier flags. Handler is bubble-phase on #canvas-area (js/05h-slider-bindings.js:311). Zoom Mode's capture-phase handler intercepts first when active (js/35-zoom-view.js:168-180) — keep zoomMode off.",
+      "pointer": "Real strokes: CDP Input.dispatchMouseEvent (mousePressed/mouseMoved/mouseReleased, button 'left') over the canvas — Chromium synthesizes trusted PointerEvents with pointerType 'mouse'. Synthetic PointerEvent via dispatchEvent also drives the state machine (handlers never check isTrusted); getCoalescedEvents is absent on synthetic events and the handler falls back to a single sample (js/05d-input-replay.js:635-643).",
+      "bare_globals": "isPaused, recEnabled, recLayers, recActiveLayerId, recCountdownActive, recIsPlayingAll, currentPaletteIndex, paletteStepIndex, savedColors, splatOutActive, bordersLocked are top-level let/const in classic scripts — NOT window properties, but readable by bare identifier in CDP Runtime.evaluate (shared global lexical scope). window.pointer, window.animationMultiplier, window.__fluidFrozen, window.config, window.recIsEnabled(), window.recGetActiveLayerId(), window.recGetLayersSnapshot(), window.ZoomView, window.fluidExport, window.mutationEngine ARE on window."
+    }
+  },
+  "keyboard": [
+    {
+      "keys": "F1",
+      "event": { "key": "F1", "code": "F1", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target (js/05n-hotkeys-init.js:283 via js/01a-param-registry.js:363-374)",
+      "effect": "Toggles the hotkey reference modal (chips the list on first open)",
+      "assertion": "document.getElementById('hotkeyOverlay').style.display toggles between 'flex' and 'none' (js/05n-hotkeys-init.js:34-36,302-306)",
+      "source": "js/05n-hotkeys-init.js:302-306",
+      "sheet": "index.html:1145"
+    },
+    {
+      "keys": "Shift+?",
+      "event": { "key": "?", "code": "Slash", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "typing target; handler accepts key '?' or '/' with shiftKey (js/05n-hotkeys-init.js:302)",
+      "effect": "Same as F1 — toggles hotkey modal",
+      "assertion": "#hotkeyOverlay style.display flips 'flex'/'none'",
+      "source": "js/05n-hotkeys-init.js:302-306",
+      "sheet": "index.html:1145"
+    },
+    {
+      "keys": "Escape",
+      "event": { "key": "Escape", "code": "Escape", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; precedence: if #hotkeyOverlay display==='flex' it ONLY closes the modal (js/05n-hotkeys-init.js:309-312); else only acts if recEnabled (bare global, js/02-palettes.js:346) is true",
+      "effect": "Close hotkey modal, OR recStopAll(): cancel countdown, stop recording, stop all playback and reset playbackPosition to 0 (js/03-recording.js:350-355,344-348)",
+      "assertion": "Case 1: #hotkeyOverlay.style.display becomes 'none'. Case 2 (record mode): bare-global recCountdownActive===false, every recLayers[i].timeline.isPlaying===false and playbackPosition===0, active layer timeline.isRecording===false",
+      "source": "js/05n-hotkeys-init.js:308-320",
+      "sheet": "index.html:1070,1146"
+    },
+    {
+      "keys": "F9",
+      "event": { "key": "F9", "code": "F9", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; no-op unless recEnabled (js/05n-hotkeys-init.js:324); during countdown it cancels instead (js/03-recording.js:268); if already recording it stops (js/03-recording.js:270-273)",
+      "effect": "recToggleRecord(): starts a 3-2-1 countdown then recording on the active rec layer",
+      "assertion": "Immediately after: bare-global recCountdownActive===true (js/03-recording.js:155); after ~3s: recLayers.find(l=>l.id===recActiveLayerId).timeline.isRecording===true (js/03-recording.js:103)",
+      "source": "js/05n-hotkeys-init.js:322-333",
+      "sheet": "index.html:1068"
+    },
+    {
+      "keys": "Shift+F9",
+      "event": { "key": "F9", "code": "F9", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "typing target; no-op unless recEnabled",
+      "effect": "recStartRecording(): recording starts immediately, no countdown (creates a layer if none)",
+      "assertion": "recLayers.find(l=>l.id===recActiveLayerId).timeline.isRecording===true immediately (js/03-recording.js:99-129)",
+      "source": "js/05n-hotkeys-init.js:325-328",
+      "sheet": "index.html:1069"
+    },
+    {
+      "keys": "Space",
+      "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; e.repeat ignored (js/05n-hotkeys-init.js:343); routed to rec transport instead when recEnabled===true (js/05n-hotkeys-init.js:344-353)",
+      "effect": "window.toggleFreeze() (js/04b-presets.js:170-218): freeze saves DENSITY_DISSIPATION/VELOCITY_DISSIPATION then sets them to 1.0/0.9; unfreeze restores",
+      "assertion": "window.__fluidFrozen toggles (js/04b-presets.js:196); #freezeBtn.classList.contains('active') toggles; while frozen window.config.DENSITY_DISSIPATION===1.0 && window.config.VELOCITY_DISSIPATION===0.9",
+      "source": "js/05n-hotkeys-init.js:338-360",
+      "sheet": "index.html:1059"
+    },
+    {
+      "keys": "Shift+Space",
+      "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "typing target; e.repeat ignored; routed to rec transport when recEnabled===true",
+      "effect": "window.togglePause() (js/04f-canvas-actions.js:73-84): flips the sim pause flag; the update loop skips stepping while paused (js/05j-update-loop.js:226)",
+      "assertion": "bare-global isPaused toggles (declared js/01-config.js:32); #pauseBtn.textContent flips between '⏸' and '▶' and classList 'active' toggles",
+      "source": "js/05n-hotkeys-init.js:354-359",
+      "sheet": "index.html:1060"
+    },
+    {
+      "keys": "Space (record mode)",
+      "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "recEnabled===true; active layer must have timeline.interactions.length>0 to start playing (js/03-recording.js:313)",
+      "effect": "recTogglePlayback(): toggles active rec layer playback, stops other layers' playback",
+      "assertion": "recLayers.find(l=>l.id===recActiveLayerId).timeline.isPlaying toggles (js/03-recording.js:307-322)",
+      "source": "js/05n-hotkeys-init.js:344-351",
+      "sheet": "index.html:1066"
+    },
+    {
+      "keys": "Shift+Space (record mode)",
+      "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "recEnabled===true; at least one layer with interactions (js/03-recording.js:329-330)",
+      "effect": "recTogglePlaybackAll(): play/pause every layer that has interactions",
+      "assertion": "bare-global recIsPlayingAll toggles (js/03-recording.js:324-342)",
+      "source": "js/05n-hotkeys-init.js:345-348",
+      "sheet": "index.html:1067"
+    },
+    {
+      "keys": "Ctrl+Z",
+      "event": { "key": "z", "code": "KeyZ", "ctrlKey": true, "shiftKey": false, "altKey": false },
+      "guard": "typing target; metaKey also accepted (js/05n-hotkeys-init.js:286,362)",
+      "effect": "window.UndoManager.undo() — recency-ordered across UI-state, sketch and layer providers (js/05n-hotkeys-init.js:189-206)",
+      "assertion": "State-dependent. Deterministic recipe: press ']' (pushes a UI undo snapshot, js/05n-hotkeys-init.js:224), then Ctrl+Z restores #brushSize.value and window.config.SPLAT_RADIUS to the prior value (applyState js/05n-hotkeys-init.js:115-120)",
+      "source": "js/05n-hotkeys-init.js:362-369",
+      "sheet": "index.html:1079"
+    },
+    {
+      "keys": "Ctrl+Shift+Z",
+      "event": { "key": "Z", "code": "KeyZ", "ctrlKey": true, "shiftKey": true, "altKey": false },
+      "guard": "typing target; handler lowercases single-char keys so 'Z' matches (js/05n-hotkeys-init.js:285)",
+      "effect": "window.UndoManager.redo()",
+      "assertion": "After the Ctrl+Z recipe above, Ctrl+Shift+Z re-applies the undone #brushSize.value",
+      "source": "js/05n-hotkeys-init.js:362-369",
+      "sheet": "index.html:1080"
+    },
+    {
+      "keys": "Ctrl+Y",
+      "event": { "key": "y", "code": "KeyY", "ctrlKey": true, "shiftKey": false, "altKey": false },
+      "guard": "typing target",
+      "effect": "window.UndoManager.redo()",
+      "assertion": "Same as Ctrl+Shift+Z",
+      "source": "js/05n-hotkeys-init.js:370-374",
+      "sheet": "index.html:1080"
+    },
+    {
+      "keys": "Ctrl+Shift+N",
+      "event": { "key": "N", "code": "KeyN", "ctrlKey": true, "shiftKey": true, "altKey": false },
+      "guard": "typing target; no-op unless recEnabled (js/05n-hotkeys-init.js:378)",
+      "effect": "recAddLayer() — creates a new recording layer (js/03-recording.js:207)",
+      "assertion": "bare-global recLayers.length increments by 1; window.recGetLayersSnapshot().length increments",
+      "source": "js/05n-hotkeys-init.js:376-380",
+      "sheet": "index.html:1073"
+    },
+    {
+      "keys": "Delete",
+      "event": { "key": "Delete", "code": "Delete", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; requires no ctrl/alt/shift (js/05n-hotkeys-init.js:382); no-op unless recEnabled",
+      "effect": "recClearActive(): wipes active rec layer timeline (js/03-recording.js:1138-1149)",
+      "assertion": "Active layer timeline.interactions.length===0, duration===0, playbackPosition===0",
+      "source": "js/05n-hotkeys-init.js:382-388",
+      "sheet": "index.html:1072"
+    },
+    {
+      "keys": "C",
+      "event": { "key": "c", "code": "KeyC", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; block requires !ctrl/meta && !alt — Shift is NOT excluded, so Shift+C also fires (js/05n-hotkeys-init.js:390)",
+      "effect": "toggleCheckbox('cursorToggle'): flips checkbox + dispatches change; pushes UI undo",
+      "assertion": "document.getElementById('cursorToggle').checked flips (js/05n-hotkeys-init.js:209-215)",
+      "source": "js/05n-hotkeys-init.js:394",
+      "sheet": "index.html:1086"
+    },
+    {
+      "keys": "H",
+      "event": { "key": "h", "code": "KeyH", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "same as C",
+      "effect": "toggleCheckbox('showCanvasHandles') — canvas border & handles visibility",
+      "assertion": "document.getElementById('showCanvasHandles').checked flips",
+      "source": "js/05n-hotkeys-init.js:395",
+      "sheet": "index.html:1089"
+    },
+    {
+      "keys": "L",
+      "event": { "key": "l", "code": "KeyL", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "same as C",
+      "effect": "toggleCheckbox('lockCanvasBorders')",
+      "assertion": "document.getElementById('lockCanvasBorders').checked flips",
+      "source": "js/05n-hotkeys-init.js:396",
+      "sheet": "index.html:1090"
+    },
+    {
+      "keys": "R",
+      "event": { "key": "r", "code": "KeyR", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "same as C",
+      "effect": "toggleCheckbox('randomColor')",
+      "assertion": "document.getElementById('randomColor').checked flips",
+      "source": "js/05n-hotkeys-init.js:397",
+      "sheet": "index.html:1113"
+    },
+    {
+      "keys": "A",
+      "event": { "key": "a", "code": "KeyA", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "same as C",
+      "effect": "toggleCheckbox('stepPalette')",
+      "assertion": "document.getElementById('stepPalette').checked flips",
+      "source": "js/05n-hotkeys-init.js:398",
+      "sheet": "index.html:1114"
+    },
+    {
+      "keys": "E",
+      "event": { "key": "e", "code": "KeyE", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; !ctrl/meta && !alt && !shift (js/05n-hotkeys-init.js:400)",
+      "effect": "window.fluidExport.video() — STARTS A REAL VIDEO EXPORT (js/24-video-export.js:1256-1268)",
+      "assertion": "window.fluidExport.isExporting()===true; harness must call window.fluidExport.stop() to clean up",
+      "source": "js/05n-hotkeys-init.js:400-404",
+      "sheet": "index.html:1097"
+    },
+    {
+      "keys": "M",
+      "event": { "key": "m", "code": "KeyM", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; !ctrl/meta && !alt && !shift; silent no-op until the dynamically-built #mutationGenerate button exists (built by js/20-mixer-layout.js:1770 ~800ms after DOMContentLoaded, behind the splash)",
+      "effect": "Clicks #mutationGenerate → doMutate(): captures a preset snapshot, pushes 'Origin' to the mutation chain if empty, renders variant cards (js/20-mixer-layout.js:2075 + doMutate). Does NOT itself change sim config until a variant is applied",
+      "assertion": "window.mutationEngine.chain.length >= 1 after first press; #mutationGrid has child cards and style.display!=='none'",
+      "source": "js/05n-hotkeys-init.js:406-411",
+      "sheet": "index.html:1098"
+    },
+    {
+      "keys": "[",
+      "event": { "key": "[", "code": "BracketLeft", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; !ctrl/meta && !alt; handler matches e.key==='[' EXACTLY (js/05n-hotkeys-init.js:412)",
+      "effect": "adjustBrush(-1): #brushSize.value -1 (clamped to element min/max = 0.001/100 per index.html:261), config.SPLAT_RADIUS = value/1000; pushes UI undo",
+      "assertion": "parseFloat(#brushSize.value) decreased by 1 and window.config.SPLAT_RADIUS === new value/1000 (js/05n-hotkeys-init.js:216-228)",
+      "source": "js/05n-hotkeys-init.js:412",
+      "sheet": "index.html:1104"
+    },
+    {
+      "keys": "]",
+      "event": { "key": "]", "code": "BracketRight", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "same as [",
+      "effect": "adjustBrush(+1)",
+      "assertion": "parseFloat(#brushSize.value) increased by 1; window.config.SPLAT_RADIUS matches value/1000",
+      "source": "js/05n-hotkeys-init.js:413",
+      "sheet": "index.html:1104"
+    },
+    {
+      "keys": "N",
+      "event": { "key": "n", "code": "KeyN", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; !ctrl/meta && !alt; no-op if getStepColorList() empty (js/05n-hotkeys-init.js:230-232)",
+      "effect": "stepPaletteOnce(true): sets #colorPicker.value and window.pointer.color to the next step-list colour, advances paletteStepIndex",
+      "assertion": "bare-global paletteStepIndex increments (mod list length, declared js/01-config.js:65); #colorPicker.value equals the list entry; window.pointer.color matches its RGB/255",
+      "source": "js/05n-hotkeys-init.js:414,229-254",
+      "sheet": "index.html:1115"
+    },
+    {
+      "keys": "Shift+N",
+      "event": { "key": "N", "code": "KeyN", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "same as N",
+      "effect": "stepPaletteOnce(false): previous colour",
+      "assertion": "paletteStepIndex decrements (wrapping); #colorPicker.value equals list[paletteStepIndex]",
+      "source": "js/05n-hotkeys-init.js:414,243-252",
+      "sheet": "index.html:1115"
+    },
+    {
+      "keys": "Shift+S",
+      "event": { "key": "S", "code": "KeyS", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "typing target; !ctrl/meta && !alt (js/05n-hotkeys-init.js:415)",
+      "effect": "window.saveColor(): adds #colorPicker.value to savedColors + localStorage 'fluidSimColors' (js/04a-canvas-gl-config.js:13-18, js/02-palettes.js:276-293); duplicate colours are skipped",
+      "assertion": "bare-global savedColors includes the picker colour; JSON.parse(localStorage.getItem('fluidSimColors')) includes it; #savedColors child count grows (if not duplicate)",
+      "source": "js/05n-hotkeys-init.js:415",
+      "sheet": "index.html:1116"
+    },
+    {
+      "keys": "Shift+X",
+      "event": { "key": "X", "code": "KeyX", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "typing target; !ctrl/meta && !alt",
+      "effect": "window.clearColors() (js/04a-canvas-gl-config.js:23-25)",
+      "assertion": "bare-global savedColors.length===0; #savedColors has no children",
+      "source": "js/05n-hotkeys-init.js:416",
+      "sheet": "index.html:1117"
+    },
+    {
+      "keys": "ArrowUp",
+      "event": { "key": "ArrowUp", "code": "ArrowUp", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; no ctrl/meta/alt/shift; no-op unless recEnabled (js/05n-hotkeys-init.js:419-423)",
+      "effect": "recCycleLayer(-1): previous rec layer, wraps (js/03-recording.js:1660-1667)",
+      "assertion": "window.recGetActiveLayerId() changes (needs >=2 layers)",
+      "source": "js/05n-hotkeys-init.js:420-423",
+      "sheet": "index.html:1071"
+    },
+    {
+      "keys": "ArrowDown",
+      "event": { "key": "ArrowDown", "code": "ArrowDown", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "same as ArrowUp",
+      "effect": "recCycleLayer(1): next rec layer, wraps",
+      "assertion": "window.recGetActiveLayerId() changes (needs >=2 layers)",
+      "source": "js/05n-hotkeys-init.js:425-428",
+      "sheet": "index.html:1071"
+    },
+    {
+      "keys": "Ctrl+ArrowLeft",
+      "event": { "key": "ArrowLeft", "code": "ArrowLeft", "ctrlKey": true, "shiftKey": false, "altKey": false },
+      "guard": "typing target; ctrl or meta",
+      "effect": "window.cyclePalette(-1): previous curated palette — CLAMPS at index 0, does not wrap (js/01-config.js:449-455); pushes UI undo",
+      "assertion": "bare-global currentPaletteIndex decrements by 1 (unchanged when already 0)",
+      "source": "js/05n-hotkeys-init.js:432-436",
+      "sheet": "index.html:1118"
+    },
+    {
+      "keys": "Ctrl+ArrowRight",
+      "event": { "key": "ArrowRight", "code": "ArrowRight", "ctrlKey": true, "shiftKey": false, "altKey": false },
+      "guard": "same as Ctrl+ArrowLeft",
+      "effect": "window.cyclePalette(1): next palette, clamps at last index",
+      "assertion": "currentPaletteIndex increments by 1 (unchanged at the end)",
+      "source": "js/05n-hotkeys-init.js:432-436",
+      "sheet": "index.html:1118"
+    },
+    {
+      "keys": "Alt+ArrowUp",
+      "event": { "key": "ArrowUp", "code": "ArrowUp", "ctrlKey": false, "shiftKey": false, "altKey": true },
+      "guard": "typing target; altKey && !ctrl/meta (js/05n-hotkeys-init.js:438)",
+      "effect": "stepNumericSelect(#visualResolution, +1): nearest HIGHER numeric option, dispatches change → config.DYE_RESOLUTION = value, window.needsFramebufferReinit = true (js/05h-slider-bindings.js:234-254); pushes UI undo",
+      "assertion": "#visualResolution.value moves to the next higher option; window.config.DYE_RESOLUTION equals it; window.needsFramebufferReinit===true (until the loop consumes it). No-op at the maximum option",
+      "source": "js/05n-hotkeys-init.js:438-446, js/05n-hotkeys-init.js:264-281",
+      "sheet": "index.html:1124"
+    },
+    {
+      "keys": "Alt+ArrowDown",
+      "event": { "key": "ArrowDown", "code": "ArrowDown", "ctrlKey": false, "shiftKey": false, "altKey": true },
+      "guard": "same as Alt+ArrowUp",
+      "effect": "stepNumericSelect(#visualResolution, -1): nearest lower option",
+      "assertion": "#visualResolution.value and window.config.DYE_RESOLUTION drop to the next lower option",
+      "source": "js/05n-hotkeys-init.js:438-446",
+      "sheet": "index.html:1124"
+    },
+    {
+      "keys": "Alt+Shift+ArrowUp",
+      "event": { "key": "ArrowUp", "code": "ArrowUp", "ctrlKey": false, "shiftKey": true, "altKey": true },
+      "guard": "typing target; altKey && !ctrl/meta; shiftKey selects the physics list (js/05n-hotkeys-init.js:443)",
+      "effect": "stepNumericSelect(#physicsResolution, +1) → config.SIM_RESOLUTION = value, window.needsFramebufferReinit = true, QualityGovernor.pinResolution() (js/05h-slider-bindings.js:275-295)",
+      "assertion": "#physicsResolution.value moves up; window.config.SIM_RESOLUTION equals it",
+      "source": "js/05n-hotkeys-init.js:438-446",
+      "sheet": "index.html:1125"
+    },
+    {
+      "keys": "Alt+Shift+ArrowDown",
+      "event": { "key": "ArrowDown", "code": "ArrowDown", "ctrlKey": false, "shiftKey": true, "altKey": true },
+      "guard": "same as Alt+Shift+ArrowUp",
+      "effect": "stepNumericSelect(#physicsResolution, -1)",
+      "assertion": "#physicsResolution.value and window.config.SIM_RESOLUTION drop to the next lower option",
+      "source": "js/05n-hotkeys-init.js:438-446",
+      "sheet": "index.html:1125"
+    },
+    {
+      "keys": "1..8 (top row)",
+      "event": { "key": "1", "code": "Digit1", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target only (js/05e-effect-controls.js:273-281). NO modifier check — Ctrl/Shift/Alt+digit ALSO fire (matches on e.code, so Shift+1='!' still sets multiplier)",
+      "effect": "setMultiplierHotkey(n): animationMultiplier = n, syncs #multiplier slider + #multiplierValue text (js/05e-effect-controls.js:262-272)",
+      "assertion": "window.animationMultiplier === n; #multiplierValue.textContent === n+'x'",
+      "source": "js/05e-effect-controls.js:273-291",
+      "sheet": "index.html:1138"
+    },
+    {
+      "keys": "Numpad 1..8",
+      "event": { "key": "1", "code": "Numpad1", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "same as top-row digits (code startsWith 'Numpad')",
+      "effect": "setMultiplierHotkey(n)",
+      "assertion": "window.animationMultiplier === n",
+      "source": "js/05e-effect-controls.js:282-290",
+      "sheet": "index.html:1139"
+    },
+    {
+      "keys": "F",
+      "event": { "key": "f", "code": "KeyF", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target (own handler, js/21-focus-mode.js:127-131); requires NO modifiers at all (js/21-focus-mode.js:133); accepts 'f' or 'F' (CapsLock-proof)",
+      "effect": "toggleFocus(): hides UI chrome, canvas fills viewport, FOCUS badge; auto-unchecks cursorToggle while focused (js/21-focus-mode.js:49-120)",
+      "assertion": "document.body.classList.contains('focus-mode') toggles (js/21-focus-mode.js:70); #focusModeToggle.checked syncs; #focus-mode-badge classList 'visible' toggles",
+      "source": "js/21-focus-mode.js:124-137",
+      "sheet": "index.html:1091"
+    },
+    {
+      "keys": "F11",
+      "event": { "key": "F11", "code": "F11", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target",
+      "effect": "window.displayMode.toggleFullscreen() if present, else document.documentElement.requestFullscreen()/exitFullscreen()",
+      "assertion": "document.fullscreenElement toggles null/non-null (async; requestFullscreen from a synthetic key event may be rejected without a user gesture — prefer skipping in headless harness)",
+      "source": "js/05n-hotkeys-init.js:289-300",
+      "sheet": "index.html (via 17-hotkey-reminder cap, js/17-hotkey-reminder.js:118; not in the F1 modal list)"
+    },
+    {
+      "keys": "Z",
+      "event": { "key": "z", "code": "KeyZ", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target (js/35-zoom-view.js:212-213); excludes ctrl/meta/alt but NOT shift — Shift+Z also toggles (js/35-zoom-view.js:214-215). Capture-phase document listener",
+      "effect": "setZoomMode(!zoomMode): pan/zoom navigation mode; painting and the brush-size wheel are intercepted while on (js/35-zoom-view.js:156-205)",
+      "assertion": "document.body.classList.contains('zoom-mode') toggles; #canvas.style.cursor becomes 'grab' when on, '' when off",
+      "source": "js/35-zoom-view.js:208-215",
+      "sheet": "NOT LISTED in the F1 modal"
+    },
+    {
+      "keys": "0",
+      "event": { "key": "0", "code": "Digit0", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; no ctrl/meta/alt; only acts when zoomMode is on OR window.ZoomView.scale !== 1 (js/35-zoom-view.js:222)",
+      "effect": "window.ZoomView.reset(): view transform back to scale 1, origin pan",
+      "assertion": "window.ZoomView.scale === 1 after; before the press it was !== 1",
+      "source": "js/35-zoom-view.js:222-224",
+      "sheet": "NOT LISTED in the F1 modal (badge text mentions '0 to reset', js/35-zoom-view.js:153)"
+    },
+    {
+      "keys": "Ctrl+V",
+      "event": { "key": "v", "code": "KeyV", "ctrlKey": true, "shiftKey": false, "altKey": false },
+      "guard": "typing target (js/32-file-drop.js:402 via __isTypingTarget); alt excluded (js/32-file-drop.js:400); e.repeat marks repeatPaste and is swallowed (js/32-file-drop.js:403). Needs an IMAGE on the clipboard; on web the native 'paste' event is the only working route (js/32-file-drop.js:300-312,314-319) — the 200ms keydown watchdog fallback only helps packaged Electron (js/32-file-drop.js:427-436)",
+      "effect": "Pastes clipboard image(s) as new raster layer(s)",
+      "assertion": "window.layers.length increments (getter defined js/01-config.js:7-11); a toast flashes 'Pasted as a new layer'. Hard to drive synthetically: requires real clipboard data + a trusted paste event",
+      "source": "js/32-file-drop.js:300-312,399-436",
+      "sheet": "index.html:1087"
+    },
+    {
+      "keys": "Ctrl+Shift+V",
+      "event": { "key": "V", "code": "KeyV", "ctrlKey": true, "shiftKey": true, "altKey": false },
+      "guard": "same typing/alt/repeat guards; preventDefault beats Chromium's paste-and-match-style (js/32-file-drop.js:406-425); needs clipboard image; on web triggers navigator.clipboard.read() permission flow",
+      "effect": "clipboardFallback('collider'): pastes clipboard image as a HIDDEN COLLIDER layer",
+      "assertion": "window.layers.length increments with the new layer wired as a collider; toast 'Pasted as a hidden collider'. Same synthetic-drive caveat as Ctrl+V",
+      "source": "js/32-file-drop.js:399-425",
+      "sheet": "index.html:1088"
+    },
+    {
+      "keys": "Ctrl+Enter",
+      "event": { "key": "Enter", "code": "Enter", "ctrlKey": true, "shiftKey": false, "altKey": false },
+      "guard": "NO typing-target guard; capture phase with stopPropagation (js/comfyui-bridge.js:231-238) — fires even while focused in a text field",
+      "effect": "sendToComfyUI(): captures the canvas and posts it to the ComfyUI relay (network side effect when a bridge is configured)",
+      "assertion": "Behavior depends on bridge configuration; without a relay it errors/toasts. HARNESS: avoid synthesizing this chord",
+      "source": "js/comfyui-bridge.js:231-238",
+      "sheet": "NOT LISTED in the F1 modal"
+    },
+    {
+      "keys": "Ctrl+Shift+G",
+      "event": { "key": "G", "code": "KeyG", "ctrlKey": true, "shiftKey": true, "altKey": false },
+      "guard": "Only bound in UNPACKAGED Electron builds (js/electron-performance.js:29-32); no typing guard",
+      "effect": "window.electronPerf.forceGC() — window.gc() if exposed",
+      "assertion": "No observable state; dev-only. Exclude from sweep",
+      "source": "js/electron-performance.js:29-38",
+      "sheet": "NOT LISTED in the F1 modal"
+    }
+  ],
+  "wheel": [
+    {
+      "keys": "Scroll",
+      "event": { "type": "wheel", "deltaY": -100, "ctrlKey": false, "shiftKey": false, "altKey": false, "bubbles": true, "cancelable": true, "targetSelector": "#canvas-area", "clientXY": "over the canvas" },
+      "guard": "Zoom Mode must be OFF (capture-phase interceptor js/35-zoom-view.js:168-180 stopImmediatePropagation). deltaY<0 = increase",
+      "effect": "Brush size, proportional step ~8% of current value scaled by scroll speed, rounded to 3 decimals under 1 / 1 decimal above; dispatches 'input' on #brushSize which sets config.SPLAT_RADIUS = value/1000 (js/05h-slider-bindings.js:25-27,449-479)",
+      "assertion": "parseFloat(#brushSize.value) changes in the deltaY direction and window.config.SPLAT_RADIUS === value/1000",
+      "source": "js/05h-slider-bindings.js:449-479",
+      "sheet": "index.html:1106"
+    },
+    {
+      "keys": "Shift+Scroll",
+      "event": { "type": "wheel", "deltaY": -100, "ctrlKey": false, "shiftKey": true, "altKey": false, "bubbles": true, "cancelable": true, "targetSelector": "#canvas-area" },
+      "guard": "zoom mode off; matched only when no ctrl/alt (branch order js/05h-slider-bindings.js:313,340,363,389,429)",
+      "effect": "Rotates brush tip: config.BRUSH_ANGLE += ~3-9 deg per notch (eased by |deltaY|), wraps [0,360); deltaY<0 = clockwise; syncs #brushAngle slider + settingsManager 'brush.brushAngle'",
+      "assertion": "window.config.BRUSH_ANGLE changes by the eased step, stays in [0,360)",
+      "source": "js/05h-slider-bindings.js:429-448",
+      "sheet": "index.html:1107"
+    },
+    {
+      "keys": "Ctrl+Scroll",
+      "event": { "type": "wheel", "deltaY": -100, "ctrlKey": true, "shiftKey": false, "altKey": false, "bubbles": true, "cancelable": true, "targetSelector": "#canvas-area" },
+      "guard": "zoom mode off; ctrl without shift/alt. HAZARD: value dropping below 0.88 calls wipeSimulation() and destroys dye state (js/05h-slider-bindings.js:426-428); a momentary 1500ms 'stick' holds the value at exactly 1.0 (js/05h-slider-bindings.js:398-419)",
+      "effect": "Density sustain: config.DENSITY_DISSIPATION +-0.001 per notch, synced to #densityDissipation slider + #densityValue text",
+      "assertion": "window.config.DENSITY_DISSIPATION changes by 0.001 in the deltaY direction (unless captured by the 1.0 stick window)",
+      "source": "js/05h-slider-bindings.js:389-428",
+      "sheet": "index.html:1131"
+    },
+    {
+      "keys": "Ctrl+Shift+Scroll",
+      "event": { "type": "wheel", "deltaY": -100, "ctrlKey": true, "shiftKey": true, "altKey": false, "bubbles": true, "cancelable": true, "targetSelector": "#canvas-area" },
+      "guard": "zoom mode off; first branch — also matches Ctrl+Alt+Shift",
+      "effect": "Motion Isolation: config.VELOCITY_INFLUENCE eased step (0.1-0.4 of range/4 by scroll speed), clamped to #velocityInfluence min/max, syncs slider + #velocityInfluenceValue",
+      "assertion": "window.config.VELOCITY_INFLUENCE changes in the deltaY direction and #velocityInfluence.value matches",
+      "source": "js/05h-slider-bindings.js:313-339",
+      "sheet": "index.html:1132"
+    },
+    {
+      "keys": "Ctrl+Alt+Scroll",
+      "event": { "type": "wheel", "deltaY": -100, "ctrlKey": true, "shiftKey": false, "altKey": true, "bubbles": true, "cancelable": true, "targetSelector": "#canvas-area" },
+      "guard": "zoom mode off; skipped entirely while a Material Mode is active (js/05h-slider-bindings.js:345)",
+      "effect": "Raw curl: config.CURL +- slider step (default 1), clamped, syncs #curl + #curlValue",
+      "assertion": "window.config.CURL changes by the #curl step in the deltaY direction",
+      "source": "js/05h-slider-bindings.js:340-362",
+      "sheet": "NOT LISTED in the F1 modal"
+    },
+    {
+      "keys": "Alt+Shift+Scroll",
+      "event": { "type": "wheel", "deltaY": -100, "ctrlKey": false, "shiftKey": true, "altKey": true, "bubbles": true, "cancelable": true, "targetSelector": "#canvas-area" },
+      "guard": "zoom mode off; alt+shift without ctrl",
+      "effect": "Velocity sustain: config.VELOCITY_DISSIPATION +- 10x slider step, clamped, syncs #velocityDissipation + #velocityValue",
+      "assertion": "window.config.VELOCITY_DISSIPATION changes by 10*step in the deltaY direction",
+      "source": "js/05h-slider-bindings.js:363-388",
+      "sheet": "NOT LISTED in the F1 modal"
+    },
+    {
+      "keys": "Scroll (Zoom Mode on)",
+      "event": { "type": "wheel", "deltaY": -100, "ctrlKey": false, "shiftKey": false, "altKey": false, "bubbles": true, "cancelable": true, "targetSelector": "#canvas-area" },
+      "guard": "only when zoomMode is on (toggle with Z); capture phase, stopImmediatePropagation so NO brush-size change happens",
+      "effect": "window.ZoomView.zoomAt(1.12 or 1/1.12, clientX, clientY)",
+      "assertion": "window.ZoomView.scale multiplied by ~1.12 (deltaY<0) or divided (deltaY>0); #brushSize.value UNCHANGED",
+      "source": "js/35-zoom-view.js:168-180",
+      "sheet": "NOT LISTED in the F1 modal"
+    }
+  ],
+  "pointer_stroke": [
+    {
+      "phase": "begin",
+      "event": { "type": "pointerdown", "target": "#canvas", "button": 0, "pointerType": "mouse or pen (touch is filtered to the touch path)", "clientXY": "over the canvas" },
+      "guard": "e.button===0 (js/05d-input-replay.js:546); e.target must BE the canvas element (js/05d-input-replay.js:548) — overlays/zoom-mode must not cover the point; !isPaused (js/05d-input-replay.js:548); !window.__mpTurnBlocked (js/05d-input-replay.js:510); zoomMode off (js/35-zoom-view.js:183-189 captures and stops propagation)",
+      "effect": "Stroke begins: setPointerCapture, immediate press splat when config.BRUSH_TARGET==='fluid' (multiSplatWithRadius js/05d-input-replay.js:590), sketch/mask stamp for those targets (js/05d-input-replay.js:572-578), BrushEngine.begin, multiplayer broadcastSplat",
+      "assertion": "window.pointer.down===true, window.pointer.moved===false, window.pointer.x/y === backing-store coords ((clientX-rect.left)*canvas.width/rect.width — js/02-palettes.js:260-273), window.pointer.dx===0, window.pointer.dy===0, window.__paintPointerId === event.pointerId (js/05d-input-replay.js:553-560)",
+      "source": "js/05d-input-replay.js:504-609"
+    },
+    {
+      "phase": "move",
+      "event": { "type": "pointermove", "target": "#canvas", "pointerType": "mouse or pen", "clientXY": "over the canvas, displaced from the press point" },
+      "guard": "skipped while isPaused or isReplayActive (js/05d-input-replay.js:631); sub-threshold moves with dx^2+dy^2 < 1.0 (backing-store px * 10) update x/y but never set moved (js/05d-input-replay.js:658)",
+      "effect": "window.pointer.dx/dy = (newCoords - old) * 10.0, x/y updated; while down: moved=true, BrushEngine.move dabs (spaced by BRUSH_SPACING, drained in 05j), recRecordInteraction when recording, throttled broadcastSplat",
+      "assertion": "window.pointer.x/y track the move; after a >0.1px-scale move while down, window.pointer.moved===true and window.pointer.dx/dy are non-zero (js/05d-input-replay.js:648-659)",
+      "source": "js/05d-input-replay.js:618-680"
+    },
+    {
+      "phase": "end",
+      "event": { "type": "pointerup", "target": "window (listener on window so off-canvas lifts count)", "button": 0, "pointerType": "mouse or pen" },
+      "guard": "button 0 only finalizes the paint stroke (js/05d-input-replay.js:777)",
+      "effect": "finishLeftStroke(): splat-out tail armed when window.splatOutMode!=='instant' && config.BRUSH_TARGET==='fluid' (js/05d-input-replay.js:693-703), BrushEngine.end (stabilizer catch-up dabs drain in 05j), archiveCurrentStroke, arm-colour advance deferred (pendingArmAdvance), broadcastPointerUp",
+      "assertion": "window.pointer.down===false, window.pointer.moved===false, window.__paintPointerId===null (js/05d-input-replay.js:704-705,726-728); bare-global splatOutActive===true right after lift when a non-instant splat-out mode is set (declared js/05d-input-replay.js:23)",
+      "source": "js/05d-input-replay.js:681-780"
+    },
+    {
+      "phase": "cancel (graceful)",
+      "event": { "type": "pointercancel", "target": "window", "pointerType": "mouse or pen (touch routed to touchcancel)" },
+      "guard": "non-touch only (js/05d-input-replay.js:814)",
+      "effect": "Same graceful finalize as pointerup: finishLeftStroke at last known point — tail drains, arm colours advance (Windows pen palm-rejection path)",
+      "assertion": "window.pointer.down===false, window.__paintPointerId===null; identical end-state to pointerup",
+      "source": "js/05d-input-replay.js:806-824"
+    },
+    {
+      "phase": "abort (hard)",
+      "event": { "type": "blur or dragstart", "target": "window" },
+      "guard": "none",
+      "effect": "abortPointerStroke(): HARD end — no tail, BrushEngine.abort, replay state cleared (js/05d-input-replay.js:791-803)",
+      "assertion": "window.pointer.down===false; bare-global splatOutActive stays false (no tail armed)",
+      "source": "js/05d-input-replay.js:784-805"
+    },
+    {
+      "phase": "right-click replay",
+      "event": { "type": "pointerdown", "target": "#canvas", "button": 2, "pointerType": "mouse or pen barrel" },
+      "guard": "!window.__mpTurnBlocked (js/05d-input-replay.js:510); contextmenu is preventDefault-ed (js/05d-input-replay.js:781-783)",
+      "effect": "Hold replays the last stroke (replayStroke); while the tip is also down it pauses painting instead. Self-heals if the release is missed (buttons bitmask checks js/05d-input-replay.js:626-630,739-741). Release: button-2 pointerup clears replay, fires the fast-brush burst if tip held with velocity",
+      "assertion": "bare-global isRightMouseDown===true and isReplayActive===true while held; both false plus window._activeReplayEvents===null after button-2 pointerup (js/05d-input-replay.js:742-745)",
+      "source": "js/05d-input-replay.js:516-539,742-776"
+    }
+  ]
+}

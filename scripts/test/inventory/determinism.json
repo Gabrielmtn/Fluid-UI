@@ -1,0 +1,125 @@
+{
+  "frameLoop": {
+    "file": "js/05j-update-loop.js",
+    "entryPoint": {
+      "declaration": "function update() at js/05j-update-loop.js:54",
+      "globalAccess": "window.update — the sim chunks are classic scripts loaded via plain injected <script> tags (index.html:1163-1241, no type=module), so the top-level function declaration lands on window. Only available AFTER the async chunk loader finishes: gate on window.__scriptsReady === true (index.html:1210).",
+      "firstCall": "js/05n-hotkeys-init.js:516 — update() called once at script-eval time; loop then self-schedules",
+      "reschedule": "requestAnimationFrame(update) at js/05j-update-loop.js:1337 (end of every frame) and js/05j-update-loop.js:64 (fps-cap skip path). update() takes NO timestamp argument — it reads performance.now() itself."
+    },
+    "timestep": {
+      "wallClockDependent": true,
+      "nowSource": "const nowMs = performance.now() — js/05j-update-loop.js:55",
+      "wallDt": "Math.min((nowMs - lastTime) / 1000, 1.0) — js/05j-update-loop.js:80; lastTime declared at js/05i-sim-stats.js:519 (initialized to performance.now() at load), updated at js/05j-update-loop.js:81",
+      "rawDt": "Math.min(wallDt / subSteps, 0.016) — js/05j-update-loop.js:111 (hard 16ms clamp per step)",
+      "dt": "rawDt * (window.timeScale || 1.0) — js/05j-update-loop.js:114; window.timeScale = 1.0 default at js/05e-effect-controls.js:254",
+      "subStepping": "config.SIM_SUBSTEP (default true, js/04a-canvas-gl-config.js:710) engages ONLY when wallDt > 0.020 AND window.__stats.fps >= 0.85 * panel Hz — js/05j-update-loop.js:101-110; max 4 steps (SIM_SUBSTEP_MAX, js/04a-canvas-gl-config.js:722). A virtual clock stepping 16.667ms/frame keeps wallDt at ~0.0167 < 0.020, so subSteps is always 1 and rawDt clamps to exactly 0.016 every frame — bit-constant dt.",
+      "simClockExports": "window.__simDtMs (05j:131), window.__simTimeMs (05j:135), window.__depositDebt (05j:146-149) — all derived from dt, no independent clock"
+    },
+    "fpsCap": {
+      "default": "window.fpsCap defaults to 60 — js/05i-sim-stats.js:634",
+      "gate": "js/05j-update-loop.js:60-75 — if nowMs - lastDrawTimeMs < 1000/cap - 0.5 the frame early-returns (re-arming rAF) WITHOUT simulating",
+      "harnessAction": "set window.fpsCap = 0 before stepping so every manual window.update() call simulates exactly one frame; otherwise step the virtual clock >= 1000/cap - 0.5 ms per call"
+    },
+    "otherWallClockReadsInsideUpdate": [
+      "detectDisplayHz(nowMs) — js/05j-update-loop.js:58 -> js/05i-sim-stats.js:597-632 (rAF-interval Hz measurement; self-disables after 60 samples; result feeds only the substep gate and stats)",
+      "window.cosOscillator.tick(nowMs / 1000) — js/05j-update-loop.js:77 (parameter oscillators follow the stubbed clock automatically)",
+      "FBO resize settle deadline _fboSettleAtMs = nowMs + 180 — js/05j-update-loop.js:198, checked at :203",
+      "swirl clock _swirlT = (nowMs % 3600000) / 1000 — js/05j-update-loop.js:915, fed to all three dye advection passes; config.SWIRL defaults 0 (js/04a-canvas-gl-config.js:786) so inert by default, and deterministic anyway once performance.now is stubbed",
+      "attractor-field staleness gate nowMs - _af.ts < 500 — js/05j-update-loop.js:1078 (ferrofluid scenes only)",
+      "window.__lastPaintMs = nowMs — js/05j-update-loop.js:393,475 (governor hint only)",
+      "stats: pushFrameTimestamp(nowMs) / cpuMs = performance.now() - cpuStart — js/05j-update-loop.js:1316-1330",
+      "window.QualityGovernor.onFrame(nowMs, cpuMs) — js/05j-update-loop.js:1332; cpuMs is REAL elapsed CPU time, so governor decisions are inherently nondeterministic even under a stubbed clock (see stubs.governor)"
+    ],
+    "stubsRequiredForBitIdentity": {
+      "performanceNow": "REQUIRED. Sole time authority of the loop (update() takes no argument). Stub to a virtual clock advancing a fixed 16.667ms per step. Prior session (P15-1 wetness A/B) achieved dye+velocity bit-identity with exactly this technique.",
+      "requestAnimationFrame": "REQUIRED while manually stepping. update() unconditionally re-arms rAF (js/05j-update-loop.js:1337); replace window.requestAnimationFrame with a callback-swallowing stub before calling window.update() yourself, or real vsync ticks double-step the sim. Note the rAF stub must be installed AFTER boot completes (or be pass-through during boot): the deferred UI build and boot choreography need real rAF (see memory: hidden-tab rAF pause blocks the deferred UI build).",
+      "mathRandom": "REQUIRED. Pin Math.random to a seeded PRNG (e.g. mulberry32) via Page.addScriptToEvaluateOnNewDocument or before painting begins — the splat shader stamp seed is fresh random on EVERY dab (js/05i-sim-stats.js:110).",
+      "dateNow": "NOT required for dye/velocity identity in a solo run: update() and the whole splat path never read Date.now (only a comment at js/05j-update-loop.js:120 mentions it). Date.now is used by recording (js/03-recording.js), multiplayer ids/timers (js/06-multiplayer.js:1800), and animation ids (js/04d-anim-ascend-star.js:205) — stub it too if those features run.",
+      "governor": "window.QualityGovernor adapts resolution/iterations/fx to measured CPU time, including a boot-time quality ascent that ramps FBO resolution (js/08a-quality-governor.js:44-160; hooks at js/05j-update-loop.js:695-697 effIters, :909-910 fxOn gating MacCormack, js/05c-programs-framebuffers.js:151-152 dyeScale/simScale). Call window.QualityGovernor.setEnabled(false) (js/08a-quality-governor.js:480) before measuring, or two runs can diverge in pressure iterations, MacCormack on/off, and FBO resolution."
+    },
+    "manualStepRecipe": [
+      "1. Launch app; wait for window.__scriptsReady === true (index.html:1210) and window.Boot frame-done / window.__stats populated (first frame drawn: js/05j-update-loop.js:1333-1336)",
+      "2. Wait past the synthetic +1px resize fired 500ms after init (js/05n-hotkeys-init.js:521-532) — it triggers an FBO reinit; wait until no _fboSettleAtMs rebuild is pending (e.g. ~1s of real time), then keep the canvas wrapper size untouched for the whole run",
+      "3. window.QualityGovernor.setEnabled(false); window.fpsCap = 0; pin Math.random with a seeded PRNG",
+      "4. Swap window.requestAnimationFrame for a no-op stub (swallow the callback), and stub performance.now to a virtual clock",
+      "5. Per frame: advance virtual clock by 16.667ms, inject input (window.applyMultiSplatWith(x,y,dx,dy,color,mult,radius,exactColor) — js/05g-arm-colors.js:294 — or drive window.BrushEngine/pointer state), then call window.update()",
+      "6. Readback/hash at checkpoint frames (see readback)"
+    ],
+    "pauseGates": {
+      "isPaused": "top-level let at js/01-config.js:32 — NOT on window; gates the entire paint+physics block at js/05j-update-loop.js:226 (display/post-FX still run; processReplay still runs, :225). Flipped only by window.togglePause() (js/04f-canvas-actions.js:73-85) and multiplayer state sync (js/06-multiplayer.js:604-606).",
+      "visibilityAutoPause": "js/04f-canvas-actions.js:149-173 — document.hidden => togglePause() (pausedByVisibility), auto-resume on visible. A hidden/backgrounded tab ALSO stops rAF entirely (browser behavior — the known preview-harness failure mode). Harness options: keep the window visible, or after the visibilitychange fires call window.togglePause() to unpause and drive window.update() manually (manual calls bypass the rAF freeze).",
+      "windowBlur": "window.addEventListener('blur', abortPointerStroke) — js/05d-input-replay.js:804: a blur mid-stroke hard-ends the synthetic pointer stroke (js/05d0-brush-engine.js:346 abort path). Keep the window focused while injecting pointer-level input; applyMultiSplatWith is immune."
+    },
+    "initialStateHazard": "Saved settings autoload (js/09-settings-manager.js + applyState in js/05n-hotkeys-init.js) overwrites config from per-origin localStorage at boot — two runs are only comparable from identical localStorage (or a cleared origin). Presets are per-origin localStorage too."
+  },
+  "randomSites": [
+    { "file": "js/05i-sim-stats.js", "lines": "110", "context": "splat(): gl.uniform2f(stampSeed, Math.random()*19.7, Math.random()*23.3) — fresh seed uploaded on EVERY splat call (every dab, velocity+dye passes share it)", "path": "core-splat", "firesWhen": "always, every dab", "mustSeed": true },
+    { "file": "js/05d0-brush-engine.js", "lines": "258-259", "context": "brush-engine dab position jitter (angle + sqrt radius)", "path": "core-splat", "firesWhen": "only when config.BRUSH_JITTER > 0 (default 0, js/05d0-brush-engine.js:250)", "mustSeed": true },
+    { "file": "js/05g-arm-colors.js", "lines": "408-410", "context": "generateVibrantColor() hue/sat/lightness — called from resolveArmColor color caches (js/05g-arm-colors.js:41,73) for non-exactColor strokes, and :503", "path": "core-splat", "firesWhen": "user/pointer strokes with arm color modes; bypassed by applyMultiSplatWith(..., exactColor=true)", "mustSeed": true },
+    { "file": "js/01-config.js", "lines": "570", "context": "palette cycling first-pick index", "path": "color-selection", "firesWhen": "palette cycle with no stored index", "mustSeed": true },
+    { "file": "js/03-recording.js", "lines": "837, 1246-1257, 1269, 1286-1290, 1340-1342", "context": "recording replay color + synthetic pulse/burst generators", "path": "feature:recording", "firesWhen": "recording layers replaying with randomized modes", "mustSeed": true },
+    { "file": "js/04c-anim-burst.js", "lines": "163-165, 177, 195-199, 225-229, 259-261, 293, 303, 309, 329, 409, 433-441, 467", "context": "burst/jellyfish animation positions, colors, velocities", "path": "feature:animations", "firesWhen": "burst animations triggered", "mustSeed": true },
+    { "file": "js/04d-anim-ascend-star.js", "lines": "97, 125, 135-137, 205", "context": "ascend-star spawn jitter, angle, origin variance, id (also Date.now at :205)", "path": "feature:animations", "firesWhen": "ascend-star animation active", "mustSeed": true },
+    { "file": "js/04e-anim-portal.js", "lines": "79, 223, 305-307, 323, 359, 729, 785", "context": "portal animation colors, angles, drag lengths", "path": "feature:animations", "firesWhen": "portal animation active", "mustSeed": true },
+    { "file": "js/22-audio-reactive.js", "lines": "840-844, 854, 860, 908, 921", "context": "audio-reactive splat position/direction generators", "path": "feature:audio", "firesWhen": "audio react enabled", "mustSeed": true },
+    { "file": "js/30-audio-scenes.js", "lines": "46, 346", "context": "audio scene color fallback + base phase", "path": "feature:audio", "firesWhen": "audio scenes active", "mustSeed": true },
+    { "file": "js/24-path-layers.js", "lines": "547", "context": "path-layer color fallback when config.COLOR unset", "path": "feature:path-layers", "firesWhen": "path layers emitting without a set color", "mustSeed": true },
+    { "file": "js/25-mutation-engine.js", "lines": "100-101, 208-210, 241, 289-290, 315-316, 367-373, 386-390, 415-429", "context": "preset mutation randomness (gaussian pairs, slider picks, palette synthesis)", "path": "feature:mutation", "firesWhen": "mutate invoked", "mustSeed": true },
+    { "file": "js/06-multiplayer.js", "lines": "37-39, 78, 232, 1472, 1800", "context": "client/session ids, room codes, reconnect/matchmaking timers", "path": "feature:multiplayer (no dye effect in a solo offline run)", "firesWhen": "multiplayer connects", "mustSeed": false },
+    { "file": "js/14-radial-slider.js", "lines": "38", "context": "SVG gradient DOM id suffix", "path": "ui-only", "firesWhen": "radial slider built", "mustSeed": false },
+    { "file": "js/33-brush-shapes.js", "lines": "186", "context": "brush-shape id generation (also Date.now)", "path": "ui-only", "firesWhen": "creating a custom brush shape", "mustSeed": false },
+    { "file": "js/05g-arm-colors.js", "lines": "503", "context": "random color pick helper", "path": "color-selection", "firesWhen": "color randomize action", "mustSeed": true }
+  ],
+  "readback": {
+    "fboCreation": {
+      "file": "js/05c-programs-framebuffers.js",
+      "createFBO": "js/05c-programs-framebuffers.js:60-74 — returns {texture, fbo, width, height, texelSizeX, texelSizeY}",
+      "createDoubleFBO": "js/05c-programs-framebuffers.js:75-83 — {read, write, swap()} getters (read is always the canonical current texture)",
+      "formats": {
+        "density (dye)": "dye-res RGBA16F / HALF_FLOAT double-FBO — js/05c-programs-framebuffers.js:167-168,184; default dye base 2048 (js/04a-canvas-gl-config.js:358), aspect-scaled at :156-166",
+        "velocity": "sim-res RG16F / HALF_FLOAT double-FBO — js/05c-programs-framebuffers.js:169,201; default sim base 512 (js/04a-canvas-gl-config.js:363)",
+        "pressure": "sim-res R16F double-FBO — js/05c-programs-framebuffers.js:207",
+        "wetness": "sim-res R16F double-FBO (P15-1) — js/05c-programs-framebuffers.js:204",
+        "raster/mask layers": "dye-res RGBA8 / UNSIGNED_BYTE — js/05c-programs-framebuffers.js:189,192"
+      }
+    },
+    "windowExposure": "exposeSimStats() — js/05c-programs-framebuffers.js:43-50 — puts window.density, window.velocity, window.pressure, window.simTexWidth/Height, window.dyeTexWidth/Height on window; called at load (05c:365) and after every FBO reinit (js/05j-update-loop.js:217), so window.* references stay current across reinits",
+    "verifiedReadbackCode": {
+      "float": "window.JankMonitor.grain() — js/08b-jank-monitor.js:333-397: gl.bindFramebuffer(gl.FRAMEBUFFER, velocity.read.fbo) then gl.readPixels(0, 0, simTexWidth, simTexHeight, gl.RGBA, gl.FLOAT, Float32Array) — WORKS on the half-float FBOs (WebGL2 + EXT_color_buffer_float on Chromium/ANGLE); same pattern on density.read.fbo at dye res (08b:368-369) and pressure (08b:357-358). This is the exact readback family the splat-scissor session used to verify dye 0-mismatch / velocity <=1 ulp. Restore gl.bindFramebuffer(gl.FRAMEBUFFER, null) after (08b:385).",
+      "byte": "RGBA8 stores read with gl.UNSIGNED_BYTE — js/05l-layers-transform.js:758, js/05o-masks.js:88-92 (note: a lost GL context makes readPixels a silent all-zero no-op — both sites guard for it)",
+      "glAccess": "gl is a top-level lexical binding shared across the classic-script chunks; injected page scripts reach it as bare `gl` exactly like js/08b-jank-monitor.js does (guard: typeof gl !== 'undefined', 08b:336)"
+    },
+    "readFormatNote": "readPixels with gl.RGBA / gl.FLOAT returns 4 floats per pixel even for RG16F velocity and R16F pressure targets (extra channels read 0/1); allocate width*height*4 Float32Array",
+    "hashRecipe": {
+      "recommended": "Per-checkpoint: read velocity.read.fbo at sim res (default ~512x{aspect} = ~0.15M px, ~2.4MB Float32Array — cheap, do every sampled frame) and hash the raw buffer bytes (e.g. FNV-1a/xxhash over the Float32Array's Uint8Array view). Read density.read.fbo at full dye res (default ~2048x{aspect}, ~2.3M px, ~38MB) only at sparse checkpoints (e.g. frame 50/100/end). fp16 storage means values are already quantized — byte-exact buffer comparison is the correct bit-identity test (this is how the prior 0-mismatch verification worked).",
+      "downsampledOption": "No prebuilt GPU-downsample readback helper exists; if dye reads are too heavy, either CPU-stride-subsample like grain() does (js/08b-jank-monitor.js:371-372, stride 2) — fine for drift DETECTION but not proof of bit-identity — or blit density into an existing smaller RGBA16F FBO (e.g. shadeForm) and read that; only full-res reads prove bit-identity.",
+      "noExistingHashCode": "grep for hash/mismatch/bitIdentical found no in-repo hashing helper — harness must bring its own"
+    },
+    "hazards": [
+      "FBO objects are deleted+recreated on any resize/governor reinit (initFramebuffers, js/05c-programs-framebuffers.js:102+; settle logic js/05j-update-loop.js:197-223). Keep window size fixed and governor disabled during a run; window.velocity etc. are refreshed by exposeSimStats after a reinit.",
+      "js/05n-hotkeys-init.js:521-532 fires a synthetic +1px resize 500ms after boot (Electron canvas-sync workaround) — an FBO reinit lands shortly after startup; start measuring after it settles",
+      "preserveDrawingBuffer: true (js/04a-canvas-gl-config.js:190) — canvas-level screenshots/toBlob also work, but the display pass includes post-FX/tone-map; hash the sim FBOs, not the canvas"
+    ]
+  },
+  "consoleCapture": {
+    "existing": {
+      "windowOnError": "index.html:102-105 — window.onerror shows an in-page error card (showErrorCard) with msg/src/line/col/stack",
+      "reportErrorHook": "index.html:101 — window.__reportError = showErrorCard (also used by the chunk loader for failed script loads, index.html:1222-1231)",
+      "unhandledRejection": "index.html:106-109 — window.addEventListener('unhandledrejection', ...) shows the same card",
+      "consoleWrapping": "NONE — no console.error/log interception anywhere in app code (verified by grep); errors are not accumulated in any JS array, only rendered as DOM cards"
+    },
+    "harnessRecipe": "Capture via CDP: Runtime.enable + Runtime.consoleAPICalled + Runtime.exceptionThrown (and Log.enable/Log.entryAdded for network/GL driver messages). Alternatively chain window.onerror in an injected script BEFORE index.html's inline script would be needed to catch it first — index.html assigns window.onerror early, so an injected wrapper installed later can wrap the existing handler and push into a window.__testErrors array. The error card DOM is also queryable as a fallback signal."
+  },
+  "reusable": [
+    { "file": "tmp-cdp-driver.js (repo root)", "what": "CDP Runtime.evaluate driver against http://127.0.0.1:9333 (awaitPromise, returnByValue, @file support, exceptionDetails printing) — pairs with launch line: node_modules\\electron\\dist\\electron.exe . --remote-debugging-port=9333 (documented at scripts/shot-helpers.js:6-9)" },
+    { "file": "tmp-cdp-shot.js (repo root)", "what": "CDP screenshot capture of the running app" },
+    { "file": "tmp-cdp-front.js / tmp-cdp-trace.js (repo root)", "what": "window fronting + tracing helpers from the store-asset baking sessions" },
+    { "file": "scripts/shot-helpers.js", "what": "page-side staging kit (window.__shot): raf(n) awaiter (:22-26), deterministic bezier stroke driver strokeAlong() built on window.applyMultiSplatWith (:50-75), canvas-box fitting — a ready-made pattern for scripted paint input" },
+    { "file": "js/08b-jank-monitor.js:333-397", "what": "window.JankMonitor.grain() — THE verified float readPixels pattern for velocity/pressure/dye plus HF-noise + max metrics; copy its bind/read/unbind sequence" },
+    { "file": "js/08b-jank-monitor.js:407-520", "what": "window.LookWatchdog — polls every look-affecting config/resolution/governor state and logs changes; use snapshot()/history to assert nothing mutated sim parameters mid-run" },
+    { "file": "js/05g-arm-colors.js:294-303", "what": "window.applyMultiSplatWith(x, y, dx, dy, color, mult, radius, exactColor) — deterministic programmatic dye+velocity injection; exactColor=true bypasses arm-color randomness (js/05g-arm-colors.js:277)" },
+    { "file": "js/05i-sim-stats.js (splatScissorRect/splatPass at :22-58)", "what": "splat-scissor machinery with kill switch config.SPLAT_SCISSOR (default true, js/04a-canvas-gl-config.js:346) — flip false for an A/B lane if a scissor regression is ever suspected" },
+    { "file": "TODO-NEXT.md:50", "what": "prior-art note: 'Screenshots fail on a hidden tab. Use gl.readPixels; preserveDrawingBuffer is on' — confirms the hidden-tab constraint and the readPixels escape hatch" }
+  ]
+}

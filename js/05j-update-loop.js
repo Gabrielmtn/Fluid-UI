@@ -148,7 +148,14 @@
             if (depositCredit) _depDebt = Math.min(_depDebt - 1.0, 1.0);
             window.__depositDebt = _depDebt;
             if (window.kAnimateRot && window.kSpinSpeed) {
-                window.kAngle = (window.kAngle || 0) + frameDt * window.kSpinSpeed * Math.PI / 180;
+                // PhotoSafe: cap the spin RATE (deg/s), never the stored slider
+                // value — protection off restores the user's speed untouched.
+                let _spin = window.kSpinSpeed;
+                if (config.PHOTOSAFE) {
+                    const _spinCap = (config.PHOTOSAFE_SPIN_CAP != null) ? config.PHOTOSAFE_SPIN_CAP : 90;
+                    _spin = Math.max(-_spinCap, Math.min(_spinCap, _spin));
+                }
+                window.kAngle = (window.kAngle || 0) + frameDt * _spin * Math.PI / 180;
             }
             const targetWidth = canvasWrapper.clientWidth;
             const targetHeight = canvasWrapper.clientHeight;
@@ -1191,6 +1198,50 @@
             // ── Glow (HDR bloom) ── mip-chain halo off the pre-tone-map HDR
             // frame; display adds it after the tone-map.
             const _glowOn = _fxOn && !!config.GLOW; // [GOVERNOR HOOK]
+            // ── Scatter origin ── resolved BEFORE applyGlow, which runs the
+            // shaft march internally (05i) while glow's prefilter buffer is
+            // still the un-blurred emitter.
+            const _scatterOn = _glowOn && !!config.SCATTER;
+            if (_scatterOn) {
+                let _tx = 0.5, _ty = 0.5;
+                if (config.SCATTER_SOURCE === 'brush') {
+                    // window.pointer is already canvas BACKING-STORE px, so
+                    // this divide is render-cap and Zoom-View independent —
+                    // do not re-measure via getBoundingClientRect. Its initial
+                    // value is (0,0), i.e. the top-left CORNER, not the centre,
+                    // so fall back until the first real pointer event.
+                    const _p = window.pointer;
+                    if (_p && (_p.x !== 0 || _p.y !== 0)) {
+                        _tx = _p.x / canvas.width;
+                        _ty = 1.0 - _p.y / canvas.height; // same flip as the splat uniform (05i)
+                    }
+                } else {
+                    // Read the light position regardless of lightSource.enabled:
+                    // Scatter must not require the diffuse shading pass to be on.
+                    const _ls = window.lightSource;
+                    if (_ls) {
+                        _tx = (typeof _ls.x === 'number') ? _ls.x : 0.5;
+                        _ty = 1.0 - ((typeof _ls.y === 'number') ? _ls.y : 0.5);
+                    }
+                }
+                // Guard every path: a NaN origin here would march garbage into
+                // the shaft buffer, which is exactly how bd7e62f killed Sunrays.
+                if (!isFinite(_tx)) _tx = 0.5;
+                if (!isFinite(_ty)) _ty = 0.5;
+                const _cur = window.__scatterOrigin;
+                if (!_cur) {
+                    window.__scatterOrigin = { x: _tx, y: _ty };
+                } else {
+                    // Ease toward the target so the shafts swing rather than
+                    // snap — matters most for the brush, whose origin teleports
+                    // between dabs.
+                    let _f = (config.SCATTER_FOLLOW != null) ? config.SCATTER_FOLLOW : 0.15;
+                    if (!isFinite(_f)) _f = 0.15;
+                    _f = Math.max(0, Math.min(1, _f));
+                    _cur.x += (_tx - _cur.x) * _f;
+                    _cur.y += (_ty - _cur.y) * _f;
+                }
+            }
             if (_glowOn) applyGlow(displayTexture);
             gl.disable(gl.BLEND);
             // Shading form field: downsample the frame into the quarter-res
@@ -1281,6 +1332,8 @@
             }
             gl.uniform1i(displayProg.uniforms.uGlow, 1);
             gl.uniform1f(displayProg.uniforms.glowEnabled, _glowOn ? 1.0 : 0.0);
+            gl.uniform1i(displayProg.uniforms.uScatter, 12);
+            gl.uniform1f(displayProg.uniforms.scatterEnabled, _scatterOn ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.preserveOpacity, window.preserveFluidOpacity ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.backgroundTransparency, window.backgroundTransparency || 0.0);
             gl.uniform1f(displayProg.uniforms.kaleidoEnabled, window.kaleidoEnabled ? 1.0 : 0.0);
@@ -1311,7 +1364,26 @@
             }
             gl.activeTexture(gl.TEXTURE7);
             gl.bindTexture(gl.TEXTURE_2D, _mOverlay ? _mOverlay.texture : null);
-            blit(null);
+            // Unit 12: units 0-11 are taken (dye, glow, shadeForm, raster×4,
+            // mask overlay, clip masks×4). 7246d7d handed Sunrays' old unit 1
+            // to uGlow, so the shafts get a fresh one.
+            gl.activeTexture(gl.TEXTURE12);
+            gl.bindTexture(gl.TEXTURE_2D, (_scatterOn && scatter) ? scatter.texture : null);
+            // PhotoSafe (photosensitivity protection): when on, the display
+            // pass renders into safeFrame instead of the canvas, and
+            // applyPhotoSafe (05i) measures the frame, updates the limiter,
+            // and presents the corrected result. This is the ONLY blit(null)
+            // in the codebase, so every visual path — local strokes, peers,
+            // replay, audio scenes, every effect — passes through the limiter.
+            // Deliberately NOT gated on the governor's fxOn(): safety is not
+            // sheddable. When off: the exact pre-existing present, untouched.
+            const _photoSafeOn = !!config.PHOTOSAFE && !!safeFrame;
+            // OFF->ON edge: clear the limiter state so it re-seeds from the
+            // CURRENT scene instead of correcting against stale history.
+            if (_photoSafeOn && !window.__photoSafeWasOn) resetPhotoSafeState();
+            window.__photoSafeWasOn = _photoSafeOn;
+            blit(_photoSafeOn ? safeFrame.fbo : null);
+            if (_photoSafeOn) applyPhotoSafe();
             // ─── Stats update (ring buffer, zero-GC) ──────────────────
             pushFrameTimestamp(nowMs);
             const fpsVal = countRecentFrames(nowMs);

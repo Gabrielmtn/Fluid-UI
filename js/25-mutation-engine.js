@@ -59,6 +59,10 @@
         vibrance: ['microDetailToggle'],
         glowIntensity: ['glowToggle'],
         glowThreshold: ['glowToggle'],
+        // Two conditions, ANDed (see the loop in _gateOk): Scatter marches
+        // Glow's prefilter buffer, so with Glow off the slider is doubly dead.
+        scatterAmount: ['glowToggle', 'scatterToggle'],
+        scatterReach: ['glowToggle', 'scatterToggle'],
         ssFrequency: ['shootingStarToggle'],
         ssAngle: ['shootingStarToggle'],
         ssLength: ['shootingStarToggle'],

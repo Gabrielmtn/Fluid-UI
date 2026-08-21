@@ -793,6 +793,15 @@
             if (window.kaleidoEnabled) {
                 try {
                     var rotSpeed = mid * s * 0.12;
+                    // PhotoSafe: the second kaleido-spin advance site (the
+                    // first is the kSpinSpeed animator in 05j). Cap the audio-
+                    // driven rate to ~PHOTOSAFE_SPIN_CAP deg/s at 60fps so a
+                    // hot mix cannot whip the fold into a strobe-speed spin.
+                    if (window.config && window.config.PHOTOSAFE) {
+                        var _psCapDeg = (window.config.PHOTOSAFE_SPIN_CAP != null) ? window.config.PHOTOSAFE_SPIN_CAP : 90;
+                        var _psCapTick = (_psCapDeg * Math.PI / 180) / 60;
+                        rotSpeed = Math.max(-_psCapTick, Math.min(_psCapTick, rotSpeed));
+                    }
                     window.kAngle = ((window.kAngle || 0) + rotSpeed) % (Math.PI * 2);
                 } catch (_) {}
             }

@@ -1,0 +1,152 @@
+{
+  "stamp": "2026-08-21T08-21-29",
+  "results": [
+    {
+      "name": "plain-stroke",
+      "checkpoints": [
+        {
+          "name": "settled",
+          "dye": "de682c8f",
+          "vel": "9bb5d005",
+          "display": "7911c6b6",
+          "nan": 0,
+          "coverage": 0.27842,
+          "meanLum": 0.11575
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "name": "pointer-stroke",
+      "checkpoints": [
+        {
+          "name": "settled",
+          "dye": "00b5f0ca",
+          "vel": "5e081285",
+          "display": "2b4342ce",
+          "nan": 0,
+          "coverage": 0.49151,
+          "meanLum": 0.33836
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "name": "materials",
+      "checkpoints": [
+        {
+          "name": "acrylic",
+          "dye": "f2e5d584",
+          "vel": "00bf3ca1",
+          "display": "255eff1a",
+          "nan": 0,
+          "coverage": 0.24765,
+          "meanLum": 0.08374
+        },
+        {
+          "name": "clay",
+          "dye": "6baec2aa",
+          "vel": "ab27eef0",
+          "display": "1c1e08d2",
+          "nan": 0,
+          "coverage": 0.2256,
+          "meanLum": 0.08948
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "name": "builtin-presets",
+      "checkpoints": [
+        {
+          "name": "silky",
+          "dye": "e52048b3",
+          "vel": "5476770f",
+          "display": "6fc03403",
+          "nan": 0,
+          "coverage": 0.27979,
+          "meanLum": 0.12934
+        },
+        {
+          "name": "electric",
+          "dye": "a43d7d31",
+          "vel": "ac18d106",
+          "display": "e2a2518f",
+          "nan": 0,
+          "coverage": 0.28048,
+          "meanLum": 0.1304
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "name": "multi-arm-radial",
+      "checkpoints": [
+        {
+          "name": "rosette",
+          "dye": "582f0023",
+          "vel": "5cd495cf",
+          "display": "deaeeae0",
+          "nan": 0,
+          "coverage": 0.73601,
+          "meanLum": 0.43345
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "name": "collider-lattice",
+      "checkpoints": [
+        {
+          "name": "wakes",
+          "dye": "985af88b",
+          "vel": "241f3edd",
+          "display": "cbc40202",
+          "nan": 0,
+          "coverage": 0.29058,
+          "meanLum": 0.11397
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "name": "kaleido-display",
+      "checkpoints": [
+        {
+          "name": "wedged",
+          "dye": "588873ee",
+          "vel": "4e6e81ea",
+          "display": "deff689a",
+          "nan": 0,
+          "coverage": 0.27567,
+          "meanLum": 0.49144
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "name": "hotkey-freeze-toggle",
+      "checkpoints": [
+        {
+          "name": "frozen",
+          "dye": "8fd43c2a",
+          "vel": "dcb1a374",
+          "display": "285a8cd5",
+          "nan": 0,
+          "coverage": 0.23912,
+          "meanLum": 0.10143
+        },
+        {
+          "name": "still-frozen",
+          "dye": "9ef5df89",
+          "vel": "03e4e6fd",
+          "display": "44069ee6",
+          "nan": 0,
+          "coverage": 0.24402,
+          "meanLum": 0.1045
+        }
+      ],
+      "pageErrors": []
+    }
+  ]
+}

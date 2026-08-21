@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05b-shader-sim.js — part 2/14 of former 05-fluid-sim.js (lines 654–966)
 // LOAD ORDER: after 05a-shader-core.js, before 05c-programs-framebuffers.js
-// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow frag sources
+// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter frag sources
 // REQUIRES: PRECISION (05a)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -17,6 +17,7 @@
             uniform float radius, aspectRatio, velocityInfluence;
             uniform float velocityScale;
             uniform float stampNoise;  // 0 = classic gaussian splat; >0 blends in the clay stamp
+            uniform float stampTipOn;  // 1 = explicit brush tip: the SHAPE is absolute and stampNoise is grain only
             uniform vec2 stampSeed;    // per-splat offset so consecutive stamps differ
             uniform int stampShape;    // 0 = blob, 1 = chisel (square press), 2 = streak (elongated smear)
             uniform float stampAngle;  // brush rotation (radians, screen space) for chisel/streak; 0 = upright
@@ -149,7 +150,7 @@
                     // they define their own alpha and a stamp overwrite paints
                     // a blob/square inside the ring's hollow center (JS also
                     // zeroes stampNoise for tip 4; this is defense-in-depth).
-                    if (stampNoise > 0.0 && ringRadius <= 0.0 && barHalfW <= 0.0) {
+                    if ((stampNoise > 0.0 || stampTipOn > 0.5) && ringRadius <= 0.0 && barHalfW <= 0.0) {
                         // Clay stamp: hard-edged footprint with a noise-notched rim
                         // and surface grain instead of the gaussian bloom. Dye only —
                         // the velocity pass stays gaussian, or motion reads as glitch.
@@ -174,9 +175,28 @@
                             vec2 qs = qr * vec2(0.55, 2.4);            // 2: streak — wide smear
                             m = dot(qs, qs);
                         }
-                        float rim = 1.4 * (0.55 + 0.9 * n);
-                        float stamp = (1.0 - smoothstep(rim * 0.72, rim, m)) * (0.75 + 0.5 * n);
-                        shape = mix(shape, stamp, stampNoise);
+                        if (stampTipOn > 0.5) {
+                            // Brush tips: Texture adds ROUGHNESS to the tip's own
+                            // footprint — it must never dissolve the footprint. The
+                            // old mix(gaussian, stamp, stampNoise) turned a chisel
+                            // back into a soft circle as the slider came down; now
+                            // the shape metric always wins and the slider only fades
+                            // the rim jitter, the surface grain and the edge softness,
+                            // so turning Texture down HARDENS the chisel's angles.
+                            // At stampNoise = 1 this is identical to the clay stamp
+                            // below (rim jitter ±0.9·(n-0.5), 0.28 edge, 0.75+0.5n grain).
+                            float t = clamp(stampNoise, 0.0, 1.0);
+                            float rim = 1.4 * (1.0 + 0.9 * (n - 0.5) * t);
+                            float edge = mix(0.06, 0.28, t);
+                            shape = (1.0 - smoothstep(rim * (1.0 - edge), rim, m))
+                                  * mix(1.0, 0.75 + 0.5 * n, t);
+                        } else {
+                            // Material-mode clay stamp (STAMP_NOISE/STAMP_SHAPE):
+                            // unchanged — its noise IS the blend, by design.
+                            float rim = 1.4 * (0.55 + 0.9 * n);
+                            float stamp = (1.0 - smoothstep(rim * 0.72, rim, m)) * (0.75 + 0.5 * n);
+                            shape = mix(shape, stamp, stampNoise);
+                        }
                     }
                     // Custom brush shape: the dye footprint is a user-authored
                     // alpha stamp, sampled in the same rotated size-normalized
@@ -1690,5 +1710,285 @@
                 vec4 sum = texture(uTexture, vL) + texture(uTexture, vR)
                          + texture(uTexture, vT) + texture(uTexture, vB);
                 fragColor = sum * 0.25 * intensity;
+            }
+        `;
+        // ─── Scatter (volumetric light shafts) ──────────────────────────
+        // Glow is the EMISSIVE half of light: a bright pixel bleeds outward
+        // equally in every direction. It has no source position, no
+        // direction, no medium. This is the TRANSPORT half — light leaving
+        // an origin and travelling through the canvas.
+        //
+        // Each pixel marches TOWARD the origin, accumulating the emissive
+        // dye that lies between the two. Bright dye therefore smears into a
+        // shaft pointing back at the source, so the shafts read as radiating
+        // FROM it, and gaps in the dye read as the shadows between them.
+        //
+        // Reads Glow's prefilter output (the soft-knee-thresholded overbright
+        // frame), so the emitter is already computed — this costs one extra
+        // 256-base pass.
+        //
+        // Deliberately NOT the old Sunrays pass (removed in 7246d7d, "never
+        // worked right"). That one marched from a hard-coded vec2(0.5),
+        // sampled .a as OCCLUSION so bright dye cast shadow, accumulated a
+        // single greyscale float, and composited MULTIPLICATIVELY — which is
+        // why a NaN weight could black out the entire canvas (bd7e62f). This
+        // one is origin-driven, emissive, per-channel and purely additive:
+        // that failure mode is structurally impossible here.
+        const scatterFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;  // Glow's prefiltered overbright dye = the emitter
+            uniform vec2 origin;         // Ray origin in UV (light source or brush)
+            uniform vec2 aspect;         // (w/h, 1.0) — circular falloff on non-square canvases
+            uniform float density;       // Fraction of the pixel→origin gap the march covers
+            uniform float decay;         // Per-step falloff
+            uniform float weight;        // Amount slider
+            uniform float dispersion;    // Per-channel decay spread
+            uniform sampler2D uObstacle; // Collider coverage (R16F, sim res, same 0..1 UV)
+            uniform float uObsMax;       // window.__obsStrengthMax \u2014 the coverage normalizer
+            uniform int hasObstacle;     // 0 = no colliders / occlusion off
+            uniform float blockStrength; // 1 = opaque wall, <1 = translucent
+            #define ITERATIONS 48
+            void main() {
+                // NB: stepUV, not step — 'step' is a GLSL builtin.
+                vec2 stepUV = (vUv - origin) * (density / float(ITERATIONS));
+                // Dither the march's starting phase per pixel. With every pixel
+                // sampling in lockstep, the discrete steps land in phase across
+                // neighbours and the falloff prints as concentric arcs centred on
+                // the origin — ghost copies of the dye silhouette, worst far out
+                // where the step is longest. Offsetting the start by a fraction of
+                // one step decorrelates them, trading banding for fine noise.
+                //
+                // Interleaved gradient noise off gl_FragCoord, NOT fract(sin(vUv)):
+                // the sin hash collapses on drivers that fast-path sin, and it keys
+                // off vUv, which is constant along each row of this 256-base buffer
+                // for small x deltas — exactly the correlation that leaves the
+                // banding visible. IGN is a cheap integer-lattice hash with none of
+                // that, and being a pure function of the pixel it stays fixed frame
+                // to frame (a time-varying dither would crawl instead of band).
+                float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy,
+                                                         vec2(0.06711056, 0.00583715))));
+                vec2 coord = vUv - stepUV * ign;
+                vec3 accum = vec3(0.0);
+                // Chromatic dispersion: long wavelengths survive more
+                // scattering events, so red carries furthest down the shaft
+                // and blue drops out first. This is the whole difference
+                // between light moving through a medium and a radial blur.
+                vec3 dec = clamp(vec3(decay + dispersion, decay, decay - dispersion), 0.0, 1.0);
+                vec3 illum = vec3(1.0);
+                for (int i = 0; i < ITERATIONS; i++) {
+                    coord -= stepUV;
+                    // Colliders block light. illum is already the transmittance
+                    // along this pixel's path to the origin, so occlusion is the
+                    // same multiply the distance falloff uses \u2014 attenuate BEFORE
+                    // accumulating, so the wall's own texel contributes nothing and
+                    // everything beyond it is shadowed. The shadow therefore falls
+                    // AWAY from the origin behind each collider, which is what a
+                    // real shaft of light does.
+                    //
+                    // Decode is the house convention: the texel stores
+                    // coverage*collisionStrength, so divide by uObsMax to recover
+                    // coverage. Reading .r raw would treat a fully solid wall as
+                    // 0.7 and leak light through it.
+                    //
+                    // Geometric coverage ONLY, deliberately without the strength
+                    // permeability term that solidity() applies: Strength governs
+                    // how porous a wall is to FLUID, and a chain-link fence barely
+                    // slows air while still throwing a shadow. Same reasoning as
+                    // splatFrag's obsBlockDye, which drops strength for the same
+                    // reason (a brush is blocked by a wall's shape).
+                    if (hasObstacle == 1) {
+                        float cov = clamp(texture(uObstacle, coord).r / max(uObsMax, 0.05), 0.0, 1.0);
+                        illum *= 1.0 - blockStrength * smoothstep(0.35, 0.85, cov);
+                    }
+                    accum += texture(uTexture, coord).rgb * illum;
+                    illum *= dec;
+                }
+                accum *= weight / float(ITERATIONS);
+                // Fade in with distance so the origin itself doesn't render
+                // as a hard bright disc.
+                accum *= smoothstep(0.0, 0.08, length((vUv - origin) * aspect));
+                fragColor = vec4(max(accum, vec3(0.0)), 1.0);
+            }
+        `;
+        // ─── PhotoSafe (photosensitivity protection) shaders ──────────────
+        // Three tiny passes that make the WCAG 2.3.1 / ISO 9241-391 flash
+        // limits hold on the FINAL composited frame — whatever produced it
+        // (strokes, peers, replay, audio scenes, Glow, Ignite, Light Shift).
+        // 1. photoSafeLumaFrag: 16×16 block grid of approximately-linear
+        //    luminance + redness of the rendered frame.
+        // 2. photoSafeStatsFrag: 1×1 state update — flash-area detection,
+        //    suppression envelope, slew-limited global luminance target.
+        // 3. photoSafeCompositeFrag: exposure correction + history blend;
+        //    EXACT pass-through (mix a=1.0) when the envelope is idle.
+        const photoSafeLumaFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;   // the rendered frame (safeFrame)
+            void main() {
+                // 4x4 jittered taps per block; LINEAR filtering widens each
+                // tap to a 2x2 average, so a block integrates ~8x8 samples.
+                vec2 block = vec2(1.0 / 16.0);
+                vec2 base = vUv - block * 0.5;
+                float luma = 0.0;
+                float red = 0.0;
+                for (int i = 0; i < 4; i++) {
+                    for (int j = 0; j < 4; j++) {
+                        vec2 off = (vec2(float(i), float(j)) + 0.5) * 0.25 * block;
+                        vec3 c = texture(uTexture, base + off).rgb;
+                        // Display-referred values; square approximates the
+                        // linearization WCAG relative luminance expects.
+                        vec3 lin = c * c;
+                        luma += dot(lin, vec3(0.2126, 0.7152, 0.0722));
+                        red += max(0.0, lin.r - 0.5 * (lin.g + lin.b));
+                    }
+                }
+                fragColor = vec4(luma / 16.0, red / 16.0, 0.0, 1.0);
+            }
+        `;
+        const photoSafeStatsFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uLumaCur;   // 16x16 this frame  (r=luma g=red)
+            uniform sampler2D uLumaPrev;  // 16x16 previous frame
+            uniform sampler2D uStatsPrev; // 2x1 state, layout below
+            uniform float dt;             // wall-clock seconds, clamped by caller
+            uniform float slew;           // max luma change per second (global)
+            uniform float flashDelta;     // per-block flash threshold (0.10)
+            uniform float darkFloor;      // WCAG dark-state condition (0.80)
+            uniform float redDelta;       // red-transition threshold (0.20)
+            uniform float areaFrac;       // min flashing area to count a transition
+            uniform float releaseTau;     // envelope decay time constant (s)
+            uniform float pairWindow;     // opposing-transition window (s)
+            uniform float rateAllow;      // transitions/sec permitted before engaging
+            //
+            // 2x1 state. Texel 0 (display): R envelope, G slew-limited luma
+            // target, B this frame's TRUE mean (the composite needs it to form
+            // a GLOBAL exposure ratio), A init flag. Texel 1 (detector):
+            // R lastSign+1, G pairTimer, B transition-rate accumulator, A init.
+            //
+            // WHY RATE, NOT DEVIATION: v1 also flagged a block whose luminance
+            // deviated from its own short EMA. Painting does that constantly —
+            // a stroke entering a block raises it far above its 0.12s average —
+            // so merely painting pinned the envelope at 1.0 and the history
+            // blend smeared the canvas into ghosts. The hazard WCAG defines is
+            // not deviation, it is OSCILLATION: >3 flashes/sec. So count
+            // opposing transitions and engage on their RATE. Monotonic change
+            // (painting, fades, dye drifting through a block) contributes at
+            // most one transition and then stops; only genuine flicker
+            // sustains a high rate.
+            void main() {
+                vec4 s0 = texture(uStatsPrev, vec2(0.25, 0.5));
+                vec4 s1 = texture(uStatsPrev, vec2(0.75, 0.5));
+                float meanCur = 0.0;
+                float posArea = 0.0;
+                float negArea = 0.0;
+                for (int i = 0; i < 16; i++) {
+                    for (int j = 0; j < 16; j++) {
+                        vec2 uv = (vec2(float(i), float(j)) + 0.5) / 16.0;
+                        vec2 cur = texture(uLumaCur, uv).rg;
+                        vec2 prv = texture(uLumaPrev, uv).rg;
+                        meanCur += cur.r;
+                        float dL = cur.r - prv.r;
+                        float dR = cur.g - prv.g;
+                        // WCAG flash transition: >=10% of max luminance with
+                        // the darker state below 0.80, plus the stricter
+                        // saturated-red rule (isoluminant red counts too).
+                        float sgn = 0.0;
+                        if (abs(dL) >= flashDelta && min(cur.r, prv.r) < darkFloor) sgn = sign(dL);
+                        else if (abs(dR) >= redDelta) sgn = (dR >= 0.0) ? 1.0 : -1.0;
+                        if (sgn > 0.5) posArea += 1.0;
+                        else if (sgn < -0.5) negArea += 1.0;
+                    }
+                }
+                meanCur /= 256.0;
+                posArea /= 256.0;
+                negArea /= 256.0;
+                // Fresh FBO (all zeros): seed from the live scene so boot and
+                // resize never open with a spurious exposure dip.
+                if (s0.a < 0.5) {
+                    if (gl_FragCoord.x < 1.0) fragColor = vec4(0.0, meanCur, meanCur, 1.0);
+                    else fragColor = vec4(1.0, 0.0, 0.0, 1.0);
+                    return;
+                }
+                float envelope = s0.r;
+                float slewLuma = s0.g;
+                float lastSign = s1.r - 1.0;   // -1 / 0 / +1
+                float pairTimer = s1.g;
+                float rate = s1.b;
+                // Rate accumulator decays with tau = 1s, so its steady-state
+                // value IS the transitions-per-second of a sustained flicker.
+                rate *= exp(-dt / 1.0);
+                pairTimer += dt;
+                float total = posArea + negArea;
+                // Antiphase strobes (one region up while another goes down)
+                // barely move the global mean, so the dominant side is what
+                // flips: sign(pos-neg) handles both the ordinary and the
+                // antiphase case with one rule.
+                float dir = (total >= areaFrac) ? ((posArea >= negArea) ? 1.0 : -1.0) : 0.0;
+                if (dir != 0.0 && dir != lastSign) {
+                    // An OPPOSING transition inside the window is half of a
+                    // flash pair. Outside the window it just re-arms.
+                    if (lastSign != 0.0 && pairTimer <= pairWindow) rate += 1.0;
+                    lastSign = dir;
+                    pairTimer = 0.0;
+                } else if (pairTimer > pairWindow * 3.0) {
+                    lastSign = 0.0;   // flicker stopped; forget the phase
+                }
+                rate = min(rate, 40.0);
+                // Engage on RATE: rateAllow transitions/sec is the permitted
+                // floor (a square-wave flash is TWO transitions, so 6/s == the
+                // 3 flashes/sec danger line), ramping to full 4/s above it.
+                float engage = smoothstep(rateAllow, rateAllow + 4.0, rate);
+                envelope = max(engage, envelope * exp(-dt / max(releaseTau, 0.05)));
+                if (envelope < 0.004) envelope = 0.0;   // snap to exact pass-through
+                // Global slew clamp \u2014 ALWAYS on, independent of the envelope.
+                // This is the hard guarantee: a slew-limited signal at f has
+                // peak-to-peak <= slew/(2f), so 0.5/s gives 0.083 at 3 Hz,
+                // under the 0.10 threshold, whatever the source. It is also
+                // what covers slow sine/ramp strobes that per-frame deltas are
+                // too coarse to flag.
+                slewLuma += clamp(meanCur - slewLuma, -slew * dt, slew * dt);
+                if (gl_FragCoord.x < 1.0) fragColor = vec4(envelope, slewLuma, meanCur, 1.0);
+                else fragColor = vec4(lastSign + 1.0, min(pairTimer, 9.0), rate, 1.0);
+            }
+        `;
+        const photoSafeCompositeFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uCur;    // this frame (safeFrame)
+            uniform sampler2D uHist;   // last PRESENTED frame (safeOut.read)
+            uniform sampler2D uStats;  // 2x1 state (texel 0 = display state)
+            uniform float dt;          // wall-clock seconds, clamped by caller
+            void main() {
+                vec4 cur = texture(uCur, vUv);
+                vec4 hist = texture(uHist, vUv);
+                vec4 st = texture(uStats, vec2(0.25, 0.5));
+                float envelope = st.r;
+                float slewLuma = st.g;
+                float meanFrame = st.b;
+                // GLOBAL exposure: one uniform ratio for every pixel. On a
+                // settled scene slewLuma lands exactly on meanFrame, so the
+                // branch below restores bit-exact pass-through. Asymmetric cap:
+                // dimming a bright flash is protective, brightening past 1.25x
+                // would add light the artist never painted.
+                float exposure = clamp((slewLuma + 0.005) / (meanFrame + 0.005), 0.33, 1.25);
+                vec3 corr;
+                if (exposure == 1.0) {
+                    corr = cur.rgb;   // exact \u2014 no sqrt(x*x) round-trip
+                } else {
+                    corr = sqrt(cur.rgb * cur.rgb * exposure);
+                }
+                // History blend, dt-corrected: at full suppression the follow
+                // rate is 1-exp(-dt/0.55) \u2014 0.030/frame at 60 fps, the same
+                // 0.29 Hz corner (3 Hz attenuated to ~0.097) at ANY refresh
+                // rate. a = 1 -> EXACT pass-through.
+                float aSup = 1.0 - exp(-dt / 0.55);
+                float a = mix(1.0, aSup, envelope);
+                fragColor = vec4(mix(hist.rgb, corr, a), mix(hist.a, cur.a, a));
             }
         `;

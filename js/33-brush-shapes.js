@@ -58,15 +58,15 @@
         return load().find(function (s) { return s.id === id; }) || null;
     }
 
-    // Lazy GL upload. `gl` is 04a's lexical global — it exists by the time
-    // anyone paints; guard anyway so an early call is just a no-op retry.
-    function ensureTexture(entry) {
-        if (!entry || TEX[entry.id] || BROKEN[entry.id]) return;
-        var hasGl;
-        try { hasGl = (typeof gl !== 'undefined') && !!gl; } catch (_) { hasGl = false; }
-        if (!hasGl) return;
-        var slot = { texture: null, aspect: 1 };
-        TEX[entry.id] = slot;
+    function hasGL() {
+        try { return (typeof gl !== 'undefined') && !!gl; } catch (_) { return false; }
+    }
+
+    // Decode a stamp dataURL into `slot` (shared by the local library and the
+    // peer cache — a peer's stamp is the same kind of bitmap, it just arrived
+    // over the wire instead of out of storage). onFail runs if it will never
+    // decode, so each caller can retire its own entry.
+    function uploadStamp(slot, dataURL, onFail) {
         var img = new Image();
         img.onload = function () {
             try {
@@ -81,10 +81,91 @@
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 slot.texture = t;
                 slot.aspect = (img.naturalWidth || 1) / (img.naturalHeight || 1);
-            } catch (e) { delete TEX[entry.id]; markBroken(entry.id); }
+            } catch (e) { if (onFail) onFail(); }
         };
-        img.onerror = function () { delete TEX[entry.id]; markBroken(entry.id); };
-        img.src = entry.dataURL;
+        img.onerror = function () { if (onFail) onFail(); };
+        img.src = dataURL;
+    }
+
+    // Lazy GL upload. `gl` is 04a's lexical global — it exists by the time
+    // anyone paints; guard anyway so an early call is just a no-op retry.
+    function ensureTexture(entry) {
+        if (!entry || TEX[entry.id] || BROKEN[entry.id]) return;
+        if (!hasGL()) return;
+        var slot = { texture: null, aspect: 1 };
+        TEX[entry.id] = slot;
+        uploadStamp(slot, entry.dataURL, function () {
+            delete TEX[entry.id];
+            markBroken(entry.id);
+        });
+    }
+
+    // ── Peer shapes (multiplayer) ────────────────────────────────────────
+    // Stamps a peer painted with, held ONLY for as long as we are in a room
+    // with them. Deliberately NOT the persisted library: importList() would
+    // merge a stranger's brushes into the user's own 24 slots permanently
+    // (and silently refuse once full). These live in RAM, are keyed by the
+    // sender's id, and are dropped when the room empties.
+    var PEER = {};              // id → {texture, aspect, rev}
+    var PEER_MAX = 48;          // plenty for a full room; bounds a hostile peer
+    var PEER_MAX_BYTES = 400000; // a ≤128px stamp is ~5-90KB; refuse anything wild
+
+    function peerReady(id) {
+        var p = id && PEER[id];
+        return !!(p && p.texture);
+    }
+
+    // Accept a stamp that arrived over the wire. `rev` is a content hash, so a
+    // peer re-editing a shape in place (replace() keeps the id) invalidates the
+    // cached bitmap instead of painting with the stale one.
+    function putPeer(id, dataURL, rev) {
+        if (typeof id !== 'string' || !id || id.length > 64) return false;
+        if (typeof dataURL !== 'string' || dataURL.length > PEER_MAX_BYTES) return false;
+        // Only a PNG data URL is ever a legitimate stamp here. Anything else
+        // would merely fail to decode, but refusing by shape keeps a peer from
+        // pushing arbitrary URLs into this client's network activity at all.
+        if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(dataURL)) return false;
+        var have = PEER[id];
+        if (have && have.rev === rev && have.texture) return true; // already current
+        if (have) dropPeer(id);
+        if (Object.keys(PEER).length >= PEER_MAX) return false;
+        if (!hasGL()) return false;
+        var slot = { texture: null, aspect: 1, rev: rev };
+        PEER[id] = slot;
+        uploadStamp(slot, dataURL, function () { dropPeer(id); });
+        return true;
+    }
+
+    function dropPeer(id) {
+        var p = PEER[id];
+        if (!p) return;
+        try { if (p.texture && hasGL()) gl.deleteTexture(p.texture); } catch (_) {}
+        delete PEER[id];
+    }
+
+    // Room left / disconnected: the cache has no reason to outlive the session
+    // that filled it, and the ids mean nothing in the next room.
+    function dropPeers() {
+        Object.keys(PEER).forEach(dropPeer);
+    }
+
+    // Content hash of a stamp (FNV-1a, hex). The sender stamps this on every
+    // definition it publishes and on every dab that references the shape, so
+    // both ends agree on WHICH version of an id they mean.
+    function revOf(dataURL) {
+        var h = 0x811c9dc5;
+        for (var i = 0; i < dataURL.length; i++) {
+            h ^= dataURL.charCodeAt(i);
+            h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+        }
+        return h.toString(36);
+    }
+
+    // The wire form of one of OUR shapes, for publishing to a room.
+    function exportShape(id) {
+        var e = findEntry(id);
+        if (!e) return null;
+        return { id: e.id, name: e.name || 'Shape', dataURL: e.dataURL, rev: revOf(e.dataURL) };
     }
 
     // A stamp whose bitmap never decodes (a dataURL truncated by a full
@@ -131,6 +212,13 @@
         if (!id) return null;
         var t = TEX[id];
         if (t && t.texture) return { texture: t.texture, aspect: t.aspect };
+        // A peer's stamp resolves the same way: while applying a remote stroke
+        // (or replaying one) the receiver pins BRUSH_SHAPE_ID to the SENDER's
+        // id, and the bitmap for it lives in the peer cache rather than the
+        // library. Nothing else can reach these — an id only becomes active
+        // for the span of the dab loop that pinned it.
+        var p = PEER[id];
+        if (p && p.texture) return { texture: p.texture, aspect: p.aspect };
         ensureTexture(findEntry(id));
         return null;
     }
@@ -141,6 +229,19 @@
         try { if (sm()) sm().set('brush.shapeId', id || null); } catch (_) {}
         if (id) ensureTexture(findEntry(id));
         notify();
+        publishToRoom(id);
+    }
+
+    // Multiplayer: hand the bitmap to the room the moment a shape is PICKED,
+    // not on the first dab that uses it. Peers decode asynchronously, so a
+    // stroke starting inside that window would open with the built-in tip and
+    // switch to the shape a frame or two in — visible as a flicker at the
+    // start of the stroke. Picking a brush happens seconds before painting
+    // with it, which is all the head start the decode needs. No-op offline.
+    function publishToRoom(id) {
+        try {
+            if (id && typeof window.publishBrushShape === 'function') window.publishBrushShape(id);
+        } catch (_) {}
     }
 
     // Crop the stamp canvas to its alpha bounding box (+4% pad) and
@@ -231,6 +332,10 @@
         dropTexture(id);
         if (activeId() === id) ensureTexture(entry);
         notify();
+        // Same id, new art — so peers holding the old bitmap must be told now.
+        // publishShape keys on the content hash, so this genuinely re-sends
+        // rather than being skipped as "already published".
+        publishToRoom(id);
         return id;
     }
 
@@ -329,8 +434,17 @@
         beginEdit: beginEdit,
         // Replay asks these per dab: is this recorded stamp one we can draw,
         // and please start its GL upload now rather than mid-stroke (05d).
-        has: function (id) { return !!(id && findEntry(id)); },
-        warm: function (id) { ensureTexture(findEntry(id)); },
+        // A peer's cached stamp counts as drawable — that is what lets a
+        // replayed or relayed stroke keep the shape it was painted with.
+        has: function (id) { return !!(id && (findEntry(id) || peerReady(id))); },
+        warm: function (id) { if (!peerReady(id)) ensureTexture(findEntry(id)); },
+        // Multiplayer (06): publish one of ours, cache one of theirs, and let
+        // go of the cache when the room does.
+        exportShape: exportShape,
+        revOf: revOf,
+        putPeer: putPeer,
+        peerReady: peerReady,
+        dropPeers: dropPeers,
         beginImportFile: beginImportFile,
         beginImportDataUrl: beginImportDataUrl,
         exportList: exportList,

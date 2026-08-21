@@ -40,3 +40,11 @@ tmp-*
 
 # Steamworks dev-only app id (never ship: silently changes launch behavior)
 steam_appid.txt
+
+# Baked Steam imagery (regenerate with scripts/bake-*.js — ~90MB of PNGs).
+# The bake SCRIPTS and the copy docs stay tracked; only their output is
+# ignored. steam/store-assets/ and steam/library-assets/ are the final
+# deliverables and DO stay in git.
+steam/screenshots/
+steam/store-assets-slicebg/
+steam/about/images/

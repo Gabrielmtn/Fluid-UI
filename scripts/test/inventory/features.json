@@ -1,0 +1,392 @@
+{
+  "_meta": {
+    "purpose": "Feature-activation map for pairwise integration tests driven over CDP. Every statement verified against source on 2026-08-21.",
+    "executionContext": "All app chunks are classic scripts (index.html loads them via plain or dynamically-inserted <script> tags, never modules, except js/16 and js/23 which are type=module). Top-level function declarations (update, multiSplat, recStartRecording, setMultiplierHotkey, ...) therefore land on window, and top-level let/const (animationMultiplier, isPaused, recEnabled, pointer, obstacle, ...) are global lexical bindings reachable from CDP Runtime.evaluate at global scope. js/23-depth-collision.js is a module but exposes everything via window.collisionLayers / window.depthEstimator.",
+    "coordinateSpace": "x,y for splat/stamp helpers are canvas BACKING-STORE pixels, y-down (canvas.width/canvas.height). multiplayer/scheduleStrokeReplay events are normalized 0..1.",
+    "clockNotes": "The sim clock is dt = min(wallDt/subSteps, 16ms) * window.timeScale computed in update() (js/05j-update-loop.js:80-115). window.__simDtMs / __simTimeMs are published per frame. Several feature-local animation loops (light source, light shift, audio tick) run their OWN rAF with 15ms performance.now() gates and are NOT on the sim clock - pin performance.now/Date.now or freeze those features for determinism."
+  },
+  "features": [
+    {
+      "name": "kaleido",
+      "activate": "window._kaleidoBootstrapped = true; var k = document.getElementById('kaleidoToggle'); k.checked = true; k.dispatchEvent(new Event('change', {bubbles: true}));  /* set _kaleidoBootstrapped FIRST or the first-enable bootstrap forces animationMultiplier=8 and kaleidoSegments=16 (js/05f-kaleido-controls.js:37-55). Display-only alternative: window.kaleidoEnabled = true (the display pass reads only this global, js/05j-update-loop.js:1286) but leaves the checkbox/panel out of sync. Parameters: window.kaleidoSegments, window.kaleidoMode (1=Wedge..5, 0=off), window.kAngle (radians), window.kTwist, window.kZoom, window.kBlend, window.kAnimateRot. */",
+      "deactivate": "var k = document.getElementById('kaleidoToggle'); k.checked = false; k.dispatchEvent(new Event('change', {bubbles: true}));  /* toggle-off restores animationMultiplier from window._prevMultiplier (js/05f-kaleido-controls.js:56-66) */",
+      "activeCheck": "window.kaleidoEnabled === true",
+      "touchesSharedState": [
+        "window.kaleidoEnabled / kaleidoSegments / kaleidoMode / kAngle / kTwist / kZoom / kBlend / kAnimateRot (display-pass uniforms, js/05j-update-loop.js:1286-1298)",
+        "animationMultiplier + #multiplier slider (first-enable bootstrap writes 8; toggle-off restores _prevMultiplier; js/05f-kaleido-controls.js:37-66)",
+        "window.kAngle is ALSO written by: the update loop when kAnimateRot (js/05j-update-loop.js:150-152, sim-clock frameDt so deterministic), audio-reactive mid->kaleido mapping (js/22-audio-reactive.js:791-797, wall-clock), and mandala's pinAngle (js/34-mandala-mode.js:144-153)",
+        "window._kaleidoBootstrapped / window._prevMultiplier"
+      ],
+      "knownHazards": [
+        "First-enable bootstrap mutates multi-arm state (multiplier 8x, segments 16) - js/05f-kaleido-controls.js:37-55; suppress with window._kaleidoBootstrapped = true (mandala does exactly this, js/34-mandala-mode.js:406)",
+        "Preset applies re-dispatch 'change' on the checkbox; the handler early-returns during window._profileApplying to stop it clobbering the snapshot's arm count - js/05f-kaleido-controls.js:26-36",
+        "kAngle slider sticks to 0 for 1500ms after a near-zero write and rewrites the input's value (ANGLE_STICK_MS) - programmatic angle writes through the slider can be silently swallowed; write window.kAngle directly too - js/05f-kaleido-controls.js:88-111 and the workaround at js/34-mandala-mode.js:123-142",
+        "Kaleido is display-only: dye/velocity FBO contents are NOT affected, so state-measuring tests that read FBOs see no difference; only the drawing-buffer output changes"
+      ]
+    },
+    {
+      "name": "multiArmSymmetry",
+      "activate": "setMultiplierHotkey(4); var s = document.getElementById('symmetryMode'); s.value = 'mirrorX'; s.dispatchEvent(new Event('change'));  /* setMultiplierHotkey is a top-level function (js/05e-effect-controls.js:262-272) that sets both the lexical animationMultiplier and window.animationMultiplier and syncs the slider. symmetryMode change handler writes config.SYMMETRY_MODE (js/05g-arm-colors.js:233-239). Valid modes: radial|mirrorX|mirrorY|mirrorQuad|rake (js/01a-param-registry.js:166). */",
+      "deactivate": "setMultiplierHotkey(1); var s = document.getElementById('symmetryMode'); s.value = 'radial'; s.dispatchEvent(new Event('change'));",
+      "activeCheck": "(window.animationMultiplier || 1) > 1 || window.config.SYMMETRY_MODE !== 'radial'",
+      "touchesSharedState": [
+        "animationMultiplier (global lexical + window mirror) - also written by kaleido bootstrap/restore (js/05f-kaleido-controls.js:40,58), mandala enter/exit (js/34-mandala-mode.js:414,447), applyMultiSplatWith temporarily (js/05g-arm-colors.js:294-303)",
+        "config.SYMMETRY_MODE, config.SYM_RAKE_SMOOTH, config.SYM_RAKE_SPACING",
+        "config.SPLAT_RADIUS (applyMultiSplatWith saves/writes/restores it around each call - js/05g-arm-colors.js:294-303)",
+        "window.multiArmColors + arm-color advance state (pendingArmAdvance flushed by the update loop's full-idle gate, js/05j-update-loop.js:497-506)",
+        "rake heading smoothing state rakeUx/rakeUy persists ACROSS strokes (js/05g-arm-colors.js:140-188)"
+      ],
+      "knownHazards": [
+        "Every dye source funnels through multiSplat (js/05g-arm-colors.js:244-292): arm count multiplies dye deposited per event, so total-dye measurements scale with it",
+        "mirrorQuad at even arm counts dedupes coincident transforms so D_n keeps 2n elements, not 4n - dab count is NOT simply 4*n (js/05g-arm-colors.js:209-218)",
+        "Mandala wraps window.multiSplat and window.applyMultiSplatWith globally once entered (wrap persists for the session, gated on the toggle) - js/34-mandala-mode.js:184-210",
+        "recording captures mult per interaction (js/03-recording.js:291,301); replay restores the RECORDED arm count, not the live one"
+      ]
+    },
+    {
+      "name": "mandalaStudio",
+      "activate": "var m = document.getElementById('mandalaToggle'); m.checked = true; m.dispatchEvent(new Event('change', {bubbles: true}));  /* enterMandala (js/34-mandala-mode.js:378-427): forces kaleido ON mode=1, segments from #mandalaWedges, twist 0, zoom 1, blend 1, animRot off, multiplier 1, brushSize 0.05, densityDissipation 1, velocityInfluence 5, wetInfluence 1, wetDrying 0.5, pins kAngle to PI/wedgeCount */",
+      "deactivate": "var m = document.getElementById('mandalaToggle'); m.checked = false; m.dispatchEvent(new Event('change', {bubbles: true}));  /* exitMandala restores the pre-entry snapshot of ALL those controls (js/34-mandala-mode.js:437-458) */",
+      "activeCheck": "!!(document.getElementById('mandalaToggle') && document.getElementById('mandalaToggle').checked)",
+      "touchesSharedState": [
+        "Entire kaleido control set (kaleidoToggle/kaleidoMode/kaleidoSegments/kAngle/kTwist/kZoom/kBlend/kAnimateRot) + window._kaleidoBootstrapped",
+        "#multiplier (forced to 1), #brushSize (forced to 0.05), #densityDissipation, #velocityInfluence, #wetInfluence, #wetDrying - i.e. config DENSITY_DISSIPATION / VELOCITY_INFLUENCE / WET_INFLUENCE / WET_DRYING via the real sliders' input events",
+        "window.multiSplat and window.applyMultiSplatWith are WRAPPED globally on first activation (wedge constraint gate; bypass flag for remote strokes) - js/34-mandala-mode.js:184-210",
+        "window.ZoomView (Fill radios call ZoomView.focus/reset) + __onZoomViewChange/__onZoomViewUserChange hooks (js/34-mandala-mode.js:298-336)",
+        "DOM: #mandalaGuides SVG overlay appended to #canvas-wrapper, z-index read from the canvas's inline style"
+      ],
+      "knownHazards": [
+        "With 'Paint Only In Wedge' checked (#mandalaConstrain, default state in markup - verify at runtime), user splats OUTSIDE the source wedge are silently DROPPED (multiSplat wrap returns early, js/34-mandala-mode.js:186-189); programmatic splats passing exactColor=true bypass the gate",
+        "A preset apply that lands with kaleidoToggle unchecked kicks mandala out via the kaleidoToggle change listener - js/34-mandala-mode.js:483-499",
+        "Exit restores the snapshot of density/isolation/wet sliders: any pairwise feature that changed those DURING mandala gets reverted on exit (js/34-mandala-mode.js:437-458)",
+        "Changing kaleidoSegments/#mandalaWedges while active re-pins kAngle (js/34-mandala-mode.js:358-373)"
+      ]
+    },
+    {
+      "name": "masks",
+      "activate": "window.Masks.ensureDefault(); window.config.BRUSH_TARGET = 'mask';  /* the paint route: subsequent brush dabs go through window.__maskStamp into the active Mask FBO (js/05j-update-loop.js:405-409, js/05i-sim-stats.js:311-343). Direct deterministic coverage without pointer input: window.__maskStamp(x, y, 1) with x,y in canvas px. Import a full coverage canvas: window.Masks.importCoverage(canvasEl, 'name') (js/05o-masks.js:175-190). Overlay film without painting: window.config.MASK_OVERLAY = true (js/05j-update-loop.js:1275). config.BRUSH_TARGET direct write is exactly what the UI's setBrushTarget does (js/20-mixer-layout.js:3050-3058) minus button classes and settings persistence. */",
+      "deactivate": "window.config.BRUSH_TARGET = 'fluid'; window.config.MASK_OVERLAY = false;  /* the Mask objects themselves persist; remove with window.Masks.remove(id) or wipe coverage with window.Masks.clear(id) (js/05o-masks.js:45-72) */",
+      "activeCheck": "!!(window.Masks && window.Masks.activeId() != null)",
+      "touchesSharedState": [
+        "maskStore dye-res RGBA8 FBOs (js/05o-masks.js:20-21) - created at current dyeTexWidth/Height",
+        "config.BRUSH_TARGET - reroutes ALL brush dabs away from the fluid (js/05j-update-loop.js:394-409); config.MASK_OVERLAY",
+        "Display pass: red overlay film sampled on texture unit 7 whenever BRUSH_TARGET==='mask' or MASK_OVERLAY (js/05j-update-loop.js:1275-1278,1312-1313); suppressed during window.__exporting",
+        "Mask stamping reads config.BRUSH_ERASER / BRUSH_FLOW / BRUSH_HARDNESS / SPLAT_RADIUS * STAMP_RADIUS_SCALE (js/05i-sim-stats.js:311-342) - so materialModes 'clay' (STAMP_RADIUS_SCALE=1.3) changes mask brush footprint",
+        "Consumers that READ mask coverage: colliders (createFromMask/setMaskLive, js/23-depth-collision.js:274-276,905-934,1141), raster-layer clip bindings (layer.clipMaskId -> display units 8-11, js/05l-layers-transform.js:739-743), image-layer CSS masks (window.applyLayerClip readback, js/05m-layer-masks.js:17-61)",
+        "Shared sketch/mask undo ring (window.__maskUndoPush, entries tagged kind:'mask')",
+        "window.__onMaskMutated hook - owned by 23-depth-collision (live collider refresh) and CHAINED by 05m image-clip refresh (js/05m-layer-masks.js:83-91)"
+      ],
+      "knownHazards": [
+        "Mask mutation triggers a debounced (140ms setTimeout) readPixels+toDataURL refresh of image-layer CSS clips - a GPU stall on a wall-clock timer (js/05m-layer-masks.js:67-97)",
+        "The red overlay is composited into the drawing buffer: pixel-diff tests on the displayed canvas must set BRUSH_TARGET='fluid' and MASK_OVERLAY=false before reading (js/05j-update-loop.js:1275)",
+        "Mask FBO coverage is NOT resized with the canvas within a session in 05o itself; serialize/restore round-trips through PNG at FBO res (js/05o-masks.js:87-172)",
+        "stampMaskDab lazily calls ensureDefault - painting with target 'mask' and no mask silently creates 'Mask 1' (js/05i-sim-stats.js:314)"
+      ]
+    },
+    {
+      "name": "colliders",
+      "activate": "window.collisionLayers.setProcedural(function (ctx, simW, simH) { ctx.fillStyle = '#fff'; ctx.fillRect(simW * 0.4, simH * 0.4, simW * 0.2, simH * 0.2); });  /* deterministic, no AI models, no layers: sets enabled=true and schedules the recomposite (js/23-depth-collision.js:295-311). The recomposite is rAF-coalesced (js/23-depth-collision.js:1147-1151) so step at least one frame before asserting walls. Alternative from a Mask: window.Masks.ensureDefault(); window.__maskStamp(cx, cy, 1); window.collisionLayers.createFromMask() (js/23-depth-collision.js:905-934) - adds a collision LAYER (layers[] entry + panel DOM). Live binding: window.collisionLayers.setMaskLive(true, {rebind:true}) (js/23-depth-collision.js:1095-1141). */",
+      "deactivate": "window.collisionLayers.setProcedural(null);  /* auto-disables + clears the obstacle synchronously when no collision layers remain (js/23-depth-collision.js:300-310). Force-off regardless of layers: window.collisionLayers.enabled = false (setter clears the obstacle texture, js/23-depth-collision.js:264) */",
+      "activeCheck": "window.collisionLayers.enabled && !!window.__getObstacle()",
+      "touchesSharedState": [
+        "obstacle FBO (sim-res, global lexical; window.__getObstacle() accessor at js/05c-programs-framebuffers.js:59) - sampled by vorticity, divergence, pressure, gradient, obstacle-damp, hf-floor, wetness-advect, MacCormack and dye advection passes and by ring splats (js/05j-update-loop.js:613-1065, js/05i-sim-stats.js:240-245)",
+        "window.__obsStrengthMax (strength normalization, js/23-depth-collision.js:1286,1447)",
+        "Dye MASS: the obstacle drain removes dye pinned in walls at config.COLLIDER_DRAIN (default 0.06/frame, js/04a-canvas-gl-config.js:471) gated by COLLIDER_FLOW_KEEP / COLLIDER_DRAIN_DILATE - collider on/off changes total-dye metrics",
+        "config knobs: DEPTH_EDGE_BAND, COLLIDER_GAP_FILL, COLLIDER_ALPHA_SOLID, CURL_WALL_GATE, WALL_SLIP, COLLIDER_FLOW_KEEP, COLLIDER_DRAIN, COLLIDER_DRAIN_DILATE (js/04a-canvas-gl-config.js:383-479, 581-592)",
+        "layers[] / layerOrder[] when created via createFromMask/createFromLayerMask (collision layers are real layer entries with panel DOM, js/23-depth-collision.js:594-749)",
+        "Pigment memory: memory is drained in step with dye by the obstacle drain (js/04a-canvas-gl-config.js:562-571)"
+      ],
+      "knownHazards": [
+        "updateObstacleFromLayers is requestAnimationFrame-coalesced (js/23-depth-collision.js:1147-1151): under a shimmed-rAF harness the walls appear only after the next driven frame",
+        "The obstacle is re-uploaded after every FBO reinit (js/05j-update-loop.js:220-222) - resize mid-test recomposites walls",
+        "Depth estimation (refreshDepth / DepthEstimator) downloads a ~25MB model and is async - avoid in deterministic tests; use setProcedural or mask sources instead (js/23-depth-collision.js:60-107)",
+        "Collider coverage semantics: coverage = SHAPE not texture; mid-alpha source pixels are saturated by the COLLIDER_ALPHA_SOLID knee in both GPU and CPU paths (js/23-depth-collision.js:1448-1472, js/04a-canvas-gl-config.js:406-414)",
+        "Live mask/raster binding auto-unbinds when the bound source FBO is deleted (js/23-depth-collision.js:951-959)",
+        "1-cycle multigrid is unstable around colliders (documented measurement, js/05j-update-loop.js:699-715) - never force MG_CYCLES below 2 with colliders on"
+      ]
+    },
+    {
+      "name": "imageLayers",
+      "activate": "window.createLayerFromDataUrl(pngDataUrl, 'Test Layer');  /* pngDataUrl = any 'data:image/png;base64,...' string. ASYNC: an Image probe must decode before layers.push + renderLayers run (js/04f-canvas-actions.js:352-514); poll the activeCheck. Optional third arg onCreated(layer) fires on completion. The layer div is #layer<N>, inserted below the sim in layerOrder. */",
+      "deactivate": "window.deleteLayer(index);  /* index = layer.index from window.layers; deleteLayer is installed by js/05l-layers-transform.js (referenced as the deletion path at js/23-depth-collision.js:1521-1527) */",
+      "activeCheck": "(window.layers || []).some(function (l) { return !l.isRaster && !l.isCollision; })",
+      "touchesSharedState": [
+        "window.layers[] / layerOrder[] (shared registry with raster paint layers, collision layers and the sim's z-order entry, js/01-config.js:1-31)",
+        "DOM: .background-layer divs #layer0..#layer9 stacked under/over the GL canvas; canvas inline z-index rewritten by updateLayerZIndices (js/05k-layers-render.js)",
+        "MAX_LAYERS = 10 total across image+raster+collision (js/01-config.js:1, guard at js/04f-canvas-actions.js:354)",
+        "Mask system: layer.clipMaskId/clipInvert -> CSS mask via window.applyLayerClip (js/05m-layer-masks.js:17-46); legacy layer.mask.shapes consumed by colliders and Masks.importFromLayer (js/05o-masks.js:196-224)",
+        "window.LayerGeometry.retarget runs every frame to carry layers with canvas-box resizes (js/05j-update-loop.js:166)"
+      ],
+      "knownHazards": [
+        "Creation is async (image decode) with a _pendingLayerSlots reservation - firing many creates in one tick can exhaust slots (js/04f-canvas-actions.js:354-407)",
+        "Image layers are browser-composited DOM, invisible to GL readbacks: dye/velocity FBO measurements never see them; only drawing-buffer screenshots do, and only where fluid alpha lets them through (preserveFluidOpacity path)",
+        "gl context flags alpha:true + desynchronized:false are load-bearing for layer compositing - desync presents expose the layer divs as flashes (js/04a-canvas-gl-config.js:196-204)",
+        "Deleting a layer that is a live collider source strands/unbinds the binding via polled hook installation (js/23-depth-collision.js:1521-1527)"
+      ]
+    },
+    {
+      "name": "rasterLayers",
+      "activate": "window.rasterLayers.ensureDefault(); window.config.BRUSH_TARGET = 'sketch';  /* ensureDefault creates 'Paint 1' if none exists and sets window.sketch (js/05l-layers-transform.js:680-700). Deterministic dab without pointer input: window.__sketchStamp(x, y, 1) (js/05i-sim-stats.js:270-306). Layers composite in the display pass whenever visible - BRUSH_TARGET only controls where the brush paints. */",
+      "deactivate": "window.config.BRUSH_TARGET = 'fluid';  /* layer + pixels persist; window.deleteLayer(id) removes it; global visibility gate: config.SKETCH_VISIBLE = false hides the whole stack (js/05j-update-loop.js:1260) */",
+      "activeCheck": "!!(window.rasterLayers && window.rasterLayers.activeId() != null)",
+      "touchesSharedState": [
+        "Display pass raster slots: texture units 3-6 + clip units 8-11, uRasterP/uRasterC uniforms (js/05j-update-loop.js:1260-1311)",
+        "config.SKETCH_VISIBLE (master gate), config.BRUSH_TARGET, config.BRUSH_ERASER/BRUSH_FLOW/BRUSH_HARDNESS (stamp params, js/05i-sim-stats.js:282-301)",
+        "window.sketch alias (active raster FBO) - also the default collider source when no binding is set (js/23-depth-collision.js:884-890)",
+        "layers[]/layerOrder[] registry (isRaster entries) and MAX_LAYERS budget",
+        "Shared undo ring with mask painting (window.__sketchUndoPush / __sketchStrokeEnd, stroke boundary closed by the update loop's idle gate js/05j-update-loop.js:491-494)",
+        "Masks: layer.clipMaskId gates the layer through a Mask coverage FBO in-shader (js/05l-layers-transform.js:739-743)"
+      ],
+      "knownHazards": [
+        "Shader budget is 4 slots: the TOPMOST extra visible raster layers silently drop from the composite (js/05l-layers-transform.js:720-733)",
+        "Sketch stamps are display-composited, NOT part of dye/velocity - fluid-state measurements are blind to them; __igniteSketch pours sketch into dye as a one-shot (js/05i-sim-stats.js:357-369)",
+        "Stroke-undo boundaries only close when the update loop runs with the engine idle (js/05j-update-loop.js:491-494) - step frames between strokes",
+        "Thumbnail refresh does a readback on a 200ms setTimeout (js/05l-layers-transform.js:788-813) - wall-clock GPU stalls"
+      ]
+    },
+    {
+      "name": "materialModes",
+      "activate": "window.MaterialModes.setMode('acrylic');  /* or 'clay' (Acrylic-Thick). Bundle-applies: displayShadingToggle/microDetailToggle checkboxes, shadingIntensity/sharpness/clarity/vibrance sliders, config VELOCITY_DISSIPATION/CURL/PRESSURE_ITERATIONS/PRESSURE_DISSIPATION/STAMP_NOISE/STAMP_RADIUS_SCALE(/STAMP_SHAPE for clay), window.displayShadingInvert (js/29-material-modes.js:50-94). Amount rides the #curl slider (0..60 -> 0..1). */",
+      "deactivate": "window.MaterialModes.setMode('fluid');  /* restores the snapshot taken when leaving fluid (js/29-material-modes.js:160-177). If an external writer (preset/session load) is about to install raw config, call window.MaterialModes.yieldToExternal() instead (js/29-material-modes.js:234-252) */",
+      "activeCheck": "window.MaterialModes.active()",
+      "touchesSharedState": [
+        "config.CURL, VELOCITY_DISSIPATION, PRESSURE_ITERATIONS, PRESSURE_DISSIPATION, SHARPNESS, CLARITY, VIBRANCE, STAMP_NOISE, STAMP_RADIUS_SCALE, STAMP_SHAPE (js/29-material-modes.js:27-28,50-94)",
+        "window.displayShading (via shadingIntensity slider + displayShadingToggle checkbox) and window.displayShadingInvert",
+        "The #curl slider's MEANING (vorticity vs material amount) - 05h delegates its input to MaterialModes while active",
+        "localStorage keys fluidui.materialMode / fluidui.materialAmount.* / fluidui.stampShape - PERSIST ACROSS RUNS (js/29-material-modes.js:22-24,227)",
+        "STAMP_RADIUS_SCALE affects sketch AND mask stamp footprints (js/05i-sim-stats.js:288-289,326-327)"
+      ],
+      "knownHazards": [
+        "clay writes VELOCITY_DISSIPATION down to 0.90, BELOW the velocityDissipation slider's ui min (0.9 exactly at hard 0.5) - syncSideSliders deliberately writes slider.value without dispatching 'input' to avoid a clamp-writeback (js/29-material-modes.js:101-115)",
+        "Material state persists in localStorage: a harness run that ends in 'clay' boots the NEXT run in clay (js/29-material-modes.js:320-325). Clear fluidui.materialMode between tests",
+        "Preset/session/mutation writers must route through yieldToExternal or applyState; raw config writes while a material is active get re-derived on the next slider input (js/29-material-modes.js:234-252)",
+        "Restore order is load-bearing: sliders before checkboxes (js/29-material-modes.js:165-171)"
+      ]
+    },
+    {
+      "name": "brushShapes",
+      "activate": "window.BrushShapes.importList([{id: 'test1', name: 'TestShape', dataURL: pngDataUrl}]); window.BrushShapes.setActive('test1');  /* pngDataUrl = small white/alpha PNG data URL (<=128px recommended - add() would crop/downscale, importList takes it as-is). THEN WAIT until window.BrushShapes.stampPending() === false: the GL texture upload is async (Image decode, js/33-brush-shapes.js:63-125). */",
+      "deactivate": "window.BrushShapes.setActive(null);  /* remove entirely: window.BrushShapes.remove('test1') (js/33-brush-shapes.js:199-205) */",
+      "activeCheck": "window.BrushShapes.activeId() != null && !window.BrushShapes.stampPending()",
+      "touchesSharedState": [
+        "config.BRUSH_SHAPE_ID (js/33-brush-shapes.js:138-144)",
+        "splat shader stamp texture on unit 2 (05b stampTexOn branch, bound in 05i splat(); js/33-brush-shapes.js:5-8)",
+        "settingsManager keys brush.shapes / brush.shapeId - PERSIST ACROSS RUNS (js/33-brush-shapes.js:13-15,44-46,141)",
+        "multiSplat dab gate: while stampPending() every user dab (and its broadcast) is skipped (js/05g-arm-colors.js:251-257)",
+        "Stroke events record shape id per dab (js/05d-input-replay.js:212-218); replay warms stamps (js/05d-input-replay.js:302-310)"
+      ],
+      "knownHazards": [
+        "stampPending() HOLDS all user paint: dabs landing between setActive and texture-ready are dropped silently - always await !stampPending() before scripted strokes (js/33-brush-shapes.js:109-125, js/05g-arm-colors.js:251-257)",
+        "A broken dataURL fires an app-modal dialog and auto-clears the selection (markBroken, js/33-brush-shapes.js:96-107)",
+        "Shapes persist in settings storage; importList merges with a 24 cap where existing entries win (js/33-brush-shapes.js:278-305) - clean up test shapes or ids collide across runs",
+        "Shaped strokes render as gaussian for multiplayer peers and recorded-timeline playback in some paths (shape id not on the wire - repo memory, kept gap)"
+      ]
+    },
+    {
+      "name": "wetness",
+      "activate": "window.config.WET_INFLUENCE = 0.5; window.config.WET_DRYING = 3.0;  /* direct config write is sufficient - the update loop reads config each frame (js/05j-update-loop.js:846-879). UI path: #wetInfluence / #wetDrying sliders (registry: js/01a-param-registry.js:40-41) with 'input' events. */",
+      "deactivate": "window.config.WET_INFLUENCE = 0;  /* verified bit-identical to no-wetness when 0: wetInfluence uniform 0 makes dyeMobility() an exact 1.0 and the wetness advect pass is skipped entirely (js/05j-update-loop.js:799-801,841-848) */",
+      "activeCheck": "window.config.WET_INFLUENCE > 0",
+      "touchesSharedState": [
+        "wetness FBO ping-pong (sim-res) written by the wetness advect+dry pass (js/05j-update-loop.js:841-879)",
+        "wetness texture bound to unit 4 for ALL THREE dye passes unconditionally, sampled only when wetInfluence > 0 (js/05j-update-loop.js:920-923,938-939,971-972,1011-1012)",
+        "Dye transport speed (dyeMobility scales dye advection but NEVER velocity self-advection - js/05j-update-loop.js:797-801)",
+        "wetDryAccum/lastWetDrying batching accumulators (js/05j-update-loop.js:23,39-49)"
+      ],
+      "knownHazards": [
+        "Wetness FBO contents persist across a toggle off/on - re-enabling resumes with stale wet regions unless FBOs are rebuilt",
+        "Drying is fp16-batched: pow(0.5, dt/halfLife) is applied only once the accumulated debt clears ~0.002, so the drying step lands in bursts whose frame alignment depends on dt history (js/05j-update-loop.js:39-49)",
+        "Mandala enter forces WET_INFLUENCE=1, WET_DRYING=0.5 through the real sliders and restores them on exit (js/34-mandala-mode.js:424-425,450-452)",
+        "P15-1 shipped default-off; feature-off bit-identity was the verified invariant (repo memory + js/05j-update-loop.js:843-845) - a regression harness should assert it"
+      ]
+    },
+    {
+      "name": "lightSource",
+      "activate": "window.lightSource.enabled = true; window.lightSource.mode = 'manual'; window.lightSource.x = 0.3; window.lightSource.y = 0.3; window.lightSource.intensity = 0.5; window.lightSource.ambient = 0.3;  /* the update loop reads only window.lightSource (js/05j-update-loop.js:1172-1190). UI path (#enableLighting checkbox + change) additionally persists to settingsManager (js/13-light-source.js:52-65,284-294). */",
+      "deactivate": "window.lightSource.enabled = false;",
+      "activeCheck": "!!(window.lightSource && window.lightSource.enabled)",
+      "touchesSharedState": [
+        "lit FBO (dye-res): the lighting pass rewrites the display texture chain - displayTexture becomes lit.texture, changing input to glow/shading/display (js/05j-update-loop.js:1171-1190)",
+        "window.lightSource.x/y/intensity/ambient/mode/speed",
+        "settingsManager lightSource.* keys on the UI/checkbox path (persist across runs, js/13-light-source.js:284-294)"
+      ],
+      "knownHazards": [
+        "mode 'random' animates x/y on the module's OWN rAF loop with a 15ms performance.now gate and Date.now()-seeded sines (js/13-light-source.js:212-282) - nondeterministic under a stepped sim clock unless performance.now/Date.now are pinned; keep mode 'manual' for reproducibility",
+        "Lighting pass y is flipped for GL (1.0 - y, js/05j-update-loop.js:1180)",
+        "Post-FX blend-ghosting bug class: post-FX passes must overwrite, never alpha-blend (comment js/05j-update-loop.js:1107-1118) - lighting is one of the passes whose early-exit writes faded alpha"
+      ]
+    },
+    {
+      "name": "lightShift",
+      "activate": "window.lightShift.enabled = true; window.lightShift.setPath([{x: 90, y: 45, hue: 200, saturation: 80, lightness: 50}]); window.lightShift.mode = 'replace'; window.lightShift.threshold = 0.85; window.lightShift.intensity = 0.5;  /* the display pass requires enabled AND colorPath.length > 0 (js/05j-update-loop.js:1238). A SINGLE-point path makes getCurrentColor() time-invariant (js/14-light-shift.js:448-472) - use that for determinism. setPath persists via settingsManager unless window.__mpApplyingRemote (js/14-light-shift.js:535-543). */",
+      "deactivate": "window.lightShift.enabled = false;",
+      "activeCheck": "!!(window.lightShift && window.lightShift.enabled && window.lightShift.colorPath.length > 0)",
+      "touchesSharedState": [
+        "Display-pass uniforms lightShiftEnabled/Color/Threshold/Intensity/Mode (js/05j-update-loop.js:1238-1253)",
+        "READS config.BLOOM_CEILING (Gate ceiling) and config.LS_DENSITY_MIX for the density-hybrid trigger - direct coupling with colorGate (js/05j-update-loop.js:1247-1252, js/04a-canvas-gl-config.js:510-519)",
+        "settingsManager lightShift.* keys (persist across runs)",
+        "window.lightShift.saturation multiplier applied inside getCurrentColor"
+      ],
+      "knownHazards": [
+        "Multi-point paths animate: currentPathIndex advances on the module's own rAF with a 15ms wall gate (js/14-light-shift.js:409-440) - the shader color changes every wall-clock frame; single-point paths are static",
+        "The trigger keys off displayed whiteness PLUS pigment-memory/raw-density (LS_DENSITY_MIX) so it fires differently with Gate/Ignite active - this is half of the documented Gate/Color-Shift interplay (js/04a-canvas-gl-config.js:510-519)",
+        "setPath from a test persists into the user's saved settings unless window.__mpApplyingRemote is set around the call (js/14-light-shift.js:535-543) - or restore afterwards"
+      ]
+    },
+    {
+      "name": "colorGate",
+      "activate": "window.applyGateState(true);  /* sets config.COLOR_GATE = true and config.BLOOM_CEILING = 1.0 (js/05h-slider-bindings.js:74-79). UI path: #colorGate checkbox + change, which also persists via Settings.saveCheckbox (js/05h-slider-bindings.js:196-209). */",
+      "deactivate": "window.applyGateState(false);",
+      "activeCheck": "window.config.BLOOM_CEILING > 0",
+      "touchesSharedState": [
+        "config.COLOR_GATE + config.BLOOM_CEILING",
+        "Splat shader FLOW MODEL: with Gate on, flow scales the CONVERGENCE toward the stroke colour via the gateFlow uniform / window.__splatFlow instead of scaling the deposited colour (js/05d-input-replay.js:139-148, js/05b-shader-sim.js:31,236, js/05i-sim-stats.js:148)",
+        "__normalizePaintFlow switches between linear (additive) and exponent (Gate convergence) compensation (js/05d-input-replay.js:170-177)",
+        "Advection pass: bloomCeiling clamp + pigment memory restore path (js/05j-update-loop.js:1021-1032; memory dissipation config.DYE_MEMORY_DISS, js/04a-canvas-gl-config.js:562-571)",
+        "Display tone-map: gateVibrance, gateWhite (extended Reinhard white point = BLOOM_CEILING * GATE_WHITE_MULT), igniteVibrance (js/05j-update-loop.js:1218-1235)",
+        "window.DyeNudge (Ignite): its growth push only engages when BLOOM_CEILING > 0 (js/05h-slider-bindings.js:155-168)",
+        "Light Shift trigger reference (lightShiftCeiling uniform, js/05j-update-loop.js:1247-1252)"
+      ],
+      "knownHazards": [
+        "THE documented integration-bug class: with Gate on, painting over dense settling paint CONVERGES it toward the current picker colour (mix toward stroke colour) instead of adding - dense regions snap to the picked colour mid-bake. Interacts with pigment memory (dye alpha remembers painted strength, js/04a-canvas-gl-config.js:562-571) and with Ignite's memory restore (js/05h-slider-bindings.js:80-195). Pairwise tests painting the same scripted strokes with Gate on vs off are NOT paint-equivalent by design (js/05d-input-replay.js:131-147)",
+        "Gate changes the display tone-map curve globally (gateWhite extended Reinhard) - screenshot diffs across the toggle differ even for identical dye (js/05j-update-loop.js:1219-1227)",
+        "Callers of __applyPaintFlow must reset window.__splatFlow = 1 after the splat or programmatic splats inherit reduced flow (js/05d-input-replay.js:135-138, reset at js/05j-update-loop.js:458)",
+        "UI checkbox path persists colorGate to settings - restore after tests (js/05h-slider-bindings.js:200-208)"
+      ]
+    },
+    {
+      "name": "zoomView",
+      "activate": "window.ZoomView.set(2);  /* or window.ZoomView.zoomAt(1.5, clientX, clientY) about a client point; pan: window.ZoomView.panBy(dx, dy). Zoom MODE (wheel/drag ownership + paint suppression): window.setZoomMode(true) (js/35-zoom-view.js:43-163). */",
+      "deactivate": "window.ZoomView.reset(); window.setZoomMode(false);",
+      "activeCheck": "window.ZoomView.scale !== 1",
+      "touchesSharedState": [
+        "#canvas-wrapper CSS transform + transformOrigin and #canvas-area overflow:hidden (js/35-zoom-view.js:27-39) - pure CSS, GL buffers untouched",
+        "Pointer-to-canvas mapping: getCanvasCoordinates normalizes through getBoundingClientRect so scripted CDP pointer coords must be pre-transformed client coords (js/02-palettes.js:260-273)",
+        "body.zoom-mode class, canvas cursor, #zoomBadge DOM overlay",
+        "__onZoomViewChange / __onZoomViewUserChange hooks (mandala Fill listens, js/34-mandala-mode.js:318-336)"
+      ],
+      "knownHazards": [
+        "Zoom Mode ON suppresses painting entirely and captures wheel/pointer events at capture phase (js/35-zoom-view.js:168-205) - scripted strokes while zoomMode is on do nothing",
+        "Global hotkeys Z (toggle) and 0 (reset) are document-level (js/35-zoom-view.js:208-225) - synthetic keyboard input in tests can flip this feature accidentally",
+        "Safe for FBO-level measurements (dye/velocity unchanged); drawing-buffer screenshots are unchanged too (the transform is on the wrapper DOM, applied by the compositor)"
+      ]
+    },
+    {
+      "name": "focusMode",
+      "activate": "window.focusMode.toggle();  /* applies body.focus-mode, saves wrapper geometry, auto-hides cursor, then double-rAF -> window.updateCanvasSize() which sets canvas.width/height and window.needsFramebufferReinit (js/21-focus-mode.js:49-120, js/01-config.js:613-629) */",
+      "deactivate": "window.focusMode.toggle();  /* restores saved wrapper geometry then resizes again */",
+      "activeCheck": "window.focusMode.isActive()",
+      "touchesSharedState": [
+        "canvas.width/height + ALL FBOs via needsFramebufferReinit -> initFramebuffers (js/05j-update-loop.js:203-223)",
+        "#canvas-wrapper inline geometry (saved/restored), body.focus-mode class",
+        "#cursorToggle checkbox (auto-off with _preStreamState restore, js/21-focus-mode.js:83-94)",
+        "settingsManager focus.mode + stream.format keys - PERSIST: a run ending focused re-enters focus mode on next boot (js/21-focus-mode.js:114-119,229-250)",
+        "Collision obstacle re-upload after the FBO rebuild (js/05j-update-loop.js:220-222)"
+      ],
+      "knownHazards": [
+        "Toggling resizes the canvas -> full FBO rebuild; dye survives via a preserving copy (js/08a-quality-governor.js header note 5) but is RESAMPLED - not bit-stable across a focus toggle. Never toggle mid-measurement",
+        "The resize lands via double-requestAnimationFrame then the update loop's 180ms settle debounce (js/21-focus-mode.js:106-112, js/05j-update-loop.js:197-216) - step frames and advance the clock past the settle before asserting",
+        "Persists focus.mode=true to settings - reset between harness runs or every boot starts focused",
+        "F hotkey is global (no modifiers, js/21-focus-mode.js:123-137) - synthetic keyboard input can flip it"
+      ]
+    },
+    {
+      "name": "audioReactive",
+      "activate": "window.audioReactive.enable('file', wavFile);  /* wavFile = a File made from a synthesized WAV Blob (new File([wavBlob], 't.wav', {type:'audio/wav'})) - decodes via decodeAudioData, no permission prompt (js/22-audio-reactive.js:314+, 1042-1080). ASYNC + token-guarded; poll isEnabled(). NO built-in fake feature-bus injection exists: tick() reads only analyser.getByteFrequencyData(freqData) (js/22-audio-reactive.js:577-584), so the deterministic injection path is patching AnalyserNode.prototype.getByteFrequencyData (and the hi-res analyser's, js/22-audio-reactive.js:1184-1197) to write scripted spectra BEFORE enable. Physics-visible side effects can also be driven with NO audio at all: window.__edgeAbsorb = 1 and a per-frame refreshed window.__attractorField = {a: [[x,y,radius,strength],...], force: 0.6, swirl: 0.25, ts: performance.now()} (js/05j-update-loop.js:644,786,1073-1104 - ts must be < 500ms old each frame). */",
+      "deactivate": "window.audioReactive.disable();  /* also invalidates in-flight starts via startToken (js/22-audio-reactive.js:1082-1088). Clear scene globals: window.__attractorField = null; window.__edgeAbsorb = 0; */",
+      "activeCheck": "window.audioReactive.isEnabled()",
+      "touchesSharedState": [
+        "config.SPLAT_RADIUS (overall->size mapping with foreign-write rebasing - the mapping and the brush slider co-own the value, js/22-audio-reactive.js:88-96,761-783)",
+        "window.kAngle (mid->kaleido rotation when kaleidoEnabled, js/22-audio-reactive.js:791-803)",
+        "Palette step state via window.stepPaletteOnce (treble->color, js/22-audio-reactive.js:806-818)",
+        "Dye/velocity via auto-splats through window.applyMultiSplatWith (js/22-audio-reactive.js:924-951) - honors animationMultiplier for single-splat patterns",
+        "AudioScenes side effects: window.__edgeAbsorb (js/30-audio-scenes.js:293-314), window.__attractorField (dye-transport pass, js/05j-update-loop.js:1073-1104), collisionLayers.setProcedural (EQ lane walls)",
+        "AudioContext + speaker output for 'file' sources (monitor gain, js/22-audio-reactive.js:130-211)"
+      ],
+      "knownHazards": [
+        "tick() is its OWN rAF loop with a 15ms performance.now gate (js/22-audio-reactive.js:577-582), decoupled from the driven update() - under a virtual-clock harness the audio mappings advance on wall time unless performance.now is pinned and rAF shimmed globally",
+        "Autoplay policy can leave the AudioContext 'suspended' until a trusted gesture (armGestureResume, js/22-audio-reactive.js:163-180) - launch Chrome/Electron with autoplay-policy=no-user-gesture-required or dispatch a trusted CDP input event after enable",
+        "enable() while already enabled calls disable() first; completion is async and token-guarded - always await isEnabled() (js/22-audio-reactive.js:1042-1080)",
+        "mapOverallToSize writes config.SPLAT_RADIUS every tick (except mid-stroke, js/22-audio-reactive.js:746-783) - fights any test that asserts a fixed brush size",
+        "The __attractorField staleness guard (500ms, js/05j-update-loop.js:1077-1078) compares against performance.now() - under a frozen clock the field never expires; under a real clock it expires between slow steps"
+      ]
+    },
+    {
+      "name": "recordingLayers",
+      "activate": "var rm = document.getElementById('recMode'); rm.value = 'min'; rm.dispatchEvent(new Event('change')); recStartRecording();  /* applyMode('min') sets recEnabled=true and mints a layer if none (js/03-recording.js:1501-1528). recStartRecording() (top-level fn, js/03-recording.js:99-127) starts capture IMMEDIATELY - recToggleRecord() instead runs a 3-2-1 setTimeout countdown (js/03-recording.js:152-172), avoid it in tests. Stop: recStopRecording(). Play back: recTogglePlayback() or recTogglePlaybackAll() (js/03-recording.js:307-342). Playback speed: #recPlaybackSpeed select - NOTE its registry default is '0.25' (js/01a-param-registry.js:171). */",
+      "deactivate": "recStopAll(); var rm = document.getElementById('recMode'); rm.value = 'off'; rm.dispatchEvent(new Event('change'));  /* applyMode('off') sets recEnabled=false and stops playback/recording (js/03-recording.js:1501-1516) */",
+      "activeCheck": "recEnabled === true",
+      "touchesSharedState": [
+        "Dye/velocity via playback splats (applyMultiSplatWith with each interaction's recorded mult + radius)",
+        "recRecordInteraction reads window.__lastPaintRadius, animationMultiplier, and captures the brush colour mode from window.multiArmColors at record start (js/03-recording.js:99-112,278-305)",
+        "Playhead rides window.__simDtMs when config.REC_SIM_CLOCK !== false (js/03-recording.js:361-398) - playback IS deterministic under a driven sim clock",
+        "recEnabled / recLayers / recPlaybackSpeed / recMaxDurationMs globals (declared js/02-palettes.js:346-356)",
+        "Constant-flow mode records stationary holds from inside update() (js/05j-update-loop.js:326-329)"
+      ],
+      "knownHazards": [
+        "RECORDING timestamps are Date.now() wall clock (recordingStartTime js/03-recording.js:104, interaction timestamp js/03-recording.js:282) even though PLAYBACK is sim-clock - capture under a stepped harness needs Date.now pinned to the virtual clock for faithful timelines",
+        "recToggleRecord's countdown and the auto-stop timer are setTimeout wall clock (js/03-recording.js:152-172,117-127)",
+        "Default playback speed select is 0.25x (js/01a-param-registry.js:171) - set #recPlaybackSpeed to '1' + change for 1:1 playback",
+        "Replay colour modes: 'original' REGENERATES random/step colours per stroke - non-deterministic unless the layer's colorMode is 'exact' (js/03-recording.js:404-436)"
+      ]
+    },
+    {
+      "name": "strokeReplay",
+      "activate": "window.scheduleStrokeReplay(normalizedEvents);  /* normalizedEvents = [{t, x, y, dx, dy, color:[r,g,b], mult, radius, tip, shape}] with x/y/dx/dy normalized 0..1 (js/05d-input-replay.js:472-489); sets isReplayActive=true and window._activeReplayEvents; processReplay() consumes them inside update() (called at js/05j-update-loop.js:225, even while paused). Interactive path: hold right mouse button on the canvas (js/05d-input-replay.js:510-530). Time-window replay of recent strokes: buildTimeReplayEvents() honors window.replayTimePeriod seconds (js/05d-input-replay.js:224-260). */",
+      "deactivate": "isReplayActive = false; window._activeReplayEvents = null;  /* also ends naturally when events are exhausted (js/05d-input-replay.js:459-470) */",
+      "activeCheck": "isReplayActive === true",
+      "touchesSharedState": [
+        "Dye/velocity via replayed splats with recorded radius/mult/tip/shape (js/05d-input-replay.js:403-470)",
+        "isReplayActive gates: the brush-engine drain (js/05j-update-loop.js:243), pushStrokeEvent recording (js/05d-input-replay.js:200), and trackMouseMovement (js/04a-canvas-gl-config.js:75)",
+        "strokeEvents/strokeHistory ring (cap 200 strokes, js/05d-input-replay.js:183-192)",
+        "window.BrushShapes.warm() pre-uploads recorded stamp textures (js/05d-input-replay.js:302-310)"
+      ],
+      "knownHazards": [
+        "Replay pacing is Date.now() wall clock times window.replaySpeed (js/05d-input-replay.js:405-407) - NOT the sim clock; under a stepped harness pin Date.now or all events fire on the first frame whose elapsed wall time covers them",
+        "Right-mouse hold-to-replay (mousePositions trail) is a separate legacy loop (replayMovements, js/04a-canvas-gl-config.js:116-176) driven by its own rAF and Date.now",
+        "Recorded events replay with exact recorded radius/mult - current UI slider state is irrelevant during replay, by design (js/05d-input-replay.js:409-414)"
+      ]
+    },
+    {
+      "name": "photoSafe",
+      "activate": "var t = document.getElementById('photoSafeToggle'); t.checked = true; t.dispatchEvent(new Event('change', {bubbles: true})); /* default-ON; activation only needed after a test disabled it */",
+      "deactivate": "var t = document.getElementById('photoSafeToggle'); t.checked = false; t.dispatchEvent(new Event('change', {bubbles: true}));",
+      "activeCheck": "window.config.PHOTOSAFE === true",
+      "touchesSharedState": [
+        "localStorage 'fluidui.photoSafe' — persisted preference; also read by 04a config seed and the first-frame warning modal",
+        "localStorage 'fluidui.photoWarn.ack.v1' — modal acknowledgement; clear it to re-show the warning on next load",
+        "body.photosafe-on class — CSS transitions on canvas background/opacity",
+        "safeFrame/safeOut/safeLuma/safeStats FBOs via window.__getPhotoSafe() — safeStats is 2x1: texel0 {R:envelope, G:slewLuma, B:mean}, texel1 {R:lastSign+1, G:pairTimer, B:transitionRate}"
+      ],
+      "knownHazards": [
+        "Default ON: A/B captures against pre-feature baselines must disable it OR rely on pass-through bit-identity (verified for static scenes; any detected flash breaks identity BY DESIGN)",
+        "applyPhotoSafe uses its own wall-clock dt — virtual-clock harnesses do not pace the limiter; drive real time or expect envelope decay to run on wall time",
+        "The limiter reacts to the FINAL frame: a test that strobes any visual (glow, background, splats) >3Hz will see amplitudes crushed while ON — that is the feature working",
+        "photoSafeToggle is in PRESET_SKIP: preset/vault/multiplayer snapshots neither carry nor apply it; do not expect applyPresetSnapshot to change it",
+        "Exports/captures/recordings read the canvas AFTER the limiter: a mid-strobe export is the CLAMPED look (intended — what the viewer was protected into seeing is what ships)",
+        "Alpha-channel flashes (backgroundTransparency strobing the DOM composite) are outside the GL limiter; the CSS transition guard on body.photosafe-on covers background-color/opacity of the canvas elements, nothing else",
+        "OFF->ON edge clears limiter state via resetPhotoSafeState() (05i, called from 05j); buffers are allocated lazily when booted with protection off — window.__photoSafeEnsure() builds them",
+        "Detection is OSCILLATION RATE, not per-frame deviation: a test that changes the frame monotonically (painting, fades, a single burst) will NOT engage the envelope by design. To exercise suppression, alternate large-area luminance at >2.5Hz for ~1s (engagement ramps over ~0.8s; WCAG permits up to 3 flashes/sec, so onset is not instant).",
+        "The live rAF loop keeps running between harness tool calls and releases envelope/rate (tau 1s / PHOTOSAFE_RELEASE) — build the strobe AND read the state inside ONE evaluation."
+      ]
+    },
+    {
+      "name": "scatterOcclusion",
+      "activate": "window.config.GLOW=true; window.config.SCATTER=true; var t=document.getElementById('scatterBlockToggle'); t.checked=true; t.dispatchEvent(new Event('change',{bubbles:true})); /* needs a collision layer to have any effect */",
+      "deactivate": "var t=document.getElementById('scatterBlockToggle'); t.checked=false; t.dispatchEvent(new Event('change',{bubbles:true}));",
+      "activeCheck": "window.config.SCATTER_BLOCK === true",
+      "touchesSharedState": [
+        "obstacle FBO via window.__getObstacle() — READ ONLY here; the pointer swaps with obstacleScratch every composite, never cache it",
+        "window.__obsStrengthMax — the coverage normalizer; raw texels store coverage*collisionStrength",
+        "texture unit 1 during the scatter pass (the rest of the glow chain uses only unit 0)"
+      ],
+      "knownHazards": [
+        "No-op without BOTH a collision layer and Scatter on — a test that forgets the collider sees zero difference and looks like a failure",
+        "updateObstacleFromLayers() is rAF-COALESCED: window.update() does not pump rAF, so after changing colliders you must await a real animation frame before the obstacle reflects it",
+        "collisionLayers.enabled=false calls clearObstacle(), so re-enabling needs a recomposite plus a real rAF frame",
+        "Probe the obstacle by reading channel R ONLY — it is R16F, so averaging RGBA reports 1/3 of the true coverage",
+        "Dye decays between harness tool calls; repaint inside the same evaluation or the emitter is gone and every scatter reading collapses to ~0"
+      ]
+    }
+  ]
+}
