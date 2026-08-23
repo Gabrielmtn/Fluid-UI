@@ -33,6 +33,7 @@
         const wetSplatProg = new Program(baseVert, wetSplatFrag);           // P15-1 wetness deposit
         const rasterStampProg = new Program(baseVert, rasterStampFrag);
         const igniteProg = new Program(baseVert, igniteFrag);   // D2 bridge: sketch → dye
+        const imageSplatProg = new Program(baseVert, imageSplatFrag); // image → dye (Splat to Fluid)
         const captureProg = new Program(baseVert, captureFrag); // D2 bridge: dye → sketch
         const blurProg = new Program(blurVert, blurFrag);
         const glowPrefilterProg = new Program(baseVert, glowPrefilterFrag);

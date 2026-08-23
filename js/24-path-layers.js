@@ -653,9 +653,9 @@
                             <button class="path-shape-btn" data-shape="wave" title="Wave">〰️</button>
                         </div>
                         <div class="path-action-row">
-                            <button class="path-draw-btn" data-action="draw">✏️ Draw</button>
+                            <button class="path-draw-btn" data-action="draw">Draw</button>
                             <button class="path-transform-btn" data-action="transform" ${!hasPath ? 'disabled' : ''} title="Move or resize this layer's paths on the canvas">⤢ Move / Resize</button>
-                            <button class="path-clear-btn" data-action="clear-paths" ${layer.paths.length === 0 ? 'disabled' : ''} title="Remove all paths from this layer">✕ Clear paths</button>
+                            <button class="path-clear-btn" data-action="clear-paths" ${layer.paths.length === 0 ? 'disabled' : ''} title="Remove all paths from this layer">Clear paths</button>
                         </div>
                     </div>
                     <canvas class="path-preview-canvas" width="200" height="60"></canvas>
@@ -924,8 +924,8 @@
         drawOverlay.innerHTML = `
             <div class="draw-toolbar">
                 <span id="pathDrawStatus">Draw your paths on the canvas</span>
-                <button id="pathDrawDone" type="button">✓ Done</button>
-                <button id="pathDrawCancel" type="button">✕ Cancel</button>
+                <button id="pathDrawDone" type="button">Done</button>
+                <button id="pathDrawCancel" type="button">Cancel</button>
             </div>
             <div class="draw-canvas-area">
                 <canvas id="pathDrawCanvas"></canvas>
@@ -1084,8 +1084,8 @@
         transformOverlay.innerHTML = `
             <div class="draw-toolbar">
                 <span>Drag inside the box to move · drag a corner to resize</span>
-                <button id="pathTransformDone" type="button">✓ Done</button>
-                <button id="pathTransformCancel" type="button">✕ Cancel</button>
+                <button id="pathTransformDone" type="button">Done</button>
+                <button id="pathTransformCancel" type="button">Cancel</button>
             </div>
             <div class="draw-canvas-area">
                 <canvas id="pathTransformCanvas"></canvas>

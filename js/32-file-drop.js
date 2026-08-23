@@ -212,8 +212,19 @@
 
     function toLayer(dataUrl, title, mode) {
         if (typeof window.createLayerFromDataUrl !== 'function') return false;
-        if (mode !== 'collider') return window.createLayerFromDataUrl(dataUrl, title);
-        return window.createLayerFromDataUrl(dataUrl, title, colliderize);
+        if (mode === 'collider') return window.createLayerFromDataUrl(dataUrl, title, colliderize);
+        // A pasted layer lands below the sim and its panel row renders
+        // collapsed, so the flash was the only sign it arrived. Open Layers on
+        // the new row instead — the paste is usually the thing you are about to
+        // mask, transform or fluidize. (A collider paste is deliberately
+        // invisible, so it keeps its silence.)
+        //
+        // Taking the callback means taking the undo record with it: 04f only
+        // self-records when no onCreated is supplied.
+        return window.createLayerFromDataUrl(dataUrl, title, function (layer) {
+            recordCreate([layer.index], 'paste layer');
+            if (typeof window.revealLayerRow === 'function') window.revealLayerRow(layer.index);
+        });
     }
 
     function layerFromBlob(blob, title, mode) {

@@ -195,13 +195,20 @@
         return container ? container.querySelector('[data-overlay-id="' + id + '"]') : null;
     }
 
-    // ─── QR CODE GENERATOR (placeholder) ────────────────────────
+    // ─── QR CODE ────────────────────────────────────────────────
+    // Was a placeholder that drew a white box reading "SCAN" with the URL
+    // printed under it — legible to a person, invisible to a camera. Now a
+    // real symbol via js/39-qrcode.js. The fallback below only shows if that
+    // module failed to load, or if the URL is longer than version 6-M holds.
     function generateQRSvg(url, size) {
         var s = size || 100;
-        return '<div style="width:' + s + 'px;height:' + s + 'px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:white;color:black;font-size:9px;text-align:center;font-family:monospace;line-height:1.3;overflow:hidden;">' +
-            '<div style="font-size:14px;font-weight:bold;margin-bottom:4px;">📱 SCAN</div>' +
-            '<div style="word-break:break-all;padding:0 4px;font-size:8px;opacity:0.7;">' + url + '</div>' +
-            '</div>';
+        if (window.QRCode && url) {
+            var svg = window.QRCode.svg(url, { size: s, margin: 3 });
+            if (svg) return svg;
+        }
+        return '<div style="width:' + s + 'px;height:' + s + 'px;display:flex;align-items:center;' +
+            'justify-content:center;background:white;color:#b00;font-size:9px;text-align:center;' +
+            'font-family:monospace;padding:4px;box-sizing:border-box;">Link too long for a QR code</div>';
     }
 
     // ─── OVERLAY MANAGEMENT ─────────────────────────────────────
@@ -541,7 +548,7 @@
         aBar.innerHTML =
             '<span class="ba-title">✋ Arrange overlays</span>' +
             '<span class="ba-hint">click to select · drag to move · corners resize · ↻ rotate · painting paused</span>' +
-            '<button id="brandingArrangeDone" type="button">✓ Done</button>';
+            '<button id="brandingArrangeDone" type="button">Done</button>';
         document.body.appendChild(aBar);
         document.getElementById('brandingArrangeDone').onclick = function (ev) { ev.preventDefault(); closeArrange(); };
 

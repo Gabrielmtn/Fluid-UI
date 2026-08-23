@@ -26,6 +26,7 @@ var turnHolderId = null;    // connection id of the current painter (null = none
 var turnOrder = [];         // connection ids in rotation order
 var turnMsLocal = 0;        // turn length from the server (0 = no timer)
 var turnDeadlineLocal = 0;  // local-clock time the turn auto-passes (0 = none)
+var turnModeLocal = 'timer'; // 'timer' | 'stroke' ("One swirl each")
 window.__mpTurnBlocked = false; // paint gate (read by 05d pointer/touch + 04f clear)
 
 // Stable per-device id (opaque, localStorage). Used to re-admit a dropped
@@ -110,9 +111,10 @@ function joinRoom(code) {
     connectToRoom(room);
 }
 
-// "Paint with a stranger": ask the lobby to pair us 1:1 with another seeker,
-// then connect to whatever room it hands back (a pub- room).
-function paintWithStranger() {
+// "Swirl With a Stranger": ask the lobby to pair us 1:1 with another seeker,
+// then connect to whatever room it hands back (a pub- room). A pairing lasts
+// exactly as long as both people stay — see strangerPartnerLeft.
+function swirlWithStranger() {
     // Leave any current room/socket before matchmaking so we never leak one.
     if (partySocket || currentRoom) disconnectMultiplayer();
     hideMpError();
@@ -222,7 +224,7 @@ window.addEventListener('pageshow', function (e) {
 // pairing us with ourselves. If it hands back a different room, someone else
 // was already waiting and we go to them.
 var strangerKeepAlive = null;
-var strangerWasPaired = false; // so a partner's departure is ANNOUNCED, not silent
+var strangerWasPaired = false; // tells a partner's DEPARTURE from a waiter nobody has reached yet
 // First tick fires EARLY (~8-13s) so two seekers whose initial matchmakes
 // double-minted (the lobby's waiting pointer was lost between their requests)
 // converge within seconds instead of a 45s tick; later ticks stay comfortably
@@ -250,7 +252,7 @@ function scheduleStrangerKeepAlive(first) {
         }
         var mine = currentRoom;
         // Normal path: the waiting pin socket is open — refresh our slot on it.
-        // (Replies land in the paintWithStranger handler: waiting:true refreshes
+        // (Replies land in the swirlWithStranger handler: waiting:true refreshes
         // are ignored there; a waiting:false pairing makes us hop to the room.)
         if (matchmakingSocket && matchmakingSocket.readyState === WebSocket.OPEN) {
             try { matchmakingSocket.send(JSON.stringify({ type: 'matchmake', uid: DEVICE_UID, holding: mine })); } catch (_) {}
@@ -289,6 +291,21 @@ function scheduleStrangerKeepAlive(first) {
         } catch (_) { /* transient network — try again next tick */ }
         scheduleStrangerKeepAlive(false);
     }, strangerKeepAliveDelay(first));
+}
+
+// A stranger pairing is exactly two people, and it ends when either of them
+// goes. Before this, a survivor slid silently back into the lobby queue —
+// still "connected", still painting, on a canvas with nobody on the other end,
+// and liable to be teleported into a third party's room mid-stroke. Leaving
+// the room is the honest reading of what just happened: the swirl you were in
+// is over, and the next one is something you ask for.
+function strangerPartnerLeft() {
+    // disconnectMultiplayer owns the whole teardown — socket, room, lobby pin,
+    // keep-alive, turn gates, strangerWasPaired — and lands us back on the
+    // "not in a room" panel with no Reconnect button (there is nothing to
+    // reconnect TO: the room's other seat is empty and the lobby has let it go).
+    disconnectMultiplayer();
+    showMpError('Your partner left, so the swirl ended. Swirl With a Stranger again to meet someone new.', true);
 }
 
 // Host-only: toggle the room lock. The server confirms via a 'lock-state' broadcast.
@@ -592,7 +609,7 @@ function setSettingsLockedByHost(locked, snapshot) {
         if (!banner) {
             banner = document.createElement('div');
             banner.id = 'mpSettingsLockBanner';
-            banner.textContent = '🔒 Settings locked by host';
+            banner.textContent = 'Settings locked by host';
             banner.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10002;' +
                 'padding:6px 14px;border-radius:8px;background:rgba(15,20,27,0.92);border:1px solid rgba(255,178,71,0.5);' +
                 'color:#ffb347;font-size:12px;font-weight:600;pointer-events:none;';
@@ -651,7 +668,13 @@ function isMyTurn() { return turnsOn && !!turnHolderId && turnHolderId === clien
 // paths that clear __mpSettingsLocked wholesale, e.g. a host promotion).
 function syncTurnGates() {
     if (turnsOn) {
-        window.__mpTurnBlocked = !isMyTurn();
+        // "One swirl each" closes the paint gate the moment the stroke ends,
+        // before the server has answered our pass: without it the couple of
+        // hundred milliseconds of round trip are a window for a second stroke
+        // that the relay would drop — painted here, on nobody else's canvas.
+        // Settings stay ours until the brush actually leaves (the mirror is
+        // still ours to drive, and tweaking is half of what a turn is for).
+        window.__mpTurnBlocked = !isMyTurn() || _oneSwirlSpent;
         window.__mpSettingsLocked = !isMyTurn();
     } else {
         window.__mpTurnBlocked = false;
@@ -686,6 +709,16 @@ function applyTurnState(wasMyTurn) {
         _dabQueue.length = 0;
         if (window.BrushEngine && window.BrushEngine.isActive()) window.BrushEngine.abort();
     }
+    // "One swirl each": a fresh allowance opens when the rotation update that
+    // ANSWERS our auto-pass lands — including in a room of one, where the
+    // brush legitimately comes straight back to us — and whenever the brush is
+    // no longer ours (a host skip, turns ending), so it is never carried into
+    // a later turn. Resyncs that leave us holding an unspent turn (a join, a
+    // reconnect) deliberately do not clear it.
+    if (_oneSwirlPassSent || !isMyTurn() || turnModeLocal !== 'stroke') {
+        _oneSwirlSpent = false;
+        _oneSwirlPassSent = false;
+    }
     syncTurnGates();
     syncLookMirror();
     // Whenever we hold the brush on a rotation update, (re)send our look:
@@ -702,6 +735,13 @@ function resetTurnState() {
     turnOrder = [];
     turnMsLocal = 0;
     turnDeadlineLocal = 0;
+    turnModeLocal = 'timer';
+    cancelOneSwirlPass();
+    // The spent-paint gate is per-turn state: leaving the room (or the mode)
+    // must not carry it into the next rotation, where it would block the
+    // painter's first stroke with nothing left to answer it.
+    _oneSwirlSpent = false;
+    _oneSwirlPassSent = false;
     clearInviteWait();
     dismissTurnInvitePrompt();
     stopTurnTick();
@@ -727,6 +767,14 @@ function fmtRemaining() {
     var m = Math.floor(s / 60);
     var r = s % 60;
     return m + ':' + (r < 10 ? '0' : '') + r;
+}
+
+// What the countdown slot says. "One swirl each" has no clock, so the slot
+// carries the rule instead — the thing a watcher actually wants to know is
+// how the current turn ends, not that it has no timer.
+function turnClockText() {
+    if (isOneSwirlMode()) return 'one swirl';
+    return fmtRemaining();
 }
 
 function stopTurnTick() {
@@ -793,18 +841,23 @@ function updateTurnChip() {
     }
     if (chip.parentElement !== wantParent) wantParent.appendChild(chip);
     chip.classList.toggle('floating', !barVisible);
-    var t = fmtRemaining();
+    var t = turnClockText();
     var clock = t ? ' · ' + t : '';
+    var once = isOneSwirlMode();
     if (isMyTurn()) {
-        chip.textContent = '🖌 Your turn' + clock;
-        chip.title = 'Your turn — everyone sees your settings. Click to open the rotation.';
+        chip.textContent = (once && _oneSwirlSpent ? 'Passing…' : 'Your turn') + clock;
+        chip.title = once
+            ? 'Your turn — tweak anything you like, then make one swirl and the brush passes on. Click to open the rotation.'
+            : 'Your turn — everyone sees your settings. Click to open the rotation.';
         chip.classList.add('you');
     } else if (turnHolderId) {
-        chip.textContent = '🖌 ' + shortName(turnHolderId) + clock;
-        chip.title = shortName(turnHolderId) + ' is painting — your settings mirror theirs. Click to open the rotation.';
+        chip.textContent = shortName(turnHolderId) + clock;
+        chip.title = shortName(turnHolderId) + (once
+            ? ' has one swirl — your settings mirror theirs. Click to open the rotation.'
+            : ' is painting — your settings mirror theirs. Click to open the rotation.');
         chip.classList.remove('you');
     } else {
-        chip.textContent = '⏳ Next painter…';
+        chip.textContent = 'Next painter…';
         chip.title = 'Waiting for the next painter. Click to open the rotation.';
         chip.classList.remove('you');
     }
@@ -843,7 +896,7 @@ function turnQueueRow(item, posText, isNow) {
         if (isNow) {
             var brush = document.createElement('span');
             brush.className = 'mp-turn-qbrush';
-            brush.textContent = '🖌';
+            brush.textContent = 'painting';
             row.appendChild(brush);
         }
     } else {
@@ -857,8 +910,9 @@ function turnQueueRow(item, posText, isNow) {
         // rewrites this node's text; rotation changes rebuild the list.
         var clock = document.createElement('span');
         clock.id = 'turnWheelClock';
-        clock.className = 'mp-turn-qclock' + (isMyTurn() ? ' you' : '');
-        clock.textContent = fmtRemaining();
+        clock.className = 'mp-turn-qclock' + (isMyTurn() ? ' you' : '') +
+            (isOneSwirlMode() ? ' rule' : '');
+        clock.textContent = turnClockText();
         row.appendChild(clock);
     }
     return row;
@@ -876,7 +930,8 @@ function renderTurnWheel() {
     host.style.display = '';
     var ids = turnOrder.slice();
     if (!ids.length && turnHolderId) ids = [turnHolderId];
-    var key = ids.join('|') + '#' + (turnHolderId || '') + '#' + (clientId || '') + '#' + (turnDeadlineLocal ? 1 : 0);
+    var key = ids.join('|') + '#' + (turnHolderId || '') + '#' + (clientId || '') +
+        '#' + (turnDeadlineLocal ? 1 : 0) + '#' + turnModeLocal;
     if (key === _wheelKey) {
         // Rotation unchanged — the tick only refreshes the clock text.
         return;
@@ -920,9 +975,9 @@ function updateTurnStatusLine() {
     }
     tStat.style.display = '';
     var n = turnOrder.length;
-    var t = fmtRemaining();
-    var who = isMyTurn() ? '🖌 Your turn' : (turnHolderId ? '🖌 ' + shortName(turnHolderId) + ' painting' : '⏳ Waiting');
-    tStat.textContent = who + (t ? ' · ⏱ ' + t : '') + ' · ' + n + (n === 1 ? ' artist' : ' artists');
+    var t = turnClockText();
+    var who = isMyTurn() ? 'Your turn' : (turnHolderId ? shortName(turnHolderId) + ' painting' : 'Waiting');
+    tStat.textContent = who + (t ? ' · ' + t : '') + ' · ' + n + (n === 1 ? ' artist' : ' artists');
     tStat.classList.toggle('mp-turn-you', isMyTurn());
 }
 
@@ -946,16 +1001,16 @@ function updateTurnUI() {
         tBtn.style.display = showBtn ? '' : 'none';
         tBtn.disabled = !canDrive || invitePending;
         if (invitePending) {
-            tBtn.textContent = '⏳ Waiting for their answer…';
+            tBtn.textContent = 'Waiting for their answer…';
             tBtn.title = 'Your partner has been asked to take turns';
         } else if (!canDrive) {
-            tBtn.textContent = '🔁 Take turns · host only';
+            tBtn.textContent = 'Take turns · host only';
             tBtn.title = 'Only the room host can start taking turns';
         } else if (turnsOn) {
-            tBtn.textContent = '🔁 Stop taking turns';
+            tBtn.textContent = 'Stop taking turns';
             tBtn.title = 'Go back to painting at the same time';
         } else {
-            tBtn.textContent = pair ? '🔁 Ask to take turns' : '🔁 Take turns';
+            tBtn.textContent = pair ? 'Ask to take turns' : 'Take turns';
             tBtn.title = pair
                 ? 'Ask your partner to take turns — nothing changes unless they agree'
                 : "Take turns painting — one artist at a time while everyone else watches with the painter's settings mirrored live";
@@ -966,25 +1021,58 @@ function updateTurnUI() {
     var tSel = document.getElementById('turnTimerSel');
     // The asker picks the length (it rides along in the invite), so both
     // members of a pair get the picker.
-    if (tSel) tSel.style.display = (canDrive && !turnsOn) || (isHost && turnsOn) ? '' : 'none';
+    if (tSel) {
+        tSel.style.display = (canDrive && !turnsOn) || (isHost && turnsOn) ? '' : 'none';
+        // While turns run the picker must read the ROOM, not whatever this
+        // client last chose — a host handover otherwise leaves the new host
+        // looking at "1 minute turns" in a room passing on strokes.
+        if (turnsOn && document.activeElement !== tSel) {
+            var want = turnModeLocal === 'stroke' ? 'stroke' : String(Math.round(turnMsLocal / 1000));
+            if (tSel.value !== want &&
+                tSel.querySelector('option[value="' + want + '"]')) tSel.value = want;
+        }
+    }
     var pBtn = document.getElementById('turnPassBtn');
     if (pBtn) {
         // Skipping SOMEONE ELSE's turn is a host power, and a stranger pair has
         // no real host — so in a pair you may only pass your own turn.
         var showPass = turnsOn && (isMyTurn() || (isHost && !pair));
         pBtn.style.display = showPass ? '' : 'none';
-        pBtn.textContent = isMyTurn() ? '➡ Pass turn' : '⏭ Skip turn';
+        pBtn.disabled = isMyTurn() && _oneSwirlSpent; // pass already on its way
+        pBtn.textContent = isMyTurn()
+            ? (_oneSwirlSpent ? 'Passing…' : 'Pass turn')
+            : 'Skip turn';
+        pBtn.title = isMyTurn()
+            ? (isOneSwirlMode()
+                ? 'Hand the brush on now, without using your swirl'
+                : 'Hand the brush to the next artist in the rotation')
+            : 'Skip this artist and move the brush on';
     }
+    syncHostBlock();
     renderTurnWheel();
     updateTurnStatusLine();
     if (turnsOn && turnDeadlineLocal) ensureTurnTick(); else stopTurnTick();
 }
 
+// The turn-length picker doubles as the turn-ENDING picker: every numeric
+// option is a clock, 'stroke' is "One swirl each". Split into two readers so
+// the wire carries both — `seconds` alone still means the right thing (no
+// timer) to a relay that predates the mode.
 function turnTimerSeconds() {
     var sel = document.getElementById('turnTimerSel');
+    if (sel && sel.value === 'stroke') return 0;
     var v = sel ? parseInt(sel.value, 10) : 60;
     return isNaN(v) ? 60 : v;
 }
+
+function turnTimerMode() {
+    var sel = document.getElementById('turnTimerSel');
+    return (sel && sel.value === 'stroke') ? 'stroke' : 'timer';
+}
+
+// True while the room is passing the brush on completed strokes rather than
+// on a clock.
+function isOneSwirlMode() { return turnsOn && turnModeLocal === 'stroke'; }
 
 // ── Stranger-pair consent ───────────────────────────────────────────
 // A stranger room has no real host — "host" is just whoever connected first —
@@ -1006,7 +1094,9 @@ function sendTurnInvite() {
     if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
     if (invitePending || turnsOn) return;
     invitePending = true;
-    partySocket.send(JSON.stringify({ type: 'turn-invite', seconds: turnTimerSeconds() }));
+    partySocket.send(JSON.stringify({
+        type: 'turn-invite', seconds: turnTimerSeconds(), mode: turnTimerMode()
+    }));
     // A relay that predates turn invites has no handler for the message and
     // simply rebroadcasts it, so nothing ever comes back. Without this probe
     // that is indistinguishable from a partner who is ignoring you — you just
@@ -1014,13 +1104,13 @@ function sendTurnInvite() {
     inviteAckTimeout = setTimeout(function () {
         if (!invitePending) return;
         clearInviteWait();
-        showTurnToast('⚠ This room\'s server is too old for turn invites — it needs a relay update.');
+        showTurnToast('This room\'s server is too old for turn invites — it needs a relay update.');
         updateTurnUI();
     }, INVITE_ACK_MS);
     inviteTimeout = setTimeout(function () {
         if (!invitePending) return;
         clearInviteWait();
-        showTurnToast('⏳ No answer — they may not be at the keyboard.');
+        showTurnToast('No answer — they may not be at the keyboard.');
         updateTurnUI();
     }, INVITE_WAIT_MS);
     updateTurnUI();
@@ -1039,19 +1129,21 @@ function dismissTurnInvitePrompt() {
 
 // The partner asked us. Accept/Decline, shown near the turn banner so the
 // whole turn conversation happens in one place on screen.
-function showTurnInvitePrompt(fromId, seconds) {
+function showTurnInvitePrompt(fromId, seconds, mode) {
     dismissTurnInvitePrompt();
     var el = document.createElement('div');
     el.id = 'mpTurnInvite';
     el.className = 'mp-turn-invite';
     var who = fromId ? shortName(fromId) : 'Your partner';
-    var len = (typeof seconds === 'number' && seconds > 0)
-        ? (seconds >= 60 ? (seconds / 60) + ' min' : seconds + ' sec') + ' each'
-        : 'no timer';
+    var len = mode === 'stroke'
+        ? 'one swirl each'
+        : ((typeof seconds === 'number' && seconds > 0)
+            ? (seconds >= 60 ? (seconds / 60) + ' min' : seconds + ' sec') + ' each'
+            : 'no timer');
     var msg = document.createElement('span');
-    msg.textContent = '🔁 ' + who + ' wants to take turns painting (' + len + ')';
+    msg.textContent = who + ' wants to take turns painting (' + len + ')';
     var yes = document.createElement('button');
-    yes.className = 'mp-invite-yes';
+    yes.className = 'mp-invite-yes btn--emphasis';
     yes.textContent = 'Take turns';
     yes.addEventListener('click', function () { answerTurnInvite(true); });
     var no = document.createElement('button');
@@ -1093,12 +1185,59 @@ function toggleTurns() {
         sendTurnInvite();
         return;
     }
-    partySocket.send(JSON.stringify({ type: 'turns', on: !turnsOn, seconds: turnTimerSeconds() }));
+    partySocket.send(JSON.stringify({
+        type: 'turns', on: !turnsOn, seconds: turnTimerSeconds(), mode: turnTimerMode()
+    }));
 }
 
 function passTurn() {
     if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
     partySocket.send(JSON.stringify({ type: 'turn-pass' }));
+}
+
+// ── "One swirl each": the brush passes itself ───────────────────────
+// Tweak whatever you like, lay down one stroke, and the turn moves on. The
+// pass is fired by the painter's own client (the relay has no idea what a
+// stroke is), but NOT at pointer-up: a stroke keeps broadcasting after the
+// lift — the splat-out tail and the stabilizer's catch-up dabs drain over the
+// following frames — and the relay drops every one of them the instant we
+// stop being the holder. Passing early would cut the stroke short on every
+// other canvas while ours eased out. So the pass waits on full paint idle,
+// the same gate 05j uses for the deferred arm-colour advance.
+var _oneSwirlSpent = false;    // our one swirl this turn is down
+var _oneSwirlPassSent = false; // ...and its pass is on the wire
+var _oneSwirlTimer = null;
+var _oneSwirlSettleBy = 0;
+var ONE_SWIRL_SETTLE_CAP_MS = 4000; // pause escape hatch: a frozen sim never drains
+
+function swirlFullySettled() {
+    if (window.pointer && window.pointer.down) return false;
+    if (window.splatOutActive) return false;
+    var BE = window.BrushEngine;
+    if (BE && (BE.isActive() || BE.pending())) return false;
+    return true;
+}
+
+function cancelOneSwirlPass() {
+    if (_oneSwirlTimer) { clearInterval(_oneSwirlTimer); _oneSwirlTimer = null; }
+    _oneSwirlSettleBy = 0;
+}
+
+function scheduleOneSwirlPass() {
+    if (_oneSwirlTimer) return;
+    _oneSwirlSpent = true;
+    syncTurnGates();      // shut the paint gate now, not on the server's answer
+    updateTurnUI();
+    _oneSwirlSettleBy = Date.now() + ONE_SWIRL_SETTLE_CAP_MS;
+    _oneSwirlTimer = setInterval(function () {
+        // The brush can move out from under us mid-drain (a host skip, turns
+        // switching off) — then there is nothing left to pass.
+        if (!isOneSwirlMode() || !isMyTurn()) { cancelOneSwirlPass(); return; }
+        if (!swirlFullySettled() && Date.now() < _oneSwirlSettleBy) return;
+        cancelOneSwirlPass();
+        _oneSwirlPassSent = true;
+        passTurn();
+    }, 100);
 }
 
 // Throttled "not your turn" toast, fired from the gated paint/clear paths.
@@ -1117,7 +1256,7 @@ window.__mpTurnHint = function () {
             'color:#9db8ff;font-size:12px;font-weight:600;pointer-events:none;transition:opacity 0.3s;';
         document.body.appendChild(el);
     }
-    el.textContent = turnHolderId ? ('🖌 It\'s ' + shortName(turnHolderId) + '\'s turn') : '⏳ Waiting for the next painter…';
+    el.textContent = turnHolderId ? ('It\'s ' + shortName(turnHolderId) + '\'s turn') : 'Waiting for the next painter…';
     el.style.opacity = '1';
     if (_turnHintTimer) clearTimeout(_turnHintTimer);
     _turnHintTimer = setTimeout(function () { el.style.opacity = '0'; }, 1400);
@@ -1453,6 +1592,10 @@ function onMultiplayerMessage(event) {
                     ? data.order.filter(function (x) { return typeof x === 'string'; })
                     : [];
                 turnMsLocal = (typeof data.turnMs === 'number' && data.turnMs > 0) ? data.turnMs : 0;
+                // A relay too old to know about "One swirl each" simply omits
+                // mode; those rooms fall back to a timer-less rotation, which
+                // is what its `seconds: 0` companion already asked for.
+                turnModeLocal = data.mode === 'stroke' ? 'stroke' : 'timer';
                 // The countdown needs no synchronized clocks: the message's
                 // server timestamp gives us the skew to shift the deadline
                 // onto the local clock.
@@ -1467,7 +1610,7 @@ function onMultiplayerMessage(event) {
             case 'turn-invite-offer':
                 // Partner proposed taking turns (stranger pairs only). Server-
                 // authored: the relay never forwards a client-sent copy.
-                if (!turnsOn) showTurnInvitePrompt(data.from, data.seconds);
+                if (!turnsOn) showTurnInvitePrompt(data.from, data.seconds, data.mode);
                 break;
 
             case 'turn-invite-sent':
@@ -1481,11 +1624,11 @@ function onMultiplayerMessage(event) {
                 if (!data.accepted) {
                     clearInviteWait();
                     if (data.reason === 'same-device') {
-                        showTurnToast('⚠ Both windows share one device id — open the other in a different browser or a private window.');
+                        showTurnToast('Both windows share one device id — open the other in a different browser or a private window.');
                     } else if (data.reason === 'alone') {
-                        showTurnToast('⏳ Nobody else in the room yet.');
+                        showTurnToast('Nobody else in the room yet.');
                     } else {
-                        showTurnToast('🙅 ' + (data.by ? shortName(data.by) : 'They') + ' would rather keep painting together');
+                        showTurnToast((data.by ? shortName(data.by) : 'They') + ' would rather keep painting together');
                     }
                     updateTurnUI();
                 }
@@ -2096,6 +2239,10 @@ function broadcastPointerUp() {
         type: 'pointer-up',
         timestamp: Date.now()
     }));
+
+    // That was our swirl. In "One swirl each" the turn ends with it — once the
+    // stroke has finished landing (see scheduleOneSwirlPass).
+    if (isOneSwirlMode() && isMyTurn() && !_oneSwirlSpent) scheduleOneSwirlPass();
 }
 
 // Send clear event
@@ -2457,7 +2604,7 @@ function showMatchmaking() {
     setShown('mpConnected', true);
     var dot = document.getElementById('connectionDot');
     if (dot) dot.className = 'mp-dot mp-dot-connecting';
-    updateMultiplayerStatus('🎲 Finding a stranger…');
+    updateMultiplayerStatus('Finding a stranger…');
     ['roomDisplay', 'shareHint', 'copyRoomBtn', 'lockRoomBtn', 'lockBadge'].forEach(function(id) { setShown(id, false); });
 }
 
@@ -2466,10 +2613,9 @@ function showConnecting() {
     setShown('mpConnected', true);
     var dot = document.getElementById('connectionDot');
     if (dot) dot.className = 'mp-dot mp-dot-connecting';
-    updateMultiplayerStatus(isStrangerRoom() ? '🎲 Finding a stranger…' : 'Connecting…');
+    updateMultiplayerStatus(isStrangerRoom() ? 'Finding a stranger…' : 'Connecting…');
     setShown('roomDisplay', !isStrangerRoom());
-    var roomEl = document.getElementById('roomName');
-    if (roomEl && !isStrangerRoom()) roomEl.textContent = currentRoom || '------';
+    if (!isStrangerRoom()) renderShareMode();
 }
 
 function showConnectedUI() {
@@ -2488,20 +2634,23 @@ function updateConnectedView() {
 
     if (stranger) {
         var alone = connectedClients < 2;
-        updateMultiplayerStatus(alone ? '🎲 Waiting for a stranger…' : '🎨 Painting with a stranger');
-        // Waiting alone is NOT the same as painting together: show the amber
-        // dot while alone, and SAY it when a partner leaves. This used to
-        // slide back silently — green dot, connected panel — which read as
-        // "still connected" while you kept painting for nobody.
+        updateMultiplayerStatus(alone ? 'Waiting for a stranger…' : 'Swirling with a stranger');
+        // Waiting alone is NOT the same as swirling together, so the dot goes
+        // amber while alone. It only ever reads "alone" before anyone arrives
+        // now — a partner LEAVING ends the room outright (strangerPartnerLeft).
         var dot = document.getElementById('connectionDot');
         if (dot) dot.className = alone ? 'mp-dot mp-dot-connecting' : 'mp-dot mp-dot-connected';
         if (alone) {
             if (strangerWasPaired) {
-                strangerWasPaired = false;
-                showTurnToast('🚪 Your painting partner left — looking for a new stranger…');
+                // They left, so the pairing is over (see strangerPartnerLeft).
+                // Return: the rest of this pass would be dressing a room we
+                // are no longer in.
+                strangerPartnerLeft();
+                return;
             }
-            // Hold our matchmaking slot while alone; drop it (and the lobby
-            // pin socket that holds it open) the moment we pair.
+            // Nobody has arrived yet — that is not a departure. Hold our
+            // matchmaking slot while we wait, and drop it (with the lobby pin
+            // socket that holds it open) the moment someone pairs with us.
             if (!strangerKeepAlive) startStrangerKeepAlive();
         } else {
             strangerWasPaired = true;
@@ -2510,29 +2659,30 @@ function updateConnectedView() {
         }
     } else {
         stopStrangerKeepAlive();
-        updateMultiplayerStatus(roomLocked ? '🔒 Room locked' : 'Connected');
+        updateMultiplayerStatus(roomLocked ? 'Room locked' : 'Connected');
     }
 
     // Room code / share / copy: private rooms only (you can't invite to a 1:1 pairing).
     setShown('roomDisplay', !stranger);
     setShown('shareHint', !stranger);
     setShown('copyRoomBtn', !stranger);
-    var roomEl = document.getElementById('roomName');
-    if (roomEl && !stranger) roomEl.textContent = currentRoom || '------';
+    // Through renderShareMode, never straight to textContent: a direct write
+    // would unmask a room the user deliberately hid.
+    if (!stranger) renderShareMode();
 
     // Lock toggle: only the host of a private room sees it.
     var lockBtn = document.getElementById('lockRoomBtn');
     if (lockBtn) {
         var canLock = !stranger && isHost;
         lockBtn.style.display = canLock ? '' : 'none';
-        lockBtn.textContent = roomLocked ? '🔓 Unlock room' : '🔒 Lock room';
+        lockBtn.textContent = roomLocked ? 'Unlock room' : 'Lock room';
     }
     // Settings lock (13.5): any host can lock look settings (incl. stranger
     // rooms) — hidden while turns run, which supersede it.
     var sLockBtn = document.getElementById('settingsLockBtn');
     if (sLockBtn) {
         sLockBtn.style.display = (isHost && !turnsOn) ? '' : 'none';
-        sLockBtn.textContent = settingsLockOn ? '🎛 Unlock settings' : '🎛 Lock settings';
+        sLockBtn.textContent = settingsLockOn ? 'Unlock settings' : 'Lock settings';
         sLockBtn.classList.toggle('active', settingsLockOn);
     }
     // Locked badge: non-host members see why no one else can join.
@@ -2556,19 +2706,120 @@ function showDisconnectedUI() {
 
 function updateUsersDisplay() {
     var el = document.getElementById('connectedUsers');
-    if (el) el.textContent = connectedClients + (connectedClients === 1 ? ' user' : ' users');
+    if (el) el.textContent = connectedClients + (connectedClients === 1 ? ' artist' : ' artists');
 }
 
-function showMpError(msg) {
+// `notice` marks an outcome that is not a failure (a stranger leaving) so it
+// does not arrive dressed as one — same slot, neutral colour.
+function showMpError(msg, notice) {
     var el = document.getElementById('mpError');
-    if (el) { el.textContent = msg; el.style.display = ''; }
+    if (el) {
+        el.textContent = msg;
+        el.classList.toggle('mp-notice', !!notice);
+        el.style.display = '';
+    }
 }
 function hideMpError() {
     var el = document.getElementById('mpError');
     if (el) el.style.display = 'none';
 }
 
-// Copy just the room # to the clipboard (the only thing a friend needs).
+// ── Sharing a room: code, QR, or hidden ────────────────────
+// A room code on screen is a live invitation to anyone who can read it. That
+// is exactly what you want at a table and exactly what you do not want on a
+// stream, so how a room is shared is a choice, not a constant:
+//
+//   code    the six characters, to read out or type
+//   qr      a scannable link, for a phone in the same room
+//   hidden  nothing on screen — Copy still works, so the code can go into a
+//           DM without ever being visible to a viewer
+//
+// The choice persists: someone who streams sets it once and should not have
+// to remember again next session. Written straight to localStorage rather
+// than through the settings snapshot, because a privacy choice has to survive
+// a settings clear and must not wait for a Save.
+var SHARE_MODE_KEY = 'swirlShareMode';
+var shareMode = (function () {
+    try {
+        var v = localStorage.getItem(SHARE_MODE_KEY);
+        return (v === 'qr' || v === 'hidden') ? v : 'code';
+    } catch (_) { return 'code'; }
+})();
+
+// The link a scanned QR opens. On the web that is this origin; the desktop
+// build runs from file://, which no phone can follow, so it falls back to the
+// deployed host the relay already lives on.
+function roomJoinUrl() {
+    if (!currentRoom) return '';
+    var base = (location.protocol === 'http:' || location.protocol === 'https:')
+        ? location.origin + location.pathname.replace(/[^/]*$/, '')
+        : 'https://' + PARTYKIT_HOST + '/';
+    return base + '#' + currentRoom;
+}
+
+function setShareMode(mode) {
+    shareMode = mode;
+    try { localStorage.setItem(SHARE_MODE_KEY, mode); } catch (_) {}
+    renderShareMode();
+}
+
+function renderShareMode() {
+    var codeEl = document.getElementById('roomName');
+    if (!codeEl) return;
+    var qrEl = document.getElementById('roomQr');
+    var hintEl = document.getElementById('shareHint');
+    var copyEl = document.getElementById('copyRoomBtn');
+
+    var ids = { code: 'shareModeCode', qr: 'shareModeQr', hidden: 'shareModeHidden' };
+    Object.keys(ids).forEach(function (k) {
+        var b = document.getElementById(ids[k]);
+        if (b) b.setAttribute('aria-pressed', String(k === shareMode));
+    });
+
+    // QR falls back to the code rather than to an empty white box if the
+    // encoder failed to load or the link outgrew the symbol.
+    var qrOk = false;
+    if (shareMode === 'qr' && qrEl && window.QRCode && currentRoom) {
+        var svg = window.QRCode.svg(roomJoinUrl(), { margin: 3 });
+        if (svg) { qrEl.innerHTML = svg; qrOk = true; }
+    }
+    var mode = (shareMode === 'qr' && !qrOk) ? 'code' : shareMode;
+
+    codeEl.textContent = mode === 'hidden' ? '●●●●●●' : (currentRoom || '------');
+    codeEl.classList.toggle('mp-code-hidden', mode === 'hidden');
+    codeEl.style.display = mode === 'qr' ? 'none' : '';
+    if (qrEl) {
+        qrEl.style.display = mode === 'qr' ? '' : 'none';
+        // Emptied, not just hidden. Hide mode exists so the code is not on
+        // screen; leaving a rendered symbol behind display:none would put it
+        // one stray style override away from being visible again.
+        if (mode !== 'qr') qrEl.innerHTML = '';
+    }
+
+    if (hintEl) {
+        hintEl.textContent =
+            mode === 'qr'     ? 'Point a phone camera at this to join.' :
+            mode === 'hidden' ? 'Hidden — safe to show on a stream. Copy still works.' :
+                                'Send this code to a friend so they can join.';
+    }
+    if (copyEl) copyEl.textContent = mode === 'qr' ? 'Copy link' : 'Copy code';
+}
+
+// The room-wide controls hide as a group when nothing inside them applies, so
+// a guest is never left looking at an empty labelled box.
+function syncHostBlock() {
+    var block = document.getElementById('mpHostBlock');
+    if (!block) return;
+    var any = ['lockRoomBtn', 'settingsLockBtn', 'turnsBtn', 'turnTimerSel'].some(function (id) {
+        var el = document.getElementById(id);
+        return el && el.style.display !== 'none';
+    });
+    block.style.display = any ? '' : 'none';
+}
+
+// Copy the invite. What gets copied follows the share mode: the code in
+// Code and Hide, the full link in QR. Hide is the case that matters — the
+// code reaches the clipboard without ever being drawn on screen.
 function fallbackCopy(text) {
     var ta = document.createElement('textarea');
     ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
@@ -2578,17 +2829,19 @@ function fallbackCopy(text) {
 }
 function copyRoomCode(fromCreate) {
     if (!currentRoom) return;
-    var code = currentRoom;
+    var asLink = shareMode === 'qr';
+    var text = asLink ? roomJoinUrl() : currentRoom;
+    var idle = asLink ? 'Copy link' : 'Copy code';
     var flash = function () {
         var btn = document.getElementById('copyRoomBtn');
         if (!btn) return;
-        btn.textContent = fromCreate ? '✓ Copied — send it!' : '✓ Copied!';
-        setTimeout(function () { btn.textContent = '📋 Copy #'; }, 2000);
+        btn.textContent = fromCreate ? 'Copied — send it to a friend' : 'Copied';
+        setTimeout(function () { btn.textContent = idle; }, 2000);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(code).then(flash).catch(function () { fallbackCopy(code); flash(); });
+        navigator.clipboard.writeText(text).then(flash).catch(function () { fallbackCopy(text); flash(); });
     } else {
-        fallbackCopy(code); flash();
+        fallbackCopy(text); flash();
     }
 }
 
@@ -2616,6 +2869,14 @@ function initMultiplayerUI() {
     var copyBtn = document.getElementById('copyRoomBtn');
     if (copyBtn) copyBtn.addEventListener('click', function() { copyRoomCode(false); });
 
+    // Code / QR / Hide. Re-rendered rather than toggled so the QR is only
+    // ever built when it is about to be looked at.
+    [['shareModeCode', 'code'], ['shareModeQr', 'qr'], ['shareModeHidden', 'hidden']].forEach(function (pair) {
+        var b = document.getElementById(pair[0]);
+        if (b) b.addEventListener('click', function () { setShareMode(pair[1]); });
+    });
+    renderShareMode();
+
     var reconnectBtn = document.getElementById('reconnectBtn');
     if (reconnectBtn) reconnectBtn.addEventListener('click', function() {
         if (!lastRoom) return;
@@ -2631,7 +2892,7 @@ function initMultiplayerUI() {
     if (discBtn) discBtn.addEventListener('click', function () { disconnectMultiplayer(); });
 
     var strangerBtn = document.getElementById('strangerBtn');
-    if (strangerBtn) strangerBtn.addEventListener('click', paintWithStranger);
+    if (strangerBtn) strangerBtn.addEventListener('click', swirlWithStranger);
 
     var lockBtn = document.getElementById('lockRoomBtn');
     if (lockBtn) lockBtn.addEventListener('click', toggleLock);
@@ -2650,7 +2911,9 @@ function initMultiplayerUI() {
         // Host changing the length mid-round applies it immediately
         // (restarts the current turn's clock server-side).
         if (turnsOn && myRole === 'host' && partySocket && partySocket.readyState === WebSocket.OPEN) {
-            partySocket.send(JSON.stringify({ type: 'turns', on: true, seconds: turnTimerSeconds() }));
+            partySocket.send(JSON.stringify({
+                type: 'turns', on: true, seconds: turnTimerSeconds(), mode: turnTimerMode()
+            }));
         }
     });
 
@@ -2679,7 +2942,7 @@ window.publishCollider = publishCollider;
 window.broadcastColliderRemove = broadcastColliderRemove;
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
-window.paintWithStranger = paintWithStranger;
+window.swirlWithStranger = swirlWithStranger;
 window.toggleLock = toggleLock;
 window.toggleTurns = toggleTurns;
 window.passTurn = passTurn;

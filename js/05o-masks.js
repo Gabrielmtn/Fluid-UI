@@ -193,8 +193,11 @@
     // drawMaskShape renderer the visual clip uses, so the imported
     // coverage matches what the user sees. SAM and depth are now mask
     // SOURCES: click/estimate → import → paint on it → bind it.
-    function importFromLayer(layerIndex) {
-        const layer = (window.layers || []).find(function (l) { return l.index === layerIndex; });
+    // Rasterize a layer's mask shapes as white/alpha coverage at dye
+    // resolution, WITH the layer's on-screen transform baked in. Shared by
+    // importFromLayer and by ClipSources below, so a layer's mask reads the
+    // same whether it is copied into a Mask or bound straight as a clip.
+    function layerCoverageCanvas(layer) {
         if (!layer || !layer.mask || !layer.mask.shapes || !layer.mask.shapes.length) return null;
         if (typeof window._drawMaskShape !== 'function') return null;
         const mainCanvas = document.getElementById('canvas');
@@ -220,6 +223,12 @@
         ctx.scale(layer.scaleX || 1, layer.scaleY || 1);
         ctx.translate(-bcx, -bcy);
         layer.mask.shapes.forEach(function (s) { window._drawMaskShape(ctx, s); });
+        return c;
+    }
+    function importFromLayer(layerIndex) {
+        const layer = (window.layers || []).find(function (l) { return l.index === layerIndex; });
+        const c = layerCoverageCanvas(layer);
+        if (!c) return null;
         return importCoverage(c, (layer.title || 'Layer') + ' mask');
     }
     window.Masks = {
@@ -237,5 +246,173 @@
         remove: remove,
         serialize: serialize,
         restore: restore
+    };
+
+    // ── Clip sources (2026-08-23) ───────────────────────────────────────
+    // Everything in the project that already HAS a silhouette, offered to the
+    // Clip dropdown by name so nothing has to be converted by hand first:
+    //   • paintable Masks           → their own name
+    //   • a layer with a shape mask → "<layer> - mask"
+    //   • a collision layer         → "<layer> - collider"
+    // Sources are addressed by a string key ("mask:3" / "layer:1") rather than
+    // a bare Mask id, because a layer's mask is not a Mask and never becomes
+    // one — it is read where it lives, so editing the layer's mask (or renaming
+    // the layer) moves every clip bound to it. No import step, no second copy
+    // to keep in sync.
+    const _layerFBO = {};   // layer index → {fbo, rev} materialized for the shader path
+
+    function _kindOf(layer) {
+        if (!layer) return null;
+        if (layer.isCollision) return 'collider';
+        if (layer.mask && layer.mask.shapes && layer.mask.shapes.length) return 'mask';
+        return null;
+    }
+
+    // A stamp that changes whenever the coverage would: shape count plus the
+    // placement the raster bakes in. Cheap enough to compute per frame, and it
+    // is what lets the materialized FBO know it has gone stale.
+    function _layerRev(layer) {
+        const n = (layer.mask && layer.mask.shapes) ? layer.mask.shapes.length : 0;
+        return [n, layer.x | 0, layer.y | 0, layer.rotation || 0,
+                (layer.scaleX || 1).toFixed(4), (layer.scaleY || 1).toFixed(4),
+                layer.__clipRev || 0].join('/');
+    }
+
+    function clipSourceList(excludeLayerIndex) {
+        const out = [];
+        list().forEach(function (m) {
+            out.push({ key: 'mask:' + m.id, kind: 'mask', id: m.id, label: m.name || ('Mask ' + m.id) });
+        });
+        (window.layers || []).forEach(function (l) {
+            if (excludeLayerIndex != null && l.index === excludeLayerIndex) return; // never clip a layer by itself
+            const kind = _kindOf(l);
+            if (!kind) return;
+            out.push({
+                key: 'layer:' + l.index, kind: kind, id: l.index,
+                label: (l.title || 'Layer') + ' - ' + kind
+            });
+        });
+        // Two layers can carry the same name, and a Mask can be named after
+        // one. Number the repeats so every row in the dropdown addresses
+        // exactly one thing.
+        const seen = {};
+        out.forEach(function (s) {
+            const base = s.label;
+            if (seen[base] === undefined) { seen[base] = 0; return; }
+            seen[base] += 1;
+            s.label = base + '-' + seen[base];
+        });
+        return out;
+    }
+
+    function _parseKey(key) {
+        if (typeof key === 'number') return { kind: 'mask', id: key };      // legacy clipMaskId
+        if (typeof key !== 'string' || !key) return null;
+        const i = key.indexOf(':');
+        if (i < 0) return null;
+        const id = parseInt(key.slice(i + 1), 10);
+        if (!isFinite(id)) return null;
+        return { kind: key.slice(0, i), id: id };
+    }
+
+    function _layerOf(index) {
+        return (window.layers || []).find(function (l) { return l.index === index; }) || null;
+    }
+
+    // Coverage as a top-down white/alpha PNG — what a DOM image layer's CSS
+    // mask-image needs.
+    function clipSourceDataURL(key, invert) {
+        const p = _parseKey(key);
+        if (!p) return null;
+        if (p.kind === 'mask') return coverageDataURL(p.id, invert);
+        const c = layerCoverageCanvas(_layerOf(p.id));
+        if (!c) return null;
+        if (invert) {
+            const cx = c.getContext('2d');
+            let d;
+            try { d = cx.getImageData(0, 0, c.width, c.height); } catch (_) { return null; }
+            const px = d.data;
+            for (let i = 0; i < px.length; i += 4) {
+                px[i] = 255; px[i + 1] = 255; px[i + 2] = 255;
+                px[i + 3] = 255 - px[i + 3];
+            }
+            cx.putImageData(d, 0, 0);
+        }
+        return c.toDataURL('image/png');
+    }
+
+    // Coverage as an FBO — what the raster compositor samples in-shader.
+    // Masks already are one; a layer's mask is materialized on demand and
+    // cached until its shapes or placement change.
+    function clipSourceFBO(key) {
+        const p = _parseKey(key);
+        if (!p) return null;
+        if (p.kind === 'mask') return maskStore[p.id] || null;
+        const layer = _layerOf(p.id);
+        if (!_kindOf(layer)) { dropLayerFBO(p.id); return null; }
+        const rev = _layerRev(layer);
+        const have = _layerFBO[p.id];
+        if (have && have.rev === rev) return have.fbo;
+        const c = layerCoverageCanvas(layer);
+        if (!c) return have ? have.fbo : null;
+        const f = (have && have.fbo) ? have.fbo : _newFBO();
+        gl.bindTexture(gl.TEXTURE_2D, f.texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, c);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        _layerFBO[p.id] = { fbo: f, rev: rev };
+        return f;
+    }
+
+    function dropLayerFBO(index) {
+        const have = _layerFBO[index];
+        if (!have) return;
+        try { gl.deleteTexture(have.fbo.texture); gl.deleteFramebuffer(have.fbo.fbo); } catch (_) {}
+        delete _layerFBO[index];
+    }
+
+    // A layer's mask was edited: bump its revision so the cached FBO rebuilds,
+    // and repaint the CSS clips of every image layer bound to it.
+    function clipSourceInvalidate(index) {
+        const layer = _layerOf(index);
+        if (layer) layer.__clipRev = (layer.__clipRev || 0) + 1;
+        const key = 'layer:' + index;
+        if (typeof window.reapplyImageLayerClips === 'function') {
+            (window.layers || []).forEach(function (l) {
+                if (l.clipSource === key) window.applyLayerClip(l.index);
+            });
+        }
+    }
+
+    // Resolve whatever a layer is bound to, tolerating the pre-key form.
+    function clipKeyOf(layer) {
+        if (!layer) return null;
+        if (typeof layer.clipSource === 'string' && layer.clipSource) return layer.clipSource;
+        if (typeof layer.clipMaskId === 'number') return 'mask:' + layer.clipMaskId;
+        return null;
+    }
+
+    // Keep the legacy field in step so saves written by this build still load
+    // in one that predates keys (a Mask binding survives; a layer-mask binding
+    // degrades to None rather than to the wrong shape).
+    function setClipSource(layer, key) {
+        if (!layer) return;
+        layer.clipSource = key || null;
+        const p = _parseKey(key);
+        layer.clipMaskId = (p && p.kind === 'mask') ? p.id : null;
+    }
+
+    window.ClipSources = {
+        list: clipSourceList,
+        getFBO: clipSourceFBO,
+        coverageDataURL: clipSourceDataURL,
+        invalidate: clipSourceInvalidate,
+        dropLayer: dropLayerFBO,
+        keyOf: clipKeyOf,
+        set: setClipSource,
+        parse: _parseKey
     };
 })();

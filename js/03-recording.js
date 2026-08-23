@@ -534,25 +534,25 @@
             
             // Full panel buttons
             if (btns.rec) {
-                btns.rec.textContent = recCountdownActive ? String(recCountdownVal || 3) : '⏺ Record';
+                btns.rec.textContent = recCountdownActive ? String(recCountdownVal || 3) : 'Record';
                 btns.rec.classList.toggle('active', isRec);
             }
             if (btns.play) {
-                btns.play.textContent = a && a.timeline.isPlaying ? '⏸ Pause' : '▶ Play Layer';
+                btns.play.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play Layer';
                 btns.play.classList.toggle('active', !!(a && a.timeline.isPlaying));
             }
-            if (btns.playAll) btns.playAll.textContent = recIsPlayingAll ? '⏸⏸ Pause All' : '▶▶ Play All';
+            if (btns.playAll) btns.playAll.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
             
             // Mini panel buttons
             if (btns.miniRec) {
-                btns.miniRec.textContent = recCountdownActive ? String(recCountdownVal || 3) : '⏺ Record';
+                btns.miniRec.textContent = recCountdownActive ? String(recCountdownVal || 3) : 'Record';
                 btns.miniRec.classList.toggle('active', isRec);
             }
             if (btns.miniPause) {
-                btns.miniPause.textContent = a && a.timeline.isPlaying ? '⏸ Pause' : '▶ Play';
+                btns.miniPause.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play';
                 btns.miniPause.classList.toggle('active', !!(a && a.timeline.isPlaying));
             }
-            if (btns.miniPlayAll) btns.miniPlayAll.textContent = recIsPlayingAll ? '⏸⏸ Pause All' : '▶▶ Play All';
+            if (btns.miniPlayAll) btns.miniPlayAll.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
             
             // Body state classes
             document.body.classList.toggle('rec-recording', isRec);
@@ -589,13 +589,13 @@
                     <div id="recLayerMeta-${layer.id}" style="font-size:12px; opacity:0.85; margin-bottom:4px;">${layer.timeline.interactions.length} interactions | ${(recGetEffectiveDuration(layer)/1000).toFixed(1)}s${layer.mask?.enabled ? ' | 🎭 Masked' : ''}</div>
                     ${hasMask ? `
                     <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
-                        <button class="mask-control-btn" data-action="edit-mask" data-id="${layer.id}" title="Edit Mask">✏️ Edit Mask</button>
-                        <button class="mask-control-btn mask-clear-btn" data-action="clear-mask" data-id="${layer.id}" title="Clear Mask">🗑️ Clear</button>
+                        <button class="mask-control-btn" data-action="edit-mask" data-id="${layer.id}" title="Edit Mask">Edit Mask</button>
+                        <button class="mask-control-btn mask-clear-btn" data-action="clear-mask" data-id="${layer.id}" title="Clear Mask">Clear</button>
                         <span style="font-size:11px; opacity:0.7;">${layer.mask.shapes.length} shape${layer.mask.shapes.length !== 1 ? 's' : ''}</span>
                     </div>
                     ` : `
                     <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px;">
-                        <button class="mask-control-btn mask-create-btn" data-action="edit-mask" data-id="${layer.id}" title="Create Mask">✂️ Create Mask</button>
+                        <button class="mask-control-btn mask-create-btn" data-action="edit-mask" data-id="${layer.id}" title="Create Mask">Create Mask</button>
                     </div>
                     `}
                     <div class="layer-max-row" style="margin-bottom:6px; display:flex; align-items:center; gap:6px;">
@@ -624,9 +624,9 @@
             const playBtn = document.getElementById('recPlayBtn');
             const playAllBtn = document.getElementById('recPlayAllBtn');
             const a = recGetActiveLayer();
-            if (recordBtn) recordBtn.textContent = recCountdownActive ? String(recCountdownVal || 3) : '⏺ Record';
-            if (playBtn) playBtn.textContent = a && a.timeline.isPlaying ? '⏸ Pause' : '▶ Play Layer';
-            if (playAllBtn) playAllBtn.textContent = recIsPlayingAll ? '⏸⏸ Pause All' : '▶▶ Play All';
+            if (recordBtn) recordBtn.textContent = recCountdownActive ? String(recCountdownVal || 3) : 'Record';
+            if (playBtn) playBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play Layer';
+            if (playAllBtn) playAllBtn.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
             if (recordBtn) recordBtn.classList.toggle('active', !!(a && a.timeline.isRecording));
             if (recordMultiBtn) recordMultiBtn.classList.toggle('active', recIsMultiEnabled());
             if (playBtn) playBtn.classList.toggle('active', !!(a && a.timeline.isPlaying));
@@ -640,9 +640,9 @@
             const miniMultiBtn = document.getElementById('recMiniMultiBtn');
             const miniPauseBtn = document.getElementById('recMiniPauseBtn');
             const miniPlayAllBtn = document.getElementById('recMiniPlayAllBtn');
-            if (miniRecBtn) miniRecBtn.textContent = recCountdownActive ? String(recCountdownVal || 3) : '⏺ Record';
-            if (miniPauseBtn) miniPauseBtn.textContent = a && a.timeline.isPlaying ? '⏸ Pause' : '▶ Play';
-            if (miniPlayAllBtn) miniPlayAllBtn.textContent = recIsPlayingAll ? '⏸⏸ Pause All' : '▶▶ Play All';
+            if (miniRecBtn) miniRecBtn.textContent = recCountdownActive ? String(recCountdownVal || 3) : 'Record';
+            if (miniPauseBtn) miniPauseBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play';
+            if (miniPlayAllBtn) miniPlayAllBtn.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
             if (miniRecBtn) miniRecBtn.classList.toggle('active', !!(a && a.timeline.isRecording));
             if (miniMultiBtn) miniMultiBtn.classList.toggle('active', recIsMultiEnabled());
             if (miniPauseBtn) miniPauseBtn.classList.toggle('active', !!(a && a.timeline.isPlaying));

@@ -129,6 +129,7 @@
          web it is inert and the splash flow below runs unchanged. -->
     <script src="js/00a-boot.js"></script>
     <link rel="stylesheet" href="css/00-tokens.css">
+    <link rel="stylesheet" href="css/01-buttons.css">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/slider-styles.css">
     <link rel="stylesheet" href="css/mask-editor.css">
@@ -441,7 +442,7 @@
             <input type="color" id="colorPicker" value="#ff0000">
             <div class="color-actions">
                 <button onclick="saveColor()">Save Color</button>
-                <button onclick="clearColors()">Clear All</button>
+                <button class="btn--destructive" onclick="clearColors()">Clear All</button>
             </div>
             <div class="saved-colors" id="savedColors"></div>
             <div class="control-group checkbox-group" style="margin-top: 8px;">
@@ -758,7 +759,7 @@
                 <input type="range" id="mandalaDryTime" min="0.5" max="20" value="0.5" step="0.5">
             </div>
             <div class="control-group">
-                <button id="mandalaCaptureBtn" style="width:100%">📸 Capture PNG</button>
+                <button id="mandalaCaptureBtn" style="width:100%">Capture PNG</button>
             </div>
         </div>
         <div id="kaleidoPanel" class="collapsible">
@@ -955,7 +956,7 @@
                 </label>
                 <input type="range" id="lightShiftSaturation" min="0" max="1" step="0.01" value="1.0">
             </div>
-            <button id="clearLightShiftPath" style="width: 100%; padding: 6px; background: rgba(255, 100, 100, 0.2); border: 1px solid rgba(255, 100, 100, 0.4); color: white; border-radius: 4px; cursor: pointer; font-size: 11px;">Clear Path</button>
+            <button class="btn--destructive" id="clearLightShiftPath" style="width: 100%; cursor: pointer">Clear Path</button>
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="lockCanvasBorders">
@@ -964,9 +965,9 @@
         <div class="control-group" style="margin-top: 15px;">
             <label>Settings</label>
             <div style="display: flex; gap: 8px;">
-                <button id="saveSettingsBtn" style="flex: 1;">💾 Save</button>
-                <button id="loadSettingsBtn" style="flex: 1;">📂 Load</button>
-                <button id="clearSettingsBtn" style="flex: 1;">🧹 Clear</button>
+                <button id="saveSettingsBtn" style="flex: 1;">Save</button>
+                <button id="loadSettingsBtn" style="flex: 1;">Load</button>
+                <button class="btn--destructive" id="clearSettingsBtn" style="flex: 1;">Clear</button>
             </div>
             <div class="control-group checkbox-group" style="margin-top: 8px;">
                 <input type="checkbox" id="autoloadSettings">
@@ -987,90 +988,112 @@
             </div>
             <div id="userPresetsList" class="user-presets-list" style="margin-top: 6px;"></div>
             <div id="userPresetSaveRow" style="margin-top: 6px;">
-                <button id="saveAsPresetBtn" style="width: 100%; font-size: 10px; padding: 6px;">+ Save Current as Preset</button>
+                <button id="saveAsPresetBtn" style="width: 100%">+ Save Current as Preset</button>
             </div>
             <div id="userPresetNameRow" style="display: none; gap: 6px; margin-top: 6px;">
                 <input type="text" id="userPresetNameInput" placeholder="Preset name..." maxlength="32" spellcheck="false" autocomplete="off" style="flex: 1; padding: 6px 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; font-size: 11px;">
-                <button id="userPresetConfirmBtn" style="padding: 6px 10px;">Save</button>
-                <button id="userPresetCancelBtn" style="padding: 6px 10px; background: rgba(255,100,100,0.2); border: 1px solid rgba(255,100,100,0.3);">Cancel</button>
+                <button id="userPresetConfirmBtn">Save</button>
+                <button id="userPresetCancelBtn">Cancel</button>
             </div>
             <div id="userPresetStatus" style="display: none; font-size: 10px; margin-top: 4px; color: #3fb950; text-align: center;"></div>
             <div id="userPresetBulkRow" style="display: flex; gap: 6px; margin-top: 6px;">
-                <button id="exportAllPresetsBtn" style="flex: 1; font-size: 10px; padding: 6px;" title="Download every saved preset as a portable .fluidpresets file (backup / move between the desktop and web builds)">⤓ Export Presets</button>
-                <button id="importPresetsBtn" style="flex: 1; font-size: 10px; padding: 6px;" title="Import presets from a .fluidpresets file — merges into your library">⤒ Import Presets</button>
+                <button id="exportAllPresetsBtn" style="flex: 1" title="Download every saved preset as a portable .fluidpresets file (backup / move between the desktop and web builds)">⤓ Export Presets</button>
+                <button id="importPresetsBtn" style="flex: 1" title="Import presets from a .fluidpresets file — merges into your library">⤒ Import Presets</button>
                 <input type="file" id="importPresetsInput" accept=".fluidpresets,.json,application/json" style="display: none">
             </div>
-            <button id="openPresetsFolderBtn" style="display: none; width: 100%; font-size: 10px; padding: 6px; margin-top: 6px;" title="Open your presets folder in File Explorer">📁 Open Presets Folder</button>
+            <button id="openPresetsFolderBtn" style="display: none; width: 100%; margin-top: 6px" title="Open your presets folder in File Explorer">Open Presets Folder</button>
         </div>
         <input type="checkbox" id="multiplayerToggle" style="display:none">
         <div id="multiArtistPanel">
-            <!-- Disconnected state -->
+            <!-- ── Not in a room ── -->
             <div id="mpDisconnected">
-                <div class="mp-hint">Draw together live — create a room and share the #, or jump in with a random stranger.</div>
-                <button id="createRoomBtn" class="mp-btn-create">🎨 Create Room</button>
+                <div class="mp-hint">Paint on the same canvas as someone else, live.</div>
+                <button id="createRoomBtn" class="mp-btn-primary">Start a room</button>
+                <div class="mp-sub">You get a code to send to whoever you want.</div>
                 <div class="mp-join-row">
-                    <input type="text" id="joinRoomInput" placeholder="Enter room #" maxlength="48" spellcheck="false" autocomplete="off">
+                    <input type="text" id="joinRoomInput" placeholder="Paste a room code" maxlength="48" spellcheck="false" autocomplete="off" aria-label="Room code to join">
                     <button id="joinRoomBtn">Join</button>
                 </div>
-                <div class="mp-or">— or —</div>
-                <button id="strangerBtn" class="mp-btn-stranger">🎲 Paint with a stranger</button>
-                <div id="mpError" class="mp-error" style="display:none"></div>
-                <button id="reconnectBtn" class="mp-btn-create" style="display:none; margin-top:8px;">🔄 Reconnect</button>
+                <div class="mp-or">or</div>
+                <button id="strangerBtn" class="mp-btn-primary">Swirl With a Stranger</button>
+                <div class="mp-sub">Pairs you with one other person who is also looking. When either of you leaves, the swirl is over — ask again for a new one.</div>
+                <div id="mpError" class="mp-error" style="display:none" role="alert"></div>
+                <button id="reconnectBtn" style="display:none; width:100%; margin-top:8px;">Reconnect</button>
             </div>
-            <!-- Connected state -->
+
+            <!-- ── In a room ── -->
             <div id="mpConnected" style="display:none">
                 <div class="mp-status-row">
                     <div id="connectionDot" class="mp-dot mp-dot-connected"></div>
                     <span id="multiplayerStatus">Connected</span>
+                    <span id="connectedUsers" class="mp-users">1 here</span>
                 </div>
-                <div id="lockBadge" class="mp-lock-badge" style="display:none">🔒 Locked — invite-only</div>
-                <div class="mp-room-display" id="roomDisplay">
-                    <div class="mp-room-label">Room Code</div>
+                <div id="lockBadge" class="mp-lock-badge" style="display:none">Locked — invite only</div>
+
+                <!-- Invite block. The three share modes exist because a room
+                     code on screen is a live invitation: fine at a table,
+                     not fine on a stream. -->
+                <div class="mp-invite" id="roomDisplay">
+                    <div class="mp-invite-head">
+                        <span class="mp-room-label">Room code</span>
+                        <div class="mp-share-modes" role="group" aria-label="How to share this room">
+                            <button type="button" id="shareModeCode" class="mp-share-mode" aria-pressed="true" title="Show the code so you can read it out or type it">Code</button>
+                            <button type="button" id="shareModeQr" class="mp-share-mode" aria-pressed="false" title="Show a QR code someone can scan with a phone camera to join">QR</button>
+                            <button type="button" id="shareModeHidden" class="mp-share-mode" aria-pressed="false" title="Hide the code — safe to show on a stream or a shared screen">Hide</button>
+                        </div>
+                    </div>
                     <div class="mp-room-code" id="roomName">------</div>
+                    <div class="mp-qr" id="roomQr" style="display:none"></div>
+                    <div class="mp-share-hint" id="shareHint">Send this code to a friend so they can join.</div>
+                    <button id="copyRoomBtn" class="mp-btn-share">Copy code</button>
                 </div>
-                <div class="mp-share-hint" id="shareHint">Send this # to a friend to draw together.</div>
-                <div class="mp-action-row">
-                    <button id="copyRoomBtn" class="mp-btn-share">📋 Copy #</button>
-                    <button id="disconnectBtn" class="mp-btn-disconnect">Disconnect</button>
+
+                <!-- Host-only. Grouped and labelled so a guest is not reading
+                     three controls that do nothing for them. -->
+                <div class="mp-host-block" id="mpHostBlock" style="display:none">
+                    <div class="mp-subhead">Room controls</div>
+                    <button id="lockRoomBtn" class="mp-btn-lock" style="display:none" title="Stop anyone new from joining, even with the code">Lock room</button>
+                    <button id="settingsLockBtn" class="mp-btn-lock" style="display:none" title="Guests mirror your look settings; their performance controls stay their own">Lock settings</button>
+                    <button id="turnsBtn" class="mp-btn-lock" style="display:none" title="One artist paints at a time while everyone else watches, with the painter’s settings mirrored live">Take turns</button>
+                    <select id="turnTimerSel" class="mp-turn-timer" style="display:none" title="When the brush passes on: after a set time, when the artist hands it over, or as soon as they finish one swirl">
+                        <option value="30">30 second turns</option>
+                        <option value="60" selected>1 minute turns</option>
+                        <option value="120">2 minute turns</option>
+                        <option value="300">5 minute turns</option>
+                        <option value="stroke">One swirl each</option>
+                        <option value="0">No timer</option>
+                    </select>
                 </div>
-                <button id="lockRoomBtn" class="mp-btn-lock" style="display:none">🔒 Lock room</button>
-                <button id="settingsLockBtn" class="mp-btn-lock" style="display:none" title="Lock look settings so guests mirror yours (their performance controls stay local)">🎛 Lock settings</button>
-                <button id="turnsBtn" class="mp-btn-lock" style="display:none" title="Take turns painting — one artist at a time while everyone else watches with the painter's settings mirrored live">🔁 Take turns</button>
-                <select id="turnTimerSel" class="mp-turn-timer" style="display:none" title="How long each artist holds the brush before it auto-passes">
-                    <option value="30">30 sec turns</option>
-                    <option value="60" selected>1 min turns</option>
-                    <option value="120">2 min turns</option>
-                    <option value="300">5 min turns</option>
-                    <option value="0">No timer</option>
-                </select>
+
                 <div id="turnWheel" class="mp-turn-wheel" style="display:none"></div>
                 <div id="turnStatus" class="mp-turn-status" style="display:none"></div>
-                <button id="turnPassBtn" class="mp-btn-pass" style="display:none" title="Hand the brush to the next artist in the rotation">➡ Pass turn</button>
-                <div id="connectedUsers" class="mp-users">1 user</div>
+                <button id="turnPassBtn" class="mp-btn-pass" style="display:none" title="Hand the brush to the next artist in the rotation">Pass turn</button>
+
+                <button id="disconnectBtn" class="mp-btn-leave">Leave room</button>
             </div>
         </div>
         <button onclick="togglePause()" id="pauseBtn" style="width: 100%; margin-top: 10px">Pause</button>
-        <button onclick="clearCanvas()" style="width: 100%; margin-top: 10px">Clear</button>
-        <button onclick="toggleFreeze()" id="freezeBtn" style="width: 100%; margin-top: 10px">❄️ Freeze</button>
-        <button id="smashBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 100, 100, 0.2); padding: 8px; line-height: 1.3;">
-            <div style="font-size: 1.1em; margin-bottom: 2px;">💥 Smash</div>
+        <button class="btn--destructive" onclick="clearCanvas()" style="width: 100%; margin-top: 10px">Clear</button>
+        <button onclick="toggleFreeze()" id="freezeBtn" style="width: 100%; margin-top: 10px">Freeze</button>
+        <button id="smashBtn" style="width: 100%; margin-top: 10px">
+            <div style="font-size: 1.1em; margin-bottom: 2px;">Smash</div>
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Collide | Right: Expand</div>
         </button>
-        <button id="jellyfishBtn" style="width: 100%; margin-top: 10px; background: rgba(100, 150, 255, 0.2); padding: 8px; line-height: 1.3;">
-            <div style="font-size: 1.1em; margin-bottom: 2px;">🪼 Jellyfish</div>
+        <button id="jellyfishBtn" style="width: 100%; margin-top: 10px">
+            <div style="font-size: 1.1em; margin-bottom: 2px;">Jellyfish</div>
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Single | Right: Swarm</div>
         </button>
-        <button onclick="playPortraitAnimation()" style="width: 100%; margin-top: 10px; background: rgba(200, 150, 255, 0.2);">🎨 Portrait</button>
-        <button id="vortexBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 200, 100, 0.2); padding: 8px; line-height: 1.3;">
-            <div style="font-size: 1.1em; margin-bottom: 2px;">🌀 Vortex</div>
+        <button onclick="playPortraitAnimation()" style="width: 100%; margin-top: 10px;">Portrait</button>
+        <button id="vortexBtn" style="width: 100%; margin-top: 10px">
+            <div style="font-size: 1.1em; margin-bottom: 2px;">Vortex</div>
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Clockwise | Right: Counter</div>
         </button>
-        <button id="portalBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 100, 255, 0.2); padding: 8px; line-height: 1.3;">
-            <div style="font-size: 1.1em; margin-bottom: 2px;">🌌 Portal</div>
+        <button id="portalBtn" style="width: 100%; margin-top: 10px">
+            <div style="font-size: 1.1em; margin-bottom: 2px;">Portal</div>
             <div style="font-size: 0.7em; opacity: 0.7;">Left: Swoop | Right: Expand</div>
         </button>
-        <button id="chimeraBtn" onclick="playChimeraAnimation()" style="width: 100%; margin-top: 10px; background: rgba(255, 180, 60, 0.2); padding: 8px; line-height: 1.3;">
-            <div style="font-size: 1.1em; margin-bottom: 2px;">🐉 Chimera</div>
+        <button id="chimeraBtn" onclick="playChimeraAnimation()" style="width: 100%; margin-top: 10px">
+            <div style="font-size: 1.1em; margin-bottom: 2px;">Chimera</div>
             <div style="font-size: 0.7em; opacity: 0.7;">Three sine strokes × 8 arms</div>
         </button>
         <!-- Toggle animations (Ascend removed 2026-08-15 — photosensitivity) -->
@@ -1115,7 +1138,7 @@
                 </div>
             </div>
         </div>
-        <button id="captureBtn" style="width: 100%; margin-top: 10px; background: rgba(100, 255, 100, 0.2);">Capture Layer</button>
+        <button id="captureBtn" style="width: 100%; margin-top: 10px;">Capture Layer</button>
         <div class="control-group checkbox-group" style="margin-top: 10px;">
             <input type="checkbox" id="hoverCaptureToggle">
             <label for="hoverCaptureToggle" style="margin: 0">Enable Capture on Hover</label>
@@ -1125,7 +1148,7 @@
             <label for="detachCaptureToggle" style="margin: 0">Detach Capture Area</label>
         </div>
         <input type="file" id="imageUpload" accept="image/png,image/jpeg,image/jpg,image/webp" style="display: none;">
-        <button id="uploadBtn" style="width: 100%; margin-top: 10px; background: rgba(255, 200, 100, 0.2);">📁 Upload Image Layer</button>
+        <button id="uploadBtn" style="width: 100%; margin-top: 10px;">Upload Image Layer</button>
         <div class="preview-toggle" id="previewToggle" 
              onmouseenter="showPreview()" 
              onmouseleave="hidePreview()">
@@ -1140,21 +1163,21 @@
                 <option value="full">Full</option>
             </select>
         </div>
-        <div id="recMini" class="rec-mini" style="display: none;">
+        <div id="recMini" class="rec-mini" data-group="expressive" style="display: none;">
             <div class="rec-mini-grid">
                 <div class="rec-square" id="recMiniSquareControls">
                     <div class="rec-square-content">
                         <div class="row top3">
-                            <button id="recMiniRecordBtn" class="action-record">⏺ Record</button>
-                            <button id="recMiniMultiBtn" class="action-multi" title="Join or leave the shared multiplayer room">🌐 Multi</button>
+                            <button id="recMiniRecordBtn" class="action-record btn--record">Record</button>
+                            <button id="recMiniMultiBtn" class="action-multi" title="Join or leave a Swirl Together room">Swirl</button>
                             <input type="text" id="recMiniMaxDuration" class="time-input action-max" value="00:10:000" placeholder="mm:ss:ms">
                         </div>
                         <div class="row bottom2">
-                            <button id="recMiniPauseBtn" class="action-pause">⏸ Pause</button>
-                            <button id="recMiniStopBtn" class="action-stop">⏹ Stop</button>
+                            <button id="recMiniPauseBtn" class="action-pause">Pause</button>
+                            <button id="recMiniStopBtn" class="action-stop">Stop</button>
                         </div>
                         <div class="row bottom1">
-                            <button id="recMiniPlayAllBtn" class="full action-full">▶▶ Play All</button>
+                            <button id="recMiniPlayAllBtn" class="full action-full">Play All</button>
                         </div>
                     </div>
                 </div>
@@ -1169,13 +1192,13 @@
                             <button id="recMiniNextLayerBtn" class="action-next">▶</button>
                         </div>
                         <div class="row layer-bottom">
-                            <button id="recMiniAddLayerBtn" class="full action-add">➕ New Layer</button>
+                            <button id="recMiniAddLayerBtn" class="full action-add">New Layer</button>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="rec-mini-actions">
-                <button id="recOpenFullBtn" class="full action-full" title="Open full recorder">⬆️ Full Recorder</button>
+                <button id="recOpenFullBtn" class="full action-full" title="Open full recorder">Full Recorder</button>
             </div>
         </div>
         <div class="control-group" style="margin-top: 20px">
@@ -1184,12 +1207,12 @@
         </div>
     </div>
     <!-- Recorded Layers Drawer (full-width) -->
-    <div id="recDrawer" class="rec-drawer studio-drawer" data-active-tab="record">
+    <div id="recDrawer" class="rec-drawer studio-drawer" data-group="expressive" data-active-tab="record">
         <div id="recResizeHandle" class="rec-resize-handle"><div class="rec-grabber"></div></div>
         <div class="studio-tabbar">
             <div class="studio-tabs">
-                <button type="button" class="studio-tab active" data-tab="record">🎬 Record</button>
-                <button type="button" class="studio-tab" data-tab="audio">🎵 Audio</button>
+                <button type="button" class="studio-tab active" data-tab="record">Record</button>
+                <button type="button" class="studio-tab" data-tab="audio">Audio</button>
             </div>
             <button id="studioCloseBtn" class="rec-close" title="Close">✕</button>
         </div>
@@ -1214,17 +1237,17 @@
         </div>
         <div class="rec-header" style="gap:6px;">
             <div class="rec-left" style="gap:6px;">
-                <button id="recRecordBtn">⏺ Record</button>
-                <button id="recMultiRecordBtn" title="Join or leave the shared multiplayer room">🌐 Multiplayer</button>
-                <button id="recPlayBtn">▶ Play Layer</button>
-                <button id="recPlayAllBtn">▶▶ Play All</button>
-                <button id="recStopBtn">⏹ Stop</button>
-                <button id="recAddLayerBtn">➕ Add Layer</button>
-                <button id="recDuplicateLayerBtn">📋 Duplicate</button>
-                <button id="recDeleteLayerBtn">🗑 Delete</button>
-                <button id="recClearBtn">🧹 Clear Active</button>
-                <button id="recExportBtn">💾 Export</button>
-                <button id="recImportBtn">📁 Import</button>
+                <button class="btn--record" id="recRecordBtn">Record</button>
+                <button id="recMultiRecordBtn" title="Join or leave a Swirl Together room">Swirl Together</button>
+                <button id="recPlayBtn">Play Layer</button>
+                <button id="recPlayAllBtn">Play All</button>
+                <button id="recStopBtn">Stop</button>
+                <button id="recAddLayerBtn">Add Layer</button>
+                <button id="recDuplicateLayerBtn">Duplicate</button>
+                <button class="btn--destructive" id="recDeleteLayerBtn">Delete</button>
+                <button class="btn--destructive" id="recClearBtn">Clear Active</button>
+                <button id="recExportBtn">Export</button>
+                <button id="recImportBtn">Import</button>
                 <input type="file" id="recImportFile" accept=".json" style="display:none;" />
             </div>
         </div>
@@ -1358,6 +1381,9 @@
             </div>
         </div>
     </div>
+    <!-- Dependency-free QR encoder; the branding overlay and the room panel
+         both render through it, so it loads before either. -->
+    <script src="js/39-qrcode.js"></script>
     <script src="js/00-window-controls.js"></script>
     <script src="js/01-config.js"></script>
     <script src="js/01a-param-registry.js"></script>
@@ -1486,6 +1512,7 @@
     <script src="js/35-zoom-view.js"></script>
     <script src="js/36-display-mode.js"></script>
     <script src="js/37-nav-idle-glow.js"></script>
+    <script src="js/38-button-audit.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">
@@ -1493,7 +1520,7 @@
             <div class="delete-modal-message" id="deleteModalMessage">Are you sure you want to delete this palette?</div>
             <div class="delete-modal-actions">
                 <button class="delete-modal-cancel" onclick="hideDeleteModal()">Cancel</button>
-                <button class="delete-modal-confirm" onclick="confirmDeletePalette()">Delete</button>
+                <button class="delete-modal-confirm btn--destructive" onclick="confirmDeletePalette()">Delete</button>
             </div>
         </div>
     </div>

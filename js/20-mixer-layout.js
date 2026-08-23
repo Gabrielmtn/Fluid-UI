@@ -579,6 +579,9 @@
 
         var menu = document.createElement('div');
         menu.className = 'arm-colors-panel brush-tip-menu';
+        // Popovers are portaled to <body>, so they carry the paint surface's tint
+        // with them rather than inheriting the app-root system fallback.
+        menu.dataset.group = 'core';
         menu.style.display = 'none';
         menu.style.position = 'fixed';   // the strip is overflow-x:auto — a popup inside it would clip
         document.body.appendChild(menu);
@@ -674,7 +677,7 @@
                 // A custom stamp overrides the built-in tip — show the stamp.
                 face.textContent = '';
                 face.style.backgroundImage = 'url("' + entry.dataURL + '")';
-                btn.title = 'Brush tip: ' + entry.name + ' (custom shape) — click to change';
+                btn.title = 'Brush tip: ' + entry.name + ' (custom shape) — click to change · right-click to edit or delete';
             } else {
                 face.style.backgroundImage = '';
                 face.textContent = BRUSH_TIPS[tip].glyph;
@@ -693,6 +696,18 @@
         btn.addEventListener('click', function () {
             if (menu.style.display === 'none') openMenu(); else closeMenu();
         });
+        // Right-click is the SAME door as a shape tile's. The swatch is the one
+        // place the loaded shape is always on screen, so right-clicking it was
+        // the obvious way to edit or delete that shape — and it was the one
+        // place that answered with the browser's own context menu instead.
+        // Built-in tips have nothing to edit, so they keep the default menu.
+        btn.addEventListener('contextmenu', function (e) {
+            var entry = activeShapeEntry();
+            if (!entry) return;
+            e.preventDefault();
+            e.stopPropagation();
+            openShapeMenu(entry, e.clientX, e.clientY);
+        });
         document.addEventListener('click', function (e) {
             if (menu.style.display !== 'none' && !menu.contains(e.target)
                 && e.target !== btn && !btn.contains(e.target)) closeMenu();
@@ -709,6 +724,7 @@
     function buildMixerStrip(controls) {
         const strip = document.createElement('div');
         strip.id = 'mixer-strip';
+        strip.dataset.group = 'core';
 
         // Channel faders for key controls
         // (renames 2026-07-29: 'Size'→'Brush Size' and 'Brush'→'Multi-Brush' —
@@ -1159,7 +1175,7 @@
         var igniteBtnColor = document.createElement('button');
         igniteBtnColor.type = 'button';
         igniteBtnColor.className = 'ch-text-toggle ch-nudge-btn';
-        igniteBtnColor.textContent = '🔥 Ignite';
+        igniteBtnColor.textContent = 'Ignite';
         igniteBtnColor.title = 'Hold to perk the fluid up — faded dye is pulled back to the colour it was '
             + 'painted at, past even the Cap Color limit. Slide right onto the lock to keep it on. '
             + 'Your density decay setting is untouched.';
@@ -1329,6 +1345,9 @@
         // non-scrolling sibling of the list, so it is ALWAYS visible).
         var panel = document.createElement('div');
         panel.className = 'arm-colors-panel mixer-presets-panel';
+        // Popovers are portaled to <body>, so they carry the paint surface's tint
+        // with them rather than inheriting the app-root system fallback.
+        panel.dataset.group = 'core';
         panel.style.display = 'none';
         panel.style.position = 'fixed';
         document.body.appendChild(panel);
@@ -2171,7 +2190,7 @@
         const actions = document.createElement('div');
         actions.className = 'section-header-actions';
         const captureBtn = document.getElementById('captureBtn');
-        if (captureBtn) { captureBtn.style.cssText = 'font-size:11px;padding:3px 8px;'; captureBtn.textContent = 'Capture Layer'; actions.appendChild(captureBtn); }
+        if (captureBtn) { captureBtn.style.cssText = ''; captureBtn.textContent = 'Capture Layer'; actions.appendChild(captureBtn); }
         const uploadBtn = document.getElementById('uploadBtn');
         if (uploadBtn) { uploadBtn.style.cssText = ''; uploadBtn.textContent = '📁'; actions.appendChild(uploadBtn); }
 
@@ -2180,7 +2199,7 @@
         pathBtn.type = 'button';
         pathBtn.textContent = '✏️';
         pathBtn.title = 'Add Path Layer';
-        pathBtn.style.cssText = 'font-size:11px;padding:3px 6px;cursor:pointer;';
+        pathBtn.style.cssText = 'cursor:pointer;';
         pathBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             if (window.pathLayers) {
@@ -2195,7 +2214,7 @@
         collisionBtn.type = 'button';
         collisionBtn.textContent = '🧱';
         collisionBtn.title = 'Add Collision Layer — pick a picture, cut the subject out, get a wall';
-        collisionBtn.style.cssText = 'font-size:11px;padding:3px 6px;cursor:pointer;position:relative;';
+        collisionBtn.style.cssText = 'cursor:pointer;position:relative;';
         actions.appendChild(collisionBtn);
 
         var collisionMenu = document.createElement('div');
@@ -2205,8 +2224,8 @@
         // startFrom*), with step 3's collider hand-off pre-checked — the wall
         // comes from a mask the user cut, not from a depth guess.
         collisionMenu.innerHTML =
-            '<button type="button" data-src="image">📁 From Image…</button>' +
-            '<button type="button" data-src="snapshot">📸 From Canvas</button>';
+            '<button type="button" data-src="image">From Image…</button>' +
+            '<button type="button" data-src="snapshot">From Canvas</button>';
         collisionBtn.appendChild(collisionMenu);
 
         var collisionFileInput = document.createElement('input');
@@ -2808,6 +2827,9 @@
 
         var panel = document.createElement('div');
         panel.className = 'arm-colors-panel brush-settings-panel slide-left';
+        // Popovers are portaled to <body>, so they carry the paint surface's tint
+        // with them rather than inheriting the app-root system fallback.
+        panel.dataset.group = 'core';
         panel.style.position = 'fixed';
         document.body.appendChild(panel);
 
@@ -3088,7 +3110,7 @@
         fluidBtn.type = 'button'; fluidBtn.className = 'brush-mode-btn active'; fluidBtn.textContent = 'Fluid';
         fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
         var colliderBtn = document.createElement('button');
-        colliderBtn.type = 'button'; colliderBtn.className = 'brush-mode-btn'; colliderBtn.textContent = '🧱 Paint Collider';
+        colliderBtn.type = 'button'; colliderBtn.className = 'brush-mode-btn'; colliderBtn.textContent = 'Paint Collider';
         colliderBtn.title = 'Paint walls with your brush: strokes build a live collider layer (see the Layers panel) that the fluid flows around — shown as a red film while painting. Click Fluid to paint dye again.';
         targetRow.appendChild(fluidBtn); targetRow.appendChild(colliderBtn);
         panel.appendChild(targetRow);
@@ -3410,7 +3432,7 @@
         var arrangeBtn = document.createElement('button');
         arrangeBtn.type = 'button';
         arrangeBtn.className = 'branding-arrange-btn';
-        arrangeBtn.style.cssText = 'width:100%;margin-bottom:4px;padding:7px;font-size:11px;font-weight:600;border-radius:4px;background:rgba(255,130,170,0.18);border:1px solid rgba(255,130,170,0.3);color:white;cursor:pointer;';
+        arrangeBtn.style.cssText = 'width:100%;margin-bottom:4px;cursor:pointer;';
         body.appendChild(arrangeBtn);
 
         var arrangeHint = document.createElement('div');
@@ -3420,7 +3442,7 @@
 
         function syncArrangeBtn() {
             var on = !!(api() && api().isArranging());
-            arrangeBtn.textContent = on ? '\u2713 Done Arranging' : '\u270b Arrange Overlays';
+            arrangeBtn.textContent = on ? 'Done Arranging' : 'Arrange Overlays';
             arrangeBtn.classList.toggle('active', on);
         }
         arrangeBtn.addEventListener('click', function () {
@@ -3457,7 +3479,7 @@
         var textAddBtn = document.createElement('button');
         textAddBtn.type = 'button';
         textAddBtn.textContent = '+ Add';
-        textAddBtn.style.cssText = 'padding:4px 8px;font-size:10px;border-radius:3px;background:rgba(255,130,170,0.2);border:1px solid rgba(255,130,170,0.3);color:white;cursor:pointer;flex:none;';
+        textAddBtn.style.cssText = 'cursor:pointer;flex:none;';
         textRow.appendChild(textInput);
         textRow.appendChild(colorPick);
         textRow.appendChild(sizeInput);
@@ -3470,7 +3492,7 @@
             var b = document.createElement('button');
             b.type = 'button';
             b.textContent = text;
-            b.style.cssText = 'padding:2px 6px;font-size:9px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);cursor:pointer;';
+            b.style.cssText = 'cursor:pointer;';
             b.addEventListener('click', function () { textInput.value = text; textInput.focus(); });
             quickRow.appendChild(b);
         });
@@ -3483,8 +3505,8 @@
         body.appendChild(imgLabel);
         var imgUploadBtn = document.createElement('button');
         imgUploadBtn.type = 'button';
-        imgUploadBtn.textContent = '\ud83d\udcce Upload Logo';
-        imgUploadBtn.style.cssText = 'width:100%;margin-bottom:10px;padding:5px 8px;font-size:10px;border-radius:3px;background:rgba(255,200,100,0.15);border:1px solid rgba(255,200,100,0.2);color:white;cursor:pointer;';
+        imgUploadBtn.textContent = 'Upload Logo';
+        imgUploadBtn.style.cssText = 'width:100%;margin-bottom:10px;cursor:pointer;';
         var imgFileInput = document.createElement('input');
         imgFileInput.type = 'file';
         imgFileInput.accept = 'image/png,image/svg+xml,image/jpeg,image/webp';
@@ -3506,7 +3528,7 @@
         var qrAddBtn = document.createElement('button');
         qrAddBtn.type = 'button';
         qrAddBtn.textContent = '+ QR';
-        qrAddBtn.style.cssText = 'padding:4px 8px;font-size:10px;border-radius:3px;background:rgba(180,130,255,0.2);border:1px solid rgba(180,130,255,0.3);color:white;cursor:pointer;flex:none;';
+        qrAddBtn.style.cssText = 'cursor:pointer;flex:none;';
         qrRow.appendChild(qrInput);
         qrRow.appendChild(qrAddBtn);
         body.appendChild(qrRow);
@@ -3523,16 +3545,18 @@
 
         var clearBtn = document.createElement('button');
         clearBtn.type = 'button';
-        clearBtn.textContent = '\ud83d\uddd1 Clear All';
-        clearBtn.style.cssText = 'width:100%;padding:4px;font-size:10px;border-radius:3px;background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.2);color:rgba(255,255,255,0.6);cursor:pointer;';
+        clearBtn.className = 'btn--destructive';
+        clearBtn.textContent = 'Clear All';
+        clearBtn.style.cssText = 'width:100%;cursor:pointer;';
         body.appendChild(clearBtn);
 
         function mkRowBtn(txt, title, fn) {
             var b = document.createElement('button');
             b.type = 'button';
+            b.className = 'btn--ghost';
             b.textContent = txt;
             b.title = title;
-            b.style.cssText = 'padding:1px 5px;font-size:12px;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.7);line-height:1;flex:none;';
+            b.style.cssText = 'cursor:pointer;flex:none;';
             b.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
             return b;
         }
@@ -4348,9 +4372,9 @@
         var projGrid = document.createElement('div');
         projGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;';
         var saveProjBtn = document.createElement('button');
-        saveProjBtn.textContent = '💾 Save Project';
+        saveProjBtn.textContent = 'Save Project';
         saveProjBtn.title = 'Download the whole project (layers, masks, bindings, brush presets, colors…) as a .fluid file';
-        saveProjBtn.style.cssText = 'padding:8px;background:rgba(180,130,255,0.15);border:1px solid rgba(180,130,255,0.35);color:#c8a2ff;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        saveProjBtn.style.cssText = 'cursor:pointer;';
         saveProjBtn.addEventListener('click', function () {
             var nm = window.prompt ? window.prompt('Project name', 'fluid-project') : 'fluid-project';
             if (nm === null) return; // cancelled
@@ -4358,9 +4382,9 @@
         });
         projGrid.appendChild(saveProjBtn);
         var loadProjBtn = document.createElement('button');
-        loadProjBtn.textContent = '📂 Load Project';
+        loadProjBtn.textContent = 'Load Project';
         loadProjBtn.title = 'Load a .fluid project file (replaces the current stack)';
-        loadProjBtn.style.cssText = 'padding:8px;background:rgba(180,130,255,0.08);border:1px solid rgba(180,130,255,0.25);color:#c8a2ff;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        loadProjBtn.style.cssText = 'cursor:pointer;';
         var projInput = document.createElement('input');
         projInput.type = 'file';
         projInput.accept = '.fluid,application/json';
@@ -4397,32 +4421,32 @@
         quickGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;';
 
         var videoBtn = document.createElement('button');
-        videoBtn.textContent = '🎬 Video';
-        videoBtn.style.cssText = 'padding:8px;background:rgba(88,166,255,0.15);border:1px solid rgba(88,166,255,0.3);color:#58a6ff;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        videoBtn.textContent = 'Video';
+        videoBtn.style.cssText = 'cursor:pointer;';
         videoBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.video();
         });
         quickGrid.appendChild(videoBtn);
 
         var gifBtn = document.createElement('button');
-        gifBtn.textContent = '🎨 GIF';
-        gifBtn.style.cssText = 'padding:8px;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.3);color:#3fb950;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        gifBtn.textContent = 'GIF';
+        gifBtn.style.cssText = 'cursor:pointer;';
         gifBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.gif();
         });
         quickGrid.appendChild(gifBtn);
 
         var stillBtn = document.createElement('button');
-        stillBtn.textContent = '📸 Still';
-        stillBtn.style.cssText = 'padding:8px;background:rgba(210,153,34,0.15);border:1px solid rgba(210,153,34,0.3);color:#d29922;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        stillBtn.textContent = 'Still';
+        stillBtn.style.cssText = 'cursor:pointer;';
         stillBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.still();
         });
         quickGrid.appendChild(stillBtn);
 
         var seqBtn = document.createElement('button');
-        seqBtn.textContent = '🎞️ Sequence';
-        seqBtn.style.cssText = 'padding:8px;background:rgba(248,81,73,0.15);border:1px solid rgba(248,81,73,0.3);color:#f85149;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;';
+        seqBtn.textContent = 'Sequence';
+        seqBtn.style.cssText = 'cursor:pointer;';
         seqBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.sequence();
         });
@@ -4433,8 +4457,8 @@
         // Stop button (hidden until export starts)
         var stopBtn = document.createElement('button');
         stopBtn.id = 'exportStopBtn';
-        stopBtn.textContent = '⏹ Cancel Export';
-        stopBtn.style.cssText = 'display:none;width:100%;padding:8px;background:rgba(248,81,73,0.2);border:1px solid rgba(248,81,73,0.4);color:#f85149;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;margin-bottom:12px;';
+        stopBtn.textContent = 'Cancel Export';
+        stopBtn.style.cssText = 'display:none;width:100%;cursor:pointer;margin-bottom:12px;';
         stopBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.stop();
         });
@@ -4548,7 +4572,7 @@
             var folderOpenBtn = document.createElement('button');
             folderOpenBtn.textContent = '📂';
             folderOpenBtn.title = 'Open folder';
-            folderOpenBtn.style.cssText = 'background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 8px;color:#c9d1d9;cursor:pointer;font-size:14px;';
+            folderOpenBtn.style.cssText = 'cursor:pointer;';
             folderOpenBtn.addEventListener('click', function() {
                 if (window.fluidExport) window.fluidExport.openFolder();
             });
@@ -4605,8 +4629,10 @@
     }
 
     function buildMultiArtistSection() {
+        // "Swirl Together" is the feature's name, not "Multiplayer" — the section
+        // is the front door to it, so it carries the name people are told.
         // Collapsed by default like the rest of the sidebar (UI starts fully collapsed).
-        const { sec, body } = makeSection('Multiplayer', 'core', true);
+        const { sec, body } = makeSection('Swirl Together', 'core', true);
 
         // Move the multiplayer panel
         var panel = document.getElementById('multiArtistPanel');
@@ -4695,7 +4721,7 @@
         var comfyFolderBtn = document.createElement('button');
         comfyFolderBtn.textContent = '📂';
         comfyFolderBtn.title = 'Pick or open folder';
-        comfyFolderBtn.style.cssText = 'background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 8px; color:#c9d1d9; cursor:pointer; font-size:14px;';
+        comfyFolderBtn.style.cssText = ' cursor:pointer;';
         comfyFolderBtn.addEventListener('click', function() {
             if (!window.comfyuiBridge) return;
             var cfg = window.comfyuiBridge.getConfig();
@@ -4852,6 +4878,9 @@
         // presets popup share the .arm-colors-panel skin, so 05g needs a class
         // that only this one carries to decide whether a rebuild is visible.
         panel.className = 'arm-colors-panel arm-colors-rows';
+        // Popovers are portaled to <body>, so they carry the paint surface's tint
+        // with them rather than inheriting the app-root system fallback.
+        panel.dataset.group = 'core';
         panel.style.display = 'none';
         panel.style.position = 'fixed';
         document.body.appendChild(panel);
@@ -5361,6 +5390,16 @@
 
         persistSectionState();
     }
+
+    // Open a sidebar section from code, exactly as clicking its header would
+    // (accordion sweep included). No-op if it is already open, so callers can
+    // fire it freely. Used by the paste path to surface Layers.
+    window.openSidebarSection = function (sel) {
+        var sec = (typeof sel === 'string') ? document.querySelector(sel) : sel;
+        if (!sec) return false;
+        if (sec.classList.contains('collapsed')) toggleSection(sec, false);
+        return true;
+    };
 
     function makeSection(title, group, collapsed) {
         const sec = document.createElement('div');

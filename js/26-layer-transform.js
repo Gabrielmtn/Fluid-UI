@@ -261,8 +261,8 @@
             <div class="draw-toolbar">
                 <span class="layer-transform-title">⤢ ${layer.title || 'Layer ' + index}</span>
                 <span class="layer-transform-hint">drag to move · corners to resize (Shift = proportional) · ↻ to rotate</span>
-                <button id="layerTransformDone" type="button">✓ Done</button>
-                <button id="layerTransformCancel" type="button">✕ Cancel</button>
+                <button id="layerTransformDone" type="button">Done</button>
+                <button id="layerTransformCancel" type="button">Cancel</button>
             </div>
             <div class="draw-canvas-area">
                 <canvas id="layerTransformCanvas"></canvas>

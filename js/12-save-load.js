@@ -475,24 +475,24 @@
                 const state = scanAppState();
                 // Also store a collapsed snapshot for debugging
                 window.settingsManager?.set('app.lastSnapshot', state);
-                saveBtn.textContent = '✅ Saved';
-                setTimeout(() => saveBtn.textContent = '💾 Save', 1500);
+                saveBtn.textContent = 'Saved';
+                setTimeout(() => saveBtn.textContent = 'Save', 1500);
             } catch (err) {
                 console.error('Save error:', err);
-                saveBtn.textContent = '❌ Error';
-                setTimeout(() => saveBtn.textContent = '💾 Save', 2000);
+                saveBtn.textContent = 'Error';
+                setTimeout(() => saveBtn.textContent = 'Save', 2000);
             }
         });
 
         loadBtn.addEventListener('click', () => {
             try {
                 applyFromSettings();
-                loadBtn.textContent = '✅ Loaded';
-                setTimeout(() => loadBtn.textContent = '📂 Load', 1500);
+                loadBtn.textContent = 'Loaded';
+                setTimeout(() => loadBtn.textContent = 'Load', 1500);
             } catch (err) {
                 console.error('Load error:', err);
-                loadBtn.textContent = '❌ Error';
-                setTimeout(() => loadBtn.textContent = '📂 Load', 2000);
+                loadBtn.textContent = 'Error';
+                setTimeout(() => loadBtn.textContent = 'Load', 2000);
             }
         });
 
@@ -517,12 +517,12 @@
                         window.restoreDefaultPalettes();
                     }
                     if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
-                    clearBtn.textContent = '🧹 Cleared';
-                    setTimeout(() => clearBtn.textContent = '🧹 Clear', 1500);
+                    clearBtn.textContent = 'Cleared';
+                    setTimeout(() => clearBtn.textContent = 'Clear', 1500);
                 } catch (err) {
                     console.error('Clear error:', err);
-                    clearBtn.textContent = '❌ Error';
-                    setTimeout(() => clearBtn.textContent = '🧹 Clear', 2000);
+                    clearBtn.textContent = 'Error';
+                    setTimeout(() => clearBtn.textContent = 'Clear', 2000);
                 }
             });
         }
@@ -815,6 +815,11 @@
                         opacity: typeof layer.opacity === 'number' ? layer.opacity : 1,
                         blendMode: layer.blendMode || 'normal',
                         clipMaskId: (typeof layer.clipMaskId === 'number') ? layer.clipMaskId : null,
+                        // Clip source key ("mask:3" / "layer:1"). clipMaskId
+                        // rides along for builds that predate keys: a Mask
+                        // binding still loads there, a layer-mask one falls
+                        // back to None instead of to the wrong shape.
+                        clipSource: (typeof layer.clipSource === 'string') ? layer.clipSource : null,
                         clipInvert: !!layer.clipInvert
                     };
                     // Mask data — encode collision depthData as base64 for exact restoration
@@ -1476,6 +1481,10 @@
                         opacity: typeof ld.opacity === 'number' ? ld.opacity : 1,
                         blendMode: ld.blendMode || 'normal',
                         clipMaskId: (typeof ld.clipMaskId === 'number') ? ld.clipMaskId : null,
+                        // Pre-key saves carry only clipMaskId — promote it.
+                        clipSource: (typeof ld.clipSource === 'string' && ld.clipSource)
+                            ? ld.clipSource
+                            : ((typeof ld.clipMaskId === 'number') ? ('mask:' + ld.clipMaskId) : null),
                         clipInvert: !!ld.clipInvert
                     };
 

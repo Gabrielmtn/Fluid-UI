@@ -372,18 +372,18 @@ class SAMSegmenter {
         
         switch (status) {
             case 'loading':
-                statusEl.textContent = '⏳ Loading AI model...';
+                statusEl.textContent = 'Loading AI model...';
                 statusEl.style.color = '#58a6ff';
                 console.log('📊 Status set to: Loading');
                 break;
             case 'ready':
-                statusEl.textContent = '✓ AI Ready';
+                statusEl.textContent = 'AI Ready';
                 statusEl.style.color = '#3fb950';
                 statusEl.style.fontWeight = '600';
                 console.log('📊 Status set to: Ready');
                 break;
             case 'error':
-                statusEl.textContent = '⚠ Model failed to load';
+                statusEl.textContent = 'Model failed to load';
                 statusEl.style.color = '#f85149';
                 console.log('📊 Status set to: Error');
                 break;
@@ -439,7 +439,7 @@ class SAMSegmenter {
                         ? document.getElementById('samLoadingStatus')
                         : null;
                     if (statusEl) {
-                        statusEl.textContent = '⏳ Extracting image embeddings...';
+                        statusEl.textContent = 'Extracting image embeddings...';
                         statusEl.style.color = '#58a6ff';
                     }
                 } catch (e) {

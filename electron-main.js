@@ -1,10 +1,217 @@
 // Electron Main Process
-const { app, BrowserWindow, dialog, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 // Dev affordances (F5 reload, cache clears, nuclear reset) only exist outside
 // packaged builds, or when explicitly asked for with --dev.
 const isDev = !app.isPackaged || process.argv.includes('--dev');
+
+// ── Fatal errors in THIS process ───────────────────────────────────────────
+// Registered before anything else in this file can throw, because both of
+// Electron's defaults are wrong for a shipped app (measured, Electron 39):
+//
+//   • uncaughtException → the raw "A JavaScript error occurred in the main
+//     process" box with a stack trace in it, and then the process KEEPS
+//     RUNNING. Module-scope code after the throw never runs either, so a
+//     failure up here means app.whenReady() below is never even registered:
+//     no window is ever created, and nothing ever closes.
+//
+//   • unhandledRejection → nothing at all. Electron runs Node in the legacy
+//     'warn' mode, so a throw inside app.whenReady().then(createWindow)
+//     prints to a stderr that a packaged Windows GUI build does not have.
+//     That process still holds the single-instance lock, so every relaunch
+//     loses the race below and quietly quits itself — Steam says "Running",
+//     double-clicking does nothing, and only Task Manager can recover it.
+//
+// So: the process must never be left invisible-but-alive. Say what happened,
+// write it down where a user can find it, and end.
+//
+// The one thing worse than a bad error dialog is one that throws away a
+// painting nobody saved. A main-process fault with a healthy window is
+// usually inconsequential to the canvas (the renderer holds all of it), so
+// that case reports into the app's own error card (index.html) and lets the
+// user keep working. Only a fault with NO window standing is fatal — which is
+// exactly the unrecoverable case above.
+let fatalHandled = false;
+
+// stdout/stderr can be a pipe whose reader goes away before this process does
+// — a launcher that exits, a wrapper shell, `| head`. Node then raises EPIPE
+// out of `console.log`, i.e. out of whatever happened to be logging at the
+// time. Observed here: the boot fade's completion log threw EPIPE from inside
+// applyFadeAlpha. That is plumbing, not a fault in the app, and before any of
+// this existed it would have raised Electron's raw error box. Swallow it at
+// the stream (handleFault below also refuses to surface it, belt and braces).
+try { process.stdout.on('error', () => {}); } catch (_) {}
+try { process.stderr.on('error', () => {}); } catch (_) {}
+
+function crashLogPath() {
+    try { return path.join(app.getPath('userData'), 'crash.log'); }
+    catch (_) { return path.join(require('os').tmpdir(), 'swirl-together-crash.log'); }
+}
+
+function writeCrashLog(kind, err) {
+    const p = crashLogPath();
+    try {
+        // One generation, capped. A crash LOOP must not grow an unbounded
+        // file in someone's AppData.
+        try { if (fs.statSync(p).size > 128 * 1024) fs.renameSync(p, p.replace(/\.log$/, '-prev.log')); } catch (_) {}
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.appendFileSync(p, [
+            '',
+            '=== ' + new Date().toISOString() + ' — ' + kind + ' ===',
+            'v' + app.getVersion() + (isDev ? ' (dev)' : '') +
+                ' · electron ' + process.versions.electron +
+                ' · ' + process.platform + ' ' + process.arch,
+            (err && err.stack) ? err.stack : String(err),
+        ].join('\n') + '\n');
+    } catch (_) {}
+    return p;
+}
+
+// mainWindow is a `let` declared further down, so a fault raised before this
+// module finishes evaluating would hit its temporal dead zone — and `typeof`
+// does not save you from a TDZ. Hence the try.
+function liveWindow() {
+    try { return (mainWindow && !mainWindow.isDestroyed()) ? mainWindow : null; }
+    catch (_) { return null; }
+}
+
+// "Is there anything worth keeping?" — deliberately NOT just "does a window
+// object exist". A window that has been constructed but never revealed (a
+// fault between `new BrowserWindow` and the first frame) has no painting in
+// it and no renderer able to show a card, so treating it as alive would put
+// the invisible-zombie process straight back. bootRevealed is the moment the
+// window actually reached the user, and it is re-cleared for every restart.
+function appIsUp() {
+    try { return !!(bootRevealed && liveWindow()); }
+    catch (_) { return false; }   // TDZ, as above
+}
+
+function fatalError(kind, err) {
+    if (fatalHandled) return;   // a crash loop must not stack dialogs
+    fatalHandled = true;
+    console.error('[fatal]', kind, (err && err.stack) ? err.stack : err);
+    const logPath = writeCrashLog(kind, err);
+
+    // A missing module or an unloadable native library is almost never a code
+    // bug in a shipped build — it is a half-downloaded depot or an antivirus
+    // quarantine. That has a one-click user fix, so say which one.
+    const code = err && err.code;
+    const damaged = code === 'MODULE_NOT_FOUND' || code === 'ERR_DLOPEN_FAILED' || code === 'ENOENT';
+    const message = damaged
+        ? 'Swirl Together is missing some of its files.'
+        : 'Swirl Together hit an unexpected error and has to close.';
+    const guidance = damaged
+        ? 'This usually means the install is incomplete or damaged — an interrupted download, or an antivirus that quarantined a file.\n\n' +
+          'On Steam: right-click Swirl Together → Properties → Installed Files → Verify integrity of game files.\n' +
+          'Elsewhere: reinstalling fixes it.'
+        : 'Your presets, brushes and settings are stored separately and are safe.\n\n' +
+          'If this keeps happening, updating your graphics drivers is the usual fix.';
+    const first = String((err && err.stack) || err || '').split('\n').slice(0, 3).join('\n');
+    const detail = guidance + '\n\n' + first + '\n\nWritten to:\n' + logPath;
+
+    const present = () => {
+        // Parent the box ONLY to a window that is actually on screen. An
+        // unparented dialog can land behind this frameless maximized window
+        // (the reason every in-app confirmation moved to the renderer), and
+        // parenting to the invisible boot window is the mirror of that
+        // problem — a modal attached to something with no pixels.
+        const w = liveWindow();
+        const parent = (w && w.isVisible()) ? w : null;
+        const opts = {
+            type: 'error',
+            buttons: ['Restart', 'Show log', 'Quit'],
+            defaultId: 0,
+            cancelId: 2,
+            noLink: true,
+            title: 'Swirl Together',
+            message: message,
+            detail: detail,
+        };
+        let choice = 2;
+        try { choice = parent ? dialog.showMessageBoxSync(parent, opts) : dialog.showMessageBoxSync(opts); }
+        catch (_) { /* no GUI to ask with — fall through and end cleanly */ }
+
+        if (choice === 1) {
+            try { shell.showItemInFolder(logPath); } catch (_) {}
+            // Explorer is launched asynchronously; exiting instantly races it.
+            setTimeout(() => app.exit(1), 600);
+            return;
+        }
+        if (choice === 0) { try { app.relaunch(); } catch (_) {} }
+        // exit(), not quit(): quit() runs before-quit and the window close
+        // handlers, and this process is by definition in an unknown state.
+        // exit() is unconditional, which is the whole point of being here.
+        app.exit(choice === 0 ? 0 : 1);
+    };
+
+    if (app.isReady()) { present(); return; }
+    // Pre-ready — the damaged-install case throws at require time. The ready
+    // event still arrives (the throw does not cancel it), so wait briefly for
+    // the real dialog and fall back to the primitive box if it never comes.
+    let shown = false;
+    const fallback = setTimeout(() => {
+        if (shown) return;
+        shown = true;
+        try { dialog.showErrorBox('Swirl Together', message + '\n\n' + detail); } catch (_) {}
+        app.exit(1);
+    }, 3000);
+    app.whenReady().then(() => {
+        if (shown) return;
+        shown = true;
+        clearTimeout(fallback);
+        present();
+    });
+}
+
+// Non-fatal path: the app is up, so keep it up. The renderer already owns a
+// good error surface (dismissable card, version + GPU, "Copy report") — reuse
+// it rather than growing a second one over here.
+let lastNonFatal = { key: '', at: 0 };
+
+function reportNonFatal(kind, err) {
+    const msg = String((err && err.message) || err);
+    // Not everything up here is called once. The boot fade takes an IPC step
+    // per rendered frame, so a fault on a path like that arrives ~50 times in
+    // under a second — the renderer's card dedupes, but the log would not.
+    const now = Date.now();
+    if (lastNonFatal.key === kind + '|' + msg && now - lastNonFatal.at < 5000) return;
+    lastNonFatal = { key: kind + '|' + msg, at: now };
+
+    const logPath = writeCrashLog(kind + ' (non-fatal — window is up)', err);
+    console.error('[main]', kind, (err && err.stack) ? err.stack : err);
+    const w = liveWindow();
+    if (!w) return;
+    try {
+        w.webContents.send('main-error', {
+            message: msg,
+            detail: String((err && err.stack) || '') + '\n\n' + logPath,
+        });
+    } catch (_) {}
+}
+
+// Throwing from inside an uncaughtException handler is itself unrecoverable —
+// Node aborts the process on the spot. Everything below is already defensive,
+// but this is the one place where "already defensive" is not good enough.
+function handleFault(kind, err) {
+    // See the stdout note above: a dead pipe is not something to tell anyone
+    // about, and logging it here is how you get a second EPIPE.
+    const c = err && err.code;
+    if (c === 'EPIPE' || c === 'EBADF' || c === 'ERR_STREAM_DESTROYED') return;
+    try {
+        if (appIsUp()) reportNonFatal(kind, err);
+        else fatalError(kind, err);
+    } catch (e) {
+        try { console.error('[fatal] error handler failed', e); } catch (_) {}
+        app.exit(1);
+    }
+}
+
+process.on('uncaughtException', (err) => handleFault('uncaughtException', err));
+process.on('unhandledRejection', (reason) => {
+    handleFault('unhandledRejection', (reason instanceof Error) ? reason : new Error(String(reason)));
+});
 
 // ── Steamworks (Steam plan S5-1) ───────────────────────────────────────────
 // App ID for "Swirl Together" (Steamworks app created 2026-08-06).
@@ -85,6 +292,7 @@ console.log('   - Renderer throttling: DISABLED');
 console.log('   - Version:', app.getVersion(), isDev ? '(dev)' : '(packaged)');
 
 let mainWindow = null;
+let quitting = false;   // set once a quit has actually been asked for
 
 // ── Launch choreography (renderer half: js/00a-boot.js) ────────────────────
 // The window is created effectively invisible and maximized BEFORE the page
@@ -221,7 +429,11 @@ function beginRestart(reason, prep) {
                 clearTimeout(bootWatchdog);
                 bootWatchdog = setTimeout(() => revealWindow('watchdog'), BOOT_WATCHDOG_MS);
                 mainWindow.webContents.reload();
-            });
+            })
+            // Tail catch: unhandled rejections are no longer silent, and a
+            // restart step that fails is not worth raising an error card over
+            // a working app.
+            .catch((e) => console.warn('[boot] restart failed', e && e.message));
     });
 }
 
@@ -231,6 +443,25 @@ function beginRestart(reason, prep) {
 ipcMain.on('request-restart', (_evt, reason) => {
     beginRestart(String(reason || 'renderer request').slice(0, 60));
 });
+
+// Something has gone wrong and we are about to parent a modal to this window.
+// It may still be at boot alpha (~0), and a modal owned by a window with no
+// pixels reads as a frozen desktop — the user hears the blocked-window beep
+// and sees nothing to click. Put it on screen first, with no ceremony: the
+// fade exists to make a healthy launch feel considered, and there is nothing
+// to ease in here.
+function forceWindowVisible() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    bootRevealed = true;
+    clearTimeout(bootWatchdog);
+    clearInterval(bootFadeTimer);
+    bootFadeTimer = null;
+    try {
+        if (!mainWindow.isVisible()) mainWindow.show();
+        mainWindow.setOpacity(1);
+        mainWindow.focus();
+    } catch (_) {}
+}
 
 function revealWindow(reason) {
     if (bootRevealed || !mainWindow || mainWindow.isDestroyed()) return;
@@ -385,10 +616,25 @@ function createWindow() {
     });
     mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
+    // index.html itself failing to load is a damaged install, not a bug — and
+    // it is invisible, because the window is born at ~0 alpha and the boot
+    // watchdog reveals an empty dark rectangle 12s later with no explanation.
+    // ERR_ABORTED (-3) is excluded: a reload that supersedes an in-flight load
+    // reports as a failure and is completely normal.
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        if (!isMainFrame || errorCode === -3) return;
+        const err = new Error('Could not load ' + validatedURL + ' — ' + errorDescription + ' (' + errorCode + ')');
+        err.code = 'ENOENT';   // routes to the "verify your files" copy
+        fatalError('did-fail-load', err);
+    });
+
     // A dead renderer used to be a silent white window — surface it instead.
     mainWindow.webContents.on('render-process-gone', (event, details) => {
         if (details.reason === 'clean-exit') return;
         if (!mainWindow || mainWindow.isDestroyed()) return;
+        // Written down whether or not they pick Reload — a user who hits this
+        // twice and mails you about it has something to send.
+        writeCrashLog('renderer gone — ' + details.reason, new Error('exitCode ' + details.exitCode));
         // Deliberate kill from the unresponsive-recovery path below — reload
         // silently instead of stacking a crash dialog on top.
         if (mainWindow.__expectRendererKill) {
@@ -396,19 +642,22 @@ function createWindow() {
             beginRestart('unresponsive recovery');
             return;
         }
+        forceWindowVisible();
         const choice = dialog.showMessageBoxSync(mainWindow, {
             type: 'error',
             buttons: ['Reload', 'Quit'],
             defaultId: 0,
             title: 'Swirl Together crashed',
             message: `The app's renderer crashed (${details.reason}).`,
-            detail: 'Unsaved work on the canvas is lost. If this keeps happening, update your GPU drivers.'
+            detail: 'Unsaved work on the canvas is lost. If this keeps happening, update your GPU drivers.\n\n' +
+                'Details were written to:\n' + crashLogPath()
         });
         if (choice === 0) beginRestart('renderer crash');
         else app.quit();
     });
     mainWindow.on('unresponsive', () => {
         if (!mainWindow || mainWindow.isDestroyed()) return;
+        forceWindowVisible();
         const choice = dialog.showMessageBoxSync(mainWindow, {
             type: 'warning',
             buttons: ['Keep waiting', 'Reload'],
@@ -513,6 +762,17 @@ function createWindow() {
         clearTimeout(bootWatchdog);
         clearInterval(bootFadeTimer);
         bootFadeTimer = null;
+        // A window that goes away without anyone asking it to is the app
+        // vanishing off the user's screen, and `window-all-closed` turns that
+        // straight into a clean exit(0) — no dialog, no log, nothing to send
+        // in a bug report. Seen once during this session's test run, after a
+        // "GPU state invalid after WaitForGetOffsetInRange": the app was
+        // simply gone. There is nothing left to show a dialog over by this
+        // point, but there is no excuse for leaving no trace.
+        if (!quitting && !mainWindow.__allowClose) {
+            writeCrashLog('window destroyed without a close request',
+                new Error('renderer/GPU teardown, or an external kill'));
+        }
         mainWindow = null;
     });
 }
@@ -580,6 +840,9 @@ function guardedReload(hard) {
 app.on('child-process-gone', (event, details) => {
     if (details.type === 'GPU' && details.reason !== 'clean-exit') {
         console.error('[GPU] process gone:', details.reason);
+        // The user-visible half is already handled; this is purely so a
+        // driver-reset report arrives with the reason attached.
+        writeCrashLog('GPU process gone — ' + details.reason, new Error('exitCode ' + details.exitCode));
     }
 });
 
@@ -615,6 +878,9 @@ app.on('window-all-closed', () => {
 
 // Force-destroy all windows before quitting
 app.on('before-quit', () => {
+    // Tells the 'closed' handler that this teardown was asked for, so a
+    // normal quit does not get logged as an unexplained disappearance.
+    quitting = true;
     const allWindows = BrowserWindow.getAllWindows();
     allWindows.forEach((win) => {
         if (!win.isDestroyed()) {

@@ -1,0 +1,301 @@
+/* ================================================================
+   01-BUTTONS — one button style for the whole app.
+
+   THE CONCEPT
+   Colour stops being how a button MEANS and becomes where a button
+   IS. A button does not get its colour from what it does; it inherits
+   a quiet tint from the panel it lives in — a soft echo of the
+   section label above it, same hue at half the chroma.
+
+   TWO RULES, enforced throughout:
+     1. A button must never set its own hue. It reads --sec-h /
+        --sec-c from an ancestor panel. A hardcoded colour on a button
+        is a bug unless the button carries a reserved class.
+     2. Moving a button into a different panel must retint it
+        automatically with zero code changes. That is the acceptance
+        test for this file.
+
+   Linked SECOND, right after 00-tokens.css, so every later sheet can
+   still own a button's LAYOUT (padding, width, grid placement) while
+   this file owns its COLOUR. Later sheets must not set background,
+   border-color or color on a button — see MIGRATION at the bottom.
+   ================================================================ */
+
+/* ── Fallback tint ──
+   Buttons outside any panel land on the system tint rather than on an
+   invalid colour (an undefined --sec-h would collapse every oklch()
+   below to an unparseable value and strip the button bare). */
+:root {
+    --sec-h: 250;
+    --sec-c: 0.08;
+}
+
+/* ── Section tokens ──
+   Hues match the nav label gradients in 21-sidebar.css, so a button
+   echoes the section header it sits under. Keyed off [data-group],
+   which the sidebar builder already stamps on every section — that is
+   what makes rule 2 hold: re-parent a button and it retints.
+
+   Section two is TEAL, not red. No section may use a warm red hue:
+   red is reserved below, and a section borrowing it destroys the
+   distinction. If expressive is ever retinted, keep it at least 90°
+   away from hue 25. */
+[data-group="core"]       { --sec-h: 242; --sec-c: 0.16; }
+[data-group="expressive"] { --sec-h: 190; --sec-c: 0.15; }
+[data-group="system"]     { --sec-h: 250; --sec-c: 0.08; }
+
+/* ── The button ──
+   Dark tinted fill, border a fixed +18% lightness above the fill,
+   label at 95% lightness in the section hue.
+
+   Element selector on purpose: nearly every control in this app is a
+   real <button>, so the system applies without touching ~250 call
+   sites. `.btn` is for the handful of <div>/<a> controls that behave
+   like buttons. Specificity stays at (0,0,1)/(0,1,0) so panel sheets
+   keep winning on layout. */
+button,
+.btn {
+    --c: calc(var(--sec-c) * 0.38);
+
+    background: oklch(14% var(--c) var(--sec-h));
+    border: 1px solid oklch(32% var(--c) var(--sec-h));
+    /* Near-white with only a trace of the section hue. The label is TEXT
+       first: at the old chroma this resolved to #97faff, a saturated cyan
+       that read as a colour before it read as a word. */
+    color: oklch(96% calc(var(--sec-c) * 0.20) var(--sec-h));
+
+    /* The UA reset that ~19 panel rules used to do for themselves with
+       `all: unset` — which also wiped the tokens above, so it had to go. */
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+
+    font-family: inherit;
+    font-size: var(--btn-size, 12px);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    line-height: 1.25;
+    padding: var(--btn-pad-y, 7px) var(--btn-pad-x, 12px);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 120ms, border-color 120ms;
+}
+
+/* ── Size ──
+   Three sizes, and the panel picks one by setting the variables above on
+   itself — the same inheritance the tint uses, so a row of buttons is sized
+   once at the container rather than per button. Before this the app had 58
+   distinct button metrics: nine font sizes from 9px to 14px, four weights,
+   and radii from 0 to 14px, which is why neighbouring panels never looked
+   like the same product. */
+.btn-sm,
+.btn-sm button,
+button.btn--sm,
+.btn.btn--sm       { --btn-size: 11px; --btn-pad-y: 5px; --btn-pad-x: 9px; }
+
+.btn-lg,
+.btn-lg button,
+button.btn--lg,
+.btn.btn--lg       { --btn-size: 13px; --btn-pad-y: 9px; --btn-pad-x: 15px; }
+
+/* Square controls whose glyph IS the label: chevrons, gear, close, a brush
+   tip. Sized by the container's own height, so padding would only fight it. */
+.btn-icons button,
+button.btn--icon,
+.btn.btn--icon {
+    --btn-pad-x: 0px;
+    --btn-pad-y: 0px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Full-width stack member. Common enough in this sidebar to earn a name. */
+button.btn--block,
+.btn.btn--block { display: block; width: 100%; }
+
+/* Notes on the values, so they are not "corrected" later:
+   - The +18% border lift does the structural work. Below about +8%
+     the border dissolves into the fill and buttons lose their edge on
+     black. To make buttons subtler, reduce --c, never the border lift.
+   - The fill sits at 14% so it stays a dark plate the label sits ON.
+     Above ~18% the plate starts competing with its own text, which is
+     what the first pass got wrong.
+   - Label chroma is a FIFTH of the section chroma. The hue belongs to
+     the plate and the border; the text only needs enough of it to
+     belong to the same family.
+   - Disabled drops to near-zero chroma deliberately. It leaves the
+     section family entirely, which is what "not part of this right
+     now" should look like.
+   - Pressed raises chroma rather than lightness alone, so selection
+     reads as the section colour intensifying rather than the button
+     becoming a different component. */
+
+button:hover,
+.btn:hover {
+    background: oklch(19% var(--c) var(--sec-h));
+    border-color: oklch(40% var(--c) var(--sec-h));
+}
+
+button:active,
+.btn:active {
+    background: oklch(23% var(--c) var(--sec-h));
+}
+
+/* Pressed / selected. `.active` is this codebase's existing convention
+   and is listed alongside aria-pressed so the whole app gets the state
+   without a JS sweep; new code should prefer aria-pressed. */
+button[aria-pressed="true"],
+button.active,
+.btn[aria-pressed="true"],
+.btn.active {
+    background: oklch(25% calc(var(--sec-c) * 0.62) var(--sec-h));
+    border-color: oklch(45% calc(var(--sec-c) * 0.70) var(--sec-h));
+    color: oklch(97% calc(var(--sec-c) * 0.14) var(--sec-h));
+}
+
+/* Emphasis: the expected answer in a group of answers. Deliberately the SAME
+   treatment as pressed rather than a new colour — "this one is the default
+   choice" is a weight, not a meaning, and giving it a hue is how button
+   colour sprawls. */
+button.btn--emphasis,
+.btn--emphasis {
+    background: oklch(25% calc(var(--sec-c) * 0.62) var(--sec-h));
+    border-color: oklch(45% calc(var(--sec-c) * 0.70) var(--sec-h));
+    color: oklch(97% calc(var(--sec-c) * 0.14) var(--sec-h));
+}
+button.btn--emphasis:hover,
+.btn--emphasis:hover {
+    background: oklch(30% calc(var(--sec-c) * 0.68) var(--sec-h));
+    border-color: oklch(52% calc(var(--sec-c) * 0.75) var(--sec-h));
+}
+
+button:disabled,
+.btn:disabled,
+.btn[aria-disabled="true"] {
+    background: oklch(10% 0.005 var(--sec-h));
+    border-color: oklch(16% 0.005 var(--sec-h));
+    color: oklch(56% 0.005 var(--sec-h));
+    cursor: not-allowed;
+}
+
+button:focus-visible,
+.btn:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+/* ── Ghost ──
+   Not a colour exception: the same hue with the plate removed. For
+   controls that sit ON content rather than in a panel — menu rows,
+   titlebar and close buttons, toolbar icons over the canvas — where a
+   filled rectangle would read as chrome the artwork has to fight. The
+   fill and border arrive on hover, from the same tokens. */
+button.btn--ghost,
+.btn.btn--ghost {
+    background: transparent;
+    border-color: transparent;
+}
+button.btn--ghost:hover,
+.btn.btn--ghost:hover {
+    background: oklch(19% var(--c) var(--sec-h));
+    border-color: oklch(40% var(--c) var(--sec-h));
+}
+
+/* Ghost surfaces declared here rather than as a class on each element, so
+   every colour decision in the app stays in this one file. These are all
+   controls that sit ON something — the OS titlebar, the artwork, an open
+   menu — where a plate would be chrome in the way. */
+.titlebar-button,
+#quality-underbar .qub-dd-btn,
+.collision-source-menu button,
+#mobileMenuToggle {
+    background: transparent;
+    border-color: transparent;
+}
+.titlebar-button:hover,
+#quality-underbar .qub-dd-btn:hover,
+#quality-underbar .qub-dd.open .qub-dd-btn,
+.collision-source-menu button:hover,
+#mobileMenuToggle:hover {
+    background: oklch(19% var(--c) var(--sec-h));
+    border-color: oklch(40% var(--c) var(--sec-h));
+}
+/* The underbar sits directly on the painting, so its label needs the shadow
+   that used to live in 20-mixer-strip.css — there is no plate behind it. */
+#quality-underbar .qub-dd-btn {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.55);
+}
+#quality-underbar .qub-dd-btn:hover,
+#quality-underbar .qub-dd.open .qub-dd-btn {
+    text-shadow: none;
+}
+
+/* ── Reserved ──
+   These set their own colour and ignore --sec-h / --sec-c entirely.
+   They must not shift when a panel is retinted.
+
+   The test for adding to this list: colour is reserved when getting
+   the button wrong has a consequence you cannot undo with the same
+   button. Destructive and recording qualify. Frequent actions do not
+   — "new layer" and "play" inherit the section tint like everything
+   else and use the pressed state if they need emphasis. "Frequent
+   action deserves its own colour" is the reasoning that produced the
+   sprawl this file removes.
+
+   Every section now sits over 100° from hue 25, so red carries the
+   meaning on its own. Do not add extra emphasis treatments to
+   compensate. */
+button.btn--destructive,
+button.btn--record,
+.btn--destructive,
+.btn--record {
+    background: oklch(29% 0.110 25);
+    border-color: oklch(45% 0.150 25);
+    color: oklch(89% 0.200 25);
+}
+button.btn--destructive:hover,
+button.btn--record:hover,
+.btn--destructive:hover,
+.btn--record:hover {
+    background: oklch(34% 0.125 25);
+    border-color: oklch(54% 0.170 25);
+}
+button.btn--destructive:active,
+button.btn--record:active,
+.btn--destructive:active,
+.btn--record:active {
+    background: oklch(38% 0.130 25);
+}
+/* Recording IN PROGRESS is the one state that must read across the
+   room. It is the pressed state of a reserved button, not a new
+   colour. */
+button.btn--record[aria-pressed="true"],
+button.btn--record.active,
+.btn--record.active {
+    background: oklch(45% 0.170 25);
+    border-color: oklch(62% 0.190 25);
+    color: oklch(98% 0.030 25);
+}
+button.btn--destructive:disabled,
+button.btn--record:disabled {
+    background: oklch(12% 0.005 25);
+    border-color: oklch(17% 0.005 25);
+    color: oklch(53% 0.005 25);
+}
+
+/* ================================================================
+   MIGRATION NOTE (2026-08-23)
+
+   Every per-button colour rule in css/ was deleted for this file to
+   take effect. Legacy rules outranked the element selector above on
+   specificity, so a button rendering neutral grey inside a tinted
+   panel is NOT a token problem — it is an unremoved legacy rule
+   winning. Grep for background / background-color / border-color /
+   color set on a button element or button class before adding
+   anything new here.
+
+   Audit hook: window.auditButtons() (js/38-button-audit.js) walks the
+   live DOM and reports any button whose computed colour does not come
+   from these tokens.
+   ================================================================ */

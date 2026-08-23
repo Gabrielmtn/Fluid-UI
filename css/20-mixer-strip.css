@@ -132,33 +132,14 @@
     min-width: 116px;
     height: 22px;
     padding: 1px 7px;
-    font-size: 11px;
     /* Ghost button: no fill, no border at rest — just legible text over the
        artwork. The shadow is what keeps it readable on light dye as well as
        dark, since there is no plate behind it any more. */
-    background: transparent;
-    color: rgba(230, 232, 234, 0.82);
-    border: 1px solid transparent;
-    border-radius: 4px;
-    box-shadow: none;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.55);
     transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
     cursor: pointer;
 }
-/* Only on hover / while open does it materialise into a real control. */
-#quality-underbar .qub-dd-btn:hover,
-#quality-underbar .qub-dd.open .qub-dd-btn {
-    background: rgba(24, 27, 32, 0.86);
-    border-color: rgba(255, 255, 255, 0.22);
-    color: #fff;
-    text-shadow: none;
-}
 #quality-underbar .qub-dd-btn:focus-visible {
     outline: none;
-    background: rgba(24, 27, 32, 0.86);
-    border-color: rgba(236, 48, 19, 0.8);
-    color: #fff;
-    text-shadow: none;
 }
 #quality-underbar .qub-dd-chev {
     font-size: 9px;
@@ -317,20 +298,8 @@ body > .controls {
     padding: 0;
     font-size: 12px;
     line-height: 1;
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 3px;
     cursor: pointer;
-}
-.ch-gear:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
-}
-.ch-gear.active {
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: #fff;
 }
 @media (pointer: coarse) {
     .ch-gear {
@@ -384,7 +353,6 @@ body > .controls {
     width: auto;
 }
 .ch-tip-swatch {
-    all: unset;
     box-sizing: border-box;
     position: relative;
     flex: 0 0 26px;
@@ -394,21 +362,10 @@ body > .controls {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background-color: var(--ground-600, #232830);
-    border: 1px solid var(--ground-500, #2a2e37);
     border-radius: 0;
-    color: rgba(255, 255, 255, 0.75);
     cursor: pointer;
-}
-.ch-tip-swatch:hover {
-    background-color: rgba(255, 255, 255, 0.12);
-    border-color: rgba(236, 48, 19, 0.6);
-    color: #fff;
-}
-.ch-tip-swatch.active {
-    background-color: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: #fff;
+    /* was implied by the removed `all: unset` */
+    padding: 0;
 }
 /* Corner notch — the one mark that says this square opens something */
 .ch-tip-swatch::after {
@@ -418,10 +375,6 @@ body > .controls {
     bottom: 1px;
     border-left: 4px solid transparent;
     border-bottom: 4px solid rgba(255, 255, 255, 0.45);
-}
-.ch-tip-swatch:hover::after,
-.ch-tip-swatch.active::after {
-    border-bottom-color: rgba(255, 255, 255, 0.9);
 }
 .ch-tip-face {
     display: block;
@@ -579,14 +532,7 @@ body > .controls {
     gap: 6px; /* latch cell sits close — it belongs to the button */
 }
 .ch-nudge-btn {
-    letter-spacing: 0.3px;
     touch-action: none;   /* hold-to-nudge must not turn into a scroll gesture */
-}
-/* .active and .locked both inherit the .ch-text-toggle.active accent fill */
-.ch-nudge-btn.locked {
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: #fff;
 }
 
 .ch-ignite-lock {
@@ -626,39 +572,19 @@ body > .controls {
 
 /* Text-only toggle button (lights up when active) */
 .ch-text-toggle {
-    all: unset;
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     height: 18px;
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    color: var(--ink-300, #b9bec7);
     cursor: pointer;
     padding: 0 6px;
-    border-radius: 0;
-    border: 1px solid var(--ground-500, #2a2e37);
-    background: var(--ground-600, #232830);
     white-space: nowrap;
     text-align: center;
     line-height: 1;
     user-select: none;
     min-width: 52px;
     outline: none;
-}
-.ch-text-toggle:hover {
-    color: var(--ink-100, #f2f3f5);
-}
-.ch-text-toggle.active {
-    color: #fff;
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-}
-.ch-text-toggle.active:hover {
-    color: #fff;
 }
 
 /* ── Mixer divider ── */
@@ -682,7 +608,6 @@ body > .controls {
 }
 #mixer-strip .mixer-actions button,
 .mixer-actions .transport-btn {
-    all: unset;
     box-sizing: border-box;
     display: flex;
     align-items: center;
@@ -690,19 +615,9 @@ body > .controls {
     min-width: 64px;
     height: 20px;
     padding: 0 10px;
-    font-size: 13px;
-    font-weight: 600;
-    border-radius: 5px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: white;
     cursor: pointer;
     line-height: 1;
     transition: background 0.15s, border-color 0.15s;
-}
-#mixer-strip .mixer-actions button:hover {
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.2);
 }
 /* Paused state: play icon lit */
 #mixer-strip .mixer-actions #pauseBtn.active {
@@ -726,7 +641,6 @@ body > .controls {
     min-width: 0;
     height: 20px;
     padding: 0;
-    font-size: 12px;
 }
 
 /* ── Presets: select-style trigger in the strip + popup list ──
@@ -741,40 +655,21 @@ body > .controls {
     flex: 0 0 auto;        /* hug the trigger — no dead space around it */
 }
 .mixer-presets-trigger {
-    all: unset;
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 6px 10px;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    border-radius: 0;
-    background: var(--ground-600, #232830);
-    color: var(--ink-300, #b9bec7);
-    border: 1px solid var(--ground-500, #2a2e37);
     cursor: pointer;
     max-width: 132px;
     height: 20px;
-}
-.mixer-presets-trigger:hover,
-.mixer-presets-trigger.active {
-    background: rgba(236, 48, 19, 0.12);
-    border-color: rgba(236, 48, 19, 0.45);
-    color: white;
 }
 .mixer-presets-trigger-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.mixer-presets-trigger-label.has-preset {
-    color: var(--ink-100, #f2f3f5);
-}
 .mixer-presets-trigger-chev {
-    font-size: 8px;
     opacity: 0.6;
     flex-shrink: 0;
 }
@@ -806,7 +701,8 @@ body > .controls {
     padding-top: 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
-/* (legacy `.mixer-presets button { all: unset !important; ... }` block
+/* (legacy `.mixer-presets button { all: unset !important; ... }
+` block
    removed 2026-07-13 — it was one side of a three-way specificity war
    with the JS inline styles (also removed) and made .active states
    unrenderable on every button in the presets channel. All preset-button
@@ -815,36 +711,19 @@ body > .controls {
 .mixer-presets-list .preset-sep {
     width: auto;
     height: 1px;
-    background: rgba(255,255,255,0.15);
     margin: 4px 0;
     flex-shrink: 0;
 }
 /* Built-in preset rows in the popup list (04b updatePresetButtons still
    drives .active via the .mixer-preset-btn class) */
 .mixer-presets-panel .mixer-preset-btn {
-    all: unset;
     box-sizing: border-box;
     display: block;
     width: 100%;
     text-align: left;
     padding: 6px 8px;
-    font-size: 11px;
-    border-radius: 3px;
-    background: rgba(255,255,255,0.05);
-    color: rgba(255,255,255,0.75);
-    border: 1px solid rgba(255,255,255,0.08);
     cursor: pointer;
     line-height: 1.2;
-    font-weight: 500;
-}
-.mixer-presets-panel .mixer-preset-btn:hover {
-    background: rgba(255,255,255,0.1);
-}
-.mixer-presets-panel .mixer-preset-btn.active {
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: white;
-    font-weight: 600;
 }
 /* User preset rows: load button + delete */
 .mixer-user-presets {
@@ -856,36 +735,17 @@ body > .controls {
     align-items: stretch;
 }
 .mixer-presets-panel .mixer-user-preset-btn {
-    all: unset;
     box-sizing: border-box;
     flex: 1 1 auto;
     min-width: 0;
     text-align: left;
-    padding: 6px 8px;
-    font-size: 11px;
-    border-radius: 0;
-    background: var(--ground-600, #232830);
-    color: var(--ink-300, #b9bec7);
-    border: 1px solid var(--ground-500, #2a2e37);
     cursor: pointer;
     line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-weight: 500;
-}
-.mixer-presets-panel .mixer-user-preset-btn:hover {
-    color: var(--ink-100, #f2f3f5);
-    border-color: rgba(236, 48, 19, 0.6);
-}
-.mixer-presets-panel .mixer-user-preset-btn.active {
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: white;
-    font-weight: 600;
 }
 .mixer-user-preset-delete {
-    all: unset;
     box-sizing: border-box;
     flex-shrink: 0;
     width: 22px;
@@ -894,33 +754,18 @@ body > .controls {
     justify-content: center;
     font-size: 12px;
     border-radius: 3px;
-    color: rgba(255,120,120,0.6);
-    border: 1px solid transparent;
     cursor: pointer;
-}
-.mixer-user-preset-delete:hover {
-    color: rgba(255,120,120,1);
-    background: rgba(255,120,120,0.12);
-    border-color: rgba(255,120,120,0.3);
+    /* was implied by the removed `all: unset` */
+    padding: 0;
 }
 /* Sticky-footer save button */
 .mixer-presets-footer .mixer-preset-save {
-    all: unset;
     box-sizing: border-box;
     flex: 1 1 auto;
     text-align: center;
     padding: 6px 8px;
-    font-size: 11px;
-    font-weight: 700;
-    border-radius: 3px;
-    background: rgba(63,185,80,0.15);
-    color: rgba(63,185,80,0.9);
-    border: 1px solid rgba(63,185,80,0.25);
     cursor: pointer;
     line-height: 1;
-}
-.mixer-presets-footer .mixer-preset-save:hover {
-    background: rgba(63,185,80,0.25);
 }
 .mixer-presets-footer .mixer-preset-name-input {
     flex: 1 1 auto;
@@ -944,7 +789,6 @@ body > .controls {
 
 /* ── Arm Colors Dropdown Toggle ── */
 .arm-colors-toggle {
-    all: unset;
     box-sizing: border-box;
     width: 22px;
     height: 22px;
@@ -1167,27 +1011,15 @@ body > .controls {
     margin-bottom: 8px;
 }
 .brush-tip-btn {
-    all: unset;
     box-sizing: border-box;
     flex: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     height: 26px;
-    font-size: 12px;
-    border-radius: 0;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.55);
     cursor: pointer;
-}
-.brush-tip-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-.brush-tip-btn.active {
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: #fff;
+    /* was implied by the removed `all: unset` */
+    padding: 0;
 }
 
 /* Custom brush shapes (33-brush-shapes): stamp swatches + add button */
@@ -1213,16 +1045,6 @@ body > .controls {
     background-repeat: no-repeat;
     background-position: center;
 }
-.brush-shape-btn {
-    background-color: rgba(255, 255, 255, 0.04);
-}
-.brush-tip-btn.brush-shape-btn:hover {
-    background-color: rgba(255, 255, 255, 0.14);
-}
-.brush-tip-btn.brush-shape-btn.active,
-.brush-tip-btn.brush-shape-btn.active:hover {
-    background-color: var(--accent, #ec3013);
-}
 .brush-shape-add {
     font-size: 14px;
 }
@@ -1239,35 +1061,17 @@ body > .controls {
     margin-bottom: 10px;
 }
 .brush-tip-item {
-    all: unset;
     box-sizing: border-box;
     display: flex;
     align-items: center;
     gap: 8px;
     height: 26px;
     padding: 0 6px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 0;
-    color: rgba(255, 255, 255, 0.62);
     cursor: pointer;
-}
-.brush-tip-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-}
-.brush-tip-item.active {
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: #fff;
 }
 .brush-tip-item-glyph {
     flex: 0 0 14px;
     text-align: center;
-    font-size: 12px;
 }
 .brush-tip-menu .brush-tip-row {
     margin-bottom: 0;
@@ -1275,7 +1079,6 @@ body > .controls {
 @media (pointer: coarse) {
     .brush-tip-item {
         height: 32px;
-        font-size: 12px;
     }
 }
 
@@ -1287,36 +1090,14 @@ body > .controls {
     margin-bottom: 6px;
 }
 .brush-preset-btn {
-    all: unset;
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 7px;
-    font-size: 10px;
-    font-weight: 500;
-    border-radius: 0;
-    background: var(--ground-600, #232830);
-    border: 1px solid var(--ground-500, #2a2e37);
-    color: var(--ink-300, #b9bec7);
     cursor: pointer;
     max-width: 110px;
     overflow: hidden;
     white-space: nowrap;
-}
-.brush-preset-btn:hover {
-    color: var(--ink-100, #f2f3f5);
-}
-.brush-preset-btn.active {
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: #fff;
-    font-weight: 600;
-}
-.brush-preset-btn.eraser {
-    background: rgba(255, 120, 120, 0.1);
-    border-color: rgba(255, 120, 120, 0.25);
-    color: rgba(255, 150, 150, 0.9);
 }
 .brush-preset-del {
     font-size: 11px;
@@ -1340,15 +1121,8 @@ body > .controls {
 /* The strip scopes .mixer-preset-save; the panel lives on <body>, so it
    needs its own copy of the save-button look. */
 .brush-settings-panel .mixer-preset-save {
-    all: unset;
     box-sizing: border-box;
     padding: 4px 8px;
-    font-size: 11px;
-    font-weight: 700;
-    border-radius: 3px;
-    background: rgba(63,185,80,0.15);
-    color: rgba(63,185,80,0.9);
-    border: 1px solid rgba(63,185,80,0.25);
     cursor: pointer;
     line-height: 1;
     flex-shrink: 0;
@@ -1418,5 +1192,4 @@ body > .controls {
    answerable from wherever it was raised. */
 .app-confirm-modal { z-index: 10060; }
 .app-confirm-modal .delete-modal-content { max-width: 420px; }
-.app-confirm-modal .delete-modal-confirm.app-confirm-safe { background: #3fb950; }
 .app-confirm-modal button:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }

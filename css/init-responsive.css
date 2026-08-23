@@ -127,23 +127,45 @@
     0% { opacity: 0; }
     100% { opacity: 1; }
 }
+/* Settles at .45, not 1 — that dimness is the label's look, and it now has
+   to be reached rather than assumed, since the tag itself starts at 0. */
+@keyframes splashVersionIn {
+    0% { opacity: 0; }
+    100% { opacity: 0.45; }
+}
+/* Last thing in, once the words above it have arrived. */
+.splash-version {
+    animation: splashVersionIn 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) 0.7s forwards;
+}
 
 /* ── DESKTOP LAUNCH: the window itself is the entrance ──
    js/00a-boot.js keeps the Electron window invisible for the whole boot and
-   then ramps its native opacity up to 1. Anything in here that animates on its own
+   then ramps its native opacity up to 1. A self-starting animation in here
    would either play out invisibly and be missed, or be caught halfway by the
-   reveal — both are the "stutter" the fade exists to remove. So on the
-   desktop build the splash is a STATIC title card (shown only when
-   Boot.titleCard is on) and nothing else moves. The web build has no window
-   to fade and keeps the splash/stagger flow below, unchanged. */
+   reveal — both are the "stutter" the fade exists to remove. So the timed
+   entrance above is switched off, and NOTHING replaces it: the three start
+   at opacity 0 in their style attributes (index.html) and js/00a-boot.js
+   raises them frame by frame off the same rAF that paces the window's
+   alpha. A CSS transition was tried first and is the wrong tool — opacity
+   transitions run on the compositor, so they keep their own time while the
+   main thread, which is what actually paces the window, stalls. Declaring
+   any opacity here would only fight the code that owns it; see the
+   title-card block in js/00a-boot.js.
+   The web build has no window to fade and keeps the splash/stagger flow
+   below, unchanged. */
 html.boot-fade .splash-title,
-html.boot-fade .splash-subtitle {
+html.boot-fade .splash-subtitle,
+html.boot-fade .splash-version {
     animation: none;
-    opacity: 1;
     transform: none;
 }
 /* The load bar measures a load nobody can see. */
 html.boot-fade .splash-progress { display: none; }
+
+/* The card is scenery, never a surface. It stays up for its dwell and its
+   dissolve while the app is ALREADY LIVE underneath — so a user who clicks
+   the moment the window lands must reach the app, not this. */
+html.boot-fade #splash-screen { pointer-events: none; }
 
 /* While the window is still invisible, no transition may be in flight — the
    reveal must never catch one mid-way. Dropping the class at reveal changes
@@ -348,11 +370,37 @@ html.boot-fade.booting #canvas-area {
     outline: none;
 }
 
-/* Collapse toggle in header */
+/* Show/hide checkbox in header. Fixed width because it defines the layer's
+   RIGHT-HAND COLUMN: the Feather value directly below is the same width and
+   centred, so the two line up down the edge of the row no matter what the
+   value reads. */
 #sidebar-right .layer-controls {
     display: flex;
     gap: 4px;
     flex-shrink: 0;
+    width: var(--layer-ctl-col, 40px);
+    justify-content: center;
+}
+
+/* Titled group holding everything mask-shaped, so the layer reads as two
+   parts: what you do TO the layer, and the mask that shapes it. */
+#sidebar-right .layer-group {
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 5px;
+    padding: 7px 7px 3px;
+    margin-top: 8px;
+    background: rgba(255, 255, 255, 0.015);
+}
+#sidebar-right .layer-group-title {
+    font-size: calc(9px * var(--ui-scale));
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 6px;
+}
+#sidebar-right .layer-group > .layer-mask-controls:last-child,
+#sidebar-right .layer-group > div:last-child {
+    margin-bottom: 0;
 }
 
 /* Action buttons row inside layer body (moved out of header) */
@@ -365,42 +413,20 @@ html.boot-fade.booting #canvas-area {
 
 /* Compact layer buttons with clearer styling */
 #sidebar-right .layer-btn {
-    padding: 3px 7px;
-    font-size: calc(10px * var(--ui-scale));
     min-width: auto;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.04);
     line-height: 1.2;
 }
-/* Delete says "Delete". A trash glyph in a row of other glyphs is a guess,
-   and this is the one button in the row you cannot take back. */
-#sidebar-right .layer-delete-btn {
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    font-weight: 700;
-    margin-left: auto;          /* sits apart from the icon cluster */
-    color: rgba(255, 150, 140, 0.95);
-    background: rgba(255, 80, 70, 0.10);
-    border-color: rgba(255, 80, 70, 0.22);
-}
-
 /* Mask control buttons */
 #sidebar-right .layer-mask-controls {
     padding: 0;
 }
-#sidebar-right .mask-control-btn {
-    font-size: calc(10px * var(--ui-scale));
-    padding: 4px 8px;
-    border-radius: 4px;
-}
-
-/* Threshold / Feather slider row */
+/* Threshold / Feather slider row — sits directly under the header, so the
+   thumbnail/name/checkbox block and this read as one unit. */
 #sidebar-right .layer-threshold {
     font-size: calc(10px * var(--ui-scale));
     gap: 6px;
     opacity: 0.85;
-    margin-bottom: 14px; /* Extra breathing room below */
+    margin-bottom: 8px;
 }
 #sidebar-right .layer-threshold .layer-slider-host {
     flex: 1;
@@ -425,8 +451,12 @@ html.boot-fade.booting #canvas-area {
 #sidebar-right .layer-slider-value {
     font-family: 'Courier New', monospace;
     font-size: calc(10px * var(--ui-scale));
-    min-width: 32px;
-    text-align: right;
+    /* Same column as the header's checkbox, centred in it — the two stay
+       aligned whether the value reads 0% or 100%. */
+    width: var(--layer-ctl-col, 40px);
+    min-width: var(--layer-ctl-col, 40px);
+    flex-shrink: 0;
+    text-align: center;
     color: var(--ink-100, #f2f3f5);
     font-weight: 600;
 }

@@ -1,12 +1,6 @@
 /* Layer Masking System Styles */
 
 .mask-zoom-btn {
-    background: linear-gradient(180deg, #2a3340, #1f2632);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 6px;
-    color: #c9d1d9;
-    font-size: 18px;
-    font-weight: 600;
     width: 36px;
     height: 36px;
     cursor: pointer;
@@ -14,11 +8,6 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-}
-
-
-.mask-zoom-btn:active {
-    box-shadow: none;
 }
 
 .mask-editor-overlay {
@@ -71,11 +60,6 @@
 }
 
 .mask-close-btn {
-    background: linear-gradient(#2a2f3a, #1f2430);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: #e6edf3;
-    font-size: 18px;
     width: 36px;
     height: 36px;
     cursor: pointer;
@@ -168,11 +152,6 @@
 }
 
 .mask-tool-btn {
-    background: linear-gradient(#2a2f3a, #1f2430);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    color: #e6edf3;
-    font-size: 24px;
     min-width: 48px;
     height: 48px;
     cursor: pointer;
@@ -184,8 +163,6 @@
 
 .mask-tool-btn:hover {
     transform: translateY(-1px) scale(1.04);
-    border-color: rgba(255, 200, 120, 0.5);
-    color: #ffd8a8;
 }
 
 .mask-tool-btn:active {
@@ -200,13 +177,6 @@
 }
 
 .mask-action-btn {
-    background: linear-gradient(#2a2f3a, #1f2430);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: #e6edf3;
-    padding: 10px 16px;
-    font-size: 14px;
-    font-weight: 500;
     cursor: pointer;
 }
 
@@ -214,7 +184,6 @@
 .mask-action-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background: linear-gradient(#1a1f2a, #141921);
 }
 
 .mask-canvas-container {
@@ -254,52 +223,22 @@
 
 .mask-cancel-btn,
 .mask-apply-btn {
-    padding: clamp(8px, 1.2vh, 12px) clamp(16px, 2vw, 24px);
-    border-radius: 10px;
-    font-size: clamp(13px, 1.5vh, 15px);
-    font-weight: 600;
     cursor: pointer;
-    border: 1px solid;
-}
-
-.mask-cancel-btn {
-    background: linear-gradient(#2a2f3a, #1f2430);
-    border-color: rgba(255, 255, 255, 0.1);
-    color: #8b949e;
-}
-
-
-.mask-apply-btn {
-    background: linear-gradient(135deg, #4caf50, #2e7d32);
-    border-color: rgba(76, 175, 80, 0.5);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
 
 /* Layer item mask button */
 .layer-mask-btn {
-    background: linear-gradient(#1f2733, #151b24);
-    color: #8b949e;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 16px;
     cursor: pointer;
     opacity: 0.6;
 }
 
 .layer-mask-btn.has-mask {
     opacity: 1;
-    color: #e6edf3;
 }
 
 
 .layer-mask-btn.active {
-    background: linear-gradient(135deg, #58a6ff, #1a7cff);
-    border-color: rgba(88, 166, 255, 0.6);
-    box-shadow: 0 0 12px rgba(88, 166, 255, 0.3);
-    color: #fff;
     opacity: 1;
 }
 
@@ -323,70 +262,18 @@
 }
 
 .mask-control-btn {
-    background: linear-gradient(#2a2f3a, #1f2430);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    color: #e6edf3;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 500;
     cursor: pointer;
     white-space: nowrap;
 }
 
 
-.mask-create-btn {
-    background: linear-gradient(135deg, #7b61ff, #4a33d1);
-    border-color: rgba(123, 97, 255, 0.5);
-    color: #fff;
-}
-
-
-.mask-clear-btn {
-    color: #ff7b72;
-    border-color: rgba(255, 123, 114, 0.3);
-}
-
-
 /* Mask editor tool buttons (Instant Roto / Stamps) */
 .mask-mode-btn {
-    padding: 10px 16px;
-    background: linear-gradient(180deg, #2a3340, #1f2632);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    color: #c9d1d9;
-    font-size: 14px;
-    font-weight: 600;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 6px;
     flex: 1;
-}
-
-/* Instant Roto — reads green even at rest so it pops out of the panel */
-.instant-roto-btn {
-    background: linear-gradient(180deg, rgba(35, 134, 54, 0.35), rgba(26, 127, 55, 0.18));
-    border: 1px solid rgba(63, 185, 80, 0.65);
-    color: #3fb950;
-    box-shadow: 0 0 10px rgba(63, 185, 80, 0.15), inset 0 1px 0 rgba(63, 185, 80, 0.2);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-
-.instant-roto-btn:hover:not(:disabled) {
-    background: linear-gradient(180deg, rgba(35, 134, 54, 0.5), rgba(26, 127, 55, 0.3));
-    border-color: rgba(63, 185, 80, 0.9);
-    color: #56d364;
-    box-shadow: 0 0 16px rgba(63, 185, 80, 0.3), inset 0 1px 0 rgba(63, 185, 80, 0.25);
-}
-
-/* Engaged = mode is on: solid green fill + glow */
-.instant-roto-btn.engaged {
-    background: linear-gradient(180deg, #2ea043, #238636);
-    border-color: rgba(87, 213, 108, 0.9);
-    color: #fff;
-    box-shadow: 0 0 18px rgba(63, 185, 80, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .instant-roto-btn:disabled {
@@ -400,15 +287,8 @@
 }
 
 .stamp-menu-btn .stamp-caret {
-    font-size: 11px;
     opacity: 0.7;
     transition: transform 0.15s ease;
-}
-
-.stamp-menu-btn.open {
-    background: linear-gradient(180deg, #334052, #26303f);
-    border-color: rgba(255, 255, 255, 0.25);
-    color: #fff;
 }
 
 .stamp-menu-btn.open .stamp-caret {
@@ -433,12 +313,6 @@
     gap: 8px;
     align-items: center;
     flex-wrap: wrap;
-}
-
-.collider-tool-btn.active {
-    background: linear-gradient(180deg, #b3271e, #8f1d16);
-    border-color: rgba(255, 120, 110, 0.55);
-    color: #fff;
 }
 
 .collider-size-label {
@@ -550,12 +424,6 @@
     border-color: rgba(63, 185, 80, 0.22);
 }
 
-#touchUpTools .collider-tool-btn.active {
-    background: linear-gradient(180deg, #238636, #1a7f37);
-    border-color: rgba(63, 185, 80, 0.55);
-    color: #fff;
-}
-
 #touchUpTools .collider-tool-btn:disabled {
     opacity: 0.4;
     cursor: default;
@@ -616,32 +484,13 @@
 
 .mask-back-btn,
 .mask-next-btn {
-    padding: clamp(8px, 1.2vh, 12px) clamp(16px, 2vw, 24px);
-    border-radius: 10px;
-    font-size: clamp(13px, 1.5vh, 15px);
-    font-weight: 600;
     cursor: pointer;
-    border: 1px solid;
-}
-
-.mask-back-btn {
-    background: linear-gradient(#2a2f3a, #1f2430);
-    border-color: rgba(255, 255, 255, 0.1);
-    color: #c9d1d9;
-}
-
-.mask-next-btn {
-    background: linear-gradient(135deg, #58a6ff, #1f6feb);
-    border-color: rgba(88, 166, 255, 0.5);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(31, 111, 235, 0.28);
 }
 
 .mask-next-btn:disabled,
 .mask-apply-btn:disabled {
     opacity: 0.55;
     cursor: default;
-    box-shadow: none;
 }
 
 /* ── Step 1 tool tabs: Instant Roto · Stamps · Filter ────────────────────────

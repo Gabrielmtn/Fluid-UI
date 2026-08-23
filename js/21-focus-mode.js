@@ -37,7 +37,7 @@
     function createBadge() {
         badge = document.createElement('div');
         badge.id = 'focus-mode-badge';
-        badge.textContent = '● FOCUS';
+        badge.textContent = 'FOCUS';
         badge.title = 'Click or press F to exit focus mode';
         badge.addEventListener('click', function () {
             toggleFocus();

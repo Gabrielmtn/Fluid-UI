@@ -50,7 +50,7 @@
     // what the oscillation adds on top of it.
     var RUNS = [
         { key: 'core',       hue: 242, chroma: 0.160, rot:  52, drift: 60 },
-        { key: 'expressive', hue:  32, chroma: 0.170, rot: -38, drift: 60 },
+        { key: 'expressive', hue: 190, chroma: 0.150, rot: -35, drift: 60 },
         // The system run rests at chroma 0.080, where a hue rotation is
         // perceptually inert - it would animate a number and show nothing. So
         // chroma is its animated axis instead, and it blooms rather than swings.

@@ -660,9 +660,9 @@
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'audio-gate-clear';
-        btn.textContent = '✕ Clear';
+        btn.textContent = 'Clear';
         btn.title = 'Clear this gate';
-        btn.style.cssText = 'flex:0 0 auto; margin-top:4px; padding:3px 8px; font-size:10px; cursor:pointer;';
+        btn.style.cssText = 'flex:0 0 auto; margin-top:4px; cursor:pointer;';
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
             onClear();
