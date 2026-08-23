@@ -6,6 +6,19 @@
 // not the F1 sheet) and checks each entry's `assertion` expression
 // before/after firing the synthesized event.
 //
+// INVENTORY SCHEMA this runner needs (see the F1 entry for a worked
+// example). `assertion` must be an OBJECT, not prose:
+//
+//   "assertion": {
+//       "expr":   "document.getElementById('x').style.display",  // evaluated
+//       "expect": "flex",        // optional — omit to assert "it changed"
+//       "note":   "free text, source refs, whatever"             // ignored
+//   },
+//   "toggle": true               // optional — fire twice, report the restore
+//
+// Anything else is skipped and counted, loudly. See the comment on the
+// prose guard below for why that matters.
+//
 // An entry passes when its assertion flips the way the inventory says
 // it should. Failures come in two flavours:
 //   BROKEN   the handler exists but the state did not change
@@ -51,11 +64,27 @@ async function main() {
     const bindings = (inv.keyboard || []).filter(b =>
         !only || (b.keys || '').toLowerCase().includes(only.toLowerCase()));
 
-    let pass = 0, fail = 0, skip = 0;
+    let pass = 0, fail = 0, skip = 0, prose = 0;
     for (const b of bindings) {
         if (!b.assertion || !b.event) {
             skip++;
             console.log(`~ SKIP ${b.keys}: no ${b.assertion ? 'event' : 'assertion'} in inventory`);
+            continue;
+        }
+        // The inventory agents wrote `assertion` as PROSE — e.g. "...style
+        // .display toggles between 'flex' and 'none' (05n:302-306)" — but
+        // this runner evaluates `assertion.expr` and compares to
+        // `assertion.expect`. A non-empty string is truthy, so prose sailed
+        // past the guard above, `.expr` came back undefined, `eval(undefined)`
+        // returned undefined, and before === after === "undefined" reported
+        // as BROKEN. Every binding, every run, on a completely healthy app
+        // (measured 2026-08-23: 0 pass / 45 broken, and all 58 assertions
+        // across keyboard+wheel+pointer_stroke are strings). A suite that
+        // cries wolf on everything is worse than no suite, so say plainly
+        // that the entry is not wired rather than blaming the app.
+        if (typeof b.assertion === 'string' || !b.assertion.expr) {
+            prose++; skip++;
+            console.log(`~ SKIP ${b.keys}: assertion is prose, not executable — needs { expr, expect }`);
             continue;
         }
         // Each binding runs page-side: capture assertion, fire, recapture.
@@ -88,8 +117,16 @@ async function main() {
     }
 
     console.log(`\n${pass} pass, ${fail} broken, ${skip} skipped, ${((inv.meta && inv.meta.mismatches) || []).length} sheet mismatches`);
+    if (prose) {
+        console.log(`\n⚠ ${prose} of ${bindings.length} binding(s) carry PROSE assertions this runner cannot`);
+        console.log('  evaluate. Until the inventory gives each one an executable');
+        console.log("  \"assertion\": { \"expr\": \"<js>\", \"expect\": \"<value>\" }  (omit `expect`");
+        console.log('  to assert "it changed"), this suite is not testing anything.');
+    }
     page.close();
-    process.exit(fail ? 1 : 0);
+    // Exiting 0 after evaluating NOTHING is how a dead suite passes CI
+    // forever. Nothing ran is a failure of the suite, and it says so.
+    process.exit((fail || (pass === 0 && bindings.length > 0)) ? 1 : 0);
 }
 
 main().catch(e => { console.error(e.message); process.exit(1); });

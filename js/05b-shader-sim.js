@@ -1647,6 +1647,71 @@
                 fragColor = vec4(lit, mem);
             }
         `;
+        // ─── Splat to Fluid — pour an IMAGE into the dye (2026-08-23) ───
+        // One frame of a custom brush that is the whole picture: the footprint
+        // is the image's alpha and the colour is its own RGB, per texel, laid
+        // down with the same rules a brush dab obeys — Gate converges, additive
+        // accumulates, Flow scales the convergence not the colour, colliders
+        // block deposition, pigment memory tracks what landed. Everything the
+        // splat shader does about WHERE (gaussian, clay stamps, aspect frame)
+        // is gone: the image is already positioned, so this is a straight
+        // full-screen deposit at 1:1, which is what makes it high fidelity.
+        const imageSplatFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTarget;    // dye
+            uniform sampler2D uObstacle;
+            uniform sampler2D uImage;     // canvas-aligned cut-out, straight alpha
+            uniform float amount;         // deposit strength (0-1)
+            uniform int gateColor;        // mirrors splatFrag's COLOR_GATE branch
+            uniform float gateFlow;
+            uniform int hasObstacle;
+            uniform float uObsMax;
+            uniform float toneWhite;      // display's Reinhard white point (0 = plain)
+            uniform float toneCeil;       // how much HDR headroom to allow (0 = don't pre-compensate)
+            // The display tone-maps dye on the way out (05a displayFrag): plain
+            // Reinhard turns 0.93 into 0.48, which is why a poured picture came
+            // out half-lit. Deposit the value that tone-maps BACK to the image's
+            // own colour, so what lands on screen is the picture, not a dimmed
+            // copy of it. Inverse of  d = c(1 + c/lw^2)/(1 + c)  solved for c,
+            // written in the conjugate form so lw = 0 (plain Reinhard, a = 0)
+            // falls out of the same expression as d/(1-d) with no branch.
+            vec3 unToneMap(vec3 d, float lw) {
+                d = clamp(d, 0.0, 0.995);          // pure white would need infinite dye
+                float a = (lw > 0.0) ? 1.0 / (lw * lw) : 0.0;
+                vec3 b = 1.0 - d;
+                return 2.0 * d / (b + sqrt(b * b + 4.0 * a * d));
+            }
+            void main() {
+                vec4 base4 = texture(uTarget, vUv);
+                vec3 base = base4.xyz;
+                float baseMem = base4.w;
+                vec4 src = texture(uImage, vUv);
+                // Same coverage-only wall test as splatFrag's obsBlockDye —
+                // paint goes AROUND a collider at every strength, so a poured
+                // image cannot deposit inside a wall the flow respects.
+                float obsBlockDye = 1.0;
+                if (hasObstacle == 1) {
+                    float ocov = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
+                    obsBlockDye = 1.0 - smoothstep(0.35, 0.85, ocov);
+                }
+                float cov = clamp(src.a, 0.0, 1.0) * clamp(amount, 0.0, 1.0);
+                vec3 color = src.rgb;
+                if (toneCeil > 0.0) color = min(unToneMap(color, toneWhite), vec3(toneCeil));
+                vec3 result;
+                float newMem;
+                if (gateColor == 1) {
+                    float w = cov * obsBlockDye * gateFlow;
+                    result = mix(base, color, w);
+                    newMem = mix(baseMem, max(color.r, max(color.g, color.b)), w);
+                } else {
+                    result = base + cov * color * obsBlockDye;
+                    newMem = max(baseMem, max(result.r, max(result.g, result.b)));
+                }
+                fragColor = vec4(result, newMem);
+            }
+        `;
         // ─── D2 bridge: Capture — freeze the fluid dye into the sketch ──
         // Emits a premultiplied color for over-compositing onto the sketch:
         // alpha = the dye's max channel, so bright dye lands opaque and faint

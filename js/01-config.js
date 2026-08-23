@@ -67,6 +67,43 @@
         window.customPalettes = window.customPalettes || [];
         window.deletedDefaultPalettes = window.deletedDefaultPalettes || [];
 
+        // ── User-authored palettes persist like CONTENT, not like settings ──
+        // Named palettes (and per-palette colour edits) used to reach storage
+        // only through the Save button's scanAppState(), and came back only when
+        // autoload was on — so "make a palette → reload" simply lost it
+        // (reported 2026-08-23). Creating, editing, importing or deleting one now
+        // writes through immediately, and every boot restores them: the contract
+        // brush shapes (33-brush-shapes) and brush presets (20-mixer-layout)
+        // already honour. Settings are a session; a thing you named is yours.
+        function persistPalettes() {
+            const sm = window.settingsManager;
+            if (!sm) return;
+            try { sm.set('palettes.custom', window.customPalettes || []); } catch (_) {}
+            try { sm.set('palettes.deletedDefaults', window.deletedDefaultPalettes || []); } catch (_) {}
+            try { sm.set('palettes.user', window.userPalettes || {}); } catch (_) {}
+        }
+        window.persistPalettes = persistPalettes;
+
+        // Runs from initPaletteUI(), i.e. before 12-save-load's autoload pass
+        // re-runs the same restore. Re-applying there is harmless: the deleted
+        // list splices by name and addCustomPalettes skips names already in the
+        // carousel, so both halves are idempotent.
+        function restorePersistedPalettes() {
+            const sm = window.settingsManager;
+            if (!sm) return;
+            try { if (typeof window.loadDeletedPalettes === 'function') window.loadDeletedPalettes(); } catch (_) {}
+            try {
+                const cp = sm.get('palettes.custom');
+                if (Array.isArray(cp) && cp.length && typeof window.addCustomPalettes === 'function') {
+                    window.addCustomPalettes(cp);
+                }
+            } catch (_) {}
+            try {
+                const up = sm.get('palettes.user');
+                if (up && typeof up === 'object') window.userPalettes = up;
+            } catch (_) {}
+        }
+
         Object.defineProperty(window, 'savedColors', {
             get: function() { return savedColors; },
             set: function(val) { savedColors = Array.isArray(val) ? val : []; }
@@ -170,7 +207,7 @@
             const key = String(index);
             const list = uniqueColors((colors || []).map(hexToFull));
             window.userPalettes[key] = list;
-            try { window.settingsManager?.set('palettes.user', window.userPalettes); } catch (_) {}
+            persistPalettes();
             renderPalettePreview(index);
             updatePaletteStepIndicator();
             try {
@@ -311,11 +348,13 @@
             } else if (currentPaletteIndex > pendingDeleteIndex) {
                 currentPaletteIndex--;
             }
+            persistPalettes();
             refreshPaletteCarousel();
             hideDeleteModal();
         };
         
         function initPaletteUI() {
+            restorePersistedPalettes();
             refreshPaletteCarousel();
             // Apply first palette on load if autoload is not enabled
             const autoload = window.settingsManager?.get('settings.autoload');
@@ -357,6 +396,7 @@
                     if (customIdx >= 0) {
                         window.customPalettes[customIdx].colors = list.slice();
                     }
+                    persistPalettes();
                     refreshPaletteCarousel();
                     renderPalettePreview(currentPaletteIndex);
                     const status = document.getElementById('paletteImportStatus');
@@ -366,7 +406,7 @@
                         setTimeout(() => { status.classList.remove('show'); status.textContent = ''; }, 1200);
                     }
                     // Flash the button for feedback
-                    updateBtn.textContent = '✓ Updated';
+                    updateBtn.textContent = 'Updated';
                     setTimeout(() => { updateBtn.textContent = 'Update'; }, 1200);
                 });
             }
@@ -416,6 +456,7 @@
                     const normalized = uniqueColors(list.map(hexToFull));
                     curatedPalettes.push({ name, colors: normalized });
                     window.customPalettes.push({ name, colors: list.slice() });
+                    persistPalettes();
                     refreshPaletteCarousel();
                     applyPalette(curatedPalettes.length - 1);
                     if (nameInputRow) nameInputRow.style.display = 'none';
@@ -540,8 +581,8 @@
             });
             if (newlyAdded.length) {
                 window.customPalettes.push(...newlyAdded);
-                try { window.settingsManager?.set('palettes.custom', window.customPalettes); } catch (_) {}
             }
+            persistPalettes();
             refreshPaletteCarousel();
             renderPalettePreview(currentPaletteIndex);
             const status = document.getElementById('paletteImportStatus');
@@ -607,6 +648,7 @@
             if (window.customPalettes && window.customPalettes.length) {
                 window.addCustomPalettes(window.customPalettes);
             }
+            persistPalettes();
             refreshPaletteCarousel();
         };
 

@@ -291,7 +291,7 @@
                             'max-width:560px;background:#2b2311;color:#f0d47a;border:1px solid #b8860b88;border-radius:8px;' +
                             'padding:10px 14px;font:12px/1.5 "Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5)';
                         var _txt = document.createElement('div');
-                        _txt.textContent = '⚡ Running on the integrated GPU (' + _renderer + ') — painting will feel slow. ' +
+                        _txt.textContent = 'Running on the integrated GPU (' + _renderer + ') — painting will feel slow. ' +
                             'Fix: Windows Settings → System → Display → Graphics → add ' + _appName + ' → High performance, then relaunch.';
                         var _dis = document.createElement('button');
                         _dis.textContent = 'Got it';
@@ -683,6 +683,15 @@
             BRUSH_DAB_INTERP: true,   // Constant flow places its dabs along the path travelled
                                       // this frame instead of stacking them all at the live
                                       // pointer. false restores the single-point behaviour.
+            REPLAY_INTERP: true,      // Stroke replay spreads a recorded dab along the path it
+                                      // covers instead of dropping it whole at its own
+                                      // timestamp. At 1x that is the same one dab per frame;
+                                      // below it, it is the difference between a stroke that
+                                      // flows and one that arrives as separate blobs, since a
+                                      // 0.25x replay leaves three empty frames of advection
+                                      // between deposits. Each sample carries its share of the
+                                      // dye and of the push (05d emitReplayDab), so total
+                                      // paint is unchanged. false restores whole-dab replay.
             BRUSH_TIME_COMP: 4,       // Sim-clock deposition compensation cap (05d0). A dab is
                                       // an impulse, so a distance-spaced walker deposits
                                       // 1/timeScale times as much dye per SIMULATED second at

@@ -11,8 +11,17 @@
         // Stroke tracking for right-click replay
         let strokeEvents = [];
         let strokeStartTime = 0;
-        let replayStartTime = 0;
+        // Replay playhead. Accumulated per frame at the CURRENT speed rather
+        // than re-derived from a start stamp: (now - start) * speed re-scales
+        // the whole elapsed history, so moving the Replay Speed slider during a
+        // held (looping) replay teleported the playhead — forward if you sped
+        // up, backward if you slowed down. replayFrac is how much of the
+        // segment leading into events[replayIndex] has already been deposited.
+        let replayClock = 0;
+        let replayLastMs = 0;
         let replayIndex = 0;
+        let replayFrac = 0;
+        let replayDebt = 0;
         // History of completed strokes for time-based replay
         let strokeHistory = [];
         // ─── Splat Envelope ───────────────────────────────────────────
@@ -218,8 +227,12 @@
             });
         }
         function deepCopyEvent(ev) {
+            // `head` marks the first dab of a stroke. The replay interpolator
+            // spreads a dab along the path into it, and must never do that
+            // across the gap between two separate strokes in a Time replay —
+            // that would draw a line the painter never made.
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(),
-                     mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape };
+                     mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head };
         }
         // Time replay: the last N SECONDS OF WALL CLOCK, exactly as they happened.
         //
@@ -254,7 +267,7 @@
                 if (!events || !events.length) return;
                 var base = (typeof startTime === 'number') ? startTime : 0;
                 for (var i = 0; i < events.length; i++) {
-                    flat.push({ ev: events[i], abs: base + events[i].t });
+                    flat.push({ ev: events[i], abs: base + events[i].t, head: i === 0 });
                 }
             }
             for (var s = 0; s < strokeHistory.length; s++) {
@@ -277,6 +290,7 @@
             for (var k = first; k < flat.length; k++) {
                 var copy = deepCopyEvent(flat[k].ev);
                 copy.t = flat[k].abs - t0;
+                copy.head = flat[k].head;   // stroke boundary — see deepCopyEvent
                 out.push(copy);
             }
             return out;
@@ -314,27 +328,38 @@
                 }
             } catch (_) {}
             replayIndex = 0;
-            replayStartTime = Date.now();
+            replayFrac = 0;
+            replayDebt = 0;
+            replayClock = 0;
+            replayLastMs = Date.now();
             isReplayActive = true;
             // Broadcast full stroke to multiplayer
             if (broadcast && typeof broadcastReplayStroke === 'function') {
-                const norm = eventsToReplay.map(ev => ({
-                    t: ev.t,
-                    x: ev.x / canvas.width,
-                    y: ev.y / canvas.height,
-                    dx: ev.dx / canvas.width,
-                    dy: ev.dy / canvas.height,
-                    color: ev.color,
-                    mult: ev.mult,
-                    radius: ev.radius,
-                    // Carry the footprint too. These were recorded per event
-                    // (pushStrokeEvent) and then dropped right here, so a
-                    // broadcast replay reached peers with no idea what brush
-                    // it was reproducing; 06 publishes the stamp bitmaps the
-                    // ids refer to before it sends the events.
-                    tip: ev.tip,
-                    shape: ev.shape || null
-                }));
+                const norm = eventsToReplay.map(ev => {
+                    const o = {
+                        t: ev.t,
+                        x: ev.x / canvas.width,
+                        y: ev.y / canvas.height,
+                        dx: ev.dx / canvas.width,
+                        dy: ev.dy / canvas.height,
+                        color: ev.color,
+                        mult: ev.mult,
+                        radius: ev.radius,
+                        // Carry the footprint too. These were recorded per event
+                        // (pushStrokeEvent) and then dropped right here, so a
+                        // broadcast replay reached peers with no idea what brush
+                        // it was reproducing; 06 publishes the stamp bitmaps the
+                        // ids refer to before it sends the events.
+                        tip: ev.tip,
+                        shape: ev.shape || null
+                    };
+                    // Stroke boundary, so the receiver's interpolation keeps the
+                    // gaps of a Time replay instead of painting across them.
+                    // Sent only where true; a peer on an older build ignores it
+                    // and leans on the pause/distance guards instead.
+                    if (ev.head) o.head = 1;
+                    return o;
+                });
                 try { broadcastReplayStroke(norm); } catch(_){}
             }
         }
@@ -406,58 +431,143 @@
             };
         }
         initFpsCapControl();
+        // One dab of a replayed stroke. `k` is the share of the recorded dab
+        // this call deposits — 1 for a whole one. The interpolator below splits
+        // a recorded dab across the frames a slowed replay stretches it over,
+        // and a partial dab has to carry a partial push and a partial share of
+        // the dye, or the same stroke comes out 1/k times too heavy.
+        function emitReplayDab(ev, x, y, dx, dy, k) {
+            // Faithful reproduction (2026-07-13): replay uses the brush size
+            // and arm count RECORDED with each event. The old "use current
+            // live settings" behavior meant a stroke painted small replayed at
+            // whatever the slider says now — and remote strokes replayed at the
+            // RECEIVER's brush size.
+            // Footprint, same rule as size and colour: reproduce what was
+            // RECORDED. 05i reads the tip and the active stamp straight off
+            // config, so pinning them for the dab is what makes the replay wear
+            // the brush the stroke was painted with. A stamp we cannot draw — a
+            // peer's (its bitmap can't ride the wire), or one since deleted —
+            // falls back to __remoteStroke, which suppresses the viewer's own
+            // stamp rather than printing the stroke in some arbitrary shape the
+            // user happens to have selected now.
+            var evShape = ev.shape || null;
+            var haveStamp = !!(evShape && window.BrushShapes
+                && typeof window.BrushShapes.has === 'function'
+                && window.BrushShapes.has(evShape));
+            var savedTip = config.BRUSH_TIP;
+            var savedShape = config.BRUSH_SHAPE_ID;
+            if (typeof ev.tip === 'number') config.BRUSH_TIP = ev.tip;
+            config.BRUSH_SHAPE_ID = haveStamp ? evShape : null;
+            window.__remoteStroke = !haveStamp;
+            // Replay is faithful: the colour that was painted. (The "use
+            // current colour" opt-in was removed 2026-08-16 — arm modes resolve
+            // on top of this value, and arm 0's usual 'fixed' mode discarded the
+            // live colour anyway.) A partial dab takes its share through the
+            // same helper the live brush uses, so each flow model gets the
+            // compensation that is exact for it: additive is linear, so the
+            // colour scales; Gate is a convergence, idempotent at full flow, so
+            // it correctly does not scale at all.
+            var col = (k < 1) ? applyPaintFlow(ev.color, normalizePaintFlow(1, k)) : ev.color;
+            try {
+                if (typeof window.applyMultiSplatWith === 'function') {
+                    window.applyMultiSplatWith(x, y, dx, dy, col,
+                        ev.mult || 1, (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS);
+                } else {
+                    multiSplat(x, y, dx, dy, col, false);
+                }
+            } finally {
+                window.__remoteStroke = false;
+                window.__splatFlow = 1;   // applyPaintFlow may have set it
+                config.BRUSH_TIP = savedTip;
+                config.BRUSH_SHAPE_ID = savedShape;
+            }
+            if (typeof recRecordInteraction === 'function' && recEnabled) {
+                try { recRecordInteraction(x, y, dx, dy, col); } catch(_){}
+            }
+        }
+        // ── Replay interpolation (2026-08-22) ────────────────────────────────
+        // A recorded dab used to arrive whole at its own timestamp, so Replay
+        // Speed changed WHEN dabs landed and nothing else. At 1x that is fine —
+        // the recording was sampled once per frame, so one dab lands per frame —
+        // but at 0.25x it leaves three empty frames between deposits and the
+        // fluid advects through every one of them. The stroke stopped being a
+        // stroke and became a string of separate blobs: the jerky slow replay.
+        // The cure is the brush engine's (05d0 emitFloorDab): a dab is a SAMPLE
+        // of a stroke, not a quantum of paint. Spread it along the path it
+        // covers, one sample per frame, each carrying its share — same paint,
+        // same push, finer sampling — and a slowed replay draws the same stroke
+        // slowly instead of dripping it.
+        // Only ever WITHIN a continuation, never across a boundary: not over a
+        // stroke change (a Time replay keeps the real pauses between strokes),
+        // not over a long stall inside one stroke, and not over a jump too far
+        // to be one frame of hand movement. Those still arrive whole.
+        var REPLAY_GAP_MS = 250;     // longest pause still treated as continuous
+        var REPLAY_GAP_FRAC = 0.25;  // longest jump, as a fraction of canvas width
+        var REPLAY_MIN_K = 0.01;     // smallest share worth a splat (see below)
+        function replayLerpable(prev, ev) {
+            if (!prev || ev.head || config.REPLAY_INTERP === false) return false;
+            var span = ev.t - prev.t;
+            if (!(span > 0) || span > REPLAY_GAP_MS) return false;
+            return Math.hypot(ev.x - prev.x, ev.y - prev.y) <= REPLAY_GAP_FRAC * canvas.width;
+        }
         function processReplay() {
             if (!isReplayActive) return;
             var events = window._activeReplayEvents;
             if (!events || !events.length) { isReplayActive = false; return; }
             try {
-                var speed = (typeof window.replaySpeed === 'number') ? window.replaySpeed : 1;
-                const elapsed = (Date.now() - replayStartTime) * speed;
-                while (replayIndex < events.length && events[replayIndex].t <= elapsed) {
-                    const ev = events[replayIndex++];
-                    // Faithful reproduction (2026-07-13): replay uses the brush
-                    // size and arm count RECORDED with each event. The old
-                    // "use current live settings" behavior meant a stroke
-                    // painted small replayed at whatever the slider says now —
-                    // and remote strokes replayed at the RECEIVER's brush size.
-                    // Replay is faithful: the colour that was painted. (The
-                    // "use current colour" opt-in was removed 2026-08-16 — arm
-                    // modes resolve on top of this value, and arm 0's usual
-                    // 'fixed' mode discarded the live colour anyway.)
-                    var repCol = ev.color;
-                    // Footprint, same rule as size and colour: reproduce what
-                    // was RECORDED. 05i reads the tip and the active stamp
-                    // straight off config, so pinning them for the dab is what
-                    // makes the replay wear the brush the stroke was painted
-                    // with. A stamp we cannot draw — a peer's (its bitmap
-                    // can't ride the wire), or one since deleted — falls back
-                    // to __remoteStroke, which suppresses the viewer's own
-                    // stamp rather than printing the stroke in some arbitrary
-                    // shape the user happens to have selected now.
-                    var evShape = ev.shape || null;
-                    var haveStamp = !!(evShape && window.BrushShapes
-                        && typeof window.BrushShapes.has === 'function'
-                        && window.BrushShapes.has(evShape));
-                    var savedTip = config.BRUSH_TIP;
-                    var savedShape = config.BRUSH_SHAPE_ID;
-                    if (typeof ev.tip === 'number') config.BRUSH_TIP = ev.tip;
-                    config.BRUSH_SHAPE_ID = haveStamp ? evShape : null;
-                    window.__remoteStroke = !haveStamp;
-                    try {
-                        if (typeof window.applyMultiSplatWith === 'function') {
-                            window.applyMultiSplatWith(ev.x, ev.y, ev.dx, ev.dy, repCol,
-                                ev.mult || 1, (typeof ev.radius === 'number') ? ev.radius : config.SPLAT_RADIUS);
-                        } else {
-                            multiSplat(ev.x, ev.y, ev.dx, ev.dy, repCol, false);
+                var speed = (typeof window.replaySpeed === 'number' && window.replaySpeed > 0)
+                    ? window.replaySpeed : 1;
+                // Advance the playhead by THIS frame at the CURRENT speed, so
+                // the slider retimes what is left to play instead of rescaling
+                // what has already played. Capped so a hitch (or a tab that was
+                // in the background) resumes the replay rather than dumping
+                // every dab it owes into one frame.
+                var nowMs = Date.now();
+                var dt = nowMs - replayLastMs;
+                if (!(dt > 0)) dt = 0; else if (dt > 100) dt = 100;
+                replayLastMs = nowMs;
+                replayClock += dt * speed;
+                var elapsed = replayClock;
+                while (replayIndex < events.length) {
+                    var ev = events[replayIndex];
+                    var prev = replayIndex > 0 ? events[replayIndex - 1] : null;
+                    if (!replayLerpable(prev, ev)) {
+                        if (ev.t > elapsed) break;
+                        emitReplayDab(ev, ev.x, ev.y, ev.dx, ev.dy, 1);
+                        replayIndex++;
+                        replayFrac = 0;
+                        replayDebt = 0;   // a whole dab opens a fresh account
+                        continue;
+                    }
+                    // How far into this segment the playhead has reached, and
+                    // how much of that is still undeposited — replayFrac is
+                    // what earlier frames already laid down.
+                    var f = (elapsed - prev.t) / (ev.t - prev.t);
+                    if (f > 1) f = 1;
+                    if (f > replayFrac) {
+                        var k = f - replayFrac + replayDebt;
+                        // A sliver of a dab deposits nothing anyone can see and
+                        // still costs the splat its two GPU passes. Frame time
+                        // never divides a segment exactly, so one lands at every
+                        // segment boundary: measured k ~ 0.000005, and 19 of a
+                        // 1x replay's 39 dabs were these. Don't spend a splat on
+                        // it — hold it (replayFrac still owes it) or, if the
+                        // segment is finishing, carry it to the next dab. Either
+                        // way the stroke lands exactly the paint it recorded.
+                        if (k >= REPLAY_MIN_K) {
+                            emitReplayDab(ev,
+                                prev.x + (ev.x - prev.x) * f,
+                                prev.y + (ev.y - prev.y) * f,
+                                ev.dx * k, ev.dy * k, k);
+                            replayFrac = f;
+                            replayDebt = 0;
+                        } else if (f >= 1) {
+                            replayDebt = k;
                         }
-                    } finally {
-                        window.__remoteStroke = false;
-                        config.BRUSH_TIP = savedTip;
-                        config.BRUSH_SHAPE_ID = savedShape;
                     }
-                    if (typeof recRecordInteraction === 'function' && recEnabled) {
-                        try { recRecordInteraction(ev.x, ev.y, ev.dx, ev.dy, ev.color); } catch(_){}
-                    }
+                    if (f < 1) break;   // this segment still has road left
+                    replayIndex++;
+                    replayFrac = 0;
                 }
                 if (replayIndex >= events.length) {
                     // Right button still held → loop, and REBROADCAST each
@@ -495,12 +605,18 @@
                 // with, and falls back to the built-in tip if it did not
                 // arrive rather than borrowing this client's shape.
                 tip: (typeof ev.tip === 'number') ? (ev.tip | 0) : undefined,
-                shape: (typeof ev.shape === 'string' && ev.shape) ? ev.shape : null
+                shape: (typeof ev.shape === 'string' && ev.shape) ? ev.shape : null,
+                // Stroke boundary (see deepCopyEvent). Absent from older peers,
+                // where the pause/distance guards do the same job less exactly.
+                head: !!ev.head
             }));
             if (!remoteEvents.length) return;
             window._activeReplayEvents = remoteEvents;
             replayIndex = 0;
-            replayStartTime = Date.now();
+            replayFrac = 0;
+            replayDebt = 0;
+            replayClock = 0;
+            replayLastMs = Date.now();
             isReplayActive = true;
         };
         // ── Painting lifecycle: POINTER events (pen + mouse) with capture ──

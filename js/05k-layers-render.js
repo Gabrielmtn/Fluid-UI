@@ -6,6 +6,82 @@
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
 // ═══════════════════════════════════════════════════════════════════
+        // The Clip dropdown's rows. Every silhouette already in the project
+        // shows up here by name — paintable Masks, other layers' shape masks,
+        // colliders — so clipping never needs a conversion step first (05o
+        // ClipSources owns the naming and the -1/-2 disambiguation).
+        // Pressing in a layer's name field stands that row's drag handle down
+        // (see the title-input guard in renderLayers). Putting it back on the
+        // field's own blur is not enough — the press can end anywhere, and a
+        // row left undraggable cannot be reordered until something re-renders
+        // it. One document-level release, installed once, restores every
+        // header the moment any pointer goes up.
+        if (!window.__layerTitleDragReleaseInstalled) {
+            window.__layerTitleDragReleaseInstalled = true;
+            const releaseHeaders = () => {
+                if (isLayerSliderActive) return;  // a slider drag owns it right now
+                document.querySelectorAll('.layer-item-header').forEach((h) => {
+                    if (document.activeElement && document.activeElement.classList
+                        && document.activeElement.classList.contains('layer-title')
+                        && h.contains(document.activeElement)) return;  // still being typed in
+                    h.draggable = true;
+                });
+            };
+            ['pointerup', 'mouseup', 'pointercancel', 'dragend', 'focusout']
+                .forEach(evt => document.addEventListener(evt, releaseHeaders, true));
+        }
+        // One header shape for every row type. The only controls in it are the
+        // name and a show/hide checkbox — collapsing is the header ITSELF
+        // (click anywhere that is not those two), and the state reads off a
+        // caret on the top border instead of a button competing for the same
+        // space. o.visTarget is 'sim' or the layer index.
+        function layerHeaderHTML(o) {
+            const titleAttrs = o.readonly
+                ? ' readonly'
+                : ` onchange="updateLayerTitle(${o.index}, this.value)"`;
+            return `<div class="layer-item-header">
+                                <span class="layer-collapse-caret" aria-hidden="true"></span>
+                                <div class="layer-thumbnail"${o.thumbStyle ? ` style="${o.thumbStyle}"` : ''}>${o.thumbText || ''}</div>
+                                <div class="layer-info">
+                                    <input type="text" class="layer-title" value="${window.escHtml(o.title)}"${titleAttrs}>
+                                </div>
+                                <div class="layer-controls">
+                                    <label class="layer-vis" title="Show or hide this layer">
+                                        <input type="checkbox" class="layer-vis-check" data-vis="${o.visTarget}"${o.visible ? ' checked' : ''}>
+                                        <span class="layer-vis-box"></span>
+                                    </label>
+                                </div>
+                            </div>`;
+        }
+        // Surface one layer: open the Layers section, expand that row, and
+        // scroll it into view. A new layer is inserted BELOW the sim and every
+        // row defaults to collapsed, so something arriving without this — a
+        // paste especially — leaves no trace in the panel to act on.
+        window.revealLayerRow = function revealLayerRow(index) {
+            const layer = layers.find(l => l.index === index);
+            if (layer) layer.collapsed = false;
+            if (typeof window.openSidebarSection === 'function') {
+                window.openSidebarSection('.sidebar-section.section-layers');
+            }
+            renderLayers();
+            // renderLayers rebuilt the panel, so the row to scroll to is a new
+            // node — find it after the DOM settles, not before.
+            setTimeout(function () {
+                const row = document.querySelector('.layer-item[data-layer-index="' + index + '"]');
+                if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+            }, 0);
+        };
+        function clipSourceOptions(layer) {
+            if (!window.ClipSources) return '';
+            const cur = window.ClipSources.keyOf(layer);
+            return window.ClipSources.list(layer.index).map(s =>
+                `<option value="${window.escHtml(s.key)}" ${s.key === cur ? 'selected' : ''}>${window.escHtml(s.label)}</option>`
+            ).join('');
+        }
+        function setClipSourceOn(layer, value) {
+            if (window.ClipSources) window.ClipSources.set(layer, value || null);
+            else layer.clipMaskId = value === '' ? null : parseInt(value, 10);
+        }
         function renderLayers() {
             // Ensure all layers have mask property
             if (typeof ensureLayerMasks === 'function') {
@@ -57,19 +133,12 @@
                 if (isCollapsed) element.classList.add('collapsed');
                 if (item.type === 'sim') {
                     element.dataset.layerType = 'sim';
-                    element.innerHTML = `
-                        <div class="layer-item-header">
-                            <div class="layer-thumbnail" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 20px;">
-                                🌊
-                            </div>
-                            <div class="layer-info">
-                                <input type="text" class="layer-title" value="Sim Layer" readonly>
-                            </div>
-                            <div class="layer-controls">
-                                <button class="layer-btn" onclick="toggleSimLayer()">${canvas.style.display !== 'none' ? '👁️' : '👁️‍🗨️'}</button>
-                            </div>
-                        </div>
-                    `;
+                    element.innerHTML = layerHeaderHTML({
+                        title: 'Sim Layer', readonly: true, visTarget: 'sim',
+                        visible: canvas.style.display !== 'none',
+                        thumbStyle: 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:600; letter-spacing:.1em; color:rgba(255,255,255,.9);',
+                        thumbText: 'SIM'
+                    });
                     const headerElSim = element.querySelector('.layer-item-header');
                     if (headerElSim) headerElSim.draggable = true;
                     const titleInput = element.querySelector('.layer-title');
@@ -91,22 +160,14 @@
                         const isActiveRaster = !!(window.rasterLayers && window.rasterLayers.activeId() === layer.index);
                         if (isActiveRaster) element.classList.add('raster-active');
                         element.innerHTML = `
-                            <div class="layer-item-header">
-                                <div class="layer-thumbnail" style="background-image: url('${window.safeImageUrl(layer.thumb || layer.data)}'); background-size: cover;"></div>
-                                <div class="layer-info">
-                                    <input type="text" class="layer-title" value="${window.escHtml(layer.title)}"
-                                           onchange="updateLayerTitle(${layer.index}, this.value)">
-                                </div>
-                                <div class="layer-controls">
-                                    <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${isCollapsed ? 'Expand' : 'Collapse'}">${isCollapsed ? '▼' : '▲'}</button>
-                                </div>
-                            </div>
+                            ${layerHeaderHTML({
+                                title: layer.title, index: layer.index, visTarget: layer.index,
+                                visible: layer.visible,
+                                thumbStyle: `background-image: url('${window.safeImageUrl(layer.thumb || layer.data)}'); background-size: cover;`
+                            })}
                             <div class="layer-item-body">
                                 <div class="layer-action-row">
-                                    <button class="layer-btn raster-paint-btn ${isActiveRaster ? 'active' : ''}" onclick="window.rasterLayers && rasterLayers.setActive(${layer.index})" title="Paint into this layer (the brush's 'Paint Into: Sketch' route lands here)">🖌️</button>
-                                    <button class="layer-btn" onclick="toggleLayer(${layer.index})">
-                                        ${layer.visible ? '👁️' : '👁️‍🗨️'}
-                                    </button>
+                                    <button class="layer-btn raster-paint-btn ${isActiveRaster ? 'active' : ''}" onclick="window.rasterLayers && rasterLayers.setActive(${layer.index})" title="Paint into this layer (the brush's 'Paint Into: Sketch' route lands here)">Paint</button>
                                     <button class="layer-btn layer-delete-btn" onclick="deleteLayer(${layer.index})" title="Delete this layer">Delete</button>
                                 </div>
                                 <div class="layer-threshold">
@@ -127,9 +188,7 @@
                                     <label class="collision-label">Clip</label>
                                     <select class="raster-clip-select">
                                         <option value="">None</option>
-                                        ${(window.Masks ? window.Masks.list() : []).map(m =>
-                                            `<option value="${m.id}" ${layer.clipMaskId === m.id ? 'selected' : ''}>${window.escHtml(m.name)}</option>`
-                                        ).join('')}
+                                        ${clipSourceOptions(layer)}
                                     </select>
                                     <label class="collision-toggle"><input type="checkbox" class="raster-clip-invert" ${layer.clipInvert ? 'checked' : ''}> Inv</label>
                                 </div>
@@ -161,7 +220,7 @@
                         if (cSel) {
                             cSel.addEventListener('change', (e) => {
                                 e.stopPropagation();
-                                layer.clipMaskId = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                                setClipSourceOn(layer, e.target.value);
                             });
                             cSel.addEventListener('mousedown', (e) => e.stopPropagation());
                         }
@@ -176,64 +235,70 @@
                         element.classList.add('active-layer');
                     }
                     const hasMask = layer.mask?.shapes?.length > 0;
+                    // Whether the mask (or, on a collision layer, the collider)
+                    // is switched on is STATE, not an action — so it is the same
+                    // checkbox the header uses for show/hide, captioned, and it
+                    // leads its row the way the header's does. It used to be a
+                    // button that turned blue, sitting among Edit/Clear as if it
+                    // were a third verb.
+                    const maskOn = !!layer.mask?.enabled;
+                    const maskToggle = `<label class="layer-check" title="${layer.isCollision ? (maskOn ? 'Collision ON — uncheck to disable this collider' : 'Collision OFF — check to enable') : (hasMask ? (maskOn ? 'Mask on — uncheck to show the whole layer' : 'Mask off — check to apply it') : 'No mask defined yet')}">
+                                <input type="checkbox" class="layer-mask-check" data-layer="${layer.index}"${maskOn ? ' checked' : ''}${(hasMask || layer.isCollision) ? '' : ' disabled'}>
+                                <span class="layer-vis-box"></span>
+                                <span class="layer-check-label">${layer.isCollision ? 'Collision' : 'Mask'}</span>
+                            </label>`;
                     element.innerHTML = `
-                        <div class="layer-item-header">
-                            <div class="layer-thumbnail" style="background-image: url('${window.safeImageUrl(layer.thumb || layer.data)}')"></div>
-                            <div class="layer-info">
-                                <input type="text" class="layer-title" value="${window.escHtml(layer.title)}"
-                                       onchange="updateLayerTitle(${layer.index}, this.value)">
-                            </div>
-                            <div class="layer-controls">
-                                <button class="layer-btn layer-collapse-btn" data-action="collapse" data-layer="${layer.index}" title="${isCollapsed ? 'Expand' : 'Collapse'}">${isCollapsed ? '▼' : '▲'}</button>
-                            </div>
-                        </div>
+                        ${layerHeaderHTML({
+                            title: layer.title, index: layer.index, visTarget: layer.index,
+                            visible: layer.visible,
+                            thumbStyle: `background-image: url('${window.safeImageUrl(layer.thumb || layer.data)}')`
+                        })}
                         <div class="layer-item-body">
-                        <div class="layer-action-row">
-                            <button class="layer-btn" onclick="window.LayerTransform ? LayerTransform.open(${layer.index}) : toggleActiveLayer(${layer.index})" title="Move / resize / rotate layer">
-                                ⤢
-                            </button>
-                            <button class="layer-btn" onclick="toggleLayer(${layer.index})">
-                                ${layer.visible ? '👁️' : '👁️‍🗨️'}
-                            </button>
-                            <button class="layer-btn layer-mask-btn ${hasMask ? 'has-mask' : ''} ${layer.mask?.enabled ? 'active' : ''}" onclick="toggleImageLayerMask(${layer.index})" title="${layer.isCollision ? (layer.mask?.enabled ? 'Collision ON — click to disable this collider' : 'Collision OFF — click to enable') : (hasMask ? (layer.mask?.enabled ? 'Disable Mask' : 'Enable Mask') : 'No mask defined')}">✂️</button>
-                            <button class="layer-btn layer-delete-btn" onclick="deleteLayer(${layer.index})" title="Delete this layer">Delete</button>
-                        </div>
-                        ${window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer) ? `
-                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
-                            <button class="mask-control-btn" onclick="window.enterColliderMaskMode(${layer.index})" title="Draw and erase this collider's walls over the artwork">🧱 Edit Collider</button>
-                        </div>
-                        ` : hasMask ? `
-                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
-                            <button class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">✏️ Edit Mask</button>
-                            <button class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">Clear Mask</button>
-                            <button class="mask-control-btn" onclick="window.Masks && Masks.importFromLayer(${layer.index})" title="Import this layer's mask (SAM / depth / shapes) as a paintable Mask — edit it with the brush, clip layers with it, or bind it as a collider">⤓ Mask</button>
-                            <span style="font-size:11px; opacity:0.7;">${layer.mask.shapes.length} shape${layer.mask.shapes.length !== 1 ? 's' : ''}</span>
-                        </div>
-                        ` : `
-                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px;">
-                            <button class="mask-control-btn mask-create-btn" onclick="editImageLayerMask(${layer.index})" title="Create Mask">✂️ Create Mask</button>
-                        </div>
-                        `}
                         <div class="layer-threshold">
-                            <span>${hasMask ? 'Feather:' : 'Mask:'}</span>
+                            <span>${hasMask ? 'Feather' : 'Mask'}</span>
                             <div class="layer-slider-host"></div>
                             <span class="layer-slider-value">${layer.threshold}%</span>
                         </div>
+                        <div class="layer-action-row">
+                            <button class="layer-btn" onclick="window.LayerTransform ? LayerTransform.open(${layer.index}) : toggleActiveLayer(${layer.index})" title="Move / resize / rotate layer">Transform</button>
+                            <button class="layer-btn layer-delete-btn" onclick="deleteLayer(${layer.index})" title="Delete this layer">Delete</button>
+                        </div>
+                        <div class="layer-action-row">
+                            ${hasMask ? `<button class="layer-btn" onclick="window.layerFromVisible && layerFromVisible(${layer.index})" title="Cut out what this mask is showing as a new layer of its own. The original keeps its mask, so you can carry on slicing pieces off it.">Layer from Visible</button>` : ''}
+                            <button class="layer-btn" onclick="window.splatLayerToSim && splatLayerToSim(${layer.index})" title="${hasMask ? 'Turn what this mask is showing into fluid' : 'Turn this whole picture into fluid'} — it becomes dye in its own colours and the flow takes it from there. The layer hides itself once poured; unhide it to pour again. Not undoable: it dissolves on its own.">Fluidize</button>
+                        </div>
+                        <div class="layer-group">
+                        <div class="layer-group-title">${layer.isCollision ? 'Collision' : 'Masks'}</div>
+                        ${window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer) ? `
+                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
+                            ${maskToggle}
+                            <button class="mask-control-btn" onclick="window.enterColliderMaskMode(${layer.index})" title="Draw and erase this collider's walls over the artwork">Edit Collider</button>
+                        </div>
+                        ` : hasMask ? `
+                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
+                            ${maskToggle}
+                            <span style="font-size:11px; opacity:0.7;">${layer.mask.shapes.length} shape${layer.mask.shapes.length !== 1 ? 's' : ''}</span>
+                            <button class="mask-control-btn" onclick="editImageLayerMask(${layer.index})" title="Edit Mask">Edit Mask</button>
+                            <button class="mask-control-btn mask-clear-btn" onclick="clearImageLayerMask(${layer.index})" title="Clear Mask">Clear Mask</button>
+                        </div>
+                        ` : `
+                        <div class="layer-mask-controls" style="display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                            <button class="mask-control-btn mask-create-btn" onclick="editImageLayerMask(${layer.index})" title="Create Mask">Create Mask</button>
+                        </div>
+                        `}
                         ${!layer.isCollision ? `
                         <div class="collision-row" style="margin-top:4px;">
                             <label class="collision-label">Clip</label>
                             <select class="img-clip-select">
                                 <option value="">None</option>
-                                ${(window.Masks ? window.Masks.list() : []).map(m =>
-                                    `<option value="${m.id}" ${layer.clipMaskId === m.id ? 'selected' : ''}>${window.escHtml(m.name)}</option>`
-                                ).join('')}
+                                ${clipSourceOptions(layer)}
                             </select>
                             <label class="collision-toggle"><input type="checkbox" class="img-clip-invert" ${layer.clipInvert ? 'checked' : ''}> Inv</label>
                         </div>
                         ` : ''}
                         ${!layer.isCollision ? `
                         <div style="margin-bottom:6px;">
-                            <button class="mask-control-btn" onclick="collisionFromMask(${layer.index})" title="Generate collision layer from current mask or threshold" style="width:100%;background:rgba(255,160,60,0.13);border-color:rgba(255,160,60,0.35);text-align:center;">🧱 Generate Collision Layer</button>
+                            <button class="mask-control-btn" onclick="collisionFromMask(${layer.index})" title="Generate collision layer from current mask or threshold" style="width:100%;background:rgba(255,160,60,0.13);border-color:rgba(255,160,60,0.35);text-align:center;">Generate Collision Layer</button>
                         </div>
                         ` : ''}
                         ${layer.isCollision ? `
@@ -251,11 +316,12 @@
                             </div>
                             <div class="collision-row">
                                 <label class="collision-toggle"><input type="checkbox" class="collision-invert-cb" data-cinv="${layer.index}" ${layer.mask?.shapes?.[0]?.invert ? 'checked' : ''}> Invert</label>
-                                <button type="button" class="collision-refresh-btn" data-cref="${layer.index}" title="Re-run depth estimation">🔄</button>
+                                <button type="button" class="collision-refresh-btn" data-cref="${layer.index}" title="Re-run depth estimation">Refresh</button>
                             </div>
                             `}
                         </div>
                         ` : ''}
+                        </div>
                         </div>
                     `;
                     // Create encapsulated slider in host
@@ -283,7 +349,7 @@
                     if (clipSel) {
                         clipSel.addEventListener('change', (e) => {
                             e.stopPropagation();
-                            layer.clipMaskId = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                            setClipSourceOn(layer, e.target.value);
                             if (typeof window.applyLayerClip === 'function') window.applyLayerClip(layer.index);
                         });
                         clipSel.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -378,38 +444,99 @@
                     }
                     } // end non-raster item build
                 }
-                // Collapse toggle button handler
-                const collapseBtn = element.querySelector('.layer-collapse-btn');
-                if (collapseBtn) {
-                    collapseBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const layerIdx = parseInt(collapseBtn.dataset.layer, 10);
-                        const layer = layers.find(l => l.index === layerIdx);
-                        if (layer) {
-                            // Flip from what's ON SCREEN, not from layer.collapsed —
-                            // that starts undefined, and `!undefined` is true, so a
-                            // row rendered collapsed by default would "collapse"
-                            // again on the first click and appear stuck.
-                            const next = !element.classList.contains('collapsed');
-                            layer.collapsed = next;
-                            element.classList.toggle('collapsed', next);
-                            collapseBtn.textContent = next ? '▼' : '▲';
-                            collapseBtn.title = next ? 'Expand' : 'Collapse';
+                // Show / hide lives in the header now, as a checkbox — the one
+                // control there besides the name. Its own events stop here so
+                // the header's collapse click below never sees them.
+                const visCheck = element.querySelector('.layer-vis-check');
+                if (visCheck) {
+                    const swallow = (ev) => ev.stopPropagation();
+                    ['click','mousedown','pointerdown','touchstart','dblclick'].forEach(evt =>
+                        visCheck.addEventListener(evt, swallow));
+                    const visLabel = visCheck.closest('.layer-vis');
+                    if (visLabel) ['click','mousedown','pointerdown','touchstart','dblclick'].forEach(evt =>
+                        visLabel.addEventListener(evt, swallow));
+                    visCheck.addEventListener('change', (ev) => {
+                        ev.stopPropagation();
+                        const t = visCheck.dataset.vis;
+                        if (t === 'sim') { if (typeof toggleSimLayer === 'function') toggleSimLayer(); }
+                        else if (typeof toggleLayer === 'function') toggleLayer(parseInt(t, 10));
+                    });
+                }
+                // Mask / collision enable — same control, in the body row.
+                const maskCheck = element.querySelector('.layer-mask-check');
+                if (maskCheck) {
+                    const swallow = (ev) => ev.stopPropagation();
+                    const maskLabel = maskCheck.closest('.layer-check');
+                    [maskCheck, maskLabel].forEach((el) => {
+                        if (!el) return;
+                        ['click','mousedown','pointerdown','touchstart','dblclick'].forEach(evt =>
+                            el.addEventListener(evt, swallow));
+                    });
+                    maskCheck.addEventListener('change', (ev) => {
+                        ev.stopPropagation();
+                        if (typeof toggleImageLayerMask === 'function') {
+                            toggleImageLayerMask(parseInt(maskCheck.dataset.layer, 10));
                         }
                     });
                 }
                 // Only start drags from the header
                 const headerEl = element.querySelector('.layer-item-header');
                 if (headerEl) headerEl.addEventListener('dragstart', handleDragStart);
+                // The header IS the collapse control: anything in it that isn't
+                // the name field or the show/hide checkbox opens or closes the
+                // row. Deliberately the HEADER only — clicking the body would
+                // collapse the row out from under whatever you were adjusting.
+                // The Sim row has no body, so it is left alone.
+                if (headerEl && item.type !== 'sim') {
+                    headerEl.addEventListener('click', (e) => {
+                        if (e.target.closest('input, button, select, textarea, label, .layer-vis')) return;
+                        const layerIdx = parseInt(element.dataset.layerIndex, 10);
+                        const layer = layers.find(l => l.index === layerIdx);
+                        // Flip from what's ON SCREEN, not from layer.collapsed —
+                        // that starts undefined, and `!undefined` is true, so a
+                        // row rendered collapsed by default would "collapse"
+                        // again on the first click and appear stuck.
+                        const next = !element.classList.contains('collapsed');
+                        if (layer) layer.collapsed = next;
+                        element.classList.toggle('collapsed', next);
+                    });
+                }
                 // Guard: block dragstart initiated anywhere else in the item (capture)
                 element.addEventListener('dragstart', (e) => {
                     if (isLayerSliderActive || !(e.target && e.target.closest && e.target.closest('.layer-item-header'))) { e.preventDefault(); e.stopPropagation(); }
                 }, true);
-                // Guard: prevent header text input from initiating drags
+                // Guard: the name field must not drag the row — but it MUST
+                // still be clickable. preventDefault() on mousedown/pointerdown
+                // is what places the caret, so cancelling those (copied from the
+                // read-only Sim row, where it costs nothing) made every layer
+                // name unfocusable: clicking it did nothing at all.
+                // stopPropagation alone keeps the row's own handlers out of it,
+                // and the native HTML5 drag is suppressed the way the sliders in
+                // this file already do it — stand the header's draggable down
+                // while the field is in use, put it back on blur.
                 const titleInput = element.querySelector('.layer-title');
                 if (titleInput) {
-                    const prev = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
-                    ['dragstart','mousedown','pointerdown','touchstart'].forEach(evt => titleInput.addEventListener(evt, prev, { capture: true }));
+                    titleInput.setAttribute('draggable', 'false');
+                    // ONE handler, because stopPropagation() from a capture
+                    // listener on the target skips that node's bubble pass —
+                    // a second, non-capture listener here would never run.
+                    const armEdit = (ev) => {
+                        ev.stopPropagation();
+                        if (headerEl) headerEl.draggable = false;
+                    };
+                    ['mousedown','pointerdown','touchstart','click','dblclick'].forEach(evt =>
+                        titleInput.addEventListener(evt, armEdit, { capture: true }));
+                    // A drag can only ever start from the header, so cancelling
+                    // it here is the one place preventDefault still belongs.
+                    titleInput.addEventListener('dragstart', (ev) => { ev.preventDefault(); ev.stopPropagation(); }, { capture: true });
+                    titleInput.addEventListener('focus', () => { if (headerEl) headerEl.draggable = false; });
+                    // Enter commits and gets out of the field, so the panel can
+                    // re-render (the name is a Clip-source label) without eating
+                    // the keystroke as a canvas hotkey.
+                    titleInput.addEventListener('keydown', (ev) => {
+                        ev.stopPropagation();
+                        if (ev.key === 'Enter') titleInput.blur();
+                    });
                 }
                 element.addEventListener('dragover', handleDragOver);
                 element.addEventListener('drop', handleDrop);

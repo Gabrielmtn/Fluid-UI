@@ -19,13 +19,18 @@
             if (!layer) return;
             const div = document.getElementById(`layer${index}`);
             if (!div) return;
-            const mid = (typeof layer.clipMaskId === 'number') ? layer.clipMaskId : null;
+            // A clip source is any silhouette already in the project — a
+            // paintable Mask, another layer's shape mask, or a collider (05o
+            // ClipSources). Bound by key, so the source is read where it
+            // lives instead of being copied in.
+            const key = (window.ClipSources && window.ClipSources.keyOf)
+                ? window.ClipSources.keyOf(layer) : null;
             let url = null;
-            if (mid != null && window.Masks && window.Masks.getFBO(mid) && window.Masks.coverageDataURL) {
-                // Read each (mask,invert) coverage back only ONCE per reapply pass.
-                const _k = mid + (layer.clipInvert ? ':i' : ':n');
+            if (key && window.ClipSources) {
+                // Read each (source,invert) coverage back only ONCE per reapply pass.
+                const _k = key + (layer.clipInvert ? ':i' : ':n');
                 if (_cache && _k in _cache) url = _cache[_k];
-                else { url = window.Masks.coverageDataURL(mid, !!layer.clipInvert); if (_cache) _cache[_k] = url; }
+                else { url = window.ClipSources.coverageDataURL(key, !!layer.clipInvert); if (_cache) _cache[_k] = url; }
             }
             if (!url) {
                 div.style.webkitMaskImage = '';
@@ -96,6 +101,74 @@
             }, 50);
         })();
 
+        // The masked composite itself: the artwork kept where the shapes cover
+        // (show) or everywhere they don't (hide), softened by the layer's
+        // Feather, transparent elsewhere. Untinted — applyLayerMask paints the
+        // collider film on afterwards, and "Layer from Visible" wants the plain
+        // cutout. Both go through here so what you bake is what you see.
+        // `scale` (default 1) oversamples the whole composite — shapes and
+        // artwork alike — so a consumer that needs more than canvas resolution
+        // (Splat to Fluid pours into a 2048-wide dye) rasterizes ONCE at the
+        // resolution it wants instead of upscaling a canvas-res bitmap.
+        function composeMaskedLayer(layer, img, scale) {
+            const k = (typeof scale === 'number' && scale > 0) ? scale : 1;
+            const maskCanvas = document.createElement('canvas');
+            const canvasElement = document.getElementById('canvas');
+            const baseW = canvasElement ? canvasElement.width : 1920;
+            const baseH = canvasElement ? canvasElement.height : 1080;
+            maskCanvas.width = Math.max(1, Math.round(baseW * k));
+            maskCanvas.height = Math.max(1, Math.round(baseH * k));
+            const ctx = maskCanvas.getContext('2d');
+            // Everything below is written in canvas-buffer coordinates (where
+            // mask shapes live); the scale makes that a higher-res raster.
+            if (k !== 1) ctx.scale(maskCanvas.width / baseW, maskCanvas.height / baseH);
+            const stampShapes = () => {
+                layer.mask.shapes.forEach(shape => {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+                    // Apply rotation if needed
+                    const rotation = shape.rotation || 0;
+                    const centerX = shape.x + shape.width / 2;
+                    const centerY = shape.y + shape.height / 2;
+                    if (rotation !== 0) {
+                        ctx.save();
+                        ctx.translate(centerX, centerY);
+                        ctx.rotate((rotation * Math.PI) / 180);
+                        ctx.translate(-centerX, -centerY);
+                    }
+                    drawMaskShape(ctx, shape);
+                    if (rotation !== 0) {
+                        ctx.restore();
+                    }
+                });
+            };
+            if (layer.mask.mode === 'show') {
+                // For SHOW mode: Draw shapes first, then composite image on top
+                ctx.clearRect(0, 0, baseW, baseH);
+                // Draw all mask shapes as white (shapes stored in original canvas coordinates)
+                stampShapes();
+                // Now composite the image only where shapes exist
+                ctx.globalCompositeOperation = 'source-in';
+                ctx.drawImage(img, 0, 0, baseW, baseH);
+            } else {
+                // For HIDE mode: Draw image first, then cut out shapes
+                ctx.drawImage(img, 0, 0, baseW, baseH);
+                // Cut out the mask shapes
+                ctx.globalCompositeOperation = 'destination-out';
+                stampShapes();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            const feather = typeof layer.threshold === 'number' ? layer.threshold : 0;
+            if (feather > 0) {
+                // featherMaskAlpha works in device pixels (getImageData ignores
+                // the transform), so the radius has to be carried up with them
+                // or an oversampled composite would come out proportionally
+                // sharper than the one on screen.
+                const radius = Math.max(1, Math.round((feather / 100) * 20 * k));
+                featherMaskAlpha(ctx, maskCanvas.width, maskCanvas.height, radius);
+            }
+            return maskCanvas;
+        }
+
         // Apply mask to a layer
         window.applyLayerMask = function applyLayerMask(index) {
             const layer = layers.find(l => l.index === index);
@@ -116,69 +189,13 @@
                 }
                 return;
             }
-            // Create a canvas to render the masked image
-            const maskCanvas = document.createElement('canvas');
-            const canvasElement = document.getElementById('canvas');
-            maskCanvas.width = canvasElement ? canvasElement.width : 1920;
-            maskCanvas.height = canvasElement ? canvasElement.height : 1080;
-            const ctx = maskCanvas.getContext('2d');
             // Load and draw the original image
             const img = new Image();
             img.onload = () => {
-                if (layer.mask.mode === 'show') {
-                    // For SHOW mode: Draw shapes first, then composite image on top
-                    ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-                    // Draw all mask shapes as white (shapes stored in original canvas coordinates)
-                    layer.mask.shapes.forEach(shape => {
-                        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-                        // Apply rotation if needed
-                        const rotation = shape.rotation || 0;
-                        const centerX = shape.x + shape.width / 2;
-                        const centerY = shape.y + shape.height / 2;
-                        if (rotation !== 0) {
-                            ctx.save();
-                            ctx.translate(centerX, centerY);
-                            ctx.rotate((rotation * Math.PI) / 180);
-                            ctx.translate(-centerX, -centerY);
-                        }
-                        drawMaskShape(ctx, shape);
-                        if (rotation !== 0) {
-                            ctx.restore();
-                        }
-                    });
-                    // Now composite the image only where shapes exist
-                    ctx.globalCompositeOperation = 'source-in';
-                    ctx.drawImage(img, 0, 0, maskCanvas.width, maskCanvas.height);
-                } else {
-                    // For HIDE mode: Draw image first, then cut out shapes
-                    ctx.drawImage(img, 0, 0, maskCanvas.width, maskCanvas.height);
-                    // Cut out the mask shapes
-                    ctx.globalCompositeOperation = 'destination-out';
-                    layer.mask.shapes.forEach(shape => {
-                        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-                        // Apply rotation if needed
-                        const rotation = shape.rotation || 0;
-                        const centerX = shape.x + shape.width / 2;
-                        const centerY = shape.y + shape.height / 2;
-                        if (rotation !== 0) {
-                            ctx.save();
-                            ctx.translate(centerX, centerY);
-                            ctx.rotate((rotation * Math.PI) / 180);
-                            ctx.translate(-centerX, -centerY);
-                        }
-                        drawMaskShape(ctx, shape);
-                        if (rotation !== 0) {
-                            ctx.restore();
-                        }
-                    });
-                }
-                const feather = typeof layer.threshold === 'number' ? layer.threshold : 0;
-                if (feather > 0) {
-                    const radius = Math.max(1, Math.round((feather / 100) * 20));
-                    featherMaskAlpha(ctx, maskCanvas.width, maskCanvas.height, radius);
-                }
+                const maskCanvas = composeMaskedLayer(layer, img);
                 if (layer.isCollision) {
                     // Tint the preview orange so it reads as an obstacle, not artwork
+                    const ctx = maskCanvas.getContext('2d');
                     ctx.globalCompositeOperation = 'source-atop';
                     ctx.fillStyle = 'rgba(255, 140, 60, 0.55)';
                     ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
@@ -186,6 +203,152 @@
                 }
                 layerDiv.style.backgroundImage = `url(${maskCanvas.toDataURL()})`;
             };
+            img.src = layer.originalData || layer.data;
+            // This layer's mask is a clip SOURCE for any other layer bound to
+            // it (05o ClipSources), so a mask edit has to push through to them
+            // — otherwise you'd repaint a silhouette and the layers clipped by
+            // it would keep the old one until something else forced a redraw.
+            if (window.ClipSources) window.ClipSources.invalidate(index);
+        }
+
+        // Layer from Visible: bake the cut-out into a layer of its own. The source
+        // is left untouched — this is a copy, so the mask stays live and
+        // re-editable on the original and you can keep cutting more pieces off
+        // it. The new layer inherits the source's placement (position, scale,
+        // rotation) so it lands exactly on top of the piece it came from
+        // instead of snapping back to a fresh aspect fit.
+        //
+        // Deliberately does NOT require mask.enabled: the button is offered
+        // whenever shapes exist, and "cut me this piece" is a reasonable thing
+        // to ask of a mask you have toggled off to see the whole picture.
+        window.layerFromVisible = function layerFromVisible(index) {
+            const layer = (window.layers || []).find(l => l.index === index);
+            if (!layer || !layer.mask || !layer.mask.shapes || !layer.mask.shapes.length) return;
+            if (typeof window.createLayerFromDataUrl !== 'function') return;
+            const say = (t, m) => {
+                if (typeof window.appAlert === 'function') window.appAlert(t, m);
+                else alert(t + '\n\n' + m);
+            };
+            const img = new Image();
+            img.onload = () => {
+                const cut = composeMaskedLayer(layer, img);
+                // An all-or-nothing mask (hide mode covering everything, a
+                // selection that segmented to nothing) would hand back a blank
+                // layer and a puzzled user. Say so instead of making one.
+                let empty = true;
+                try {
+                    const d = cut.getContext('2d').getImageData(0, 0, cut.width, cut.height).data;
+                    for (let i = 3; i < d.length; i += 4) { if (d[i] > 2) { empty = false; break; } }
+                } catch (_) { empty = false; }   // tainted canvas — trust the mask
+                if (empty) {
+                    say('Nothing to cut out',
+                        'This mask is not showing any of the image, so the new layer would be empty. Edit the mask (or switch it between Show and Hide) and try again.');
+                    return;
+                }
+                window.createLayerFromDataUrl(cut.toDataURL('image/png'),
+                    (layer.title || 'Layer') + ' cutout',
+                    function (created) {
+                        // The cut-out is rendered in the source's UNTRANSFORMED
+                        // space (same as the div's background), so carrying the
+                        // transform over is what makes it land on top of the
+                        // original rather than beside it.
+                        created.x = layer.x || 0;
+                        created.y = layer.y || 0;
+                        created.scaleX = layer.scaleX || 1;
+                        created.scaleY = layer.scaleY || 1;
+                        created.rotation = layer.rotation || 0;
+                        // Feather is already baked into the cut-out's alpha. On
+                        // a layer with no mask this slider is the rudimentary
+                        // luminance key instead, so inheriting it would key the
+                        // cut-out a second time.
+                        created.threshold = 0;
+                        if (typeof window.renderLayers === 'function') window.renderLayers();
+                        if (typeof window.__recordLayerCreate === 'function') {
+                            window.__recordLayerCreate([created.index], 'layer from mask');
+                        }
+                    });
+            };
+            img.onerror = () => say('Could not read that layer', 'Its image failed to decode, so there is nothing to cut out.');
+            img.src = layer.originalData || layer.data;
+        }
+
+        // Splat to Fluid: pour this layer's masked artwork into the simulation
+        // as dye — one frame of a brush whose shape AND colour are the picture
+        // itself. The layer is left alone; what lands in the dye immediately
+        // starts flowing, so this is a one-shot event, not a copy.
+        //
+        // Fidelity comes from doing the placement ONCE, in 2D, at the dye's own
+        // resolution: rasterize the cut-out oversampled, bake the layer's
+        // on-screen transform into the same pass, and hand the sim a bitmap it
+        // can deposit 1:1. Nothing is resampled a second time on the GPU.
+        window.splatLayerToSim = function splatLayerToSim(index) {
+            const layer = (window.layers || []).find(l => l.index === index);
+            if (!layer) return;
+            const say = (t, m) => {
+                if (typeof window.appAlert === 'function') window.appAlert(t, m);
+                else alert(t + '\n\n' + m);
+            };
+            if (typeof window.__splatImageToDye !== 'function') {
+                say('The simulation is still starting', 'Give it a moment and try again.');
+                return;
+            }
+            const mainCanvas = document.getElementById('canvas');
+            if (!mainCanvas) return;
+            const dye = (typeof window.__dyeTexSize === 'function') ? window.__dyeTexSize() : null;
+            // Oversample to the dye's resolution — but never below 1:1, and cap
+            // the blow-up so a small canvas on a big dye buffer can't allocate
+            // something absurd.
+            const k = dye ? Math.max(1, Math.min(4, dye.w / Math.max(1, mainCanvas.width))) : 1;
+            const img = new Image();
+            img.onload = () => {
+                const hasMask = !!(layer.mask && layer.mask.shapes && layer.mask.shapes.length);
+                let art;
+                if (hasMask) {
+                    art = composeMaskedLayer(layer, img, k);
+                } else {
+                    // No mask on this layer — pour the whole picture.
+                    art = document.createElement('canvas');
+                    art.width = Math.max(1, Math.round(mainCanvas.width * k));
+                    art.height = Math.max(1, Math.round(mainCanvas.height * k));
+                    art.getContext('2d').drawImage(img, 0, 0, art.width, art.height);
+                }
+                // Place it where the layer actually SITS. Same
+                // translate → rotate → scale about centre convention as the
+                // obstacle compositor (23) and Masks.importFromLayer (05o) —
+                // mask shapes are stored untransformed, so without this an
+                // aspect-fitted or moved layer would pour into the wrong place.
+                const out = document.createElement('canvas');
+                out.width = dye ? dye.w : art.width;
+                out.height = dye ? dye.h : art.height;
+                const octx = out.getContext('2d');
+                octx.scale(out.width / mainCanvas.width, out.height / mainCanvas.height);
+                const wrap = document.getElementById('canvas-wrapper');
+                const cssW = (wrap && wrap.clientWidth) || mainCanvas.clientWidth || mainCanvas.width || 1;
+                const cssH = (wrap && wrap.clientHeight) || mainCanvas.clientHeight || mainCanvas.height || 1;
+                const bcx = mainCanvas.width * 0.5, bcy = mainCanvas.height * 0.5;
+                octx.translate(bcx + (layer.x || 0) * (mainCanvas.width / cssW),
+                               bcy + (layer.y || 0) * (mainCanvas.height / cssH));
+                octx.rotate(((layer.rotation || 0) * Math.PI) / 180);
+                octx.scale(layer.scaleX || 1, layer.scaleY || 1);
+                octx.translate(-bcx, -bcy);
+                octx.drawImage(art, 0, 0, mainCanvas.width, mainCanvas.height);
+                // Console tunable: config.SPLAT_TO_FLUID_AMOUNT = 0.4 pours a
+                // fainter ghost. 1 = the picture at full strength.
+                const amount = (window.config && typeof config.SPLAT_TO_FLUID_AMOUNT === 'number')
+                    ? config.SPLAT_TO_FLUID_AMOUNT : 1;
+                if (!window.__splatImageToDye(out, amount)) {
+                    say('Could not fluidize that layer', 'The simulation refused the image. Try again, or reload if it keeps happening.');
+                    return;
+                }
+                // The picture is now IN the fluid, so leaving the flat copy on
+                // top of it just hides the thing you asked for. Hide the source
+                // instead of deleting it — the layer, its mask and its
+                // placement all survive, so you can pour it again.
+                if (layer.visible && typeof window.toggleLayer === 'function') {
+                    window.toggleLayer(layer.index);
+                }
+            };
+            img.onerror = () => say('Could not read that layer', 'Its image failed to decode, so there is nothing to pour.');
             img.src = layer.originalData || layer.data;
         }
         // Cached depth-mask temp canvas (avoids per-call allocations)
@@ -412,7 +575,15 @@
         }
         window.updateLayerTitle = (index, title) => {
             const layer = layers.find(l => l.index === index);
-            if (layer) layer.title = title;
+            if (!layer) return;
+            layer.title = title;
+            // A layer's name IS the label its mask/collider wears in every
+            // other layer's Clip dropdown, so a rename has to reach them.
+            // Deferred: this runs from the field's own change event, and
+            // rebuilding the panel underneath a live event would tear out the
+            // element still dispatching it (and swallow the click that caused
+            // the blur). Next tick the interaction is over.
+            setTimeout(() => { if (typeof renderLayers === 'function') renderLayers(); }, 0);
         };
         window.updateLayerThreshold = (index, threshold) => {
             const layer = layers.find(l => l.index === index);

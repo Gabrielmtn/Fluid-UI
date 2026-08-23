@@ -329,8 +329,8 @@
                          walls can be tweaked where you can see them. -->
                     <div id="colliderTools" class="mask-collider-tools" style="display:none;">
                         <div class="mask-collider-row">
-                            <button id="colliderDrawBtn" class="mask-mode-btn collider-tool-btn active" title="Add collider area — paint walls the fluid flows around">🖌️ Draw</button>
-                            <button id="colliderEraseBtn" class="mask-mode-btn collider-tool-btn" title="Remove collider area — erase walls back out">🧽 Erase</button>
+                            <button id="colliderDrawBtn" class="mask-mode-btn collider-tool-btn active" title="Add collider area — paint walls the fluid flows around">Draw</button>
+                            <button id="colliderEraseBtn" class="mask-mode-btn collider-tool-btn" title="Remove collider area — erase walls back out">Erase</button>
                             <!-- Same units as the Brush Size fader (1-30 → SPLAT_RADIUS/1000) -->
                             <label class="collider-size-label">Size
                                 <input type="range" id="colliderSize" min="1" max="30" step="0.5" value="11" data-no-scale="1">
@@ -380,8 +380,8 @@
                         <div class="mask-filter-row">
                             <span class="mask-filter-label">Background</span>
                             <input type="color" id="filterBgColor" value="#000000" title="The colour being cut away">
-                            <button type="button" id="filterPickBtn" class="mask-action-btn" title="Then click the background on the image">💧 Pick</button>
-                            <button type="button" id="filterAutoBtn" class="mask-action-btn" title="Guess it from the edges of the image">✨ Auto</button>
+                            <button type="button" id="filterPickBtn" class="mask-action-btn" title="Then click the background on the image">Pick</button>
+                            <button type="button" id="filterAutoBtn" class="mask-action-btn" title="Guess it from the edges of the image">Auto</button>
                         </div>
                         <label class="mask-filter-row">
                             <span class="mask-filter-label">Cut amount</span>
@@ -420,15 +420,15 @@
                          missed the handle". -->
                     <div id="touchUpTools" class="mask-collider-tools" style="display:none;">
                         <div class="mask-collider-row">
-                            <button id="touchUpEraseBtn" class="mask-mode-btn collider-tool-btn active" title="Erase mask — wipe away stray bits the AI included">🧽 Erase</button>
-                            <button id="touchUpDrawBtn" class="mask-mode-btn collider-tool-btn" title="Add mask — paint in a piece the AI missed">🖌️ Add</button>
+                            <button id="touchUpEraseBtn" class="mask-mode-btn collider-tool-btn active" title="Erase mask — wipe away stray bits the AI included">Erase</button>
+                            <button id="touchUpDrawBtn" class="mask-mode-btn collider-tool-btn" title="Add mask — paint in a piece the AI missed">Add</button>
                             <label class="collider-size-label">Size
                                 <input type="range" id="touchUpSize" min="2" max="60" step="1" value="14" data-no-scale="1">
                                 <span id="touchUpSizeVal">14</span>
                             </label>
                             <button id="touchUpUndoBtn" class="mask-mode-btn collider-tool-btn" title="Undo the last touch-up stroke">↶</button>
                             <button id="touchUpRedoBtn" class="mask-mode-btn collider-tool-btn" title="Redo">↷</button>
-                            <button id="touchUpDespeckBtn" class="mask-mode-btn collider-tool-btn" title="Delete every disconnected speck smaller than a twentieth of the main shape">✨ Remove specks</button>
+                            <button id="touchUpDespeckBtn" class="mask-mode-btn collider-tool-btn" title="Delete every disconnected speck smaller than a twentieth of the main shape">Remove specks</button>
                         </div>
                         <div class="mask-collider-hint" id="touchUpHint">Right-drag does the opposite of the selected tool. Shift+drag pans, scroll zooms.</div>
                     </div>
@@ -455,8 +455,8 @@
                         </label>
                     </div>
                     <div class="mask-actions">
-                        <button class="mask-action-btn" onclick="window.deleteMaskShape()">🗑 Delete</button>
-                        <button class="mask-action-btn" onclick="window.clearMaskShapes()">🧹 Clear All</button>
+                        <button class="mask-action-btn" onclick="window.deleteMaskShape()">Delete</button>
+                        <button class="mask-action-btn" onclick="window.clearMaskShapes()">Clear All</button>
                     </div>
                     <div class="mask-zoom-controls" style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 6px;">
                         <button class="mask-zoom-btn" onclick="window.maskZoomOut()" title="Zoom Out">−</button>
@@ -476,7 +476,7 @@
                     <span class="mask-footer-spacer"></span>
                     <button class="mask-back-btn" id="maskWizardBack" style="display:none;" onclick="window.maskWizardBack()">← Back</button>
                     <button class="mask-next-btn" id="maskWizardNext" style="display:none;" onclick="window.maskWizardNext()">Next →</button>
-                    <button class="mask-apply-btn" onclick="window.exitMaskMode(true)">✓ Apply Mask</button>
+                    <button class="mask-apply-btn" onclick="window.exitMaskMode(true)">Apply Mask</button>
                 </div>
             </div>
         `;
@@ -1865,14 +1865,14 @@
                 if (segmentBtn) segmentBtn.disabled = true;
                 
                 if (statusEl && !window.samSegmenter.isReady) {
-                    statusEl.textContent = '⏳ Preparing AI...';
+                    statusEl.textContent = 'Preparing AI...';
                 }
                 
                 await window.initializeSAM();
                 
                 // Check if initialization succeeded
                 if (!window.samSegmenter.isReady) {
-                    if (statusEl) statusEl.textContent = '⚠ Failed to load';
+                    if (statusEl) statusEl.textContent = 'Failed to load';
                     smartSelectBtn.disabled = false; // Re-enable button
                     // Points placed while preparing will never segment now —
                     // drop them so they can't hold Apply in its busy state.
@@ -1899,14 +1899,14 @@
                     // Recording layer - capture current canvas
                     const canvas = document.getElementById('canvas');
                     if (canvas) {
-                        if (statusEl) statusEl.textContent = '⏳ Capturing canvas...';
+                        if (statusEl) statusEl.textContent = 'Capturing canvas...';
                         imageToLoad = canvas.toDataURL('image/png');
                         console.log('📸 Captured canvas for SAM:', canvas.width + 'x' + canvas.height);
                     }
                 }
                 
                 if (imageToLoad && window.samSegmenter) {
-                    if (statusEl) statusEl.textContent = '⏳ Loading image...';
+                    if (statusEl) statusEl.textContent = 'Loading image...';
 
                     // Use the click/display space the editor canvas is sized to:
                     // adhoc mode works in the image's own space, everything else
@@ -1923,7 +1923,7 @@
 
                     const success = await window.samSegmenter.loadImage(imageToLoad, displayWidth, displayHeight);
                     if (success) {
-                        if (statusEl) statusEl.textContent = '✓ Ready to segment';
+                        if (statusEl) statusEl.textContent = 'Ready to segment';
                         if (segmentBtn) {
                             segmentBtn.disabled = false;
                             segmentBtn.title = 'Click to run AI segmentation on selected points';
@@ -1938,7 +1938,7 @@
                             autoRunSAMSegmentation();
                         }
                     } else {
-                        if (statusEl) statusEl.textContent = '⚠ Image load failed';
+                        if (statusEl) statusEl.textContent = 'Image load failed';
                         smartSelectBtn.disabled = false;
                         // Nothing will ever segment these points — stand down.
                         maskState.smartSelectPoints = [];
@@ -2037,13 +2037,13 @@
         const btn = document.querySelector('.mask-apply-btn');
         if (btn) {
             btn.disabled = busy;
-            btn.textContent = busy ? '⏳ Cutting out…' : '✓ Apply Mask';
+            btn.textContent = busy ? 'Cutting out…' : 'Apply Mask';
         }
         // Leaving step 1 finalizes the cutout, so Next waits on it too
         const next = document.getElementById('maskWizardNext');
         if (next) {
             next.disabled = busy;
-            next.textContent = busy ? '⏳ Cutting out…' : 'Next →';
+            next.textContent = busy ? 'Cutting out…' : 'Next →';
         }
     }
 
@@ -3351,7 +3351,7 @@
         setTimeout(function () {
             setColliderChromeVisible(true);
             var hdr = document.querySelector('.mask-editor-header h3');
-            if (hdr) hdr.textContent = '🧱 Edit Collider — ' + (layer.title || 'Collision');
+            if (hdr) hdr.textContent = 'Edit Collider — ' + (layer.title || 'Collision');
             var hint = document.getElementById('maskHint');
             if (hint) {
                 hint.innerHTML = '<strong style="color:#ff7b72;">🧱 Collider:</strong> '
@@ -3381,7 +3381,7 @@
         var cancelBtn = overlay.querySelector('.mask-cancel-btn');
         if (cancelBtn) cancelBtn.style.display = on ? 'none' : '';
         var applyBtn = overlay.querySelector('.mask-apply-btn');
-        if (applyBtn && on) applyBtn.textContent = '✓ Done';
+        if (applyBtn && on) applyBtn.textContent = 'Done';
     }
 
     function exitColliderMaskMode() {
@@ -3456,6 +3456,65 @@
         }, 10);
     };
 
+    // The image handed to the editor IS a finished mask (a saved brush stamp
+    // being re-opened): read its alpha back out as mask COVERAGE, cropped to
+    // its bounding box, in exactly the form commitTouchUp produces. Seeding
+    // this is what makes a re-edit incremental — without it the editor opens
+    // on an empty selection and the first touch-up stroke BECOMES the whole
+    // mask, wiping every part of the stamp it did not cover.
+    function adhocSeedShape(source, w, h) {
+        let d;
+        try {
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const cx = c.getContext('2d', { willReadFrequently: true });
+            cx.drawImage(source, 0, 0, w, h);
+            d = cx.getImageData(0, 0, w, h).data;
+        } catch (_) { return null; }
+        let minX = w, minY = h, maxX = -1, maxY = -1;
+        for (let y = 0; y < h; y++) {
+            const row = y * w;
+            for (let x = 0; x < w; x++) {
+                if (d[(row + x) * 4 + 3] > 0) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+        if (maxX < 0) return null;   // fully transparent — nothing to seed from
+        const bw = maxX - minX + 1, bh = maxY - minY + 1;
+        const out = new Uint8Array(bw * bh);
+        for (let y = 0; y < bh; y++) {
+            for (let x = 0; x < bw; x++) {
+                out[y * bw + x] = d[((minY + y) * w + (minX + x)) * 4 + 3];
+            }
+        }
+        return {
+            type: 'sam-mask',
+            x: minX, y: minY, width: bw, height: bh, rotation: 0,
+            samMask: out, samMaskWidth: bw, samMaskHeight: bh,
+            samSoft: true   // a stamp's edge is antialiased 0-255 coverage
+        };
+    }
+
+    // Re-opened stamps are cropped tight to their own silhouette (processStamp
+    // in 33 keeps only a 4% ring), so the touch-up brush's Add tool would run
+    // straight into the canvas edge. Re-compose the stamp centred on a roomier
+    // transparent canvas first. Nothing is lost: Apply re-crops to the
+    // bounding box, so the empty margin never reaches storage.
+    function padAdhocSource(img, frac) {
+        const iw = img.naturalWidth || img.width || 1;
+        const ih = img.naturalHeight || img.height || 1;
+        const pad = Math.round(Math.max(iw, ih) * frac);
+        if (pad < 1) return null;
+        const c = document.createElement('canvas');
+        c.width = iw + pad * 2; c.height = ih + pad * 2;
+        try { c.getContext('2d').drawImage(img, pad, pad, iw, ih); } catch (_) { return null; }
+        return c;
+    }
+
     // ── Ad-hoc mask mode (2026-08-09): run the full editor (stamps +
     // Instant Roto) against an arbitrary image, no layer involved. Used by
     // custom brush shapes (33-brush-shapes). The editor canvas is sized to
@@ -3463,10 +3522,18 @@
     // shapes/SAM all operate in that space. On Apply, the caller gets a
     // white/alpha canvas: alpha = image alpha (or inverted luminance for
     // fully opaque images with no shapes) ∩ the drawn mask coverage.
-    window.enterAdhocMaskMode = function (imageDataURL, name, onApply) {
+    // opts (2026-08-23, re-editing a saved stamp): {seed:true} loads the
+    // image's own alpha as the starting coverage and makes THAT — not the
+    // image — the source of the applied alpha, so every pass tweaks the last
+    // one instead of intersecting it; {pad:frac} gives the stamp room to grow.
+    window.enterAdhocMaskMode = function (imageDataURL, name, onApply, opts) {
         const img = new Image();
         img.onload = () => {
-            const long = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+            const padded = (opts && opts.pad > 0) ? padAdhocSource(img, opts.pad) : null;
+            const source = padded || img;
+            const sw = source.naturalWidth || source.width || 1;
+            const sh = source.naturalHeight || source.height || 1;
+            const long = Math.max(sw, sh) || 1;
             // Work at a comfortable editing resolution: the editor canvas
             // displays at its native CSS px (.mask-editor-canvas only has
             // max-width/height), so a small brush image would otherwise open
@@ -3474,17 +3541,30 @@
             // ones at 2048 — the saved stamp is ≤128px either way (33).
             const target = Math.min(2048, Math.max(long, 800));
             const scale = target / long;
+            const w = Math.max(1, Math.round(sw * scale));
+            const h = Math.max(1, Math.round(sh * scale));
             maskState.adhocSource = {
-                image: img,
-                dataURL: imageDataURL,
+                image: source,
+                // Instant Roto keys off this URL and maps clicks through
+                // width/height, so a padded session must hand it the PADDED
+                // bitmap or its coordinates land offset from the artwork.
+                dataURL: padded ? padded.toDataURL('image/png') : imageDataURL,
                 name: name || 'Brush Shape',
                 onApply: onApply,
-                width: Math.max(1, Math.round((img.naturalWidth || 1) * scale)),
-                height: Math.max(1, Math.round((img.naturalHeight || 1) * scale))
+                seeded: false,
+                width: w,
+                height: h
             };
             maskState.activeMaskLayerId = 'adhoc';
             maskState.maskMode = 'show';
             maskState.shapes = [];
+            if (opts && opts.seed) {
+                const seed = adhocSeedShape(source, w, h);
+                if (seed) {
+                    maskState.shapes = [seed];
+                    maskState.adhocSource.seeded = true;
+                }
+            }
             maskState.selectedShapeIndex = null;
             maskState.isDragging = false;
             maskState.isResizing = false;
@@ -3527,9 +3607,16 @@
         let data;
         try { data = octx.getImageData(0, 0, w, h); } catch (_) { return null; }
         const px = data.data;
+        // A seeded session started FROM this image's alpha, so the coverage
+        // already carries it — reading the image again would square it, and
+        // would also clip anything the touch-up brush added outside the old
+        // silhouette. Coverage alone is the answer there.
+        const seeded = !!src.seeded;
         // Does the source image carry real transparency?
         let hasAlpha = false;
-        for (let i = 3; i < px.length; i += 4) { if (px[i] < 250) { hasAlpha = true; break; } }
+        if (!seeded) {
+            for (let i = 3; i < px.length; i += 4) { if (px[i] < 250) { hasAlpha = true; break; } }
+        }
         // Coverage from the drawn shapes (the canonical renderer handles
         // every shape type incl. sam-mask softness)
         let cov = null;
@@ -3565,7 +3652,12 @@
         const invertCov = maskState.maskMode === 'hide';
         for (let i = 0; i < px.length; i += 4) {
             let a;
-            if (hasAlpha) {
+            if (seeded) {
+                // Every shape deleted = an empty stamp, which 33 refuses with
+                // "nothing left to stamp" and keeps the old art. Falling back
+                // to 1 here would silently save a full square instead.
+                a = cov ? 1 : 0;
+            } else if (hasAlpha) {
                 a = px[i + 3] / 255;
             } else if (!cov) {
                 // Opaque image, no shapes: Photoshop convention — dark paints

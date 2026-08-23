@@ -550,7 +550,7 @@
                         'background:rgba(13,17,23,.92);color:#e6edf3;border:1px solid rgba(255,255,255,.18);' +
                         'border-radius:10px;padding:12px 22px;font:14px/1.5 "Segoe UI",sans-serif;' +
                         'box-shadow:0 8px 32px rgba(0,0,0,.55);pointer-events:none;transition:opacity .6s';
-                    hint.textContent = '🖌️ Drag on the canvas to paint · F1 for shortcuts';
+                    hint.textContent = 'Drag on the canvas to paint · F1 for shortcuts';
                     document.body.appendChild(hint);
                     var done = false;
                     var dismiss = function () {

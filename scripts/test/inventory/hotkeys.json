@@ -30,7 +30,8 @@
       "event": { "key": "F1", "code": "F1", "ctrlKey": false, "shiftKey": false, "altKey": false },
       "guard": "typing target (js/05n-hotkeys-init.js:283 via js/01a-param-registry.js:363-374)",
       "effect": "Toggles the hotkey reference modal (chips the list on first open)",
-      "assertion": "document.getElementById('hotkeyOverlay').style.display toggles between 'flex' and 'none' (js/05n-hotkeys-init.js:34-36,302-306)",
+      "assertion": { "expr": "document.getElementById('hotkeyOverlay').style.display", "note": "toggles between 'flex' and 'none' (js/05n-hotkeys-init.js:34-36,302-306)" },
+      "toggle": true,
       "source": "js/05n-hotkeys-init.js:302-306",
       "sheet": "index.html:1145"
     },

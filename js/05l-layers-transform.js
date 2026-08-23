@@ -141,6 +141,19 @@
             // D2: free a raster layer's GPU buffer + history before the
             // arrays forget it existed
             if (window.rasterLayers) window.rasterLayers._onDeleted(index);
+            // This layer may have been a clip SOURCE: free the coverage FBO
+            // materialized for it, and unbind anyone pointing at it so they
+            // fall back to None rather than to a slot a later layer reuses.
+            if (window.ClipSources) {
+                window.ClipSources.dropLayer(index);
+                const gone = 'layer:' + index;
+                layers.forEach(function (l) {
+                    if (l.index !== index && window.ClipSources.keyOf(l) === gone) {
+                        window.ClipSources.set(l, null);
+                        if (typeof window.applyLayerClip === 'function') window.applyLayerClip(l.index);
+                    }
+                });
+            }
             const layerDiv = document.getElementById(`layer${index}`);
             if (layerDiv) {
                 layerDiv.style.backgroundImage = '';
@@ -736,9 +749,11 @@
                     s.opacity = (typeof layer.opacity === 'number') ? layer.opacity : 1;
                     s.mode = MODE_INT[layer.blendMode] || 0;
                     s.under = !passedSim;
-                    // D3 clip binding: a Mask's coverage gates this layer
-                    const cf = (layer.clipMaskId != null && window.Masks)
-                        ? window.Masks.getFBO(layer.clipMaskId) : null;
+                    // D3 clip binding: a clip source's coverage gates this
+                    // layer — a Mask, or another layer's mask/collider (05o).
+                    const ck = (window.ClipSources && window.ClipSources.keyOf)
+                        ? window.ClipSources.keyOf(layer) : null;
+                    const cf = ck ? window.ClipSources.getFBO(ck) : null;
                     s.clipTex = cf ? cf.texture : null;
                     s.clipInvert = !!layer.clipInvert;
                     _slots.push(s);

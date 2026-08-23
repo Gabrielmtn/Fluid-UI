@@ -631,7 +631,7 @@
                         // explicit "safe now" instead of a race. The save clears
                         // __unsavedWork, so the next attempt is silent anyway.
                         var reloading = (askKind === 'reload' || askKind === 'hard-reload');
-                        e.title.textContent = '✓ Project saved';
+                        e.title.textContent = 'Project saved';
                         e.msg.textContent = 'Saved as a .fluid project. It is safe to '
                             + (reloading ? 'reload' : 'close') + ' now.';
                         e.save.style.display = 'none';
@@ -659,7 +659,7 @@
                             '</div>' +
                             '<div class="delete-modal-actions">' +
                                 '<button type="button" class="delete-modal-cancel" id="appCloseKeep">Keep painting</button>' +
-                                '<button type="button" class="app-close-save" id="appCloseSave">💾 Save project</button>' +
+                                '<button type="button" class="app-close-save" id="appCloseSave">Save project</button>' +
                                 '<button type="button" class="delete-modal-confirm" id="appCloseQuit">Close anyway</button>' +
                             '</div>' +
                         '</div>';

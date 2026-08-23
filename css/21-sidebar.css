@@ -141,14 +141,14 @@
     --row-h: 34px;
     --row-pad: 9px;
     --g-core:       linear-gradient(in oklch 180deg, oklch(84% 0.160 242) 0%, oklch(60% 0.131 294) 100%);
-    --g-expressive: linear-gradient(in oklch 180deg, oklch(84% 0.170 32)  0%, oklch(60% 0.139 354) 100%);
+    --g-expressive: linear-gradient(in oklch 180deg, oklch(84% 0.150 190) 0%, oklch(60% 0.123 155) 100%);
     --g-system:     linear-gradient(in oklch 180deg, oklch(84% 0.080 250) 0%, oklch(60% 0.066 268) 100%);
 }
 
 /* Solid fallbacks: these are what renders if the gradient never applies, so
    the grouping survives an engine without oklch interpolation. */
 .sidebar-section[data-group="core"]       .section-title { color: rgba(88, 166, 255, 0.78); --g: var(--g-core); }
-.sidebar-section[data-group="expressive"] .section-title { color: rgba(255, 106, 88, 0.82); --g: var(--g-expressive); }
+.sidebar-section[data-group="expressive"] .section-title { color: rgba(86, 214, 205, 0.82); --g: var(--g-expressive); }
 .sidebar-section[data-group="system"]     .section-title { color: rgba(255, 255, 255, 0.45); --g: var(--g-system); }
 
 /* Gated: background-clip:text with a transparent fill turns the whole nav
@@ -315,11 +315,8 @@
     gap: 5px;
 }
 .anim-grid button {
-    padding: 7px 4px;
-    font-size: 11px;
     line-height: 1.25;
     text-align: center;
-    border-radius: 5px;
 }
 
 /* ── Animation toggle rows ── */
@@ -462,11 +459,6 @@
     gap: 4px;
     margin-top: 6px;
 }
-#sidebar-right .presets button {
-    padding: 5px 2px;
-    font-size: 9px;
-}
-
 /* ── Layers section - always at top; collapses like any other section ── */
 .sidebar-section.section-layers:not(.collapsed) {
     grid-template-rows: auto 1fr; /* fill the sidebar when open */
@@ -489,12 +481,6 @@
     border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 .section-header-actions button {
-    padding: 2px 6px;
-    font-size: 11px;
-    border-radius: 3px;
-    background: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.6);
-    border: 1px solid rgba(255,255,255,0.06);
     cursor: pointer;
     line-height: 1;
 }
@@ -529,8 +515,6 @@
 }
 .settings-btn-row button {
     flex: 1;
-    font-size: 11px;
-    padding: 6px 4px;
 }
 
 /* ── Mobile overrides ── */
@@ -607,7 +591,8 @@ body.mobile-mode #canvas-wrapper {
 }
 
 /* The mixer strip is relocated into the slide-out menu on mobile (JS, 13-mobile-mode).
-   This selector out-specifies "body.mobile-mode #mixer-strip { display:none }" above,
+   This selector out-specifies "body.mobile-mode #mixer-strip { display:none }
+" above,
    and reflows the horizontal strip into a wrapping grid that fits the menu. */
 body.mobile-mode #sidebar-right > #mixer-strip {
     display: flex !important;
@@ -783,24 +768,16 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 
 /* Animation grid buttons */
 #sidebar-right .anim-grid button {
-    padding: 7px 4px;
-    font-size: 11px;
     line-height: 1.2;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    color: white;
-    border-radius: 5px;
     cursor: pointer;
 }
 #sidebar-right .anim-grid button:hover {
     opacity: 0.8;
 }
 #sidebar-right .anim-grid button div:first-child {
-    font-size: 1em;
     margin-bottom: 1px;
 }
 #sidebar-right .anim-grid button div:last-child {
-    font-size: 0.65em;
     opacity: 0.6;
 }
 
@@ -830,8 +807,6 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 #sidebar-right .palette-actions button {
     flex: 1;
-    font-size: 9px;
-    padding: 5px 2px;
 }
 #sidebar-right .palette-row-split {
     gap: 6px;
@@ -853,11 +828,8 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 #sidebar-right .palette-btn-row button {
     flex: 1;
-    font-size: 11px;
-    padding: 5px 6px;
 }
 #sidebar-right .palette-create button {
-    font-size: 11px;
     width: 100%;
 }
 #sidebar-right .palette-name-input {
@@ -881,11 +853,6 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 #sidebar-right .color-actions {
     margin-top: 0;
 }
-#sidebar-right .color-actions button {
-    font-size: 10px;
-    padding: 5px;
-}
-
 /* Saved colors in sidebar */
 #sidebar-right .saved-colors {
     min-height: 30px;
@@ -893,39 +860,51 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     margin-top: 6px;
 }
 
-/* ── Multiplayer room UI ── */
+/* ── Swirl Together (room panel) ──
+   Layout and typography only. Every button in here takes its colour from the
+   section tokens in css/01-buttons.css — the panel sits under a [data-group]
+   section, so the buttons are already the right blue. Do not add background,
+   border-color or color to a button rule below. */
 #multiArtistPanel {
     font-size: 12px;
 }
-/* Primary weight: solid accent, flat, square (design handoff 4.7) */
-.mp-btn-create {
+
+/* One-line answer to "what is this section". */
+.mp-hint {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-300, #b9bec7);
+    margin-bottom: 10px;
+}
+/* The line under a choice that says what picking it actually does. Both
+   entry points are one click, so the difference between them has to be
+   readable before you commit. */
+.mp-sub {
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--ink-500, #7b828e);
+    margin: -2px 0 10px;
+}
+
+/* The two ways in. Same weight: neither is the "real" one. */
+.mp-btn-primary {
     width: 100%;
-    padding: 10px;
-    font-size: 13px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    background: var(--accent, #ec3013);
-    border: none;
-    color: #fff;
-    border-radius: 0;
-    cursor: pointer;
-    margin-bottom: 8px;
+        margin-bottom: 4px;
 }
-.mp-btn-create:hover {
-    filter: brightness(1.08);
-}
+
 .mp-join-row {
     display: flex;
     gap: 6px;
+    margin-bottom: 4px;
 }
 .mp-join-row input {
     flex: 1;
+    min-width: 0;
     padding: 7px 10px;
     background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--ground-500, #2a2e37);
     border-radius: 5px;
-    color: white;
+    color: var(--ink-100, #f2f3f5);
     font-size: 12px;
     font-family: 'Courier New', monospace;
     letter-spacing: 1px;
@@ -935,38 +914,47 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     text-transform: none;
     letter-spacing: 0;
     font-family: inherit;
-    opacity: 0.4;
+    opacity: 0.45;
 }
 .mp-join-row input:focus {
     outline: none;
-    border-color: rgba(100, 150, 255, 0.5);
+    border-color: oklch(51% 0.08 var(--sec-h));
 }
 .mp-join-row button {
-    flex: 1;
-    padding: 8px;
-    font-size: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: white;
-    border-radius: 5px;
-    cursor: pointer;
+    flex: 0 0 auto;
 }
-.mp-join-row button:hover {
-    opacity: 0.8;
+
+.mp-or {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ink-500, #7b828e);
+    margin: 10px 0 8px;
 }
+
 .mp-error {
-    color: #ff6b6b;
+    color: var(--danger, #ff6b6b);
     font-size: 11px;
-    margin-top: 6px;
-    padding: 4px 8px;
+    margin-top: 8px;
+    padding: 5px 8px;
     background: rgba(255, 80, 80, 0.1);
     border-radius: 4px;
 }
+/* Same slot, but for an outcome that is not anyone's fault — a stranger
+   leaving ends the swirl, it does not break anything, and the danger red
+   reads as "you did something wrong". */
+.mp-error.mp-notice {
+    color: var(--ink-300, #b9bec7);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── Connected ── */
 .mp-status-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     font-size: 12px;
 }
 .mp-dot {
@@ -976,147 +964,170 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     flex-shrink: 0;
 }
 .mp-dot-connected {
-    background: #4caf50;
-    box-shadow: 0 0 6px rgba(76, 175, 80, 0.5);
+    background: var(--ok, #3fb950);
+    box-shadow: 0 0 6px rgba(63, 185, 80, 0.5);
 }
 .mp-dot-connecting {
-    background: #ffc107;
-    box-shadow: 0 0 6px rgba(255, 193, 7, 0.4);
+    background: var(--warn, #ffa500);
+    box-shadow: 0 0 6px rgba(255, 165, 0, 0.4);
     animation: mp-pulse 1s infinite;
 }
 @keyframes mp-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
 }
-.mp-room-display {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 6px;
-    padding: 8px 12px;
-    margin-bottom: 8px;
+/* Pushed to the end of the status line: it is a count, not a heading. */
+.mp-users {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--ink-500, #7b828e);
+}
+
+.mp-lock-badge {
+    font-size: 10px;
     text-align: center;
+    padding: 4px 6px;
+    margin-bottom: 8px;
+    color: var(--ink-300, #b9bec7);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 4px;
+}
+
+/* ── Invite block ──
+   The room code is a live invitation to anyone who can read it, so how it is
+   displayed is a choice, not a constant: readable at a table, scannable
+   across a room, or blanked when the screen is being shared. */
+.mp-invite {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 6px;
+    padding: 8px 10px 10px;
+    margin-bottom: 8px;
+}
+.mp-invite-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 6px;
 }
 .mp-room-label {
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    opacity: 0.45;
-    margin-bottom: 4px;
+    color: var(--ink-500, #7b828e);
 }
+
+/* Segmented control: Code / QR / Hide. */
+.mp-share-modes {
+    display: flex;
+    gap: 2px;
+}
+.mp-share-modes { --btn-size: 11px; --btn-pad-y: 3px; --btn-pad-x: 7px; }
+
 .mp-room-code {
     font-family: 'Courier New', monospace;
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 700;
-    letter-spacing: 3px;
-    color: var(--ink-100, #f2f3f5);
-}
-.mp-action-row {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 8px;
-}
-.mp-btn-share {
-    flex: 1;
-    padding: 6px;
-    font-size: 11px;
-    background: rgba(100, 150, 255, 0.15);
-    border: 1px solid rgba(100, 150, 255, 0.25);
-    color: white;
-    border-radius: 5px;
-    cursor: pointer;
-}
-.mp-btn-share:hover {
-    opacity: 0.8;
-}
-.mp-btn-disconnect {
-    flex: 1;
-    padding: 6px;
-    font-size: 11px;
-    background: rgba(255, 80, 80, 0.12);
-    border: 1px solid rgba(255, 80, 80, 0.25);
-    color: #ff8a8a;
-    border-radius: 5px;
-    cursor: pointer;
-}
-.mp-btn-disconnect:hover {
-    opacity: 0.8;
-}
-.mp-users {
-    font-size: 11px;
-    opacity: 0.55;
+    letter-spacing: 4px;
     text-align: center;
+    color: var(--ink-100, #f2f3f5);
+    /* The masked state is the same box at the same size, so switching to it
+       does not make the panel jump. */
+    min-height: 26px;
+    line-height: 26px;
+    user-select: all;
 }
-.mp-hint {
-    font-size: 11px;
-    line-height: 1.35;
-    color: rgba(255, 255, 255, 0.45);
-    margin-bottom: 8px;
+.mp-room-code.mp-code-hidden {
+    color: var(--ink-500, #7b828e);
+    letter-spacing: 6px;
+    user-select: none;
 }
+
+/* The QR sits on white because that is what a camera expects; a tinted or
+   inverted symbol is measurably slower to acquire. */
+.mp-qr {
+    display: flex;
+    justify-content: center;
+    padding: 6px 0 2px;
+}
+.mp-qr svg {
+    display: block;
+    width: 132px;
+    height: 132px;
+    border-radius: 4px;
+}
+
 .mp-share-hint {
     font-size: 10px;
+    line-height: 1.35;
     color: var(--ink-500, #7b828e);
     text-align: center;
-    margin-bottom: 8px;
+    margin: 6px 0 8px;
 }
-/* "— or —" divider between the code flow and stranger matchmaking */
-.mp-or {
-    text-align: center;
-    font-size: 10px;
-    letter-spacing: 1px;
-    opacity: 0.35;
-    margin: 8px 0;
-}
-/* "Paint with a stranger" — secondary weight (design handoff 4.7) */
-.mp-btn-stranger {
+.mp-btn-share {
     width: 100%;
-    padding: 10px;
-    font-size: 13px;
-    font-weight: 800;
+    }
+
+/* ── Host controls ──
+   Grouped and labelled. A guest never sees this block, so they are not left
+   reading three switches that do nothing for them. */
+.mp-host-block {
+    margin-bottom: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ground-500, #2a2e37);
+}
+.mp-subhead {
+    font-size: 9px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    background: var(--ground-600, #232830);
-    border: 1px solid var(--ground-500, #2a2e37);
-    color: var(--ink-100, #f2f3f5);
-    border-radius: 0;
-    cursor: pointer;
+    letter-spacing: 1px;
+    color: var(--ink-500, #7b828e);
+    margin-bottom: 6px;
 }
-.mp-btn-stranger:hover {
-    border-color: rgba(236, 48, 19, 0.6);
-}
-/* Host-only lock toggle in the connected panel */
 .mp-btn-lock {
     width: 100%;
-    padding: 7px;
-    font-size: 12px;
-    font-weight: 600;
-    background: rgba(236, 48, 19, 0.14);
-    border: 1px solid rgba(236, 48, 19, 0.35);
-    color: var(--ink-100, #f2f3f5);
-    border-radius: 0;
-    cursor: pointer;
-    margin-bottom: 8px;
+        margin-bottom: 4px;
 }
-.mp-btn-lock:hover {
-    opacity: 0.85;
-}
-/* Non-host view of a host-only control: present, explained, inert */
+/* Non-host view of a host-only control: present, explained, inert. */
 .mp-btn-lock.mp-btn-muted,
 .mp-btn-lock.mp-btn-muted:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: var(--ground-500, #2a2e37);
-    color: var(--ink-500, #7b828e);
     cursor: default;
-    opacity: 1;
+    opacity: 0.55;
 }
-/* Take-turns mode: host toggle stays .mp-btn-lock; these are the extras */
-.mp-btn-lock.active {
-    background: rgba(236, 48, 19, 0.3);
-    border-color: rgba(236, 48, 19, 0.6);
+.mp-turn-timer {
+    width: 100%;
+    margin-bottom: 4px;
+    padding: 5px;
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--ground-500, #2a2e37);
+    border-radius: 4px;
+    color: var(--ink-100, #f2f3f5);
+}
+
+/* Leaving is reversible — the same code gets you back in — so this is a
+   normal button, not a destructive one. See the reserved-class test in
+   css/01-buttons.css. */
+.mp-btn-leave {
+    width: 100%;
+        margin-top: 4px;
+}
+.mp-btn-pass {
+    width: 100%;
+        margin-bottom: 6px;
 }
 /* "Shall we take turns?" prompt — stranger pairs, shown to the person asked.
    Sits just under the turn banner so the whole turn conversation is in one
    place on screen. */
 .mp-turn-invite {
+    /* This banner is a panel, so it declares a tint and its buttons inherit
+       it — the same mechanism the sidebar sections use. It used to be a
+       bright orange plate, which now reads as an alarm next to the reserved
+       red and belonged to no part of the system. */
+    --sec-h: 242;
+    --sec-c: 0.16;
+
     position: fixed;
     top: 10px;
     left: 50%;
@@ -1124,16 +1135,18 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     z-index: 10003;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
+    gap: 10px;
+    padding: 11px 14px;
     border-radius: 10px;
-    /* High-contrast orange: this has to register over ANY painting */
-    background: linear-gradient(180deg, #ffa63a, #f07f12);
-    border: 2px solid #ffd9a0;
-    color: #211203;
+    /* Registering over ANY painting is still the job. A dark plate with a lit
+       border and a glow does it without borrowing a warning colour: the
+       entrance and the pulse carry the urgency instead of the hue. */
+    background: oklch(18% 0.03 242 / 0.96);
+    border: 1px solid oklch(62% 0.14 242);
+    color: var(--ink-100, #f2f3f5);
     font-size: 13px;
-    font-weight: 700;
-    box-shadow: 0 10px 34px rgba(240, 130, 20, 0.55), 0 3px 10px rgba(0, 0, 0, 0.55);
+    font-weight: 600;
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6), 0 0 24px oklch(62% 0.14 242 / 0.45);
     animation:
         mpInviteIn 0.55s cubic-bezier(0.2, 1.35, 0.4, 1) both,
         mpInvitePulse 1.6s ease-in-out 0.6s 4;
@@ -1143,30 +1156,15 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     to   { transform: translate(-50%, 0) scale(1); opacity: 1; }
 }
 @keyframes mpInvitePulse {
-    0%, 100% { box-shadow: 0 10px 34px rgba(240, 130, 20, 0.55), 0 3px 10px rgba(0, 0, 0, 0.55); }
-    50%      { box-shadow: 0 10px 52px rgba(255, 160, 40, 0.95), 0 3px 10px rgba(0, 0, 0, 0.55); }
+    0%, 100% { box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6), 0 0 24px oklch(62% 0.14 242 / 0.45); }
+    50%      { box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6), 0 0 40px oklch(70% 0.16 242 / 0.85); }
 }
 .mp-turn-invite button {
-    padding: 7px 14px;
-    font-size: 12px;
-    font-weight: 800;
-    border-radius: 6px;
-    cursor: pointer;
     white-space: nowrap;
 }
-.mp-invite-yes {
-    background: #1d6f2c;
-    border: 1px solid #12481c;
-    color: #ffffff;
-}
-.mp-invite-no {
-    background: rgba(33, 18, 3, 0.16);
-    border: 1px solid rgba(33, 18, 3, 0.45);
-    color: #211203;
-}
-.mp-turn-invite button:hover {
-    filter: brightness(1.15);
-}
+/* Accepting is the answer the banner is asking for, so it carries
+   .btn--emphasis (see css/01-buttons.css). Declining is not destructive —
+   it is just the other answer, so it stays a plain button. */
 /* Transient feedback for invite outcomes (declined / no answer) */
 .mp-turn-toast {
     position: fixed;
@@ -1258,6 +1256,13 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     color: #ffb347;
 }
 .mp-turn-qclock.you { color: #3fb950; }
+/* "One swirl each" puts a rule where the countdown normally sits — it reads as
+   a caption, not a number, so it steps back a size and loses the clock weight. */
+.mp-turn-qclock.rule {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
 .mp-turn-qhint {
     font-size: 10px;
     color: var(--ink-500, #7b828e);
@@ -1284,12 +1289,6 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 .mp-btn-pass {
     width: 100%;
     padding: 7px;
-    font-size: 12px;
-    font-weight: 600;
-    background: rgba(63, 185, 80, 0.14);
-    border: 1px solid rgba(63, 185, 80, 0.35);
-    color: var(--ink-100, #f2f3f5);
-    border-radius: 0;
     cursor: pointer;
     margin-bottom: 8px;
 }
@@ -1326,11 +1325,6 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 #sidebar-right .control-group > div[style*="display: flex"] {
     gap: 4px !important;
 }
-#sidebar-right .control-group > div[style*="display: flex"] button {
-    font-size: 10px;
-    padding: 6px 2px;
-}
-
 /* Layers panel in sidebar — the max-height/margin-top pair that used to sit
    here was dead: init-responsive.css loads last and redeclares both on an
    identical selector. It now owns the list's height entirely. */
@@ -1363,35 +1357,21 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 
 .brush-mode-btn {
-    all: unset;
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: 1;
     height: 26px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: rgba(255, 255, 255, 0.3);
     cursor: pointer;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.02);
     user-select: none;
     outline: none;
+    /* was implied by the removed `all: unset` */
+    padding: 0;
 }
 .brush-mode-btn:hover {
     opacity: 0.8;
 }
-.brush-mode-btn.active {
-    color: #ffaa50;
-    text-shadow: 0 0 6px rgba(255, 170, 80, 0.4);
-    background: rgba(255, 170, 80, 0.08);
-    border-color: rgba(255, 170, 80, 0.2);
-}
-
 .brush-time-group {
     margin-bottom: 10px;
 }
@@ -1460,23 +1440,9 @@ body.rec-open #sidebar-right {
     color: var(--text-secondary);
 }
 .subsection-add-btn {
-    padding: 4px 10px;
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    background: var(--ground-600, #232830);
-    border: 1px solid var(--ground-500, #2a2e37);
-    border-radius: 0;
-    color: var(--ink-300, #b9bec7);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.subsection-add-btn:hover {
-    color: var(--ink-100, #f2f3f5);
-    border-color: rgba(236, 48, 19, 0.6);
-}
-
 /* ── Grouped layer options (capture / preview checkboxes) ── */
 .layers-options-group {
     margin-top: 14px;
@@ -1523,29 +1489,14 @@ body.rec-open #sidebar-right {
     gap: 4px;
 }
 .ar-pattern-btn {
-    all: unset;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 2px;
-    padding: 5px 2px;
-    border-radius: 5px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s, color 0.12s;
-}
-.ar-pattern-btn:hover {
-    background: rgba(255, 255, 255, 0.09);
-    color: rgba(255, 255, 255, 0.85);
-}
-.ar-pattern-btn.active {
-    background: rgba(180, 130, 255, 0.18);
-    border-color: rgba(180, 130, 255, 0.5);
-    color: #fff;
 }
 .ar-pat-glyph { font-size: 15px; line-height: 1; }
 .ar-pat-label { font-size: 8px; letter-spacing: 0.3px; text-transform: uppercase; opacity: 0.85; }
@@ -1629,12 +1580,7 @@ select option {
 .audio-play-btn {
     flex: 0 0 auto;
     width: 30px; height: 26px; padding: 0;
-    font-size: 13px; line-height: 1; cursor: pointer;
-    background: var(--ground-600, #232830); color: var(--ink-100, #f2f3f5);
-    border: 1px solid var(--ground-500, #2a2e37); border-radius: 4px;
 }
-.audio-play-btn:hover { border-color: rgba(236, 48, 19, 0.6); color: #fff; }
-.audio-play-btn.muted { color: #ff7b72; border-color: rgba(255, 123, 114, 0.5); }
 .audio-vol { flex: 1 1 auto; min-width: 60px; }
 .audio-mini-timeline {
     width: 100%; height: 54px; display: block;
@@ -1643,13 +1589,7 @@ select option {
 }
 .audio-mini-full {
     width: 100%; padding: 9px; border-radius: 0;
-    font-weight: 800; font-size: 13px; cursor: pointer;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    background: var(--ground-600, #232830); color: var(--ink-100, #f2f3f5);
-    border: 1px solid var(--ground-500, #2a2e37);
 }
-.audio-mini-full:hover { border-color: rgba(236, 48, 19, 0.6); color: #fff; }
-
 /* Audio scene quick controls (Tunnel) */
 #audioSceneControls { display: flex; flex-direction: column; gap: 6px; }
 .audio-scene-ctl {

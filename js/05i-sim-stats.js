@@ -376,6 +376,83 @@
             density.swap();
             gl.activeTexture(gl.TEXTURE0);
         };
+        // Splat to Fluid: pour a picture into the dye in one shot. `src` is any
+        // canvas/image already laid out in CANVAS space (the caller has baked in
+        // wherever its layer sits on screen), so this is a straight 1:1 deposit
+        // at dye resolution — no gaussian, no aspect frame, no resampling beyond
+        // what the caller chose. Dye ONLY: velocity is left alone, so the flow
+        // that is already running is what carries the picture away, exactly like
+        // a brush press that never moved.
+        //
+        // The dye is the live simulation, not a document — like every dab, this
+        // is not undoable; it dissolves on its own.
+        window.__dyeTexSize = function () { return { w: dyeTexWidth, h: dyeTexHeight }; };
+        window.__splatImageToDye = function (src, amount) {
+            if (!density || !src) return false;
+            let tex = null;
+            try {
+                tex = gl.createTexture();
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, tex);
+                // FLIP_Y matches every other bitmap upload here (brush stamps,
+                // Masks.importCoverage): the dye's v axis runs opposite to a
+                // 2D canvas's, and the splat shader's own `point` flips y for
+                // the same reason.
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+                // Straight alpha, NOT premultiplied: the Gate branch converges
+                // dye toward the image's own colour, which has to stay itself
+                // at low coverage instead of being pre-darkened by it.
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, src);
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            } catch (e) {
+                if (tex) { try { gl.deleteTexture(tex); } catch (_) {} }
+                gl.activeTexture(gl.TEXTURE0);
+                return false;
+            }
+            imageSplatProg.bind();
+            gl.disable(gl.BLEND);
+            gl.uniform1i(imageSplatProg.uniforms.uTarget, 0);
+            gl.uniform1i(imageSplatProg.uniforms.uObstacle, 1);
+            gl.uniform1i(imageSplatProg.uniforms.uImage, 2);
+            gl.uniform1f(imageSplatProg.uniforms.amount,
+                (typeof amount === 'number') ? Math.max(0, Math.min(1, amount)) : 1);
+            // The same two knobs a dab reads, so a poured image lands with the
+            // brush settings that are live right now (05i splat()).
+            gl.uniform1i(imageSplatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
+            gl.uniform1f(imageSplatProg.uniforms.gateFlow,
+                config.COLOR_GATE
+                    ? Math.max(0, Math.min(1, (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1))
+                    : 1);
+            // Pre-compensate for the display's tone map (same white point 05j
+            // hands displayFrag) so the picture lands looking like the picture.
+            // config.FLUIDIZE_HDR_CEIL = 0 turns it off and pours raw values.
+            const _ceil = (typeof config.FLUIDIZE_HDR_CEIL === 'number') ? config.FLUIDIZE_HDR_CEIL : 12;
+            gl.uniform1f(imageSplatProg.uniforms.toneCeil, Math.max(0, _ceil));
+            gl.uniform1f(imageSplatProg.uniforms.toneWhite,
+                (config.BLOOM_CEILING > 0)
+                    ? config.BLOOM_CEILING * ((typeof config.GATE_WHITE_MULT === 'number') ? config.GATE_WHITE_MULT : 1.25)
+                    : 0.0);
+            const _obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
+            gl.uniform1i(imageSplatProg.uniforms.hasObstacle, _obsActive ? 1 : 0);
+            if (_obsActive) {
+                gl.uniform1f(imageSplatProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            }
+            gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+            blit(density.write.fbo);
+            density.swap();
+            try { gl.deleteTexture(tex); } catch (_) {}
+            gl.activeTexture(gl.TEXTURE0);
+            return true;
+        };
         // Capture: freeze the current fluid dye into the sketch layer —
         // over-composited (captureFrag emits premultiplied color with
         // alpha = max channel), so existing sketch content shows through

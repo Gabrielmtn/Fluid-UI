@@ -93,24 +93,12 @@ body.focus-mode #canvas {
     margin-bottom: 8px;
 }
 .stream-format-grid button {
-    padding: 5px 4px;
-    font-size: 9.5px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.06);
-    color: rgba(255,255,255,0.6);
-    border: 1px solid rgba(255,255,255,0.06);
     cursor: pointer;
     line-height: 1.2;
     text-align: center;
-    font-weight: 600;
 }
 .stream-format-grid button:hover {
     opacity: 0.8;
-}
-.stream-format-grid button.active {
-    background: var(--accent, #ec3013);
-    border-color: var(--accent, #ec3013);
-    color: #fff;
 }
 .stream-format-info {
     font-size: 9px;
@@ -139,12 +127,7 @@ body.focus-mode #canvas {
     display: block;
     width: 100%;
     padding: 5px 8px;
-    font-size: 11px;
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
-    border-radius: 4px;
     text-align: left;
     white-space: nowrap;
 }
@@ -214,12 +197,6 @@ body.focus-mode #canvas {
     margin: 0;
 }
 .collision-refresh-btn {
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.6);
-    border-radius: 3px;
-    padding: 2px 6px;
-    font-size: 11px;
     cursor: pointer;
     margin-left: auto;
 }
@@ -287,32 +264,12 @@ body.focus-mode #canvas {
 
 .mutation-btn {
     flex: 1 1 auto;
-    padding: 6px 10px;
-    font-size: 10px;
-    font-weight: 600;
-    background: rgba(180, 100, 255, 0.1);
-    border: 1px solid rgba(180, 100, 255, 0.25);
-    border-radius: 5px;
-    color: rgba(220, 180, 255, 0.9);
     cursor: pointer;
-}
-.mutation-btn:hover:not(:disabled) {
-    background: rgba(180, 100, 255, 0.2);
-    border-color: rgba(180, 100, 255, 0.4);
 }
 .mutation-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
-.mutation-btn-primary {
-    background: linear-gradient(180deg, rgba(180, 100, 255, 0.25), rgba(180, 100, 255, 0.15));
-    border-color: rgba(180, 100, 255, 0.4);
-    color: rgba(230, 200, 255, 1);
-}
-.mutation-btn-primary:hover:not(:disabled) {
-    background: linear-gradient(180deg, rgba(180, 100, 255, 0.35), rgba(180, 100, 255, 0.2));
-}
-
 .mutation-locks {
     display: flex;
     flex-wrap: wrap;
@@ -509,17 +466,10 @@ body.focus-mode #canvas {
     width: 26px;
     height: 26px;
     padding: 0;
-    font-size: 12px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-}
-.path-layer-header .layer-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
 }
 .path-layer-header .layer-btn:disabled {
     opacity: 0.4;
@@ -602,19 +552,9 @@ body.focus-mode #canvas {
     border: none;
 }
 .path-use-brush-btn {
-    padding: 4px 8px;
-    font-size: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
     cursor: pointer;
     margin-left: auto;
 }
-.path-use-brush-btn:hover {
-    background: rgba(236, 48, 19, 0.15);
-    border-color: rgba(236, 48, 19, 0.45);
-}
-
 /* Shape preset buttons */
 .path-shapes-row {
     display: flex;
@@ -627,10 +567,6 @@ body.focus-mode #canvas {
     width: 32px;
     height: 32px;
     padding: 0;
-    font-size: 16px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -638,8 +574,6 @@ body.focus-mode #canvas {
     transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
 .path-shape-btn:hover {
-    background: rgba(236, 48, 19, 0.15);
-    border-color: rgba(236, 48, 19, 0.45);
     transform: scale(1.05);
 }
 .path-shape-btn:active {
@@ -651,21 +585,9 @@ body.focus-mode #canvas {
     width: 100%;
     padding: 8px 12px;
     margin-top: 8px;
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    background: var(--ground-600, #232830);
-    border: 1px solid var(--ground-500, #2a2e37);
-    border-radius: 0;
-    color: var(--ink-100, #f2f3f5);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
 }
-.path-draw-btn:hover {
-    border-color: rgba(236, 48, 19, 0.6);
-}
-
 /* Path preview canvas */
 .path-preview-canvas {
     width: 100%;
@@ -702,12 +624,7 @@ body.focus-mode #canvas {
 }
 
 #pathDrawOverlay .draw-toolbar button {
-    padding: 8px 16px;
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: 6px;
     cursor: pointer;
-    border: none;
 }
 
 #pathDrawDone {
@@ -757,9 +674,121 @@ body.focus-mode #canvas {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 8px;
+    padding: 8px 8px 6px;
     background: rgba(255, 255, 255, 0.04);
     cursor: grab;
+    position: relative;
+}
+
+/* Collapse state is an INDICATOR, not a control — the header itself is the
+   button (see the click handler in 05k renderLayers), so this only has to
+   say which way the row is. Sits on the item's top border, centred. */
+.layer-collapse-caret {
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin-left: -3px;
+    border-right: 1.5px solid rgba(255, 255, 255, 0.3);
+    border-bottom: 1.5px solid rgba(255, 255, 255, 0.3);
+    transform: rotate(-135deg);          /* points up = open */
+    pointer-events: none;
+    transition: transform 140ms ease, border-color 140ms ease;
+}
+.layer-item-collapsible.collapsed .layer-collapse-caret {
+    transform: rotate(45deg);            /* points down = closed */
+}
+/* The Sim row has no body, so it never collapses — no indicator to give. */
+.layer-item[data-layer-type="sim"] .layer-collapse-caret {
+    display: none;
+}
+.layer-item-collapsible .layer-item-header:hover .layer-collapse-caret {
+    border-color: rgba(255, 255, 255, 0.72);
+}
+
+/* Show / hide, and the mask (or collision) enable. Checkboxes rather than
+   glyphs or blue-when-on buttons: state reads at a glance, and using the same
+   control for both means learning it once. .layer-check carries a caption. */
+.layer-vis,
+.layer-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    cursor: pointer;
+    padding: 2px;
+}
+.layer-check {
+    gap: 5px;
+    padding: 3px 7px 3px 5px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.04);
+    font-size: inherit;
+    color: inherit;
+}
+.layer-check:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+}
+.layer-check-label {
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.layer-check input:disabled ~ .layer-check-label {
+    opacity: 0.4;
+}
+.layer-check:has(input:disabled) {
+    cursor: default;
+    opacity: 0.6;
+}
+.layer-vis input,
+.layer-check input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.layer-vis-box {
+    display: block;
+    position: relative;
+    width: 15px;
+    height: 15px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.05);
+    transition: background 120ms ease, border-color 120ms ease;
+}
+.layer-vis:hover .layer-vis-box,
+.layer-check:hover .layer-vis-box {
+    border-color: rgba(255, 255, 255, 0.55);
+}
+.layer-vis input:checked + .layer-vis-box,
+.layer-check input:checked + .layer-vis-box {
+    background: rgba(120, 190, 255, 0.9);
+    border-color: rgba(120, 190, 255, 1);
+}
+.layer-vis-box::after {
+    content: '';
+    position: absolute;
+    left: 4.5px;
+    top: 1px;
+    width: 4px;
+    height: 8px;
+    border-right: 2px solid #101720;
+    border-bottom: 2px solid #101720;
+    transform: rotate(45deg);
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+.layer-vis input:checked + .layer-vis-box::after,
+.layer-check input:checked + .layer-vis-box::after {
+    opacity: 1;
+}
+.layer-vis input:focus-visible + .layer-vis-box,
+.layer-check input:focus-visible + .layer-vis-box {
+    outline: 2px solid rgba(120, 190, 255, 0.65);
+    outline-offset: 2px;
 }
 .layer-item-collapsible .layer-item-body {
     overflow: hidden;
@@ -784,20 +813,8 @@ body.focus-mode #canvas {
 }
 .path-transform-btn {
     flex: 1;
-    padding: 8px 12px;
-    font-size: 11px;
-    font-weight: 600;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-    color: var(--text-primary);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
-}
-.path-transform-btn:hover:not(:disabled) {
-    background: rgba(236, 48, 19, 0.12);
-    border-color: rgba(236, 48, 19, 0.45);
-    color: var(--ink-100, #f2f3f5);
 }
 .path-transform-btn:disabled {
     opacity: 0.35;
@@ -805,20 +822,8 @@ body.focus-mode #canvas {
 }
 .path-clear-btn {
     flex: 1;
-    padding: 8px 12px;
-    font-size: 11px;
-    font-weight: 600;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--border-strong);
-    border-radius: 6px;
-    color: var(--text-primary);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
-}
-.path-clear-btn:hover:not(:disabled) {
-    background: rgba(255, 120, 120, 0.12);
-    border-color: rgba(255, 120, 120, 0.4);
-    color: rgba(255, 150, 150, 0.95);
 }
 .path-clear-btn:disabled {
     opacity: 0.35;
@@ -851,21 +856,9 @@ body.focus-mode #canvas {
 }
 .path-empty-create {
     padding: 6px 14px;
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    background: var(--accent, #ec3013);
-    border: none;
-    border-radius: 0;
-    color: #fff;
     cursor: pointer;
     transition: filter 0.15s;
 }
-.path-empty-create:hover {
-    filter: brightness(1.08);
-}
-
 /* ── Path Transform Overlay (move / resize) — mirrors the draw overlay ── */
 #pathTransformOverlay {
     position: fixed;
@@ -890,12 +883,7 @@ body.focus-mode #canvas {
     font-size: 13px;
 }
 #pathTransformOverlay .draw-toolbar button {
-    padding: 8px 16px;
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: 6px;
     cursor: pointer;
-    border: none;
 }
 #pathTransformDone {
     background: rgba(80, 200, 120, 0.9);
@@ -945,12 +933,7 @@ body.focus-mode #canvas {
     color: var(--text-secondary);
 }
 #layerTransformOverlay .draw-toolbar button {
-    padding: 8px 16px;
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: 6px;
     cursor: pointer;
-    border: none;
 }
 #layerTransformDone {
     background: rgba(80, 200, 120, 0.9);
@@ -1046,10 +1029,4 @@ body.branding-arrange-active .background-layer.active.dragging {
 }
 body.branding-arrange-active #canvas-size-display {
     opacity: 0 !important;
-}
-/* The arrange toggle button reflects active state */
-.branding-arrange-btn.active {
-    background: rgba(255, 130, 170, 0.35) !important;
-    border-color: rgba(255, 130, 170, 0.6) !important;
-    color: #fff !important;
 }

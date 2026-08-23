@@ -1,0 +1,222 @@
+{
+  "when": "2026-08-23T09-42-06",
+  "gate": null,
+  "reports": [
+    {
+      "param": "ridges",
+      "results": [
+        {
+          "level": 0,
+          "sim": {
+            "hash": "81cfda99",
+            "mean": 0.30470477336814383,
+            "max": 3.09765625,
+            "nan": 0,
+            "coverage": 0.3960733413696289,
+            "velHash": "b40446e1",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "dbdfae9c",
+            "meanLum": 0.1691297892466223,
+            "maxLum": 0.746603137254902
+          },
+          "simSameAsOff": true,
+          "lookSameAsOff": true
+        },
+        {
+          "level": 0.6,
+          "sim": {
+            "hash": "3dd20a01",
+            "mean": 0.2917237836156801,
+            "max": 3.09765625,
+            "nan": 0,
+            "coverage": 0.32103824615478516,
+            "velHash": "b9bd0db3",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "4a63af0e",
+            "meanLum": 0.15492290179940382,
+            "maxLum": 0.746603137254902
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 1.2,
+          "sim": {
+            "hash": "ef952822",
+            "mean": 0.2906945674586723,
+            "max": 3.099609375,
+            "nan": 0,
+            "coverage": 0.3205718994140625,
+            "velHash": "6fef443b",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "050189bf",
+            "meanLum": 0.15456911426343659,
+            "maxLum": 0.746603137254902
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 1.8,
+          "sim": {
+            "hash": "5c114e9a",
+            "mean": 0.29579253743332856,
+            "max": 3.09765625,
+            "nan": 0,
+            "coverage": 0.3198375701904297,
+            "velHash": "5f2c036b",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "528c7bee",
+            "meanLum": 0.1552589727857174,
+            "maxLum": 0.746603137254902
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 2.4,
+          "sim": {
+            "hash": "6b598a87",
+            "mean": 0.29172365255476507,
+            "max": 3.09765625,
+            "nan": 0,
+            "coverage": 0.32103824615478516,
+            "velHash": "b9bd0db3",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "19278495",
+            "meanLum": 0.1541205634793846,
+            "maxLum": 0.751075294117647
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 3,
+          "sim": {
+            "hash": "bbc9a30c",
+            "mean": 0.2906944571491863,
+            "max": 3.099609375,
+            "nan": 0,
+            "coverage": 0.3205718994140625,
+            "velHash": "6fef443b",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "6c97ef1a",
+            "meanLum": 0.15340071184271473,
+            "maxLum": 0.75388
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 3.6,
+          "sim": {
+            "hash": "01202507",
+            "mean": 0.2957924642621492,
+            "max": 3.09765625,
+            "nan": 0,
+            "coverage": 0.3198375701904297,
+            "velHash": "5f2c036b",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "b5eb10e4",
+            "meanLum": 0.15375985398209185,
+            "maxLum": 0.756113725490196
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 4.2,
+          "sim": {
+            "hash": "e9716d3e",
+            "mean": 0.2917237530530201,
+            "max": 3.09765625,
+            "nan": 0,
+            "coverage": 0.32103824615478516,
+            "velHash": "b9bd0db3",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "658828b0",
+            "meanLum": 0.15257872001936668,
+            "maxLum": 0.763390588235294
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 4.8,
+          "sim": {
+            "hash": "d2921314",
+            "mean": 0.2906944382933716,
+            "max": 3.099609375,
+            "nan": 0,
+            "coverage": 0.3205718994140625,
+            "velHash": "6fef443b",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "532aca5e",
+            "meanLum": 0.15178186537562283,
+            "maxLum": 0.76422431372549
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 5.4,
+          "sim": {
+            "hash": "eea51a71",
+            "mean": 0.29579259235055133,
+            "max": 3.09765625,
+            "nan": 0,
+            "coverage": 0.3198375701904297,
+            "velHash": "5f2c036b",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "6c17d28c",
+            "meanLum": 0.152114493117087,
+            "maxLum": 0.7768070588235293
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        },
+        {
+          "level": 6,
+          "sim": {
+            "hash": "af2d2d5b",
+            "mean": 0.2917236662562459,
+            "max": 3.09765625,
+            "nan": 0,
+            "coverage": 0.32103824615478516,
+            "velHash": "b9bd0db3",
+            "velNan": 0
+          },
+          "look": {
+            "hash": "5f053485",
+            "meanLum": 0.15107377329137509,
+            "maxLum": 0.7815623529411764
+          },
+          "simSameAsOff": false,
+          "lookSameAsOff": false
+        }
+      ],
+      "flags": [],
+      "pageErrors": []
+    }
+  ]
+}

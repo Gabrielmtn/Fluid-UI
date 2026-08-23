@@ -101,50 +101,27 @@ reused in search results and sale pages.)*
 
 ## 6. About This Game
 
-```
-[h2]Paint is a fluid. So paint with someone.[/h2]
+**The final text lives in [about/ABOUT-COPY.md](about/ABOUT-COPY.md)** — one
+file, so the two cannot drift. Paste the fenced block from there; the inline
+`[img]` tags need the eight files from `about/images/` uploaded through the
+description editor first (mechanics in `about/README.md`).
 
-Swirl Together is a painting game for two or more people. The canvas is a real
-fluid simulation — colour flows, curls, drags and blooms under your brush — and
-you are never the only one touching it. Your partner's strokes push into yours.
-Yours push back. What you end up with is something neither of you would have
-made alone.
+Shape, since Aug 21: the Overvoid layout Gabriel picked — a one-line statement
+of what the game is, three short paragraphs, one counted feature list, then
+images with a line of context under each. Every count in that list is checked
+against the code; the table of claim → source is in ABOUT-COPY.md, as are the
+three superseded drafts (none were ever committed, so git cannot return them).
 
-There is no score, no timer, no fail state. You are here to make a nice thing
-with another person for a few minutes.
+### [DECIDE] resolved — communal-ledger / wishlist line
 
-[h2]Two ways in[/h2]
-[list]
-[*][b]Paint with a stranger.[/b] Press one button and get matched with one other
-person, somewhere, who wanted the same thing. No chat, no profiles — just two
-brushes on one canvas.
-[*][b]Paint with a friend.[/b] Share a six-character room code. Up to eight
-people on the same canvas.
-[/list]
-
-[h2]Real fluid, real brushes[/h2]
-[list]
-[*]A GPU fluid simulation you paint into directly — vorticity, dye transport,
-wet paint that dries, thick paint that piles up.
-[*]Dozens of brushes: soft dye, wet acrylic, thick clay, multi-armed mandala
-brushes, custom stamp shapes you draw yourself.
-[*]Layers, masks and colliders — drop in an image and paint around it, or let
-the fluid break against a shape you cut out.
-[*]Glow, kaleidoscope, light shifting, surface shading — a deep drawer of look
-controls, and a Mutate button for when you would rather be surprised.
-[*]Paint that listens to music, if you want it to.
-[*]Save your canvas, export a still, or record the whole painting as a video.
-[/list]
-
-[h2]For anyone[/h2]
-Nothing here needs to be learned. You put the brush down and colour moves. The
-rest is optional depth for the people who want it.
-```
-
-**[DECIDE]** whether the communal-ledger / wishlist line goes in here. Rules
-verdict (§9.3): allowed, but keep it **out of every capsule image**, use no fake
-Steam UI, no external links, and have a softer fallback phrasing ready in case a
-reviewer reads it as a feature-removal threat.
+**Recommendation: leave it out of About This Game.** §9.3 allows it, but this
+field is read as a description of the *game*, and a reviewer skimming it can
+read a wishlist-linked mechanic as a feature-removal threat — the exact failure
+§9.3 warns about. It also spends the most valuable paragraph on a marketing
+mechanic rather than on what the thing is. Better homes for it: a Steam
+announcement post, or the demo's own UI where it can be shown rather than
+promised. Say the word if you want it added back and I will write the softer
+phrasing.
 
 ---
 

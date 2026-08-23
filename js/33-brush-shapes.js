@@ -342,7 +342,9 @@
     // Reopen the mask editor on a saved shape. It edits the STAMP, not the
     // image it came from — originals are deliberately not kept (stamps are
     // ≤128px so they ride presets/quota; originals are megabytes) — so this
-    // trims and re-cuts what is there rather than restoring lost area.
+    // reshapes what is there rather than restoring lost area. Each pass picks
+    // up where the last one left off (see the seed/pad options below), which
+    // is what makes a shape something you refine over several sittings.
     function beginEdit(id) {
         var entry = findEntry(id);
         if (!entry) return;
@@ -350,9 +352,14 @@
             say('One moment', 'The mask editor is still loading — try again in a moment.');
             return;
         }
+        // seed: the stamp IS a mask, so the editor opens with it already
+        // selected — the touch-up brush erases and adds against the real
+        // silhouette, and Apply saves what is on screen. Without it each
+        // re-edit started from an empty selection and the first stroke
+        // became the whole shape. pad: room to grow outside the tight crop.
         window.enterAdhocMaskMode(entry.dataURL, entry.name || 'Brush Shape', function (resultCanvas, nm) {
             replace(id, nm, resultCanvas);
-        });
+        }, { seed: true, pad: 0.15 });
     }
 
     function beginImportDataUrl(dataURL, name) {

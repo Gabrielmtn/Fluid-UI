@@ -86,10 +86,21 @@ export default class FluidPartyServer implements Party.Server {
   turnHolder: string | null = null; // uid of the current painter
   turnMs = 60_000; // host-chosen turn length (0 = no timer)
   turnDeadline = 0; // epoch ms when the current turn auto-passes (0 = none)
+  // How a turn ENDS. "timer": the alarm auto-passes at turnDeadline. "stroke"
+  // ("One swirl each"): no clock at all — the painter tweaks, lays down one
+  // stroke, and their own client passes the brush when that stroke has fully
+  // landed. The relay stays the authority either way; it just has no deadline
+  // to enforce in stroke mode, so turnMs is pinned to 0 there.
+  turnMode: "timer" | "stroke" = "timer";
   // Stranger-pair consent, in memory only: it lives ~30s inside a room with two
   // live connections, so there is nothing worth persisting — and a lost invite
   // simply reads as "no answer", which the proposer's client already handles.
-  pendingInvite: { from: string; seconds: number; at: number } | null = null;
+  pendingInvite: {
+    from: string;
+    seconds: number;
+    mode: "timer" | "stroke";
+    at: number;
+  } | null = null;
   lastSweep = 0; // zombie-reap rate limit (in-memory; a wake just sweeps again)
   lastAlarmArm = 0;
   loaded = false;
@@ -109,6 +120,8 @@ export default class FluidPartyServer implements Party.Server {
     const tm = await this.room.storage.get<number>("turnMs");
     this.turnMs = typeof tm === "number" ? tm : 60_000;
     this.turnDeadline = (await this.room.storage.get<number>("turnDeadline")) || 0;
+    this.turnMode =
+      (await this.room.storage.get<string>("turnMode")) === "stroke" ? "stroke" : "timer";
     this.loaded = true;
   }
 
@@ -277,12 +290,13 @@ export default class FluidPartyServer implements Party.Server {
       if (!isHost && !(pair && !wantOn)) return;
       if (pair && wantOn && !this.turnsOn) return; // needs consent — use turn-invite
       if (wantOn) {
-        this.enableTurns(st.uid, data.seconds);
+        this.enableTurns(st.uid, data.seconds, data.mode);
       } else {
         this.turnsOn = false;
         this.turnQueue = [];
         this.turnHolder = null;
         this.turnDeadline = 0;
+        this.turnMode = "timer";
         this.pendingInvite = null;
       }
       await this.persist(); // commit before announcing (same rule as the lock)
@@ -321,25 +335,27 @@ export default class FluidPartyServer implements Party.Server {
         return;
       }
       const seconds = typeof data.seconds === "number" ? data.seconds : 60;
+      const mode: "timer" | "stroke" = data.mode === "stroke" ? "stroke" : "timer";
 
       // Crossing invites (both clicked at once): the second one is consent.
       const p = this.livePendingInvite();
       const otherState = other.state as ConnState | null;
       if (p && otherState && p.from === otherState.uid) {
         this.pendingInvite = null;
-        this.enableTurns(p.from, p.seconds);
+        this.enableTurns(p.from, p.seconds, p.mode);
         await this.persist();
         await this.syncTurnAlarm();
         this.broadcastTurnState();
         return;
       }
 
-      this.pendingInvite = { from: st.uid, seconds, at: Date.now() };
+      this.pendingInvite = { from: st.uid, seconds, mode, at: Date.now() };
       other.send(
         JSON.stringify({
           type: "turn-invite-offer",
           from: sender.id,
           seconds,
+          mode,
           expiresIn: INVITE_TTL_MS,
           timestamp: Date.now(),
         })
@@ -360,7 +376,7 @@ export default class FluidPartyServer implements Party.Server {
       if (!st || !p || p.from === st.uid) return;
       this.pendingInvite = null;
       if (data.accept) {
-        this.enableTurns(p.from, p.seconds);
+        this.enableTurns(p.from, p.seconds, p.mode);
         await this.persist();
         await this.syncTurnAlarm();
         this.broadcastTurnState();
@@ -434,6 +450,7 @@ export default class FluidPartyServer implements Party.Server {
       this.turnQueue = [];
       this.turnHolder = null;
       this.turnDeadline = 0;
+      this.turnMode = "timer";
       this.pendingInvite = null;
       await this.room.storage.deleteAll();
       try {
@@ -600,12 +617,16 @@ export default class FluidPartyServer implements Party.Server {
   // Switch turns on with `starterUid` painting first, then everyone else
   // connected. Shared by the host toggle and an accepted stranger invite.
   // Caller persists, syncs the alarm, and broadcasts.
-  enableTurns(starterUid: string, seconds?: unknown) {
+  enableTurns(starterUid: string, seconds?: unknown, mode?: unknown) {
     const wasOn = this.turnsOn;
     this.turnsOn = true;
     this.pendingInvite = null;
-    // Turn length: 0 = no timer; otherwise clamp to something sane.
-    if (typeof seconds === "number" && Number.isFinite(seconds)) {
+    this.turnMode = mode === "stroke" ? "stroke" : "timer";
+    // Turn length: 0 = no timer; otherwise clamp to something sane. "One swirl
+    // each" has no clock by definition — the stroke ending is the deadline.
+    if (this.turnMode === "stroke") {
+      this.turnMs = 0;
+    } else if (typeof seconds === "number" && Number.isFinite(seconds)) {
       const s = Math.floor(seconds);
       this.turnMs = s <= 0 ? 0 : Math.max(10, Math.min(600, s)) * 1000;
     }
@@ -685,6 +706,7 @@ export default class FluidPartyServer implements Party.Server {
         holder: this.turnHolder ? this.clientIdForUid(this.turnHolder, excludeConnId) : null,
         order,
         turnMs: this.turnMs,
+        mode: this.turnMode,
         deadline: this.turnDeadline || null,
         timestamp: Date.now(),
       })
@@ -702,6 +724,7 @@ export default class FluidPartyServer implements Party.Server {
       this.room.storage.put("turnQueue", this.turnQueue),
       this.room.storage.put("turnMs", this.turnMs),
       this.room.storage.put("turnDeadline", this.turnDeadline),
+      this.room.storage.put("turnMode", this.turnMode),
       this.turnHolder
         ? this.room.storage.put("turnHolder", this.turnHolder)
         : this.room.storage.delete("turnHolder"),

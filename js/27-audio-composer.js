@@ -354,9 +354,9 @@
             '<div class="arc-insp-cfg">pattern: <b>' + esc(cfg.autoSplatMode || '—') + '</b> · sens ' + (cfg.sensitivity != null ? (+cfg.sensitivity).toFixed(1) : '—') +
             ' · maps: ' + (on.length ? on.join(', ') : 'none') + '</div>' +
             '<div class="arc-insp-actions">' +
-            '<button class="arc-mini-play" disabled title="Mini-player preview — next increment">▶ preview</button>' +
-            '<button class="arc-mini-rec" disabled title="Record paint inputs alongside — next increment">⏺ inputs</button>' +
-            '<button class="arc-del">🗑 delete</button></div>';
+            '<button class="arc-mini-play" disabled title="Mini-player preview — next increment">preview</button>' +
+            '<button class="arc-mini-rec" disabled title="Record paint inputs alongside — next increment">inputs</button>' +
+            '<button class="arc-del btn--destructive">delete</button></div>';
         var del = els.inspector.querySelector('.arc-del');
         if (del) del.addEventListener('click', function () { deleteSeg(seg.id); });
     }
@@ -405,9 +405,8 @@
         var css = '' +
             '.arc-root{font-size:11px;color:#cdd6e0;}' +
             '.arc-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;}' +
-            '.arc-bar button{all:unset;box-sizing:border-box;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#e6edf3;}' +
-            '.arc-bar button.arc-play{min-width:30px;text-align:center;background:rgba(120,200,140,0.18);border-color:rgba(120,200,140,0.4);}' +
-            '.arc-bar button.arc-cap{background:rgba(180,140,255,0.18);border-color:rgba(180,140,255,0.4);}' +
+            '.arc-bar button{box-sizing:border-box;}' +
+            '.arc-bar button.arc-play{min-width:30px;text-align:center;}' +
             '.arc-time{font-family:monospace;font-size:10px;opacity:0.7;margin-left:2px;}' +
             '.arc-dur{font-size:10px;opacity:0.7;display:flex;align-items:center;gap:2px;}' +
             '.arc-dur input{width:42px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#e6edf3;border-radius:3px;padding:2px 4px;font-size:10px;}' +
@@ -436,9 +435,9 @@
             '.arc-insp-meta{font-family:monospace;font-size:9px;opacity:0.6;}' +
             '.arc-insp-cfg{font-size:9px;opacity:0.7;margin-top:3px;}' +
             '.arc-insp-actions{display:flex;gap:4px;margin-top:6px;}' +
-            '.arc-insp-actions button{all:unset;box-sizing:border-box;cursor:pointer;padding:3px 7px;border-radius:3px;font-size:9px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:#e6edf3;}' +
+            '.arc-insp-actions button{box-sizing:border-box;}' +
             '.arc-insp-actions button:disabled{opacity:0.4;cursor:default;}' +
-            '.arc-insp-actions .arc-del{background:rgba(255,80,80,0.15);border-color:rgba(255,80,80,0.25);margin-left:auto;}';
+            '.arc-insp-actions .arc-del{margin-left:auto;}';
         var st = document.createElement('style');
         st.id = 'arc-styles'; st.textContent = css;
         document.head.appendChild(st);
