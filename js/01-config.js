@@ -639,6 +639,7 @@
             const s = window.Settings.loadCanvasSize();
             return !!(s && s.width && s.height);
         }
+        window.canvasHasPinnedSize = hasPinnedCanvasSize;
 
         // Place the canvas-wrapper so it is ALWAYS fully inside the available
         // canvas area, at any window size. opts.initial = launch (restore saved
@@ -646,6 +647,31 @@
         // keep the current size and just re-clamp + re-center.
         const CANVAS_MARGIN = 24;   // breathing room; also clears the -12px resize handles
         const CANVAS_MIN = 200;
+
+        // The box the canvas is allowed to occupy, in canvas-area coordinates.
+        // The bottom nav (quality underbar) is position:fixed OVER the bottom of
+        // the area, so the usable height stops at its top edge — measured, never
+        // assumed, because the nav's height moves with --ui-scale.
+        function canvasUsableBox() {
+            const areaRect = canvasArea.getBoundingClientRect();
+            let height = areaRect.height;
+            const underbar = document.getElementById('quality-underbar');
+            if (underbar) {
+                const ubcs = getComputedStyle(underbar);
+                if (ubcs.display !== 'none' && ubcs.visibility !== 'hidden') {
+                    const ubTop = underbar.getBoundingClientRect().top - areaRect.top;
+                    if (ubTop > 0) height = Math.min(height, ubTop);
+                }
+            }
+            return {
+                width: areaRect.width,
+                height: height,
+                maxW: Math.max(CANVAS_MIN, areaRect.width - CANVAS_MARGIN * 2),
+                maxH: Math.max(CANVAS_MIN, height - CANVAS_MARGIN * 2)
+            };
+        }
+        window.canvasUsableBox = canvasUsableBox;
+
         function initializeCanvasPosition(opts) {
             opts = opts || {};
             const areaRect = canvasArea.getBoundingClientRect();
@@ -657,57 +683,61 @@
                 return;
             }
 
-            // The bottom nav (quality underbar) is position:fixed OVER the bottom
-            // of the canvas area — measure the usable height up to its top edge,
-            // matching the drag clamp in 02-palettes.js, so the frame never
-            // initializes or re-fits underneath it.
-            let areaH = areaRect.height;
-            const _underbar = document.getElementById('quality-underbar');
-            if (_underbar) {
-                const _ubcs = getComputedStyle(_underbar);
-                if (_ubcs.display !== 'none' && _ubcs.visibility !== 'hidden') {
-                    const _ubTop = _underbar.getBoundingClientRect().top - areaRect.top;
-                    if (_ubTop > 0) areaH = Math.min(areaH, _ubTop);
-                }
-            }
+            const box = canvasUsableBox();
+            const maxW = box.maxW;
+            const maxH = box.maxH;
 
-            const maxW = Math.max(CANVAS_MIN, areaRect.width  - CANVAS_MARGIN * 2);
-            const maxH = Math.max(CANVAS_MIN, areaH - CANVAS_MARGIN * 2);
-
-            // Stream format owns the wrapper dimensions — only re-center it.
-            const hasStreamFormat = window.focusMode &&
+            // A stream format owns the ASPECT, not the pixel size — so fit its
+            // ratio into the usable box here rather than trusting whatever
+            // 21-focus-mode last wrote. Skipping the clamp for formats is what
+            // let a box sized for one window keep hanging past the sidebar and
+            // under the bottom nav on a smaller one, with nothing left to
+            // correct it (measured 2026-08-22: 1:1 Square sat 16-20px under the
+            // nav at 1366x768, 1600x900 and 1920x1080, and stayed there).
+            const streamFormat = window.focusMode &&
                 typeof window.focusMode.getActiveFormat === 'function' &&
                 window.focusMode.getActiveFormat();
 
             let w = canvasWrapper.offsetWidth;
             let h = canvasWrapper.offsetHeight;
 
-            if (!hasStreamFormat) {
-                if (opts.initial) {
-                    // Launch: restore a pinned size if present, else fill the area.
-                    let saved = null;
-                    if (window.Settings && typeof window.Settings.loadCanvasSize === 'function') {
-                        saved = window.Settings.loadCanvasSize();
-                    }
-                    if (saved && saved.width && saved.height) {
-                        w = saved.width; h = saved.height;
-                    } else {
-                        w = maxW; h = maxH;
-                    }
-                } else if (opts.fill) {
+            if (streamFormat) {
+                const ratio = streamFormat.ratio || (streamFormat.w / streamFormat.h) || 1;
+                w = Math.min(maxW, streamFormat.w);
+                h = w / ratio;
+                if (h > maxH) { h = maxH; w = h * ratio; }
+            } else if (opts.initial) {
+                // Launch: restore a pinned size if present, else fill the area.
+                let saved = null;
+                if (window.Settings && typeof window.Settings.loadCanvasSize === 'function') {
+                    saved = window.Settings.loadCanvasSize();
+                }
+                if (saved && saved.width && saved.height) {
+                    w = saved.width; h = saved.height;
+                } else {
                     w = maxW; h = maxH;
                 }
-                // Always clamp the size so it can never exceed the area.
-                w = Math.min(Math.max(w, CANVAS_MIN), maxW);
-                h = Math.min(Math.max(h, CANVAS_MIN), maxH);
-                canvasWrapper.style.width  = w + 'px';
-                canvasWrapper.style.height = h + 'px';
+            } else if (opts.fill) {
+                w = maxW; h = maxH;
             }
+
+            // Always clamp the size so it can never exceed the area.
+            w = Math.round(Math.min(Math.max(w, CANVAS_MIN), maxW));
+            h = Math.round(Math.min(Math.max(h, CANVAS_MIN), maxH));
+            canvasWrapper.style.width  = w + 'px';
+            canvasWrapper.style.height = h + 'px';
+
+            // Center against what actually RENDERED, not against what we asked
+            // for. A stylesheet max-width/max-height can shrink the box after
+            // the write, and centering the REQUESTED size then pushes the frame
+            // off to one side — the other half of the same bug.
+            w = canvasWrapper.offsetWidth;
+            h = canvasWrapper.offsetHeight;
 
             // Center, then clamp the position so the box stays fully inside the
             // area with at least CANVAS_MARGIN on every edge.
-            const left = Math.max(CANVAS_MARGIN, Math.min((areaRect.width  - w) / 2, areaRect.width  - w - CANVAS_MARGIN));
-            const top  = Math.max(CANVAS_MARGIN, Math.min((areaH - h) / 2, areaH - h - CANVAS_MARGIN));
+            const left = Math.max(CANVAS_MARGIN, Math.min((box.width  - w) / 2, box.width  - w - CANVAS_MARGIN));
+            const top  = Math.max(CANVAS_MARGIN, Math.min((box.height - h) / 2, box.height - h - CANVAS_MARGIN));
             canvasWrapper.style.left = Math.round(left) + 'px';
             canvasWrapper.style.top  = Math.round(top)  + 'px';
 
@@ -720,6 +750,13 @@
             // wrapper border (the "init size bug", 2026-07-09).
             if (opts.initial) updateCanvasSize();
         }
+
+        // The one place that decides whether the frame fits. Every other writer
+        // of the wrapper's geometry — a restored session (12-save-load), undo
+        // (05n), a stream format (21-focus-mode) — hands it back here when it is
+        // done, so a rect saved under one window size cannot survive into a
+        // smaller one.
+        window.fitCanvasIntoArea = initializeCanvasPosition;
 
         initializeCanvasPosition({ initial: true });
         

@@ -11,10 +11,14 @@
     position: relative;
 }
 
-#canvas-wrapper {
-    max-width: calc(100vw - 290px) !important;
-    max-height: calc(100vh - 150px) !important;
-}
+/* No max-width/max-height here. Those were viewport guesses at the chrome's
+   size (290px of sidebar, 150px of strip + nav) from before JS measured the
+   real thing, and !important meant they won: at --ui-scale 1.35 the sidebar is
+   378px and the chrome 164px, so "1:1 Square" rendered 960x930 on a 1080p
+   window — not square — while the placement code centred the 960x960 it had
+   asked for. 01-config's canvasUsableBox measures #canvas-area and the fixed
+   bottom nav directly and is the only cap now. #canvas-wrapper keeps its
+   min-width/min-height from styles.css. */
 
 #canvas-area {
     flex: 1;
@@ -543,9 +547,9 @@
     #sidebar-right {
         flex: 0 0 240px;
     }
-    #canvas-wrapper {
-        max-width: calc(100vw - 250px) !important;
-    }
+    /* The narrower sidebar changes #canvas-area's width, which the JS fitter
+       already measures — no wrapper cap needed (and a wrong one here would
+       shrink the frame out from under its own centring). */
 }
 
 /* Prevent sidebar flash on mobile before JS adds .mobile-mode:

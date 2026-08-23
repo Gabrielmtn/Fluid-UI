@@ -279,8 +279,9 @@
             position: absolute;
             width: 608px;  /* slightly smaller than 640px (~5% reduction) */
             height: 456px; /* slightly smaller than 480px (~5% reduction) */
-            max-width: calc(100vw - 360px); /* Leave room for controls sidebar */
-            max-height: calc(100vh - 80px);  /* Leave room for margins */
+            /* Sizing is JS-owned: 01-config's canvasUsableBox measures the real
+               #canvas-area and the fixed bottom nav. A viewport-relative cap
+               here only ever fought that measurement (see css/21-sidebar.css). */
             min-width: 200px;
             min-height: 200px;
             /* Will be positioned by JavaScript on load */

@@ -70,6 +70,12 @@
             canvasWrapper.style.top = w.top + 'px';
             canvasWrapper.style.width = w.width + 'px';
             canvasWrapper.style.height = w.height + 'px';
+            // Undo can reach back past a window resize, so the rect it restores
+            // is not guaranteed to still fit. The fitter leaves it alone when
+            // it does.
+            if (typeof window.fitCanvasIntoArea === 'function') {
+                window.fitCanvasIntoArea({});
+            }
             updateCanvasSize();
         }
         function getState() {

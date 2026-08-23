@@ -259,10 +259,11 @@ html.boot-fade.booting #canvas-area {
     zoom: var(--ui-scale);
 }
 
-/* Canvas wrapper accounts for zoomed sidebar width */
-#canvas-wrapper {
-    max-width: calc(100vw - var(--sidebar-width) * var(--ui-scale) - 10px) !important;
-}
+/* No canvas-wrapper cap here either. It tracked the zoomed sidebar, which was
+   closer than the other two guesses, but it still capped a size 01-config had
+   already computed from the measured #canvas-area — silently shrinking the
+   frame the placement code was centring. Sizing is JS-owned; see
+   canvasUsableBox in js/01-config.js. */
 
 /* ── PANEL RESIZE FOUNDATION ── */
 #sidebar-right {

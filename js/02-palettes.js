@@ -194,10 +194,15 @@
                 }
             }
             
-            // Constrain to window bounds (Electron fix)
+            // Constrain to window bounds (Electron fix). The bottom nav is
+            // position:fixed OVER the area, so the floor is its top edge, not
+            // the area's — 01-config's canvasUsableBox is the shared measure.
             const areaRect = canvasArea.getBoundingClientRect();
-            const maxRight = areaRect.width - 20;
-            const maxBottom = areaRect.height - 20;
+            const usable = (typeof window.canvasUsableBox === 'function')
+                ? window.canvasUsableBox()
+                : { width: areaRect.width, height: areaRect.height };
+            const maxRight = usable.width - 20;
+            const maxBottom = usable.height - 20;
             
             // Ensure canvas stays within bounds
             if (newLeft + newWidth > maxRight) {

@@ -147,42 +147,27 @@
 
         activeFormat = format;
 
-        // Calculate size that fits within the available area while maintaining ratio
-        var areaRect = canvasArea.getBoundingClientRect();
-        var maxW = areaRect.width - 20;
-        var maxH = areaRect.height - 20;
-
-        var w, h;
-        if (format.ratio >= 1) {
-            // Landscape or square
-            w = Math.min(maxW, format.w);
-            h = w / format.ratio;
-            if (h > maxH) {
-                h = maxH;
-                w = h * format.ratio;
-            }
+        // 01-config's fitter owns the geometry: it fits this format's RATIO into
+        // the same usable box every other placement uses — the one that stops at
+        // the fixed bottom nav rather than at the bottom of #canvas-area. The
+        // arithmetic that used to live here measured only the raw area rect and
+        // left a 20px margin, so on any window shorter than about 1440px the
+        // frame settled 16-20px underneath the nav and stayed there.
+        if (typeof window.fitCanvasIntoArea === 'function') {
+            window.fitCanvasIntoArea({ fill: true });
         } else {
-            // Portrait (e.g., 9:16)
-            h = Math.min(maxH, format.h);
-            w = h * format.ratio;
-            if (w > maxW) {
-                w = maxW;
-                h = w / format.ratio;
-            }
+            // Pre-chain fallback (a format restored before 01-config ran).
+            var areaRect = canvasArea.getBoundingClientRect();
+            var maxW = areaRect.width - 48;
+            var maxH = areaRect.height - 48;
+            var w = Math.min(maxW, format.w);
+            var h = w / format.ratio;
+            if (h > maxH) { h = maxH; w = h * format.ratio; }
+            canvasWrapper.style.width = Math.round(w) + 'px';
+            canvasWrapper.style.height = Math.round(h) + 'px';
+            canvasWrapper.style.left = Math.round(Math.max(24, (areaRect.width - w) / 2)) + 'px';
+            canvasWrapper.style.top = Math.round(Math.max(24, (areaRect.height - h) / 2)) + 'px';
         }
-
-        w = Math.round(w);
-        h = Math.round(h);
-
-        // Set wrapper size
-        canvasWrapper.style.width = w + 'px';
-        canvasWrapper.style.height = h + 'px';
-
-        // Center the wrapper in the canvas area
-        var centerLeft = Math.max(0, (areaRect.width - w) / 2);
-        var centerTop = Math.max(20, (areaRect.height - h) / 2);
-        canvasWrapper.style.left = centerLeft + 'px';
-        canvasWrapper.style.top = centerTop + 'px';
 
         // Directly update canvas element resolution + reinit WebGL framebuffers
         if (typeof window.updateCanvasSize === 'function') {
@@ -196,8 +181,8 @@
 
         // Show info (read back actual canvas size for accuracy)
         var canvas = document.getElementById('canvas');
-        var actualW = canvas ? canvas.width : w;
-        var actualH = canvas ? canvas.height : h;
+        var actualW = canvas ? canvas.width : canvasWrapper.offsetWidth;
+        var actualH = canvas ? canvas.height : canvasWrapper.offsetHeight;
         if (formatInfo) {
             formatInfo.textContent = actualW + ' × ' + actualH + ' (' + format.label + ')';
         }

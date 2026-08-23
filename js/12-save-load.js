@@ -404,6 +404,15 @@
                 wrap.style.top = wr.top + 'px';
                 wrap.style.width = wr.width + 'px';
                 wrap.style.height = wr.height + 'px';
+                // The rect was measured under whatever window, sidebar width and
+                // --ui-scale the session was saved with. Applied verbatim it can
+                // land the frame past the sidebar or under the bottom nav, and
+                // this runs on 'scripts-ready' — after the boot placement and
+                // after the last area resize — so nothing else would correct it.
+                // Hand it to the fitter, which keeps the size when it fits.
+                if (typeof window.fitCanvasIntoArea === 'function') {
+                    window.fitCanvasIntoArea({});
+                }
                 if (typeof window.updateCanvasSize === 'function') {
                     window.updateCanvasSize();
                 }

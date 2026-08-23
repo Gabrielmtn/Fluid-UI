@@ -141,6 +141,20 @@
         if (window.cosOscillator && typeof window.cosOscillator.buildUI === 'function') {
             window.cosOscillator.buildUI();
         }
+
+        // This build is what shrinks the drawing area: the strip and the fixed
+        // bottom nav take height off it and the sidebar takes width. 01-config
+        // placed the canvas long before any of that existed (measured: ~130ms
+        // vs ~850ms), so between the two the frame is a full sidebar wider and
+        // a nav taller than the area it sits in. The ResizeObserver in
+        // 01-config does eventually catch it, but only after an 80ms debounce
+        // and a rendering-update delivery — three quarters of a second of boot
+        // spent with the canvas hanging past the edges. Re-fit it here, where
+        // we already know the chrome just changed.
+        if (typeof window.fitCanvasIntoArea === 'function') {
+            var pinned = typeof window.canvasHasPinnedSize === 'function' && window.canvasHasPinnedSize();
+            window.fitCanvasIntoArea({ fill: !pinned });
+        }
     }
 
     function initResponsiveScale() {
