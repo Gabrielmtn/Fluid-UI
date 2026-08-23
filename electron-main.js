@@ -338,7 +338,6 @@ function createWindow() {
         transparent: USE_TRANSPARENT_WINDOW,
         frame: false, // Use custom title bar (frameless window)
         backgroundColor: USE_TRANSPARENT_WINDOW ? '#00000000' : '#0d1117',
-        icon: path.join(__dirname, 'assets/icon.png'),
         show: false, // revealed by revealWindow() once the renderer is settled
         // Invisible from birth, so the entire boot happens off-screen. Only
         // set when fading: passing opacity at all makes the window layered for

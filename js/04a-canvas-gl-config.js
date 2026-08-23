@@ -518,8 +518,8 @@
                                       // 1 = full hybrid; 0 = old whiteness-only. See displayFrag
                                       // in 05a. Console-tunable.
 
-            MAGIC_MASK_MODEL: 'onnx-community/EdgeTAM-ONNX',
-                                      // Magic Mask Objects segmentation model. MEASURED against
+            INSTANT_ROTO_MODEL: 'onnx-community/EdgeTAM-ONNX',
+                                      // Instant Roto segmentation model. MEASURED against
                                       // ground truth on the CPU backend (2026-08-14), 5-click
                                       // selection, true IoU:
                                       //   content       EdgeTAM (SAM 2)   SlimSAM-77 (SAM 1)
@@ -532,12 +532,12 @@
                                       // either architecture, so it is a one-line swap.
                                       // Console-tunable; reload the page to re-init.
 
-            MAGIC_MASK_DTYPE: 'fp32', // Weight precision for the model above. EdgeTAM's fp16/q8
+            INSTANT_ROTO_DTYPE: 'fp32', // Weight precision for the model above. EdgeTAM's fp16/q8
                                       // exports produce garbage masks (verified vs the upstream
                                       // truck.jpg reference) — keep fp32 unless a future model
                                       // repo ships working reduced-precision weights.
 
-            MAGIC_MASK_SOLID_FILL: true,
+            INSTANT_ROTO_SOLID_FILL: true,
                                       // Mask antialiasing only ADDS a soft skirt outside the
                                       // cutout; pixels the model marked foreground stay fully
                                       // opaque. Averaging them unconditionally eats thin
@@ -545,14 +545,14 @@
                                       // 64.6% opaque = the washed-out look on text/shapes).
                                       // false = old behaviour (softer, thinner).
 
-            MAGIC_MASK_TRUST_IOU: 0.6,
+            INSTANT_ROTO_TRUST_IOU: 0.6,
                                       // Above this predicted IoU the model is treated as
                                       // confident and its own ranking picks the default
                                       // cutout; below it (painterly/abstract content, where
                                       // the scores go flat and it will rank a speck first)
-                                      // the largest proposal under MAGIC_MASK_MAX_COVER wins.
+                                      // the largest proposal under INSTANT_ROTO_MAX_COVER wins.
 
-            MAGIC_MASK_MAX_COVER: 0.8,
+            INSTANT_ROTO_MAX_COVER: 0.8,
                                       // Default-candidate picker: proposals covering more than
                                       // this fraction of the canvas lose to any tighter proposal
                                       // (predicted IoU loves "select everything" on flat painterly

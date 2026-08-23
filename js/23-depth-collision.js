@@ -568,7 +568,7 @@ class DepthEstimator {
     // as a collider — a guess at what you meant, leaving a grey depth image on
     // the canvas and a Threshold slider to argue with. They now do what the
     // mask wizard was built for: bring the picture in as a LAYER, let you cut
-    // the subject out (Magic Mask / stamps → touch up → soften), and hand that
+    // the subject out (Instant Roto / stamps → touch up → soften), and hand that
     // finished mask to the collision system on Apply. Step 3's "also create a
     // collision layer" opt-in starts checked, since a wall is why the
     // 🧱 button was pressed.

@@ -1,7 +1,7 @@
-// Magic Mask Objects — promptable object segmentation (SAM 2 family)
+// Instant Roto — promptable object segmentation (SAM 2 family)
 // Uses the vendored Transformers.js v3 runtime to run EdgeTAM (Meta's
 // on-device SAM2 derivative) fully in the browser: WebGPU when available,
-// WASM otherwise. Model repo is config-tunable (config.MAGIC_MASK_MODEL);
+// WASM otherwise. Model repo is config-tunable (config.INSTANT_ROTO_MODEL);
 // any Sam2-family ONNX export (sam2.1-hiera-*, EdgeTAM, sam3-tracker) works
 // because they share the Sam2Model embed/prompt API. The class keeps its
 // historical "SAMSegmenter"/window.samSegmenter names — every mask-editor
@@ -99,7 +99,7 @@ class SAMSegmenter {
         }
         
         this.isLoading = true;
-        console.log('🪄 Loading Magic Mask segmentation model...');
+        console.log('🪄 Loading Instant Roto segmentation model...');
         
         // Update status indicator
         this.updateLoadingStatus('loading');
@@ -119,7 +119,7 @@ class SAMSegmenter {
             if (onProgress) onProgress('Loading model...', 0);
             this.updateDownloadProgress('Downloading AI model...', 10);
 
-            const modelId = (typeof window !== 'undefined' && window.config && window.config.MAGIC_MASK_MODEL)
+            const modelId = (typeof window !== 'undefined' && window.config && window.config.INSTANT_ROTO_MODEL)
                 || 'onnx-community/EdgeTAM-ONNX';
             this.modelId = modelId;
 
@@ -144,7 +144,7 @@ class SAMSegmenter {
             // ~0 garbage — which is why the repo pins dtype fp32). Failures can
             // surface at session creation, so the whole load is attempted per
             // device rather than feature-detecting up front.
-            const dtype = (typeof window !== 'undefined' && window.config && window.config.MAGIC_MASK_DTYPE) || 'fp32';
+            const dtype = (typeof window !== 'undefined' && window.config && window.config.INSTANT_ROTO_DTYPE) || 'fp32';
 
             // CPU (wasm) is the DEFAULT, and not merely a fallback: ONNX
             // Runtime's WebGPU backend returns numerically corrupted masks for
@@ -156,13 +156,13 @@ class SAMSegmenter {
             // head's valid range, so it is genuine numerical breakage rather
             // than a slightly different mask. Segmentation runs once per click
             // (~0.3-2s on CPU), so the GPU path buys nothing worth that.
-            // config.MAGIC_MASK_DEVICE = 'webgpu' re-tests it after an upstream
+            // config.INSTANT_ROTO_DEVICE = 'webgpu' re-tests it after an upstream
             // ORT fix — but note the vendored ORT binary is now the CPU-only
             // build (half the size, and it kept the web bundle under PartyKit's
             // 20MB per-asset cap), so that also needs the .jsep build restored:
             // requesting webgpu against this one fails with "not built with
             // JSEP support" AND poisons the wasm attempt that follows it.
-            const forced = (typeof window !== 'undefined' && window.config && window.config.MAGIC_MASK_DEVICE) || null;
+            const forced = (typeof window !== 'undefined' && window.config && window.config.INSTANT_ROTO_DEVICE) || null;
             const attempts = forced
                 ? [{ device: forced, dtype }, { device: 'wasm', dtype }]
                 : [{ device: 'wasm', dtype }];
@@ -236,7 +236,7 @@ class SAMSegmenter {
             setTimeout(() => {
                 this.hideDownloadModal();
                 console.error('💬 Showing error dialog:', modalMsg);
-                alert('⚠️ Magic Mask Objects Error\n\n' + modalMsg);
+                alert('⚠️ Instant Roto Error\n\n' + modalMsg);
             }, 2000);
         }
     }
@@ -290,7 +290,7 @@ class SAMSegmenter {
                 ">
                     <div style="font-size: 48px; margin-bottom: 16px;">🪄</div>
                     <h2 style="color: #3fb950; margin: 0 0 12px 0; font-size: 24px; font-weight: 600;">
-                        Downloading Magic Mask Model
+                        Downloading Instant Roto Model
                     </h2>
                     <p id="samDownloadMessage" style="color: #8b949e; margin: 0 0 24px 0; font-size: 14px;">
                         First-time setup: Downloading EdgeTAM (Segment Anything 2 family)...
@@ -677,7 +677,7 @@ class SAMSegmenter {
             // and thin shapes. Solid interiors + a soft outer skirt keeps the
             // antialiased edge without the erosion.
             const solidFill = !(typeof window !== 'undefined' && window.config
-                && window.config.MAGIC_MASK_SOLID_FILL === false);
+                && window.config.INSTANT_ROTO_SOLID_FILL === false);
             function binaryToCoverage(srcData, srcW, srcH) {
                 const out = new Uint8Array(srcW * srcH);
                 for (let y = 0; y < srcH; y++) {
@@ -786,8 +786,8 @@ class SAMSegmenter {
             // to everything — the near-full-canvas proposal often outscores
             // the clean object cutout on flat/painterly content, and the
             // user can still reach it through the candidate cycler.
-            const maxCover = (typeof window !== 'undefined' && window.config && typeof window.config.MAGIC_MASK_MAX_COVER === 'number')
-                ? window.config.MAGIC_MASK_MAX_COVER : 0.8;
+            const maxCover = (typeof window !== 'undefined' && window.config && typeof window.config.INSTANT_ROTO_MAX_COVER === 'number')
+                ? window.config.INSTANT_ROTO_MAX_COVER : 0.8;
             const coverageOf = (c) => {
                 let filled = 0;
                 const stride = 4; // sampled estimate is plenty for a threshold test
@@ -817,8 +817,8 @@ class SAMSegmenter {
             // model is confident, and fall back to the LARGEST proposal under
             // the coverage cap when it clearly is not. The cutout cycler still
             // offers every proposal either way.
-            const trustIoU = (typeof window !== 'undefined' && window.config && typeof window.config.MAGIC_MASK_TRUST_IOU === 'number')
-                ? window.config.MAGIC_MASK_TRUST_IOU : 0.6;
+            const trustIoU = (typeof window !== 'undefined' && window.config && typeof window.config.INSTANT_ROTO_TRUST_IOU === 'number')
+                ? window.config.INSTANT_ROTO_TRUST_IOU : 0.6;
             // The proposals are ranked by the model's predicted-IoU head, which
             // IS trustworthy on the CPU backend (measured on a 5-click logo:
             // predicted [0.927, 0.995, 0.974] against true [0.207, 0.878,

@@ -70,10 +70,10 @@
 }
 
 .section-title {
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 12.5px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.7px;
+    letter-spacing: 0.055em;
     color: rgba(255, 255, 255, 0.55);
 }
 
@@ -112,14 +112,62 @@
     pointer-events: none;
 }
 
-/* Section accent colors */
-.sidebar-section[data-color="blue"]   .section-title { color: rgba(88, 166, 255, 0.75); }
-.sidebar-section[data-color="orange"] .section-title { color: rgba(255, 170, 80, 0.75); }
-.sidebar-section[data-color="green"]  .section-title { color: rgba(80, 220, 140, 0.75); }
-.sidebar-section[data-color="purple"] .section-title { color: rgba(180, 130, 255, 0.75); }
-.sidebar-section[data-color="yellow"] .section-title { color: rgba(236, 48, 19, 0.9); }
-.sidebar-section[data-color="cyan"]   .section-title { color: rgba(80, 210, 255, 0.75); }
-.sidebar-section[data-color="pink"]   .section-title { color: rgba(255, 130, 170, 0.75); }
+/* ── Section group colours ──
+   Was seven per-section accents, which made 16 sections read as 16 unrelated
+   things. Now exactly three runs, one per contiguous block in the sidebar build
+   order (see buildSidebar in js/20-mixer-layout.js) — colour is the ONLY
+   grouping signal here: no group headings, no icons, no emoji.
+
+   Each run paints ONE continuous oklch ramp across its labels: the gradient is
+   sized to the run's full collapsed height (--rows * --row-h) and every label
+   shows only its own slice, so the block reads as a single surface rather than
+   N independently tinted rows. --rows/--i are stamped per section by
+   stampGroupRows(); --row-h is the collapsed pitch (33px header + the 1px
+   .sidebar-section border) and --row-pad the header's top padding, so a slice
+   lands exactly where its label sits. Both track .section-header — change that
+   padding and these must follow or the ramp drifts out of register.
+
+   The slices are indexed by ROW, not by screen position, so expanding a section
+   leaves a spatial gap in the ramp without breaking its order. Under the
+   accordion at most one body is open at a time, so at most one gap.
+
+   The three --g-* live on #sidebar-right so the idle easter egg can redraw all
+   three runs with three property writes per frame (js/37-nav-idle-glow.js). */
+#sidebar-right {
+    --row-h: 34px;
+    --row-pad: 9px;
+    --g-core:       linear-gradient(in oklch 180deg, oklch(84% 0.160 242) 0%, oklch(60% 0.131 294) 100%);
+    --g-expressive: linear-gradient(in oklch 180deg, oklch(84% 0.170 32)  0%, oklch(60% 0.139 354) 100%);
+    --g-system:     linear-gradient(in oklch 180deg, oklch(84% 0.080 250) 0%, oklch(60% 0.066 268) 100%);
+}
+
+/* Solid fallbacks: these are what renders if the gradient never applies, so
+   the grouping survives an engine without oklch interpolation. */
+.sidebar-section[data-group="core"]       .section-title { color: rgba(88, 166, 255, 0.78); --g: var(--g-core); }
+.sidebar-section[data-group="expressive"] .section-title { color: rgba(255, 106, 88, 0.82); --g: var(--g-expressive); }
+.sidebar-section[data-group="system"]     .section-title { color: rgba(255, 255, 255, 0.45); --g: var(--g-system); }
+
+/* Gated: background-clip:text with a transparent fill turns the whole nav
+   INVISIBLE if the gradient fails to parse, so it only ever applies where the
+   gradient is known good. */
+@supports (background-image: linear-gradient(in oklch, red, blue)) {
+    .sidebar-section[data-group] .section-title {
+        background-image: var(--g);
+        background-size: 100% calc(var(--rows) * var(--row-h));
+        background-position: 0 calc(var(--i) * var(--row-h) * -1 - var(--row-pad));
+        background-repeat: no-repeat;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+    }
+}
+
+/* Accordion sweep: when opening one section closes the others, those bodies
+   are already clipped to a 0fr grid row, so their opacity fade would be a dozen
+   simultaneous transitions paying for motion nobody can see. Suppressed for the
+   frame of the sweep — same reasoning as the grid note above. */
+.sidebar-section.snap-collapse .section-body { transition: none; }
 
 /* ── Compact controls within sidebar ──
    Density pass (2026-08-16): a row spent ~95px to carry ~39px of

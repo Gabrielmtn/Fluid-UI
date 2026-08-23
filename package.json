@@ -14,7 +14,7 @@
     "electron-build": "electron-builder",
     "dist:win": "electron-builder --win",
     "publish:itch": "butler push \"dist/win-unpacked\" YOUR_ITCH_USER/YOUR_GAME:windows",
-    "publish:steam": "steamcmd +login YOUR_STEAM_BUILDER +run_app_build \"%CD%\\steam\\app_build.vdf\" +quit"
+    "publish:steam": "node scripts/steam-upload.js"
   },
   "dependencies": {
     "@electron/remote": "^2.1.3",
@@ -74,6 +74,9 @@
       "!**/*.lnk",
       "!**/*.bat",
       "!index.html.bak.cachebust",
+      "!Design system breakdown exploration/**",
+      "!Design system breakdown exploration.zip",
+      "!*.xlsx",
       "!js/07-cos-oscillator.js",
       "!js/14-radial-slider.js",
       "!steam_appid.txt",
@@ -82,8 +85,7 @@
     "win": {
       "target": [
         "dir"
-      ],
-      "icon": "build/icon.ico"
+      ]
     }
   }
 }

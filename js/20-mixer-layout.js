@@ -542,7 +542,7 @@
         addB.type = 'button';
         addB.className = 'brush-tip-btn brush-shape-add';
         addB.textContent = '＋';
-        addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Magic Mask Objects). You can also drop an image anywhere on this row.';
+        addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Instant Roto). You can also drop an image anywhere on this row.';
         addB.addEventListener('click', function () { if (opts.onImport) opts.onImport(); });
         row.appendChild(addB);
     }
@@ -1530,30 +1530,59 @@
         // Mobile close button (keep at top)
         moveEl('mobileMenuClose', sidebar);
 
-        // Simulation + Effects lead the sidebar (Gabriel, 2026-07-29): the two
-        // most-reached-for sections go on top. No saved order exists — only
-        // per-section collapse state is persisted (keyed by title), so
-        // reordering here applies to every user, new and existing.
-        sidebar.appendChild(buildSimulationSection());
-        sidebar.appendChild(buildEffectsSection(controls));
+        // Clustered into three colour groups (Gabriel, 2026-08-22). The nav had
+        // 16 flat sections in 7 accent colours, which read as 16 unrelated
+        // things. Colour is now the ONLY grouping signal — no group headings,
+        // no icons, no emoji — so the three runs must stay contiguous here:
+        // reordering a section across a run silently breaks the clustering.
+        //   core       = what you paint with (the medium, and who is holding it)
+        //   expressive = what it performs    (motion, sound, capture, show)
+        //   system     = the app around it   (workspace, output, config)
+        // No saved order exists — only per-section collapse state is persisted
+        // (keyed by title), so reordering here applies to every user.
         sidebar.appendChild(buildMultiArtistSection());
+        sidebar.appendChild(buildSimulationSection());
         sidebar.appendChild(buildColorsSection(controls));
-        sidebar.appendChild(buildMutationSection());
-        sidebar.appendChild(buildAudioSection());
         sidebar.appendChild(buildLayersSection(controls));
-        sidebar.appendChild(buildAnimationsSection(controls));
-        sidebar.appendChild(buildKaleidoscopeSection(controls));
-        sidebar.appendChild(buildBrushSection());
-        sidebar.appendChild(buildFocusSection());
-        sidebar.appendChild(buildDisplaySection(controls));
+        sidebar.appendChild(buildMutationSection());
+
         sidebar.appendChild(buildRecordingSection());
-        sidebar.appendChild(buildExportSection());
-        sidebar.appendChild(buildSettingsSection(controls));
+        sidebar.appendChild(buildBrushSection());
+        sidebar.appendChild(buildEffectsSection(controls));
+        sidebar.appendChild(buildAnimationsSection(controls));
+        sidebar.appendChild(buildAudioSection());
+        sidebar.appendChild(buildKaleidoscopeSection(controls));
         sidebar.appendChild(buildBrandingSection());
 
+        sidebar.appendChild(buildFocusSection());
+        sidebar.appendChild(buildDisplaySection(controls));
+        sidebar.appendChild(buildExportSection());
+        sidebar.appendChild(buildSettingsSection(controls));
+
+        stampGroupRows(sidebar);
         buildQualityUnderbar();
 
         return sidebar;
+    }
+
+    // Each group paints ONE gradient across all of its labels, and every label
+    // shows only its own slice of it (see .section-title in css/21-sidebar.css).
+    // That needs two numbers per section: how many rows the group has, and
+    // which row this is. Stamped here rather than hardcoded so the slices stay
+    // correct if the order above ever changes — get these wrong and the ramp
+    // silently repeats or skips instead of reading as one surface.
+    function stampGroupRows(sidebar) {
+        const byGroup = {};
+        sidebar.querySelectorAll('.sidebar-section[data-group]').forEach(function (sec) {
+            (byGroup[sec.dataset.group] = byGroup[sec.dataset.group] || []).push(sec);
+        });
+        Object.keys(byGroup).forEach(function (key) {
+            const run = byGroup[key];
+            run.forEach(function (sec, i) {
+                sec.style.setProperty('--rows', run.length);
+                sec.style.setProperty('--i', i);
+            });
+        });
     }
 
     // UX-9.1 — quality underbar: a slim always-visible cluster pinned to the
@@ -1688,7 +1717,7 @@
     // --- Section builders ---
 
     function buildMutationSection() {
-        const { sec, body } = makeSection('🧬 Mutate Shader', 'purple', true);
+        const { sec, body } = makeSection('Mutate shader', 'core', true);
         sec.id = 'mutation-section';
 
         // ── Controls row ──
@@ -2121,7 +2150,7 @@
     }
 
     function buildLayersSection(controls) {
-        const { sec, body, header } = makeSection('📑 Layers', 'cyan', true);
+        const { sec, body, header } = makeSection('Layers', 'core', true);
         sec.classList.add('section-layers');
 
         // Action buttons in header
@@ -2267,7 +2296,7 @@
     }
 
     function buildAnimationsSection(controls) {
-        const { sec, body } = makeSection('🎬 Animations', 'orange', true);
+        const { sec, body } = makeSection('Animations', 'expressive', true);
 
         const grid = document.createElement('div');
         grid.className = 'anim-grid';
@@ -2291,7 +2320,7 @@
     }
 
     function buildKaleidoscopeSection(controls) {
-        const { sec, body } = makeSection('🔮 Kaleidoscope', 'purple', true);
+        const { sec, body } = makeSection('Kaleidoscope', 'expressive', true);
 
         // Mandala Studio leads the section: it's the guided way in (it rigs
         // the raw controls below for you), so it should be the first thing
@@ -2315,7 +2344,7 @@
     }
 
     function buildSimulationSection() {
-        const { sec, body } = makeSection('⚙️ Simulation', 'blue', true);
+        const { sec, body } = makeSection('Simulation', 'core', true);
 
         // UX-9.1: Image Sharpness + Motion Detail live in the quality
         // underbar (buildQualityUnderbar) for always-visible quick access.
@@ -2339,7 +2368,7 @@
     }
 
     function buildEffectsSection(controls) {
-        const { sec, body } = makeSection('💡 Effects', 'yellow', true);
+        const { sec, body } = makeSection('Effects', 'expressive', true);
 
         // Curl-noise micro-swirl (dye advection wisps)
         moveControlGroup('swirl', body);
@@ -2372,7 +2401,7 @@
     }
 
     function buildColorsSection(controls) {
-        const { sec, body } = makeSection('🎨 Colors & Palettes', 'pink', true);
+        const { sec, body } = makeSection('Colors and palettes', 'core', true);
 
         // Color action buttons (Save / Clear)
         const colorActions = controls.querySelector('.color-actions');
@@ -2396,7 +2425,7 @@
     }
 
     function buildDisplaySection(controls) {
-        const { sec, body } = makeSection('🖼️ Display', 'green', true);
+        const { sec, body } = makeSection('Display', 'system', true);
         // Photosensitivity protection first — safety leads the section.
         moveCheckboxGroup('photoSafeToggle', body);
 
@@ -2433,7 +2462,7 @@
         // Everyday brush controls (target/tip/feel/presets) moved to the strip's
         // Brush dropdown (buildBrushPanel) 2026-07-16 — this section keeps the
         // rarer stroke-replay + splat-ramp machinery.
-        const { sec, body } = makeSection('🖌️ Stroke & Replay', 'orange', true);
+        const { sec, body } = makeSection('Stroke and replay', 'expressive', true);
 
         // --- Replay Mode ---
         var modeLabel = document.createElement('label');
@@ -3141,7 +3170,7 @@
 
         // ── Custom shapes: user-authored stamp textures (33-brush-shapes).
         // Import → the mask editor opens in adhoc mode (full stamp suite +
-        // Magic Mask Objects) → Apply saves the cut-out as a stamp swatch here.
+        // Instant Roto) → Apply saves the cut-out as a stamp swatch here.
         // The area is also an image drop target (32-file-drop).
         var shapesArea = document.createElement('div');
         shapesArea.className = 'brush-shapes-area';
@@ -3359,7 +3388,7 @@
     //    resize/rotate) via window.brandingOverlays. Replaces the old preset-only
     //    panel (buildBrandingSection_OLD_UNUSED deleted 2026-07-09; git history has it). \u2500\u2500
     function buildBrandingSection() {
-        const { sec, body } = makeSection('\ud83c\udfa8 Branding', 'pink', true);
+        const { sec, body } = makeSection('Branding', 'expressive', true);
 
         function api() { return window.brandingOverlays; }
 
@@ -3588,7 +3617,7 @@
     var audioMiniRaf = null;
 
     function buildAudioSection() {
-        const { sec, body } = makeSection('\ud83c\udfb5 Audio', 'purple', true);
+        const { sec, body } = makeSection('Audio', 'expressive', true);
 
         // Mode select (Off / Minimized / Full) \u2014 mirrors recMode
         var modeGroup = document.createElement('div');
@@ -4193,7 +4222,7 @@
     }
 
     function buildFocusSection() {
-        const { sec, body } = makeSection('🎯 Focus', 'cyan', true);
+        const { sec, body } = makeSection('Focus', 'system', true);
 
         // Focus Mode toggle
         var focusGroup = document.createElement('div');
@@ -4280,7 +4309,7 @@
     }
 
     function buildRecordingSection() {
-        const { sec, body } = makeSection('🎙️ Recording', 'orange', true);
+        const { sec, body } = makeSection('Recording', 'expressive', true);
 
         moveControlGroup('recMode', body);
         moveEl('recMini', body);
@@ -4289,7 +4318,7 @@
     }
 
     function buildExportSection() {
-        const { sec, body } = makeSection('📤 Export', 'green', true);
+        const { sec, body } = makeSection('Export', 'system', true);
 
         // Export status display
         var statusDiv = document.createElement('div');
@@ -4563,7 +4592,7 @@
 
     function buildMultiArtistSection() {
         // Collapsed by default like the rest of the sidebar (UI starts fully collapsed).
-        const { sec, body } = makeSection('🌐 Multiplayer', 'blue', true);
+        const { sec, body } = makeSection('Multiplayer', 'core', true);
 
         // Move the multiplayer panel
         var panel = document.getElementById('multiArtistPanel');
@@ -4589,7 +4618,7 @@
     }
 
     function buildSettingsSection(controls) {
-        const { sec, body } = makeSection('💾 Settings', null, true);
+        const { sec, body } = makeSection('Settings', 'system', true);
 
         // Settings save/load/clear
         const saveBtn = document.getElementById('saveSettingsBtn');
@@ -5228,24 +5257,111 @@
 
     // ─── HELPERS ─────────────────────────────────────────────────
 
-    function makeSection(title, color, collapsed) {
+    // ZBrush-style accordion (Gabriel, 2026-08-22): opening a section closes
+    // every other open one, so what you are working on stays a single tight
+    // cluster instead of a 16-section scroll. Shift+click opts out and toggles
+    // one section on its own, for the "watch Multiplayer while I read Settings"
+    // case. The header tooltip is the only place that override is advertised.
+    const SECTION_HINT = 'Click to open — the other sections close. Shift+click to keep them open.';
+
+    function persistSectionState() {
+        try {
+            var sections = {};
+            document.querySelectorAll('#sidebar-right .sidebar-section').forEach(function (sec) {
+                var titleEl = sec.querySelector('.section-title');
+                if (titleEl) sections[titleEl.textContent.trim()] = sec.classList.contains('collapsed');
+            });
+            if (window.settingsManager) window.settingsManager.set('sidebar.sections', sections);
+        } catch (_) {}
+    }
+
+    // Layout-free: is any EXPANDED section positioned above `sec`? Only those
+    // shorten the content above the clicked header when the accordion sweeps,
+    // so only those can drag it out from under the cursor.
+    function hasOpenSectionAbove(sidebar, sec) {
+        const all = sidebar.querySelectorAll('.sidebar-section');
+        for (var i = 0; i < all.length; i++) {
+            if (all[i] === sec) return false;
+            if (!all[i].classList.contains('collapsed')) return true;
+        }
+        return false;
+    }
+
+    function toggleSection(sec, additive) {
+        if (!sec) return;
+        const sidebar = (sec.closest && sec.closest('#sidebar-right')) || sec.parentElement;
+        const header = sec.querySelector('.section-header');
+        const sweeping = !additive && sec.classList.contains('collapsed') && !!sidebar;
+
+        // Anchor the clicked header: read its viewport position BEFORE the class
+        // swap so we can put it back after. Collapsing the sections ABOVE it
+        // shortens the scroll content and would otherwise yank the row out from
+        // under the cursor — the exact layout shift the accordion is meant to
+        // remove. Gated on two layout-FREE checks, because the read costs a
+        // forced layout and the correction costs another: it can only help if
+        // the sidebar is scrolled (headroom to give back) AND an expanded
+        // section actually sits above the click (something to shrink). Measured
+        // ~8ms of forced layout on a full sidebar, otherwise spent on a
+        // scrollTop that could not move.
+        const anchoring = sweeping && !!header && sidebar.scrollTop > 0 && hasOpenSectionAbove(sidebar, sec);
+        const before = anchoring ? header.getBoundingClientRect().top : 0;
+
+        // Drop any suppress flags a previous sweep left behind. Doing this on
+        // the next click rather than on a rAF is deliberate: rAF parks on a
+        // backgrounded tab, which would strand the flag on a collapsed section
+        // and silently kill its fade the next time it opened. While collapsed
+        // the flag is invisible anyway (0fr row), so clearing it lazily costs
+        // nothing and cannot be skipped.
+        if (sidebar) {
+            sidebar.querySelectorAll('.snap-collapse').forEach(function (o) {
+                o.classList.remove('snap-collapse');
+            });
+        }
+
+        if (sweeping) {
+            // One synchronous batch → one style recalc + one layout for the
+            // whole sweep, not one per section (and `.sidebar-section` carries
+            // `contain: layout style`, so it stops there). `.section-body`
+            // opacity is suppressed on the swept sections: their grid row snaps
+            // to 0fr immediately, so a dozen concurrent fades would pay for
+            // motion nobody can see. The section you opened still fades in.
+            sidebar.querySelectorAll('.sidebar-section').forEach(function (other) {
+                if (other === sec || other.classList.contains('collapsed')) return;
+                other.classList.add('snap-collapse', 'collapsed');
+            });
+        }
+
+        sec.classList.toggle('collapsed');
+
+        if (anchoring) {
+            const drift = header.getBoundingClientRect().top - before;
+            if (drift) {
+                // #sidebar-right sets scroll-behavior:smooth; an anchor
+                // correction must land in the same frame, not animate.
+                const prev = sidebar.style.scrollBehavior;
+                sidebar.style.scrollBehavior = 'auto';
+                sidebar.scrollTop += drift;
+                sidebar.style.scrollBehavior = prev;
+            }
+        }
+
+        persistSectionState();
+    }
+
+    function makeSection(title, group, collapsed) {
         const sec = document.createElement('div');
         sec.className = 'sidebar-section' + (collapsed ? ' collapsed' : '');
-        if (color) sec.dataset.color = color;
+        if (group) sec.dataset.group = group;
 
         const header = document.createElement('div');
         header.className = 'section-header';
-        header.addEventListener('click', function() {
-            this.parentElement.classList.toggle('collapsed');
-            // Persist collapsed states
-            try {
-                var sections = {};
-                document.querySelectorAll('#sidebar-right .sidebar-section').forEach(function(sec) {
-                    var titleEl = sec.querySelector('.section-title');
-                    if (titleEl) sections[titleEl.textContent.trim()] = sec.classList.contains('collapsed');
-                });
-                if (window.settingsManager) window.settingsManager.set('sidebar.sections', sections);
-            } catch(_) {}
+        header.title = SECTION_HINT;
+        header.addEventListener('click', function (e) {
+            // Layers puts real command buttons (Capture / 📁 / ✏️ / 🧱) inside
+            // its header. A click on one of those is a command, not a toggle —
+            // and under the accordion it would collapse the whole sidebar.
+            if (e.target && e.target.closest && e.target.closest('.section-header-actions')) return;
+            toggleSection(this.parentElement, e.shiftKey);
         });
         header.innerHTML =
             '<span class="section-title">' + title + '</span>' +

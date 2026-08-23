@@ -348,7 +348,7 @@
 }
 
 
-/* Mask editor tool buttons (Magic Mask Objects / Stamps) */
+/* Mask editor tool buttons (Instant Roto / Stamps) */
 .mask-mode-btn {
     padding: 10px 16px;
     background: linear-gradient(180deg, #2a3340, #1f2632);
@@ -364,8 +364,8 @@
     flex: 1;
 }
 
-/* Magic Mask Objects — reads green even at rest so it pops out of the panel */
-.magic-mask-btn {
+/* Instant Roto — reads green even at rest so it pops out of the panel */
+.instant-roto-btn {
     background: linear-gradient(180deg, rgba(35, 134, 54, 0.35), rgba(26, 127, 55, 0.18));
     border: 1px solid rgba(63, 185, 80, 0.65);
     color: #3fb950;
@@ -373,7 +373,7 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
-.magic-mask-btn:hover:not(:disabled) {
+.instant-roto-btn:hover:not(:disabled) {
     background: linear-gradient(180deg, rgba(35, 134, 54, 0.5), rgba(26, 127, 55, 0.3));
     border-color: rgba(63, 185, 80, 0.9);
     color: #56d364;
@@ -381,7 +381,7 @@
 }
 
 /* Engaged = mode is on: solid green fill + glow */
-.magic-mask-btn.engaged {
+.instant-roto-btn.engaged {
     background: linear-gradient(180deg, #2ea043, #238636);
     border-color: rgba(87, 213, 108, 0.9);
     color: #fff;
@@ -389,7 +389,7 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.magic-mask-btn:disabled {
+.instant-roto-btn:disabled {
     opacity: 0.7;
     cursor: wait;
 }
@@ -644,7 +644,7 @@
     box-shadow: none;
 }
 
-/* ── Step 1 tool tabs: Magic Mask · Stamps · Filter ────────────────────────
+/* ── Step 1 tool tabs: Instant Roto · Stamps · Filter ────────────────────────
    One panel below, one selected tab above. The tabs sit on the panel rather
    than floating over it, so the group reads as a single control. */
 .mask-tool-tabs {
@@ -758,7 +758,7 @@
 }
 
 /* Each tool keeps its own accent so the tabs stay recognisable at a glance
-   (Magic Mask has always read green in this editor). */
+   (Instant Roto has always read green in this editor). */
 .mask-tool-tab[data-tool="magic"] { color: #3fb950; }
 .mask-tool-tab[data-tool="magic"]:hover:not(:disabled) { color: #56d364; background: rgba(63, 185, 80, 0.08); }
 .mask-tool-tab[data-tool="magic"].active {
@@ -772,7 +772,7 @@
     border-color: rgba(88, 166, 255, 0.45);
 }
 
-/* The Magic Mask panel predates the tab strip and carries inline styling;
+/* The Instant Roto panel predates the tab strip and carries inline styling;
    square off its top corners so it reads as the selected tab's panel. */
 #smartSelectControls.mask-tool-panel {
     border-top-left-radius: 0;
