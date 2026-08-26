@@ -223,7 +223,17 @@
                 mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
                 radius: effR,
                 tip: config.BRUSH_TIP | 0,
-                shape: config.BRUSH_SHAPE_ID || null
+                shape: config.BRUSH_SHAPE_ID || null,
+                // Push (velocity-only) dabs deposit no dye, so a replay that
+                // did not know about the flag would repaint them as ordinary
+                // strokes — pigment appearing where the painter laid none.
+                // Nested and null on ordinary dabs: stroke events ride the
+                // wire chunked under a 16KB cap, so three always-present
+                // fields on every dab is real weight for a rare mode.
+                push: config.BRUSH_VELOCITY_ONLY ? {
+                    m: config.BRUSH_VEL_MODE || 'smudge',
+                    s: (typeof config.BRUSH_VEL_STRENGTH === 'number') ? config.BRUSH_VEL_STRENGTH : 1
+                } : null
             });
         }
         function deepCopyEvent(ev) {
@@ -232,7 +242,8 @@
             // across the gap between two separate strokes in a Time replay —
             // that would draw a line the painter never made.
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(),
-                     mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head };
+                     mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
+                     push: ev.push ? { m: ev.push.m, s: ev.push.s } : null };
         }
         // Time replay: the last N SECONDS OF WALL CLOCK, exactly as they happened.
         //
@@ -456,6 +467,29 @@
                 && window.BrushShapes.has(evShape));
             var savedTip = config.BRUSH_TIP;
             var savedShape = config.BRUSH_SHAPE_ID;
+            // Push rides the same pin-then-restore as the footprint: a dab is
+            // replayed as velocity-only if it WAS one, whatever the brush is set
+            // to now. Pinned unconditionally (not only when ev.push is set), or
+            // a Push stroke recorded earlier would repaint as dye the moment the
+            // live brush happened to be in Push mode, and vice versa.
+            var savedVelOnly = config.BRUSH_VELOCITY_ONLY;
+            var savedVelMode = config.BRUSH_VEL_MODE;
+            var savedVelStr = config.BRUSH_VEL_STRENGTH;
+            // Replayed events are not always ours: a peer's broadcast replay
+            // arrives here as raw wire JSON (06 scheduleStrokeReplay). Coerce
+            // against the known set before it touches config — splat() would
+            // treat an unknown mode as 'smudge' and be safe, but the VALUE would
+            // still be sitting in config for the settings mirror to re-persist
+            // and re-broadcast, which is exactly how a retired symmetry mode
+            // came back from the dead once.
+            var _push = (ev.push && typeof ev.push === 'object') ? ev.push : null;
+            config.BRUSH_VELOCITY_ONLY = !!_push;
+            if (_push) {
+                config.BRUSH_VEL_MODE = (_push.m === 'spread' || _push.m === 'gather' || _push.m === 'swirl')
+                    ? _push.m : 'smudge';
+                config.BRUSH_VEL_STRENGTH = (typeof _push.s === 'number' && isFinite(_push.s))
+                    ? Math.max(0, Math.min(5, _push.s)) : 1;
+            }
             if (typeof ev.tip === 'number') config.BRUSH_TIP = ev.tip;
             config.BRUSH_SHAPE_ID = haveStamp ? evShape : null;
             window.__remoteStroke = !haveStamp;
@@ -480,6 +514,9 @@
                 window.__splatFlow = 1;   // applyPaintFlow may have set it
                 config.BRUSH_TIP = savedTip;
                 config.BRUSH_SHAPE_ID = savedShape;
+                config.BRUSH_VELOCITY_ONLY = savedVelOnly;
+                config.BRUSH_VEL_MODE = savedVelMode;
+                config.BRUSH_VEL_STRENGTH = savedVelStr;
             }
             if (typeof recRecordInteraction === 'function' && recEnabled) {
                 try { recRecordInteraction(x, y, dx, dy, col); } catch(_){}

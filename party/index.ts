@@ -47,6 +47,7 @@ const SERVER_AUTHORED = new Set([
   "turn-invite-offer",
   "turn-invite-result",
   "turn-invite-sent",
+  "share-state",
 ]);
 
 // How long a "shall we take turns?" invite stands before it goes stale.
@@ -101,6 +102,12 @@ export default class FluidPartyServer implements Party.Server {
     mode: "timer" | "stroke";
     at: number;
   } | null = null;
+  // Settings shares: opt-in circles inside the room, keyed by uid and
+  // advertised to clients as connection ids (same rule as the rotation).
+  // A member belongs to at most one; uids[0] is the circle's ANCHOR, the
+  // member whose look a joiner converges onto.
+  shares: Map<string, string[]> = new Map();
+  shareSeq = 0; // per-room counter behind the opaque share ids
   lastSweep = 0; // zombie-reap rate limit (in-memory; a wake just sweeps again)
   lastAlarmArm = 0;
   loaded = false;
@@ -122,6 +129,10 @@ export default class FluidPartyServer implements Party.Server {
     this.turnDeadline = (await this.room.storage.get<number>("turnDeadline")) || 0;
     this.turnMode =
       (await this.room.storage.get<string>("turnMode")) === "stroke" ? "stroke" : "timer";
+    this.shares = new Map(
+      (await this.room.storage.get<[string, string[]][]>("shares")) || []
+    );
+    this.shareSeq = (await this.room.storage.get<number>("shareSeq")) || 0;
     this.loaded = true;
   }
 
@@ -213,12 +224,20 @@ export default class FluidPartyServer implements Party.Server {
         locked: this.locked,
         capacity: this.capacity,
         roomKind: this.kind,
+        // Which circles were already open when this member arrived. Their
+        // client needs to tell those apart from one opened while they are
+        // here: the first is context, the second is an offer worth a prompt.
+        shares: this.shareRoster(),
       })
     );
     this.broadcastClientCount();
     // Everyone (including the joiner, and the holder whose conn id may have
     // changed across a reconnect) re-syncs the rotation.
     if (this.turnsOn) this.broadcastTurnState();
+    // Same for the settings shares: a joiner needs to see which circles are
+    // open before they can join one, and everyone else needs the newcomer's
+    // connection id in place of whatever id they held before a reconnect.
+    if (this.shares.size) this.broadcastShareState();
   }
 
   async onMessage(message: string, sender: Party.Connection) {
@@ -302,6 +321,10 @@ export default class FluidPartyServer implements Party.Server {
       await this.persist(); // commit before announcing (same rule as the lock)
       await this.syncTurnAlarm();
       this.broadcastTurnState();
+      // The room's look regime just changed hands, so the share roster is
+      // announced with it: enableTurns dissolved the circles, and saying so
+      // beats leaving every client to infer it from the turn state.
+      this.broadcastShareState();
       return;
     }
 
@@ -346,6 +369,7 @@ export default class FluidPartyServer implements Party.Server {
         await this.persist();
         await this.syncTurnAlarm();
         this.broadcastTurnState();
+        this.broadcastShareState(); // the circles just dissolved — say so
         return;
       }
 
@@ -380,6 +404,7 @@ export default class FluidPartyServer implements Party.Server {
         await this.persist();
         await this.syncTurnAlarm();
         this.broadcastTurnState();
+        this.broadcastShareState(); // the circles just dissolved — say so
       } else {
         const proposer = this.connForUid(p.from);
         if (proposer) {
@@ -404,6 +429,62 @@ export default class FluidPartyServer implements Party.Server {
       await this.persist();
       await this.syncTurnAlarm();
       this.broadcastTurnState();
+      return;
+    }
+
+    // ── Settings sharing: opt-in circles inside the room ──
+    // Not a room-wide mode and not a host power. Anyone opens a share, anyone
+    // may join it or leave it, and inside one every member's look changes
+    // reach every other member — including whoever opened it. Sharing takes
+    // nothing away (you keep every control), which is why this needs no
+    // consent handshake the way taking turns does: the offer IS the open
+    // circle, and answering it is joining.
+    if (
+      this.managed &&
+      (data.type === "share-open" ||
+        data.type === "share-join" ||
+        data.type === "share-leave" ||
+        data.type === "share-look")
+    ) {
+      await this.ensureLoaded();
+      const st = sender.state as ConnState | null;
+      if (!st) return;
+      // Take Turns owns the room's look while it runs (the painter's settings
+      // mirror to everyone, watchers are gated), so shares stand down for the
+      // duration: enableTurns dissolves them, and this refuses new ones.
+      if (this.turnsOn) return;
+
+      if (data.type === "share-look") {
+        const gid = this.shareOf(st.uid);
+        if (!gid) return; // no circle to speak into
+        // Routed, not broadcast: a look delta belongs to one circle, and the
+        // rest of the room must never be restyled by a share they are not in.
+        const out = JSON.stringify({ ...data, clientId: sender.id, timestamp: Date.now() });
+        for (const uid of this.shares.get(gid) || []) {
+          if (uid === st.uid) continue;
+          const c = this.connForUid(uid);
+          if (c) c.send(out);
+        }
+        return;
+      }
+
+      if (data.type === "share-open") {
+        this.leaveShare(st.uid);
+        this.shares.set("s" + ++this.shareSeq, [st.uid]);
+      } else if (data.type === "share-join") {
+        const gid = typeof data.group === "string" ? data.group : "";
+        const g = this.shares.get(gid);
+        // A stale offer — the circle dissolved while the prompt was still up —
+        // must leave the sender exactly where they are, not drop them out of
+        // the share they are already in for a circle that no longer exists.
+        if (!g || this.shareOf(st.uid) === gid) return;
+        this.leaveShare(st.uid);
+        g.push(st.uid);
+      } else if (!this.leaveShare(st.uid)) {
+        return; // share-leave with nothing to leave
+      }
+      await this.persist(); // commit before announcing (same rule as the lock)
+      this.broadcastShareState();
       return;
     }
 
@@ -452,6 +533,8 @@ export default class FluidPartyServer implements Party.Server {
       this.turnDeadline = 0;
       this.turnMode = "timer";
       this.pendingInvite = null;
+      this.shares.clear();
+      this.shareSeq = 0;
       await this.room.storage.deleteAll();
       try {
         await this.room.storage.deleteAlarm();
@@ -472,6 +555,26 @@ export default class FluidPartyServer implements Party.Server {
         return !!cs && cs.uid === st.uid;
       });
       if (!stillHereForInvite) this.pendingInvite = null;
+    }
+
+    // Settings-share upkeep: a member with no remaining connection leaves
+    // their circle, and the circle dissolves if they were the last one in it.
+    if (st && this.shares.size) {
+      const stillHereForShare = remaining.some((c) => {
+        const cs = c.state as ConnState | null;
+        return !!cs && cs.uid === st.uid;
+      });
+      if (!stillHereForShare) {
+        if (this.leaveShare(st.uid)) {
+          await this.persist();
+          this.broadcastShareState(conn.id);
+        }
+      } else if (this.shareOf(st.uid)) {
+        // The uid survives on another connection (second tab, or a zombie
+        // outliving a reconnect). Clients key the circle on CONNECTION ids —
+        // re-advertise, or the roster stays keyed to a dead one.
+        this.broadcastShareState(conn.id);
+      }
     }
 
     // Host left but others remain → transfer host so lock/unlock stays usable.
@@ -621,6 +724,10 @@ export default class FluidPartyServer implements Party.Server {
     const wasOn = this.turnsOn;
     this.turnsOn = true;
     this.pendingInvite = null;
+    // One painter's look now mirrors to the whole room, which is what a share
+    // was for — so the circles dissolve rather than fight the rotation over
+    // the same settings. (Callers persist and broadcast right after.)
+    this.shares.clear();
     this.turnMode = mode === "stroke" ? "stroke" : "timer";
     // Turn length: 0 = no timer; otherwise clamp to something sane. "One swirl
     // each" has no clock by definition — the stroke ending is the deadline.
@@ -713,6 +820,48 @@ export default class FluidPartyServer implements Party.Server {
     );
   }
 
+  // The share a member belongs to, or null.
+  shareOf(uid: string): string | null {
+    for (const [id, uids] of this.shares) if (uids.includes(uid)) return id;
+    return null;
+  }
+
+  // Drop a member from whatever share they are in; a circle with nobody left
+  // dissolves rather than lingering as an empty one others could still join.
+  // Returns whether anything actually changed — callers persist + broadcast.
+  leaveShare(uid: string): boolean {
+    const id = this.shareOf(uid);
+    if (!id) return false;
+    const left = (this.shares.get(id) || []).filter((u) => u !== uid);
+    if (left.length) this.shares.set(id, left);
+    else this.shares.delete(id);
+    return true;
+  }
+
+  // Who is sharing settings with whom. Members ride as connection ids — never
+  // uids, which are the lock re-admission key — exactly as the rotation does.
+  // members[0] is the anchor; a circle whose members have all gone is omitted.
+  shareRoster(excludeConnId?: string) {
+    return [...this.shares.entries()]
+      .map(([id, uids]) => ({
+        id,
+        members: uids
+          .map((u) => this.clientIdForUid(u, excludeConnId))
+          .filter((c): c is string => !!c),
+      }))
+      .filter((g) => g.members.length > 0);
+  }
+
+  broadcastShareState(excludeConnId?: string) {
+    this.room.broadcast(
+      JSON.stringify({
+        type: "share-state",
+        groups: this.shareRoster(excludeConnId),
+        timestamp: Date.now(),
+      })
+    );
+  }
+
   persist() {
     return Promise.all([
       this.room.storage.put("locked", this.locked),
@@ -728,6 +877,8 @@ export default class FluidPartyServer implements Party.Server {
       this.turnHolder
         ? this.room.storage.put("turnHolder", this.turnHolder)
         : this.room.storage.delete("turnHolder"),
+      this.room.storage.put("shares", [...this.shares.entries()]),
+      this.room.storage.put("shareSeq", this.shareSeq),
     ]);
   }
 

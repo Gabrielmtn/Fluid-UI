@@ -660,7 +660,7 @@
                             '<div class="delete-modal-actions">' +
                                 '<button type="button" class="delete-modal-cancel" id="appCloseKeep">Keep painting</button>' +
                                 '<button type="button" class="app-close-save" id="appCloseSave">Save project</button>' +
-                                '<button type="button" class="delete-modal-confirm" id="appCloseQuit">Close anyway</button>' +
+                                '<button type="button" class="delete-modal-confirm btn--destructive" id="appCloseQuit">Close anyway</button>' +
                             '</div>' +
                         '</div>';
                     document.body.appendChild(el);

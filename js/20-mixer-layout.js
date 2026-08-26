@@ -408,7 +408,7 @@
                         '<div class="delete-modal-message" id="appConfirmMessage"></div>' +
                         '<div class="delete-modal-actions">' +
                             '<button type="button" class="delete-modal-cancel" id="appConfirmCancel"></button>' +
-                            '<button type="button" class="delete-modal-confirm" id="appConfirmOk"></button>' +
+                            '<button type="button" class="delete-modal-confirm btn--destructive" id="appConfirmOk"></button>' +
                         '</div>' +
                     '</div>';
                 document.body.appendChild(modal);
@@ -424,7 +424,13 @@
             cancelEl.textContent = opts.cancelLabel || 'Cancel';
             // cancelLabel: null → one button, i.e. an alert rather than a question
             cancelEl.style.display = (opts.cancelLabel === null) ? 'none' : '';
-            okEl.classList.toggle('app-confirm-safe', opts.danger === false);
+            // A confirm's OK button is destructive unless the caller says
+            // otherwise — appAlert passes danger:false, because an alert has
+            // nothing to confirm and a red OK would be alarming for no reason.
+            // This replaces a toggle of 'app-confirm-safe', which no stylesheet
+            // has ever matched: the class was doing nothing, so every confirm
+            // (and every alert) came out the same neutral panel colour.
+            okEl.classList.toggle('btn--destructive', opts.danger !== false);
 
             var done = function (val) {
                 modal.classList.remove('show');
@@ -2400,6 +2406,137 @@
         return sec;
     }
 
+    // ── Constant pressure field: the aim pad in Effects ──────────
+    // Gravity, updraft, a sideways draught — a steady body force on the whole
+    // canvas (04a AMBIENT_FORCE, applied in 05j). The elements live in
+    // index.html beside the Light Source ones and are adopted by
+    // buildEffectsSection; this only wires them, so it is safe to call once the
+    // DOM exists and does not care whether the section has been built yet.
+    //
+    // Deliberately NOT in the brush-preset SETTERS: a canvas-wide effect that
+    // changes every layer has no business riding a brush.
+    // Takes its elements as ARGUMENTS rather than looking them up, because the
+    // whole sidebar is assembled DETACHED (1566 creates it, the caller attaches
+    // it later) and every section body along with it — so from the first
+    // moveCheckboxGroup onward these nodes are out of the document and
+    // getElementById cannot see them. The lookups are kept as a fallback for
+    // any caller that runs once everything is attached.
+    function wirePressureField(check, wrap) {
+        check = check || document.getElementById('pressureConstant');
+        wrap = wrap || document.getElementById('pressureFieldControls');
+        if (!check || !wrap) return;
+        var pad = wrap.querySelector('.pressure-pad');
+        var read = wrap.querySelector('.pressure-pad-read');
+        if (!pad || !read) return;
+        if (pad.dataset.wired) return;   // build is idempotent; so is this
+        pad.dataset.wired = '1';
+        var dot = pad.querySelector('.pressure-pad-dot');
+        var arm = pad.querySelector('.pressure-pad-arm');
+
+        function vec() {
+            var c = window.config || {};
+            return [(typeof c.AMBIENT_FORCE_X === 'number') ? c.AMBIENT_FORCE_X : 0,
+                    (typeof c.AMBIENT_FORCE_Y === 'number') ? c.AMBIENT_FORCE_Y : 0];
+        }
+        // A compass, not raw numbers: nobody aims gravity by reading -0.71.
+        function label(x, y) {
+            var m = Math.min(1, Math.hypot(x, y));
+            if (m < 0.02) return 'centred — no push';
+            var names = ['right', 'down-right', 'down', 'down-left',
+                         'left', 'up-left', 'up', 'up-right'];
+            var a = Math.atan2(y, x); // pad y is DOWN, so this reads as a screen compass
+            var i = Math.round((a < 0 ? a + Math.PI * 2 : a) / (Math.PI / 4)) % 8;
+            return names[i] + ' — ' + Math.round(m * 100) + '%';
+        }
+        function sync() {
+            var v = vec(), x = v[0], y = v[1], m = Math.hypot(x, y);
+            dot.style.left = (50 + x * 50) + '%';
+            dot.style.top = (50 + y * 50) + '%';
+            // The arm is what makes the direction readable at a glance: a lone dot
+            // near the centre is ambiguous about which way it is leaning, and
+            // leaning is the whole point of this control.
+            arm.style.width = (m * 50) + '%';
+            arm.style.transform = 'rotate(' + (Math.atan2(y, x) * 180 / Math.PI) + 'deg)';
+            arm.style.opacity = m > 0.02 ? '1' : '0';
+            read.textContent = label(x, y);
+        }
+        function setOn(on) {
+            if (window.config) window.config.AMBIENT_FORCE = !!on;
+            check.checked = !!on;
+            wrap.style.display = on ? '' : 'none';
+            try { if (window.settingsManager) window.settingsManager.set('pressure.constantOn', !!on); } catch (_) {}
+        }
+        function setVec(x, y) {
+            // Clamped to the DISC, not the square: a square pad's corners reach
+            // 1.41x its edges, so the readout would lie about how hard you are
+            // pushing. The dead zone stops a dot resting near the middle from
+            // flipping direction on sub-pixel jitter.
+            var m = Math.hypot(x, y);
+            if (m > 1) { x /= m; y /= m; m = 1; }
+            if (m < 0.04) { x = 0; y = 0; }
+            if (window.config) { window.config.AMBIENT_FORCE_X = x; window.config.AMBIENT_FORCE_Y = y; }
+            sync();
+            try {
+                if (window.settingsManager) {
+                    window.settingsManager.set('pressure.fx', x);
+                    window.settingsManager.set('pressure.fy', y);
+                }
+            } catch (_) {}
+        }
+        var dragging = false;
+        function aim(ev) {
+            var r = pad.getBoundingClientRect();
+            if (!r.width || !r.height) return;
+            setVec(((ev.clientX - r.left) / r.width) * 2 - 1,
+                   ((ev.clientY - r.top) / r.height) * 2 - 1);
+        }
+        pad.addEventListener('pointerdown', function (ev) {
+            ev.preventDefault(); ev.stopPropagation();
+            dragging = true;
+            try { pad.setPointerCapture(ev.pointerId); } catch (_) {}
+            // Aiming switches it on: a pad that does nothing until you also find
+            // the checkbox above it reads as broken.
+            if (!(window.config && window.config.AMBIENT_FORCE)) setOn(true);
+            aim(ev);
+        });
+        pad.addEventListener('pointermove', function (ev) {
+            if (!dragging) return;
+            ev.preventDefault(); aim(ev);
+        });
+        var end = function (ev) {
+            if (!dragging) return;
+            dragging = false;
+            try { pad.releasePointerCapture(ev.pointerId); } catch (_) {}
+        };
+        pad.addEventListener('pointerup', end);
+        pad.addEventListener('pointercancel', end);
+        // Double-click recentres — the quick way back to no push without hunting
+        // for the exact middle.
+        pad.addEventListener('dblclick', function (ev) {
+            ev.preventDefault(); setVec(0, 0);
+        });
+        check.addEventListener('change', function () {
+            setOn(check.checked);
+            // Switching on with the pad centred would do nothing at all, which
+            // reads as a dead checkbox. Seed it downward: gravity is the thing
+            // people reach for this to get.
+            var v = vec();
+            if (check.checked && v[0] === 0 && v[1] === 0) setVec(0, 0.6);
+        });
+        (function restore() {
+            var on = null, fx = null, fy = null;
+            try {
+                if (window.settingsManager) {
+                    on = window.settingsManager.get('pressure.constantOn');
+                    fx = window.settingsManager.get('pressure.fx');
+                    fy = window.settingsManager.get('pressure.fy');
+                }
+            } catch (_) {}
+            setVec(typeof fx === 'number' ? fx : 0, typeof fy === 'number' ? fy : 0);
+            setOn(on === true);
+        })();
+    }
+
     function buildEffectsSection(controls) {
         const { sec, body } = makeSection('Effects', 'expressive', true);
 
@@ -2411,6 +2548,28 @@
         // Surface shading (Pavel-style pseudo-normal lighting)
         moveCheckboxGroup('displayShadingToggle', body);
         moveEl('shadingIntensityGroup', body);
+
+        // Constant pressure field (ambient gravity / lift). Lived in the Brush
+        // panel's Pressure section while it was being built, which put a
+        // canvas-wide effect behind a brush mode — you had to hold the right
+        // tool to find the switch for something that never stops running. It is
+        // an effect, so it sits with the effects.
+        // Grab the refs BEFORE moving: these moves take the nodes out of the
+        // document (this section is detached until the caller appends it, and
+        // the sidebar it goes into is detached too), so a lookup afterwards
+        // finds nothing.
+        const pressureCheck = document.getElementById('pressureConstant');
+        moveCheckboxGroup('pressureConstant', body);
+        const pressureControls = document.getElementById('pressureFieldControls');
+        if (pressureControls) body.appendChild(pressureControls);
+        wirePressureField(pressureCheck, pressureControls);
+
+        // Overflow (open canvas edges) + its Border width. Sits with the
+        // pressure field because both are canvas-wide simulation behaviour,
+        // not post-FX like the lighting and glow blocks below.
+        moveCheckboxGroup('overflowToggle', body);
+        const overflowPanel = document.getElementById('overflowPanel');
+        if (overflowPanel) body.appendChild(overflowPanel);
 
         moveCheckboxGroup('enableLighting', body);
         const lightControls = document.getElementById('lightSourceControls');
@@ -2881,6 +3040,7 @@
             l.className = 'brush-section-label';
             l.textContent = text;
             panel.appendChild(l);
+            return l; // so Pressure can hide the dye-only sections
         }
 
         function pSlider(id, label, min, max, step, key, fmt, presetKey) {
@@ -2997,6 +3157,9 @@
                 spacing: num(c.BRUSH_SPACING, 0.35),
                 jitter: num(c.BRUSH_JITTER, 0),
                 splatMode: c.BRUSH_CONTINUOUS ? 'constant' : 'move',
+                velOnly: !!c.BRUSH_VELOCITY_ONLY,
+                velMode: c.BRUSH_VEL_MODE || 'smudge',
+                velStrength: num(c.BRUSH_VEL_STRENGTH, 1),
                 shape: (window.BrushShapes && window.BrushShapes.activeId()) || null
             };
         }
@@ -3017,7 +3180,7 @@
                 if (SETTERS.target) SETTERS.target(p.target);
                 if (SETTERS.tip) SETTERS.tip(p.tip | 0);
                 ['tipTexture', 'angle', 'flow', 'hardness', 'stabilizer', 'spacing', 'jitter',
-                 'eraser', 'splatMode', 'shape'
+                 'eraser', 'splatMode', 'velMode', 'velStrength', 'velOnly', 'shape'
                 ].forEach(function (k) {
                     if (SETTERS[k] && p[k] !== undefined) SETTERS[k](p[k]);
                 });
@@ -3028,6 +3191,11 @@
                 // overrides the preset's brush.
                 if (p.splatMode === undefined && SETTERS.splatMode) SETTERS.splatMode('move');
                 if (p.shape === undefined && SETTERS.shape) SETTERS.shape(null);
+                // Presets predating Pressure were all authored as painting
+                // brushes, so applying one has to switch Pressure OFF — otherwise
+                // loading an old favourite while in Pressure mode hands back a
+                // brush that silently paints nothing.
+                if (p.velOnly === undefined && SETTERS.velOnly) SETTERS.velOnly(false);
             } finally { applyingPreset = false; }
         }
         // D7-1: let a .fluid project import refresh the brush-preset chips.
@@ -3103,29 +3271,135 @@
         // still paints raster layers (BRUSH_TARGET 'sketch'), brush presets
         // with target:'sketch'/'mask' still apply via SETTERS.target, and
         // collision layers keep their controls in the Layers panel.
+        // Three things a stroke can BE, not three places paint lands: Fluid
+        // and Collider pick a target, Pressure keeps the fluid target and
+        // flips BRUSH_VELOCITY_ONLY instead. They share a row because they are
+        // mutually exclusive from where the user sits, but they are two config
+        // values underneath — and they have to stay two, because a Pressure
+        // stroke still routes through splat() exactly like a Fluid one. Making
+        // 'pressure' a BRUSH_TARGET would strand it outside every
+        // target === 'fluid' test in the paint path.
         sLabel('Paint Into');
         var targetRow = document.createElement('div');
         targetRow.className = 'brush-mode-row';
         var fluidBtn = document.createElement('button');
         fluidBtn.type = 'button'; fluidBtn.className = 'brush-mode-btn active'; fluidBtn.textContent = 'Fluid';
         fluidBtn.title = 'Strokes splat velocity + dye into the fluid sim (the classic brush)';
+        var pressureBtn = document.createElement('button');
+        pressureBtn.type = 'button'; pressureBtn.className = 'brush-mode-btn'; pressureBtn.textContent = 'Pressure';
+        pressureBtn.title = 'Move paint that is already on the canvas without adding any. '
+            + 'The stroke pushes the fluid and deposits no colour, so the tip, shape and '
+            + 'Flow controls are replaced by the pressure modes below.';
         var colliderBtn = document.createElement('button');
-        colliderBtn.type = 'button'; colliderBtn.className = 'brush-mode-btn'; colliderBtn.textContent = 'Paint Collider';
+        // 'Paint Collider' at three-across: the row is ~148px and the buttons
+        // size to their text, so the old label pushed the row 6px over and
+        // squeezed the other two. The tooltip still carries the full sentence.
+        colliderBtn.type = 'button'; colliderBtn.className = 'brush-mode-btn'; colliderBtn.textContent = 'Collider';
         colliderBtn.title = 'Paint walls with your brush: strokes build a live collider layer (see the Layers panel) that the fluid flows around — shown as a red film while painting. Click Fluid to paint dye again.';
-        targetRow.appendChild(fluidBtn); targetRow.appendChild(colliderBtn);
+        targetRow.appendChild(fluidBtn);
+        targetRow.appendChild(pressureBtn);
+        targetRow.appendChild(colliderBtn);
         panel.appendChild(targetRow);
+        // Sections that only mean anything to a DYE stroke. Collected as they
+        // are built further down and hidden wholesale under Pressure, which is
+        // why sLabel returns its element.
+        var dyeOnlyEls = [];
         var VALID_TARGETS = { fluid: 1, sketch: 1, mask: 1 };
         function setBrushTarget(t) {
             if (!VALID_TARGETS[t]) t = 'fluid';
             if (window.config) window.config.BRUSH_TARGET = t;
-            fluidBtn.classList.toggle('active', t === 'fluid');
-            // 'mask' IS collider painting; 'sketch' (entered from the Layers
-            // panel's per-layer paint button) lights neither option here.
-            colliderBtn.classList.toggle('active', t === 'mask');
+            syncBrushMode();
             try { if (window.settingsManager) window.settingsManager.set('brush.target', t); } catch (_) {}
         }
         SETTERS.target = setBrushTarget;
-        fluidBtn.addEventListener('click', function () { setBrushTarget('fluid'); markDirty(); });
+        // The buttons drive BOTH values; the setters stay single-purpose so a
+        // preset can apply target and velOnly independently (apply order in
+        // applyBrushPreset puts velOnly last, so it wins).
+        fluidBtn.addEventListener('click', function () {
+            setPressureEnabled(false); setBrushTarget('fluid'); markDirty();
+        });
+        pressureBtn.addEventListener('click', function () {
+            setBrushTarget('fluid'); setPressureEnabled(true); markDirty();
+        });
+
+        // ── Pressure: the velocity-only brush ────────────────────────
+        // The stroke runs the splat's velocity pass and skips the dye pass
+        // (04a BRUSH_VELOCITY_ONLY, 05i splat()), so it moves paint already on
+        // the canvas without adding any. Smudge takes its direction from
+        // pointer travel and therefore needs movement, exactly like the normal
+        // brush. Spread/Gather/Swirl synthesize a direction per fragment, so
+        // they work while the pointer stands still — which is what makes them
+        // the natural partner for Constant flow below.
+        //
+        // 2x2 rather than one row of four: the buttons size to their text and
+        // four labels this long overflow a ~148px row (measured 159px).
+        var pressureWrap = document.createElement('div');
+        panel.appendChild(pressureWrap);
+        var PRESSURE_MODES = [
+            [{ v: 'smudge', label: 'Smudge', title: 'Drags paint along the direction you move, like a classic smudge tool. Needs movement — standing still does nothing.' },
+             { v: 'spread', label: 'Spread', title: 'Pushes paint outward from the cursor. Works standing still: hold with Constant flow to open a clearing.' }],
+            [{ v: 'gather', label: 'Gather', title: 'Draws paint inward toward the cursor. Works standing still: hold to collect colour under the brush.' },
+             { v: 'swirl',  label: 'Swirl',  title: 'Spins paint around the cursor. Works standing still: hold to wind up a whirlpool.' }]
+        ];
+        var pModeBtns = {};
+        PRESSURE_MODES.forEach(function (pair) {
+            var row = document.createElement('div');
+            row.className = 'brush-mode-row';
+            pair.forEach(function (m) {
+                var b = document.createElement('button');
+                b.type = 'button'; b.className = 'brush-mode-btn';
+                b.textContent = m.label; b.title = m.title;
+                b.addEventListener('click', function () { setPressureMode(m.v); markDirty(); });
+                row.appendChild(b);
+                pModeBtns[m.v] = b;
+            });
+            pressureWrap.appendChild(row);
+        });
+        // pSlider appends to the panel; re-parent it so the whole Pressure
+        // block shows and hides as one node.
+        var pressStrGroup = pSlider('brushVelStrength', 'Strength', 0, 3, 0.05,
+            'BRUSH_VEL_STRENGTH', function (v) { return (+v).toFixed(2) + '\u00d7'; }, 'velStrength');
+        pressStrGroup.title = 'How hard Spread / Gather / Swirl push, against an ordinary stroke as 1x. '
+            + 'Smudge ignores it — that mode takes its force from how fast you move.';
+        pressureWrap.appendChild(pressStrGroup);
+        var PRESSURE_MODE_OK = { smudge: 1, spread: 1, gather: 1, swirl: 1 };
+        // Blow/Suck/Vortex became Spread/Gather/Swirl (2026-08-24, pre-release).
+        // Anyone who tried the feature before the rename has an old id persisted;
+        // without this it coerces to Smudge and their choice vanishes silently.
+        var PRESSURE_MODE_LEGACY = { blow: 'spread', suck: 'gather', vortex: 'swirl' };
+        function syncBrushMode() {
+            var t = (window.config && window.config.BRUSH_TARGET) || 'fluid';
+            var on = !!(window.config && window.config.BRUSH_VELOCITY_ONLY);
+            var mode = (window.config && window.config.BRUSH_VEL_MODE) || 'smudge';
+            fluidBtn.classList.toggle('active', !on && t === 'fluid');
+            pressureBtn.classList.toggle('active', on);
+            // 'mask' IS collider painting; 'sketch' (entered from the Layers
+            // panel's per-layer paint button) lights none of the three here.
+            colliderBtn.classList.toggle('active', !on && t === 'mask');
+            pressureWrap.style.display = on ? '' : 'none';
+            dyeOnlyEls.forEach(function (e) { if (e) e.style.display = on ? 'none' : ''; });
+            Object.keys(pModeBtns).forEach(function (k) {
+                pModeBtns[k].classList.toggle('active', k === mode);
+            });
+            // Smudge takes its magnitude from the pointer, so Strength means
+            // nothing there. Greyed rather than hidden, same as Spacing/Interval
+            // below, so the block does not reflow when you switch modes.
+            setGroupEnabled(pressStrGroup, mode !== 'smudge');
+        }
+        function setPressureEnabled(on) {
+            if (window.config) window.config.BRUSH_VELOCITY_ONLY = !!on;
+            syncBrushMode();
+            try { if (window.settingsManager) window.settingsManager.set('brush.velOnly', !!on); } catch (_) {}
+        }
+        function setPressureMode(m) {
+            if (PRESSURE_MODE_LEGACY[m]) m = PRESSURE_MODE_LEGACY[m];
+            if (!PRESSURE_MODE_OK[m]) m = 'smudge';
+            if (window.config) window.config.BRUSH_VEL_MODE = m;
+            syncBrushMode();
+            try { if (window.settingsManager) window.settingsManager.set('brush.velMode', m); } catch (_) {}
+        }
+        SETTERS.velOnly = function (v) { setPressureEnabled(!!v); };
+        SETTERS.velMode = function (v) { setPressureMode(v); };
         function enterColliderPainting() {
             var cl = window.collisionLayers;
             if (!window.Masks || !cl || typeof cl.setMaskLive !== 'function') {
@@ -3152,14 +3426,20 @@
             }
             setBrushTarget('mask');
         }
-        colliderBtn.addEventListener('click', function () { enterColliderPainting(); markDirty(); });
+        colliderBtn.addEventListener('click', function () {
+            // Clear Pressure on the way in, or the row lights Pressure AND
+            // Collider at once: velocity-only is inert on the mask route (it
+            // lives in splat(), which collider painting never calls), so the
+            // flag would just sit there true and misreport the brush.
+            setPressureEnabled(false); enterColliderPainting(); markDirty();
+        });
         try {
             var savedTarget = window.settingsManager && window.settingsManager.get('brush.target');
             setBrushTarget(savedTarget);
         } catch (_) { setBrushTarget('fluid'); }
 
         // ── Tip: the splat-shader stamp shapes as brush tips (D1) ──
-        sLabel('Tip');
+        dyeOnlyEls.push(sLabel('Tip'));
         var tipRow = document.createElement('div');
         tipRow.className = 'brush-tip-row';
         var tipBtns = [];
@@ -3203,6 +3483,7 @@
             tipRow.appendChild(b);
         });
         panel.appendChild(tipRow);
+        dyeOnlyEls.push(tipRow);
 
         // ── Custom shapes: user-authored stamp textures (33-brush-shapes).
         // Import → the mask editor opens in adhoc mode (full stamp suite +
@@ -3214,6 +3495,7 @@
         shapesRow.className = 'brush-tip-row brush-shapes-row';
         shapesArea.appendChild(shapesRow);
         panel.appendChild(shapesArea);
+        dyeOnlyEls.push(shapesArea);
         var shapeFileInput = document.createElement('input');
         shapeFileInput.type = 'file';
         shapeFileInput.accept = 'image/png,image/jpeg,image/jpg,image/webp';
@@ -3247,6 +3529,7 @@
         };
         renderBrushShapes();
         var texGroup = pSlider('brushTipTexture', 'Texture', 0, 1, 0.01, 'BRUSH_TIP_TEXTURE', pct, 'tipTexture');
+        dyeOnlyEls.push(texGroup);
         function syncTexState() {
             // Texture (stamp grain/blend) shapes blob/chisel/streak — and
             // custom shape stamps, which run the same grain in the shader
@@ -3268,9 +3551,12 @@
         var angleGroup = pSlider('brushAngle', 'Angle', 0, 360, 1, 'BRUSH_ANGLE',
             function (v) { return Math.round(v) + '°'; }, 'angle');
         angleGroup.title = 'Rotate the brush tip (chisel/streak). The cursor line shows the angle.';
+        dyeOnlyEls.push(angleGroup);
 
         // ── Flow + stroke feel ──
-        pSlider('brushFlow', 'Flow', 0.05, 1, 0.01, 'BRUSH_FLOW', pct, 'flow');
+        // Flow scales DYE, so a Pressure stroke has nothing for it to scale.
+        var flowGroup = pSlider('brushFlow', 'Flow', 0.05, 1, 0.01, 'BRUSH_FLOW', pct, 'flow');
+        dyeOnlyEls.push(flowGroup);
         sLabel('Stroke');
         // Stabilizer slider removed 2026-07-30 (Gabriel): panel-length trim.
         // config.BRUSH_STABILIZER stays at its default; brush presets that
@@ -3372,6 +3658,23 @@
             var saved = null;
             try { saved = window.settingsManager && window.settingsManager.get('brush.splatMode'); } catch (_) {}
             setSplatMode(saved);
+        })();
+
+        // Pressure restore + the build's final sync. Deliberately down HERE,
+        // not next to the buttons: syncBrushMode() hides the dye-only sections,
+        // and dyeOnlyEls is not filled until every one of them has been built
+        // above. Called from the button row, this would run against an empty
+        // list and Pressure would boot with the tip and Flow controls showing.
+        (function restorePressure() {
+            var savedOn = null, savedMode = null;
+            try {
+                if (window.settingsManager) {
+                    savedOn = window.settingsManager.get('brush.velOnly');
+                    savedMode = window.settingsManager.get('brush.velMode');
+                }
+            } catch (_) {}
+            setPressureMode(typeof savedMode === 'string' ? savedMode : 'smudge');
+            setPressureEnabled(savedOn === true);
         })();
 
         // ── Sketch Layer + Mask sections REMOVED 2026-08-16 (user-test:

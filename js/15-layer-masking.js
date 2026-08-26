@@ -3313,8 +3313,15 @@
         // Slider is in Brush Size units (1-30); SPLAT_RADIUS is that /1000.
         cfg.SPLAT_RADIUS = maskState.colliderSize / 1000;
         cfg.BRUSH_ERASER = (maskState.colliderTool === 'erase');
+        // ...and opt out of the custom brush shape the same way. The editor's
+        // wall tool is a precision disc with its own size; a shape the user
+        // picked for painting has no business redrawing walls in here.
+        window.__plainMaskStamp = true;
         try { window.__maskStamp(x, y, 1); }
-        finally { cfg.SPLAT_RADIUS = savedR; cfg.BRUSH_ERASER = savedE; }
+        finally {
+            cfg.SPLAT_RADIUS = savedR; cfg.BRUSH_ERASER = savedE;
+            window.__plainMaskStamp = false;
+        }
     }
 
     window.enterColliderMaskMode = function (layerIndex) {

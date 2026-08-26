@@ -298,7 +298,17 @@
             const radius = (typeof window.__lastPaintRadius === 'number' && window.__lastPaintRadius > 0)
                 ? window.__lastPaintRadius
                 : ((window.config && typeof window.config.SPLAT_RADIUS === 'number') ? window.config.SPLAT_RADIUS : undefined);
+            // The FOOTPRINT this dab was painted with, alongside its size. Without
+            // these a recording replayed as a plain gaussian however clearly the
+            // swatch said otherwise — the same gap stroke replay closed with its
+            // own tip/shape fields. Undefined on a default brush so the common
+            // interaction stays as small as it was.
+            const cfg = window.config || {};
+            const tip = cfg.BRUSH_TIP | 0;
+            const shape = cfg.BRUSH_SHAPE_ID || null;
             const interaction = { timestamp, x: x / canvas.width, y: y / canvas.height, vx: dx, vy: dy, color: colorArray.slice(), mult, radius };
+            if (tip) interaction.tip = tip;
+            if (shape) interaction.shape = shape;
             a.timeline.interactions.push(interaction);
             // PERF: During recording, skip ALL UI updates - just record data
             // Timeline visualization updates when recording stops
@@ -469,16 +479,44 @@
                     } else { // original, non-generative → the baked colors
                         replayColor = i.color;
                     }
+                    // Pin the footprint this dab was recorded with, the same
+                    // pin-then-restore stroke replay and peer dabs use. Only when
+                    // the interaction actually carries one: recordings made before
+                    // this existed have neither field and keep playing back gaussian,
+                    // which is exactly how they were painted.
+                    const _fp = (typeof i.tip === 'number') || !!i.shape;
+                    let _tipPrev, _shapePrev, _remotePrev;
+                    if (_fp && window.config) {
+                        _tipPrev = window.config.BRUSH_TIP;
+                        _shapePrev = window.config.BRUSH_SHAPE_ID;
+                        _remotePrev = window.__remoteStroke;
+                        window.config.BRUSH_TIP = (typeof i.tip === 'number') ? (i.tip | 0) : 0;
+                        // A shape we no longer have suppresses stamps outright rather
+                        // than printing the recording in whatever shape is selected now.
+                        const _have = !!(i.shape && window.BrushShapes
+                            && typeof window.BrushShapes.has === 'function'
+                            && window.BrushShapes.has(i.shape));
+                        window.config.BRUSH_SHAPE_ID = _have ? i.shape : null;
+                        window.__remoteStroke = !!i.shape && !_have;
+                    }
+                    try {
                     if (typeof window.applyMultiSplatWith === 'function') {
-                        window.applyMultiSplatWith(x, y, i.vx, i.vy, replayColor, i.mult || 1, (typeof i.radius === 'number') ? i.radius : undefined, true);
+                        window.applyMultiSplatWith(x, y, i.vx, i.vy, replayColor, i.mult || 1, (typeof i.radius === 'number') ? i.radius : undefined, true, _fp);
                     } else {
                         const prevM = (typeof window.animationMultiplier === 'number') ? window.animationMultiplier : 1;
                         const prevR = window.config ? window.config.SPLAT_RADIUS : undefined;
                         window.animationMultiplier = Math.max(1, Math.round(i.mult || 1));
                         if (window.config && typeof i.radius === 'number') window.config.SPLAT_RADIUS = i.radius;
-                        multiSplat(x, y, i.vx, i.vy, replayColor, false, true);
+                        multiSplat(x, y, i.vx, i.vy, replayColor, false, true, _fp);
                         window.animationMultiplier = prevM;
                         if (window.config && typeof prevR === 'number') window.config.SPLAT_RADIUS = prevR;
+                    }
+                    } finally {
+                        if (_fp && window.config) {
+                            window.config.BRUSH_TIP = _tipPrev;
+                            window.config.BRUSH_SHAPE_ID = _shapePrev;
+                            window.__remoteStroke = _remotePrev;
+                        }
                     }
                 }
                 if (layer.timeline.playbackPosition >= eff) {

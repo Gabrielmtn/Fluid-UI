@@ -47,10 +47,13 @@ for (const entry of INCLUDE) {
     continue;
   }
   const dest = path.join(OUT, entry);
-  // assets/boot-swirl/ is the baked sim loop, kept for a future loader that
-  // has its own idle renderer (the boot cursor is the OS spinner now — see
-  // js/00a-boot.js). Nothing loads it, so it has no business in a deploy.
-  fs.cpSync(src, dest, { recursive: true, force: true, filter: (s) => !s.includes("boot-swirl") });
+  // Boot-cursor art is DESKTOP ONLY: js/00a-boot.js installs it behind
+  // usesWindowFade, which is false on the web (there is no window to fade), so
+  // nothing here ever loads it. That covers boot-cursor.png and
+  // assets/boot-swirl/ (the full loop, kept for a future loader with its own
+  // idle renderer). ~1.5MB with no business in a deploy.
+  const desktopOnly = (s) => s.includes("boot-swirl") || s.includes("boot-cursor");
+  fs.cpSync(src, dest, { recursive: true, force: true, filter: (s) => !desktopOnly(s) });
   const stat = fs.statSync(src);
   if (stat.isDirectory()) {
     const n = fs.readdirSync(src).length;

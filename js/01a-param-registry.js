@@ -40,6 +40,13 @@
         wetInfluence: {configKey: "WET_INFLUENCE", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "simulation", perfTier: 1, mut: {min: 0, max: 0.9, step: 0.01, scope: "extended"}},
         wetDrying: {configKey: "WET_DRYING", ui: {min: 0.5, max: 20, step: 0.5}, hard: {min: 0.2, max: 60}, def: 3.0, decimals: 1, category: "simulation", perfTier: 0, mut: {min: 1, max: 12, step: 0.5, scope: "extended"}},
         ridges: {configKey: "RIDGES", ui: {min: 0, max: 6, step: 0.1}, hard: {min: 0, max: 6}, def: 0, decimals: 1, category: "effects", perfTier: 1, mut: {min: 0, max: 4, step: 0.1, scope: "extended"}},
+        // Overflow drain-band width. The slider is a PERCENTAGE of the canvas
+        // and config.EDGE_ABSORB_BAND is a fraction (05e divides by 100), so
+        // configKey stays null — naming the key here would put percentages
+        // into CONFIG_BOUNDS. No `mut`: a wider drain eats the frame from the
+        // edges inward, which reads as the painting draining away rather than
+        // as a style variant.
+        overflowBand: {configKey: null, ui: {min: 0.5, max: 15, step: 0.5}, hard: {min: 0.5, max: 25}, def: 2.5, decimals: 1, category: "effects", perfTier: 0, simSlider: false},
         velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 2.5, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
         curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 25, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
         velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 15, max: 60, step: 1, scope: "extended"}},
@@ -154,6 +161,10 @@
         macCormackToggle: {def: true, mutScope: null},
         multigridToggle: {def: true, mutScope: null},
         glowToggle: {def: false, mutScope: "extended"},
+        // Overflow (open canvas edges). mutScope null for the same reason
+        // overflowBand carries no `mut`: flipping it vents the canvas out
+        // through its own borders, which looks like a bug, not a variation.
+        overflowToggle: {def: false, mutScope: null},
         scatterToggle: {def: false, mutScope: "extended"},
         // Colliders block light. mutScope null: with no collision layer it is a
         // no-op, so mutating it would spend a variation slot on nothing.
@@ -419,14 +430,21 @@
         verifyDom: verifyDom
     };
 
-    try {
-        if (localStorage.getItem('debugParams') === '1') {
-            // DOM may not be parsed yet when this script runs
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', function () { verifyDom(); });
-            } else {
-                verifyDom();
-            }
-        }
-    } catch (_) {}
+    // The localStorage read is INSIDE the deferral, not outside it. This script
+    // runs during the initial parse, and the first localStorage touch of the
+    // process blocks the renderer for ~490ms while the storage service opens an
+    // existing store (measured; see js/00a-boot.js). A debug flag has no
+    // business being the thing that pays that, and by DOMContentLoaded the
+    // settings manager has warmed the store, so this costs nothing.
+    var checkDebugParams = function () {
+        try {
+            if (localStorage.getItem('debugParams') === '1') verifyDom();
+        } catch (_) {}
+    };
+    // DOM may not be parsed yet when this script runs
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', checkDebugParams);
+    } else {
+        checkDebugParams();
+    }
 })();

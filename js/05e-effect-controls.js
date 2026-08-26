@@ -99,6 +99,39 @@
                 if (!on) window.__scatterOrigin = null;
             });
         }
+        // Overflow (open canvas edges) toggle + Border width. Lived as a
+        // Tunnel audio-scene toggle until 2026-08-24 — a canvas-wide boundary
+        // mode you could only reach by running music through one scene. Every
+        // side effect lives INSIDE the handlers because save/load restores
+        // state by replaying synthetic change/input events into these
+        // listeners (12-save-load.js:11-12).
+        const overflowToggle = document.getElementById('overflowToggle');
+        const overflowPanel = document.getElementById('overflowPanel');
+        if (overflowToggle) {
+            overflowToggle.checked = !!config.EDGE_ABSORB;
+            if (overflowPanel) overflowPanel.style.display = config.EDGE_ABSORB ? '' : 'none';
+            overflowToggle.addEventListener('change', (e) => {
+                const on = e.target.checked;
+                config.EDGE_ABSORB = on;
+                if (overflowPanel) overflowPanel.style.display = on ? '' : 'none';
+                // Release any console/harness override (window.__edgeAbsorb
+                // outranks the config in 05j) so the checkbox is never left
+                // fighting a stale value from a test run.
+                window.__edgeAbsorb = 0;
+            });
+        }
+        // Border: the slider is a PERCENTAGE of the canvas, the shader wants a
+        // fraction — which is why this one is registry-backed with
+        // configKey:null rather than a plain slider→config binding.
+        const overflowBandSlider = document.getElementById('overflowBand');
+        const overflowBandValue = document.getElementById('overflowBandValue');
+        if (overflowBandSlider) {
+            overflowBandSlider.addEventListener('input', (e) => {
+                const pct = parseFloat(e.target.value);
+                config.EDGE_ABSORB_BAND = pct / 100;
+                if (overflowBandValue) overflowBandValue.textContent = pct.toFixed(1) + '%';
+            });
+        }
         // Swirl slider (curl-noise micro-swirl in dye advection)
         const swirlSlider = document.getElementById('swirl');
         if (swirlSlider) {

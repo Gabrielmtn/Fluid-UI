@@ -225,8 +225,47 @@
       var box = document.getElementById('pwProtect');
       var cont = document.getElementById('pwContinue');
       var exitB = document.getElementById('pwExit');
-      var stored = null, acked = false;
-      try { stored = localStorage.getItem(KEY_PROTECT); acked = localStorage.getItem(KEY_ACK) === '1'; } catch (e) {}
+      /* Where these two values come from, and why it is not simply
+         localStorage: the FIRST localStorage touch in a renderer blocks it for
+         ~490ms while the storage service opens an existing profile (measured —
+         see electron-main.js readPhotoCache). This script is the first thing in
+         the app to touch the store, so it was paying that on every launch, with
+         the renderer frozen and nothing on screen. The desktop build therefore
+         hands the two values in on argv from a JSON mirror main keeps.
+         localStorage stays the source of truth — 04a and 05e read and write
+         these same keys and are untouched — and when nothing is handed in (the
+         web build, or a profile with no mirror yet) this falls back to reading
+         it exactly as it always did, then seeds the mirror so the next launch
+         is fast. A MISSING MIRROR MUST READ localStorage rather than assume
+         "not acked", or every existing install sees the warning again. */
+      var stored = null, acked = false, fromCache = false;
+      try {
+        var argv = (typeof process !== 'undefined' && process.argv) || [];
+        var ackArg = null, protArg = null;
+        for (var ai = 0; ai < argv.length; ai++) {
+          if (argv[ai].indexOf('--photo-ack=') === 0) ackArg = argv[ai].slice(12);
+          else if (argv[ai].indexOf('--photo-protect=') === 0) protArg = argv[ai].slice(16);
+        }
+        if (ackArg !== null && protArg !== null) {
+          acked = (ackArg === '1');
+          stored = (protArg === '1' || protArg === '0') ? protArg : null;
+          fromCache = true;
+        }
+      } catch (e) {}
+      if (!fromCache) {
+        try { stored = localStorage.getItem(KEY_PROTECT); acked = localStorage.getItem(KEY_ACK) === '1'; } catch (e) {}
+        /* Seed the mirror, and do it BEFORE the early return below: an install
+           that acked back when there was no mirror would otherwise fall into
+           that return on every launch and pay the ~490ms open forever. This
+           only ever COPIES a decision already persisted by a trusted click —
+           it cannot create one. */
+        try {
+          if (window.IS_ELECTRON) {
+            require('electron').ipcRenderer.send('photo-safe-cache',
+              { ack: acked, protect: (stored === '1' || stored === '0') ? stored : null });
+          }
+        } catch (e) {}
+      }
       if (acked) { modal.hidden = true; return; }
       box.checked = stored !== '0';
       function sync() {
@@ -258,6 +297,16 @@
           if (ev && ev.isTrusted) {
             localStorage.setItem(KEY_ACK, '1');
             localStorage.setItem(KEY_PROTECT, protect ? '1' : '0');
+            /* Mirror the same trusted decision to main's boot cache, so the
+               next launch does not have to open the store to learn it. Inside
+               the isTrusted branch on purpose: a synthetic click must not be
+               able to persist consent by either route. */
+            try {
+              if (window.IS_ELECTRON) {
+                require('electron').ipcRenderer.send('photo-safe-cache',
+                  { ack: true, protect: protect ? '1' : '0' });
+              }
+            } catch (e2) {}
           }
         } catch (e) {}
         /* If the app booted while the modal was up, push the choice live. */
@@ -862,6 +911,40 @@
             <input type="checkbox" id="statsToggle">
             <label for="statsToggle" style="margin: 0">Stats For Nerds</label>
         </div>
+        <div class="control-group checkbox-group"
+             title="A steady pressure across the whole canvas, pointed with the pad below — paint drifts that way on its own. Down reads as gravity, up as lift. Applies to every brush.">
+            <input type="checkbox" id="pressureConstant">
+            <label for="pressureConstant" style="margin: 0">🌬️ Constant Pressure (Gravity / Lift)</label>
+        </div>
+        <!-- Aim pad for the constant pressure field. Centre is off, angle is the
+             direction, distance from centre is intensity; the wiring is in
+             20-mixer-layout (wirePressureField) and the pass is 05j. -->
+        <div id="pressureFieldControls" class="pressure-pad-wrap" style="display: none;">
+            <div class="pressure-pad" id="pressurePad"
+                 title="Drag to aim the constant pressure. Centre is off; further out is stronger. Double-click to recentre.">
+                <span class="pressure-pad-h"></span>
+                <span class="pressure-pad-v"></span>
+                <span class="pressure-pad-ring"></span>
+                <span class="pressure-pad-arm"></span>
+                <span class="pressure-pad-dot"></span>
+            </div>
+            <div class="pressure-pad-read" id="pressurePadRead">centred — no push</div>
+        </div>
+        <!-- Overflow: open canvas edges. The divergence/gradient passes stop
+             treating the border as a wall, and a drain band at the rim kills
+             whatever crosses it so nothing washes back in off the clamped edge
+             texels. Was a Tunnel-scene-only audio toggle until 2026-08-24. -->
+        <div class="control-group checkbox-group"
+             title="Open canvas edges — fluid that reaches the border vents off-canvas instead of bouncing back in.">
+            <input type="checkbox" id="overflowToggle">
+            <label for="overflowToggle" style="margin: 0">Overflow</label>
+        </div>
+        <div id="overflowPanel" class="collapsible" style="display:none;">
+            <div class="control-group">
+                <label for="overflowBand" title="How much of the canvas the draining border takes. Wider = fluid is nulled further in from the rim; narrower keeps the drain a hairline at the very edge.">Border <span id="overflowBandValue" class="value-display">2.5%</span></label>
+                <input type="range" id="overflowBand" min="0.5" max="15" value="2.5" step="0.5">
+            </div>
+        </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="enableLighting">
             <label for="enableLighting" style="margin: 0">💡 Light Source (Depth Effect)</label>
@@ -1063,6 +1146,17 @@
                         <option value="stroke">One swirl each</option>
                         <option value="0">No timer</option>
                     </select>
+                </div>
+
+                <!-- Settings sharing. Deliberately outside the host block:
+                     anyone can open a share and anyone can join or leave one,
+                     so it is not a room control. Each row is one open circle;
+                     the button on it is whichever action applies to you. -->
+                <div class="mp-share-block" id="mpShareBlock" style="display:none">
+                    <div class="mp-subhead">Settings sharing</div>
+                    <div id="mpShareList" class="mp-share-list"></div>
+                    <button id="shareOpenBtn" class="mp-share-open" title="Open a settings share — anyone here can join, and then everyone in it changes the settings for everyone in it">Share settings</button>
+                    <div class="mp-share-note" id="mpShareNote"></div>
                 </div>
 
                 <div id="turnWheel" class="mp-turn-wheel" style="display:none"></div>
@@ -1324,6 +1418,7 @@
                     <ul>
                         <li>E — Quick Export (Video)</li>
                         <li>M — Mutate Settings</li>
+                        <li>Right Shift+Enter — Capture Layer</li>
                     </ul>
                 </div>
                 <div>

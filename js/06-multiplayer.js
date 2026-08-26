@@ -29,6 +29,19 @@ var turnDeadlineLocal = 0;  // local-clock time the turn auto-passes (0 = none)
 var turnModeLocal = 'timer'; // 'timer' | 'stroke' ("One swirl each")
 window.__mpTurnBlocked = false; // paint gate (read by 05d pointer/touch + 04f clear)
 
+// ── Settings sharing (server-confirmed via 'share-state' broadcasts) ──
+// A share is a small opt-in circle inside the room, not a room-wide mode:
+// anyone opens one, anyone may join it or leave it, and inside it every
+// member's look changes reach every other member — whoever opened it
+// included. Nobody is gated; that is what Lock settings is for. You keep
+// every control you had, you just also receive everyone else's changes.
+var shareGroups = [];      // [{id, members:[connId,…]}] — the server's roster
+var myShareId = null;      // the circle I am in, or null
+var shareBaseline = null;  // the look my circle last agreed on (delta origin)
+var shareSeen = Object.create(null);  // circles already offered to me
+var shareSizes = Object.create(null); // last known size per circle
+var shareOpenWait = null;    // old-relay probe: nothing answered our share-open
+
 // Stable per-device id (opaque, localStorage). Used to re-admit a dropped
 // member into a locked room and to throttle matchmaking. NOT a security token.
 const DEVICE_UID = (function() {
@@ -501,14 +514,19 @@ function broadcastTurnLook() {
 // The look mirror serves two features: the 13.5 host settings lock, and
 // take-turns mode (the current painter's look mirrors to every watcher).
 // Exactly one can be live at a time — turns supersede the host lock.
+// The look mirror now serves three features. Precedence matters: turns and
+// the host lock both make ONE person's look the room's, so either supersedes
+// a share, which is many-to-many.
 function mirrorActive() {
     if (turnsOn) return isMyTurn() ? 'turn' : null;
-    return settingsLockOn ? 'lock' : null;
+    if (settingsLockOn) return 'lock';
+    return inShare() ? 'share' : null;
 }
 function broadcastLookMirror() {
     var m = mirrorActive();
     if (m === 'lock') broadcastSettingsLock();
     else if (m === 'turn') broadcastTurnLook();
+    else if (m === 'share') broadcastShareLook(false);
 }
 // While mirroring, live edits re-broadcast (debounced) so the watching side
 // tracks them — "mirror every look-affecting setting"
@@ -527,7 +545,12 @@ function installHostLockMirror() {
     // drags, kaleido buttons, Mutate. Diff-gated so a quiet host sends
     // nothing; captureLookSnapshot is the cheap lookOnly capture.
     settingsLockPoll = setInterval(function () {
-        if (!mirrorActive()) return;
+        var m = mirrorActive();
+        if (!m) return;
+        // A share carries its own diff gate (broadcastShareLook sends nothing
+        // when nothing moved), so it goes straight through rather than
+        // resetting a debounce that may already hold a fresher edit.
+        if (m === 'share') { broadcastShareLook(false); return; }
         var j;
         try { j = JSON.stringify(captureLookSnapshot() || null); } catch (_) { return; }
         if (j !== settingsLockLastSent) hostLockMirrorHandler();
@@ -549,6 +572,11 @@ function syncLookMirror() {
 
 function toggleSettingsLock() {
     settingsLockOn = !settingsLockOn;
+    // Locking says "my look, and you cannot change it"; a share says "our
+    // look, and we all can". Holding both would leave us broadcasting a
+    // mirror to people we had just frozen, so taking the lock leaves the
+    // circle (guests are dropped out of theirs by setSettingsLockedByHost).
+    if (settingsLockOn && inShare()) leaveShare();
     broadcastSettingsLock();
     syncLookMirror();
     updateConnectedView();
@@ -603,6 +631,10 @@ function sanitizeLockSnapshot(snapshot) {
 
 // Guest side: enter/leave the locked state (banner + gate + mirror apply)
 function setSettingsLockedByHost(locked, snapshot) {
+    // A locked guest cannot change settings, so they have nothing to bring to
+    // a share — leave before the gate closes rather than sit in a circle we
+    // can only receive from.
+    if (locked && !window.__mpSettingsLocked && inShare()) leaveShare();
     window.__mpSettingsLocked = !!locked;
     var banner = document.getElementById('mpSettingsLockBanner');
     if (locked) {
@@ -655,6 +687,326 @@ function resetSettingsLock() {
     setSettingsLockedByHost(false, null);
 }
 
+// ── Settings sharing ────────────────────────────────────────────────
+// The server owns the membership (party/index.ts) and announces it as
+// 'share-state'; a circle's members[0] is its ANCHOR, the member whose look
+// a joiner converges onto. That is a duty, not a privilege — once you are in,
+// every member drives, and everyone's changes reach the anchor too.
+//
+// Look changes travel as DELTAS: only what actually moved since the circle
+// last agreed. Whole-snapshot mirroring is right when one person drives (the
+// lock, a turn) and wrong here — two people dragging two different sliders
+// would spend every 400ms overwriting each other's parameter with their own
+// stale copy of it. Deltas merge instead, and only a genuine collision (the
+// same slider, at the same moment) is last-write-wins.
+function shareById(id) {
+    for (var i = 0; i < shareGroups.length; i++) {
+        if (shareGroups[i] && shareGroups[i].id === id) return shareGroups[i];
+    }
+    return null;
+}
+function inShare() { return !!myShareId; }
+function myShareMembers() {
+    var g = shareById(myShareId);
+    return (g && Array.isArray(g.members)) ? g.members : [];
+}
+function isShareMate(id) { return !!id && myShareMembers().indexOf(id) !== -1; }
+function shareAnchorOf(g) { return (g && g.members && g.members[0]) || null; }
+
+// The oscillator's phase advances every frame. Left in a snapshot, the mirror
+// poll would see a "change" forever and every member would re-broadcast on a
+// 2s heartbeat; loadState ignores phase on arrival anyway, so it is pure noise.
+function stripOscPhase(osc) {
+    if (!osc || typeof osc !== 'object') return osc || null;
+    var out = {};
+    Object.keys(osc).forEach(function (k) {
+        var v = osc[k];
+        if (!v || typeof v !== 'object') { out[k] = v; return; }
+        var c = {};
+        Object.keys(v).forEach(function (kk) { if (kk !== 'phase') c[kk] = v[kk]; });
+        out[k] = c;
+    });
+    return out;
+}
+
+function captureShareSnapshot() {
+    var snap = captureLookSnapshot();
+    if (!snap) return null;
+    // Transport is not a setting. Lock and Take Turns mirror it because they
+    // have a performer and an audience — the painter's pause is part of what
+    // you are watching. A share has no audience: a partner freezing your sim
+    // mid-stroke would be an interruption, not a look.
+    delete snap.transport;
+    snap.cosOscillator = stripOscPhase(snap.cosOscillator);
+    return snap;
+}
+
+// Sections whose KEYS diff individually — the whole point of the delta.
+var SHARE_KEYED_SECTIONS = ['sliders', 'checkboxes', 'selects'];
+
+function lookDelta(prev, next) {
+    if (!next) return null;
+    if (!prev) return next; // no agreed look yet: everything is news
+    var out = {}, any = false;
+    SHARE_KEYED_SECTIONS.forEach(function (sec) {
+        var a = prev[sec] || {}, b = next[sec] || {}, d = null;
+        Object.keys(b).forEach(function (k) {
+            if (a[k] !== b[k]) { d = d || {}; d[k] = b[k]; }
+        });
+        if (d) { out[sec] = d; any = true; }
+    });
+    Object.keys(next).forEach(function (k) {
+        if (SHARE_KEYED_SECTIONS.indexOf(k) !== -1) return;
+        var a, b;
+        try { a = JSON.stringify(prev[k]); b = JSON.stringify(next[k]); } catch (_) { return; }
+        if (a !== b) { out[k] = next[k]; any = true; }
+    });
+    return any ? out : null;
+}
+
+// Fold an applied delta back into the agreed look. Deliberately NOT a fresh
+// capture: a fresh one would also swallow a local edit made in the few hundred
+// ms between our last input event and the mirror debounce firing — that edit
+// would land inside the new baseline and so never reach anyone.
+function mergeLookDelta(base, delta) {
+    var out = {};
+    Object.keys(base || {}).forEach(function (k) { out[k] = base[k]; });
+    Object.keys(delta || {}).forEach(function (k) {
+        if (SHARE_KEYED_SECTIONS.indexOf(k) !== -1 && delta[k] && typeof delta[k] === 'object') {
+            var merged = {};
+            Object.keys(out[k] || {}).forEach(function (kk) { merged[kk] = out[k][kk]; });
+            Object.keys(delta[k]).forEach(function (kk) { merged[kk] = delta[k][kk]; });
+            out[k] = merged;
+        } else {
+            out[k] = delta[k];
+        }
+    });
+    return out;
+}
+
+// `full` pushes the whole look instead of a delta — the anchor's duty when
+// somebody joins, so a joiner converges on the circle rather than inheriting
+// only whatever happens to change next.
+function broadcastShareLook(full) {
+    if (!inShare() || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    // A circle of one has nobody to hear it. Staying quiet also leaves the
+    // baseline untouched, which is what makes the first joiner's full push
+    // (below, on growth) the whole look rather than a delta against edits
+    // they were never here for.
+    if (myShareMembers().length < 2) return;
+    var snap = captureShareSnapshot();
+    if (!snap) return;
+    var payload = full ? snap : lookDelta(shareBaseline, snap);
+    if (!payload) return; // nothing has moved since the circle last agreed
+    shareBaseline = snap;
+    partySocket.send(JSON.stringify({
+        type: 'share-look', snapshot: fitLookSnapshot(payload), timestamp: Date.now()
+    }));
+}
+
+function openShare() {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN || inShare()) return;
+    partySocket.send(JSON.stringify({ type: 'share-open' }));
+    // The share-state that follows IS the ack. Its absence means a relay too
+    // old to know about sharing — the same probe the turn invite uses, and
+    // without it that case looks exactly like a button that does nothing.
+    if (shareOpenWait) clearTimeout(shareOpenWait);
+    shareOpenWait = setTimeout(function () {
+        shareOpenWait = null;
+        if (!inShare()) showTurnToast('This room is on an older server that cannot share settings yet.');
+        updateShareUI();
+    }, 3000);
+    updateShareUI();
+}
+
+function joinShare(id) {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN || !id) return;
+    if (myShareId === id) return;
+    // Adopt the circle's look on arrival, so the baseline our first delta is
+    // measured against is what we actually have right now.
+    shareBaseline = captureShareSnapshot();
+    partySocket.send(JSON.stringify({ type: 'share-join', group: id }));
+}
+
+function leaveShare() {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN || !inShare()) return;
+    partySocket.send(JSON.stringify({ type: 'share-leave' }));
+}
+
+// A server roster landed. Work out what changed for US: whether we are in a
+// circle, whether ours grew (the anchor owes the newcomer a full look), and
+// whether a circle we have never been offered just opened.
+function applyShareState(groups) {
+    if (shareOpenWait) { clearTimeout(shareOpenWait); shareOpenWait = null; }
+    shareGroups = (groups || []).filter(function (g) {
+        return g && typeof g.id === 'string' && Array.isArray(g.members);
+    });
+    var wasId = myShareId;
+    var wasSize = shareSizes[myShareId] || 0;
+    myShareId = null;
+    for (var i = 0; i < shareGroups.length; i++) {
+        if (shareGroups[i].members.indexOf(clientId) !== -1) { myShareId = shareGroups[i].id; break; }
+    }
+
+    // Offer any circle that has opened since we arrived and that we are not
+    // in. Circles that were already open when we joined the room were seeded
+    // as seen from the 'connected' payload — those are context, not an offer,
+    // and prompting about them would greet every newcomer with a modal.
+    var offer = null;
+    shareGroups.forEach(function (g) {
+        if (!shareSeen[g.id]) {
+            shareSeen[g.id] = true;
+            if (!inShare() && g.members.indexOf(clientId) === -1) offer = g;
+        }
+    });
+    if (offer) showShareOffer(offer.id, shareAnchorOf(offer));
+
+    var mySize = myShareId ? (shareById(myShareId).members.length) : 0;
+    if (myShareId && myShareId === wasId && mySize > wasSize &&
+        shareAnchorOf(shareById(myShareId)) === clientId) {
+        // Someone joined our circle and we are its anchor: push the whole look
+        // so they land on it instead of drifting until the next slider moves.
+        broadcastShareLook(true);
+    }
+    if (myShareId && myShareId !== wasId) {
+        // We just joined (or were moved into) a circle: the offer for it is
+        // answered, and our own edits now have somewhere to go.
+        dismissShareOffer(myShareId);
+        if (!shareBaseline) shareBaseline = captureShareSnapshot();
+    }
+    if (!myShareId && wasId) shareBaseline = null; // left: keep the look, drop the thread
+
+    shareSizes = Object.create(null);
+    shareGroups.forEach(function (g) { shareSizes[g.id] = g.members.length; });
+
+    syncLookMirror();
+    updateShareUI();
+}
+
+// Local teardown only — never sends. Used wherever the socket or the room is
+// going away, and when Take Turns takes the room's look over (the relay
+// dissolves the circles at the same moment; see enableTurns).
+function resetShareState() {
+    shareGroups = [];
+    myShareId = null;
+    shareBaseline = null;
+    shareSeen = Object.create(null);
+    shareSizes = Object.create(null);
+    if (shareOpenWait) { clearTimeout(shareOpenWait); shareOpenWait = null; }
+    dismissShareOffer();
+    syncLookMirror();
+    updateShareUI();
+}
+
+// ── Share UI: the offer, and the roster in the panel ──
+function dismissShareOffer(onlyForGroup) {
+    var el = document.getElementById('mpShareInvite');
+    if (!el) return;
+    if (onlyForGroup && el.dataset.group !== onlyForGroup) return;
+    el.remove();
+}
+
+function showShareOffer(groupId, anchorId) {
+    dismissShareOffer();
+    var el = document.createElement('div');
+    el.id = 'mpShareInvite';
+    el.className = 'mp-turn-invite mp-share-invite';
+    el.dataset.group = groupId;
+    var msg = document.createElement('span');
+    // Say what joining actually does, in both directions — this is the only
+    // place the two-way part of a share is explained before you are in one.
+    msg.textContent = (anchorId ? shortName(anchorId) : 'Someone') +
+        ' opened a settings share. Join and your look matches theirs — after that, ' +
+        'either of you changes the settings for both.';
+    var yes = document.createElement('button');
+    yes.className = 'mp-invite-yes btn--emphasis';
+    yes.textContent = 'Join share';
+    yes.addEventListener('click', function () { dismissShareOffer(); joinShare(groupId); });
+    var no = document.createElement('button');
+    no.className = 'mp-invite-no';
+    no.textContent = 'No thanks';
+    no.addEventListener('click', function () { dismissShareOffer(); });
+    el.appendChild(msg);
+    el.appendChild(yes);
+    el.appendChild(no);
+    document.body.appendChild(el);
+    // Unlike a turn invite there is no server-side TTL to stay in step with:
+    // the circle stays open in the panel, so this banner timing out is "not
+    // now", not "too late" — you can still join from the roster afterwards.
+    setTimeout(function () {
+        var still = document.getElementById('mpShareInvite');
+        if (still === el) el.remove();
+    }, 20000);
+}
+
+function shareRow(g) {
+    var row = document.createElement('div');
+    row.className = 'mp-share-row' + (g.id === myShareId ? ' mine' : '');
+    var dots = document.createElement('span');
+    dots.className = 'mp-share-dots';
+    g.members.slice(0, 8).forEach(function (id) {
+        var d = document.createElement('span');
+        d.className = 'mp-share-dot';
+        d.style.background = colorForClient(id);
+        dots.appendChild(d);
+    });
+    row.appendChild(dots);
+    var names = document.createElement('span');
+    names.className = 'mp-share-names';
+    var labels = g.members.map(function (id) {
+        return id === clientId ? 'You' : shortName(id);
+    });
+    // "You" first: the row is about your relationship to the circle.
+    labels.sort(function (a, b) { return (a === 'You' ? -1 : 0) - (b === 'You' ? -1 : 0); });
+    names.textContent = labels.join(', ') + (g.members.length === 1 ? ' · waiting' : '');
+    row.appendChild(names);
+    var act = document.createElement('button');
+    act.className = 'mp-share-act';
+    if (g.id === myShareId) {
+        act.textContent = 'Leave';
+        act.title = 'Stop sharing. Your settings stay exactly as they are now.';
+        act.addEventListener('click', leaveShare);
+    } else {
+        act.textContent = 'Join';
+        act.title = 'Join this share — your look matches theirs, then everyone in it changes it for everyone';
+        act.addEventListener('click', function () { joinShare(g.id); });
+    }
+    row.appendChild(act);
+    return row;
+}
+
+function updateShareUI() {
+    var block = document.getElementById('mpShareBlock');
+    if (!block) return;
+    // There is nothing to share with nobody, and both of the other look modes
+    // own the settings outright while they run.
+    // Both other look modes own the settings outright while they run: turns
+    // for everyone, the lock for the host who set it (settingsLockOn) and for
+    // the guests it gates (__mpSettingsLocked). Either one takes precedence in
+    // mirrorActive(), so a share opened under them would send nothing.
+    var show = isMultiplayerEnabled && connectedClients > 1 &&
+               !turnsOn && !settingsLockOn && !window.__mpSettingsLocked;
+    block.style.display = show ? '' : 'none';
+    if (!show) { dismissShareOffer(); return; }
+
+    var list = document.getElementById('mpShareList');
+    if (list) {
+        list.innerHTML = '';
+        shareGroups.forEach(function (g) { list.appendChild(shareRow(g)); });
+    }
+    var openBtn = document.getElementById('shareOpenBtn');
+    if (openBtn) openBtn.style.display = inShare() ? 'none' : '';
+
+    var note = document.getElementById('mpShareNote');
+    if (note) {
+        note.textContent = inShare()
+            ? 'Everyone in this share sees your setting changes, and you see theirs.'
+            : (shareGroups.length
+                ? 'Join one and your look matches theirs, or open your own.'
+                : 'Open a share and anyone here can join. Inside it, everyone\u2019s changes reach everyone.');
+    }
+}
+
 // ── Take-turns mode ─────────────────────────────────────────────────
 // No points, no timer — the brush just passes around the room. While it's not
 // your turn, painting/clear are gated (05d/04f read __mpTurnBlocked), your look
@@ -698,6 +1050,9 @@ function applyTurnState(wasMyTurn) {
         // any guest-side locked banner/gate is replaced by the turn state.
         settingsLockOn = false;
         setSettingsLockedByHost(false, null);
+        // Same for settings shares — the relay dissolved them inside
+        // enableTurns, so this is the client catching up, not a second policy.
+        resetShareState();
     }
     // The brush was taken from us mid-stroke (a host Skip or a pass racing
     // our drag): end the live stroke NOW. The relay already drops our splats,
@@ -1276,6 +1631,7 @@ function connectToRoom(roomCode) {
     strangerWasPaired = false;
     resetSettingsLock();
     resetTurnState();
+    resetShareState();
 
     // Stranger rooms are ephemeral — keep them out of the shareable URL hash;
     // private/code rooms stay in the hash so a #CODE deep-link auto-joins.
@@ -1355,6 +1711,7 @@ function disconnectMultiplayer(rememberRoom) {
     strangerWasPaired = false;
     resetSettingsLock();
     resetTurnState();
+    resetShareState();
     if (partySocket) {
         partySocket.close();
         partySocket = null;
@@ -1448,6 +1805,15 @@ function onMultiplayerMessage(event) {
                 // message immediately and rebuilds everything. (Host-side
                 // settingsLockOn intent is deliberately left alone.)
                 resetTurnState();
+                resetShareState(); // the server re-announces any live circles
+                // Circles already open when we arrived are context, not an
+                // invitation — seed them as seen so only ones opened while we
+                // are in the room raise the offer prompt.
+                if (Array.isArray(data.shares)) {
+                    data.shares.forEach(function (g) {
+                        if (g && typeof g.id === 'string') shareSeen[g.id] = true;
+                    });
+                }
                 setSettingsLockedByHost(false, null);
                 updateConnectedView();
                 break;
@@ -1634,6 +2000,26 @@ function onMultiplayerMessage(event) {
                 }
                 break;
 
+            case 'share-state':
+                // Server-authored: the relay never forwards a client-sent copy,
+                // and a clientId here means a forgery from a peer (an older
+                // relay forwards anything). Same guard as turn-state.
+                if (data.clientId) break;
+                applyShareState(Array.isArray(data.groups) ? data.groups : []);
+                break;
+
+            case 'share-look':
+                // Only from someone in MY circle. The relay already routes
+                // these to the circle, so this catches a straggler from a
+                // circle we just left — and an older relay, which would have
+                // broadcast it to the whole room.
+                if (data.clientId !== clientId && inShare() && isShareMate(data.clientId)) {
+                    applyRemoteLookSnapshot(data.snapshot || null);
+                    shareBaseline = mergeLookDelta(shareBaseline,
+                        sanitizeLockSnapshot(data.snapshot) || {});
+                }
+                break;
+
             case 'turn-look':
                 // The current painter's look snapshot. The relay only forwards
                 // these from the turn holder; the holder check here just guards
@@ -1665,6 +2051,7 @@ function onMultiplayerClose(event) {
         currentRoom = null; lastRoom = null;
         resetSettingsLock();
         resetTurnState(); // never leave turn gates on a client with no room
+        resetShareState();
         history.replaceState(null, '', window.location.pathname + window.location.search);
         showMpError(event.code === 4001
             ? 'This room is locked — ask the host for an invite.'
@@ -1767,6 +2154,15 @@ function brushWireFields() {
     const cfg = window.config || {};
     const f = { tip: (cfg.BRUSH_TIP | 0) || 0 };
     if (cfg.BRUSH_ANGLE) f.angle = +(+cfg.BRUSH_ANGLE).toFixed(1);
+    // Push (velocity-only) has to ride the wire or peers paint dye where this
+    // canvas laid none — the same class of gap as shaped strokes arriving
+    // gaussian. Additive and omitted in the common case: an old receiver just
+    // ignores it, and a peer on an older bundle renders the stroke the way it
+    // always did (dye), which is the honest degradation.
+    if (cfg.BRUSH_VELOCITY_ONLY) {
+        f.push = cfg.BRUSH_VEL_MODE || 'smudge';
+        f.pushS = +(+((typeof cfg.BRUSH_VEL_STRENGTH === 'number') ? cfg.BRUSH_VEL_STRENGTH : 1)).toFixed(2);
+    }
     const rev = publishActiveShape();
     if (rev) { f.shape = cfg.BRUSH_SHAPE_ID; f.rev = rev; }
     return f;
@@ -2302,8 +2698,8 @@ function handleRemoteSplat(data) {
         // peer id is not in the local library, so stampPending() has nothing
         // to wait for and the dab falls through to the built-in tip.
         const _rd = data.data || {};
-        let _pinShape = false, _pinTip = false, _pinAng = false;
-        let _shapePrev, _tipPrev, _angPrev;
+        let _pinShape = false, _pinTip = false, _pinAng = false, _pinPush = false;
+        let _shapePrev, _tipPrev, _angPrev, _pushPrev;
         if (window.config) {
             if (typeof _rd.shape === 'string' && window.BrushShapes
                 && typeof window.BrushShapes.peerReady === 'function'
@@ -2316,6 +2712,29 @@ function handleRemoteSplat(data) {
                 _pinTip = true;
                 _tipPrev = window.config.BRUSH_TIP;
                 window.config.BRUSH_TIP = _rd.tip | 0;
+            }
+            // Push is pinned UNCONDITIONALLY, unlike tip/shape/angle: those are
+            // styling that can safely fall back to the viewer's own, but this
+            // decides whether the dab deposits pigment at all. Reading it as
+            // "absent means leave mine alone" would repaint a peer's ordinary
+            // stroke as a silent push whenever this client sat in Push mode.
+            _pinPush = true;
+            _pushPrev = [window.config.BRUSH_VELOCITY_ONLY,
+                         window.config.BRUSH_VEL_MODE,
+                         window.config.BRUSH_VEL_STRENGTH];
+            window.config.BRUSH_VELOCITY_ONLY = (typeof _rd.push === 'string');
+            if (typeof _rd.push === 'string') {
+                // Coerced against the known set — the mode is a raw peer string,
+                // and splat() treats an unknown one as 'smudge', which for a
+                // stationary hose means a dab that does nothing at all.
+                window.config.BRUSH_VEL_MODE =
+                    (_rd.push === 'spread' || _rd.push === 'gather' || _rd.push === 'swirl')
+                        ? _rd.push : 'smudge';
+                // Range-checked here as well as in splat()'s clamp, so a garbage
+                // value never reaches config and gets re-persisted by the mirror.
+                window.config.BRUSH_VEL_STRENGTH =
+                    (typeof _rd.pushS === 'number' && isFinite(_rd.pushS))
+                        ? Math.max(0, Math.min(5, _rd.pushS)) : 1;
             }
             if (typeof _rd.angle === 'number' && isFinite(_rd.angle)) {
                 _pinAng = true;
@@ -2421,6 +2840,11 @@ function handleRemoteSplat(data) {
             if (_pinShape) window.config.BRUSH_SHAPE_ID = _shapePrev;
             if (_pinTip) window.config.BRUSH_TIP = _tipPrev;
             if (_pinAng) window.config.BRUSH_ANGLE = _angPrev;
+            if (_pinPush) {
+                window.config.BRUSH_VELOCITY_ONLY = _pushPrev[0];
+                window.config.BRUSH_VEL_MODE = _pushPrev[1];
+                window.config.BRUSH_VEL_STRENGTH = _pushPrev[2];
+            }
         }
     }
 }
@@ -2463,6 +2887,8 @@ function broadcastReplayStroke(events) {
         // even though the events carried the shape locally (05d).
         if (typeof ev.tip === 'number') o.tip = ev.tip | 0;
         if (ev.shape && shapeRevs[ev.shape]) o.shape = ev.shape;
+        // Push dabs deposit no dye — same reason the footprint rides along.
+        if (ev.push) o.push = { m: ev.push.m, s: +(+ev.push.s || 1).toFixed(2) };
         return o;
     });
     if (q.length <= STROKE_CHUNK_EVENTS) {
@@ -2689,6 +3115,7 @@ function updateConnectedView() {
     setShown('lockBadge', !stranger && roomLocked && !isHost);
 
     updateTurnUI();
+    updateShareUI();
     updateUsersDisplay();
 }
 
@@ -2902,6 +3329,9 @@ function initMultiplayerUI() {
 
     var turnsBtn = document.getElementById('turnsBtn');
     if (turnsBtn) turnsBtn.addEventListener('click', toggleTurns);
+
+    var shareOpenBtn = document.getElementById('shareOpenBtn');
+    if (shareOpenBtn) shareOpenBtn.addEventListener('click', openShare);
 
     var turnPassBtn = document.getElementById('turnPassBtn');
     if (turnPassBtn) turnPassBtn.addEventListener('click', passTurn);

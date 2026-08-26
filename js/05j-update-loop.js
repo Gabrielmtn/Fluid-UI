@@ -24,6 +24,10 @@
         // Reusable upload buffer for the attractor forcing field (6.2):
         // 12 attractors × vec4, zero-alloc per frame.
         const attractorFieldScratch = new Float32Array(48);
+        // Same shape for the Push brush's blow/suck magnet, kept separate so a
+        // scene driving the attractor field and a user pushing in the same frame
+        // cannot scribble on each other's upload.
+        const brushPushScratch = new Float32Array(48);
         // Resize settle deadline for the debounced FBO rebuild (0 = none pending)
         let _fboSettleAtMs = 0;
         // Last frame's wrapper size — the settle deadline re-arms only when
@@ -461,8 +465,15 @@
                         // Publish the true painted radius so recording captures the
                         // actual (splat-in ramped) brush size, not the base.
                         window.__lastPaintRadius = config.SPLAT_RADIUS * inMult;
+                        // Push's stationary modes (blow/suck/vortex) invent their
+                        // own velocity, so they need the same density share the dye
+                        // gets — without it, halving Interval would double the push.
+                        // Handed over raw: velocity is additive in the shader, so
+                        // the compensation is a plain multiply (no Gate branch).
+                        window.__splatVelK = (typeof d.k === 'number' && d.k > 0) ? d.k : 1;
                         multiSplatWithRadius(d.x, d.y, d.dx, d.dy, col, window.__lastPaintRadius);
                         window.__splatFlow = 1; // reset so programmatic/press splats stay full-flow
+                        window.__splatVelK = 1; // ...and so they keep a full push share
                         pushStrokeEvent(d.x, d.y, d.dx, d.dy, col);
                         // 1.3 parity: queue THIS dab (own velocity, own ramped
                         // radius) for peers instead of letting them reconstruct
@@ -647,8 +658,50 @@
                 gl.bindTexture(gl.TEXTURE_2D, curl.texture);
                 blit(velocity.write.fbo);
                 velocity.swap();
+                // 2b. Constant pressure field — ambient gravity / lift, aimed by
+                // the pad in the Pressure brush section. A velocity force, and it
+                // belongs HERE (after confinement, before the projection) for the
+                // same reason confinement does: it is a force on the fluid, and the
+                // projection is what has to reconcile it with incompressibility.
+                // Dye-weighted so there is something for the projection to leave
+                // behind — see ambientForceFrag. Skipped whole when off or aimed
+                // nowhere, so it costs nothing until someone points it somewhere.
+                const _ambX = (typeof config.AMBIENT_FORCE_X === 'number') ? config.AMBIENT_FORCE_X : 0;
+                const _ambY = (typeof config.AMBIENT_FORCE_Y === 'number') ? config.AMBIENT_FORCE_Y : 0;
+                if (config.AMBIENT_FORCE && (_ambX !== 0 || _ambY !== 0)) {
+                    const _ambRef = (typeof config.AMBIENT_FORCE_REF === 'number')
+                        ? config.AMBIENT_FORCE_REF : 0.5;
+                    ambientForceProg.bind();
+                    // The pad stores SCREEN space (y+ down); velocity's +y is up, so
+                    // the flip happens here, once, rather than in the shader or the
+                    // UI where it would be easy to apply twice.
+                    gl.uniform2f(ambientForceProg.uniforms.uForce, _ambX * _ambRef, -_ambY * _ambRef);
+                    gl.uniform1f(ambientForceProg.uniforms.dt, dt);
+                    gl.uniform1f(ambientForceProg.uniforms.uMaxDensity,
+                        (typeof config.AMBIENT_FORCE_MAXDYE === 'number') ? config.AMBIENT_FORCE_MAXDYE : 1.6);
+                    gl.uniform1f(ambientForceProg.uniforms.uCapSpd,
+                        config.VEL_SOURCE_GATE === false ? 0.0 :
+                        ((typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0));
+                    gl.uniform1i(ambientForceProg.uniforms.uVelocity, 0);
+                    gl.uniform1i(ambientForceProg.uniforms.uDensity, 1);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    blit(velocity.write.fbo);
+                    velocity.swap();
+                    gl.activeTexture(gl.TEXTURE0);
+                }
                 // 3. Divergence
-                const _openBoundary = window.__edgeAbsorb ? 1.0 : 0.0;
+                // Overflow (open canvas edges). The Effects checkbox owns it
+                // now — it used to be a Tunnel audio-scene toggle, which put a
+                // canvas-wide boundary mode behind a music scene. Numeric
+                // window.__edgeAbsorb still wins when set, so the console and
+                // the regression suite can drive open boundaries with no UI.
+                const _absorb = (typeof window.__edgeAbsorb === 'number' && window.__edgeAbsorb > 0)
+                    ? window.__edgeAbsorb
+                    : (config.EDGE_ABSORB ? 1.0 : 0.0);
+                const _openBoundary = _absorb > 0 ? 1.0 : 0.0;
                 // fp16 headroom rescale for the whole pressure system (see
                 // divergenceFrag); gradient divides it back out below.
                 // RESOLUTION-AWARE (2026-07-15): velocity is stored in grid
@@ -788,9 +841,14 @@
                 gl.uniform2f(advectionProg.uniforms.obstacleTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(advectionProg.uniforms.dt, dt);
-                // Overflow borders (audio scenes / future toggles): same value
-                // for the velocity and dye passes below
-                gl.uniform1f(advectionProg.uniforms.edgeAbsorb, window.__edgeAbsorb || 0.0);
+                // Overflow borders: same value for the velocity and dye passes
+                // below. Band width is the Effects → Overflow → Border slider;
+                // floor it so a zeroed config can never hand the shader an
+                // undefined smoothstep.
+                gl.uniform1f(advectionProg.uniforms.edgeAbsorb, _absorb);
+                gl.uniform1f(advectionProg.uniforms.edgeAbsorbBand,
+                    (typeof config.EDGE_ABSORB_BAND === 'number' && config.EDGE_ABSORB_BAND > 0)
+                        ? config.EDGE_ABSORB_BAND : 0.025);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 0);
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, 0);
                 gl.uniform1i(advectionProg.uniforms.macMode, 0);
@@ -1102,7 +1160,44 @@
                     gl.uniform1f(attractorProg.uniforms.uDensityGate, (typeof _af.densityGate === 'number') ? _af.densityGate : 0.75);
                     gl.uniform1f(attractorProg.uniforms.uMaxDensity, (typeof _af.maxDensity === 'number') ? _af.maxDensity : 1.6);
                     gl.uniform1i(attractorProg.uniforms.uCount, _n);
+                    gl.uniform1f(attractorProg.uniforms.uKeep, 0); // scene field: plain gather
                     if (attractorProg.uniforms['uAtt[0]']) gl.uniform4fv(attractorProg.uniforms['uAtt[0]'], _flat);
+                    gl.uniform1i(attractorProg.uniforms.uDensity, 0);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    blit(density.write.fbo);
+                    density.swap();
+                }
+                // 8c. Push brush, blow/suck — the dye-transport half of the
+                // velocity-only brush (05i publishes window.__brushPush; see the
+                // BRUSH_VEL_MODE note in 04a for why these two modes cannot be a
+                // velocity force). Reuses attractorProg outright: one magnet at the
+                // cursor, sign from the mode, so a push costs one blit and no new
+                // shader. The fill gate is off — it exists so a POOL settles
+                // instead of clipping, and a brush the user is holding should keep
+                // pushing wherever they hold it.
+                const _bp = window.__brushPush;
+                // Tight staleness window (a brush, not a scene): dabs arrive every
+                // few ms while the pointer is held, so ~6 frames after the last one
+                // the push stops. Nothing has to clear this on release.
+                if (_bp && (nowMs - _bp.ts) < 100) {
+                    const _bf = brushPushScratch;
+                    _bf[0] = _bp.u; _bf[1] = _bp.v; _bf[2] = _bp.sign; _bf[3] = _bp.radius;
+                    attractorProg.bind();
+                    gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                    gl.uniform1f(attractorProg.uniforms.aspectRatio, canvas.width / Math.max(1, canvas.height));
+                    gl.uniform1f(attractorProg.uniforms.dt, dt);
+                    gl.uniform1f(attractorProg.uniforms.uForce, _bp.force);
+                    gl.uniform1f(attractorProg.uniforms.uSwirl, 0);
+                    gl.uniform1f(attractorProg.uniforms.uDensityGate, 0);
+                    gl.uniform1f(attractorProg.uniforms.uMaxDensity, 1.6);
+                    gl.uniform1i(attractorProg.uniforms.uCount, 1);
+                    // Only the inward pull needs the never-erase blend — Blow reads
+                    // from further IN, toward denser paint, so it has no empty side
+                    // to sample and conserves dye on its own (measured 1.36x the
+                    // control's retention while spreading 1.21x wider).
+                    gl.uniform1f(attractorProg.uniforms.uKeep, _bp.sign > 0 ? 1 : 0);
+                    if (attractorProg.uniforms['uAtt[0]']) gl.uniform4fv(attractorProg.uniforms['uAtt[0]'], _bf);
                     gl.uniform1i(attractorProg.uniforms.uDensity, 0);
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, density.read.texture);

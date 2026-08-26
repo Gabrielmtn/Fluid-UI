@@ -275,7 +275,11 @@
     // ─── Scene: TUNNEL ──────────────────────────────────────────────
     scenes.tunnel = {
         label: 'Tunnel',
-        defaults: { dir: 'out', trigger: 'bass', gates: [], gain: 1, volume: 1, spin: false, overflow: false },
+        // 'overflow' left this scene 2026-08-24 — it is an Effects checkbox
+        // now (config.EDGE_ABSORB). Dropping the key from defaults is what
+        // retires it: loadOpts only copies saved keys that still exist here,
+        // so a stale saved overflow:true is inert rather than resurrected.
+        defaults: { dir: 'out', trigger: 'bass', gates: [], gain: 1, volume: 1, spin: false },
         controls: [
             { type: 'cycle', key: 'dir', label: 'Direction',
               values: ['out', 'in', 'alt'],
@@ -286,12 +290,8 @@
               names: { bass: 'Bass', mid: 'Mids', treble: 'Treble', onset: 'Onset', any: 'Any hit' } },
             { type: 'slider', key: 'gain', label: 'Gain', min: 0.1, max: 4, step: 0.05 },
             { type: 'slider', key: 'volume', label: 'Volume', min: 0, max: 2, step: 0.01 },
-            { type: 'toggle', key: 'spin', label: 'Spin' },
-            { type: 'toggle', key: 'overflow', label: 'Overflow' }
+            { type: 'toggle', key: 'spin', label: 'Spin' }
         ],
-        onChange: function (key, o, F) {
-            if (key === 'overflow') window.__edgeAbsorb = o.overflow ? 1 : 0;
-        },
         enter: function (o, F) {
             this._flip = false;
             this._gs = { above: false, lastFire: 0 };
@@ -302,16 +302,8 @@
                 window.config.DENSITY_DISSIPATION = 0.92;
                 window.config.VELOCITY_DISSIPATION = 0.975;
             }
-            // Overflow: absorbing canvas borders — outbound rings (Entering
-            // direction especially) exit past the edge instead of bouncing
-            // back and breaking the tunnel illusion
-            this._prevAbsorb = window.__edgeAbsorb || 0;
-            window.__edgeAbsorb = o.overflow ? 1 : 0;
             // The scene animates the canvas; it does not touch the user's brush.
             // (This used to force overallToSize back on, overriding the checkbox.)
-        },
-        exit: function () {
-            window.__edgeAbsorb = this._prevAbsorb || 0;
         },
         tick: function (frame, o, F) {
             // Drawn gates rule when present; otherwise fall back to engine
@@ -330,7 +322,14 @@
             var dir = o.dir;
             if (dir === 'alt') { this._flip = !this._flip; dir = this._flip ? 'out' : 'in'; }
 
-            var vpx = W * 0.5, vpy = H * 0.44;      // vanishing point: slightly above center
+            // Vanishing point = the canvas centre, which is the SAME pivot every
+            // mirror in the app turns about: kaleido's vec2(0.5) (05a), Multi-Brush
+            // symmetry's canvas.width/height * 0.5 (05g multiSplat), and Mandala's
+            // W/2,H/2 (34). It used to sit at 0.44H — "slightly above centre" reads
+            // fine on its own, but with Kaleido or a mirror symmetry on, the
+            // reflections pivot about 0.5H and the tunnel doubles off-register
+            // instead of landing back on itself.
+            var vpx = W * 0.5, vpy = H * 0.5;
             var maxR = minDim * 0.52, minR = minDim * 0.04;
             // Volume: the feel dial — scales ring energy (thickness, speed,
             // travel time) and dye brightness together

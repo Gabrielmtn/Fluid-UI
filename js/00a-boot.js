@@ -51,10 +51,23 @@
     // all. So the card stands down for that run and plays clean on every
     // one after. Same key the dialog reads (index.html); this file runs
     // first, so the decision can be made here before anything paints.
-    var TITLE_CARD = true;
-    try {
-        if (localStorage.getItem('fluidui.photoWarn.ack.v1') !== '1') TITLE_CARD = false;
-    } catch (_) { /* no storage — leave the card on */ }
+    //
+    // RESOLVED LAZILY, and that is not a micro-optimisation. This is the
+    // first localStorage read of the process, and the first one costs ~714ms
+    // — measured, on this machine: the storage service starting, with the
+    // main thread gone for all of it. Reading it here, eagerly, meant the
+    // boot veil did not exist until 811ms into a ~2s boot, so the OS busy
+    // cursor owned the first third of every launch. Nothing needs this answer
+    // until the reveal, so nothing asks for it until then.
+    var TITLE_CARD = null;
+    function titleCard() {
+        if (TITLE_CARD !== null) return TITLE_CARD;
+        TITLE_CARD = true;
+        try {
+            if (localStorage.getItem('fluidui.photoWarn.ack.v1') !== '1') TITLE_CARD = false;
+        } catch (_) { /* no storage — leave the card on */ }
+        return TITLE_CARD;
+    }
     var TITLE_HOLD_MS = 420;   // title-card dwell after the window has landed
     var QUIET_FRAMES = 5;      // identical layout samples that mean "settled"
     var QUIET_MAX_MS = 1500;   // ...but never wait longer than this for quiet
@@ -138,7 +151,6 @@
         if (asked) return;
         asked = true;
         clearTimeout(watchdog);
-        resolveCursor();
         log('ready (' + reason + ')');
         if (ipc) {
             ipc.send('boot-ready');
@@ -161,7 +173,7 @@
     // prevent. With no title card, nothing is on screen at the reveal but the
     // app.
     function dropSplashIfNoCard() {
-        if (TITLE_CARD) return;
+        if (titleCard()) return;
         var s = document.getElementById('splash-screen');
         if (s && s.parentNode) s.parentNode.removeChild(s);
     }
@@ -193,7 +205,7 @@
     var cardEls = null;
 
     function paintCard(t) {
-        if (!TITLE_CARD) return;
+        if (!titleCard()) return;
         if (!cardEls) {
             cardEls = [];
             for (var j = 0; j < CARD_RESTING.length; j++) {
@@ -215,7 +227,7 @@
         // has to show the card rather than leave it sitting at zero.
         if (!driveFade()) paintCard(1);
         root.classList.remove('booting');
-        var info = { fadeMs: fadeMs, titleHoldMs: TITLE_HOLD_MS, titleCard: TITLE_CARD };
+        var info = { fadeMs: fadeMs, titleHoldMs: TITLE_HOLD_MS, titleCard: titleCard() };
         log('revealing (fade ' + fadeMs + 'ms)');
         var cbs = revealCbs.splice(0);
         for (var i = 0; i < cbs.length; i++) {
@@ -256,271 +268,127 @@
 
     // ══ Boot cursor ═══════════════════════════════════════════════════
     // The window is invisible for the whole load, so the CURSOR is the only
-    // feedback there is. It is the app's own fluid — one frame of the real
-    // sim (assets/boot-cursor.png, lifted out of the baked loop by
-    // scripts/bake-boot-swirl.js) — with a small ring off its lower right
-    // that steps around to say "working", the way ZBrush's loader does.
+    // feedback there is. It is the app's own fluid — one frame of the real sim
+    // (assets/boot-cursor.png, lifted out of the baked loop by
+    // scripts/bake-boot-swirl.js) — and it is a STILL, set once and never
+    // reassigned.
     //
-    // That ring is a MINIATURE of the in-app brush cursor: same dark
-    // under-halo, same light stroke, same accent, and at the very end the
-    // same angle line and centre dot (js/31-brush-cursor.js). So the ring
-    // spins, settles into the shape the app is about to put under the
-    // pointer, and only then does the window arrive carrying it.
+    // IT IS STILL BECAUSE A CSS CURSOR CANNOT CHANGE WITHOUT FLASHING. That is
+    // measured, not assumed: a Win32 GetCursorInfo trace over a real boot,
+    // sampling on every change while the pointer was moved at ~60Hz, caught
+    // the system ARROW on screen for 1–4ms before EVERY switch —
     //
-    // WHY THE FLUID HOLDS STILL AND ONLY THE RING MOVES. A page's cursor is
-    // re-evaluated only when the renderer services a MOUSE-MOVE HIT TEST, so
-    // the animation is driven by input, not by time: park the pointer and it
-    // stops dead (measured — zero custom frames in six seconds of a parked
-    // mouse), and during the load that same thread services those hit tests
-    // about three times a second (measured, hand moving at 60Hz). None of
-    // that is tunable, so an animation that wants to be SMOOTH cannot be
-    // built on this channel — which is the whole reason the fluid is a still
-    // and the only moving part is an eight-frame ring. A 45° step is legible
-    // as a step whether it lands at 9Hz or at 3Hz; it reads as a chosen
-    // cadence instead of a stutter.
+    //     t= 985ms  OURS(1074925543)      the orb
+    //     t=1210ms  ARROW                 ← flash
+    //     t=1213ms  OURS(12521985)        next state
+    //     t=2003ms  ARROW                 ← flash
+    //     t=2004ms  OURS(1006374615)      next state
     //
-    // The frame index comes off the CLOCK and is never counted, so a stretch
-    // with no hit tests resumes at the phase the ring should have reached
-    // rather than picking up where it stalled.
+    // — and note the handles: every switch mints a NEW HCURSOR, including one
+    // back to a state already shown moments earlier (574098955, where the same
+    // art had been 1074925543). Chromium caches no cursor bitmap, so the gap
+    // where the platform default shows through is structural. A fallback chain
+    // does not help; the arrow is not the chain resolving, it is Blink dropping
+    // to the default while it rebuilds. Warming every image with decode() does
+    // not help either — the second showing flashed exactly like the first.
     //
-    // NOTHING MAY MAKE THE FLUID BLINK. Swapping the cursor is a resource
-    // reload, and a `url()` that is not decoded yet falls THROUGH to the next
-    // entry in its list — so the fallback chain decides what a stumble looks
-    // like. Every frame therefore names the still orb before it names the OS
-    // cursor: the worst a hiccup can do is drop the ring for a frame, never
-    // take the paint away. Two more things keep it steady — the frames are
-    // all handed to the decoder BEFORE any of them is asked for (or the ring
-    // arrives a frame late for the whole first revolution), and a repeat of
-    // the value already showing is dropped rather than re-assigned, because
-    // the timer and the frame clock drift against each other and a redundant
-    // assignment still costs a reload.
+    // So zero flashes is reachable only at ZERO CHANGES. There is exactly one
+    // handover here, `progress` → the orb, and it lands ON a system cursor
+    // where the 2ms of arrow is invisible; a switch between two of OUR cursors
+    // is what the eye catches, because everything around it is steady.
     //
-    // THE FLUID IS ALSO NEVER SHOWN AT THE WRONG SIZE. assets/boot-cursor.png
-    // is source art, not a cursor: on its own it is the orb filling all 128px,
-    // with no ring and a hotspot in a different place, so wearing it while the
-    // frames compose meant the paint appeared large and bare and then jumped.
-    // Nothing is worn until the composed set exists — the OS busy cursor holds
-    // those first ~230ms, which is what it is for — and from then on every
-    // cursor in play shares one geometry. The fallback is the IDLE frame (the
-    // same orb and ring track, minus the accent), so a stumble subtracts the
-    // red arc and nothing else.
+    // THINGS THAT DO NOT FIX THIS, all tried and measured (2026-08-18,
+    // 2026-08-23 twice): a slower cadence; rAF; a clock-derived frame index;
+    // driving the steps off real load progress instead of a timer (the flash
+    // is per-CHANGE, so it does not care what causes the change); a fallback
+    // chain naming every sibling state; pre-decoding every frame. The channel
+    // is wrong, not the pacing — a page cursor is also only re-evaluated when
+    // the renderer services a mouse-move hit test, and during a load that
+    // renderer delivers ~3.5 of those per second.
     //
-    // assets/boot-swirl/ keeps the full 48-frame loop for a future loader
-    // that has its own idle renderer to animate the fluid too.
+    // A MOVING LOADER NEEDS ITS OWN RENDERER. Measured: a second BrowserWindow
+    // on its own `partition` gets its own process and held a 16.7ms median —
+    // 7 frames over 33ms out of 470 — straight through this window's boot.
+    // assets/boot-swirl/ keeps the full 48-frame loop for exactly that. It is
+    // the only way a smooth loader is happening here, and it is not the cursor.
     //
-    // Set on a dedicated top-most veil rather than on <html>: the cursor
-    // property inherits, so a rule on <html> looks like it should be enough —
-    // it is not. Measured, the element actually under the pointer during boot
-    // carries its own cursor, which beats anything inherited.
+    // `progress` is the fallback, which Chromium wears until the PNG has
+    // decoded — the OS busy cursor covers the first instants and then the orb
+    // takes over, once. The decode is kicked off before the veil exists so the
+    // handover happens early rather than on the first pointer move.
+    //
+    // Carried by a stylesheet that names `*`, never by an element over the
+    // app: the cursor property inherits, so a rule on <html> alone looks like
+    // it should be enough — measured, it is not, because whatever sits under
+    // the pointer during boot carries its own. See startCursor() for why this
+    // must not be an element.
+    // NO RING, and that is the point. A ring carrying a progress arc would be
+    // a lie — nothing can animate it, see above — and a ring WITHOUT one reads
+    // as a spinner that is broken: "a single frame where the spinner is empty"
+    // was the verdict when it shipped that way. A plain orb promises nothing
+    // it cannot deliver. A loading indicator with real motion needs its own
+    // renderer and its own surface; it is not this.
     var CUR_SRC = 'assets/boot-cursor.png';
-    var CUR_BOX = 128;        // Chromium ignores a cursor image larger than this
-    var CUR_ORB = 88;         // the fluid's diameter
-    var CUR_HOT = 58;         // orb centre, and the hotspot: 88px clears 14..102
-    var CUR_RING_C = 104;     // ring centre, on the down-right diagonal
-    var CUR_RING_R = 15;      // ...far enough out to leave ~4px of daylight
-    var CUR_FRAMES = 8;       // deliberately few — see above
-    var CUR_MS = 160;         // ~1.3s per revolution, at 45° a step
-    var CUR_ARC = 1.9;        // accent arc length in radians (~109°)
-    var ACCENT = '#ec3013';   // --accent (css/00-tokens.css), so it is on-brand
-    var HALO = 'rgba(0,0,0,0.55)';   // the brush cursor's under-stroke, verbatim
-    var TAU = Math.PI * 2;
-    var curVeil = null, curTimer = null, curFrames = null, curResolved = null;
-
-    // One 128px frame. `mode` is either a number — the angle the accent arc
-    // starts at — or one of two words:
-    //   'idle'      orb and ring track only. The fallback, and what a frame
-    //               that is somehow not ready degrades to.
-    //   'resolved'  closed ring with the brush cursor's own angle mark and
-    //               centre dot, worn for the last instant before the window
-    //               materializes.
-    function cursorFrame(orb, mode) {
-        var c = document.createElement('canvas');
-        c.width = c.height = CUR_BOX;
-        var g = c.getContext && c.getContext('2d');
-        if (!g) return null;
-        g.lineCap = 'round';
-
-        var o = CUR_ORB / 2;
-        g.drawImage(orb, CUR_HOT - o, CUR_HOT - o, CUR_ORB, CUR_ORB);
-
-        // Everything below is drawn twice — dark under-stroke, then the light
-        // one — which is how the in-app cursor stays legible on artwork of any
-        // brightness, and here on any desktop.
-        var ring = function (from, to, width, color) {
-            g.beginPath();
-            g.arc(CUR_RING_C, CUR_RING_C, CUR_RING_R, from, to);
-            g.lineWidth = width; g.strokeStyle = color; g.stroke();
-        };
-
-        var resolved = (mode === 'resolved');
-        ring(0, TAU, 3.6, HALO);
-        ring(0, TAU, 1.8, resolved ? '#ffffff' : 'rgba(255,255,255,0.22)');
-
-        if (typeof mode === 'number') {
-            ring(mode, mode + CUR_ARC, 2.6, ACCENT);
-        }
-        if (!resolved) {
-            try { return c.toDataURL('image/png'); } catch (_) { return null; }
-        }
-
-        // Resolved: the brush cursor in miniature — closed ring (above), the
-        // accent angle line across it, and the centre dot marking the spot.
-        var line = function (width, color) {
-            g.beginPath();
-            g.moveTo(CUR_RING_C - CUR_RING_R, CUR_RING_C);
-            g.lineTo(CUR_RING_C + CUR_RING_R, CUR_RING_C);
-            g.lineWidth = width; g.strokeStyle = color; g.stroke();
-        };
-        line(3.4, HALO);
-        line(1.8, ACCENT);
-        g.beginPath();
-        g.arc(CUR_RING_C, CUR_RING_C, 1.6, 0, TAU);
-        g.fillStyle = '#ffffff'; g.fill();
-        g.lineWidth = 0.8; g.strokeStyle = HALO; g.stroke();
-
-        try { return c.toDataURL('image/png'); } catch (_) { return null; }
-    }
-
-    var curIdle = null;   // composed 'idle' frame; the fallback for every other
-    function cursorCss(url) {
-        var hot = ' ' + CUR_HOT + ' ' + CUR_HOT;
-        return 'url("' + url + '")' + hot +
-               (curIdle && url !== curIdle ? ', url("' + curIdle + '")' + hot : '') +
-               ', progress';
-    }
-
-    var curLast = '';
-    function applyCursor(css) {
-        if (!curVeil || css === curLast) return;
-        curLast = css;
-        curVeil.style.cursor = css;
-    }
-
-    // Every frame into the decoder before the first one is worn. A failure
-    // counts as done: that frame simply falls back to the still orb, which
-    // is exactly what the fallback chain is for.
-    function warmFrames(urls, done) {
-        var left = urls.length;
-        if (!left) { done(); return; }
-        var tick = function () { if (--left === 0) done(); };
-        for (var i = 0; i < urls.length; i++) {
-            var im = new Image();
-            im.src = urls[i];
-            if (im.decode) im.decode().then(tick, tick);
-            else { im.onload = im.onerror = tick; }
-        }
-    }
-
-    // Clock-derived, never counted — see the note above.
-    var curShownAt = 0;
-    function spinCursor() {
-        if (!curFrames) return;
-        var t = now();
-        // A minimum dwell, because a timer that fires late and then catches
-        // up can otherwise put two frames on screen a few tens of ms apart —
-        // measured, 27ms. That is not a step, it is a flick. Skipping the
-        // late one costs nothing: the index below is read off the clock, so
-        // the ring is back on phase at the very next tick.
-        if (t - curShownAt < CUR_MS * 0.6) return;
-        var css = curFrames[Math.floor(t / CUR_MS) % CUR_FRAMES];
-        if (css === curLast) return;
-        curShownAt = t;
-        applyCursor(css);
-    }
-
-    // Every gate is clear and the window is about to come up: stop the ring
-    // on the brush cursor's own shape, so the last thing the pointer wears
-    // before the app appears is the thing the app is about to put there.
-    function resolveCursor() {
-        if (curTimer) { clearInterval(curTimer); curTimer = null; }
-        if (curResolved) applyCursor(curResolved);
-    }
+    var CUR_HOT = 64;         // orb centre — the source frame's own hotspot
+    var curStyle = null;
 
     function startCursor() {
-        // Transparent, covers the window, sits above everything. The window is
-        // invisible while this exists, so it costs nothing visually — and it
-        // is removed at the reveal, before there is anything for it to
-        // swallow.
-        curVeil = document.createElement('div');
-        curVeil.id = 'boot-veil';
-        // No art yet, and deliberately none: see the note above. `progress`
-        // says "working" for the ~230ms it takes to compose the set.
-        curLast = 'progress';
-        curVeil.style.cssText = 'position:fixed;inset:0;z-index:2147483647;' +
-            'background:transparent;cursor:' + curLast;
-        (document.body || root).appendChild(curVeil);
-        // Built in <head>, so <body> does not exist yet — re-home it once the
-        // parser has made one, or a stray element outside <body> outlives us.
-        if (!document.body) {
-            document.addEventListener('DOMContentLoaded', function () {
-                if (curVeil && document.body) document.body.appendChild(curVeil);
-            });
-        }
+        // Decode it up front so the handover from the `progress` fallback
+        // happens once, early, rather than the first time the pointer moves.
+        try { (new Image()).src = CUR_SRC; } catch (_) {}
 
-        // Everything past here is best-effort: any failure leaves the OS busy
-        // cursor up, which is a truthful thing to be showing during a load.
+        // A STYLESHEET, NOT AN ELEMENT — this is the important part, and it is
+        // the second time this bit has cost real debugging. The obvious build
+        // is a transparent full-window veil that carries the cursor, and it
+        // works right up until it does not get removed: a `position:fixed;
+        // inset:0` node at the top of the z-order swallows every pointer event
+        // in the app, so one missed teardown turns the whole canvas dead. It
+        // did, twice. `pointer-events:none` is not a fix either — an element
+        // that is not hit-tested does not supply a cursor.
         //
-        // The page is served from file:// in the desktop build, which is the
-        // usual way a canvas ends up tainted and toDataURL throws — measured
-        // here, it does not: Electron lets a file:// page read a file:// image
-        // it loaded itself, so the frames build. The null checks below are
-        // what catches it if that ever stops being true.
-        var img = new Image();
-        img.onload = function () {
-            if (!curVeil) return;   // revealed before the decode landed
-            var frames = [], i, f;
-            for (i = 0; i < CUR_FRAMES; i++) {
-                f = cursorFrame(img, (i / CUR_FRAMES) * TAU);
-                if (!f) return;
-                frames.push(f);
-            }
-            f = cursorFrame(img, 'resolved');
-            var idle = cursorFrame(img, 'idle');
-            if (!f || !idle) return;
-
-            warmFrames(frames.concat([f, idle]), function () {
-                if (!curVeil) return;
-                // Named before anything else is built: cursorCss reads it.
-                curIdle = idle;
-                curFrames = [];
-                for (var k = 0; k < frames.length; k++) curFrames.push(cursorCss(frames[k]));
-                curResolved = cursorCss(f);
-                log('boot cursor: ' + CUR_FRAMES + ' frames @' + CUR_MS + 'ms, decoded');
-                // A decode slow enough to land after the gates cleared skips
-                // the spin entirely and goes straight to the settled shape.
-                if (asked) { applyCursor(curResolved); return; }
-                spinCursor();
-                // Ticked at half the frame period so a slot is never missed
-                // by a whole frame; the repeat check above swallows the extra
-                // visits, so this costs a string compare, not a reload.
-                curTimer = setInterval(spinCursor, Math.round(CUR_MS / 2));
-            });
-        };
-        try { img.src = CUR_SRC; } catch (_) {}
+        // So nothing goes over the app at all. The rule has to name `*`
+        // because cursor INHERITANCE loses to any element that sets its own
+        // (measured — a rule on <html> alone is not enough during boot), and
+        // it hangs off `.booting`, which enter() drops at the reveal. That is
+        // belt AND braces: even if this node were somehow left behind, the
+        // class going away already stops it applying, and either way there is
+        // no hit-test target to block anything.
+        curStyle = document.createElement('style');
+        curStyle.id = 'boot-cursor-style';
+        curStyle.textContent = 'html.booting, html.booting * { cursor: url("' +
+            CUR_SRC + '") ' + CUR_HOT + ' ' + CUR_HOT + ', progress !important; }';
+        (document.head || root).appendChild(curStyle);
     }
 
     function stopCursor() {
-        if (curTimer) { clearInterval(curTimer); curTimer = null; }
-        if (curVeil && curVeil.parentNode) curVeil.parentNode.removeChild(curVeil);
-        curVeil = null;
-        curFrames = null;
-        curResolved = null;
-        curIdle = null;
-        curLast = '';
-        curShownAt = 0;
+        if (curStyle && curStyle.parentNode) curStyle.parentNode.removeChild(curStyle);
+        curStyle = null;
+        // By id as well as by reference, and including the veil this used to
+        // build: a boot that ran its cursor setup twice, or one that lost the
+        // reference, must not be able to leave anything standing. Removing a
+        // full-window node is the difference between a live canvas and a dead
+        // one, so it is worth the two lines.
+        var strays = ['boot-cursor-style', 'boot-veil'], el;
+        for (var i = 0; i < strays.length; i++) {
+            el = document.getElementById(strays[i]);
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+        }
     }
 
     // ══ Public surface ════════════════════════════════════════════════
     window.Boot = {
         usesWindowFade: usesWindowFade,
-        titleCard: TITLE_CARD,
+        // A getter, not a value: reading it resolves the title card, and the
+        // whole point is that nothing resolves it during the load. The one
+        // caller (20-mixer-layout.js) runs well after the reveal.
+        get titleCard() { return titleCard(); },
         done: done,
         // Run fn when the window starts fading in. Late registrations run
         // immediately, so a chunk that loads after the reveal still works.
         onReveal: function (fn) {
             if (typeof fn !== 'function') return;
             if (entered) {
-                try { fn({ fadeMs: fadeMs, titleHoldMs: TITLE_HOLD_MS, titleCard: TITLE_CARD }); }
+                try { fn({ fadeMs: fadeMs, titleHoldMs: TITLE_HOLD_MS, titleCard: titleCard() }); }
                 catch (e) { console.warn('[boot] reveal callback failed', e); }
                 return;
             }
@@ -548,7 +416,13 @@
     // Only the desktop build hides itself, so only it needs the boot skin.
     if (usesWindowFade) {
         root.classList.add('boot-fade', 'booting');
-        if (!TITLE_CARD) root.classList.add('boot-no-title');
+        // FIRST, before anything that can block. The veil's bare-orb url()
+        // resolves off the main thread, so putting it up here means the fluid
+        // is on screen THROUGH the storage stall that index.html's
+        // photosensitivity gate is about to trigger, instead of after it.
+        // (A `boot-no-title` class used to be set here off TITLE_CARD, which
+        // dragged that ~714ms read onto the critical path. No stylesheet has
+        // ever had a rule for it, so it was removed rather than deferred.)
         startCursor();
         log('window-fade launch armed');
     }

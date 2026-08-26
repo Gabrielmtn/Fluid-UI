@@ -86,6 +86,69 @@
             if (window.__brushTipOn) {
                 brushTip = config.BRUSH_TIP | 0;
             }
+            // ── Pressure: the velocity-only brush ────────────────────────
+            // Runs the velocity pass and returns before the dye pass, so the
+            // stroke moves paint that is already down without depositing any
+            // new pigment. Rides the same __brushTipOn gate the tips do, and
+            // for the same reason: programmatic splats (audio scenes, path
+            // layers, animations) are dye SOURCES and must keep painting.
+            const velOnly = !!(config.BRUSH_VELOCITY_ONLY && window.__brushTipOn);
+            // 'smudge' takes its direction from pointer travel, exactly like the
+            // classic brush — so it does nothing while the pointer stands still
+            // (dx/dy are zero). The analytic modes synthesize a direction per
+            // fragment instead and therefore DO work stationary, which is the
+            // whole point of pairing them with Constant flow.
+            let velMode = 'smudge', velSwirl = 0;
+            if (velOnly) {
+                velMode = config.BRUSH_VEL_MODE || 'smudge';
+                if (velMode !== 'smudge' && velMode !== 'spread'
+                    && velMode !== 'gather' && velMode !== 'swirl') {
+                    velMode = 'smudge'; // unknown string: push along travel rather
+                }                       // than push nothing at all
+                // Clamped HERE rather than at each caller because this is the one
+                // choke point every push goes through — the live brush, stroke
+                // replay, and a peer's dabs alike. Peer strength arrives as
+                // untrusted wire data (06), and an absurd value would dump enough
+                // force to blow the field past its cap.
+                const velStr = Math.max(0, Math.min(5,
+                    (typeof config.BRUSH_VEL_STRENGTH === 'number') ? config.BRUSH_VEL_STRENGTH : 1));
+                if (velMode === 'spread' || velMode === 'gather') {
+                    // Radial DYE TRANSPORT, not a velocity force — see the
+                    // BRUSH_VEL_MODE note in 04a for the measurements. Published for
+                    // the update loop to consume once a frame (05j) rather than
+                    // applied per dab: the transport rides dt, so the push rate is
+                    // already independent of how fast the hose emits, and a dab
+                    // does no GL work at all beyond this.
+                    window.__brushPush = {
+                        u: x / canvas.width,
+                        v: 1.0 - y / canvas.height,
+                        // attractorFrag gathers toward POSITIVE strength, so Gather is
+                        // the positive sign and Spread the negative one.
+                        sign: (velMode === 'spread') ? -1 : 1,
+                        // The gather's falloff is exp(-d^2 / (r^2 * 0.5)) while the
+                        // splat's is exp(-d^2 / radius), so r = sqrt(2 * radius) puts
+                        // the push footprint exactly on the brush ring.
+                        radius: Math.sqrt(2 * Math.max(baseRadius, 1e-6)),
+                        force: velStr * Math.sqrt(Math.max(baseRadius, 1e-6))
+                               * (config.BRUSH_PUSH_DYE_RATE || 2.5),
+                        ts: (window.performance && performance.now) ? performance.now() : Date.now()
+                    };
+                    return;
+                }
+                if (velMode === 'swirl') {
+                    // Tangential velocity IS divergence-free, so the projection keeps
+                    // all of it — this one stays a real force on the fluid. Its
+                    // magnitude has to carry this dab's share of the reference
+                    // sampling density (__splatVelK, published by the paint loop) or
+                    // the swirl would get stronger every time the Interval slider
+                    // went down. Velocity is purely ADDITIVE in the shader (base +
+                    // splat), so unlike dye it takes a plain linear share: no
+                    // Gate/additive split, no normalizePaintFlow.
+                    const velK = (typeof window.__splatVelK === 'number' && window.__splatVelK > 0)
+                        ? Math.min(1, window.__splatVelK) : 1;
+                    velSwirl = velStr * (config.BRUSH_VEL_SPEED_REF || 120) * velK;
+                }
+            }
             splatProg.bind();
             gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
             gl.uniform2f(splatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
@@ -165,11 +228,38 @@
             gl.viewport(0, 0, simTexWidth, simTexHeight);
             gl.uniform1i(splatProg.uniforms.isVelocity, 1); // Velocity pass
             gl.uniform1i(splatProg.uniforms.uTarget, 0);
-            gl.uniform3f(splatProg.uniforms.color, dx, -dy, 1.0);
+            if (velMode === 'swirl') {
+                // Swirl reuses the ring band's machinery (splatFrag's isVelocity
+                // branch: color.x is signed radial speed, color.y a tangential
+                // swirl, both resolved PER FRAGMENT off the vector from the dab
+                // centre). Collapsing the band radius to ~0 turns that ring into a
+                // point source — rr = d - e, so the envelope is exp(-d^2/radius),
+                // the very same gaussian the classic velocity splat uses, while the
+                // tangent still resolves around the cursor. No new shader code: the
+                // geometry was already there for the Tunnel scene. Only color.y is
+                // driven — color.x is the RADIAL component, and that is the one
+                // the projection eats.
+                gl.uniform1f(splatProg.uniforms.ringRadius, 1e-4);
+                gl.uniform1f(splatProg.uniforms.ringSquash, 1);
+                gl.uniform3f(splatProg.uniforms.color, 0.0, velSwirl, 0.0);
+            } else {
+                gl.uniform3f(splatProg.uniforms.color, dx, -dy, 1.0);
+            }
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
             splatPass(velocity, simTexWidth, simTexHeight,
                 _scOn ? splatScissorRect(_u, _v, _dHalf, aspectRatio, simTexWidth, simTexHeight) : 'full');
+            // Push stops here — skipping the dye pass IS the feature. Two other
+            // things fall out of the early return and both are correct: no
+            // wetness is deposited (no paint was laid, so no paper got wet), and
+            // no pigment-memory refresh is queued (that tracks the running peak
+            // of DYE, and nothing wrote dye). ringRadius is reset on the way out
+            // the same way the tip-4 path and ringSplat reset theirs — splat()
+            // already zeroes it on entry, so this is defence in depth.
+            if (velOnly) {
+                if (velMode === 'swirl') gl.uniform1f(splatProg.uniforms.ringRadius, 0);
+                return;
+            }
             // Write density at dye resolution (full radius for visual quality)
             gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
             gl.uniform1i(splatProg.uniforms.isVelocity, 0); // Density pass
@@ -268,12 +358,57 @@
             gl.uniform1f(splatProg.uniforms.ringRadius, 0); // belt-and-braces: no leak into classic splats
         }
         window.applyRingSplat = ringSplat;
+        // ─── Custom brush shapes on the raster/mask stamp ────────────
+        // The collider and raster brushes run rasterStampProg, which was a plain
+        // disc — so a custom shape was silently ignored the moment you pointed
+        // it at a wall or a paint layer, however clearly the swatch said otherwise.
+        // Shared by both stampers so they can never drift apart.
+        //
+        // Returns whether a stamp was bound, because the RADIUS differs: the disc
+        // path halves the footprint on purpose (its edge is tuned to sit where the
+        // fluid gaussian's visible core ends, so both read as the same Size), while
+        // a stamp has no such core and wants the full radius to land at the size it
+        // would have painted into the fluid.
+        //
+        // Built-in tips (chisel/streak/ring) are NOT ported here: those are analytic
+        // shapes living in splatFrag's clay-stamp block, and the raster brush stays
+        // round for them.
+        function bindRasterStamp() {
+            var stampTex = null;
+            // __plainMaskStamp: the mask EDITOR's own wall tool (15) shares this
+            // stamper but is a precision instrument with its own size and eraser —
+            // it must stay a disc. __remoteStroke keeps its existing meaning: a stamp
+            // bitmap is viewer-local and cannot ride the wire.
+            if (!window.__plainMaskStamp && !window.__remoteStroke
+                && window.BrushShapes && typeof window.BrushShapes.getActiveStamp === 'function') {
+                stampTex = window.BrushShapes.getActiveStamp(); // {texture, aspect} | null
+            }
+            gl.uniform1f(rasterStampProg.uniforms.stampTexOn, stampTex ? 1 : 0);
+            if (!stampTex) return false;
+            gl.uniform1i(rasterStampProg.uniforms.uStampTex, 1);
+            gl.uniform1f(rasterStampProg.uniforms.stampAspect, stampTex.aspect || 1);
+            gl.uniform1f(rasterStampProg.uniforms.stampAngle, (config.BRUSH_ANGLE || 0) * Math.PI / 180);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, stampTex.texture);
+            gl.activeTexture(gl.TEXTURE0);
+            return true;
+        }
+        // Same hold splat() applies: while a freshly imported shape is still
+        // uploading, drop the dab rather than print a disc. Into a COLLIDER that
+        // matters more than it does in dye — a wrong wall is one you have to
+        // notice and undo, not something the next stroke covers.
+        function rasterStampHeld() {
+            return !window.__plainMaskStamp && !window.__remoteStroke && window.BrushShapes
+                && typeof window.BrushShapes.stampPending === 'function'
+                && window.BrushShapes.stampPending();
+        }
         // ─── D2 sketch stamping (raster layer) ──────────────────────────
         // Normal-control drawing: premultiplied over-composite into the
         // persistent sketch FBO; eraser = destination-out with the same
         // stamp. No kaleido arms, no splat-in/out ramps — a plain
         // draughtsman's brush sharing the Size fader and picker color.
         function stampSketchDab(x, y, pressure) {
+            if (rasterStampHeld()) return;
             // D2: lazily create the default paint layer on first use (boot,
             // or after the user deleted every raster layer)
             if (!sketch && window.rasterLayers) window.rasterLayers.ensureDefault();
@@ -290,9 +425,12 @@
             gl.uniform2f(rasterStampProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
             // 0.5× the fluid footprint: the sketch disc edge sits where the
             // fluid gaussian's visible core ends, so both brushes read as
-            // the same Size fader setting.
+            // the same Size fader setting. A custom stamp takes the FULL
+            // radius instead (see bindRasterStamp).
+            var _sketchBaseR = config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1);
+            var _sketchShaped = bindRasterStamp();
             gl.uniform1f(rasterStampProg.uniforms.radius,
-                config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1) * 0.5);
+                _sketchShaped ? _sketchBaseR : _sketchBaseR * 0.5);
             gl.uniform1f(rasterStampProg.uniforms.aspectRatio, aspectRatio);
             const c = (window.pointer && window.pointer.color) ? window.pointer.color : [1, 1, 1];
             gl.uniform3f(rasterStampProg.uniforms.color, c[0], c[1], c[2]);
@@ -315,6 +453,7 @@
         // Mask object's buffer. Eraser carves coverage back out. Shares the
         // undo ring (entries tagged kind:'mask').
         function stampMaskDab(x, y, pressure) {
+            if (rasterStampHeld()) return;
             const M = window.Masks;
             if (!M) return;
             if (M.activeId() == null) M.ensureDefault();
@@ -329,8 +468,10 @@
             const flowMul = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
             rasterStampProg.bind();
             gl.uniform2f(rasterStampProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
+            var _maskBaseR = config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1);
+            var _maskShaped = bindRasterStamp();
             gl.uniform1f(rasterStampProg.uniforms.radius,
-                config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1) * 0.5);
+                _maskShaped ? _maskBaseR : _maskBaseR * 0.5);
             gl.uniform1f(rasterStampProg.uniforms.aspectRatio, aspectRatio);
             gl.uniform3f(rasterStampProg.uniforms.color, 1, 1, 1); // coverage is the alpha
             gl.uniform1f(rasterStampProg.uniforms.flow, flowMul);
