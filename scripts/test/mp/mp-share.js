@@ -4,8 +4,17 @@
 // member goes, and do Take Turns / forgery / stranger pairs behave?
 const WebSocket = require('ws');
 const HOST = process.env.MP_HOST || '127.0.0.1:1999';
-const ROOM = process.env.MP_ROOM || 'SHAREA';
+// ws:// for a local relay, wss:// for a deployed one — the rule the client uses.
+const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(HOST);
+const PROTO = LOCAL ? 'ws' : 'wss';
+const AB = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const rnd = () => Array.from({ length: 6 }, () => AB[Math.floor(Math.random() * AB.length)]).join('');
+// Against a LIVE relay take a random code, so the probe cannot land in a room
+// real people are using — and skip the pub- pair, because those ids are the
+// lobby's to mint and squatting one could put a probe in a stranger's path.
+const ROOM = process.env.MP_ROOM || (LOCAL ? 'SHAREA' : rnd());
 const PAIR = process.env.MP_PAIR || 'pub-SHRPR';
+const SKIP_PAIR = process.env.MP_SKIP_PAIR === '1' || !LOCAL;
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
 
@@ -16,7 +25,7 @@ function ok(label, cond, detail) {
 
 function connect(room, uid) {
   return new Promise((res) => {
-    const ws = new WebSocket(`ws://${HOST}/parties/fluid/${room}?uid=${uid}`);
+    const ws = new WebSocket(`${PROTO}://${HOST}/parties/fluid/${room}?uid=${uid}`);
     const c = { ws, uid, id: null, role: null, shares: null, looks: [], got: {} };
     ws.on('message', (b) => {
       const d = JSON.parse(b.toString());
@@ -139,6 +148,11 @@ const names = (cs, g) => g ? g.members.map(m => label(cs, m)).join('+') : '(none
   cs.forEach(c => { try { c.ws.close(); } catch {} });
 
   // ── Stranger pair: no host privilege anywhere in this feature ───────
+  if (SKIP_PAIR) {
+    console.log('\n(stranger pair skipped — pub- ids belong to the lobby)');
+    console.log(`\n${pass} passed, ${fail} failed`);
+    process.exit(fail ? 1 : 0);
+  }
   console.log('\n== a stranger pair (cap 2, no real host) ==');
   const ps = [await connect(PAIR, 'pr0'), await connect(PAIR, 'pr1')];
   await wait(300);
