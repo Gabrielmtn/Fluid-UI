@@ -129,7 +129,7 @@
         hsl[0] = (hsl[0] + gaussRandom() * strength * 0.3 + 1) % 1;
         hsl[1] = Math.max(0, Math.min(1, hsl[1] + gaussRandom() * strength * 0.3));
         hsl[2] = Math.max(0.05, Math.min(0.95, hsl[2] + gaussRandom() * strength * 0.2));
-        var rgb = hslToRgb(hsl[0], hsl[1], hsl[2]);
+        var rgb = hslFrac01ToRgb255(hsl[0], hsl[1], hsl[2]);
         return '#' + toHex(rgb[0]) + toHex(rgb[1]) + toHex(rgb[2]);
     }
 
@@ -150,7 +150,10 @@
         return [h, s, l];
     }
 
-    function hslToRgb(h, s, l) {
+    // h, s and l ALL as fractions (0-1) — the shape rgbToHsl above returns —
+    // and returns 0-255 floats. See the naming note in 05g-arm-colors: the
+    // other two hslToRgb functions here take degrees, and one takes percent.
+    function hslFrac01ToRgb255(h, s, l) {
         if (s === 0) { var v = l * 255; return [v, v, v]; }
         function hue2rgb(p, q, t) {
             if (t < 0) t += 1; if (t > 1) t -= 1;

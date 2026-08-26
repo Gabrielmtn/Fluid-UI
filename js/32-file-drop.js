@@ -13,6 +13,11 @@
 //   • Ctrl+Shift+V → hidden luminance-keyed collider (23-depth-collision's
 //                    createFromLayerMask; all use is at event time, so its
 //                    load order relative to this file doesn't matter)
+//   and, for callers that want the clipboard IMAGE rather than a layer of
+//   it (the Brush panel's clipboard tile, 20-mixer-layout):
+//   • window.readClipboardImage(cb) → cb({url, title}) or cb(null)
+//   • window.armClipboardShapePaste() → the next paste becomes a brush
+//                    shape instead of a layer (the no-permission route)
 // Also the document-level guard: without a cancelled dragover, a stray
 // drop NAVIGATES the window to the dropped file, replacing the app.
 // Internal layer-reorder drags (05k) carry no Files type and keep their
@@ -314,6 +319,17 @@
         if (isTyping(e.target)) return; // text fields keep their normal paste
         var repeat = repeatPaste; repeatPaste = false;
         if (repeat) return;
+        // Armed by the Brush panel's clipboard tile (see armClipboardShapePaste
+        // below — hoisted, so it reads as undefined until the user arms it).
+        // A brush shape, not a layer: this paste was asked for by a button.
+        if (shapeArmedUntil && Date.now() < shapeArmedUntil) {
+            shapeArmedUntil = 0;
+            var shapeFiles = clipboardImages(e.clipboardData);
+            if (!shapeFiles.length) { flash(NO_IMAGE); return; }
+            e.preventDefault();
+            shapeFromBlob(shapeFiles[0]);
+            return;
+        }
         var mode = 'layer';
         if (armedUntil && Date.now() < armedUntil) { mode = 'collider'; armedUntil = 0; }
         var files = clipboardImages(e.clipboardData);
@@ -380,6 +396,74 @@
                 title: file.slice(sep + 1, dot) || 'Pasted'
             };
         } catch (_) { return null; }
+    }
+
+    // ── Clipboard → whatever the caller wants ────────────────────────
+    // Same three routes as the chords above (Electron bitmap, Explorer file
+    // reference, async web API), but handing back the IMAGE rather than
+    // making a layer of it — the Brush panel's clipboard tile starts a brush
+    // shape with it. Reports failure as a plain cb(null) and leaves the
+    // recovery to the caller — see the paste handoff below, which is what a
+    // failed read actually means most of the time.
+    window.readClipboardImage = function (cb) {
+        var clip = electronClipboard();
+        if (clip) {
+            var url = null, title = 'Pasted';
+            try { var img = clip.readImage(); if (img && !img.isEmpty()) url = img.toDataURL(); } catch (_) {}
+            if (!url) {
+                var f = electronClipboardFile(clip); // Explorer file copy
+                if (f) { url = f.url; title = f.title; }
+            }
+            if (url) { cb({ url: url, title: title }); return; }
+            // Electron saw nothing — fall through rather than give up here.
+            // The web API is a genuinely different reader (different formats,
+            // different failure modes), and below it the paste handoff works
+            // when neither of them can read a thing.
+        }
+        if (!navigator.clipboard || !navigator.clipboard.read) { cb(null); return; }
+        navigator.clipboard.read().then(function (items) {
+            for (var i = 0; i < items.length; i++) {
+                var types = items[i].types || [];
+                for (var t = 0; t < types.length; t++) {
+                    if (!/^image\//i.test(types[t])) continue;
+                    return items[i].getType(types[t]).then(function (blob) {
+                        var reader = new FileReader();
+                        reader.onload = function (ev) { cb({ url: ev.target.result, title: 'Pasted' }); };
+                        reader.onerror = function () { cb(null); };
+                        reader.readAsDataURL(blob);
+                    });
+                }
+            }
+            cb(null);   // read worked, no image on the clipboard
+        }).catch(function () { cb(null); }); // blocked or declined
+    };
+
+    // The handoff that makes the clipboard tile work everywhere.
+    //
+    // Direct reads are the exception, not the rule: on the web
+    // navigator.clipboard.read() needs a permission Chrome may never have been
+    // asked for, isn't defined at all on a plain-http origin, and Firefox
+    // doesn't implement it. A paste EVENT carries the same image with no
+    // permission on every engine — the user's own keystroke is the grant.
+    // So when a read comes up empty, arm the next paste instead of declaring
+    // the clipboard empty, and say so in the passive indicator: a modal would
+    // be both the wrong tone and literally in the way of the keystroke it is
+    // asking for. Same shape as armColliderPaste above.
+    var shapeArmedUntil = 0;
+    var SHAPE_ARM_MS = 8000;
+
+    window.armClipboardShapePaste = function () {
+        shapeArmedUntil = Date.now() + SHAPE_ARM_MS;
+        armedUntil = 0;        // a shape arm supersedes a pending collider one
+        swallowPasteAt = 0;    // the paste we are now waiting for must land
+        flash('Press ' + pasteChord() + ' now to make a brush shape from your copied image', SHAPE_ARM_MS);
+    };
+
+    function shapeFromBlob(blob) {
+        if (!window.BrushShapes || typeof window.BrushShapes.beginImportDataUrl !== 'function') return;
+        var reader = new FileReader();
+        reader.onload = function (ev) { window.BrushShapes.beginImportDataUrl(ev.target.result, titleFor(blob)); };
+        reader.readAsDataURL(blob);
     }
 
     function clipboardFallback(mode) {

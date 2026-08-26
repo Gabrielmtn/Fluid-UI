@@ -12,9 +12,11 @@
 //
 //   await __test.freeze();      // capture the loop; time stops
 //   __test.seed(0xC0FFEE);      // pin Math.random
+//   __test.glErrorCheck(true);  // optional: watch gl.getError per frame
 //   __test.stroke(...);         // deposit deterministic input
 //   await __test.step(120);     // 120 frames of exactly 16.667ms each
 //   __test.hashState();         // FNV-1a over dye+velocity float bytes
+//   __test.glErrors(true);      // [{frame, where, name}] since enabling
 //   __test.thaw();              // restore real time
 //
 // Two runs of the same recipe are bit-identical (same technique that
@@ -122,11 +124,13 @@
             (function one() {
                 if (n-- <= 0) return resolve({ now: virtualNow });
                 virtualNow += FRAME_MS;
+                pumped++;
                 var batch = queue;
                 queue = [];
                 for (var i = 0; i < batch.length; i++) {
                     try { batch[i].cb(virtualNow); } catch (e) { errors.push('rAF cb: ' + e.message); }
                 }
+                if (glCheck) drainGlErrors('frame');
                 setTimeout(one, 0);
             })();
         });
@@ -168,6 +172,84 @@
     window.addEventListener('error', function (e) {
         errors.push('window.onerror: ' + e.message);
     });
+
+    // ── GL error sweep (opt-in, default OFF) ───────────────────────────
+    // Nothing in js/ or scripts/ has ever called gl.getError() — grepped
+    // the whole tree 2026-08-26, zero hits. Both GL bugs this project has
+    // actually hit raised INVALID_OPERATION into an empty room: 6fd1be4's
+    // plain-dye pass leaning on the previous program's uniform+unit-0
+    // bindings (it drew the VELOCITY field into dye for five months), and
+    // the sub-stepping texture feedback loop. Neither was visible to any
+    // instrument in here — a wrong-program draw still yields a hash, just
+    // the wrong one, and a hash suite reads that as "the sim changed".
+    //
+    // OFF by default because getError() is a SYNCHRONIZING call: it
+    // flushes the command queue and stalls the CPU on the GPU. That is
+    // precisely the property the sweep driver's per-level timing would
+    // lose, so it may not be on for everything. With the flag off the
+    // cost is one boolean test per pumped frame and nothing else.
+    //
+    // Per FRAME, not per checkpoint: WebGL keeps error FLAGS, not a
+    // history. Asked once at a checkpoint 20 frames after the fact, the
+    // answer is only "something, somewhere, since you last asked" — no
+    // frame, no pass. Per-frame gives the frame index, and localizing to
+    // a frame is the entire method that cracked every determinism bug in
+    // this suite (see GUIDANCE §2, the divergence probe). getError()
+    // returns ONE flag and clears it, so drain in a loop; the cap keeps a
+    // lost context — which returns CONTEXT_LOST_WEBGL forever — from
+    // spinning the pump.
+    var glCheck = false;
+    var glErrs = [];
+    var pumped = 0;              // virtual frames pumped since install
+    var GL_ERR_NAMES = null;     // built lazily: needs GL, costs nothing when off
+    // A bad bind is not a one-frame event — it re-raises the same flag on
+    // every frame after it, so an unbounded record is thousands of
+    // identical rows crossing CDP by value and landing in results/. The
+    // first ones carry the frame index that localizes the cause, which is
+    // the only part anybody reads; the rest are volume.
+    var GL_ERRS_MAX = 200;
+
+    function glErrName(code) {
+        if (!GL_ERR_NAMES) {
+            GL_ERR_NAMES = {};
+            ['INVALID_ENUM', 'INVALID_VALUE', 'INVALID_OPERATION', 'OUT_OF_MEMORY',
+             'INVALID_FRAMEBUFFER_OPERATION', 'CONTEXT_LOST_WEBGL'].forEach(function (n) {
+                if (GL[n] !== undefined) GL_ERR_NAMES[GL[n]] = n;
+            });
+        }
+        return GL_ERR_NAMES[code] || ('0x' + (code >>> 0).toString(16));
+    }
+
+    // `where` names the phase that raised it, because the answer to "is
+    // this the app or the harness" is not obvious: readFBO's own
+    // bindFramebuffer/readPixels are GL calls too, and a driver that
+    // dislikes FLOAT readback would otherwise pin its complaint on
+    // whatever frame ran next. Labelled, the two are told apart on sight.
+    function drainGlErrors(where) {
+        for (var i = 0; i < 8; i++) {
+            var code = GL.getError();
+            if (code === GL.NO_ERROR) return;
+            // Keep draining past the cap even though nothing is recorded:
+            // getError() is what CLEARS the flag, and leaving it set would
+            // hand the app's own future getError callers a stale error.
+            if (glErrs.length < GL_ERRS_MAX) {
+                glErrs.push({ frame: pumped, at: virtualNow, where: where, code: code, name: glErrName(code) });
+            } else if (glErrs.length === GL_ERRS_MAX) {
+                glErrs.push({ frame: pumped, at: virtualNow, where: where, code: 0,
+                    name: 'RECORDING CAPPED at ' + GL_ERRS_MAX + ' — GL is still erroring past this frame' });
+            }
+            if (code === GL.CONTEXT_LOST_WEBGL) return;
+        }
+    }
+
+    // Enabling drains first and DISCARDS: a flag set before anyone was
+    // watching belongs to no frame, and reporting it against the first
+    // checked frame would be a lie the driver cannot see through.
+    function glErrorCheck(on) {
+        if (on && !glCheck) { for (var i = 0; i < 8; i++) { if (GL.getError() === GL.NO_ERROR) break; } }
+        glCheck = !!on;
+        return { on: glCheck, atFrame: pumped };
+    }
 
     // ── Readback, stats, hashes ────────────────────────────────────────
     function readFBO(target, w, h) {
@@ -229,6 +311,9 @@
             out.vel.res = sw + 'x' + sh;
         }
         if (opts.display) out.display = displaySnapshot();
+        // Drained separately from the frame sweep so readback's own GL
+        // calls are attributed to readback, not to the next frame.
+        if (glCheck) drainGlErrors('snapshot');
         return out;
     }
 
@@ -420,7 +505,14 @@
             if (reset) errors.length = 0;
             return e;
         },
+        glErrorCheck: glErrorCheck,
+        glErrors: function (reset) {
+            var e = glErrs.slice();
+            if (reset) glErrs.length = 0;
+            return e;
+        },
         frozen: function () { return frozen; },
+        frames: function () { return pumped; },
     };
 
     return Promise.resolve({

@@ -208,6 +208,13 @@
         function pushStrokeEvent(x, y, dx, dy, color) {
             if (isReplayActive) return; // Don't record during replay
             const t = Date.now() - strokeStartTime;
+            // Per-arm Pressure, captured with the dab for the same reason the
+            // whole-brush flag is: which arms deposited pigment is a property of
+            // the stroke that was painted. Read through the pin so a replay that
+            // is itself being re-recorded stays faithful.
+            const _apMask = (typeof window.__armPushPin === 'number')
+                ? window.__armPushPin
+                : ((typeof window.armPushMask === 'function') ? window.armPushMask() : 0);
             // Store the EFFECTIVE painted size (splat-in ramp / pressure), not the
             // base — so stroke replay (local AND multiplayer 2.1) reproduces the
             // actual brush size. The paint path publishes it to __lastPaintRadius.
@@ -233,7 +240,13 @@
                 push: config.BRUSH_VELOCITY_ONLY ? {
                     m: config.BRUSH_VEL_MODE || 'smudge',
                     s: (typeof config.BRUSH_VEL_STRENGTH === 'number') ? config.BRUSH_VEL_STRENGTH : 1
-                } : null
+                } : null,
+                // Which ARMS pushed (bitmask, 05g currentArmPushMask). Separate
+                // from `push` because the two are independent: a painting brush
+                // can have push arms, and a Pressure brush pushes on every arm
+                // whatever this says. Omitted entirely at 0 — the common case —
+                // so an ordinary dab is the same size on the wire as before.
+                ap: _apMask || undefined
             });
         }
         function deepCopyEvent(ev) {
@@ -243,7 +256,8 @@
             // that would draw a line the painter never made.
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(),
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
-                     push: ev.push ? { m: ev.push.m, s: ev.push.s } : null };
+                     push: ev.push ? { m: ev.push.m, s: ev.push.s } : null,
+                     ap: ev.ap };
         }
         // Time replay: the last N SECONDS OF WALL CLOCK, exactly as they happened.
         //
@@ -475,6 +489,13 @@
             var savedVelOnly = config.BRUSH_VELOCITY_ONLY;
             var savedVelMode = config.BRUSH_VEL_MODE;
             var savedVelStr = config.BRUSH_VEL_STRENGTH;
+            // Per-arm Pressure rides the same pin, and unconditionally for the
+            // same reason: without it, a stroke painted with plain arms replays
+            // with holes wherever the panel happens to have an arm marked now
+            // (and a stroke that DID have push arms replays as solid dye).
+            var savedArmPush = window.__armPushPin;
+            window.__armPushPin = (typeof ev.ap === 'number' && isFinite(ev.ap))
+                ? (ev.ap | 0) : 0;
             // Replayed events are not always ours: a peer's broadcast replay
             // arrives here as raw wire JSON (06 scheduleStrokeReplay). Coerce
             // against the known set before it touches config — splat() would
@@ -509,6 +530,14 @@
                 } else {
                     multiSplat(x, y, dx, dy, col, false);
                 }
+                // Re-recording a replay captures what the REPLAY painted, so
+                // this has to run while the pin is still on. Outside the
+                // finally it read the live brush instead — a Pressure dab was
+                // re-recorded as ordinary dye (and the tip likewise), which is
+                // the very gap the pin exists to close.
+                if (typeof recRecordInteraction === 'function' && recEnabled) {
+                    try { recRecordInteraction(x, y, dx, dy, col); } catch(_){}
+                }
             } finally {
                 window.__remoteStroke = false;
                 window.__splatFlow = 1;   // applyPaintFlow may have set it
@@ -517,9 +546,7 @@
                 config.BRUSH_VELOCITY_ONLY = savedVelOnly;
                 config.BRUSH_VEL_MODE = savedVelMode;
                 config.BRUSH_VEL_STRENGTH = savedVelStr;
-            }
-            if (typeof recRecordInteraction === 'function' && recEnabled) {
-                try { recRecordInteraction(x, y, dx, dy, col); } catch(_){}
+                window.__armPushPin = savedArmPush;
             }
         }
         // ── Replay interpolation (2026-08-22) ────────────────────────────────
@@ -645,7 +672,17 @@
                 shape: (typeof ev.shape === 'string' && ev.shape) ? ev.shape : null,
                 // Stroke boundary (see deepCopyEvent). Absent from older peers,
                 // where the pause/distance guards do the same job less exactly.
-                head: !!ev.head
+                head: !!ev.head,
+                // Push. Dropping these here is what made a broadcast replay of
+                // a Pressure stroke repaint as DYE on every peer: 06 has been
+                // sending `push` on the wire, and this mapper — which rebuilds
+                // each event field by field — silently discarded it, so
+                // emitReplayDab saw an ordinary dab. `ap` is the per-arm mask.
+                // Shape-checked only; emitReplayDab does the value coercion,
+                // and does it for local events too.
+                push: (ev.push && typeof ev.push === 'object')
+                    ? { m: ev.push.m, s: ev.push.s } : null,
+                ap: (typeof ev.ap === 'number' && isFinite(ev.ap)) ? (Math.abs(ev.ap) | 0) : undefined
             }));
             if (!remoteEvents.length) return;
             window._activeReplayEvents = remoteEvents;
@@ -670,6 +707,20 @@
         // multiplied around the canvas and screams. Touch keeps its own touch*
         // path below (multi-finger gestures need raw TouchList data), so it's
         // filtered out of these pointer handlers.
+        // ── One device owns a stroke ──────────────────────────────────
+        // A pen and a mouse are two INDEPENDENT pointers and Windows keeps both
+        // alive at once: a pen in proximity streams hover moves while the mouse
+        // sits (or paints) somewhere else, and moving the pen also warps the
+        // system cursor. These handlers used to take EVERY non-touch pointer, so
+        // pointer.x/y jumped between the two devices' positions on alternating
+        // events — the stroke, and every kaleidoscope mirror arm of it, zipped
+        // back and forth across the canvas at enormous velocity — and a lift on
+        // the IDLE device ended the stroke the other one was drawing. So: the
+        // first pointer to press owns the stroke (window.__paintPointerId) and
+        // every other pointer is ignored until it ends. The right-button replay
+        // hold gets the same treatment (replayPointerId): a second device's
+        // buttonless hover moves used to trip its self-heal and cancel it.
+        let replayPointerId = null;
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'touch') return; // touchstart owns touch
             // Take-turns multiplayer: while it's someone else's turn, both
@@ -685,6 +736,7 @@
             if (e.button === 2) {
                 e.preventDefault();
                 isRightMouseDown = true;
+                replayPointerId = e.pointerId;
                 // Capture, like the paint path does: without it a release that
                 // happens off-window is never delivered here and the hold
                 // strands. (The paint branch below captures; this one never did.)
@@ -715,6 +767,13 @@
             if (e.button !== 0) return;
             // Only process presses that actually target the canvas (not click-throughs from UI)
             if (isPaused || e.target !== canvas) return;
+            // Another device is already mid-stroke (pen down, mouse clicks — or
+            // the reverse): leave it alone. Adopting the press would re-point
+            // __paintPointerId, restart the brush engine under the first stroke
+            // and strand its tail. Gated on pointer.down as well as the id so a
+            // stale id can never permanently lock painting out.
+            if (pointer.down && window.__paintPointerId != null
+                && window.__paintPointerId !== e.pointerId) return;
             // Capture the pointer so the stroke keeps getting move/up/cancel even
             // if the pen drifts off-canvas or over an overlay, AND so pointerup /
             // pointercancel are guaranteed to reach us and end the stroke cleanly.
@@ -792,11 +851,21 @@
             // dead until the app restarts. A genuine mouse right-hold and a
             // barrel-held hover both still report bit 2, so a deliberate replay
             // hold is untouched.
-            if (isRightMouseDown && (e.buttons & 2) === 0) {
+            if (isRightMouseDown && (e.buttons & 2) === 0
+                && (replayPointerId == null || e.pointerId === replayPointerId)) {
                 isRightMouseDown = false;
+                replayPointerId = null;
                 isReplayActive = false;
                 window._activeReplayEvents = null;
             }
+            // Only the pointer that owns the live stroke may move it (see the
+            // note above pointerdown). Everything else — a hovering pen, a
+            // nudged mouse — is dropped here, before it can touch pointer.x/y
+            // or feed the brush engine a dab at the other device's position.
+            // Placed AFTER the self-heal above so a replay hold latched by the
+            // idle device can still release itself.
+            if (pointer.down && window.__paintPointerId != null
+                && e.pointerId !== window.__paintPointerId) return;
             if (isPaused || isReplayActive) return;
             // Engine feed: replay every coalesced sub-frame sample (position)
             // while a stroke is live. Density is governed by BRUSH_SPACING.
@@ -892,7 +961,13 @@
         // 'mouseup' path kept missing for pens.
         window.addEventListener('pointerup', (e) => {
             if (e.pointerType === 'touch') return; // touchend owns touch
-            if (window.__paintPointerId != null) {
+            // A lift on a device that ISN'T the one painting must not end the
+            // stroke or drop its capture (see the note above pointerdown). Null
+            // means unowned — touch strokes, or a press that began off-canvas —
+            // and keeps the old catch-all behaviour as a safety net.
+            const _ownsPaint = (window.__paintPointerId == null
+                || window.__paintPointerId === e.pointerId);
+            if (window.__paintPointerId === e.pointerId) {
                 try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
                 window.__paintPointerId = null;
             }
@@ -905,10 +980,15 @@
             // dye where you were painting and gates all further painting down to
             // press dots: "the stylus stopped working". It also rebroadcast every
             // pass, so one stuck client locked painting for the whole room.
-            if (isRightMouseDown && (e.buttons & 2) === 0 && e.button !== 2) {
+            if (isRightMouseDown && (e.buttons & 2) === 0 && e.button !== 2
+                && (replayPointerId == null || e.pointerId === replayPointerId)) {
                 isRightMouseDown = false;
+                replayPointerId = null;
             }
             if (e.button === 2) {
+                // A barrel/right release from the other device isn't ours.
+                if (replayPointerId != null && e.pointerId !== replayPointerId) return;
+                replayPointerId = null;
                 isRightMouseDown = false;
                 isReplayActive = false;
                 window._activeReplayEvents = null;
@@ -944,7 +1024,7 @@
                     window._pausedPointerState = null;
                 }
             } else if (e.button === 0) {
-                finishLeftStroke();
+                if (_ownsPaint) finishLeftStroke();
             }
         });
         canvas.addEventListener('contextmenu', (e) => {
@@ -959,6 +1039,7 @@
         // stick. This is a HARD abort (no catch-up tail) — the user has left.
         function abortPointerStroke() {
             isRightMouseDown = false;
+            replayPointerId = null;
             isReplayActive = false;
             window._activeReplayEvents = null;
             window._pausedPointerState = null;
@@ -981,14 +1062,23 @@
         // path (touchcancel → abortPointerStroke).
         window.addEventListener('pointercancel', (e) => {
             if (e && e.pointerType === 'touch') return; // touchcancel owns touch
+            const _pid = e ? e.pointerId : null;
+            // A cancel on the idle device — a pen leaving proximity while the
+            // mouse paints — clears only ITS OWN replay hold; it must never
+            // finalize the other device's stroke.
+            if (replayPointerId == null || _pid == null || replayPointerId === _pid) {
+                isRightMouseDown = false;
+                replayPointerId = null;
+                isReplayActive = false;
+                window._activeReplayEvents = null;
+                window._pausedPointerState = null;
+            }
+            if (window.__paintPointerId != null && _pid != null
+                && window.__paintPointerId !== _pid) return;
             if (window.__paintPointerId != null) {
-                try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+                try { canvas.releasePointerCapture(_pid); } catch (_) {}
                 window.__paintPointerId = null;
             }
-            isRightMouseDown = false;
-            isReplayActive = false;
-            window._activeReplayEvents = null;
-            window._pausedPointerState = null;
             finishLeftStroke();
         });
         // ── Mobile gesture layer (13.1-13.3) ─────────────────────────

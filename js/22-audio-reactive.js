@@ -355,9 +355,17 @@
         });
     }
 
+    // Anything that has to re-read the source (the mixer transport row, the
+    // timing chart) subscribes here. __onAudioSourceChanged stays as the
+    // single legacy slot the mixer already owns; sourceListeners is the
+    // many-subscriber path added alongside it.
+    var sourceListeners = [];
     function notifySourceChanged() {
         if (typeof window.__onAudioSourceChanged === 'function') {
             try { window.__onAudioSourceChanged(srcKind); } catch (_) {}
+        }
+        for (var i = 0; i < sourceListeners.length; i++) {
+            try { sourceListeners[i](srcKind); } catch (_) {}
         }
     }
     function stopFileSource() {
@@ -513,9 +521,7 @@
         // NOT monitored: a mic echoed to the speakers is a feedback loop, and
         // system audio is already coming out of them.
         routeSource(sourceNode, false);
-        if (typeof window.__onAudioSourceChanged === 'function') {
-            try { window.__onAudioSourceChanged(srcKind); } catch (_) {}
-        }
+        notifySourceChanged();
 
         // Handle stream ending unexpectedly (user revokes permission, etc.)
         s.addEventListener('inactive', function () {
@@ -1130,6 +1136,11 @@
         setLoop: setFileLoop,
         isLooping: function () { return fileLoop; },
         fileName: function () { return fileName; },
+        // The decoded track itself. The timing chart analyses it offline to
+        // know what is COMING — something no live analyser can tell you.
+        // Files only: there is no future to read off a microphone.
+        getFileBuffer: function () { return (srcKind === 'file') ? fileBuffer : null; },
+        onSourceChange: function (fn) { if (typeof fn === 'function') sourceListeners.push(fn); },
         // Playhead + duration (files only) — for the transport UI.
         position: function () {
             if (!audioCtx || !fileBuffer) return null;

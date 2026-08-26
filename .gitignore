@@ -16,6 +16,12 @@ dist/
 # Backup files
 *.backup
 
+# Test-run output. Every regression/sweep invocation drops a timestamped JSON
+# here; they are machine-local measurements (hashes depend on the GPU — see the
+# ANGLE fp16 note in the debug playbook), so they are evidence for the run that
+# produced them, not shared state. scripts/test/goldens/ IS tracked.
+scripts/test/results/
+
 # OS files
 .DS_Store
 Thumbs.db

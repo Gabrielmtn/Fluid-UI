@@ -351,6 +351,37 @@ var MP_PERF_LOCAL_KEYS = [
     'recMode', 'recPlaybackSpeed', 'statsToggle', 'autoloadSettings',
     'brushEraser', 'sketchVisible'
 ];
+// Per-arm Pressure (armColors[].push) falls under the SAME rule, and arrived
+// after that list was written. The colours an arm paints are look; whether an
+// arm deposits pigment at all is workflow — and it is the most damaging kind
+// to inherit, because applyPresetSnapshot PERSISTS the arms it applies
+// (12-save-load, brush.armColors). One mirrored snapshot from a painter with
+// a push arm therefore rewrote the watcher's own saved arms, and every launch
+// afterwards restored a brush that laid no dye with the Pressure button
+// showing OFF — "it loaded into Pressure and I never turned it on".
+// Stripped on SEND for parity with the keys above, and overwritten with the
+// viewer's own flags on RECEIVE, which is the boundary that actually holds
+// (snapshots come from untrusted peers on any build).
+function stripArmPush(arms) {
+    if (!Array.isArray(arms)) return arms || null;
+    return arms.map(function (a) {
+        if (!a || typeof a !== 'object') return a;
+        return { mode: a.mode, color: a.color, stepIndex: a.stepIndex || 0 };
+    });
+}
+// Replace an incoming snapshot's push flags with THIS client's, so applying it
+// leaves the local per-arm Pressure state exactly as it was. Deleting the key
+// would not do: applyPresetSnapshot reads absent as false and would clear a
+// push arm the viewer set themselves.
+function keepLocalArmPush(arms) {
+    if (!Array.isArray(arms)) return arms;
+    var mine = window.multiArmColors || [];
+    arms.forEach(function (a, i) {
+        if (!a || typeof a !== 'object') return;
+        if (mine[i] && mine[i].push) a.push = true; else delete a.push;
+    });
+    return arms;
+}
 
 // A freehand light-shift path stores one full-precision point per ~2px of
 // drag — ~117 bytes each, so a normal path is ~12KB on its own and pushed the
@@ -441,7 +472,7 @@ function captureLookSnapshot() {
             frozen: !!window.__fluidFrozen
         },
         ssOrigin: full.ssOrigin || null,
-        armColors: full.armColors || null
+        armColors: stripArmPush(full.armColors)
     };
     Object.keys(full.sliders || {}).forEach(function (k) {
         if (MP_PERF_LOCAL_KEYS.indexOf(k) === -1) snap.sliders[k] = full.sliders[k];
@@ -619,6 +650,7 @@ function sanitizeLockSnapshot(snapshot) {
         var v = cleanLockValue(snapshot[k], 0);
         if (v !== undefined) out[k] = v;
     });
+    if (out.armColors) keepLocalArmPush(out.armColors);
     // Relay caps messages at 16KB — shed the bulkiest optional sections
     // rather than letting the whole snapshot fail to arrive.
     try {
@@ -1842,7 +1874,15 @@ function onMultiplayerMessage(event) {
                 break;
 
             case 'host-changed':
-                myRole = (data.hostId === DEVICE_UID) ? 'host' : 'guest';
+                // hostId is a CONNECTION id now, not a uid — see the relay note
+                // in party/index.ts. It used to be the uid, which meant every
+                // host handover broadcast the promoted member's re-admission
+                // key (and, while they hold the role, the credential the relay
+                // grants host on) to the whole room. DEVICE_UID stays accepted
+                // as a fallback purely so a client that lands on a relay from
+                // before that change still learns it was promoted; it grants
+                // nothing on its own, since the relay decides the real role.
+                myRole = (data.hostId === clientId || data.hostId === DEVICE_UID) ? 'host' : 'guest';
                 // Promotion to host frees this client from any settings lock —
                 // but NOT from the turn gates (a promoted watcher still waits
                 // for the brush), so re-derive those after the reset.
@@ -1851,9 +1891,11 @@ function onMultiplayerMessage(event) {
                 break;
 
             case 'splat':
-                // Receive splat from another client
+                // Receive splat from another client. Queued, not applied here —
+                // 05j drains it under the frame's dab budget (see the inbound
+                // budget note above enqueueRemoteSplat).
                 if (data.clientId !== clientId) {
-                    handleRemoteSplat(data);
+                    enqueueRemoteSplat(data);
                 }
                 break;
 
@@ -1913,6 +1955,7 @@ function onMultiplayerMessage(event) {
                 // re-broadcasts and the wipe ping-pongs between clients forever
                 // (same class of bug as the preset loop below).
                 if (data.clientId !== clientId && typeof clearCanvas === 'function') {
+                    window.__mpFlushInbound(); // queued dabs predate the wipe
                     isProcessingRemoteEvent = true;
                     window.__mpApplyingRemote = true;
                     try { clearCanvas(); }
@@ -2163,6 +2206,13 @@ function brushWireFields() {
         f.push = cfg.BRUSH_VEL_MODE || 'smudge';
         f.pushS = +(+((typeof cfg.BRUSH_VEL_STRENGTH === 'number') ? cfg.BRUSH_VEL_STRENGTH : 1)).toFixed(2);
     }
+    // Per-arm Pressure (bitmask, 05g): WHICH arms push is the painter's, not
+    // the viewer's. Arm colours are deliberately resolved locally, but this is
+    // not styling — it decides whether an arm deposits pigment at all, so
+    // leaving it local meant a peer's plain stroke came out with holes wherever
+    // this client had an arm marked. Omitted at 0, like `push`.
+    var _ap = (typeof window.armPushMask === 'function') ? window.armPushMask() : 0;
+    if (_ap) f.ap = _ap;
     const rev = publishActiveShape();
     if (rev) { f.shape = cfg.BRUSH_SHAPE_ID; f.rev = rev; }
     return f;
@@ -2343,6 +2393,12 @@ function publishCollider(layerIndex) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
     if (isProcessingRemoteEvent) return;               // never echo a peer's wall back
     if (isPeerCollider(layerIndex)) return;            // ...including later edits to it
+    // Watchers do not reshape the painter's fluid. The relay drops these while
+    // turns run (TURN_HOLDER_ONLY), and stopping here as well is what keeps the
+    // room's canvases agreeing: a send the relay silently discards would leave
+    // this client with a wall nobody else has, and there is no resync path to
+    // reconcile that afterwards.
+    if (window.__mpTurnBlocked) return;
     const meta = serializeCollider(layerIndex);
     if (!meta) return;
     const rev = colliderRev(meta);
@@ -2365,6 +2421,7 @@ function broadcastColliderRemove(layerIndex) {
     _colliderPublished.delete(layerIndex);
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
     if (isProcessingRemoteEvent || isPeerCollider(layerIndex)) return;
+    if (window.__mpTurnBlocked) return; // same rotation gate as publishCollider
     partySocket.send(JSON.stringify({
         type: 'collider-remove', data: { lid: layerIndex }, timestamp: Date.now()
     }));
@@ -2668,14 +2725,153 @@ function broadcastPreset(presetName) {
     }));
 }
 
+// ── Inbound paint budget ─────────────────────────────────────────────────
+// Peer dabs used to be applied synchronously inside the WebSocket message
+// handler, which made received paint the one unbudgeted GPU load in the app.
+// Measured with 8 clients painting flat out (MP-AUDIT-2026-08-23 §1.1): about
+// 19,200 peer dabs/sec arriving at each client, each costing the SENDER's arm
+// multiplier in splat passes — roughly 150k draw calls/sec on top of the local
+// sim, with no cap, no coalescing to the frame, and no drop policy. The local
+// brush has been frame-budgeted this whole time (BRUSH_DAB_BUDGET, drained at
+// 05j:253); this is the other half of that rule.
+//
+// Messages now queue here and drain from the frame loop under a budget of the
+// same size, so the room's entire inbound paint costs at most what one local
+// brush does, no matter how many peers are painting.
+//
+// Whole MESSAGES are the drain unit, not individual dabs: handleRemoteSplat
+// pins the sender's brush config (shape, tip, push mode, symmetry) around its
+// dab train and restores it afterwards, so splitting one train across frames
+// would mean either re-pinning per dab or leaking a peer's footprint into the
+// next message. A message is at most DAB_MAX_PER_MSG dabs, so the overshoot
+// past the budget is bounded and small.
+//
+// Kill switch: config.MP_INBOUND_QUEUE = false restores apply-on-arrival.
+var _inboundSplats = [];
+var _inboundQueuedDabs = 0;
+var _inboundDropped = 0;
+// Cap in QUEUED DABS rather than messages, since a message is 1 to 96 of them.
+// 2000 is half a second of the drain budget: long enough to ride out a burst
+// or a slow frame, short enough that a client which simply cannot keep up
+// stays close to live instead of playing back an ever-lengthening tape.
+var INBOUND_QUEUE_MAX_DABS = 2000;
+
+function inboundDabCount(data) {
+    var d = data && data.data;
+    if (!d) return 1;
+    return (Array.isArray(d.dabs) && d.dabs.length) ? Math.min(d.dabs.length, DAB_MAX_PER_MSG) : 1;
+}
+
+function enqueueRemoteSplat(data) {
+    if (window.config && window.config.MP_INBOUND_QUEUE === false) { handleRemoteSplat(data); return; }
+    _inboundSplats.push(data);
+    _inboundQueuedDabs += inboundDabCount(data);
+    // Overflow drops from the FRONT. Dropping paint diverges this canvas from
+    // the sender's permanently (there is no resync path), so it is a genuine
+    // loss either way — but dropping the OLDEST keeps the visible stroke head
+    // moving with the peer's cursor, where dropping the newest would show a
+    // stroke lagging further behind reality the longer the overload lasts.
+    while (_inboundQueuedDabs > INBOUND_QUEUE_MAX_DABS && _inboundSplats.length > 1) {
+        _inboundQueuedDabs -= inboundDabCount(_inboundSplats.shift());
+        _inboundDropped++;
+    }
+}
+
+// Drained once per frame from 05j. Always retires at least one message so a
+// train larger than the budget can never wedge the queue.
+window.__mpDrainInbound = function (budget) {
+    if (!_inboundSplats.length) return;
+    var spent = 0;
+    while (_inboundSplats.length && spent < budget) {
+        var msg = _inboundSplats.shift();
+        _inboundQueuedDabs -= inboundDabCount(msg);
+        spent += inboundDabCount(msg);
+        handleRemoteSplat(msg);
+    }
+    if (_inboundQueuedDabs < 0) _inboundQueuedDabs = 0;
+    if (_inboundDropped && !window.__mpDropWarned) {
+        console.warn('[Multiplayer] Inbound paint over budget — dropped ' + _inboundDropped
+            + ' message(s) to stay live. config.MP_INBOUND_QUEUE = false disables queueing.');
+        window.__mpDropWarned = true;
+        setTimeout(function () { window.__mpDropWarned = false; }, 10000);
+    }
+};
+
+// A clear wipes everything queued paint would have landed on, so pending dabs
+// that arrived BEFORE it are discarded rather than painted onto the fresh
+// canvas. This is exactly what the old apply-on-arrival path did implicitly:
+// those dabs were drawn and then erased a moment later. Net result identical,
+// minus the work.
+window.__mpFlushInbound = function () {
+    _inboundSplats.length = 0;
+    _inboundQueuedDabs = 0;
+};
+
+// Harness hook (same convention as __getObstacle / __reinitFramebuffers in
+// 05c): feed a peer paint message in without a socket, and read what the queue
+// is holding. No automated test has ever executed this file's message handling
+// — the mp/ probes re-speak the protocol in Node and never load the client —
+// so peer-render regressions have been structurally invisible. This is the
+// smallest opening that lets a test drive the real receive path.
+window.__mpInboundProbe = {
+    push: function (msg) { enqueueRemoteSplat(msg); },
+    depth: function () { return { messages: _inboundSplats.length, dabs: _inboundQueuedDabs, dropped: _inboundDropped }; },
+    reset: function () { window.__mpFlushInbound(); _inboundDropped = 0; }
+};
+
+// Peer paint numerics are UNTRUSTED. The relay enforces a 16KB size cap and
+// nothing else, so every field below is whatever a modified, buggy, or hostile
+// client put on the wire — and this runs synchronously inside the socket
+// message handler, so a bad value stalls the receiving tab rather than just
+// painting something wrong. Sanitize at the boundary, once, instead of hoping
+// each downstream consumer range-checks (05g's applyMultiSplatWith only floors
+// mult at 1; symmetryTransforms only lower-bounds the arm count).
+function sanitizeRemoteNum(v, dflt) {
+    return (typeof v === 'number' && isFinite(v)) ? v : dflt;
+}
 function handleRemoteSplat(data) {
     if (typeof splat === 'function') {
-        const { x, y, dx, dy, color, mult, radius } = data.data;
+        // A message with no payload at all is not a crash: destructuring
+        // data.data used to throw straight out of the socket handler, taking
+        // the rest of that message's processing with it.
+        const _raw = (data && data.data) || {};
+        // splat() hands this straight to gl.uniform3fv, which throws on a
+        // wrong-length array and would abort the whole message handler — so a
+        // peer's colour is coerced to exactly three finite channels, not merely
+        // defaulted when absent.
+        const color = (Array.isArray(_raw.color) && _raw.color.length >= 3)
+            ? [sanitizeRemoteNum(_raw.color[0], 1), sanitizeRemoteNum(_raw.color[1], 0), sanitizeRemoteNum(_raw.color[2], 0)]
+            : [1, 0, 0];
+        // Arm count: the loop bound. A forged mult of 1e6 is one message that
+        // hangs every other canvas in the room. Bounded to the Multi-Brush
+        // slider's own range (index.html #multiplier, min 1 max 8) — a peer on
+        // a future build with more arms then paints with fewer arms here, which
+        // is a wrong picture rather than a dead tab.
+        const mult = Math.max(1, Math.min(8, Math.round(sanitizeRemoteNum(_raw.mult, 1))));
+        // Radius rides the same hard bounds the local brush slider clamps to,
+        // so a peer can never splat a dab larger than this build can produce.
+        // undefined is meaningful downstream (fall back to local SPLAT_RADIUS),
+        // so only a PRESENT-but-bad value is corrected.
+        const _rb = (window.ParamRegistry && window.ParamRegistry.CONFIG_BOUNDS
+                     && window.ParamRegistry.CONFIG_BOUNDS.SPLAT_RADIUS) || { min: 0.001, max: 0.1 };
+        const radius = (typeof _raw.radius === 'number' && isFinite(_raw.radius))
+            ? Math.max(_rb.min, Math.min(_rb.max, _raw.radius))
+            : undefined;
+        // Positions are normalized 0..1; velocities are normalized deltas. A dab
+        // off-canvas is harmless (the scissor rect just clips it away), but a
+        // non-finite one poisons the velocity field with NaN for the rest of the
+        // session, and an enormous delta blows it into fp16 static. Clamp
+        // position generously and velocity to one canvas per message — no real
+        // stroke moves further than that between two 33ms broadcasts.
+        const x = Math.max(-1, Math.min(2, sanitizeRemoteNum(_raw.x, 0.5)));
+        const y = Math.max(-1, Math.min(2, sanitizeRemoteNum(_raw.y, 0.5)));
+        const dx = Math.max(-1, Math.min(1, sanitizeRemoteNum(_raw.dx, 0)));
+        const dy = Math.max(-1, Math.min(1, sanitizeRemoteNum(_raw.dy, 0)));
         const canvasX = x * canvas.width;
         const canvasY = y * canvas.height;
         const canvasDx = dx * canvas.width;
         const canvasDy = dy * canvas.height;
-        const normalizedRadius = (typeof radius === 'number' ? radius : undefined);
+        const normalizedRadius = radius;
 
         if (!handleRemoteSplat._logged) {
             console.log('[Multiplayer] Remote splat settings:', { mult, radius, normalizedRadius, localMult: window.animationMultiplier, localRadius: window.config?.SPLAT_RADIUS });
@@ -2721,7 +2917,13 @@ function handleRemoteSplat(data) {
             _pinPush = true;
             _pushPrev = [window.config.BRUSH_VELOCITY_ONLY,
                          window.config.BRUSH_VEL_MODE,
-                         window.config.BRUSH_VEL_STRENGTH];
+                         window.config.BRUSH_VEL_STRENGTH,
+                         window.__armPushPin];
+            // Same unconditional rule for the per-arm mask, and range-checked:
+            // an arm index past the painter's count is harmless (no transform
+            // carries it), but a non-integer would poison the bit test.
+            window.__armPushPin = (typeof _rd.ap === 'number' && isFinite(_rd.ap))
+                ? (Math.abs(_rd.ap) | 0) : 0;
             window.config.BRUSH_VELOCITY_ONLY = (typeof _rd.push === 'string');
             if (typeof _rd.push === 'string') {
                 // Coerced against the known set — the mode is a raw peer string,
@@ -2769,21 +2971,40 @@ function handleRemoteSplat(data) {
             // with ITS OWN full velocity, verbatim — no gap-fill invention and
             // no dividing one message's momentum across guessed positions. This
             // is what makes the peer's curl match the painter's.
-            const dabs = data.data.dabs;
+            const dabs = _raw.dabs;
             if (Array.isArray(dabs) && dabs.length) {
-                for (let i = 0; i < dabs.length; i++) {
+                // Each dab carries its own [x, y, dx, dy, r], so the top-level
+                // sanitize above does NOT cover this path — clamp per dab, on
+                // the same bounds and for the same reasons. The train length is
+                // capped too: the sender never packs more than DAB_MAX_PER_MSG
+                // (96), and while the relay's 16KB limit already bounds a
+                // forged train to roughly a few hundred, the loop below is
+                // mult GL passes per entry and has no business trusting that
+                // arithmetic to stay true.
+                const _n = Math.min(dabs.length, DAB_MAX_PER_MSG);
+                for (let i = 0; i < _n; i++) {
                     const d = dabs[i];
-                    const px = d[0] * canvas.width;
-                    const py = d[1] * canvas.height;
-                    const r = (typeof d[4] === 'number' && d[4] > 0) ? d[4] : normalizedRadius;
+                    if (!Array.isArray(d)) continue;
+                    const px = Math.max(-1, Math.min(2, sanitizeRemoteNum(d[0], 0.5))) * canvas.width;
+                    const py = Math.max(-1, Math.min(2, sanitizeRemoteNum(d[1], 0.5))) * canvas.height;
+                    const ddx = Math.max(-1, Math.min(1, sanitizeRemoteNum(d[2], 0)));
+                    const ddy = Math.max(-1, Math.min(1, sanitizeRemoteNum(d[3], 0)));
+                    const r = (typeof d[4] === 'number' && isFinite(d[4]) && d[4] > 0)
+                        ? Math.max(_rb.min, Math.min(_rb.max, d[4]))
+                        : normalizedRadius;
                     if (typeof window.applyMultiSplatWith === 'function') {
-                        window.applyMultiSplatWith(px, py, d[2], d[3], color || [1, 0, 0], mult || 1, r);
+                        window.applyMultiSplatWith(px, py, ddx, ddy, color, mult, r);
                     } else {
-                        splat(px, py, d[2], d[3], color || [1, 0, 0]);
+                        splat(px, py, ddx, ddy, color);
                     }
                 }
-                const lastD = dabs[dabs.length - 1];
-                remoteLastPositions.set(data.clientId, { x: lastD[0] * canvas.width, y: lastD[1] * canvas.height });
+                const lastD = dabs[_n - 1];
+                if (Array.isArray(lastD)) {
+                    remoteLastPositions.set(data.clientId, {
+                        x: Math.max(-1, Math.min(2, sanitizeRemoteNum(lastD[0], 0.5))) * canvas.width,
+                        y: Math.max(-1, Math.min(2, sanitizeRemoteNum(lastD[1], 0.5))) * canvas.height
+                    });
+                }
                 return;
             }
 
@@ -2794,7 +3015,7 @@ function handleRemoteSplat(data) {
             // previous stroke to the start of the next. pointer-up clears the
             // position, but the release TAIL now streams dabs after it and
             // re-seeds it, so the flag is what makes this reliable.
-            if (data.data.down) remoteLastPositions.delete(data.clientId);
+            if (_raw.down) remoteLastPositions.delete(data.clientId);
             const lastPos = remoteLastPositions.get(data.clientId);
             // Gap-fill between network messages at ~12px spacing (matching how
             // densely local mousemove events deposit dabs), splitting the
@@ -2844,6 +3065,7 @@ function handleRemoteSplat(data) {
                 window.config.BRUSH_VELOCITY_ONLY = _pushPrev[0];
                 window.config.BRUSH_VEL_MODE = _pushPrev[1];
                 window.config.BRUSH_VEL_STRENGTH = _pushPrev[2];
+                window.__armPushPin = _pushPrev[3];
             }
         }
     }
@@ -2889,6 +3111,8 @@ function broadcastReplayStroke(events) {
         if (ev.shape && shapeRevs[ev.shape]) o.shape = ev.shape;
         // Push dabs deposit no dye — same reason the footprint rides along.
         if (ev.push) o.push = { m: ev.push.m, s: +(+ev.push.s || 1).toFixed(2) };
+        // ...and WHICH arms pushed, for a stroke whose brush was painting.
+        if (ev.ap) o.ap = ev.ap | 0;
         return o;
     });
     if (q.length <= STROKE_CHUNK_EVENTS) {

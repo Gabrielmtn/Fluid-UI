@@ -13,7 +13,10 @@ A deterministic test rig that drives the REAL app over CDP:
 
 - `window.__test` (from `harness.js`): frozen virtual clock (hand-pumped
   16.6ms frames), seeded RNG, dye/velocity float readback + FNV hashes,
-  display-canvas hash + luminance, splat/pointer/keyboard input synthesis.
+  display-canvas hash + luminance, splat/pointer/keyboard input synthesis,
+  and an opt-in per-frame `gl.getError()` sweep (`glErrorCheck(true)` /
+  `glErrors()`) — off by default because `getError()` synchronizes the
+  GPU and would distort the sweep driver's timing.
 - Three drivers: `run-sweep.js` (per-param response curves with DEAD-ZONE /
   NON-MONOTONIC / DESTRUCTION flags), `run-regression.js` (goldens over
   `scenarios.json`), `run-inputs.js` (hotkey conformance from the inventory).
@@ -158,6 +161,30 @@ off · lightShift off · material fluid · layers/colliders stripped by id.
   windows makes the suite green and useful for the refactor TODAY, at the
   cost of measuring less-settled fields. Gabriel's call.
 
+**APPLIED 2026-08-26.** Every scenario that settled 40–60 frames now
+settles 20 (`scenarios.json`'s `settleComment` records the trade and how
+to undo it). Two deliberate exemptions, both explained at their scenario:
+`collider-lattice` keeps its 8 pre-stroke frames — they exist so the
+obstacle texture is live before the dye arrives, and cutting them tests
+nothing — and `hotkey-freeze-toggle/still-frozen` keeps its 30
+post-freeze frames, because it is compared to `frozen` *within* the run
+where neither residual applies, and at 8 frames the ~2% drift it exists
+to detect would fall inside tolerance and read as a pass.
+
+The mitigation was also measured NOT to be the whole story. Compared
+run-to-run in one boot, 9 of 11 checkpoints hold their scalars to the
+recorded 5 decimals while their dye hash moves — but **`pointer-stroke`
+swings 155% on coverage and 123% on meanLum between two runs of the same
+boot** (08-23 09-33 vs 09-35), and its velocity hash moves where the
+others' hold. That is a different class from A and B: the deposit itself
+differs, so no settle window touches it. Read as bimodal — the stroke
+sometimes lands and sometimes largely does not. Suspects, untested:
+the `pointerdown`/first-`pointermove` race against the interleaved
+`step(1)` inside `harness.pointerStroke`, or brush-engine spacing state
+surviving between scenarios. **Until it is diagnosed, a `pointer-stroke`
+delta is uninformative — do not read it as a regression, and do not widen
+the suite tolerances to swallow it.**
+
 ## 5. Build-out order (each phase is independently valuable)
 
 **P1 — close determinism.** Get the cross-boot record→compare green twice
@@ -225,6 +252,14 @@ refactor's safety net and the whole point.
 | 4 | Pigment memory survives clear → baseline drift | 05c/05i, wipe TBD |
 | 5 | Collision-1.0 destruction unreproduced yet; fp16 suspect documented | 04a:416 |
 | 6 | Ctrl+Enter ComfyUI post fires with no typing guard | comfyui-bridge.js:231 |
+| 7 | "Freeze" (Space) does not freeze — it zeroes dye decay and damps velocity 0.9/frame; advection keeps running. Shift+Space (`isPaused`) is the real halt. Product decision, not a test edit | 04b:170, 05j:237 |
+| 8 | `pointer-stroke` deposits bimodally: 155% coverage swing between two runs in ONE boot. Not residual A or B | harness `pointerStroke`, 05d |
+
+Findings 7 and 8 landed 2026-08-26 while adding tolerance comparison and
+the first executable invariants. Both are encoded — 7 as the
+`freeze-halts-the-sim` invariant, which FAILS by design until someone
+answers the product question; 8 in `pointer-stroke`'s scenario comment,
+which says plainly that its deltas mean nothing yet.
 
 ## 7. Working style that worked (keep it)
 

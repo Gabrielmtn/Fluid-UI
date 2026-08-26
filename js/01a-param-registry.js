@@ -214,7 +214,7 @@
         // 'ferro' removed 2026-08-16 — dropping it from options is what makes
         // a saved/mirrored audioMode:'ferro' coerce to the default instead of
         // selecting a scene that no longer exists.
-        audioMode: {options: ["off", "tunnel", "min", "full"], def: "off", mut: null},
+        audioMode: {options: ["off", "tunnel", "timing", "min", "full"], def: "off", mut: null},
         audioReactSource: {options: null, def: null, mut: null},
         audioAutoSplatMode: {options: null, def: null, mut: null},
         splatInMode: {options: null, def: null, mut: null},

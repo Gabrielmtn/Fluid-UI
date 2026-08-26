@@ -494,12 +494,51 @@
     // timestamp-throttled (rAF runs uncapped in the Electron build).
     var MAX_GATES = 8;
     function wireGatesEditor(cv, spec, opts, changed, sceneName) {
-        var drawing = null;   // { x0, y0, x1, y1 } while dragging
+        var drawing = null;   // { x0, y0, x1, y1 } while dragging a NEW box
+        var editing = null;   // { idx, g, zone, orig, sx, sy, moved } while dragging an EXISTING one
+        var activePid = null; // the ONE pointer that owns the current gesture (multi-touch latch)
+        var lastMovedEnd = 0; // when the last real edit-drag ended — suppresses dblclick-delete
         var colBins = null;   // Int16Array LUT: column → first hi-res bin
         var lutW = 0, lutSr = 0;
         var lastDraw = 0;
+        var lastLive = 0;
+        // Optional live-edit hook: called with the gate index while a box is
+        // being grabbed/dragged, and null when the gesture ends — the timing
+        // chart glows the matching lane off this.
+        var notifyEdit = (typeof spec.onEditActive === 'function') ? spec.onEditActive : function () {};
 
         function rect() { return cv.getBoundingClientRect(); }
+
+        // What is under the pointer? Boxes are grabbable (2026-08-26): the
+        // top edge drags the threshold, the sides retune the band, the body
+        // moves the whole box; empty space still draws a new one. Top-most
+        // (last-drawn) box wins where they overlap.
+        var HITPX = 11;   // grab tolerance around box edges — a hair over half a WCAG target
+        function gateAt(px, py, r) {
+            var gates = opts[spec.key] || [];
+            for (var i = gates.length - 1; i >= 0; i--) {
+                var g = gates[i];
+                var gx0 = g.lo * r.width, gx1 = g.hi * r.width, gy = (1 - g.th) * r.height;
+                if (px < gx0 - HITPX || px > gx1 + HITPX) continue;
+                if (Math.abs(py - gy) <= HITPX && px >= gx0 - HITPX && px <= gx1 + HITPX) return { idx: i, zone: 'th' };
+                if (py > gy) {
+                    if (Math.abs(px - gx0) <= HITPX) return { idx: i, zone: 'l' };
+                    if (Math.abs(px - gx1) <= HITPX) return { idx: i, zone: 'r' };
+                    return { idx: i, zone: 'in' };
+                }
+            }
+            return null;
+        }
+        var CURSORS = { th: 'ns-resize', l: 'ew-resize', r: 'ew-resize', 'in': 'move' };
+
+        // Live commit while dragging, throttled: with the timing chart's
+        // cached extraction a re-chart costs ~1 ms, so the lanes refill AS
+        // the box moves; the trailing edge lands in pointerup's final commit.
+        function liveChange(now) {
+            if (now - lastLive < 40) return;   // extraction is ~1 ms — commit often
+            lastLive = now;
+            changed(spec.key);
+        }
         function buildLUT(wCols, sr, fftSize) {
             if (colBins && lutW === wCols && lutSr === sr) return;
             colBins = new Int16Array(wCols + 1);
@@ -522,24 +561,131 @@
             gates.push({
                 lo: Math.max(0, Math.min(0.99, x0)),
                 hi: Math.max(0.01, Math.min(1, x1)),
-                th: Math.max(0.05, Math.min(0.98, 1 - topY))
+                th: Math.max(0.05, Math.min(0.98, 1 - topY)),
+                // A drawn top edge is a CHOICE — auto-calibration (timing
+                // chart) must never slide an edge the user placed.
+                uth: 1
             });
             changed(spec.key);
         }
 
         cv.addEventListener('pointerdown', function (e) {
+            if (activePid !== null) return;   // one finger owns a gesture at a time
+            activePid = e.pointerId;
+            lastLive = 0;   // the FIRST movement of a fresh gesture commits immediately
             var r = rect();
-            drawing = { x0: e.clientX - r.left, y0: e.clientY - r.top, x1: e.clientX - r.left, y1: e.clientY - r.top };
+            var px = e.clientX - r.left, py = e.clientY - r.top;
+            var hit = gateAt(px, py, r);
+            if (hit) {
+                var g = (opts[spec.key] || [])[hit.idx];
+                // g itself is stashed: if the array is replaced or spliced
+                // mid-gesture (Auto, Clear, a row ✕), identity — not the
+                // index — decides whether the drag may continue.
+                editing = { idx: hit.idx, g: g, zone: hit.zone, sx: px, sy: py,
+                            orig: { lo: g.lo, hi: g.hi, th: g.th }, moved: false };
+                notifyEdit(hit.idx);
+            } else {
+                drawing = { x0: px, y0: py, x1: px, y1: py };
+            }
             try { cv.setPointerCapture(e.pointerId); } catch (_) {}
         });
         cv.addEventListener('pointermove', function (e) {
-            if (!drawing) return;
             var r = rect();
-            drawing.x1 = e.clientX - r.left;
-            drawing.y1 = e.clientY - r.top;
+            var px = e.clientX - r.left, py = e.clientY - r.top;
+            if ((editing || drawing) && e.pointerId !== activePid) return;
+            if (editing) {
+                // Mouse insurance for a failed setPointerCapture: buttons 0
+                // mid-"drag" means the up happened somewhere we missed.
+                if (e.pointerType === 'mouse' && e.buttons === 0) {
+                    if (editing.moved) {
+                        if (editing.zone === 'th') editing.g.uth = 1;
+                        changed(spec.key); lastMovedEnd = performance.now();
+                    }
+                    editing = null; activePid = null; notifyEdit(null); return;
+                }
+                var gates = opts[spec.key] || [];
+                var g = gates[editing.idx];
+                if (g !== editing.g) {
+                    // The array changed under the gesture (Auto / Clear / a
+                    // row delete). Follow the SAME object if it merely moved
+                    // index; drop the gesture if it is gone.
+                    var ni = gates.indexOf(editing.g);
+                    if (ni < 0) { editing = null; notifyEdit(null); return; }
+                    editing.idx = ni;
+                    g = editing.g;
+                    notifyEdit(ni);
+                }
+                // A plain click must not count as an edit: require real travel.
+                if (!editing.moved && Math.abs(px - editing.sx) + Math.abs(py - editing.sy) < 3) return;
+                var o = editing.orig;
+                if (editing.zone === 'th') {
+                    g.th = Math.max(0.05, Math.min(0.98, 1 - py / r.height));
+                } else if (editing.zone === 'l') {
+                    g.lo = Math.max(0, Math.min(g.hi - 0.02, px / r.width));
+                } else if (editing.zone === 'r') {
+                    g.hi = Math.max(g.lo + 0.02, Math.min(1, px / r.width));
+                } else { // 'in' — slide the whole band, width preserved
+                    var w = o.hi - o.lo;
+                    var nlo = Math.max(0, Math.min(1 - w, o.lo + (px - editing.sx) / r.width));
+                    g.lo = nlo; g.hi = nlo + w;
+                }
+                editing.moved = true;
+                liveChange(performance.now());
+                return;
+            }
+            if (drawing) {
+                drawing.x1 = px;
+                drawing.y1 = py;
+                return;
+            }
+            // Hover: advertise what a grab would do
+            var hov = gateAt(px, py, r);
+            cv.style.cursor = hov ? CURSORS[hov.zone] : 'crosshair';
         });
-        cv.addEventListener('pointerup', commitDrawing);
+        cv.addEventListener('pointerup', function (e) {
+            if (e.pointerId !== activePid) return;
+            activePid = null;
+            if (editing) {
+                if (editing.moved) {
+                    // Dragging the top edge claims the threshold as user-set;
+                    // band moves/resizes leave calibration free to help.
+                    if (editing.zone === 'th') editing.g.uth = 1;
+                    changed(spec.key);   // trailing edge of the live drag
+                    // Two quick nudges land inside the OS double-click window
+                    // and dblclick would DELETE the box being fine-tuned —
+                    // remember when a real drag ended so it can decline.
+                    lastMovedEnd = performance.now();
+                }
+                editing = null;
+                notifyEdit(null);
+                return;
+            }
+            commitDrawing(e);
+        });
+        // A cancelled pen/touch stroke (palm rejection, pen leaving range)
+        // must NOT leave the drag armed — the phantom box would follow the
+        // hover and the next click would commit a gate nobody drew. A
+        // cancelled EDIT puts the box back where it started.
+        cv.addEventListener('pointercancel', function (e) {
+            if (e.pointerId !== activePid) return;
+            activePid = null;
+            if (editing) {
+                // Restore by IDENTITY — the index may point at an unrelated
+                // gate if the array changed during the gesture.
+                var gates = opts[spec.key] || [];
+                if (gates.indexOf(editing.g) >= 0) {
+                    editing.g.lo = editing.orig.lo; editing.g.hi = editing.orig.hi; editing.g.th = editing.orig.th;
+                    changed(spec.key);
+                }
+                editing = null;
+                notifyEdit(null);
+            }
+            drawing = null;
+        });
         cv.addEventListener('dblclick', function (e) {
+            // Two quick threshold nudges read as a double-click to the OS;
+            // deleting the box someone is fine-tuning is the worst outcome.
+            if (performance.now() - lastMovedEnd < 400) return;
             var r = rect();
             var x = (e.clientX - r.left) / r.width;
             var y = (e.clientY - r.top) / r.height;
@@ -558,7 +704,7 @@
             if (!cv.isConnected) return; // widget rebuilt/left — loop dies
             requestAnimationFrame(draw);
             var now = performance.now();
-            if (now - lastDraw < (drawing ? 16 : 33)) return; // uncapped rAF — self-throttle
+            if (now - lastDraw < ((drawing || editing) ? 16 : 33)) return; // uncapped rAF — self-throttle
             lastDraw = now;
             var r = rect();
             if (r.width < 2) return;
@@ -621,10 +767,12 @@
                 if (hr) hot = Math.min(1, gateBandMax(hr, g) * gain) >= g.th;
                 var fl = gateFlash[sceneName + ':' + i] || 0;
                 var flashing = now - fl < 150;
-                ctx.fillStyle = hot ? 'rgba(255,178,71,0.30)' : 'rgba(255,255,255,0.10)';
+                var grabbed = editing && editing.idx === i;
+                if (grabbed) { flashing = false; hot = false; }
+                ctx.fillStyle = grabbed ? 'rgba(120,200,255,0.22)' : hot ? 'rgba(255,178,71,0.30)' : 'rgba(255,255,255,0.10)';
                 ctx.fillRect(gx, gy, gw, h - gy);
-                ctx.strokeStyle = flashing ? 'rgba(255,255,255,0.95)' : hot ? '#ffb347' : 'rgba(255,255,255,0.55)';
-                ctx.lineWidth = (flashing || hot ? 2 : 1) * dpr;
+                ctx.strokeStyle = grabbed ? 'rgba(120,200,255,0.95)' : flashing ? 'rgba(255,255,255,0.95)' : hot ? '#ffb347' : 'rgba(255,255,255,0.55)';
+                ctx.lineWidth = (grabbed || flashing || hot ? 2 : 1) * dpr;
                 ctx.strokeRect(gx, gy, gw, h - gy);
                 // threshold line emphasis
                 ctx.fillStyle = flashing ? '#fff' : hot ? '#ffb347' : 'rgba(255,255,255,0.8)';
@@ -647,7 +795,7 @@
                 ctx.fillStyle = 'rgba(255,255,255,0.35)';
                 ctx.font = Math.round(h * 0.12) + 'px sans-serif';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText('drag a box to gate a band · dbl-click deletes', w / 2, h * 0.5);
+                ctx.fillText('drag a box to gate a band · drag its edges to retune · dbl-click deletes', w / 2, h * 0.5);
             }
         }
         requestAnimationFrame(draw);
@@ -762,6 +910,28 @@
         deactivate: deactivate,
         active: function () { return activeName; },
         tickFrame: tickFrame,
-        buildControls: buildControls
+        buildControls: buildControls,
+
+        // ── Gate-editor widget, lent out (2026-08-26) ────────────────
+        // The spectral gate editor is not scene-specific: it is "draw the
+        // bands you care about on the live spectrum". The timing chart
+        // (40-audio-timing.js) draws its lanes from exactly the same boxes,
+        // so it borrows the widget rather than growing a second copy that
+        // would drift. `store` is any object; `key` is the array field on it.
+        // hooks (optional): { onEditActive(idxOrNull) } — fires while a box
+        // is being grabbed/dragged so the borrower can glow the matching lane.
+        mountGatesEditor: function (canvasEl, store, key, onChange, tag, hooks) {
+            wireGatesEditor(canvasEl, { key: key, onEditActive: hooks && hooks.onEditActive }, store, function () {
+                if (onChange) onChange(key);
+            }, tag || 'gates');
+        },
+        gateClearButton: makeGateClearBtn,
+        // Blink box `i` of `tag`'s editor — lets a non-scene consumer show a
+        // hit on the same surface the user drew it on.
+        flashGate: function (tag, i) { gateFlash[tag + ':' + i] = performance.now(); },
+        // The 20 Hz - 20 kHz log axis the editor's X coordinates mean, so a
+        // consumer can label a box in hertz.
+        x01ToHz: x01ToHz,
+        hzToX01: hzToX01
     };
 })();

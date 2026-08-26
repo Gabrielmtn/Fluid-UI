@@ -65,6 +65,19 @@
             if (window.__brushTipOn && !window.__remoteStroke && window.BrushShapes
                 && typeof window.BrushShapes.stampPending === 'function'
                 && window.BrushShapes.stampPending()) return;
+            // Assert the blend baseline rather than inheriting it. splatFrag
+            // composites by hand (it samples uTarget and writes the result), so
+            // blending is never wanted here — but unlike every other pass in the
+            // app, splat() runs OUTSIDE the update() loop that disables blend at
+            // 05j:615: the pointerdown press dab (05d), peer dabs applied inside
+            // the multiplayer socket handler (06), and the audio scenes' own rAF
+            // tick (22 -> 30) all reach this function directly. That made the
+            // whole splat path depend on every unrelated GL site having cleaned
+            // up after itself, which 05c's reinit path did not. One redundant
+            // state call per dab is the right price for making the dependency
+            // explicit — the same reason this function binds its own program,
+            // viewport and textures instead of trusting the caller.
+            gl.disable(gl.BLEND);
             const aspectRatio = canvas.width / canvas.height;
             const baseRadius = config.SPLAT_RADIUS * (config.STAMP_RADIUS_SCALE || 1);
             // Dab bounding half-width in p-space (canvas-height-normalized).
@@ -92,7 +105,14 @@
             // new pigment. Rides the same __brushTipOn gate the tips do, and
             // for the same reason: programmatic splats (audio scenes, path
             // layers, animations) are dye SOURCES and must keep painting.
-            const velOnly = !!(config.BRUSH_VELOCITY_ONLY && window.__brushTipOn);
+            // __armVelOnly is the per-arm override (05g multiSplat): the
+            // Multi-Brush panel can mark individual arms as push arms, so this
+            // dab may be velocity-only even while the brush as a whole paints.
+            // It only ever forces the mode ON — an unmarked arm still follows
+            // BRUSH_VELOCITY_ONLY, which is what keeps whole-brush Pressure
+            // working exactly as before.
+            const velOnly = !!((config.BRUSH_VELOCITY_ONLY || window.__armVelOnly === true)
+                && window.__brushTipOn);
             // 'smudge' takes its direction from pointer travel, exactly like the
             // classic brush — so it does nothing while the pointer stands still
             // (dx/dy are zero). The analytic modes synthesize a direction per
@@ -119,20 +139,54 @@
                     // applied per dab: the transport rides dt, so the push rate is
                     // already independent of how fast the hose emits, and a dab
                     // does no GL work at all beyond this.
-                    window.__brushPush = {
-                        u: x / canvas.width,
-                        v: 1.0 - y / canvas.height,
-                        // attractorFrag gathers toward POSITIVE strength, so Gather is
-                        // the positive sign and Spread the negative one.
-                        sign: (velMode === 'spread') ? -1 : 1,
-                        // The gather's falloff is exp(-d^2 / (r^2 * 0.5)) while the
-                        // splat's is exp(-d^2 / radius), so r = sqrt(2 * radius) puts
-                        // the push footprint exactly on the brush ring.
-                        radius: Math.sqrt(2 * Math.max(baseRadius, 1e-6)),
-                        force: velStr * Math.sqrt(Math.max(baseRadius, 1e-6))
-                               * (config.BRUSH_PUSH_DYE_RATE || 2.5),
-                        ts: (window.performance && performance.now) ? performance.now() : Date.now()
-                    };
+                    // ONE SOURCE PER PUSHING ARM. This used to be a single
+                    // object, so every arm overwrote the one before it and a
+                    // 6-arm Spread pushed at exactly one place — the arms were
+                    // visible in the dye pass and invisible here. attractorFrag
+                    // already takes up to 12 sources in ONE blit (the audio
+                    // scenes' field uses the same array), so the arms cost no
+                    // extra GL work.
+                    // Rebuilt per multiSplat call rather than accumulated over
+                    // the frame (__dabSeq, published by 05g): the hose emits
+                    // many dabs per frame and summing them would multiply the
+                    // push by the dab rate. Keyed this way the 1-arm case is
+                    // exactly what it was — the frame's last dab wins.
+                    // attractorFrag gathers toward POSITIVE strength, so Gather
+                    // is the positive sign and Spread the negative one.
+                    const _pSign = (velMode === 'spread') ? -1 : 1;
+                    // The gather's falloff is exp(-d^2 / (r^2 * 0.5)) while the
+                    // splat's is exp(-d^2 / radius), so r = sqrt(2 * radius) puts
+                    // the push footprint exactly on the brush ring.
+                    const _pRad = Math.sqrt(2 * Math.max(baseRadius, 1e-6));
+                    const _seq = window.__dabSeq | 0;
+                    let _bp = window.__brushPush;
+                    if (!_bp || _bp.seq !== _seq || !_bp.a) {
+                        _bp = window.__brushPush = { seq: _seq, ts: 0, sign: _pSign, force: 0, a: [] };
+                    }
+                    // sign rides the parent too: uKeep is ONE uniform for the
+                    // whole pass, and every arm of a stroke shares the mode.
+                    _bp.sign = _pSign;
+                    _bp.force = velStr * Math.sqrt(Math.max(baseRadius, 1e-6))
+                                * (config.BRUSH_PUSH_DYE_RATE || 2.5);
+                    _bp.ts = (window.performance && performance.now) ? performance.now() : Date.now();
+                    // 12 is attractorFrag's uAtt ceiling (05b MAX_ATTRACTORS).
+                    // Transforms per dab, measured: radial and rake are 1:1 with
+                    // the arm count so they never reach it; mirrorX/mirrorY are
+                    // 2n (14 and 16 at 7 and 8 arms); mirrorQuad alternates 4n on
+                    // ODD arm counts and 2n on even ones — because its point
+                    // reflection is already a rotation in C_n when n is even — so
+                    // it reads 4, 4, 12, 8, 20, 12, 28, 16 for 1..8 arms. Over the
+                    // ceiling the tail of the list stops pushing, and because the
+                    // list is built in symmetryTransforms order (all of arm 0's
+                    // variants, then arm 1's...) the survivors are a contiguous
+                    // sector rather than an even sample: the push goes LOPSIDED,
+                    // not merely weaker. Only Spread/Gather are affected — they
+                    // are the modes that ride this one uniform array. Smudge and
+                    // Swirl are ordinary velocity splats, one draw per arm, with
+                    // no ceiling at all.
+                    if (_bp.a.length < 12) {
+                        _bp.a.push([x / canvas.width, 1.0 - y / canvas.height, _pSign, _pRad]);
+                    }
                     return;
                 }
                 if (velMode === 'swirl') {
@@ -147,6 +201,13 @@
                     const velK = (typeof window.__splatVelK === 'number' && window.__splatVelK > 0)
                         ? Math.min(1, window.__splatVelK) : 1;
                     velSwirl = velStr * (config.BRUSH_VEL_SPEED_REF || 120) * velK;
+                    // Mirrored arm: chirality flips under a reflection. Smudge
+                    // gets this for free (05g hands it the transformed dx/dy),
+                    // but the swirl is a scalar the shader resolves per
+                    // fragment, so it has to be flipped here — otherwise a
+                    // mirrorX pair spins the SAME way round and reads as two
+                    // brushes rather than one folded over.
+                    if (window.__armFlip) velSwirl = -velSwirl;
                 }
             }
             splatProg.bind();
@@ -314,6 +375,8 @@
         //   (gaussian width² of the band); radialSpeed >0 pushes outward,
         //   <0 toward the center; squash <1 flattens the ellipse vertically.
         function ringSplat(cx, cy, ringRadiusPx, thickness, radialSpeed, swirl, squash, color) {
+            gl.disable(gl.BLEND); // same contract as splat() above — audio scenes
+                                  // call this from their own rAF tick, outside update()
             const aspectRatio = canvas.width / canvas.height;
             splatProg.bind();
             gl.uniform1f(splatProg.uniforms.aspectRatio, aspectRatio);
@@ -446,6 +509,7 @@
             gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
             blit(sketch.fbo);
             gl.disable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // back to canonical (see blit() in 05c)
         }
         window.__sketchStamp = stampSketchDab;
         // ─── D3 mask stamping ────────────────────────────────────────────
@@ -486,6 +550,7 @@
             gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
             blit(mf.fbo);
             gl.disable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // back to canonical (see blit() in 05c)
         }
         window.__maskStamp = stampMaskDab;
         window.__clearSketch = function () {
@@ -611,6 +676,7 @@
             gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
             blit(sketch.fbo);
             gl.disable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // back to canonical (see blit() in 05c)
             notifySketchMutated();
         };
         // ─── D6 slice 1: sketch stroke undo/redo ────────────────────────
@@ -964,6 +1030,11 @@
                 last = dest;
             }
             gl.disable(gl.BLEND);
+            // Back to canonical (see blit() in 05c). Without this the additive
+            // (ONE,ONE) above stayed live for the rest of the session — glow
+            // runs every frame it is enabled, so from the first glow frame on,
+            // ANY later bare gl.enable(gl.BLEND) inherited additive blending.
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             // Final: intensity-scaled write back into the full glow target
             glowFinalProg.bind();
             gl.uniform2f(glowFinalProg.uniforms.texelSize, last.texelSizeX, last.texelSizeY);

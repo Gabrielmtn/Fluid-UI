@@ -1,104 +1,106 @@
 {
-  "comment": "Deterministic regression scenarios for run-regression.js. Each runs under the shared determinism policy (governor off, test resolution, gate off, fluid material, seeded RNG, frozen clock). Action vocabulary: slider/checkbox/select/preset/material/stroke/pointerStroke/key/step/clear/snapshot/eval. Grow this list one scenario per feature system — the features inventory (inventory/features.json) lists the activation recipes.",
+  "comment": "Deterministic regression scenarios for run-regression.js. Each runs under the shared determinism policy (governor off, test resolution, gate off, fluid material, seeded RNG, frozen clock). Action vocabulary: slider/checkbox/select/preset/material/stroke/pointerStroke/key/step/clear/snapshot/eval/glcheck. Grow this list one scenario per feature system — the features inventory (inventory/features.json) lists the activation recipes. A scenario may also carry \"glErrors\": true to run the harness's gl.getError() sweep for that scenario alone (--gl-errors on the driver turns it on for all of them).",
+  "settleComment": "SETTLE WINDOWS ARE CAPPED AT 20 FRAMES POST-STROKE, on purpose. GUIDANCE §4 measured cross-boot bit-identity holding through frame 20 and breaking at frames ~20-40 (residual B, suspected real-clock timers firing at phase-random pump indices), and names shortening the settle windows as the pragmatic mitigation until residuals A and B are actually fixed. Every scenario below that used to settle 40-60 frames now settles 20; the cost is that fields are measured less settled, which is the trade GUIDANCE describes. The single deliberate exception is hotkey-freeze-toggle/still-frozen — see its comment. Restoring the long windows is a one-line-per-scenario change once residual B is closed.",
+  "invariantComment": "invariants[] are relations that must hold WITHIN one run, checked by run-regression.js against the run itself (not the goldens), in compare mode AND under --record. Each names two checkpoints as left/right and asserts per field: \"equal\" (hashes must match; if they differ the field's scalars are consulted and the result is NEAR inside tolerance, FAIL outside) or \"differ\" (hashes must not match). Fields: dye, vel, display. `note` is printed whenever the invariant does not hold.",
   "scenarios": [
     {
       "name": "plain-stroke",
-      "comment": "The canonical baseline: one seeded stroke, advected 60 frames.",
+      "comment": "The canonical baseline: one seeded stroke, advected 20 frames. This is also the physics reference the kaleido-is-display-only invariant compares against, so its stroke and step count must stay identical to kaleido-display's.",
       "seed": 48879,
       "actions": [
         { "do": "stroke" },
-        { "do": "step", "frames": 60 },
+        { "do": "step", "frames": 20 },
         { "do": "snapshot", "name": "settled" }
       ]
     },
     {
       "name": "pointer-stroke",
-      "comment": "Same idea through the REAL input pipeline (05d handlers, brush engine spacing) — catches input-path regressions the splat path cannot.",
+      "comment": "Same idea through the REAL input pipeline (05d handlers, brush engine spacing) — catches input-path regressions the splat path cannot. WARNING, measured 2026-08-26 across every run in results/: this scenario is the one that does not repeat. Two runs in the SAME boot have come back 155% apart on coverage and 123% apart on meanLum (08-23 09-33 vs 09-35), and its velocity hash moves run-to-run where the other nine checkpoints' hold. That is a different failure from the GUIDANCE §4 residuals — those move hashes while scalars agree to 5 decimals; this moves the deposit itself, so the settle cap does nothing for it. Read as bimodal: the stroke sometimes lands and sometimes largely does not. Likeliest suspect is the pointerdown/first-move race against the interleaved step(1) in harness.pointerStroke, or brush-engine spacing state surviving between scenarios. Until it is diagnosed, treat a pointer-stroke delta as uninformative rather than as a regression, and do NOT widen the global tolerances to accommodate it.",
       "seed": 48879,
       "actions": [
         { "do": "pointerStroke" },
-        { "do": "step", "frames": 40 },
+        { "do": "step", "frames": 20 },
         { "do": "snapshot", "name": "settled" }
       ]
     },
     {
       "name": "materials",
-      "comment": "One stroke per material. setMode must follow any snapshot apply, never precede it (material-vs-snapshot ordering, 29-material-modes).",
+      "comment": "One stroke per material. setMode must follow any snapshot apply, never precede it (material-vs-snapshot ordering, 29-material-modes). 20-frame settles: clay and acrylic differ from fluid in the first frames (viscosity/plasticity act on deposit), so the shortened window still separates them — the goldens show acrylic and clay 10% apart on coverage at 50 frames and the mechanisms that produce that gap are all early.",
       "seed": 48879,
       "actions": [
         { "do": "material", "mode": "acrylic" },
         { "do": "stroke" },
-        { "do": "step", "frames": 50 },
+        { "do": "step", "frames": 20 },
         { "do": "snapshot", "name": "acrylic" },
         { "do": "clear" },
         { "do": "material", "mode": "clay" },
         { "do": "stroke" },
-        { "do": "step", "frames": 50 },
+        { "do": "step", "frames": 20 },
         { "do": "snapshot", "name": "clay" },
         { "do": "material", "mode": "fluid" }
       ]
     },
     {
       "name": "builtin-presets",
-      "comment": "Two contrast-extreme built-ins over the same stroke.",
+      "comment": "Two contrast-extreme built-ins over the same stroke. Presets are parameter sets applied before the stroke, so what this probes — did applyPreset land, and does the sim respond to it — is fully visible at 20 frames.",
       "seed": 48879,
       "actions": [
         { "do": "preset", "name": "silky" },
         { "do": "stroke" },
-        { "do": "step", "frames": 50 },
+        { "do": "step", "frames": 20 },
         { "do": "snapshot", "name": "silky" },
         { "do": "clear" },
         { "do": "preset", "name": "electric" },
         { "do": "stroke" },
-        { "do": "step", "frames": 50 },
+        { "do": "step", "frames": 20 },
         { "do": "snapshot", "name": "electric" }
       ]
     },
     {
       "name": "multi-arm-radial",
-      "comment": "Six-arm radial symmetry through the splat multiplier.",
+      "comment": "Six-arm radial symmetry through the splat multiplier. The rosette is geometry laid down AT deposit, not something the sim has to develop, so 20 frames is if anything a cleaner read of it. Note this checkpoint is one of the two whose scalars wobble run-to-run even in one boot (|Δcoverage| up to 0.28%, |Δlum| 0.04%) — well inside tolerance, but it is why the tolerance is not set tighter.",
       "seed": 48879,
       "actions": [
         { "do": "select", "id": "symmetryMode", "value": "radial" },
         { "do": "stroke", "opts": { "mult": 6, "pts": [[0.57, 0.42], [0.63, 0.33], [0.70, 0.26], [0.79, 0.17]] } },
-        { "do": "step", "frames": 50 },
+        { "do": "step", "frames": 20 },
         { "do": "snapshot", "name": "rosette" }
       ]
     },
     {
       "name": "collider-lattice",
-      "comment": "Procedural obstacle field, stroke driven through it. setProcedural flips collision on itself; the reset between scenarios clears it via the next scenario's clear (obstacle texture wipe is in the features inventory if this ever leaks).",
+      "comment": "Procedural obstacle field, stroke driven through it. setProcedural flips collision on itself; the reset between scenarios clears it via the next scenario's clear (obstacle texture wipe is in the features inventory if this ever leaks). The 8 pre-stroke frames stay — they exist to let the obstacle texture take effect BEFORE the dye arrives, and cutting them would test nothing. The post-stroke settle drops 60 → 20: the obstacle mask deflects flow from the first advected frame, so this now measures early wakes rather than developed ones. If a future collision bug turns out to need the long tail to show itself, this is the scenario to exempt from the cap first.",
       "seed": 48879,
       "actions": [
         { "do": "eval", "js": "window.collisionLayers.setProcedural(function(ctx,w,h){ctx.fillStyle='#fff';for(var i=0;i<4;i++){ctx.beginPath();ctx.arc((0.25+i*0.17)*w,0.5*h,0.04*Math.min(w,h),0,Math.PI*2);ctx.fill();}})" },
         { "do": "step", "frames": 8 },
         { "do": "stroke", "opts": { "pts": [[-0.02, 0.5], [0.3, 0.48], [0.7, 0.52], [1.02, 0.5]] } },
-        { "do": "step", "frames": 60 },
+        { "do": "step", "frames": 20 },
         { "do": "snapshot", "name": "wakes" },
         { "do": "eval", "js": "window.collisionLayers.setProcedural(null); window.collisionLayers.enabled=false; if(window.clearObstacleTexture)window.clearObstacleTexture()" }
       ]
     },
     {
       "name": "kaleido-display",
-      "comment": "Kaleidoscope is display-chain: sim hashes should MATCH plain-stroke's physics under identical input while the display hash differs. First-enable side effect: the kaleido toggle bootstraps multiplier to 8 — pinned back to 1 here explicitly.",
+      "comment": "Kaleidoscope is display-chain: sim hashes should MATCH plain-stroke's physics under identical input while the display hash differs. That sentence is now the kaleido-is-display-only invariant below instead of a comment nothing read — which is why the stroke and the 20-frame settle here must stay bit-for-bit identical to plain-stroke's. First-enable side effect: the kaleido toggle bootstraps multiplier to 8 — pinned back to 1 here explicitly.",
       "seed": 48879,
       "actions": [
         { "do": "eval", "js": "window.kaleidoEnabled = true" },
         { "do": "eval", "js": "var m=document.getElementById('multiplier'); if(m){m.value=1;m.dispatchEvent(new Event('input',{bubbles:true}))}" },
         { "do": "select", "id": "kaleidoMode", "value": "1" },
         { "do": "stroke" },
-        { "do": "step", "frames": 60 },
+        { "do": "step", "frames": 20 },
         { "do": "snapshot", "name": "wedged" },
         { "do": "eval", "js": "window.kaleidoEnabled = false" }
       ]
     },
     {
       "name": "hotkey-freeze-toggle",
-      "comment": "Space stops the fluid (toggleFreeze). Snapshot while frozen must equal snapshot after more steps (nothing advances), then unfreeze.",
+      "comment": "Space transport. The pre-freeze settle drops 20 → 10 so the 'frozen' checkpoint lands at 12 frames post-stroke, inside the stable window. The 30 post-freeze frames are DELIBERATELY kept even though that puts 'still-frozen' at 42 frames post-stroke, outside it: that checkpoint exists only to be compared against 'frozen' WITHIN this run, where residuals A and B (a same-boot ratchet and a cross-boot drift) do not apply. Shortening it would also blunt the assertion — the drift it is meant to detect is ~2% of coverage over 30 frames, so at 8 frames it would read as ~0.5% and land inside tolerance as a NEAR, hiding the very thing the checkpoint is for.",
       "seed": 48879,
       "actions": [
         { "do": "stroke" },
-        { "do": "step", "frames": 20 },
+        { "do": "step", "frames": 10 },
         { "do": "key", "spec": { "key": " ", "code": "Space" } },
         { "do": "step", "frames": 2 },
         { "do": "snapshot", "name": "frozen" },
@@ -107,6 +109,25 @@
         { "do": "key", "spec": { "key": " ", "code": "Space" } },
         { "do": "step", "frames": 2 }
       ]
+    }
+  ],
+  "invariants": [
+    {
+      "name": "kaleido-is-display-only",
+      "why": "Kaleidoscope renders in the display chain and must never touch density or velocity. Identical seed, identical stroke, identical settle — so the sim hashes must be the same field and only the rendered canvas may differ. This is also the cheapest standing detector for bug #2 (GUIDANCE §6): a display pass leaking into the sim shows up here first.",
+      "left": { "scenario": "plain-stroke", "checkpoint": "settled" },
+      "right": { "scenario": "kaleido-display", "checkpoint": "wedged" },
+      "assert": { "dye": "equal", "vel": "equal", "display": "differ" },
+      "note": "Expect dye NEAR, not PASS, until bug #2 is fixed. The committed goldens (2026-08-21) already show it half-broken: kaleido's vel hash IS plain-stroke's (4e6e81ea both) but its dye hash is not (d9b4a359 vs da8d052b) while coverage is identical to all five recorded decimals (0.27567 both) — a bit-level leak with no measurable magnitude, exactly the signature of the Ridges display→sim coupling. A jump from NEAR to FAIL here means the leak grew teeth."
+    },
+    {
+      "name": "freeze-halts-the-sim",
+      "why": "scenarios.json has claimed since the day it was written that a snapshot taken while frozen must equal a snapshot taken after more steps, because nothing advances. Nothing ever checked it.",
+      "left": { "scenario": "hotkey-freeze-toggle", "checkpoint": "frozen" },
+      "right": { "scenario": "hotkey-freeze-toggle", "checkpoint": "still-frozen" },
+      "assert": { "dye": "equal", "vel": "equal", "display": "equal" },
+      "assertComment": "display is asserted too, and not as padding: it is the only one of the three that carries an independent magnitude here. Velocity has no scalar at all, and dye's +2.05% coverage sits a hair inside the 2% tolerance, so on those two alone the failure would rest on an absence rather than on evidence. meanLum moves +3.03% and is outside — the picture demonstrably brightened during the freeze.",
+      "note": "THIS IS EXPECTED TO FAIL, and the cause is neither a lost keypress nor a bug — the assertion is mis-specified. Space reaches window.toggleFreeze (05n:372-393 → 04b:170), which does not stop the loop: it sets config.DENSITY_DISSIPATION = 1.0 and config.VELOCITY_DISSIPATION = 0.9 and raises window.__fluidFrozen. Dye stops FADING; advection keeps running, and velocity decays hard at 0.9/frame. The gate that actually halts the sim step is isPaused (05j:237), driven by window.togglePause (04f:73) on SHIFT+Space. The committed goldens agree with that mechanism and not with the prose: frozen → still-frozen moves dye 70c06c8d → 05182583 and coverage 0.23912 → 0.24402 (+2.05%), meanLum 0.10143 → 0.10450 (+3.03%) — the field spread and brightened over 30 supposedly-frozen frames, which is what a dissipation-only freeze does. Left failing on purpose. Closing it is a product decision, not a test edit: either 'Freeze' should hold the picture still (fix 04b:170 or route Space to togglePause) or it should not, in which case retarget this invariant at Shift+Space and rename the button. Do not silence it by loosening the tolerance."
     }
   ]
 }

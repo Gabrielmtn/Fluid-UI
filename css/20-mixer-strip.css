@@ -1048,6 +1048,19 @@ body > .controls {
 .brush-shape-add {
     font-size: 14px;
 }
+/* The clipboard button sits beside the ＋ and says what it does in words, so
+   it takes the row's height but sizes to its label — the panel's 10px control
+   type, same as the labels above it. The row wraps, so a narrow popup drops it
+   to its own line rather than squeezing the swatches. */
+.brush-shape-paste {
+    flex: 0 0 auto;
+    width: auto;
+    height: 26px;
+    padding: 0 9px;
+    font-size: 10px;
+    line-height: 1;
+    white-space: nowrap;
+}
 
 /* ── Tip menu (the strip swatch's dropdown) ──
    Wears the shared .arm-colors-panel skin; the shapes row below reuses the

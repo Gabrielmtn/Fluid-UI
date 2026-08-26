@@ -33,7 +33,9 @@ then:
 
 ```bash
 node scripts/test/run-regression.js --record   # once, on a known-good build
-node scripts/test/run-regression.js            # after changes: exit 1 on drift
+node scripts/test/run-regression.js            # after changes: exit 1 on a FAIL
+node scripts/test/run-regression.js --strict   # ...and on a NEAR too
+node scripts/test/run-regression.js --gl-errors  # + per-frame gl.getError()
 node scripts/test/run-sweep.js --param ridges
 node scripts/test/run-sweep.js --all           # every sweepRelevant slider
 node scripts/test/run-inputs.js
@@ -74,6 +76,70 @@ gate stays off under the shared policy meanwhile.
 A regression that flips sim hashes changed the physics; one that flips
 only the display hash changed the look pipeline. Both matter; the suite
 reports them separately.
+
+## Three verdicts, and why (2026-08-26)
+
+Bit-identity was the only thing `run-regression.js` could say until
+2026-08-26, and it made the gate unreadable: it had not been green once
+since the goldens were recorded, and the two determinism residuals in
+`GUIDANCE.md` §4 mean it will not be for a while. Measured across every
+run in `results/`, three back-to-back runs in **one boot** produce a
+different dye hash every time while their `coverage` and `meanLum` agree
+to all five recorded decimals.
+
+So a checkpoint now reports magnitude, not just difference:
+
+| | meaning | exit |
+|---|---|---|
+| **PASS** | all three hashes identical to the golden | 0 |
+| **NEAR** | a hash moved, every scalar inside tolerance — deltas printed | 0 |
+| **FAIL** | a scalar left tolerance, NaNs appeared, or the page/GL errored | 1 |
+
+Tolerances are named constants at the top of the driver with the
+measurement they came from. Defaults: **±2% relative** (+0.001 absolute)
+on `meanLum` and `coverage`. The highest same-code delta anywhere in
+`results/` is 1.04%; the runs that carried real code change sit at
+15–116%, two orders the other way. Override per run with
+`--tol-lum-rel` / `--tol-cov-rel` (or `FLUID_TEST_TOL_*`), or make NEAR
+fatal with `--strict`.
+
+NEAR exits 0 on purpose — a permanently red gate is a gate nobody reads
+— but it is never quiet: every NEAR prints its deltas and gets its own
+summary banner.
+
+## Invariants
+
+`scenarios.json` also carries an `invariants` list: relations that must
+hold **within** a run, so they need no goldens and are checked under
+`--record` too. Each names two checkpoints and asserts `equal` or
+`differ` per field (`dye` / `vel` / `display`); an `equal` whose hash
+moved falls back to that field's scalars, so it can land NEAR.
+
+Two shipped with the mechanism, both of them promoted from prose
+comments that nothing had ever checked:
+
+- **`kaleido-is-display-only`** — kaleido renders in the display chain,
+  so its sim hashes must equal `plain-stroke`'s. Reports **NEAR**: the
+  dye hash differs while coverage is identical to 5 decimals. That is
+  standing bug #2 (display→sim coupling) with no measurable magnitude.
+- **`freeze-halts-the-sim`** — reports **FAIL**, and the committed
+  goldens already violate it. Not a lost keypress and not a bug: Space
+  runs `toggleFreeze` (04b:170), which sets `DENSITY_DISSIPATION = 1.0`
+  and `VELOCITY_DISSIPATION = 0.9` — dye stops *fading*, advection keeps
+  running. `isPaused` (05j:237), on **Shift+Space**, is the gate that
+  actually halts the step. Left failing until someone decides whether
+  "Freeze" is meant to hold the picture still.
+
+## GL errors
+
+`gl.getError()` appeared nowhere in this repo until 2026-08-26 — and
+both GL bugs the project has actually hit (6fd1be4's wrong-program
+uniforms, the sub-stepping feedback loop) raised `INVALID_OPERATION`
+into an empty room for months. `__test.glErrorCheck(true)` drains the
+error queue after **every pumped frame**, tagging each with its frame
+index and phase; `--gl-errors` turns it on for the whole suite and any
+error is a FAIL. Default off, because `getError()` synchronizes the GPU
+and would distort the sweep driver's timing.
 
 ## Protocol rules (each one was learned the hard way)
 

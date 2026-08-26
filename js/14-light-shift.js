@@ -170,7 +170,7 @@
             const saturation = 100 - (y / canvasSize) * 100;
             for (let x = 0; x < canvasSize; x++) {
                 const hue = (x / canvasSize) * 360;
-                const rgb = hslToRgb(hue, saturation, 50);
+                const rgb = hslDegPctToRgb255(hue, saturation, 50);
                 const idx = (y * canvasSize + x) * 4;
                 data[idx] = rgb[0];
                 data[idx + 1] = rgb[1];
@@ -181,7 +181,10 @@
         offCtx.putImageData(imageData, 0, 0);
     }
 
-    function hslToRgb(h, s, l) {
+    // h in DEGREES (0-360), s and l in PERCENT (0-100); returns 0-255 ints,
+    // ready for ImageData. See the naming note in 05g-arm-colors — the other
+    // two hslToRgb functions in this codebase use different units at both ends.
+    function hslDegPctToRgb255(h, s, l) {
         s /= 100; l /= 100;
         const c = (1 - Math.abs(2 * l - 1)) * s;
         const x = c * (1 - Math.abs((h / 60) % 2 - 1));

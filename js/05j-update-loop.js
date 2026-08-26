@@ -234,6 +234,24 @@
             }
             // Process replay even when paused so right-click replay always works
             processReplay();
+            // Dab budget for this frame, in dabs — BRUSH_DAB_BUDGET is per
+            // SIMULATED second, so a 33ms frame retires twice what a 16ms one
+            // does. The old flat 64/frame was itself a frame-rate dependence:
+            // at 30fps a fast dense stroke measured 54 of 64 used, ~10 dabs
+            // from silently thinning the line. 05d0 reads this for its
+            // coalescing bump so both ends agree.
+            //
+            // Hoisted above the isPaused branch (2026-08-26) so peer paint can
+            // share it: pausing freezes YOUR sim, it does not mute the room,
+            // and the apply-on-arrival path this replaced never checked it.
+            const _dabBudget = Math.max(8, Math.ceil(
+                ((typeof config.BRUSH_DAB_BUDGET === 'number' ? config.BRUSH_DAB_BUDGET : 4000)) * frameDt));
+            window.__dabDrainBudget = _dabBudget;
+            // Peer dabs land HERE, on the frame, instead of inside the
+            // WebSocket message handler — the whole room's inbound paint now
+            // costs at most what one local brush does. See the inbound-budget
+            // note in 06-multiplayer.
+            if (typeof window.__mpDrainInbound === 'function') window.__mpDrainInbound(_dabBudget);
             if (!isPaused) {
                 // Constant-flow bookkeeping: the engine branch below stops
                 // running once a stroke's queue drains, so a reset inside it
@@ -242,15 +260,6 @@
                 // the previous stroke's position (a phantom velocity kick).
                 // Clear it any frame the pointer is up.
                 if (!pointer.down) { window.__contFlowLast = null; window.__contFlowCredit = 0; }
-                // Dab budget for this frame, in dabs — BRUSH_DAB_BUDGET is per
-                // SIMULATED second, so a 33ms frame retires twice what a 16ms one
-                // does. The old flat 64/frame was itself a frame-rate dependence:
-                // at 30fps a fast dense stroke measured 54 of 64 used, ~10 dabs
-                // from silently thinning the line. 05d0 reads this for its
-                // coalescing bump so both ends agree.
-                const _dabBudget = Math.max(8, Math.ceil(
-                    ((typeof config.BRUSH_DAB_BUDGET === 'number' ? config.BRUSH_DAB_BUDGET : 4000)) * frameDt));
-                window.__dabDrainBudget = _dabBudget;
                 if (window.BrushEngine && (window.BrushEngine.isActive() || window.BrushEngine.pending()) && !isReplayActive) {
                     // D1 brush engine: drain this frame's dab train (distance-
                     // parameterized spacing + stabilizer + gap-fill, built in
@@ -1180,9 +1189,21 @@
                 // Tight staleness window (a brush, not a scene): dabs arrive every
                 // few ms while the pointer is held, so ~6 frames after the last one
                 // the push stops. Nothing has to clear this on release.
-                if (_bp && (nowMs - _bp.ts) < 100) {
+                if (_bp && _bp.a && _bp.a.length && (nowMs - _bp.ts) < 100) {
+                    // ONE SOURCE PER PUSHING ARM (2026-08-26). 05i publishes a
+                    // list now, not a single point: Multi-Brush arms each push
+                    // where they land, in the SAME blit the single push already
+                    // cost — uAtt holds 12 and the audio scenes' field has always
+                    // driven it this way. A 1-arm stroke is a 1-entry list, i.e.
+                    // exactly the old uniform.
                     const _bf = brushPushScratch;
-                    _bf[0] = _bp.u; _bf[1] = _bp.v; _bf[2] = _bp.sign; _bf[3] = _bp.radius;
+                    const _bn = Math.min(_bp.a.length, 12);
+                    for (let _bi = 0; _bi < _bn; _bi++) {
+                        const _be = _bp.a[_bi];
+                        _bf[_bi * 4] = _be[0]; _bf[_bi * 4 + 1] = _be[1];
+                        _bf[_bi * 4 + 2] = _be[2]; _bf[_bi * 4 + 3] = _be[3];
+                    }
+                    for (let _bi = _bn * 4; _bi < _bf.length; _bi++) _bf[_bi] = 0;
                     attractorProg.bind();
                     gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                     gl.uniform1f(attractorProg.uniforms.aspectRatio, canvas.width / Math.max(1, canvas.height));
@@ -1191,7 +1212,7 @@
                     gl.uniform1f(attractorProg.uniforms.uSwirl, 0);
                     gl.uniform1f(attractorProg.uniforms.uDensityGate, 0);
                     gl.uniform1f(attractorProg.uniforms.uMaxDensity, 1.6);
-                    gl.uniform1i(attractorProg.uniforms.uCount, 1);
+                    gl.uniform1i(attractorProg.uniforms.uCount, _bn);
                     // Only the inward pull needs the never-erase blend — Blow reads
                     // from further IN, toward denser paint, so it has no empty side
                     // to sample and conserves dye on its own (measured 1.36x the

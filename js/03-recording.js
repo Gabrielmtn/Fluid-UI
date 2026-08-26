@@ -309,6 +309,23 @@
             const interaction = { timestamp, x: x / canvas.width, y: y / canvas.height, vx: dx, vy: dy, color: colorArray.slice(), mult, radius };
             if (tip) interaction.tip = tip;
             if (shape) interaction.shape = shape;
+            // Pressure, alongside the footprint and for a louder reason than
+            // either: a velocity-only dab lays NO pigment, so a recording that
+            // did not carry the flag played back as an ordinary stroke and put
+            // paint on the canvas the painter never laid. `ap` is the per-arm
+            // mask (05g) — a painting brush can still have push arms, so the two
+            // are independent. Both omitted on an ordinary dab, keeping the
+            // common interaction as small as it was.
+            if (cfg.BRUSH_VELOCITY_ONLY) {
+                interaction.push = {
+                    m: cfg.BRUSH_VEL_MODE || 'smudge',
+                    s: (typeof cfg.BRUSH_VEL_STRENGTH === 'number') ? cfg.BRUSH_VEL_STRENGTH : 1
+                };
+            }
+            const apMask = (typeof window.__armPushPin === 'number')
+                ? window.__armPushPin
+                : ((typeof window.armPushMask === 'function') ? window.armPushMask() : 0);
+            if (apMask) interaction.ap = apMask;
             a.timeline.interactions.push(interaction);
             // PERF: During recording, skip ALL UI updates - just record data
             // Timeline visualization updates when recording stops
@@ -484,12 +501,38 @@
                     // the interaction actually carries one: recordings made before
                     // this existed have neither field and keep playing back gaussian,
                     // which is exactly how they were painted.
-                    const _fp = (typeof i.tip === 'number') || !!i.shape;
-                    let _tipPrev, _shapePrev, _remotePrev;
+                    // Pressure counts toward the footprint pin, and has to:
+                    // splat() only honours a velocity-only dab on a user stroke
+                    // (the __brushTipOn gate), and _fp is what opens that gate
+                    // for a recorded one. Coerced against the known modes the
+                    // same way stroke replay coerces a peer's — a recording can
+                    // arrive through a .fluid import or a peer's snapshot.
+                    const _rp = (i.push && typeof i.push === 'object') ? i.push : null;
+                    const _rap = (typeof i.ap === 'number' && isFinite(i.ap)) ? (i.ap | 0) : 0;
+                    const _fp = (typeof i.tip === 'number') || !!i.shape || !!_rp || !!_rap;
+                    let _tipPrev, _shapePrev, _remotePrev, _pushPrev, _apPrev;
                     if (_fp && window.config) {
                         _tipPrev = window.config.BRUSH_TIP;
                         _shapePrev = window.config.BRUSH_SHAPE_ID;
                         _remotePrev = window.__remoteStroke;
+                        // Pinned whether or not the dab carries push, like stroke
+                        // replay: reading absence as "leave mine alone" would
+                        // repaint an ordinary recording as a silent push whenever
+                        // the live brush happened to be in Pressure mode.
+                        _pushPrev = [window.config.BRUSH_VELOCITY_ONLY,
+                                     window.config.BRUSH_VEL_MODE,
+                                     window.config.BRUSH_VEL_STRENGTH];
+                        _apPrev = window.__armPushPin;
+                        window.config.BRUSH_VELOCITY_ONLY = !!_rp;
+                        if (_rp) {
+                            window.config.BRUSH_VEL_MODE =
+                                (_rp.m === 'spread' || _rp.m === 'gather' || _rp.m === 'swirl')
+                                    ? _rp.m : 'smudge';
+                            window.config.BRUSH_VEL_STRENGTH =
+                                (typeof _rp.s === 'number' && isFinite(_rp.s))
+                                    ? Math.max(0, Math.min(5, _rp.s)) : 1;
+                        }
+                        window.__armPushPin = _rap;
                         window.config.BRUSH_TIP = (typeof i.tip === 'number') ? (i.tip | 0) : 0;
                         // A shape we no longer have suppresses stamps outright rather
                         // than printing the recording in whatever shape is selected now.
@@ -516,6 +559,10 @@
                             window.config.BRUSH_TIP = _tipPrev;
                             window.config.BRUSH_SHAPE_ID = _shapePrev;
                             window.__remoteStroke = _remotePrev;
+                            window.config.BRUSH_VELOCITY_ONLY = _pushPrev[0];
+                            window.config.BRUSH_VEL_MODE = _pushPrev[1];
+                            window.config.BRUSH_VEL_STRENGTH = _pushPrev[2];
+                            window.__armPushPin = _apPrev;
                         }
                     }
                 }

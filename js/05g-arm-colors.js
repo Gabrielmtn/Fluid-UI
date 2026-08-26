@@ -237,6 +237,33 @@
             el.addEventListener('change', applySymmetryMode);
             applySymmetryMode();
         })();
+        // ── Per-arm Pressure (2026-08-26) ────────────────────────────────
+        // An arm can be marked as a PUSH arm in the Multi-Brush panel: it runs
+        // the velocity pass and lays no dye, while its siblings paint normally.
+        // Resolved HERE and not in splat(), because the arm index only exists at
+        // this level — splat() sees one dab and has no idea which arm it is.
+        // The state rides as a BITMASK (bit i = arm i pushes) rather than as the
+        // arm array itself, so replay, recordings and the wire can pin the
+        // painter's layout in one small integer the same way they pin the tip.
+        function currentArmPushMask() {
+            var arr = window.multiArmColors;
+            if (!arr) return 0;
+            var m = 0;
+            // 8 is the arm-count ceiling (#multiplier max); the guard is against
+            // a longer array left behind by a bigger session, not a real 30-arm
+            // brush.
+            for (var i = 0; i < arr.length && i < 30; i++) {
+                if (arr[i] && arr[i].push) m |= (1 << i);
+            }
+            return m;
+        }
+        window.armPushMask = currentArmPushMask;
+        // Pinned by stroke replay (05d), recordings (03) and peer strokes (06),
+        // exactly as BRUSH_VELOCITY_ONLY is: which arms deposited pigment is a
+        // property of the stroke that was painted, not of whoever is watching.
+        // null = no pin, read the live panel.
+        window.__armPushPin = null;
+
         // exactColor: programmatic splat sources (path layers, audio scenes,
         // animations) pass true so their configured color is deposited as-is on
         // every arm. Pointer strokes, stroke replay, and remote-peer strokes
@@ -263,7 +290,19 @@
                 && window.BrushShapes.stampPending()) return;
             window.__unsavedWork = true; // every dye source funnels through here
             window.__brushTipOn = !exactColor || !!withFootprint;
+            // Marks THIS call's dab train for the push accumulator in splat()
+            // (05i): Spread/Gather publish one source per pushing arm, and the
+            // list has to be rebuilt per multiSplat rather than accumulated
+            // across a frame's worth of dabs — see the note there.
+            window.__dabSeq = (window.__dabSeq | 0) + 1;
             try {
+            // Per-arm Pressure rides the same gate as the tip and the shape:
+            // user strokes only. A programmatic source (audio scene, path
+            // layer, animation) is a dye SOURCE and must keep painting on
+            // every arm whatever the panel says.
+            const armPushMask = window.__brushTipOn
+                ? ((typeof window.__armPushPin === 'number') ? window.__armPushPin : currentArmPushMask())
+                : 0;
             // Multi-Brush arms: one dab per symmetry transform (see the
             // symmetryTransforms block above for what each mode builds).
             const centerX = canvas.width * 0.5;
@@ -281,8 +320,26 @@
                 const armDx = m[0] * dx + m[1] * dy;
                 const armDy = m[3] * dx + m[4] * dy;
                 const armColor = exactColor ? color : resolveArmColor(transforms[i].arm, color);
+                // Two things splat() cannot work out for itself, published for
+                // the length of this one dab and cleared in the finally:
+                //  · __armVelOnly — true forces the velocity-only path for a
+                //    marked arm even while the brush as a whole paints. Never
+                //    false: an unmarked arm still follows BRUSH_VELOCITY_ONLY,
+                //    so the whole-brush Pressure mode keeps working unchanged.
+                //  · __armFlip — this transform is a REFLECTION (negative
+                //    determinant). Smudge is already handled by armDx/armDy
+                //    above, but Swirl's handedness is a scalar the shader
+                //    resolves per fragment, and chirality flips in a mirror:
+                //    without this, a mirrored arm spun the same way round as
+                //    its source and the pair read as two brushes, not one
+                //    folded over. A point reflection (mirrorXY = 180° rotation)
+                //    has determinant +1 and correctly does NOT flip.
+                window.__armVelOnly = (armPushMask & (1 << transforms[i].arm)) ? true : null;
+                window.__armFlip = (m[0] * m[4] - m[1] * m[3]) < 0;
                 splat(finalX, finalY, armDx, armDy, armColor);
             }
+            window.__armVelOnly = null;
+            window.__armFlip = false;
             if (shouldBroadcast && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     x / canvas.width,
@@ -294,7 +351,11 @@
                     config.SPLAT_RADIUS
                 );
             }
-            } finally { window.__brushTipOn = false; }
+            } finally {
+                window.__brushTipOn = false;
+                window.__armVelOnly = null;
+                window.__armFlip = false;
+            }
         }
         // Helper to apply a multiSplat with specific multiplier and radius, restoring after
         window.applyMultiSplatWith = function(x, y, dx, dy, color, mult, radius, exactColor, withFootprint) {
@@ -414,7 +475,14 @@
             const hue = Math.random() * 360; // Full spectrum
             const sat = 0.85 + Math.random() * 0.15; // 85-100% saturation (sharp, clear hues)
             let light = 0.5 + Math.random() * 0.15; // 50-65% lightness (luminous, never muddy)
-            function hslToRgb(h, s, l) {
+            // h in DEGREES (0-360), s and l as fractions (0-1); returns floats 0-1.
+            // Named for its contract because two other chunks define a function
+            // called hslToRgb with different units on both ends — 14-light-shift
+            // takes percent and returns 0-255, 25-mutation-engine takes all
+            // fractions and returns 0-255. They are file-scoped so they never
+            // collide at runtime, but moving a line between chunks silently
+            // rescales the colour.
+            function hslDeg01ToRgb01(h, s, l) {
                 const c = (1 - Math.abs(2 * l - 1)) * s;
                 const x = c * (1 - Math.abs((h / 60) % 2 - 1));
                 const m = l - c / 2;
@@ -427,7 +495,7 @@
                 else { r = c; g = 0; b = x; }
                 return [r + m, g + m, b + m];
             }
-            let rgb = hslToRgb(hue, sat, light);
+            let rgb = hslDeg01ToRgb01(hue, sat, light);
             // Equal HSL lightness is not equal perceived brightness: a deep blue at
             // L 0.5 reads near-black on the dark canvas while a yellow glows. Lift
             // lightness until the color clears a luma floor so every hue lands legible.
@@ -447,7 +515,7 @@
                 : ((typeof config.RANDOM_LUMA_FLOOR === 'number') ? config.RANDOM_LUMA_FLOOR : 0.22);
             while ((0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) < lumaFloor && light < 0.82) {
                 light += 0.04;
-                rgb = hslToRgb(hue, sat, light);
+                rgb = hslDeg01ToRgb01(hue, sat, light);
             }
             return rgb;
         }

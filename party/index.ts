@@ -32,7 +32,21 @@ const TURN_HOLDER_ONLY = new Set([
   "clear",
   "preset",
   "turn-look",
+  // Colliders shipped after this gate was written (peer collider sync, PR #42,
+  // "zero relay changes") and so escaped it. They belong here: an obstacle
+  // feeds vorticity, pressure and advection every frame on every canvas, so a
+  // watcher placing or deleting a wall rewrites the physics of the painter's
+  // turn — the exact out-of-turn influence the rotation exists to prevent.
+  "collider-add",
+  "collider-remove",
 ]);
+
+// Deliberately NOT gated by the rotation, though it shipped alongside the
+// colliders: brush-shape publishes a peer's stamp BITMAP, it does not paint.
+// A watcher's shape needs to be in everyone's hands before their turn starts —
+// gating it would drop the definition and leave their eventual stroke printing
+// as a plain gaussian for everyone else, which is the known shaped-stroke gap
+// made worse rather than a safety win.
 
 // Message types only this relay may author. A client-sent copy is a forgery —
 // e.g. a fake 'turn-state' would gate every other member's painting and
@@ -493,6 +507,17 @@ export default class FluidPartyServer implements Party.Server {
     // wipe, or restyle the room out of turn.)
     if (this.managed) {
       if (!this.loaded) await this.ensureLoaded();
+      // Only the host may lock the room's look. This gate was missing entirely:
+      // settings-lock predates the take-turns hardening and rode the default
+      // relay, while the CLIENT only checked whether the RECEIVER was the host,
+      // never whether the sender was. Any guest could therefore gate every
+      // other member's settings, restyle them with a snapshot of their
+      // choosing (the snapshot's `transport` section even toggles pause and
+      // freeze), or silently release a genuine host's lock with locked:false.
+      if (data.type === "settings-lock") {
+        const st = sender.state as ConnState | null;
+        if (!st || st.uid !== this.hostId) return;
+      }
       if (this.turnsOn) {
         if (data.type === "settings-lock") return; // superseded while taking turns
         if (TURN_HOLDER_ONLY.has(data.type)) {
@@ -507,7 +532,15 @@ export default class FluidPartyServer implements Party.Server {
     }
 
     // ── Default relay: stamp sender id/timestamp + broadcast to everyone else ──
-    if (!data.clientId) data.clientId = sender.id;
+    // clientId is FORCED, not filled in when absent. Trusting a sender-supplied
+    // one made peer identity a free-text field: clients key real state on it —
+    // collider-remove on `clientId|lid` (so a peer could delete another peer's
+    // wall from every canvas), stroke-chunk reassembly on `clientId|sid`
+    // first-chunk-wins (so a forged chunk could poison someone else's in-flight
+    // stroke), plus remote cursors and gap-fill positions. share-look already
+    // force-stamped for exactly this reason; the rest of the types simply never
+    // got the same treatment.
+    data.clientId = sender.id;
     if (!data.timestamp) data.timestamp = Date.now();
     this.room.broadcast(JSON.stringify(data), [sender.id]);
   }
@@ -583,9 +616,20 @@ export default class FluidPartyServer implements Party.Server {
       this.hostId = nextState ? nextState.uid : null;
       await this.persist();
       if (this.hostId) {
-        this.room.broadcast(
-          JSON.stringify({ type: "host-changed", hostId: this.hostId, timestamp: Date.now() })
-        );
+        // Announce the new host by CONNECTION id, never by uid — the same rule
+        // the rotation and the share roster already follow, and for a sharper
+        // reason here. A uid is the lock re-admission key (see the allowlist
+        // check in onConnect), and while it is also the current hostId, a
+        // connection presenting it is handed role "host" outright — so
+        // broadcasting it room-wide handed every listener both a way past a
+        // locked room and the credential for lock/turns/pass-skip. Clients
+        // compare this against their own connection id from "connected".
+        const hostConnId = this.clientIdForUid(this.hostId, conn.id);
+        if (hostConnId) {
+          this.room.broadcast(
+            JSON.stringify({ type: "host-changed", hostId: hostConnId, timestamp: Date.now() })
+          );
+        }
       }
     }
 

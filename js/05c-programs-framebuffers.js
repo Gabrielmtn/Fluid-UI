@@ -420,7 +420,24 @@
                     gl.deleteTexture(prev.texture);
                     gl.deleteFramebuffer(prev.fbo);
                 });
-                gl.enable(gl.BLEND);
+                // Exit on the canonical baseline (blend OFF, see the contract
+                // note at blit()), NOT on boot's gl.enable(gl.BLEND). This line
+                // used to re-enable blending to mirror 04a's boot state, and
+                // that was wrong twice over: nothing re-establishes a blendFunc
+                // here, so the live one was whatever the last pass left —
+                // (ONE,ONE) once applyGlow's additive upsample has run, or the
+                // eraser's (ZERO,ONE_MINUS_SRC_ALPHA) after a sketch/mask
+                // erase. The preserved-copy branch only runs on MID-SESSION
+                // reinits (governor tier change, resize settle, PhotoSafe
+                // toggle), never at boot, so it handed blend-on plus an
+                // arbitrary func to whatever ran next — and splat()/ringSplat()
+                // inherit blend state rather than setting it. A dab landing in
+                // that window ghosted (additive) or ERASED dye and zeroed
+                // velocity inside its scissor rect, which splatPass then blitted
+                // into the canonical .read texture. Same class as 6fd1be4:
+                // state owned by a different logical pass.
+                gl.disable(gl.BLEND);
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             }
             // Re-point the active-layer alias at the rebuilt store entry
             if (window.rasterLayers) {
@@ -739,6 +756,30 @@
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
         gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(0);
+        // ─── GL state contract (read before adding a pass) ───────────────
+        // Every draw in the app funnels through blit(), and blit() binds only
+        // the framebuffer. Two things it therefore takes on faith:
+        //
+        // 1. The fullscreen quad above is bound ONCE, here, for the life of the
+        //    context — default VAO, ARRAY_BUFFER + ELEMENT_ARRAY_BUFFER + attrib
+        //    0 never rebound anywhere (verified: no other gl.bindBuffer or
+        //    vertex-attrib call exists in js/). Anything that binds a buffer or
+        //    a VAO and does not restore this breaks EVERY pass at once, which
+        //    reads as total garbage rather than a localized bug. If you add a
+        //    particle system, a debug overlay or any third-party GL snippet,
+        //    restore these three bindings on the way out.
+        //
+        // 2. The baseline between passes is BLEND DISABLED with blendFunc left
+        //    on (SRC_ALPHA, ONE_MINUS_SRC_ALPHA). update() re-asserts the
+        //    disable at the top of the physics loop (05j:615), and every pass
+        //    that wants blending — the sketch/mask stampers and Capture (05i),
+        //    the glow upsample (05i), the obstacle recomposite (below) — owns
+        //    the full enable/blendFunc/disable/restore cycle itself. Leaving a
+        //    non-canonical func live is not harmless: splat() and ringSplat()
+        //    run outside update() (event handlers, the multiplayer socket
+        //    handler, the audio scenes' own rAF), so a stray (ONE,ONE) or an
+        //    eraser func reaches live dabs. That is precisely the 6fd1be4 bug
+        //    class — a pass silently inheriting state another pass owns.
         function blit(dest) {
             gl.bindFramebuffer(gl.FRAMEBUFFER, dest);
             gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);

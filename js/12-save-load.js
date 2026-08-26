@@ -377,7 +377,9 @@
                     // saved modes land as 'fixed' so the row shows a real
                     // active mode instead of nothing.
                     var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
-                    arm.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                    // push: the arm is a Pressure arm (moves paint, lays none).
+                    arm.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
+                               push: !!c.push });
                 });
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             } else {
@@ -926,7 +928,8 @@
         try {
             if (window.multiArmColors && window.multiArmColors.length) {
                 armColorsData = window.multiArmColors.map(function(c) {
-                    return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0 };
+                    return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0,
+                             push: !!c.push };
                 });
             }
         } catch(_){}
@@ -1096,14 +1099,15 @@
                     // 'rainbow' (removed 2026-08-15, photosensitivity): old
                     // presets and stale peers' snapshots coerce to 'fixed'.
                     var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
-                    armArr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                    armArr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
+                                  push: !!c.push });
                 });
                 if (window.settingsManager) {
                     // Persist the SANITIZED arms, not the raw snapshot — an
                     // old preset's 'rainbow' would otherwise reseed
                     // localStorage and resurrect on the next launch.
                     window.settingsManager.set('brush.armColors', armArr.map(function (a) {
-                        return { mode: a.mode, color: a.color, stepIndex: a.stepIndex };
+                        return { mode: a.mode, color: a.color, stepIndex: a.stepIndex, push: !!a.push };
                     }));
                 }
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
@@ -1762,7 +1766,7 @@
             colors: { background: '#000000', brush: '#ffffff', brandingText: '#ffffff' },
             kaleido: { mode: 1, segments: 12, angle: 0, twist: 0, zoom: 1, blend: 1 },
             paletteIndex: 0,
-            armColors: [{ mode: 'main', color: '#ffffff', stepIndex: 0 }],
+            armColors: [{ mode: 'main', color: '#ffffff', stepIndex: 0, push: false }],
             lightPos: { x: 0.5, y: 0.5 },
             brushState: { replayMode: 'stroke', replayTimePeriod: 5,
                 splatInMode: 'instant', splatOutMode: 'instant',

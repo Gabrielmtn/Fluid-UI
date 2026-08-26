@@ -349,6 +349,11 @@
                                       // gaussian tail below fp16's smallest subnormal with margin — measured
                                       // dye bit-identical, velocity ≤1-ulp on a handful of texels (console-tunable)
 
+            MP_INBOUND_QUEUE: true,   // Drain peer dabs on the frame under BRUSH_DAB_BUDGET instead of
+                                      // applying them inside the WebSocket handler (06 enqueueRemoteSplat).
+                                      // false = old apply-on-arrival, which was unbudgeted: ~19k peer
+                                      // dabs/sec measured at 8 painters (MP-AUDIT-2026-08-23 §1.1)
+
             SHARPNESS: 0.8,           // Adaptive sharpness (0.0 = off, 1.0 = moderate, 2.0 = aggressive)
 
             CLARITY: 0,               // Local contrast enhancement (0 = off, 1.0 = max)

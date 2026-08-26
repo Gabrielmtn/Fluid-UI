@@ -522,7 +522,36 @@
         }, 0);
     }
 
-    // Custom stamp swatches (33-brush-shapes) + the import tile, shared by
+    // Start a brush shape from whatever image is on the clipboard — the same
+    // flow as ＋ (mask editor → Apply → new stamp), sourced from a copy
+    // instead of a file picker. Copying a reference and cutting a brush out
+    // of it is one gesture short of a round trip through Save As.
+    function importShapeFromClipboard() {
+        if (!window.BrushShapes) return;
+        if (typeof window.readClipboardImage !== 'function') {
+            window.appAlert('One moment', 'The clipboard reader is still loading — try again in a moment.');
+            return;
+        }
+        window.readClipboardImage(function (img) {
+            if (img) { window.BrushShapes.beginImportDataUrl(img.url, img.title || 'Pasted'); return; }
+            // A failed read does NOT mean an empty clipboard: in a browser the
+            // direct read needs a permission that may never have been granted,
+            // and on a plain-http origin the API isn't there at all. Ask for
+            // the paste instead — the user's own keystroke carries the image
+            // where no API can. The indicator says what to press; only if that
+            // paste arrives empty is the clipboard genuinely empty, and the
+            // paste handler says so itself.
+            if (typeof window.armClipboardShapePaste === 'function') {
+                window.armClipboardShapePaste();
+                return;
+            }
+            window.appAlert('Nothing to paste',
+                'Copy an image first — a screenshot, or "Copy image" from anywhere — then press this again. ' +
+                'You can also drag an image straight onto this row.');
+        });
+    }
+
+    // Custom stamp swatches (33-brush-shapes) + the import tiles, shared by
     // the drawer's shapes row and the strip's tip menu — one renderer, so a
     // shape selects, deletes and highlights identically wherever it's clicked.
     function renderShapeTiles(row, opts) {
@@ -565,6 +594,19 @@
         addB.title = 'Add brush shape — import an image and cut it out with the mask tools (incl. Instant Roto). You can also drop an image anywhere on this row.';
         addB.addEventListener('click', function () { if (opts.onImport) opts.onImport(); });
         row.appendChild(addB);
+
+        var pasteB = document.createElement('button');
+        pasteB.type = 'button';
+        pasteB.className = 'brush-tip-btn brush-shape-paste';
+        pasteB.textContent = 'Clipboard';
+        pasteB.title = 'New brush shape from the clipboard — takes the image you last copied and opens the same cut-out editor as ＋.';
+        pasteB.addEventListener('click', function () {
+            // The caller closes its popup first: the mask editor takes the
+            // screen from here, exactly as it does for ＋.
+            if (opts.onImportClose) opts.onImportClose();
+            importShapeFromClipboard();
+        });
+        row.appendChild(pasteB);
     }
 
     // The square appended to the Brush Size fader: it SHOWS the tip you are
@@ -645,6 +687,7 @@
                     closeMenu();  // the mask editor takes the screen from here
                     if (BrushTipCtl) BrushTipCtl.openImport();
                 },
+                onImportClose: closeMenu,   // same, for the clipboard tile
                 onPick: closeMenu
             });
         }
@@ -3385,6 +3428,14 @@
             // nothing there. Greyed rather than hidden, same as Spacing/Interval
             // below, so the block does not reflow when you switch modes.
             setGroupEnabled(pressStrGroup, mode !== 'smudge');
+            // The Multi-Brush panel's per-arm Pressure toggles read this flag
+            // for their inert state, so refresh them if that panel is open.
+            // Query the arm-colours popup specifically — the brush drawer and
+            // the presets popup share the .arm-colors-panel skin.
+            if (typeof window.rebuildArmColorRows === 'function') {
+                var armPanel = document.querySelector('.arm-colors-panel.arm-colors-rows');
+                if (armPanel && armPanel.style.display !== 'none') window.rebuildArmColorRows();
+            }
         }
         function setPressureEnabled(on) {
             if (window.config) window.config.BRUSH_VELOCITY_ONLY = !!on;
@@ -3972,6 +4023,7 @@
         modeSel.innerHTML =
             '<option value="off" selected>Off</option>' +
             '<option value="tunnel">🌀 Tunnel</option>' +
+            '<option value="timing">🎯 Timing Only</option>' +
             '<option value="min">Minimized</option>' +
             '<option value="full">Full</option>';
         modeGroup.appendChild(modeLbl);
@@ -4000,6 +4052,7 @@
                 '<select id="audioReactSource" class="audio-mini-src">' +
                     '<option value="mic">Mic</option><option value="system">System</option><option value="file">File</option>' +
                 '</select>' +
+                '<button type="button" id="audioChooseTrack" class="audio-choose-track" title="Load an audio track — every audio feature follows this one file">🎵 Track…</button>' +
             '</div>' +
             // Transport (2026-08-16): a loaded file plays out loud, so it gets
             // real controls \u2014 play/pause, restart, loop, a draggable playhead
@@ -4032,8 +4085,57 @@
         fileInput.id = 'audioReactFile';
         body.appendChild(fileInput);
 
+        // ── Visualize Audio Timing (js/40-audio-timing.js) ──────────
+        // The second gated feature in Audio, and deliberately built from
+        // parts that already exist: the same hidden uploader above, and
+        // the same spectral gate boxes the scenes fire on. The difference
+        // is WHEN it reads them — offline, ahead of the playhead — so the
+        // hits can fall down a lane before you have to move on them.
+        var timingRow = document.createElement('div');
+        timingRow.className = 'control-group checkbox-group';
+        timingRow.style.marginTop = '6px';
+        var timingCb = document.createElement('input');
+        timingCb.type = 'checkbox';
+        timingCb.id = 'audioTimingToggle';
+        var timingLbl = document.createElement('label');
+        timingLbl.setAttribute('for', 'audioTimingToggle');
+        timingLbl.style.cssText = 'margin:0;font-size:10px';
+        timingLbl.textContent = 'Visualize Audio Timing';
+        timingLbl.title = 'Chart the loaded track as descending bars, so you can see the hits coming and move on them';
+        timingRow.appendChild(timingCb);
+        timingRow.appendChild(timingLbl);
+        body.appendChild(timingRow);
+
+        var timingHost = document.createElement('div');
+        timingHost.className = 'atv-controls';
+        timingHost.style.display = 'none';
+        body.appendChild(timingHost);
+
+        timingCb.addEventListener('change', function () {
+            if (!window.AudioTiming) { timingCb.checked = false; return; }
+            if (timingCb.checked) {
+                // The chart runs off the engine's transport clock, and Audio
+                // Mode 'off' tears the engine down — so turning this on lands
+                // in Timing Only: the mode that is exactly this feature.
+                if (modeSel.value === 'off') { modeSel.value = 'timing'; applyAudioMode('timing', true); }
+                window.AudioTiming.enable();
+            } else {
+                window.AudioTiming.disable();
+            }
+            window.AudioTiming.mountControls(timingHost);
+        });
+        if (window.AudioTiming) window.AudioTiming.mountControls(timingHost);
+
         var enableCb = mini.querySelector('#audioReactToggle');
         var srcSel = mini.querySelector('#audioReactSource');
+        // Track picker, promoted into the enable row (2026-08-26): loading
+        // the file is the FIRST thing a session does, so it lives beside the
+        // source selector instead of down in the timing controls.
+        var chooseBtn = mini.querySelector('#audioChooseTrack');
+        if (chooseBtn) chooseBtn.addEventListener('click', function () {
+            if (srcSel.value !== 'file') srcSel.value = 'file';
+            fileInput.click();
+        });
         // The enable row (checkbox + source) is SHARED between the mini widget
         // and the full drawer: the same DOM nodes are relocated on mode change
         // so there's exactly one control and zero state-sync problems. Without
@@ -4065,19 +4167,37 @@
                 window.audioReactive.enable(src);
             }
         }
-        enableCb.addEventListener('change', function () {
+        enableCb.addEventListener('change', function (e) {
             if (!window.audioReactive) return;
-            if (enableCb.checked) enableFromSource();
+            // The box is a REFLECTION of engine state (see above) — and a
+            // restored snapshot re-dispatches 'change' on it. Untrusted
+            // checks must not start engines: that was a mic-permission
+            // prompt (or a swallowed file-picker click) on page load, with
+            // the sync below then unchecking the box anyway.
+            if (enableCb.checked) { if (e.isTrusted) enableFromSource(); }
             else window.audioReactive.disable();
             syncEnableCheckbox();
         });
-        srcSel.addEventListener('change', function () {
+        srcSel.addEventListener('change', function (e) {
             // Switching source while running: tear the old one down, then ask
             // for the new one. If that ask is the file picker and the user
             // cancels, the sync leaves the box unchecked — honest, because
             // nothing is running any more.
-            if (window.audioReactive && window.audioReactive.isEnabled()) {
+            if (!window.audioReactive) return;
+            if (window.audioReactive.isEnabled()) {
                 window.audioReactive.disable();
+                // A SYNTHETIC switch to 'file' (settings restore, preset,
+                // multiplayer look apply) must not chase the picker — the
+                // click is either ignored (no activation) or pops a dialog
+                // out of a settings load. Real sources re-enable fine.
+                if (srcSel.value !== 'file' || e.isTrusted) enableFromSource();
+            } else if (e.isTrusted && srcSel.value === 'file') {
+                // Picking File while audio is OFF is the intent to load a
+                // track — open the picker right there. It used to require
+                // bouncing to another source and back (or finding the Enable
+                // box first): this change handler only ran the enabled path,
+                // so the most important pick did nothing. isTrusted keeps
+                // restored sessions from popping a dialog on boot.
                 enableFromSource();
             }
             syncEnableCheckbox();
@@ -4222,8 +4342,26 @@
             modeSel.dispatchEvent(new Event('change'));
         });
 
+        // Timing Only mode suspends every visual mapping while it holds —
+        // the track plays, the chart charts, the fluid stays yours. The
+        // engine snapshot restores the moment any other mode is picked.
+        var timingModeSnap = null;
+        function suppressReactVisuals() {
+            if (!window.audioReactive || timingModeSnap) return;
+            timingModeSnap = window.audioReactive.getConfig();
+            ['bassAutoSplat', 'overallToSize', 'midToKaleido', 'trebleToColor'].forEach(function (k) {
+                window.audioReactive.setMapping(k, false);
+            });
+        }
+        function restoreReactVisuals() {
+            if (!window.audioReactive || !timingModeSnap) return;
+            window.audioReactive.applyConfig(timingModeSnap);
+            timingModeSnap = null;
+        }
+
         function applyAudioMode(mode, userInitiated) {
             var isScene = !!(window.AudioScenes && window.AudioScenes.isScene(mode));
+            if (mode !== 'timing') restoreReactVisuals();
             // Park the shared enable row where the active mode can reach it —
             // and keep the file transport docked directly beneath it, or the
             // playback controls would stay behind in the hidden mini widget
@@ -4249,6 +4387,7 @@
                 mini.style.display = 'none';
                 if (window.audioReactive) window.audioReactive.disable();
                 if (enableCb) enableCb.checked = false;
+                if (timingCb && timingCb.checked) { timingCb.checked = false; timingCb.dispatchEvent(new Event('change')); }
                 if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
                 stopAudioMiniLoop();
             } else if (isScene) {
@@ -4266,6 +4405,17 @@
                     // the lie when the source is File and the picker is
                     // cancelled, or when mic permission is denied).
                     enableFromSource();
+                }
+            } else if (mode === 'timing') {
+                // The mini shows (the transport lives there), the chart runs,
+                // and no mapping touches the canvas.
+                mini.style.display = '';
+                suppressReactVisuals();
+                if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
+                startAudioMiniLoop();
+                if (userInitiated) {
+                    if (window.audioReactive && !window.audioReactive.isEnabled()) enableFromSource();
+                    if (timingCb && !timingCb.checked) { timingCb.checked = true; timingCb.dispatchEvent(new Event('change')); }
                 }
             } else if (mode === 'min') {
                 mini.style.display = '';
@@ -5335,7 +5485,7 @@
             var arr = window.multiArmColors;
             if (!arr) { arr = []; window.multiArmColors = arr; }
             while (arr.length < count) {
-                arr.push({ mode: 'main', color: '#ffffff', stepIndex: 0 });
+                arr.push({ mode: 'main', color: '#ffffff', stepIndex: 0, push: false });
             }
         }
 
@@ -5343,7 +5493,7 @@
             if (!window.settingsManager) return;
             var arr = window.multiArmColors || [];
             window.settingsManager.set('brush.armColors', arr.map(function(c) {
-                return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0 };
+                return { mode: c.mode, color: c.color, stepIndex: c.stepIndex || 0, push: !!c.push };
             }));
         }
         // Exposed for the picker→arm-0 sync in 05g (two-way brush color sync)
@@ -5368,7 +5518,8 @@
                     // the dead mode every launch (row showed no active
                     // mode, arm painted fallback).
                     var mode = (c.mode === 'rainbow') ? 'fixed' : (c.mode || 'main');
-                    arr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0 });
+                    arr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
+                               push: !!c.push });
                 });
             } else {
                 // No saved per-arm config: import the active brush's mode from the
@@ -5376,7 +5527,7 @@
                 // palette-preseed "auto-step" surfaces in BOTH colour UIs and in
                 // recording. Otherwise arm 0 would stay 'main' and the reconcile
                 // below would wipe the visibly-checked Step/Rnd state.
-                if (!arr[0]) arr[0] = { mode: 'main', color: '#ffffff', stepIndex: 0 };
+                if (!arr[0]) arr[0] = { mode: 'main', color: '#ffffff', stepIndex: 0, push: false };
                 if (arr[0].mode === 'main') {
                     var rndEl = document.getElementById('randomColor');
                     var stepC = document.getElementById('stepPalette');
@@ -5528,6 +5679,48 @@
 
                     row.appendChild(picker);
                     row.appendChild(modeWrap);
+
+                    // ── Per-arm Pressure (2026-08-26) ────────────────────
+                    // Marks this arm as a PUSH arm: it moves paint already on
+                    // the canvas and lays none of its own, while its siblings
+                    // keep painting. The brush drawer's Pressure button is the
+                    // all-arms version of the same switch, so while THAT is on
+                    // every arm pushes and these are inert — greyed rather than
+                    // hidden, so the rows don't reflow when you switch the
+                    // brush over. Lives outside modeWrap (which is the colour
+                    // group) and is pushed to the right edge: it answers a
+                    // different question from the four buttons beside it.
+                    var brushPush = !!(window.config && window.config.BRUSH_VELOCITY_ONLY);
+                    var pushBtn = document.createElement('button');
+                    pushBtn.type = 'button';
+                    pushBtn.className = 'arm-mode-btn arm-push-btn';
+                    pushBtn.textContent = '≈';
+                    function paintPushBtn() {
+                        var on = !!cfg.push;
+                        pushBtn.classList.toggle('active', on);
+                        pushBtn.style.cssText = 'all:unset;box-sizing:border-box;margin-left:auto;'
+                            + 'padding:4px 7px;font-size:11px;line-height:1;border-radius:0;background:'
+                            + (on ? '#ec3013' : 'rgba(255,255,255,0.08)') + ';color:'
+                            + (on ? '#fff' : 'rgba(255,255,255,0.6)') + ';border:1px solid '
+                            + (on ? '#ec3013' : 'rgba(255,255,255,0.1)')
+                            + ';cursor:pointer;opacity:' + (brushPush ? '0.45' : '1') + ';';
+                        pushBtn.title = brushPush
+                            ? 'Pressure arm — the whole brush is already in Pressure mode, '
+                              + 'so every arm pushes. Switch the brush back to Fluid to mix '
+                              + 'pushing and painting arms.'
+                            : (on ? 'Pressure arm: this arm pushes the paint already on the canvas '
+                                    + 'and lays none of its own. Click to make it paint again.'
+                                  : 'Make this a Pressure arm — it pushes paint instead of '
+                                    + 'laying it down, using the mode and Strength set in the '
+                                    + 'brush drawer. The other arms keep painting.');
+                    }
+                    paintPushBtn();
+                    pushBtn.addEventListener('click', function () {
+                        cfg.push = !cfg.push;
+                        paintPushBtn();
+                        persistArmColors();
+                    });
+                    row.appendChild(pushBtn);
                     rowsWrap.appendChild(row);
                 })(i);
             }
