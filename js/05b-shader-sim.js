@@ -520,6 +520,7 @@
             uniform float uRestore;     // 0..1: how far toward remembered strength this frame
             uniform float uRestoreGain; // overshoot past it — the "and brighter"
             uniform float edgeAbsorb; // >0: absorbing borders — fluid vents off-canvas instead of bouncing
+            uniform float edgeAbsorbBand; // drain band width, fraction of the canvas per axis
             uniform int isDensity;
             uniform int hasObstacle;
             uniform int macMode; // 1 = uSource is the already-advected MacCormack
@@ -805,13 +806,17 @@
                 }
                 // Overflow mode rim drain: with open boundaries (divergence and
                 // gradient passes stop treating edges as walls) outbound fluid
-                // exits freely — this hairline drain at the outermost ~2.5%
-                // just guarantees whatever crosses the rim dies there and never
-                // washes back in via the clamped edge texels. Invisible: it sits
-                // at the border, not inside the composition.
+                // exits freely — this drain at the rim guarantees whatever
+                // crosses it dies there and never washes back in via the
+                // clamped edge texels. Its width is the Border slider
+                // (edgeAbsorbBand, canvas fraction per axis): at the 0.025
+                // default it is a hairline sitting at the border rather than
+                // inside the composition; wider bands visibly eat into the
+                // frame, which is the point of exposing it.
                 if (edgeAbsorb > 0.0) {
                     float ed = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
-                    float bandK = (1.0 - smoothstep(0.0, 0.025, ed)) * edgeAbsorb;
+                    // Floor the width: smoothstep(0.0, 0.0, x) is undefined.
+                    float bandK = (1.0 - smoothstep(0.0, max(edgeAbsorbBand, 1e-4), ed)) * edgeAbsorb;
                     color *= max(0.0, 1.0 - bandK * 0.55 * dt * 60.0);
                     if (isDensity == 0) color.a = 1.0;
                 }
@@ -1155,6 +1160,50 @@
                 fragColor = vec4(vel + force * dt, 0.0, 1.0);
             }
         `;
+        // ── Constant pressure field (ambient gravity / lift) ────────
+        // A steady directional body force, weighted by how much PAINT is in
+        // each texel — and that weighting is the entire reason this works.
+        //
+        // A UNIFORM body force is curl-free, and the projection step removes
+        // exactly the curl-free part. In a closed box (divergenceFrag mirrors
+        // velocity at the edges) the solve finds the hydrostatic gradient that
+        // cancels gravity outright, so pushing every texel the same way is
+        // undone as fast as it is applied — nothing moves. That is the same
+        // wall the radial Pressure modes hit from another angle (measured
+        // 2026-08-23: a radial dab kept 51% of its speed after six steps while
+        // a divergence-free one kept 107%).
+        //
+        // Scaling by dye makes the field NON-uniform, so its curl is
+        // grad(rho) x g — nonzero wherever a dye edge runs across the force.
+        // That is the baroclinic term, the same one that makes smoke mushroom:
+        // the INTERIOR of a blob does not accelerate (correct, it is
+        // incompressible and has nowhere to go) but its EDGES roll. What you
+        // see is paint falling, pooling and fingering rather than the whole
+        // canvas sliding off one side.
+        const ambientForceFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity;
+            uniform sampler2D uDensity;
+            uniform vec2  uForce;      // direction * intensity, velocity units per second
+            uniform float dt;
+            uniform float uMaxDensity; // dye level treated as fully loaded
+            uniform float uCapSpd;     // Max Speed headroom gate (0 = off)
+            void main() {
+                vec2 vel = texture(uVelocity, vUv).xy;
+                vec3 d = texture(uDensity, vUv).rgb;
+                float rho = clamp(max(d.r, max(d.g, d.b)) / max(uMaxDensity, 1e-4), 0.0, 1.0);
+                vec2 f = uForce * rho;
+                // Same source gate vorticity uses: stop pushing texels already
+                // near the Max Speed ceiling. Pushing a capped texel adds no
+                // motion, only divergence for the projection to bounce back.
+                if (uCapSpd > 0.0) {
+                    f *= 1.0 - smoothstep(0.45 * uCapSpd, 0.7 * uCapSpd, length(vel));
+                }
+                fragColor = vec4(vel + f * dt, 0.0, 1.0);
+            }
+        `;
         // ── Attractor field (analytic dye-gather force, 2026-07-18) ─────
         // A DYE-TRANSPORT gather that captures the fluid toward a set of
         // "magnet" points — a sacred-geometry attractor layout the caller
@@ -1190,6 +1239,7 @@
             uniform float uDensityGate;   // 0..1: how hard filled regions back off
             uniform float uMaxDensity;    // dye level treated as "full"
             uniform int   uCount;
+            uniform float uKeep;          // 1 = gather may only ADD (see the note below)
             uniform vec4  uAtt[${MAX_ATTRACTORS}]; // xy = UV pos, z = signed strength, w = radius (UV)
             void main() {
                 vec3 here = texture(uDensity, vUv).rgb;
@@ -1220,7 +1270,21 @@
                 // writing a constant here would erase it everywhere the
                 // attractor field runs (and read as full-strength memory over
                 // the whole canvas, so Ignite would blow the pool out).
-                fragColor = texture(uDensity, src);
+                vec4 gathered = texture(uDensity, src);
+                // uKeep: a plain gather ERODES an inward pull's outer rim. Every
+                // texel reads from further OUT, so the texels at the edge of a
+                // painted region read empty canvas and write it — the region is
+                // eaten from the outside in while its middle fills. Harmless for
+                // the scene field, whose magnets sit inside a broad dye wash; fatal
+                // for the Push brush's Suck, which is aimed at a finite blob
+                // (measured 2026-08-23: 57% of the paint gone in 0.7s against the
+                // do-nothing control). Taking the max instead lets a texel receive
+                // what is outward of it but never lose what it already had, so Suck
+                // concentrates and cannot erase. It also cannot run away: a max can
+                // never exceed the field's existing peak, so the pool saturates at
+                // the brightest dye already present and stops. Default 0 keeps the
+                // attractor scene bit-identical.
+                fragColor = (uKeep > 0.5) ? max(gathered, texture(uDensity, vUv)) : gathered;
             }
         `;
         // M2 spectral floor (2026-07-17): the sim's small-scale energy sink.
@@ -1614,13 +1678,43 @@
             uniform float radius, aspectRatio;
             uniform float flow;     // stamp alpha at the core
             uniform float hardness; // 0 = soft gaussian edge, 1 = hard AA disc
+            uniform sampler2D uStampTex; // custom brush shape (alpha = coverage), unit 1
+            uniform float stampTexOn;    // 1 = the footprint IS the stamp, not the disc
+            uniform float stampAspect;   // stamp width/height, so non-square shapes keep it
+            uniform float stampAngle;    // brush rotation (radians, screen space)
             void main() {
                 vec2 p = vUv - point;
                 p.x *= aspectRatio;
-                float r2 = dot(p, p) / radius;
-                float soft = exp(-r2 * 3.0);
-                float hard = 1.0 - smoothstep(0.72, 1.0, r2);
-                float a = mix(soft, hard, clamp(hardness, 0.0, 1.0)) * clamp(flow, 0.0, 1.0);
+                float a;
+                if (stampTexOn > 0.5) {
+                    // Deliberately the SAME mapping splatFrag uses for a custom
+                    // stamp (the he/suv block there), so one shape lands at one
+                    // size and one angle whether the stroke is painting dye, a
+                    // raster layer or a collider wall. Diverging here would mean
+                    // a shape that traces a different outline than the wall it
+                    // just built. The caller uploads the FULL brush radius in
+                    // this branch, not the disc path's halved one.
+                    vec2 q = p / sqrt(radius);
+                    vec2 qr = q;
+                    if (stampAngle != 0.0) {
+                        float ca = cos(stampAngle), sa = sin(stampAngle);
+                        qr = vec2(q.x * ca - q.y * sa, q.x * sa + q.y * ca);
+                    }
+                    vec2 he = (stampAspect >= 1.0)
+                        ? vec2(1.6, 1.6 / max(stampAspect, 0.001))
+                        : vec2(1.6 * max(stampAspect, 0.001), 1.6);
+                    vec2 suv = qr / (2.0 * he) + 0.5;
+                    float cov = 0.0;
+                    if (all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0)))) {
+                        cov = texture(uStampTex, suv).a;
+                    }
+                    a = cov * clamp(flow, 0.0, 1.0);
+                } else {
+                    float r2 = dot(p, p) / radius;
+                    float soft = exp(-r2 * 3.0);
+                    float hard = 1.0 - smoothstep(0.72, 1.0, r2);
+                    a = mix(soft, hard, clamp(hardness, 0.0, 1.0)) * clamp(flow, 0.0, 1.0);
+                }
                 fragColor = vec4(color * a, a); // premultiplied
             }
         `;

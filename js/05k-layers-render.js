@@ -247,6 +247,28 @@
                                 <span class="layer-vis-box"></span>
                                 <span class="layer-check-label">${layer.isCollision ? 'Collision' : 'Mask'}</span>
                             </label>`;
+                    // Neither of these belongs on a collision layer, and both are
+                    // gated on the one flag — isPaintedColliderLayer requires it
+                    // too, so painted and generated colliders are covered alike.
+                    //
+                    // Fluidize pours a layer's picture into the dye and hides the
+                    // layer. A collider is the thing dye flows AROUND, so there it is
+                    // either a no-op or actively wrong: a painted collider has no
+                    // image to pour (05m says so out loud, 'Could not fluidize that
+                    // layer'), and an imported-image one dumps its picture into the
+                    // sim and switches the wall off as a side effect.
+                    //
+                    // Layer from Visible cuts the masked region out as a new picture
+                    // layer. A collider's mask is its WALL, not artwork — the
+                    // cut-out is a silhouette of the shape you are flowing around,
+                    // which is not a thing anyone reaches for that button to get.
+                    //
+                    // Built as a list because a collider now contributes nothing to
+                    // this row, and an empty div would still hold its margin.
+                    const actionBtns = [
+                        (hasMask && !layer.isCollision) ? `<button class="layer-btn" onclick="window.layerFromVisible && layerFromVisible(${layer.index})" title="Cut out what this mask is showing as a new layer of its own. The original keeps its mask, so you can carry on slicing pieces off it.">Layer from Visible</button>` : '',
+                        layer.isCollision ? '' : `<button class="layer-btn" onclick="window.splatLayerToSim && splatLayerToSim(${layer.index})" title="${hasMask ? 'Turn what this mask is showing into fluid' : 'Turn this whole picture into fluid'} — it becomes dye in its own colours and the flow takes it from there. The layer hides itself once poured; unhide it to pour again. Not undoable: it dissolves on its own.">Fluidize</button>`
+                    ].filter(Boolean).join('');
                     element.innerHTML = `
                         ${layerHeaderHTML({
                             title: layer.title, index: layer.index, visTarget: layer.index,
@@ -263,10 +285,7 @@
                             <button class="layer-btn" onclick="window.LayerTransform ? LayerTransform.open(${layer.index}) : toggleActiveLayer(${layer.index})" title="Move / resize / rotate layer">Transform</button>
                             <button class="layer-btn layer-delete-btn" onclick="deleteLayer(${layer.index})" title="Delete this layer">Delete</button>
                         </div>
-                        <div class="layer-action-row">
-                            ${hasMask ? `<button class="layer-btn" onclick="window.layerFromVisible && layerFromVisible(${layer.index})" title="Cut out what this mask is showing as a new layer of its own. The original keeps its mask, so you can carry on slicing pieces off it.">Layer from Visible</button>` : ''}
-                            <button class="layer-btn" onclick="window.splatLayerToSim && splatLayerToSim(${layer.index})" title="${hasMask ? 'Turn what this mask is showing into fluid' : 'Turn this whole picture into fluid'} — it becomes dye in its own colours and the flow takes it from there. The layer hides itself once poured; unhide it to pour again. Not undoable: it dissolves on its own.">Fluidize</button>
-                        </div>
+                        ${actionBtns ? `<div class="layer-action-row">${actionBtns}</div>` : ''}
                         <div class="layer-group">
                         <div class="layer-group-title">${layer.isCollision ? 'Collision' : 'Masks'}</div>
                         ${window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer) ? `

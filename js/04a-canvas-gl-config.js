@@ -743,6 +743,93 @@
             BRUSH_HARDNESS: 0.8,      // Sketch stamp edge: 0 = soft gaussian, 1 = hard AA disc
             SKETCH_VISIBLE: true,     // Sketch layer visibility (display composite)
 
+            // ── Constant pressure field (ambient gravity / lift) ──────────
+            // A steady body force on the whole canvas, aimed with the pad in the
+            // Pressure brush section. AMBIENT_ rather than PRESSURE_ on purpose:
+            // PRESSURE_ITERATIONS and friends are the projection solver, and this
+            // is a body force, which is very nearly the opposite thing.
+            //
+            // It is AMBIENT: once switched on it keeps running whichever brush is
+            // in hand, because gravity you have to hold a tool to feel is not
+            // gravity. The control lives in the Pressure section only because that
+            // is where it belongs conceptually.
+            AMBIENT_FORCE: false,     // Master on/off for the constant field
+            AMBIENT_FORCE_X: 0,       // Pad vector, SCREEN space, -1..1 (y+ = DOWN,
+            AMBIENT_FORCE_Y: 0,       // matching the pad). 05j flips y on upload,
+                                      // because velocity's +y is up.
+            AMBIENT_FORCE_REF: 5,     // Velocity added per second at full pad deflection,
+                                      // on fully loaded dye. Measured 2026-08-24 (blob
+                                      // dropped for one second, canvas fractions fallen):
+                                      //   0.5 — 1.1%   2 — 5.1%    5 — 10.4%
+                                      //    10 — 17.4%  20 — 27.0%
+                                      // 5 puts full deflection at ~10% of the canvas per
+                                      // second and peak velocity ~1.8x a painted dab: a
+                                      // fall you can watch cross the canvas in ten
+                                      // seconds, with the low end of the pad still a slow
+                                      // atmospheric drift. Above ~10 the field starts
+                                      // outrunning the dye it is pushing.
+            AMBIENT_FORCE_MAXDYE: 1.6,// Dye level treated as fully loaded, so a faint
+                                      // wash falls slower than a saturated one.
+            BRUSH_VELOCITY_ONLY: false, // Velocity-only brush ("Pressure"): the stroke runs the
+                                      // splat's VELOCITY pass and skips the dye pass entirely,
+                                      // so it moves paint that is already down without
+                                      // depositing any new pigment. Fluid target only — the
+                                      // sketch/mask routes have their own paths. User strokes
+                                      // only (the __brushTipOn gate): programmatic splats
+                                      // (audio scenes, path layers, animations) still paint.
+            BRUSH_VEL_MODE: 'smudge', // How a Pressure dab moves paint:
+                                      //   'smudge' — velocity along pointer travel (the
+                                      //              classic brush's push, minus the dye)
+                                      //   'swirl'  — tangential velocity, a vortex at the cursor
+                                      //   'spread' — dye transported radially outward
+                                      //   'gather' — dye transported radially inward
+                                      // The last three are ANALYTIC, so they work while the
+                                      // pointer stands still — which 'smudge' cannot do
+                                      // (its dx/dy go to zero). Pair them with Constant flow.
+                                      //
+                                      // The UI calls this whole mode 'Pressure', but the config
+                                      // keys stay BRUSH_VEL_* on purpose: BRUSH_PRESSURE_* was
+                                      // PEN pressure, removed 2026-07-22, and reusing that
+                                      // prefix would make the two indistinguishable in a grep.
+                                      //
+                                      // Why spread/gather move DYE while smudge/swirl move
+                                      // VELOCITY: the projection step removes the curl-free
+                                      // part of the velocity field, and a radial push is
+                                      // ENTIRELY curl-free — so forcing velocity radially
+                                      // is undone as fast as it is applied. Measured
+                                      // 2026-08-23, six steps after one dab: swirl
+                                      // (divergence-free) kept 107% of its speed and smudge
+                                      // 187%, while spread kept 51% and gather 55% — and
+                                      // the projection's return flow pulled dye INWARD,
+                                      // CONTRACTING the blob spread was meant to open (mean
+                                      // radius 0.93x the do-nothing control). Same wall the
+                                      // attractor field hit from the opposite sign (05b
+                                      // attractorFrag), so it takes the same answer:
+                                      // transport the dye, never the velocity.
+            BRUSH_VEL_STRENGTH: 1,    // Pressure speed for the stationary modes, in units of
+                                      // BRUSH_VEL_SPEED_REF. Inert for 'smudge', which takes
+                                      // its magnitude from the pointer.
+            BRUSH_PUSH_DYE_RATE: 0.5, // Spread/Gather transport rate at strength 1, in brush-radii
+                                      // per second. Those two modes move DYE rather than
+                                      // velocity (see BRUSH_VEL_MODE above), so they need
+                                      // their own scale — BRUSH_VEL_SPEED_REF is in
+                                      // splat-velocity units and means nothing to them.
+                                      //
+                                      // Ceiling, not taste: the gather is a RESAMPLE, so a
+                                      // texel reads from wherever the offset lands, and an
+                                      // offset larger than the painted region reads EMPTY
+                                      // canvas — which writes empty, destroying paint
+                                      // instead of moving it. Measured at 2.5 (2026-08-23):
+                                      // ~8.7 texels of jump per frame, and a 0.7s gather ate
+                                      // 98% of the blob it was supposed to collect. At 0.5
+                                      // the step is ~1 texel/frame — the same scale
+                                      // advection itself moves at — and dye is conserved.
+                                      // Raise it only alongside a substepped transport.
+            BRUSH_VEL_SPEED_REF: 120, // Strength 1.0 in splat-velocity units. Calibrated
+                                      // against a real stroke: the engine emits |v| = 10x
+                                      // spacing per dab (05d0), so 120 is a hand moving ~12px
+                                      // between dabs — a firm but unremarkable push.
+
             BRUSH_FLOW: 1,            // D1 dye intensity per dab (fluid: scales splat color;
                                       // sketch: scales stamp alpha). 1 = legacy full flow.
             BRUSH_JITTER: 0,          // D1 per-dab scatter, fraction of brush diameter
@@ -813,6 +900,20 @@
                                       // this is > 0.
 
 
+
+            // ── Overflow (open canvas edges) ── the divergence and gradient
+            // passes stop treating the border as a wall, so outbound fluid
+            // leaves instead of bouncing; a drain band at the rim nulls
+            // whatever crosses it so nothing washes back in off the clamped
+            // edge texels. Lived as a Tunnel audio-scene toggle until it
+            // became an Effects checkbox (2026-08-24).
+
+            EDGE_ABSORB: false,       // Overflow enabled (toggled in Effects)
+
+            EDGE_ABSORB_BAND: 0.025,  // Drain band width as a fraction of the canvas,
+                                      // per axis (0.025 = the original hairline 2.5%).
+                                      // The Border slider writes this; MUST stay > 0 —
+                                      // smoothstep(0, 0, x) is undefined in GLSL.
 
             GLOW: false,              // Glow (HDR bloom) post-FX enabled (toggled in Effects)
 

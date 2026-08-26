@@ -506,6 +506,67 @@ function revealWindow(reason) {
     }, 8);
 }
 
+// ══ Photosensitivity boot cache ═══════════════════════════════════════
+// The gate in index.html has to know two things before it paints: has the
+// warning been acknowledged, and is protection on. Those live in
+// localStorage — and reading localStorage is the single most expensive thing
+// in the whole launch. Measured: the FIRST touch of the store in a renderer
+// blocks it for ~490ms while the storage service opens an existing profile
+// (761/802/1026ms across three runs of a bare `localStorage.length`, 0ms for
+// every call after; a virgin profile is free, so it is opening an existing
+// store that costs). Frozen renderer means nothing paints and no cursor
+// hit-test is serviced — it was most of the "Windows spinner spins forever"
+// at launch, and it delayed the boot cursor by ~880ms.
+//
+// So main keeps a plain-JSON mirror of those two values and hands them to the
+// renderer on argv, which costs an fs.readFileSync of ~40 bytes. localStorage
+// REMAINS THE SOURCE OF TRUTH — js/04a and js/05e read and write the same keys
+// directly, and nothing about that changes. This is a boot-time cache and
+// nothing more; when it is absent or unreadable the gate falls back to reading
+// localStorage exactly as it always did, and then seeds the cache so the next
+// launch is fast. That fallback is also the migration path for every existing
+// install, which is why a missing file must never be treated as "not acked".
+const PHOTO_CACHE = () => path.join(app.getPath('userData'), 'photo-safe.json');
+
+function readPhotoCache() {
+    try {
+        // replace(/^\uFEFF/, '') — a BOM makes JSON.parse throw, and anything
+        // that ever rewrites this file by hand (or an editor that helpfully
+        // adds one) would silently cost every launch the 490ms it exists to
+        // avoid. Cheap to tolerate, invisible when it bites.
+        const raw = JSON.parse(fs.readFileSync(PHOTO_CACHE(), 'utf8').replace(/^\uFEFF/, ''));
+        if (!raw || typeof raw !== 'object') return null;
+        // `protect` is deliberately tri-state: '1', '0', or absent. Absent
+        // means protected AND "no trusted choice on record", which the gate
+        // treats differently from an explicit '1' — flattening it to a boolean
+        // would silently convert a never-asked user into an opted-in one.
+        const protect = (raw.protect === '1' || raw.protect === '0') ? raw.protect : null;
+        return { ack: raw.ack === true, protect };
+    } catch (_) { return null; }
+}
+
+function photoCacheArgs() {
+    const c = readPhotoCache();
+    if (!c) return [];   // no cache yet — the gate reads localStorage, as before
+    return ['--photo-ack=' + (c.ack ? '1' : '0'),
+            '--photo-protect=' + (c.protect === null ? 'unset' : c.protect)];
+}
+
+// Written only from the renderer's trusted-consent path — see index.html.
+ipcMain.on('photo-safe-cache', (_evt, payload) => {
+    try {
+        if (!payload || typeof payload !== 'object') return;
+        const ack = payload.ack === true;
+        const protect = (payload.protect === '1' || payload.protect === '0') ? payload.protect : null;
+        fs.writeFileSync(PHOTO_CACHE(), JSON.stringify({ ack, protect }), 'utf8');
+    } catch (e) {
+        // A cache that cannot be written is not a failure worth surfacing:
+        // the gate falls back to localStorage and the app is simply as slow
+        // as it used to be.
+        console.warn('[photo-safe] cache write failed:', e && e.message);
+    }
+});
+
 // The renderer reports ready once its scripts, layout and first drawn frame
 // are all in and the layout has stopped moving (js/00a-boot.js).
 ipcMain.on('boot-ready', () => {
@@ -565,6 +626,11 @@ function createWindow() {
             webSecurity: true, // Keep security but allow WASM
             allowRunningInsecureContent: false,
             // cache: true by default — preserves localStorage/settings across restarts
+            // The photosensitivity gate reads these off process.argv instead of
+            // paying the ~490ms storage-service cold start before it can paint.
+            // Nothing is passed when the cache is missing, and the gate then
+            // falls back to localStorage — see readPhotoCache() above.
+            additionalArguments: photoCacheArgs(),
         },
         transparent: USE_TRANSPARENT_WINDOW,
         frame: false, // Use custom title bar (frameless window)

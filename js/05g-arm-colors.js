@@ -241,7 +241,13 @@
         // animations) pass true so their configured color is deposited as-is on
         // every arm. Pointer strokes, stroke replay, and remote-peer strokes
         // leave it false — they ARE user strokes, so arm color modes apply.
-        function multiSplat(x, y, dx, dy, color, shouldBroadcast, exactColor) {
+        // withFootprint: paint this dab with the user's TIP/SHAPE even though its
+        // colour is exact. Those are independent questions, and bundling both
+        // under exactColor is what made recorded playback come out gaussian — a
+        // recording bakes its colours (so it needs exactColor) but WAS painted
+        // with the user's brush, and should play back in it. The caller pins the
+        // footprint into config first, exactly as stroke replay does.
+        function multiSplat(x, y, dx, dy, color, shouldBroadcast, exactColor, withFootprint) {
             // Brush tip (D1) rides the exactColor split: user strokes (live
             // pointer, replay, remote peers — exactColor falsy) stamp with the
             // configured BRUSH_TIP; programmatic sources (path layers, audio
@@ -256,7 +262,7 @@
                 && typeof window.BrushShapes.stampPending === 'function'
                 && window.BrushShapes.stampPending()) return;
             window.__unsavedWork = true; // every dye source funnels through here
-            window.__brushTipOn = !exactColor;
+            window.__brushTipOn = !exactColor || !!withFootprint;
             try {
             // Multi-Brush arms: one dab per symmetry transform (see the
             // symmetryTransforms block above for what each mode builds).
@@ -291,12 +297,12 @@
             } finally { window.__brushTipOn = false; }
         }
         // Helper to apply a multiSplat with specific multiplier and radius, restoring after
-        window.applyMultiSplatWith = function(x, y, dx, dy, color, mult, radius, exactColor) {
+        window.applyMultiSplatWith = function(x, y, dx, dy, color, mult, radius, exactColor, withFootprint) {
             const prevM = (typeof animationMultiplier === 'number') ? animationMultiplier : 1;
             const prevR = config.SPLAT_RADIUS;
             animationMultiplier = Math.max(1, Math.round(mult || 1));
             config.SPLAT_RADIUS = (typeof radius === 'number') ? radius : prevR;
-            try { multiSplat(x, y, dx, dy, color, false, exactColor); } finally {
+            try { multiSplat(x, y, dx, dy, color, false, exactColor, withFootprint); } finally {
                 animationMultiplier = prevM;
                 config.SPLAT_RADIUS = prevR;
             }

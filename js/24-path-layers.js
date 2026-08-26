@@ -876,7 +876,7 @@
                 <div class="delete-modal-message" id="pathDeleteModalMessage"></div>
                 <div class="delete-modal-actions">
                     <button type="button" class="delete-modal-cancel" id="pathDeleteCancel">Cancel</button>
-                    <button type="button" class="delete-modal-confirm" id="pathDeleteConfirm">Delete</button>
+                    <button type="button" class="delete-modal-confirm btn--destructive" id="pathDeleteConfirm">Delete</button>
                 </div>
             </div>
         `;

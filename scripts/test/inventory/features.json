@@ -292,7 +292,7 @@
     },
     {
       "name": "audioReactive",
-      "activate": "window.audioReactive.enable('file', wavFile);  /* wavFile = a File made from a synthesized WAV Blob (new File([wavBlob], 't.wav', {type:'audio/wav'})) - decodes via decodeAudioData, no permission prompt (js/22-audio-reactive.js:314+, 1042-1080). ASYNC + token-guarded; poll isEnabled(). NO built-in fake feature-bus injection exists: tick() reads only analyser.getByteFrequencyData(freqData) (js/22-audio-reactive.js:577-584), so the deterministic injection path is patching AnalyserNode.prototype.getByteFrequencyData (and the hi-res analyser's, js/22-audio-reactive.js:1184-1197) to write scripted spectra BEFORE enable. Physics-visible side effects can also be driven with NO audio at all: window.__edgeAbsorb = 1 and a per-frame refreshed window.__attractorField = {a: [[x,y,radius,strength],...], force: 0.6, swirl: 0.25, ts: performance.now()} (js/05j-update-loop.js:644,786,1073-1104 - ts must be < 500ms old each frame). */",
+      "activate": "window.audioReactive.enable('file', wavFile);  /* wavFile = a File made from a synthesized WAV Blob (new File([wavBlob], 't.wav', {type:'audio/wav'})) - decodes via decodeAudioData, no permission prompt (js/22-audio-reactive.js:314+, 1042-1080). ASYNC + token-guarded; poll isEnabled(). NO built-in fake feature-bus injection exists: tick() reads only analyser.getByteFrequencyData(freqData) (js/22-audio-reactive.js:577-584), so the deterministic injection path is patching AnalyserNode.prototype.getByteFrequencyData (and the hi-res analyser's, js/22-audio-reactive.js:1184-1197) to write scripted spectra BEFORE enable. Physics-visible side effects can also be driven with NO audio at all: window.__edgeAbsorb = 1 (numeric override outranking the Effects Overflow checkbox, js/05j-update-loop.js:696-704) and a per-frame refreshed window.__attractorField = {a: [[x,y,radius,strength],...], force: 0.6, swirl: 0.25, ts: performance.now()} (js/05j-update-loop.js:644,786,1073-1104 - ts must be < 500ms old each frame). */",
       "deactivate": "window.audioReactive.disable();  /* also invalidates in-flight starts via startToken (js/22-audio-reactive.js:1082-1088). Clear scene globals: window.__attractorField = null; window.__edgeAbsorb = 0; */",
       "activeCheck": "window.audioReactive.isEnabled()",
       "touchesSharedState": [
@@ -300,7 +300,7 @@
         "window.kAngle (mid->kaleido rotation when kaleidoEnabled, js/22-audio-reactive.js:791-803)",
         "Palette step state via window.stepPaletteOnce (treble->color, js/22-audio-reactive.js:806-818)",
         "Dye/velocity via auto-splats through window.applyMultiSplatWith (js/22-audio-reactive.js:924-951) - honors animationMultiplier for single-splat patterns",
-        "AudioScenes side effects: window.__edgeAbsorb (js/30-audio-scenes.js:293-314), window.__attractorField (dye-transport pass, js/05j-update-loop.js:1073-1104), collisionLayers.setProcedural (EQ lane walls)",
+        "AudioScenes side effects: window.__attractorField (dye-transport pass, js/05j-update-loop.js:1073-1104), collisionLayers.setProcedural (EQ lane walls)",
         "AudioContext + speaker output for 'file' sources (monitor gain, js/22-audio-reactive.js:130-211)"
       ],
       "knownHazards": [

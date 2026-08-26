@@ -285,6 +285,24 @@
             el.selectedIndex = bestIdx;
             el.dispatchEvent(new Event('change'));
         }
+        // ── Right-Shift tracking (drives Right Shift+Enter = Capture Layer) ──
+        // An Enter event reports THAT a shift is held (e.shiftKey), never
+        // WHICH one, so the right shift has to be watched through its own
+        // key events. Capture phase so nothing upstream can swallow the
+        // release, and the resets below so a shift let go while the window
+        // is out of focus can't leave the flag stuck on.
+        let rightShiftHeld = false;
+        function isRightShiftKey(e) {
+            return e.key === 'Shift' && (e.code === 'ShiftRight' || e.location === 2);
+        }
+        document.addEventListener('keydown', (e) => {
+            if (isRightShiftKey(e)) rightShiftHeld = true;
+            else if (!e.shiftKey) rightShiftHeld = false;
+        }, true);
+        document.addEventListener('keyup', (e) => {
+            if (isRightShiftKey(e) || !e.shiftKey) rightShiftHeld = false;
+        }, true);
+        window.addEventListener('blur', () => { rightShiftHeld = false; });
         document.addEventListener('keydown', (e) => {
             if (isTypingTarget(e.target)) return;
             const key = e.key;
@@ -335,6 +353,16 @@
                     // F9: toggle record (with countdown)
                     if (typeof recToggleRecord === 'function') recToggleRecord();
                 }
+                return;
+            }
+            // ── Capture Layer: Right Shift+Enter ──
+            // The RIGHT shift specifically — the left one sits under the
+            // hand that paints, where Shift+Enter would fire mid-stroke.
+            // Same path as clicking Capture Layer: region-aware, debounced.
+            if (key === 'Enter' && e.shiftKey && rightShiftHeld && !ctrlOrMeta && !e.altKey) {
+                e.preventDefault();
+                if (e.repeat) return; // a held Enter must not strobe captures
+                if (typeof window.captureLayer === 'function') window.captureLayer();
                 return;
             }
             // ── Space transport ──
