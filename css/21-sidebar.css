@@ -1194,6 +1194,80 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     cursor: pointer;
     margin-bottom: 8px;
 }
+/* ── Settings sharing ──
+   A share is an opt-in circle inside the room, so this block is NOT part of
+   the host controls: everyone sees it, and every row carries the one action
+   that applies to the reader (Join, or Leave). */
+.mp-share-block {
+    margin-bottom: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ground-500, #2a2e37);
+}
+.mp-share-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 6px;
+}
+.mp-share-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.03);
+}
+.mp-share-row.mine {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.mp-share-dots {
+    display: flex;
+    flex: 0 0 auto;
+    padding-right: 3px;
+}
+/* Overlapped rather than spaced, so a circle reads as one group at a glance
+   instead of as a list of separate people. */
+.mp-share-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.35);
+    margin-right: -3px;
+}
+.mp-share-names {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 11px;
+    color: var(--ink-300, #c7ccd4);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mp-share-act {
+    flex: 0 0 auto;
+    font-size: 10px;
+    padding: 3px 8px;
+}
+.mp-share-open {
+    width: 100%;
+}
+.mp-share-note {
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--ink-500, #7b828e);
+    margin-top: 6px;
+}
+/* The offer banner carries more words than a turn invite — it has to say that
+   the sharing runs both ways — so it is allowed to wrap. */
+.mp-share-invite {
+    max-width: min(560px, 92vw);
+}
+.mp-share-invite span {
+    font-weight: 500;
+    line-height: 1.35;
+}
+
 /* Turn queue (2026-08-15, replaces the SVG wheel): Now / Next / 2nd / 3rd
    as a plain ordered list — no arrows. Transition-free (Electron rule). */
 .mp-turn-wheel {
@@ -1640,4 +1714,84 @@ select option {
 }
 .sidebar-section {
     contain: layout style;
+}
+
+/* ── Constant pressure pad (Effects section) ─────────────────────────
+   Aims the ambient gravity/lift field: centre is off, angle is direction,
+   distance from centre is intensity. Same affordance as the Light Source
+   grid so it reads as "drag the dot to aim it" on sight.
+   Not a button, so it may carry its own colour — but it still borrows the
+   panel's hue via --sec-h rather than inventing one, so it belongs to
+   whatever section it is dropped into. */
+.pressure-pad-wrap {
+    margin-bottom: 10px;
+}
+
+.pressure-pad {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    background:
+        radial-gradient(circle at 50% 50%,
+            oklch(24% 0.030 var(--sec-h, 250)) 0%,
+            oklch(15% 0.020 var(--sec-h, 250)) 70%);
+    cursor: crosshair;
+    touch-action: none;   /* the pad owns the drag; no scroll-stealing */
+    overflow: hidden;
+}
+
+.pressure-pad-h,
+.pressure-pad-v {
+    position: absolute;
+    background: oklch(55% 0.040 var(--sec-h, 250) / 0.35);
+    pointer-events: none;
+}
+.pressure-pad-h { left: 0; right: 0; top: 50%; height: 1px; }
+.pressure-pad-v { top: 0; bottom: 0; left: 50%; width: 1px; }
+
+/* Full-intensity boundary. The vector is clamped to this circle, so drawing
+   it is the difference between "the pad has corners" and "the pad lies". */
+.pressure-pad-ring {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 100%; height: 100%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px dashed oklch(55% 0.040 var(--sec-h, 250) / 0.25);
+    pointer-events: none;
+}
+
+/* Centre-to-dot line: a lone dot near the middle is ambiguous about which
+   way it leans, and leaning is the whole point of this control. */
+.pressure-pad-arm {
+    position: absolute;
+    left: 50%; top: 50%;
+    height: 2px;
+    transform-origin: 0 50%;
+    background: linear-gradient(90deg,
+        oklch(70% 0.090 var(--sec-h, 250) / 0.15),
+        oklch(80% 0.140 var(--sec-h, 250) / 0.75));
+    border-radius: 1px;
+    pointer-events: none;
+}
+
+.pressure-pad-dot {
+    position: absolute;
+    width: 13px; height: 13px;
+    margin: -6.5px 0 0 -6.5px;
+    border-radius: 50%;
+    background: oklch(88% 0.150 var(--sec-h, 250));
+    border: 2px solid oklch(98% 0.020 var(--sec-h, 250) / 0.85);
+    box-shadow: 0 0 9px oklch(80% 0.150 var(--sec-h, 250) / 0.8);
+    pointer-events: none;
+}
+
+.pressure-pad-read {
+    margin-top: 4px;
+    font-size: 10px;
+    text-align: center;
+    color: var(--ink-500);
+    font-variant-numeric: tabular-nums;
 }
