@@ -180,16 +180,25 @@
             tCtx.stroke();
         });
 
-        // Skew handles: edge-midpoint diamonds
+        // Skew handles: edge-midpoint parallelograms — the glyph shows what
+        // the drag does (top/bottom lean the layer sideways, left/right lean
+        // it vertically).
         skewHandles(g).forEach(s => {
             tCtx.fillStyle = CHROME_DIM;
             tCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
             tCtx.lineWidth = 1.5;
             tCtx.beginPath();
-            tCtx.moveTo(s.lx, s.ly - 6);
-            tCtx.lineTo(s.lx + 6, s.ly);
-            tCtx.lineTo(s.lx, s.ly + 6);
-            tCtx.lineTo(s.lx - 6, s.ly);
+            if (s.axis === 'x') {
+                tCtx.moveTo(s.lx - 4, s.ly - 4);
+                tCtx.lineTo(s.lx + 10, s.ly - 4);
+                tCtx.lineTo(s.lx + 4, s.ly + 4);
+                tCtx.lineTo(s.lx - 10, s.ly + 4);
+            } else {
+                tCtx.moveTo(s.lx - 4, s.ly - 4);
+                tCtx.lineTo(s.lx - 4, s.ly + 10);
+                tCtx.lineTo(s.lx + 4, s.ly + 4);
+                tCtx.lineTo(s.lx + 4, s.ly - 10);
+            }
             tCtx.closePath();
             tCtx.fill();
             tCtx.stroke();
