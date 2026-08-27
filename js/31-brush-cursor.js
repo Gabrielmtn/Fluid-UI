@@ -48,13 +48,23 @@
         'stroke-width="1.8" vector-effect="non-scaling-stroke" stroke-linecap="round"/>' +
         '</g>' +
         // Center dot marks the exact hotspot.
-        '<circle cx="0" cy="0" r="1.4" fill="#ffffff" stroke="rgba(0,0,0,0.55)" ' +
+        '<circle id="brushCursorDot" cx="0" cy="0" r="1.4" fill="#ffffff" stroke="rgba(0,0,0,0.55)" ' +
         'stroke-width="0.8" vector-effect="non-scaling-stroke"/>' +
-        '</svg>';
+        '</svg>' +
+        // Pressure-mode badge: replaces the colour line while the brush moves
+        // paint instead of depositing it. Fixed-px HTML (not viewBox units) so
+        // it stays legible at tiny ring sizes (the host floors at 6px).
+        '<div id="brushCursorP" style="position:absolute;left:50%;top:50%;' +
+        'transform:translate(-50%,-50%);display:none;' +
+        'font:700 11px system-ui,sans-serif;color:#fff;line-height:1;' +
+        'text-shadow:0 0 3px rgba(0,0,0,0.9),0 1px 1px rgba(0,0,0,0.85);' +
+        'user-select:none;">P</div>';
 
     var ringEl = el.querySelector('#brushCursorRing');
     var lineEl = el.querySelector('#brushCursorLine');
     var lineGroupEl = el.querySelector('#brushCursorLineGroup');
+    var dotEl = el.querySelector('#brushCursorDot');
+    var pEl = el.querySelector('#brushCursorP');
 
     // ── Ring colour override (persisted) ──────────────────────────────
     var RING_KEY = 'ui.brushCursorColor';
@@ -147,6 +157,15 @@
         var c = window.config || {};
         return typeof c.BRUSH_ANGLE === 'number' ? c.BRUSH_ANGLE : 0;
     }
+    function pressureActive() {
+        // "Pressure" = the velocity-only brush (whole-brush toggle) or the
+        // active arm (arm 0, the one under the pointer) marked as a push arm.
+        // Not pen pressure — the app deliberately has none.
+        var c = window.config || {};
+        if (c.BRUSH_VELOCITY_ONLY) return true;
+        var a = window.multiArmColors;
+        return !!(a && a[0] && a[0].push);
+    }
 
     // ── Render loop (runs only while hovering) ────────────────────────
     var lastX = 0, lastY = 0, visible = false, rafId = 0;
@@ -165,11 +184,19 @@
 
         if (ringEl) ringEl.setAttribute('stroke', ringColor);
 
-        var col = paintColorHex();
-        if (lineEl) lineEl.setAttribute('stroke', col);
-        // SVG rotate() is clockwise in screen space — same sense the shader's
-        // stampAngle turns the stamp, so cursor line and painted streak agree.
-        if (lineGroupEl) lineGroupEl.setAttribute('transform', 'rotate(' + brushAngleDeg() + ')');
+        // Pressure mode swaps the upcoming-colour line for the P badge — the
+        // brush moves paint rather than depositing a colour.
+        var pOn = pressureActive();
+        if (pEl) pEl.style.display = pOn ? 'block' : 'none';
+        if (dotEl) dotEl.style.display = pOn ? 'none' : '';
+        if (lineGroupEl) lineGroupEl.style.display = pOn ? 'none' : '';
+        if (!pOn) {
+            var col = paintColorHex();
+            if (lineEl) lineEl.setAttribute('stroke', col);
+            // SVG rotate() is clockwise in screen space — same sense the shader's
+            // stampAngle turns the stamp, so cursor line and painted streak agree.
+            if (lineGroupEl) lineGroupEl.setAttribute('transform', 'rotate(' + brushAngleDeg() + ')');
+        }
 
         rafId = requestAnimationFrame(render);
     }
