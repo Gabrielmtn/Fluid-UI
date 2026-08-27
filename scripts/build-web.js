@@ -65,6 +65,19 @@ for (const entry of INCLUDE) {
   }
 }
 
+// index.html declares <link rel="icon" href="assets/favicon.ico">, but plenty of
+// clients (bookmark stores, link scrapers, feed readers) skip the markup and probe
+// the origin root instead. Mirror the icon there so /favicon.ico answers rather
+// than 404ing into the browser's blank-page dot. Copied, not committed twice — the
+// single source stays in assets/.
+const icoSrc = path.join(ROOT, "assets", "favicon.ico");
+if (fs.existsSync(icoSrc)) {
+  fs.copyFileSync(icoSrc, path.join(OUT, "favicon.ico"));
+  console.log("  + favicon.ico (root mirror of assets/favicon.ico)");
+} else {
+  console.warn("  ! assets/favicon.ico missing — run: npx electron scripts/make-favicon.js");
+}
+
 // Cache-bust: append ?v=<buildId> to every local js/ and css/ URL so devices —
 // especially iOS Safari, which caches JS/CSS very aggressively — fetch fresh assets
 // after a deploy instead of running stale code. This rewrites <script src>, <link
