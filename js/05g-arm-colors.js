@@ -398,6 +398,31 @@
         });
         // Initialize cursor state on page load
         cursorToggle.dispatchEvent(new Event('change'));
+        // Lift cursor hiding while a system save dialog is up (file exports):
+        // the OS cursor must be visible over the page even with Show Cursor off.
+        // Restore checks the LIVE checkbox (focus mode / undo / hotkey may have
+        // flipped it while the dialog was open), and restores by direct class
+        // writes — a synthetic 'change' on cursorToggle would trip the
+        // document-capture settings mirror in multiplayer.
+        let cursorLiftDepth = 0;
+        let cursorLifted = [];
+        window.withCursorVisible = async function (fn) {
+            if (++cursorLiftDepth === 1) {
+                cursorLifted = Array.from(document.querySelectorAll('.hide-cursor'));
+                cursorLifted.forEach(el => el.classList.remove('hide-cursor'));
+                try { if (window.__brushCursor) window.__brushCursor.hide(); } catch (_) { }
+            }
+            try {
+                return await fn();
+            } finally {
+                if (--cursorLiftDepth === 0) {
+                    if (!cursorToggle.checked) {
+                        cursorLifted.forEach(el => el.classList.add('hide-cursor'));
+                    }
+                    cursorLifted = [];
+                }
+            }
+        };
         colorStorage.load();
         initPaletteUI();
         preseedPaletteOnLoad();

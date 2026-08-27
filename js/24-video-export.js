@@ -112,14 +112,49 @@
                 reader.onerror = function () { reject(reader.error); };
                 reader.readAsArrayBuffer(blob);
             } else {
-                var url = URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url; a.download = filename;
-                document.body.appendChild(a); a.click();
-                document.body.removeChild(a);
-                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-                resolve(filename);
+                // Keep the OS cursor visible while the browser's save dialog
+                // may be up (Show Cursor off hides it page-wide otherwise).
+                var wrap = window.withCursorVisible || function (f) { return f(); };
+                resolve(wrap(function () {
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url; a.download = filename;
+                    document.body.appendChild(a); a.click();
+                    document.body.removeChild(a);
+                    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                    return dialogSettled().then(function () { return filename; });
+                }));
             }
+        });
+    }
+
+    // An anchor download gives no dialog signal. If the "ask where to save"
+    // dialog takes focus, hold until the window refocuses (save and cancel
+    // both refocus); if focus never leaves, the download was silent — settle
+    // after a short poll.
+    function dialogSettled() {
+        return new Promise(function (resolve) {
+            var t0 = performance.now();
+            var done = false;
+            function finish() {
+                if (done) return; done = true;
+                window.removeEventListener('focus', finish);
+                resolve();
+            }
+            (function poll() {
+                if (done) return;
+                if (!document.hasFocus()) {
+                    window.addEventListener('focus', finish);
+                    (function repoll() { // belt: focus events can be missed
+                        if (done) return;
+                        if (document.hasFocus()) return finish();
+                        setTimeout(repoll, 250);
+                    })();
+                    return;
+                }
+                if (performance.now() - t0 > 1200) return finish();
+                setTimeout(poll, 100);
+            })();
         });
     }
 
