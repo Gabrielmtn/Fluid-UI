@@ -446,9 +446,18 @@
                 && window.BrushShapes && typeof window.BrushShapes.getActiveStamp === 'function') {
                 stampTex = window.BrushShapes.getActiveStamp(); // {texture, aspect} | null
             }
+            // uStampTex must point at unit 1 even when NO stamp is bound. A
+            // sampler uniform defaults to unit 0, and unit 0 routinely holds
+            // the very texture this stamp is about to draw into (the undo
+            // push's snapshot copy leaves the mask/sketch texture there) —
+            // WebGL treats sampler-references-render-target as a feedback
+            // loop and drops the draw with INVALID_OPERATION even though the
+            // stampTexOn branch never samples it. The first dab of every
+            // stroke died; in the collider editor, where no display pass
+            // rebinds unit 0 between dabs, entire strokes did.
+            gl.uniform1i(rasterStampProg.uniforms.uStampTex, 1);
             gl.uniform1f(rasterStampProg.uniforms.stampTexOn, stampTex ? 1 : 0);
             if (!stampTex) return false;
-            gl.uniform1i(rasterStampProg.uniforms.uStampTex, 1);
             gl.uniform1f(rasterStampProg.uniforms.stampAspect, stampTex.aspect || 1);
             gl.uniform1f(rasterStampProg.uniforms.stampAngle, (config.BRUSH_ANGLE || 0) * Math.PI / 180);
             gl.activeTexture(gl.TEXTURE1);
