@@ -338,6 +338,9 @@
                             </label>
                             <button id="colliderUndoBtn" class="mask-mode-btn collider-tool-btn" title="Undo the last collider stroke (Ctrl+Z)">↶</button>
                             <button id="colliderRedoBtn" class="mask-mode-btn collider-tool-btn" title="Redo (Ctrl+Shift+Z)">↷</button>
+                            <label class="collider-size-label" title="Show the artwork as it looks right now behind the collider — a snapshot taken when ticked, for placing walls against the picture">
+                                <input type="checkbox" id="colliderViewArt"> View on canvas
+                            </label>
                         </div>
                         <div class="mask-collider-hint">Paint directly on the artwork — the collider and its thumbnail update as you go. Shift+drag pans, scroll zooms.</div>
                     </div>
@@ -496,6 +499,8 @@
             maskState.colliderTool = t;
             if (cDraw) cDraw.classList.toggle('active', t === 'draw');
             if (cErase) cErase.classList.toggle('active', t === 'erase');
+            // The hover ring is colour-coded by tool
+            if (colliderModeActive() && maskState.colliderCursor) scheduleMaskRender();
         };
         if (cDraw) cDraw.addEventListener('click', () => setTool('draw'));
         if (cErase) cErase.addEventListener('click', () => setTool('erase'));
@@ -505,8 +510,21 @@
                 maskState.colliderSize = parseFloat(e.target.value);
                 const out = overlay.querySelector('#colliderSizeVal');
                 if (out) out.textContent = String(maskState.colliderSize);
+                // The hover ring previews this size — resize it live
+                if (colliderModeActive() && maskState.colliderCursor) scheduleMaskRender();
             });
         }
+        // "View on canvas": the artwork as the user last saw it (the full
+        // composite — fluid AND layer divs; the raw GL canvas alone reads
+        // black for scenes that live in layers) behind the collider film.
+        // One snapshot per tick-on: a static reference is the point, and
+        // re-compositing per stroke would eat the paint budget.
+        const cView = overlay.querySelector('#colliderViewArt');
+        if (cView) cView.addEventListener('change', () => {
+            maskState.colliderViewArt = cView.checked;
+            if (cView.checked) captureColliderArtSnap();
+            else { maskState.colliderArtSnap = null; renderMaskEditor(); }
+        });
         const cUndo = overlay.querySelector('#colliderUndoBtn');
         const cRedo = overlay.querySelector('#colliderRedoBtn');
         // The mask stamp pushes onto the shared sketch/mask history ring, so
@@ -876,6 +894,7 @@
             maskState.colliderPainting = true;
             maskState.colliderLastX = x;
             maskState.colliderLastY = y;
+            maskState.colliderCursor = { x: x, y: y };
             colliderStamp(x, y);
             scheduleColliderFilm();
             e.preventDefault();
@@ -1029,7 +1048,12 @@
         const x = _p.x, y = _p.y;
 
         if (colliderModeActive()) {
-            if (!maskState.colliderPainting) { canvas.style.cursor = 'crosshair'; return; }
+            maskState.colliderCursor = { x: x, y: y };
+            if (!maskState.colliderPainting) {
+                canvas.style.cursor = 'none'; // the drawn ring IS the cursor
+                scheduleMaskRender();
+                return;
+            }
             // Interpolate along the drag so fast strokes stay continuous
             // (the mask stamp is per-dab, like the canvas brush).
             const lx = maskState.colliderLastX, ly = maskState.colliderLastY;
@@ -1044,6 +1068,7 @@
             if (n > 0) { maskState.colliderLastX = x; maskState.colliderLastY = y; }
             else colliderStamp(x, y);
             scheduleColliderFilm();
+            scheduleMaskRender(); // ring keeps tracking mid-stroke
             return;
         }
 
@@ -1119,6 +1144,10 @@
         if (e && (e.type === 'pointerleave' || e.type === 'mouseleave')) {
             maskState.touchUpCursor = null;
             if (touchUpActive()) scheduleMaskRender();
+            if (colliderModeActive()) {
+                maskState.colliderCursor = null;
+                scheduleMaskRender();
+            }
         }
         if (maskState.colliderPainting) {
             maskState.colliderPainting = false;
@@ -1379,7 +1408,17 @@
             // placed against what's actually on the canvas), dimmed, with
             // the collider's own coverage as a red film on top — the same
             // reading as the on-canvas film while painting colliders.
-            if (displayCanvas) {
+            if (maskState.colliderViewArt && maskState.colliderArtSnap) {
+                // "View on canvas": the full composite the user actually
+                // sees (layer divs included — the raw GL canvas alone is
+                // black for scenes that live in layers), barely dimmed so
+                // the film still reads on top.
+                drawWithTransform(() => {
+                    ctx.drawImage(maskState.colliderArtSnap, 0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                });
+            } else if (displayCanvas) {
                 drawWithTransform(() => {
                     ctx.drawImage(displayCanvas, 0, 0, canvas.width, canvas.height);
                     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
@@ -1393,6 +1432,7 @@
                     ctx.globalAlpha = 1;
                 });
             }
+            drawColliderCursor(ctx, canvas);
             return;
         }
         if (maskState.activeMaskLayerId && maskState.activeMaskLayerId.startsWith('image-')) {
@@ -3299,6 +3339,68 @@
         }, 90);
     }
 
+    // Brush ring — same honesty rule as the touch-up ring: drawn in STORED
+    // space so a squashed/skewed layer view distorts the ring exactly like
+    // the dab it previews.
+    function drawColliderCursor(ctx, canvas) {
+        var cur = maskState.colliderCursor;
+        if (!cur) return;
+        ctx.save();
+        ctx.translate(maskState.panX, maskState.panY);
+        ctx.scale(maskState.zoom, maskState.zoom);
+        applyLayerView(ctx, canvas);
+        var vs = layerViewScale(canvas);
+        var vsMean = (vs.sx + vs.sy) / 2 || 1;
+        ctx.beginPath();
+        ctx.arc(cur.x, cur.y, colliderRingRadius(canvas), 0, Math.PI * 2);
+        ctx.strokeStyle = (maskState.colliderTool === 'erase')
+            ? 'rgba(201,209,217,0.95)'   // erase: neutral — wall coming off
+            : 'rgba(255,99,88,0.95)';    // draw: the wall red it lays down
+        ctx.lineWidth = 2 / (maskState.zoom * vsMean);
+        ctx.stroke();
+        // Center dot marks the exact hotspot at small sizes
+        ctx.beginPath();
+        ctx.arc(cur.x, cur.y, 1 / (maskState.zoom * vsMean), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // The dab's visible edge, in editor-buffer px: rasterStampFrag puts the
+    // hard disc edge at |uv − point| = √R (r2 = |p|²/R, aspect conjugated
+    // away, so the disc is round in pixels), and stampMaskDab feeds
+    // R = (size/1000 · STAMP_RADIUS_SCALE) · 0.5 on the plain-disc path.
+    function colliderRingRadius(canvas) {
+        var R = ((maskState.colliderSize || 11) / 1000)
+            * ((window.config && window.config.STAMP_RADIUS_SCALE) || 1) * 0.5;
+        return Math.max(2, Math.sqrt(R) * canvas.height);
+    }
+
+    // "View on canvas" backdrop: one composite of the scene as the user sees
+    // it, via the export compositor (fluid + layer divs with their
+    // transforms/masks). Static by design — a reference to place walls
+    // against, not a live view.
+    function captureColliderArtSnap() {
+        var fx = window.fluidExport;
+        if (!fx || typeof fx.captureFrame !== 'function') { renderMaskEditor(); return; }
+        // Hide THIS collider's own on-canvas film for the capture — the
+        // editor draws its film live on top, and baking a stale copy into
+        // the backdrop would double it under fresh strokes. captureFrame
+        // builds its draw list synchronously, so a hide around the call is
+        // never visible on screen.
+        var l = colliderLayer();
+        var div = l ? document.getElementById('layer' + l.index) : null;
+        var prev = div ? div.style.display : null;
+        if (div) div.style.display = 'none';
+        var p = fx.captureFrame();
+        if (div) div.style.display = prev;
+        p.then(function (comp) {
+            if (!colliderModeActive() || !maskState.colliderViewArt) return;
+            maskState.colliderArtSnap = comp;
+            renderMaskEditor();
+        }).catch(function () { renderMaskEditor(); });
+    }
+
     // The coverage preview is white-on-transparent; paint it red so it reads
     // as the same "wall" film the canvas shows while collider painting.
     function tintColliderFilm(img) {
@@ -3354,6 +3456,9 @@
         maskState.colliderFilm = null;
         maskState.colliderFilmTinted = null;
         maskState.colliderPainting = false;
+        maskState.colliderCursor = null;
+        maskState.colliderArtSnap = null;   // stale scene — recapture below if opted in
+        maskState.colliderViewArt = !!maskState.colliderViewArt; // sticky across opens
         // Route __maskStamp at THIS collider's mask for the session, and put
         // the user's previous active mask back on the way out.
         maskState.colliderPrevMask = (window.Masks && window.Masks.activeId) ? window.Masks.activeId() : null;
@@ -3373,6 +3478,9 @@
                 hint.innerHTML = '<strong style="color:#ff7b72;">🧱 Collider:</strong> '
                     + 'Draw to add walls • Erase to carve them back • Shift+Drag to pan • Scroll to zoom';
             }
+            var cv = document.getElementById('colliderViewArt');
+            if (cv) cv.checked = !!maskState.colliderViewArt;
+            if (maskState.colliderViewArt) captureColliderArtSnap();
             updateZoomDisplay();
             scheduleColliderFilm();
             renderMaskEditor();
@@ -3420,6 +3528,8 @@
         maskState.colliderFilmTinted = null;
         maskState.colliderPainting = false;
         maskState.colliderPrevMask = null;
+        maskState.colliderCursor = null;
+        maskState.colliderArtSnap = null;
         if (typeof window.renderLayers === 'function') window.renderLayers();
     }
 
