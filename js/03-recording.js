@@ -326,6 +326,17 @@
                 ? window.__armPushPin
                 : ((typeof window.armPushMask === 'function') ? window.armPushMask() : 0);
             if (apMask) interaction.ap = apMask;
+            // Preserve Randomness: mark the dab as rolled by random mode rather
+            // than only freezing the roll, so 'original' playback re-rolls per
+            // stroke ('exact' still freezes). Read through the pin so a replay
+            // being re-recorded stays faithful to its source events instead of
+            // the live panel. Omitted when off — the common dab stays as-is.
+            const rndOn = (typeof window.__recRndPin === 'number')
+                ? window.__recRndPin
+                : ((window.preserveRandomness &&
+                    window.multiArmColors && window.multiArmColors[0] &&
+                    window.multiArmColors[0].mode === 'random') ? 1 : 0);
+            if (rndOn) interaction.rnd = 1;
             a.timeline.interactions.push(interaction);
             // PERF: During recording, skip ALL UI updates - just record data
             // Timeline visualization updates when recording stops
@@ -479,16 +490,22 @@
                     const x = i.x * canvas.width;
                     const y = i.y * canvas.height;
                     let replayColor;
+                    // A dab that carries rnd (Preserve Randomness) re-rolls
+                    // under 'original' even when the layer-level recordMode
+                    // heuristic missed it — mode toggled mid-recording, or a
+                    // re-recorded replay. 'exact' stays the freeze escape
+                    // hatch; 'live' stays fully current-brush.
+                    const iGen = (cMode === 'original' && i.rnd) ? 'random' : genMode;
                     if (cMode === 'exact') {
                         replayColor = i.color;
-                    } else if (genMode) {
+                    } else if (iGen) {
                         // Regenerate per stroke: a change in the baked color
                         // marks a new stroke (random holds one color per stroke,
                         // rainbow changes per splat — both fall out naturally).
                         const key = ((i.color[0] * 255) | 0) + ',' + ((i.color[1] * 255) | 0) + ',' + ((i.color[2] * 255) | 0);
                         if (key !== layer._repKey) {
                             layer._repKey = key;
-                            layer._repColor = recGenerativeColor(genMode, genPalette, layer) || i.color;
+                            layer._repColor = recGenerativeColor(iGen, genPalette, layer) || i.color;
                         }
                         replayColor = layer._repColor;
                     } else if (cMode === 'live') {

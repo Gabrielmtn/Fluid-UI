@@ -2783,6 +2783,27 @@
         // pointer colour defaults to red until they paint) could repaint peer
         // replays red. Faithful replay is now the only behaviour.
 
+        // --- Preserve Randomness ---
+        // Record-side, unlike the removed checkbox above: when ON, strokes
+        // painted in random colour mode are recorded as "random rolled this"
+        // (per-event rnd flag) alongside the baked colour, so every replay —
+        // stroke loop, timeline 'original' — re-rolls a fresh colour per
+        // stroke. Recordings made with it OFF keep replaying their baked
+        // colours exactly as today.
+        var rndRow = document.createElement('div');
+        rndRow.className = 'control-group checkbox-group';
+        var rndCb = document.createElement('input');
+        rndCb.type = 'checkbox';
+        rndCb.id = 'preserveRandomness';
+        var rndLbl = document.createElement('label');
+        rndLbl.setAttribute('for', 'preserveRandomness');
+        rndLbl.style.margin = '0';
+        rndLbl.textContent = 'Preserve Randomness';
+        rndLbl.title = 'Record random-mode strokes as random, not as the colour random produced — replays re-roll a fresh colour per stroke';
+        rndRow.appendChild(rndCb);
+        rndRow.appendChild(rndLbl);
+        body.appendChild(rndRow);
+
         // --- Splat In ---
         var splatInLabel = document.createElement('label');
         splatInLabel.className = 'brush-section-label';
@@ -2959,6 +2980,14 @@
             } catch (_) {}
         });
 
+        // --- Wire preserve randomness ---
+        rndCb.addEventListener('change', function () {
+            window.preserveRandomness = rndCb.checked;
+            try {
+                if (window.settingsManager) window.settingsManager.set('brush.preserveRandomness', rndCb.checked);
+            } catch (_) {}
+        });
+
         // --- Load saved settings ---
         try {
             if (window.settingsManager) {
@@ -2976,6 +3005,12 @@
                     speedSlider.value = savedSpeed;
                     window.replaySpeed = savedSpeed;
                     if (speedDisplay) speedDisplay.textContent = savedSpeed.toFixed(2).replace(/\.?0+$/, '') + '×';
+                }
+
+                var savedRnd = window.settingsManager.get('brush.preserveRandomness');
+                if (typeof savedRnd === 'boolean') {
+                    rndCb.checked = savedRnd;
+                    window.preserveRandomness = savedRnd;
                 }
 
                 var savedSplatIn = window.settingsManager.get('brush.splatInMode');
@@ -3007,6 +3042,7 @@
         // Defaults
         if (!window.replayMode) window.replayMode = 'stroke';
         if (!window.replayTimePeriod) window.replayTimePeriod = 5;
+        if (typeof window.preserveRandomness !== 'boolean') window.preserveRandomness = false;
         if (!window.splatInMode) window.splatInMode = 'instant';
         if (!window.splatOutMode) window.splatOutMode = 'instant';
 

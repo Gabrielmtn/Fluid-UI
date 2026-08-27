@@ -225,6 +225,22 @@
             // Without these, replay had no idea what it was reproducing and
             // fell back to suppressing custom stamps entirely — you painted
             // with your own brush and the replay came out in a different one.
+            // Preserve Randomness: note that random mode rolled this colour
+            // (rnd), plus the flow factor baked into it (fm — the recorded
+            // colour is pointer.color × a scalar flow dim in additive mode),
+            // so a replay can re-roll a fresh colour and re-dim it the same.
+            // Both omitted when the checkbox is off — the common event stays
+            // byte-identical.
+            let _rnd, _fm;
+            if (window.preserveRandomness &&
+                window.multiArmColors && window.multiArmColors[0] &&
+                window.multiArmColors[0].mode === 'random') {
+                _rnd = 1;
+                const _sB = color[0] + color[1] + color[2];
+                const _sP = pointer.color[0] + pointer.color[1] + pointer.color[2];
+                let f = (_sP > 1e-6) ? _sB / _sP : 1;
+                if (isFinite(f) && Math.abs(f - 1) >= 0.005) _fm = Math.round(f * 1000) / 1000;
+            }
             strokeEvents.push({
                 t, x, y, dx, dy, color: color.slice(),
                 mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
@@ -246,7 +262,9 @@
                 // can have push arms, and a Pressure brush pushes on every arm
                 // whatever this says. Omitted entirely at 0 — the common case —
                 // so an ordinary dab is the same size on the wire as before.
-                ap: _apMask || undefined
+                ap: _apMask || undefined,
+                rnd: _rnd,
+                fm: _fm
             });
         }
         function deepCopyEvent(ev) {
@@ -257,7 +275,30 @@
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(),
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
                      push: ev.push ? { m: ev.push.m, s: ev.push.s } : null,
-                     ap: ev.ap };
+                     ap: ev.ap, rnd: ev.rnd, fm: ev.fm };
+        }
+        // Preserve Randomness: an event whose colour was rolled by random mode
+        // carries rnd:1 (+ fm, the flow factor baked into its recorded colour).
+        // Re-roll ONE fresh colour per stroke — index 0 and each `head` — and
+        // scale it by fm so additive flow dimming survives the swap. Returns
+        // copies for the flagged events, never mutates: a held loop re-resolves
+        // the same array every pass, so each loop gets its own roll (and the
+        // resolve runs BEFORE the broadcast, so peers see the painter's roll).
+        function resolveReplayRandomness(events) {
+            var any = false;
+            for (var i = 0; i < events.length; i++) {
+                if (events[i].rnd) { any = true; break; }
+            }
+            if (!any || typeof window.generateVibrantColor !== 'function') return events;
+            var fresh = null;
+            return events.map(function (ev, idx) {
+                if (idx === 0 || ev.head) fresh = window.generateVibrantColor();
+                if (!ev.rnd) return ev;
+                var c = deepCopyEvent(ev);
+                var fm = (typeof ev.fm === 'number' && isFinite(ev.fm)) ? ev.fm : 1;
+                c.color = [fresh[0] * fm, fresh[1] * fm, fresh[2] * fm];
+                return c;
+            });
         }
         // Time replay: the last N SECONDS OF WALL CLOCK, exactly as they happened.
         //
@@ -338,6 +379,8 @@
                 }
             }
             if (!eventsToReplay || !eventsToReplay.length) { isReplayActive = false; return; }
+            // Re-roll rnd-flagged colours per stroke — see resolveReplayRandomness.
+            eventsToReplay = resolveReplayRandomness(eventsToReplay);
             // Store the active replay events for processReplay
             window._activeReplayEvents = eventsToReplay;
             // Warm every stamp this replay will ask for. The GL upload is lazy
@@ -536,7 +579,12 @@
                 // re-recorded as ordinary dye (and the tip likewise), which is
                 // the very gap the pin exists to close.
                 if (typeof recRecordInteraction === 'function' && recEnabled) {
+                    // Randomness rides the same pin as push/footprint: the
+                    // source event knows whether random rolled it, and the
+                    // re-record must not read the live panel instead.
+                    window.__recRndPin = ev.rnd ? 1 : 0;
                     try { recRecordInteraction(x, y, dx, dy, col); } catch(_){}
+                    window.__recRndPin = null;
                 }
             } finally {
                 window.__remoteStroke = false;
