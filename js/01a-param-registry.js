@@ -112,12 +112,9 @@
         // pixel→origin distance — past 1.0 it would overshoot the origin and
         // start gathering mirrored content on the far side.
         scatterReach: {configKey: null, ui: {min: 0.2, max: 1, step: 0.05}, hard: {min: 0.05, max: 1}, def: 1.0, decimals: 2, category: "glow", perfTier: 1, simSlider: false, mut: {min: 0.3, max: 1, step: 0.05, scope: "extended"}},
-        ssFrequency: {configKey: null, ui: {min: 0.2, max: 8, step: 0.1}, hard: {min: 0.2, max: 8}, def: 2, decimals: 1, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.2, max: 8, step: 0.1, scope: "extended"}},
-        ssAngle: {configKey: null, ui: {min: 0, max: 360, step: 1}, hard: {min: 0, max: 360}, def: 120, decimals: 0, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0, max: 360, step: 1, scope: "extended"}},
-        ssLength: {configKey: null, ui: {min: 0.1, max: 3, step: 0.05}, hard: {min: 0.1, max: 3}, def: 0.4, decimals: 2, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.05, scope: "extended"}},
-        ssSize: {configKey: null, ui: {min: 0.1, max: 2, step: 0.05}, hard: {min: 0.1, max: 2}, def: 0.5, decimals: 2, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 2, step: 0.05, scope: "extended"}},
-        ssVariance: {configKey: null, ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 15, decimals: 0, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0, max: 60, step: 1, scope: "extended"}},
-        ssGravity: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.1, decimals: 2, category: "shootingStar", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
+        // ss* sliders removed 2026-08-27 with the Shooting Star row (Animations
+        // curation): same load-bearing deletion as ascendToggle below — saved
+        // values skip on load and Mutate can't reach the hidden controls.
         audioSensitivity: {configKey: null, ui: null, hard: {min: 0.1, max: 3}, def: null, decimals: 1, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 3, step: 0.1, scope: "extended"}},
         audioBeatThreshold: {configKey: null, ui: null, hard: {min: 0.1, max: 1}, def: null, decimals: 2, category: "audio", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 1, step: 0.05, scope: "extended"}},
         // D1 stroke engine (dynamically-created in buildBrushSection; no mut —
@@ -178,7 +175,9 @@
         // deleting the entries is load-bearing — old presets/snapshots that
         // carry them skip-with-warn (12-save-load coerceCheckbox null path)
         // and Mutate's extended scope can no longer flip Ascend on.
-        shootingStarToggle: {def: false, mutScope: "extended"},
+        // shootingStarToggle removed 2026-08-27 (Animations curation): the UI
+        // left the panel, so the same load-bearing deletion applies — autoload
+        // can't restore it on and Mutate can't flip an invisible feature.
         hoverCaptureToggle: {def: false, mutScope: null},
         detachCaptureToggle: {def: false, mutScope: null},
         audioReactToggle: {def: null, mutScope: null},

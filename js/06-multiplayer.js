@@ -2146,7 +2146,7 @@ function onMultiplayerError(error) {
 // re-stamps a shape IN PLACE keeping its id (33-brush-shapes), so without the
 // rev a peer would keep painting with the version it cached first.
 const SHAPE_CHUNK_CHARS = 11000; // + envelope: comfortably under the 16KB cap
-const SHAPE_MAX_CHUNKS = 32;     // ≈350KB — far above any ≤128px stamp
+const SHAPE_MAX_CHUNKS = 32;     // ≈350KB — far above 33's 100KB-per-stamp budget
 var _shapePublished = new Map(); // id → rev already sent on THIS socket
 
 // A fresh socket is a fresh audience: whatever we published to the last room

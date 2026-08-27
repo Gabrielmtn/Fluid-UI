@@ -349,6 +349,12 @@
     // every outside-click closer already exempts.
     function wireGearToTrigger(gear, trigger) {
         if (!trigger) { gear.disabled = true; return; }
+        // The gear and the trigger are two doors onto ONE popup, so an
+        // outside-click closer has to treat them as the same element: a press
+        // on the gear is a press on the trigger. Without this the closer
+        // dismisses the panel on the gear's pointerdown and the gear's own
+        // click re-opens it, and the gear could never close anything.
+        trigger.__chGear = gear;
         gear.addEventListener('click', function (e) {
             e.stopPropagation();
             trigger.click();
@@ -1914,7 +1920,6 @@
             { key: 'kaleido', label: 'Kaleido' },
             { key: 'simulation', label: 'Sim' },
             { key: 'effects', label: 'Effects' },
-            { key: 'animations', label: 'Anim' },
             { key: 'audio', label: 'Audio' }
         ];
         lockGroups.forEach(function (g) {
@@ -1990,8 +1995,6 @@
                       'shadingIntensity', 'displayShadingToggle',
                       'lightShiftSpeed', 'lightShiftThreshold', 'lightShiftIntensity', 'lightShiftSaturation',
                       'lightPos', 'lightShiftPath'],
-            animations: ['shootingStarToggle',
-                         'ssFrequency', 'ssAngle', 'ssLength', 'ssSize', 'ssVariance', 'ssGravity', 'ssOrigin'],
             audio: ['audioReactToggle', 'arMapAutoSplat', 'arMapSize', 'arMapKaleido', 'arMapColor',
                     'audioSensitivity', 'audioBeatThreshold']
         };
@@ -2380,23 +2383,298 @@
     function buildAnimationsSection(controls) {
         const { sec, body } = makeSection('Animations', 'expressive', true);
 
+        // Curated 2026-08-27: the grid is six SLOTS, not six fixed buttons.
+        // Smash and Vortex keep their spots by default; the other stock
+        // animations left the panel (their buttons stay wired in the hidden
+        // legacy panel, so nothing 04c binds to disappears). Open slots hold
+        // the user's saved recordings, dragged in from the library below.
+        const SLOT_COUNT = 6;
+        const SLOT_DEFAULTS = [
+            { kind: 'builtin', name: 'Smash' },
+            { kind: 'builtin', name: 'Vortex' },
+            null, null, null, null
+        ];
+        const BUILTIN_BTN = { Smash: 'smashBtn', Vortex: 'vortexBtn' };
+        // Direct references, captured while the buttons are still in the
+        // document: the section is built detached, so once a button is parked
+        // in the stash getElementById can't see it until the sidebar attaches.
+        const builtinEls = {};
+        Object.keys(BUILTIN_BTN).forEach(k => { builtinEls[k] = document.getElementById(BUILTIN_BTN[k]); });
+
         const grid = document.createElement('div');
         grid.className = 'anim-grid';
-
-        moveEl('smashBtn', grid);
-        moveEl('jellyfishBtn', grid);
-
-        const portraitBtn = controls.querySelector('button[onclick*="playPortraitAnimation"]');
-        if (portraitBtn) { portraitBtn.style.cssText = ''; grid.appendChild(portraitBtn); }
-
-        moveEl('vortexBtn', grid);
-        moveEl('portalBtn', grid);
-        moveEl('chimeraBtn', grid);
-
         body.appendChild(grid);
 
-        // Toggle animations (full-width, with collapsible settings)
-        moveEl('shootingStarWrap', body);
+        // Unslotted stock buttons wait here so their click wiring survives.
+        const stash = document.createElement('div');
+        stash.style.display = 'none';
+        body.appendChild(stash);
+
+        // Slot assignments are user-authored curation: write through
+        // immediately, restore every boot — they do not ride Save Settings.
+        function loadSlots() {
+            const sm = window.settingsManager;
+            const saved = sm ? sm.get('animSlots', null) : null;
+            const slots = SLOT_DEFAULTS.map(d => d ? { ...d } : null);
+            if (Array.isArray(saved)) {
+                for (let i = 0; i < SLOT_COUNT; i++) {
+                    const s = saved[i];
+                    if (s === null) slots[i] = null;
+                    else if (s && s.kind === 'builtin' && BUILTIN_BTN[s.name]) slots[i] = { kind: 'builtin', name: s.name };
+                    else if (s && s.kind === 'preset' && typeof s.name === 'string') slots[i] = { kind: 'preset', name: s.name };
+                }
+            }
+            return slots;
+        }
+        let slots = loadSlots();
+        function saveSlots() {
+            const sm = window.settingsManager;
+            if (sm) sm.set('animSlots', slots.map(s => s ? { ...s } : null), false);
+        }
+
+        let dragName = null; // library entry currently being dragged
+
+        function makeDropTarget(cell, idx) {
+            cell.addEventListener('dragover', e => {
+                if (!dragName) return;
+                e.preventDefault();
+                cell.classList.add('anim-slot-over');
+            });
+            cell.addEventListener('dragleave', () => cell.classList.remove('anim-slot-over'));
+            cell.addEventListener('drop', e => {
+                e.preventDefault();
+                cell.classList.remove('anim-slot-over');
+                if (!dragName) return;
+                slots[idx] = { kind: 'preset', name: dragName };
+                dragName = null;
+                saveSlots();
+                renderSlots();
+            });
+        }
+
+        function renderSlots() {
+            // Park the stock buttons before wiping the grid so they are
+            // never destroyed with it.
+            Object.values(builtinEls).forEach(b => { if (b) stash.appendChild(b); });
+            grid.innerHTML = '';
+            const savedNames = window.recListSavedAnimations ? window.recListSavedAnimations() : [];
+            slots.forEach((s, idx) => {
+                const cell = document.createElement('div');
+                cell.className = 'anim-slot';
+                if (s && s.kind === 'builtin') {
+                    const btn = builtinEls[s.name];
+                    if (btn) { btn.style.cssText = ''; cell.appendChild(btn); }
+                } else if (s && s.kind === 'preset') {
+                    const missing = savedNames.indexOf(s.name) === -1;
+                    const playing = !missing && !!(window.recIsSavedAnimationPlaying
+                        && window.recIsSavedAnimationPlaying(s.name));
+                    const btn = document.createElement('button');
+                    btn.dataset.animName = s.name;
+                    const t = document.createElement('div');
+                    t.textContent = s.name;
+                    const sub = document.createElement('div');
+                    sub.textContent = missing ? 'Missing' : (playing ? 'Playing — click to stop' : 'Recorded');
+                    btn.appendChild(t);
+                    btn.appendChild(sub);
+                    btn.title = missing
+                        ? `The recording "${s.name}" no longer exists`
+                        : `Loop "${s.name}" — click again to stop`;
+                    if (missing) btn.classList.add('anim-slot-missing');
+                    // aria-pressed carries the playing state (and its styling)
+                    btn.setAttribute('aria-pressed', playing ? 'true' : 'false');
+                    btn.addEventListener('click', () => {
+                        if (window.recToggleSavedAnimation) window.recToggleSavedAnimation(s.name);
+                    });
+                    cell.appendChild(btn);
+                    const clear = document.createElement('button');
+                    clear.className = 'anim-slot-clear';
+                    clear.textContent = '✕';
+                    clear.title = SLOT_DEFAULTS[idx] ? `Restore ${SLOT_DEFAULTS[idx].name}` : 'Clear slot';
+                    clear.addEventListener('click', e => {
+                        e.stopPropagation();
+                        slots[idx] = SLOT_DEFAULTS[idx] ? { ...SLOT_DEFAULTS[idx] } : null;
+                        saveSlots();
+                        renderSlots();
+                    });
+                    cell.appendChild(clear);
+                } else {
+                    cell.classList.add('anim-slot-empty');
+                    const hint = document.createElement('div');
+                    hint.textContent = 'Drag an animation here';
+                    cell.appendChild(hint);
+                }
+                makeDropTarget(cell, idx);
+                grid.appendChild(cell);
+            });
+        }
+
+        // Create new: straight into the full recorder — record, then
+        // "Save as New" puts it in the library below.
+        const createBtn = document.createElement('button');
+        createBtn.id = 'animCreateNewBtn';
+        createBtn.textContent = 'Create New Animation';
+        createBtn.title = 'Open the recorder — record a performance, then "Save as New" to add it to this library';
+        createBtn.addEventListener('click', () => {
+            const sel = document.getElementById('recMode');
+            if (sel) { sel.value = 'full'; sel.dispatchEvent(new Event('change')); }
+            else if (window.studioDrawer) window.studioDrawer.open('record');
+        });
+        body.appendChild(createBtn);
+
+        // Library dropdown: every saved recording, playable by click,
+        // draggable into a slot above.
+        const lib = document.createElement('div');
+        lib.className = 'anim-lib';
+        const libHead = document.createElement('button');
+        libHead.className = 'anim-lib-head';
+        libHead.setAttribute('aria-expanded', 'false');
+        const libList = document.createElement('div');
+        libList.className = 'anim-lib-list';
+        libList.style.display = 'none';
+        function syncLibHead() {
+            const open = libList.style.display !== 'none';
+            libHead.textContent = 'Saved Animations ' + (open ? '▴' : '▾');
+            libHead.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        libHead.addEventListener('click', () => {
+            const open = libList.style.display !== 'none';
+            libList.style.display = open ? 'none' : '';
+            if (!open) renderLib();
+            syncLibHead();
+        });
+        lib.appendChild(libHead);
+        lib.appendChild(libList);
+        body.appendChild(lib);
+
+        function renderLib() {
+            libList.innerHTML = '';
+            const names = window.recListSavedAnimations ? window.recListSavedAnimations() : [];
+            if (!names.length) {
+                const empty = document.createElement('div');
+                empty.className = 'anim-lib-empty';
+                empty.textContent = 'No saved animations yet — Create New Animation records one.';
+                libList.appendChild(empty);
+                return;
+            }
+            names.forEach(name => {
+                const row = document.createElement('div');
+                row.className = 'anim-lib-row';
+                row.draggable = true;
+                row.title = 'Click to play · drag into a slot above';
+                const grip = document.createElement('span');
+                grip.className = 'anim-lib-grip';
+                grip.textContent = '⠿';
+                const label = document.createElement('span');
+                label.className = 'anim-lib-name';
+                label.textContent = name;
+                row.appendChild(grip);
+                row.appendChild(label);
+                row.addEventListener('dragstart', e => {
+                    dragName = name;
+                    row.classList.add('dragging');
+                    try {
+                        e.dataTransfer.setData('text/plain', name);
+                        e.dataTransfer.effectAllowed = 'copy';
+                    } catch (_) {}
+                });
+                row.addEventListener('dragend', () => {
+                    dragName = null;
+                    row.classList.remove('dragging');
+                });
+                row.addEventListener('click', () => {
+                    if (window.recToggleSavedAnimation) window.recToggleSavedAnimation(name);
+                });
+                if (window.recIsSavedAnimationPlaying && window.recIsSavedAnimationPlaying(name)) {
+                    row.classList.add('playing');
+                }
+                // The replay colour mode, the same three the recorder offers.
+                // It lives HERE because saving froze the recorder's choice into
+                // a copy no layer owns any more — without this the dropdown
+                // upstairs looked like it governed playback and did not.
+                // Its own click/drag handlers stop at the select: the row plays
+                // on click and drags into a slot, and neither should fire while
+                // someone is picking a mode.
+                // Nothing to offer if the recorder module never defined the
+                // modes — better a row without the control than an empty select.
+                const modes = window.REC_COLOR_MODES || [];
+                if (modes.length && window.recGetSavedAnimationColorMode) {
+                    const modeSel = document.createElement('select');
+                    modeSel.className = 'rec-color-mode anim-lib-mode';
+                    modeSel.draggable = false;
+                    modeSel.title = 'How replay colours this animation';
+                    modes.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.v;
+                        opt.textContent = m.label;
+                        modeSel.appendChild(opt);
+                    });
+                    modeSel.value = window.recGetSavedAnimationColorMode(name);
+                    modeSel.addEventListener('mousedown', e => e.stopPropagation());
+                    modeSel.addEventListener('click', e => e.stopPropagation());
+                    modeSel.addEventListener('dragstart', e => { e.preventDefault(); e.stopPropagation(); });
+                    // The row is draggable, and a draggable ancestor swallows the
+                    // press that should open the select. Drop the flag while the
+                    // pointer is over the control and restore it on the way out.
+                    modeSel.addEventListener('pointerenter', () => { row.draggable = false; });
+                    modeSel.addEventListener('pointerleave', () => { row.draggable = true; });
+                    modeSel.addEventListener('change', e => {
+                        e.stopPropagation();
+                        window.recSetSavedAnimationColorMode(name, modeSel.value);
+                    });
+                    row.appendChild(modeSel);
+                }
+
+                // Deleting a recording is permanent, so it confirms first.
+                const del = document.createElement('button');
+                del.className = 'anim-lib-delete';
+                del.draggable = false;
+                del.textContent = '✕';
+                del.title = `Delete "${name}"`;
+                del.addEventListener('click', e => {
+                    e.stopPropagation();
+                    if (!window.confirm(`Delete the animation "${name}"?\n\nThis cannot be undone.`)) return;
+                    if (window.recDeleteSavedAnimation) window.recDeleteSavedAnimation(name);
+                });
+                row.appendChild(del);
+                libList.appendChild(row);
+            });
+        }
+
+        function refreshAnimViews() {
+            renderSlots();
+            if (libList.style.display !== 'none') renderLib();
+        }
+        // Recorder saves refresh both views (slot subtitles can flip
+        // between Recorded and Missing when the underlying preset changes);
+        // so does an animation starting or stopping, which repaints the
+        // pressed state — including when Esc stops everything.
+        window.addEventListener('recPresetsChanged', refreshAnimViews);
+        window.addEventListener('recAnimPlaybackChanged', refreshAnimViews);
+        // Only an actual delete clears slots. A generic refresh must never do
+        // it: if the store were ever slow or empty at boot, "the preset isn't
+        // there" would silently wipe the user's curation. Slots that go
+        // missing any other way keep showing Missing for the user to clear.
+        window.addEventListener('recAnimationDeleted', e => {
+            const gone = e && e.detail && e.detail.name;
+            if (!gone) return;
+            let changed = false;
+            slots.forEach((s, idx) => {
+                if (s && s.kind === 'preset' && s.name === gone) {
+                    slots[idx] = SLOT_DEFAULTS[idx] ? { ...SLOT_DEFAULTS[idx] } : null;
+                    changed = true;
+                }
+            });
+            if (changed) saveSlots();
+            refreshAnimViews();
+        });
+
+        renderSlots();
+        syncLibHead();
+
+        // Shooting Star (and its settings) left the panel with the other
+        // stock animations — #shootingStarWrap stays in the hidden legacy
+        // panel and its ParamRegistry entries are gone, so neither autoload
+        // nor the mutation engine can switch it on invisibly.
 
         return sec;
     }
@@ -5617,27 +5895,13 @@
                     var picker = document.createElement('input');
                     picker.type = 'color';
                     picker.className = 'arm-picker';
-                    // 'main' arms paint the live default color (resolveArmColor
-                    // defers to pointer.color), so show THAT — not the arm's
-                    // stored custom hex. Display-only: cfg.color is untouched,
-                    // and .value is set by property so the picker's input
-                    // handler (which flips the arm to 'fixed' and persists)
-                    // never fires. Rebuilds re-run this on every default-color
-                    // change while the popup is open, so it tracks live.
-                    if (cfg.mode === 'main') {
-                        var mainPk = document.getElementById('colorPicker');
-                        picker.value = (mainPk && mainPk.value) || cfg.color || '#ffffff';
-                    } else {
-                        picker.value = cfg.color || '#ffffff';
-                    }
-                    picker.disabled = cfg.mode !== 'fixed';
-                    // Generative modes (random/step) dim the swatch —
-                    // no single color is "the" color. A 'main' arm's swatch is
-                    // accurate (it IS the default color), so keep it readable.
-                    if (cfg.mode !== 'fixed') {
-                        picker.style.opacity = (cfg.mode === 'main') ? '0.8' : '0.35';
-                    }
-
+                    // Two controls, deliberately: the four colour modes are one
+                    // exclusive choice, and Pressure is an independent switch on
+                    // top of it — so an arm can be pressure-less paint, or push
+                    // while still carrying the colour mode it goes back to. The
+                    // toggle keeps its own place at the far right of the row,
+                    // clear of the four-button group, so it doesn't read as a
+                    // fifth option in it.
                     var modes = [
                         { key: 'main',    text: '\u25CF', title: 'Follow pointer color' },
                         { key: 'fixed',   text: '\u25C6', title: 'Fixed color' },
@@ -5650,15 +5914,82 @@
                     modeWrap.className = 'arm-mode-wrap';
                     var btns = [];
 
+                    // ── Per-arm Pressure (2026-08-26) ────────────────────────
+                    // Marks this arm as a PUSH arm: it moves paint already on
+                    // the canvas and lays none of its own, while its siblings
+                    // keep painting. The brush drawer's Pressure button is the
+                    // all-arms version of the same switch, so while THAT is on
+                    // every arm pushes and this one is inert — greyed rather
+                    // than hidden, so the rows don't reflow when you switch the
+                    // brush over.
+                    var brushPush = !!(window.config && window.config.BRUSH_VELOCITY_ONLY);
+                    var pushBtn = document.createElement('button');
+                    pushBtn.type = 'button';
+                    pushBtn.className = 'arm-mode-btn arm-push-btn';
+                    pushBtn.textContent = '\u2248';
+
+                    // Repaints the row from cfg — the mode buttons, the Pressure
+                    // toggle AND the swatch, in one place, so no widget can end
+                    // up describing a state the others have moved on from.
+                    function paintRow() {
+                        btns.forEach(function(b) {
+                            var on = b.dataset.mode === cfg.mode;
+                            b.classList.toggle('active', on);
+                            b.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 6px;'
+                                + 'font-size:10px;border-radius:0;background:'
+                                + (on ? '#ec3013' : 'rgba(255,255,255,0.08)') + ';color:'
+                                + (on ? '#fff' : 'rgba(255,255,255,0.6)') + ';border:1px solid '
+                                + (on ? '#ec3013' : 'rgba(255,255,255,0.1)') + ';cursor:pointer;';
+                        });
+
+                        var push = !!cfg.push;
+                        pushBtn.classList.toggle('active', push);
+                        pushBtn.style.cssText = 'all:unset;box-sizing:border-box;margin-left:auto;'
+                            + 'padding:4px 7px;font-size:11px;line-height:1;border-radius:0;background:'
+                            + (push ? '#ec3013' : 'rgba(255,255,255,0.08)') + ';color:'
+                            + (push ? '#fff' : 'rgba(255,255,255,0.6)') + ';border:1px solid '
+                            + (push ? '#ec3013' : 'rgba(255,255,255,0.1)')
+                            + ';cursor:pointer;opacity:' + (brushPush ? '0.45' : '1') + ';';
+                        pushBtn.title = brushPush
+                            ? 'Pressure arm — the whole brush is already in Pressure mode, '
+                              + 'so every arm pushes. Switch the brush back to Fluid to mix '
+                              + 'pushing and painting arms.'
+                            : (push ? 'Pressure arm: this arm pushes the paint already on the canvas '
+                                      + 'and lays none of its own. Click to make it paint again.'
+                                    : 'Make this a Pressure arm — it pushes paint instead of '
+                                      + 'laying it down, using the mode and Strength set in the '
+                                      + 'brush drawer. The other arms keep painting.');
+
+                        // 'main' arms paint the live default color (resolveArmColor
+                        // defers to pointer.color), so show THAT — not the arm's
+                        // stored custom hex. Display-only: cfg.color is untouched,
+                        // and .value is set by property so the picker's input
+                        // handler (which flips the arm to 'fixed' and persists)
+                        // never fires. Rebuilds re-run this on every default-color
+                        // change while the popup is open, so it tracks live.
+                        if (cfg.mode === 'main') {
+                            var mainPk = document.getElementById('colorPicker');
+                            picker.value = (mainPk && mainPk.value) || cfg.color || '#ffffff';
+                        } else {
+                            picker.value = cfg.color || '#ffffff';
+                        }
+                        picker.disabled = cfg.mode !== 'fixed';
+                        // Generative modes (random/step) dim the swatch — no single
+                        // color is "the" color. A 'main' arm's swatch is accurate
+                        // (it IS the default color), so keep it readable. Pressure
+                        // doesn't touch this: a push arm keeps the colour mode it
+                        // paints in the moment you switch it back.
+                        picker.style.opacity = (cfg.mode === 'fixed') ? '1'
+                                             : (cfg.mode === 'main')  ? '0.8' : '0.35';
+                    }
+
                     modes.forEach(function(m) {
                         var btn = document.createElement('button');
                         btn.type = 'button';
-                        btn.className = 'arm-mode-btn' + (cfg.mode === m.key ? ' active' : '');
+                        btn.className = 'arm-mode-btn';
                         btn.textContent = m.text;
                         btn.title = m.title;
                         btn.dataset.mode = m.key;
-                        var isActive = cfg.mode === m.key;
-                        btn.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 6px;font-size:10px;border-radius:0;background:' + (isActive ? '#ec3013' : 'rgba(255,255,255,0.08)') + ';color:' + (isActive ? '#fff' : 'rgba(255,255,255,0.6)') + ';border:1px solid ' + (isActive ? '#ec3013' : 'rgba(255,255,255,0.1)') + ';cursor:pointer;';
                         btn.addEventListener('click', function() {
                             cfg.mode = m.key;
                             cfg.cachedColor = null;
@@ -5666,17 +5997,7 @@
                                 // Auto-pick a hue based on arm index
                                 var hue = Math.round((idx / (count || 1)) * 360) % 360;
                                 cfg.color = hslToHex(hue, 80, 55);
-                                picker.value = cfg.color;
                             }
-                            btns.forEach(function(b) {
-                                var active = b.dataset.mode === m.key;
-                                b.classList.toggle('active', active);
-                                b.style.background = active ? '#ec3013' : 'rgba(255,255,255,0.08)';
-                                b.style.color = active ? '#fff' : 'rgba(255,255,255,0.6)';
-                                b.style.borderColor = active ? '#ec3013' : 'rgba(255,255,255,0.1)';
-                            });
-                            picker.disabled = m.key !== 'fixed';
-                            picker.style.opacity = m.key === 'fixed' ? '1' : '0.35';
                             persistArmColors();
                             // Arm 0 is the active brush: reflect its new mode into
                             // the top-nav chips + hidden checkboxes (skipPanel — we
@@ -5684,24 +6005,27 @@
                             if (idx === 0 && typeof window.syncBrushColorUI === 'function') {
                                 window.syncBrushColorUI({ skipPanel: true });
                             }
+                            // Repaint AFTER the sync: on arm 0 that sync can move
+                            // the top-nav picker, and a Follow row mirrors THAT.
+                            paintRow();
                         });
                         btns.push(btn);
                         modeWrap.appendChild(btn);
                     });
 
+                    pushBtn.addEventListener('click', function () {
+                        cfg.push = !cfg.push;
+                        paintRow();
+                        persistArmColors();
+                    });
+
+                    paintRow();
+
                     picker.addEventListener('input', function() {
                         cfg.color = picker.value;
                         if (cfg.mode !== 'fixed') {
                             cfg.mode = 'fixed';
-                            btns.forEach(function(b) {
-                                var active = b.dataset.mode === 'fixed';
-                                b.classList.toggle('active', active);
-                                b.style.background = active ? '#ec3013' : 'rgba(255,255,255,0.08)';
-                                b.style.color = active ? '#fff' : 'rgba(255,255,255,0.6)';
-                                b.style.borderColor = active ? '#ec3013' : 'rgba(255,255,255,0.1)';
-                            });
-                            picker.disabled = false;
-                            picker.style.opacity = '1';
+                            paintRow();
                         }
                         persistArmColors();
                         // Arm 0 picker = the active brush's fixed swatch: route
@@ -5715,48 +6039,8 @@
 
                     row.appendChild(picker);
                     row.appendChild(modeWrap);
-
-                    // ── Per-arm Pressure (2026-08-26) ────────────────────
-                    // Marks this arm as a PUSH arm: it moves paint already on
-                    // the canvas and lays none of its own, while its siblings
-                    // keep painting. The brush drawer's Pressure button is the
-                    // all-arms version of the same switch, so while THAT is on
-                    // every arm pushes and these are inert — greyed rather than
-                    // hidden, so the rows don't reflow when you switch the
-                    // brush over. Lives outside modeWrap (which is the colour
-                    // group) and is pushed to the right edge: it answers a
-                    // different question from the four buttons beside it.
-                    var brushPush = !!(window.config && window.config.BRUSH_VELOCITY_ONLY);
-                    var pushBtn = document.createElement('button');
-                    pushBtn.type = 'button';
-                    pushBtn.className = 'arm-mode-btn arm-push-btn';
-                    pushBtn.textContent = '≈';
-                    function paintPushBtn() {
-                        var on = !!cfg.push;
-                        pushBtn.classList.toggle('active', on);
-                        pushBtn.style.cssText = 'all:unset;box-sizing:border-box;margin-left:auto;'
-                            + 'padding:4px 7px;font-size:11px;line-height:1;border-radius:0;background:'
-                            + (on ? '#ec3013' : 'rgba(255,255,255,0.08)') + ';color:'
-                            + (on ? '#fff' : 'rgba(255,255,255,0.6)') + ';border:1px solid '
-                            + (on ? '#ec3013' : 'rgba(255,255,255,0.1)')
-                            + ';cursor:pointer;opacity:' + (brushPush ? '0.45' : '1') + ';';
-                        pushBtn.title = brushPush
-                            ? 'Pressure arm — the whole brush is already in Pressure mode, '
-                              + 'so every arm pushes. Switch the brush back to Fluid to mix '
-                              + 'pushing and painting arms.'
-                            : (on ? 'Pressure arm: this arm pushes the paint already on the canvas '
-                                    + 'and lays none of its own. Click to make it paint again.'
-                                  : 'Make this a Pressure arm — it pushes paint instead of '
-                                    + 'laying it down, using the mode and Strength set in the '
-                                    + 'brush drawer. The other arms keep painting.');
-                    }
-                    paintPushBtn();
-                    pushBtn.addEventListener('click', function () {
-                        cfg.push = !cfg.push;
-                        paintPushBtn();
-                        persistArmColors();
-                    });
                     row.appendChild(pushBtn);
+
                     rowsWrap.appendChild(row);
                 })(i);
             }
@@ -5782,17 +6066,37 @@
             }
         });
 
-        // Close when clicking elsewhere in the UI — but NOT on the canvas. Any
+        // Close when pressing elsewhere in the UI — but NOT on the artwork. Any
         // canvas click used to dismiss this, so you could never hold a colour
         // open while working against the art you were picking for, which is
         // most of the reason to move the panel at all.
-        document.addEventListener('click', function(e) {
-            if (panel.style.display === 'none' || panel.contains(e.target) || e.target === toggle) return;
-            var onCanvas = e.target && e.target.closest &&
-                (e.target.id === 'canvas' || e.target.closest('#canvas, #canvas-wrapper, #canvas-area'));
-            if (onCanvas) return;
+        //
+        // Two things made this feel broken (2026-08-27). The exemption covered
+        // all of #canvas-area — the entire region the panel floats over, empty
+        // letterbox included — so nearly every click that looked like "outside
+        // the dropdown" was inside the exemption and nothing happened. And it
+        // listened for a BUBBLED click, which half the strip never delivers:
+        // every ⚙ stops propagation (wireGearToTrigger), so opening another
+        // channel's popup left this one hanging open behind it.
+        //
+        // pointerdown in the CAPTURE phase fixes the second: document capture
+        // runs before any handler in the tree, so nothing can swallow it. The
+        // exemption is now the artboard itself — #canvas and the wrapper that
+        // carries its resize handles — not the room it sits in.
+        document.addEventListener('pointerdown', function(e) {
+            if (panel.style.display === 'none') return;
+            var t = e.target;
+            if (t && panel.contains(t)) return;
+            // The trigger and its gear own the open/close toggle themselves.
+            if (t === toggle || (t && toggle.contains(t))) return;
+            var gear = toggle.__chGear;
+            if (gear && (t === gear || gear.contains(t))) return;
+            if (t && t.closest && t.closest('#canvas, #canvas-wrapper')) return;
             closePanel();
-        });
+        }, true);
+        // Left in place for the OTHER popups' bubble-phase closers, which is
+        // all it ever guarded: this panel's own closer reads pointerdown and
+        // checks panel.contains() directly.
         panel.addEventListener('click', function(e) { e.stopPropagation(); });
 
         // Reposition or close on resize

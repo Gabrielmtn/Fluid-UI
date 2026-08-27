@@ -103,7 +103,7 @@
             a.timeline.isRecording = true;
             a.timeline.recordingStartTime = Date.now() - a.timeline.playbackPosition;
             a.timeline.duration = recMaxDurationMs;
-            // Capture the brush's color mode at record start so 'Original Mode'
+            // Capture the brush's color mode at record start so 'Preserve Mode'
             // can reproduce it on replay (random keeps being random, etc.)
             var _arm0 = (window.multiArmColors && window.multiArmColors[0]) ? window.multiArmColors[0] : null;
             a.recordMode = (_arm0 && _arm0.mode) ? _arm0.mode : 'main';
@@ -402,10 +402,173 @@
             recStopPlayback();
         }
         
+        // ── Shared replay emitter ───────────────────────────────────────
+        // Paints every interaction in (prevMs, currMs] from one track. A
+        // "track" is anything carrying the replay-colour fields (colorMode /
+        // recordMode / recordStepPalette) plus the _rep* scratch — a recorder
+        // layer and a slot animation's track both qualify, so both get the
+        // same colour handling, footprint pinning and push-dab behaviour.
+        // maskId is a layer id to test against the mask system, or null for
+        // sources that have no mask of their own (slot animations).
+        function recEmitTrackWindow(track, interactions, prevMs, currMs, maskId) {
+            if (!interactions || !interactions.length) return;
+            // Per-track replay color behavior (1.3, reworked 2026-07-18):
+            //   'original' (default) — reproduce the record-time brush
+            //        behavior: generative modes (random/rainbow/step)
+            //        REGENERATE per stroke so a random recording keeps
+            //        being random; fixed/main replay the baked colors.
+            //   'exact' — the literal captured colors (frozen sequence).
+            //   'live'  — defer to the CURRENT brush settings.
+            // All final colors are computed here and applied with
+            // exactColor=true: arm resolution freezes its per-stroke cache
+            // during replay (no mouseup to advance it), so letting it run
+            // would collapse a random recording to ONE frozen color — the
+            // bug this rework fixes.
+            const cMode = track.colorMode || 'original';
+            let genMode = null, genPalette = null, liveSolid = null;
+            if (cMode === 'original') {
+                // 'rainbow' dropped from the generative set (removed
+                // 2026-08-15, photosensitivity): old rainbow recordings
+                // fall through to the non-generative baked-color path —
+                // still colorful, but no fresh random color per splat.
+                if (/^(random|step)$/.test(track.recordMode || '')) {
+                    genMode = track.recordMode;
+                    genPalette = track.recordStepPalette || null;
+                }
+            } else if (cMode === 'live') {
+                const cm = (window.multiArmColors && window.multiArmColors[0] && window.multiArmColors[0].mode) || 'main';
+                if (/^(random|step)$/.test(cm)) {
+                    genMode = cm; // current palette (recGenerativeColor reads it live)
+                } else if (cm === 'fixed' && window.multiArmColors[0].color) {
+                    liveSolid = recHexToRgb(window.multiArmColors[0].color);
+                } else {
+                    liveSolid = (window.pointer && window.pointer.color) ? window.pointer.color.slice() : null;
+                }
+            }
+            // Binary search for start index instead of O(n) filter
+            let lo = 0, hi = interactions.length;
+            while (lo < hi) {
+                const mid = (lo + hi) >>> 1;
+                if (interactions[mid].timestamp <= prevMs) lo = mid + 1;
+                else hi = mid;
+            }
+            for (let idx = lo; idx < interactions.length; idx++) {
+                const i = interactions[idx];
+                if (i.timestamp > currMs) break;
+                // Check if this interaction passes through the layer's mask
+                if (maskId !== null && typeof window.checkMaskPoint === 'function' && !window.checkMaskPoint(maskId, i.x, i.y)) {
+                    continue; // Skip this interaction if masked out
+                }
+                const x = i.x * canvas.width;
+                const y = i.y * canvas.height;
+                let replayColor;
+                // A dab that carries rnd (Preserve Randomness) re-rolls
+                // under 'original' even when the track-level recordMode
+                // heuristic missed it — mode toggled mid-recording, or a
+                // re-recorded replay. 'exact' stays the freeze escape
+                // hatch; 'live' stays fully current-brush.
+                const iGen = (cMode === 'original' && i.rnd) ? 'random' : genMode;
+                if (cMode === 'exact') {
+                    replayColor = i.color;
+                } else if (iGen) {
+                    // Regenerate per stroke: a change in the baked color
+                    // marks a new stroke (random holds one color per stroke,
+                    // rainbow changes per splat — both fall out naturally).
+                    // Key on the DE-DIMMED colour: rnd dabs from a
+                    // re-recorded replay carry per-dab flow shares in fm,
+                    // so the raw baked colour changes every dab — de-
+                    // dimming restores one key per stroke, and the fresh
+                    // roll is re-dimmed by the same share.
+                    const fm = (typeof i.fm === 'number' && isFinite(i.fm) && i.fm > 0) ? i.fm : 1;
+                    const key = (((i.color[0] / fm) * 255) | 0) + ',' + (((i.color[1] / fm) * 255) | 0) + ',' + (((i.color[2] / fm) * 255) | 0);
+                    if (key !== track._repKey) {
+                        track._repKey = key;
+                        track._repColor = recGenerativeColor(iGen, genPalette, track) || i.color;
+                    }
+                    replayColor = (fm !== 1)
+                        ? [track._repColor[0] * fm, track._repColor[1] * fm, track._repColor[2] * fm]
+                        : track._repColor;
+                } else if (cMode === 'live') {
+                    replayColor = liveSolid || i.color;
+                } else { // original, non-generative → the baked colors
+                    replayColor = i.color;
+                }
+                // Pin the footprint this dab was recorded with, the same
+                // pin-then-restore stroke replay and peer dabs use. Only when
+                // the interaction actually carries one: recordings made before
+                // this existed have neither field and keep playing back gaussian,
+                // which is exactly how they were painted.
+                // Pressure counts toward the footprint pin, and has to:
+                // splat() only honours a velocity-only dab on a user stroke
+                // (the __brushTipOn gate), and _fp is what opens that gate
+                // for a recorded one. Coerced against the known modes the
+                // same way stroke replay coerces a peer's — a recording can
+                // arrive through a .fluid import or a peer's snapshot.
+                const _rp = (i.push && typeof i.push === 'object') ? i.push : null;
+                const _rap = (typeof i.ap === 'number' && isFinite(i.ap)) ? (i.ap | 0) : 0;
+                const _fp = (typeof i.tip === 'number') || !!i.shape || !!_rp || !!_rap;
+                let _tipPrev, _shapePrev, _remotePrev, _pushPrev, _apPrev;
+                if (_fp && window.config) {
+                    _tipPrev = window.config.BRUSH_TIP;
+                    _shapePrev = window.config.BRUSH_SHAPE_ID;
+                    _remotePrev = window.__remoteStroke;
+                    // Pinned whether or not the dab carries push, like stroke
+                    // replay: reading absence as "leave mine alone" would
+                    // repaint an ordinary recording as a silent push whenever
+                    // the live brush happened to be in Pressure mode.
+                    _pushPrev = [window.config.BRUSH_VELOCITY_ONLY,
+                                 window.config.BRUSH_VEL_MODE,
+                                 window.config.BRUSH_VEL_STRENGTH];
+                    _apPrev = window.__armPushPin;
+                    window.config.BRUSH_VELOCITY_ONLY = !!_rp;
+                    if (_rp) {
+                        window.config.BRUSH_VEL_MODE =
+                            (_rp.m === 'spread' || _rp.m === 'gather' || _rp.m === 'swirl')
+                                ? _rp.m : 'smudge';
+                        window.config.BRUSH_VEL_STRENGTH =
+                            (typeof _rp.s === 'number' && isFinite(_rp.s))
+                                ? Math.max(0, Math.min(5, _rp.s)) : 1;
+                    }
+                    window.__armPushPin = _rap;
+                    window.config.BRUSH_TIP = (typeof i.tip === 'number') ? (i.tip | 0) : 0;
+                    // A shape we no longer have suppresses stamps outright rather
+                    // than printing the recording in whatever shape is selected now.
+                    const _have = !!(i.shape && window.BrushShapes
+                        && typeof window.BrushShapes.has === 'function'
+                        && window.BrushShapes.has(i.shape));
+                    window.config.BRUSH_SHAPE_ID = _have ? i.shape : null;
+                    window.__remoteStroke = !!i.shape && !_have;
+                }
+                try {
+                if (typeof window.applyMultiSplatWith === 'function') {
+                    window.applyMultiSplatWith(x, y, i.vx, i.vy, replayColor, i.mult || 1, (typeof i.radius === 'number') ? i.radius : undefined, true, _fp);
+                } else {
+                    const prevM = (typeof window.animationMultiplier === 'number') ? window.animationMultiplier : 1;
+                    const prevR = window.config ? window.config.SPLAT_RADIUS : undefined;
+                    window.animationMultiplier = Math.max(1, Math.round(i.mult || 1));
+                    if (window.config && typeof i.radius === 'number') window.config.SPLAT_RADIUS = i.radius;
+                    multiSplat(x, y, i.vx, i.vy, replayColor, false, true, _fp);
+                    window.animationMultiplier = prevM;
+                    if (window.config && typeof prevR === 'number') window.config.SPLAT_RADIUS = prevR;
+                }
+                } finally {
+                    if (_fp && window.config) {
+                        window.config.BRUSH_TIP = _tipPrev;
+                        window.config.BRUSH_SHAPE_ID = _shapePrev;
+                        window.__remoteStroke = _remotePrev;
+                        window.config.BRUSH_VELOCITY_ONLY = _pushPrev[0];
+                        window.config.BRUSH_VEL_MODE = _pushPrev[1];
+                        window.config.BRUSH_VEL_STRENGTH = _pushPrev[2];
+                        window.__armPushPin = _apPrev;
+                    }
+                }
+            }
+        }
+
         // PERF: Throttle heads UI updates during recording
         let _recHeadsLastUpdate = 0;
         const _recHeadsUpdateInterval = 100; // ms
-        
+
         function recUpdatePlayback() {
             const now = Date.now();
             // ── Sim-clock playhead (2026-08-16) ─────────────────────────────
@@ -449,158 +612,7 @@
                 const prevTime = currentTime - scaledDelta;
                 const cappedPrev = Math.min(prevTime, eff);
                 const cappedCurr = Math.min(currentTime, eff);
-                // Per-layer replay color behavior (1.3, reworked 2026-07-18):
-                //   'original' (default) — reproduce the record-time brush
-                //        behavior: generative modes (random/rainbow/step)
-                //        REGENERATE per stroke so a random recording keeps
-                //        being random; fixed/main replay the baked colors.
-                //   'exact' — the literal captured colors (frozen sequence).
-                //   'live'  — defer to the CURRENT brush settings.
-                // All final colors are computed here and applied with
-                // exactColor=true: arm resolution freezes its per-stroke cache
-                // during replay (no mouseup to advance it), so letting it run
-                // would collapse a random recording to ONE frozen color — the
-                // bug this rework fixes.
-                const cMode = layer.colorMode || 'original';
-                let genMode = null, genPalette = null, liveSolid = null;
-                if (cMode === 'original') {
-                    // 'rainbow' dropped from the generative set (removed
-                    // 2026-08-15, photosensitivity): old rainbow recordings
-                    // fall through to the non-generative baked-color path —
-                    // still colorful, but no fresh random color per splat.
-                    if (/^(random|step)$/.test(layer.recordMode || '')) {
-                        genMode = layer.recordMode;
-                        genPalette = layer.recordStepPalette || null;
-                    }
-                } else if (cMode === 'live') {
-                    const cm = (window.multiArmColors && window.multiArmColors[0] && window.multiArmColors[0].mode) || 'main';
-                    if (/^(random|step)$/.test(cm)) {
-                        genMode = cm; // current palette (recGenerativeColor reads it live)
-                    } else if (cm === 'fixed' && window.multiArmColors[0].color) {
-                        liveSolid = recHexToRgb(window.multiArmColors[0].color);
-                    } else {
-                        liveSolid = (window.pointer && window.pointer.color) ? window.pointer.color.slice() : null;
-                    }
-                }
-                // Binary search for start index instead of O(n) filter
-                const interactions = layer.timeline.interactions;
-                let lo = 0, hi = interactions.length;
-                while (lo < hi) {
-                    const mid = (lo + hi) >>> 1;
-                    if (interactions[mid].timestamp <= cappedPrev) lo = mid + 1;
-                    else hi = mid;
-                }
-                for (let idx = lo; idx < interactions.length; idx++) {
-                    const i = interactions[idx];
-                    if (i.timestamp > cappedCurr) break;
-                    // Check if this interaction passes through the layer's mask
-                    if (typeof window.checkMaskPoint === 'function' && !window.checkMaskPoint(layer.id, i.x, i.y)) {
-                        continue; // Skip this interaction if masked out
-                    }
-                    const x = i.x * canvas.width;
-                    const y = i.y * canvas.height;
-                    let replayColor;
-                    // A dab that carries rnd (Preserve Randomness) re-rolls
-                    // under 'original' even when the layer-level recordMode
-                    // heuristic missed it — mode toggled mid-recording, or a
-                    // re-recorded replay. 'exact' stays the freeze escape
-                    // hatch; 'live' stays fully current-brush.
-                    const iGen = (cMode === 'original' && i.rnd) ? 'random' : genMode;
-                    if (cMode === 'exact') {
-                        replayColor = i.color;
-                    } else if (iGen) {
-                        // Regenerate per stroke: a change in the baked color
-                        // marks a new stroke (random holds one color per stroke,
-                        // rainbow changes per splat — both fall out naturally).
-                        // Key on the DE-DIMMED colour: rnd dabs from a
-                        // re-recorded replay carry per-dab flow shares in fm,
-                        // so the raw baked colour changes every dab — de-
-                        // dimming restores one key per stroke, and the fresh
-                        // roll is re-dimmed by the same share.
-                        const fm = (typeof i.fm === 'number' && isFinite(i.fm) && i.fm > 0) ? i.fm : 1;
-                        const key = (((i.color[0] / fm) * 255) | 0) + ',' + (((i.color[1] / fm) * 255) | 0) + ',' + (((i.color[2] / fm) * 255) | 0);
-                        if (key !== layer._repKey) {
-                            layer._repKey = key;
-                            layer._repColor = recGenerativeColor(iGen, genPalette, layer) || i.color;
-                        }
-                        replayColor = (fm !== 1)
-                            ? [layer._repColor[0] * fm, layer._repColor[1] * fm, layer._repColor[2] * fm]
-                            : layer._repColor;
-                    } else if (cMode === 'live') {
-                        replayColor = liveSolid || i.color;
-                    } else { // original, non-generative → the baked colors
-                        replayColor = i.color;
-                    }
-                    // Pin the footprint this dab was recorded with, the same
-                    // pin-then-restore stroke replay and peer dabs use. Only when
-                    // the interaction actually carries one: recordings made before
-                    // this existed have neither field and keep playing back gaussian,
-                    // which is exactly how they were painted.
-                    // Pressure counts toward the footprint pin, and has to:
-                    // splat() only honours a velocity-only dab on a user stroke
-                    // (the __brushTipOn gate), and _fp is what opens that gate
-                    // for a recorded one. Coerced against the known modes the
-                    // same way stroke replay coerces a peer's — a recording can
-                    // arrive through a .fluid import or a peer's snapshot.
-                    const _rp = (i.push && typeof i.push === 'object') ? i.push : null;
-                    const _rap = (typeof i.ap === 'number' && isFinite(i.ap)) ? (i.ap | 0) : 0;
-                    const _fp = (typeof i.tip === 'number') || !!i.shape || !!_rp || !!_rap;
-                    let _tipPrev, _shapePrev, _remotePrev, _pushPrev, _apPrev;
-                    if (_fp && window.config) {
-                        _tipPrev = window.config.BRUSH_TIP;
-                        _shapePrev = window.config.BRUSH_SHAPE_ID;
-                        _remotePrev = window.__remoteStroke;
-                        // Pinned whether or not the dab carries push, like stroke
-                        // replay: reading absence as "leave mine alone" would
-                        // repaint an ordinary recording as a silent push whenever
-                        // the live brush happened to be in Pressure mode.
-                        _pushPrev = [window.config.BRUSH_VELOCITY_ONLY,
-                                     window.config.BRUSH_VEL_MODE,
-                                     window.config.BRUSH_VEL_STRENGTH];
-                        _apPrev = window.__armPushPin;
-                        window.config.BRUSH_VELOCITY_ONLY = !!_rp;
-                        if (_rp) {
-                            window.config.BRUSH_VEL_MODE =
-                                (_rp.m === 'spread' || _rp.m === 'gather' || _rp.m === 'swirl')
-                                    ? _rp.m : 'smudge';
-                            window.config.BRUSH_VEL_STRENGTH =
-                                (typeof _rp.s === 'number' && isFinite(_rp.s))
-                                    ? Math.max(0, Math.min(5, _rp.s)) : 1;
-                        }
-                        window.__armPushPin = _rap;
-                        window.config.BRUSH_TIP = (typeof i.tip === 'number') ? (i.tip | 0) : 0;
-                        // A shape we no longer have suppresses stamps outright rather
-                        // than printing the recording in whatever shape is selected now.
-                        const _have = !!(i.shape && window.BrushShapes
-                            && typeof window.BrushShapes.has === 'function'
-                            && window.BrushShapes.has(i.shape));
-                        window.config.BRUSH_SHAPE_ID = _have ? i.shape : null;
-                        window.__remoteStroke = !!i.shape && !_have;
-                    }
-                    try {
-                    if (typeof window.applyMultiSplatWith === 'function') {
-                        window.applyMultiSplatWith(x, y, i.vx, i.vy, replayColor, i.mult || 1, (typeof i.radius === 'number') ? i.radius : undefined, true, _fp);
-                    } else {
-                        const prevM = (typeof window.animationMultiplier === 'number') ? window.animationMultiplier : 1;
-                        const prevR = window.config ? window.config.SPLAT_RADIUS : undefined;
-                        window.animationMultiplier = Math.max(1, Math.round(i.mult || 1));
-                        if (window.config && typeof i.radius === 'number') window.config.SPLAT_RADIUS = i.radius;
-                        multiSplat(x, y, i.vx, i.vy, replayColor, false, true, _fp);
-                        window.animationMultiplier = prevM;
-                        if (window.config && typeof prevR === 'number') window.config.SPLAT_RADIUS = prevR;
-                    }
-                    } finally {
-                        if (_fp && window.config) {
-                            window.config.BRUSH_TIP = _tipPrev;
-                            window.config.BRUSH_SHAPE_ID = _shapePrev;
-                            window.__remoteStroke = _remotePrev;
-                            window.config.BRUSH_VELOCITY_ONLY = _pushPrev[0];
-                            window.config.BRUSH_VEL_MODE = _pushPrev[1];
-                            window.config.BRUSH_VEL_STRENGTH = _pushPrev[2];
-                            window.__armPushPin = _apPrev;
-                        }
-                    }
-                }
+                recEmitTrackWindow(layer, layer.timeline.interactions, cappedPrev, cappedCurr, layer.id);
                 if (layer.timeline.playbackPosition >= eff) {
                     if (layer.isLooping) {
                         layer.timeline.playbackPosition = 0;
@@ -740,7 +752,6 @@
                 }
             });
             const recordBtn = document.getElementById('recRecordBtn');
-            const recordMultiBtn = document.getElementById('recMultiRecordBtn');
             const playBtn = document.getElementById('recPlayBtn');
             const playAllBtn = document.getElementById('recPlayAllBtn');
             const a = recGetActiveLayer();
@@ -748,7 +759,6 @@
             if (playBtn) playBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play Layer';
             if (playAllBtn) playAllBtn.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
             if (recordBtn) recordBtn.classList.toggle('active', !!(a && a.timeline.isRecording));
-            if (recordMultiBtn) recordMultiBtn.classList.toggle('active', recIsMultiEnabled());
             if (playBtn) playBtn.classList.toggle('active', !!(a && a.timeline.isPlaying));
             recRefreshTimelinesUI();
             recBindLayerListEvents();
@@ -757,14 +767,12 @@
             const mini = document.getElementById('recMini');
             const recDrawerElState = document.getElementById('recDrawer');
             const miniRecBtn = document.getElementById('recMiniRecordBtn');
-            const miniMultiBtn = document.getElementById('recMiniMultiBtn');
             const miniPauseBtn = document.getElementById('recMiniPauseBtn');
             const miniPlayAllBtn = document.getElementById('recMiniPlayAllBtn');
             if (miniRecBtn) miniRecBtn.textContent = recCountdownActive ? String(recCountdownVal || 3) : 'Record';
             if (miniPauseBtn) miniPauseBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play';
             if (miniPlayAllBtn) miniPlayAllBtn.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
             if (miniRecBtn) miniRecBtn.classList.toggle('active', !!(a && a.timeline.isRecording));
-            if (miniMultiBtn) miniMultiBtn.classList.toggle('active', recIsMultiEnabled());
             if (miniPauseBtn) miniPauseBtn.classList.toggle('active', !!(a && a.timeline.isPlaying));
             if (miniPlayAllBtn) miniPlayAllBtn.classList.toggle('active', !!recIsPlayingAll);
             if (mini) {
@@ -968,11 +976,14 @@
             return null;
         }
 
-        // Human-readable labels for the color-mode dropdowns (full + mini)
+        // Human-readable labels for the color-mode dropdowns (full + mini +
+        // the Saved Animations library). The names say what each one keeps:
+        // the record-time MODE (re-rolled), the record-time OUTPUT (frozen),
+        // or nothing at all (whatever the brush is set to right now).
         var REC_COLOR_MODES = [
-            { v: 'original', label: 'Original Mode' },
+            { v: 'original', label: 'Preserve Mode' },
             { v: 'exact', label: 'Exact Recording' },
-            { v: 'live', label: 'Live Colors' }
+            { v: 'live', label: 'Current Settings' }
         ];
 
         // Migrate saved color-mode values to the reworked set (2026-07-18):
@@ -1177,10 +1188,6 @@
             _recBtnCache = null;
         }
 
-        function recIsMultiEnabled() {
-            return (typeof isMultiplayerEnabled !== 'undefined') ? !!isMultiplayerEnabled : !!window.isMultiplayerEnabled;
-        }
-
         function recSetupTimelineInteractions() {
             const c = document.getElementById('recTimelineCanvas');
             if (!c) return;
@@ -1200,29 +1207,6 @@
             c.addEventListener('mousedown', (e) => { seeking = true; seekClientX(e.clientX); });
             window.addEventListener('mousemove', (e) => { if (seeking) seekClientX(e.clientX); });
             window.addEventListener('mouseup', () => { seeking = false; });
-        }
-
-        function recToggleMultiplayerActivation() {
-            const cb = document.getElementById('multiplayerToggle');
-            const currentlyOn = recIsMultiEnabled();
-            if (!currentlyOn) {
-                if (cb) cb.checked = true;
-                if (typeof initMultiplayer === 'function') initMultiplayer();
-            } else {
-                // One unguarded click here used to close the socket outright —
-                // the relay drops you from the Take Turns rotation and passes
-                // the brush on, and (for stranger rooms) there's no way back.
-                // Confirm before leaving, and keep the room for Reconnect.
-                const inTurns = !!window.turnsOn;
-                const msg = inTurns
-                    ? 'Leave the multiplayer room?\n\nTake Turns is on — leaving gives up your spot in the rotation.'
-                    : 'Leave the multiplayer room?';
-                if (!window.confirm(msg)) { recRenderUI(); return; }
-                if (cb) cb.checked = false;
-                if (typeof disconnectMultiplayer === 'function') disconnectMultiplayer(true);
-            }
-            // Let connection events update state, but refresh UI immediately for button highlight
-            recRenderUI();
         }
 
         function recSetupResizeHandle() {
@@ -1517,6 +1501,46 @@
             return d;
         }
 
+        // One track's own length, capped by its loop Max the way
+        // recGetEffectiveDuration caps a live layer's.
+        function recTrackEffectiveDuration(t) {
+            const base = Math.max(0, (t && t.duration) || 0);
+            const loop = (t && typeof t.loopMaxMs === 'number' && t.loopMaxMs > 0) ? t.loopMaxMs : null;
+            return Math.max(1, (loop !== null) ? Math.min(base, loop) : base);
+        }
+
+        // A preset holds the WHOLE performance — every layer that had
+        // something in it — as {version:2, layers:[...]}. v1 presets (and the
+        // builtin generators) are a single flat {interactions, duration},
+        // which normalizes to a one-track preset, so old saves keep loading.
+        function recNormalizePreset(data) {
+            if (!data || typeof data !== 'object') return null;
+            let raw;
+            if (Array.isArray(data.layers) && data.layers.length) raw = data.layers;
+            else if (Array.isArray(data.interactions)) raw = [data];
+            else return null;
+            const tracks = [];
+            raw.forEach((l, idx) => {
+                if (!l || !Array.isArray(l.interactions) || !l.interactions.length) return;
+                const interactions = l.interactions.slice();
+                tracks.push({
+                    name: (typeof l.name === 'string' && l.name) ? l.name : `Layer ${idx + 1}`,
+                    interactions,
+                    duration: (typeof l.duration === 'number' && l.duration > 0)
+                        ? l.duration : recComputeDurationFromInteractions(interactions),
+                    loopMaxMs: (typeof l.loopMaxMs === 'number') ? l.loopMaxMs : undefined,
+                    colorMode: recMigrateColorMode(l.colorMode),
+                    recordMode: (typeof l.recordMode === 'string') ? l.recordMode : 'main',
+                    recordStepPalette: Array.isArray(l.recordStepPalette) ? l.recordStepPalette.slice() : null
+                });
+            });
+            if (!tracks.length) return null;
+            // The performance runs as long as its longest layer.
+            let duration = 0;
+            tracks.forEach(t => { duration = Math.max(duration, recTrackEffectiveDuration(t)); });
+            return { tracks, duration: Math.max(1, duration) };
+        }
+
         function recListLocalPresets() {
             const sm = window.settingsManager;
             const all = sm && typeof sm.getAll === 'function' ? sm.getAll() : {};
@@ -1524,12 +1548,8 @@
             Object.keys(all).forEach(key => {
                 if (key.startsWith('recPreset.')) {
                     const name = key.substring('recPreset.'.length);
-                    const data = all[key] || {};
-                    if (Array.isArray(data.interactions)) {
-                        const duration = (typeof data.duration === 'number') ? data.duration : recComputeDurationFromInteractions(data.interactions);
-                        const loopMaxMs = (typeof data.loopMaxMs === 'number') ? data.loopMaxMs : undefined;
-                        out[name] = { interactions: data.interactions.slice(), duration, loopMaxMs };
-                    }
+                    const preset = recNormalizePreset(all[key]);
+                    if (preset) out[name] = preset;
                 }
             });
             return out;
@@ -1542,7 +1562,7 @@
             sel.innerHTML = '';
             const def = document.createElement('option');
             def.value = '';
-            def.textContent = 'Select a preset...';
+            def.textContent = 'Select an animation...';
             sel.appendChild(def);
             const local = recListLocalPresets();
             const names = new Set();
@@ -1555,43 +1575,64 @@
                 sel.appendChild(opt);
             });
             if ([...sel.options].some(o => o.value === current)) sel.value = current;
+            // The sidebar Animations section mirrors this library (slots +
+            // saved-animations list) — tell it the set of presets changed.
+            try { window.dispatchEvent(new CustomEvent('recPresetsChanged')); } catch (_) {}
         }
 
         function recGetPresetByName(name) {
             const map = recListLocalPresets();
             if (map[name]) return map[name];
             const gen = recBuiltinPresetGenerators[name];
-            if (typeof gen === 'function') {
-                const data = gen();
-                return { interactions: (data.interactions || []).slice(), duration: data.duration };
-            }
+            if (typeof gen === 'function') return recNormalizePreset(gen());
             return null;
         }
 
+        // Loading restores the whole performance: one layer per saved track,
+        // each with the colour behaviour and loop length it was saved with.
         function recApplyPresetByName(name) {
             if (!name) return;
             const preset = recGetPresetByName(name);
             if (!preset) { recSetStatus('Preset not found'); return; }
-            const layer = recCreateLayer(name);
-            layer.timeline.interactions = JSON.parse(JSON.stringify(preset.interactions || []));
-            layer.timeline.duration = (typeof preset.duration === 'number') ? preset.duration : recComputeDurationFromInteractions(layer.timeline.interactions);
-            layer.timeline.playbackPosition = 0;
-            if (typeof preset.loopMaxMs === 'number') layer.loopMaxMs = preset.loopMaxMs;
-            recSetActiveLayer(layer.id);
+            const multi = preset.tracks.length > 1;
+            let first = null;
+            preset.tracks.forEach(t => {
+                const layer = recCreateLayer(multi ? `${name} — ${t.name}` : name);
+                layer.timeline.interactions = JSON.parse(JSON.stringify(t.interactions));
+                layer.timeline.duration = t.duration;
+                layer.timeline.playbackPosition = 0;
+                if (typeof t.loopMaxMs === 'number') layer.loopMaxMs = t.loopMaxMs;
+                layer.colorMode = t.colorMode;
+                layer.recordMode = t.recordMode;
+                layer.recordStepPalette = t.recordStepPalette ? t.recordStepPalette.slice() : null;
+                if (!first) first = layer;
+            });
+            if (first) recSetActiveLayer(first.id);
             recRenderUI();
-            recSetStatus(`Loaded preset "${name}"`);
+            recSetStatus(`Loaded preset "${name}"` + (multi ? ` (${preset.tracks.length} layers)` : ''));
         }
 
-        function recSaveActiveLayerAsPreset(name) {
-            const a = recGetActiveLayer();
-            if (!a || !name) return false;
+        // Save the whole stack, not just the selected layer: a performance is
+        // every layer that has something in it, and recalling one from a slot
+        // should bring back what the artist actually made. Empty layers are
+        // dropped so a stray New Layer doesn't pad the preset.
+        function recSaveAllLayersAsPreset(name) {
+            if (!name) return false;
             // Commit any pending edit from the in-layer Max input
             try { recCommitActiveLayerMaxFromUI(); } catch(_){}
-            const payload = {
-                interactions: (a.timeline.interactions || []).map(i => ({ ...i })),
-                duration: a.timeline.duration || recComputeDurationFromInteractions(a.timeline.interactions),
-                loopMaxMs: (typeof a.loopMaxMs === 'number') ? a.loopMaxMs : undefined
-            };
+            const filled = recLayers.filter(l => l && l.timeline && (l.timeline.interactions || []).length > 0);
+            if (!filled.length) return 'empty';
+            const layers = filled.map(l => ({
+                name: l.name,
+                interactions: (l.timeline.interactions || []).map(i => ({ ...i })),
+                duration: l.timeline.duration || recComputeDurationFromInteractions(l.timeline.interactions),
+                loopMaxMs: (typeof l.loopMaxMs === 'number') ? l.loopMaxMs : undefined,
+                colorMode: l.colorMode || 'original',
+                recordMode: l.recordMode || 'main',
+                recordStepPalette: Array.isArray(l.recordStepPalette) ? l.recordStepPalette.slice() : null
+            }));
+            let duration = 0;
+            layers.forEach(l => { duration = Math.max(duration, recTrackEffectiveDuration(l)); });
             const sm = window.settingsManager;
             if (!sm) return false;
             const key = `recPreset.${name}`;
@@ -1599,16 +1640,201 @@
             if (Object.prototype.hasOwnProperty.call(all, key)) {
                 return 'exists';
             }
-            sm.set(key, payload, false);
+            sm.set(key, { version: 2, layers, duration: Math.max(1, duration) }, false);
             return true;
         }
-        
+
+        // ── Slot animations: an independent, looping transport ──────────
+        // A slot animation is NOT the recorder. It keeps its own playhead and
+        // loops until it is clicked again, and it never touches recLayers,
+        // recIsPlayingAll or the transport buttons — so recording and layer
+        // playback stay exactly as the artist left them while one runs. It
+        // rides the same sim clock and the same emitter as layer replay, so
+        // colours, footprint pins and push dabs behave identically.
+        const recAnimPlayers = new Map(); // name -> { tracks, duration, position }
+        let recAnimLastTime = Date.now();
+
+        function recAnimNotify() {
+            try { window.dispatchEvent(new CustomEvent('recAnimPlaybackChanged')); } catch (_) {}
+        }
+
+        function recStartSavedAnimation(name) {
+            const preset = name ? recGetPresetByName(name) : null;
+            if (!preset) return false;
+            recAnimPlayers.set(name, {
+                // Own scratch per player: two slots holding the same recording
+                // generate their own colours instead of sharing one cache.
+                tracks: preset.tracks.map(t => ({
+                    interactions: t.interactions,
+                    colorMode: t.colorMode,
+                    recordMode: t.recordMode,
+                    recordStepPalette: t.recordStepPalette,
+                    endMs: recTrackEffectiveDuration(t)
+                })),
+                duration: Math.max(1, preset.duration),
+                position: 0
+            });
+            recAnimNotify();
+            return true;
+        }
+
+        function recStopSavedAnimation(name) {
+            const had = recAnimPlayers.delete(name);
+            if (had) recAnimNotify();
+            return had;
+        }
+
+        function recStopAllSavedAnimations() {
+            if (!recAnimPlayers.size) return false;
+            recAnimPlayers.clear();
+            recAnimNotify();
+            return true;
+        }
+
+        function recIsSavedAnimationPlaying(name) { return recAnimPlayers.has(name); }
+
+        function recToggleSavedAnimation(name) {
+            if (recAnimPlayers.has(name)) { recStopSavedAnimation(name); return false; }
+            return recStartSavedAnimation(name);
+        }
+
+        // Ticked every frame from the update loop, whatever the recorder is
+        // doing (see 05j) — an animation plays with Recording Mode Off.
+        function recAnimTick() {
+            const now = Date.now();
+            const wallDelta = now - recAnimLastTime;
+            recAnimLastTime = now;
+            if (!recAnimPlayers.size) return;
+            // Same sim-clock playhead as layer playback (see recUpdatePlayback)
+            const delta = ((window.config && window.config.REC_SIM_CLOCK === false)
+                || typeof window.__simDtMs !== 'number')
+                ? wallDelta
+                : window.__simDtMs;
+            if (!(delta > 0)) return;
+            recAnimPlayers.forEach(p => {
+                let remaining = delta;
+                // A stall (or a very short loop) must not spin here: whole
+                // loops beyond a few are dropped rather than replayed.
+                let guard = 0;
+                while (remaining > 0 && guard++ < 8) {
+                    const prev = p.position;
+                    const step = Math.min(remaining, p.duration - prev);
+                    const curr = prev + step;
+                    for (let k = 0; k < p.tracks.length; k++) {
+                        const t = p.tracks[k];
+                        // A short track inside a longer performance finishes
+                        // and waits for the loop point, like a layer does.
+                        if (prev >= t.endMs) continue;
+                        recEmitTrackWindow(t, t.interactions, prev, Math.min(curr, t.endMs), null);
+                    }
+                    remaining -= step;
+                    p.position = curr;
+                    if (p.position >= p.duration) {
+                        p.position = 0;
+                        // Fresh generative colors each loop ("keeps being random")
+                        for (let k = 0; k < p.tracks.length; k++) p.tracks[k]._repKey = null;
+                    }
+                }
+            });
+        }
+
+        // Deleting is permanent — a recorded performance has no undo and no
+        // vault copy — so every caller confirms first. Builtins aren't stored
+        // and simply report false. A playing copy is stopped rather than left
+        // looping against a recording that no longer exists.
+        function recDeleteSavedAnimation(name) {
+            if (!name) return false;
+            const sm = window.settingsManager;
+            if (!sm) return false;
+            const key = `recPreset.${name}`;
+            const all = (typeof sm.getAll === 'function') ? sm.getAll() : {};
+            if (!Object.prototype.hasOwnProperty.call(all, key)) return false;
+            recStopSavedAnimation(name);
+            if (typeof sm.remove === 'function') sm.remove(key);
+            else sm.set(key, undefined, false);
+            // Refreshing the select fires recPresetsChanged for the sidebar;
+            // the delete event additionally lets it prune slots that pointed
+            // here, which a generic refresh must never do on its own.
+            recRefreshPresetSelect();
+            try {
+                window.dispatchEvent(new CustomEvent('recAnimationDeleted', { detail: { name } }));
+            } catch (_) {}
+            return true;
+        }
+
+        function recIsBuiltinAnimation(name) {
+            return Object.prototype.hasOwnProperty.call(recBuiltinPresetGenerators, name);
+        }
+
+        // ── A saved animation's replay colour mode, after the fact ───────
+        // Saving froze whatever the recorder's Colors dropdown happened to
+        // read, and nothing could reach it again: the dropdown edits a
+        // recorder LAYER, and a saved animation is a copy that no layer owns
+        // any more. So the library row carries its own copy of that dropdown,
+        // and these two are what it reads and writes.
+        //
+        // A performance can hold several tracks, each saved with its own
+        // mode. The row shows one control, so it reports the first track's
+        // mode and writes to ALL of them — one animation, one colour policy,
+        // which is how it reads on screen.
+        function recGetSavedAnimationColorMode(name) {
+            const preset = name ? recGetPresetByName(name) : null;
+            if (!preset || !preset.tracks.length) return 'original';
+            return recMigrateColorMode(preset.tracks[0].colorMode);
+        }
+
+        // Writes through immediately (user-authored content does not ride
+        // Save Settings) and retunes a copy that is playing RIGHT NOW, so the
+        // change is visible in the loop the artist is watching rather than
+        // the next time they start it. Builtins are generated, not stored,
+        // so they have nothing to write to and report false.
+        function recSetSavedAnimationColorMode(name, mode) {
+            if (!name) return false;
+            mode = recMigrateColorMode(mode);
+            const sm = window.settingsManager;
+            if (!sm) return false;
+            const key = `recPreset.${name}`;
+            const all = (typeof sm.getAll === 'function') ? sm.getAll() : {};
+            if (!Object.prototype.hasOwnProperty.call(all, key)) return false;
+            const stored = all[key];
+            if (!stored || typeof stored !== 'object') return false;
+            // Both shapes on disk: v2 wraps a layers[] array, the original
+            // single-track form IS the track.
+            const rows = Array.isArray(stored.layers) ? stored.layers
+                : (Array.isArray(stored.interactions) ? [stored] : null);
+            if (!rows) return false;
+            rows.forEach(r => { if (r && typeof r === 'object') r.colorMode = mode; });
+            sm.set(key, stored, false);
+            // Live retune. _repKey/_repStep are the generative scratch: clearing
+            // them re-seeds on the next dab instead of holding the colour the
+            // old mode had cached.
+            const player = recAnimPlayers.get(name);
+            if (player) {
+                player.tracks.forEach(t => { t.colorMode = mode; t._repKey = null; t._repStep = 0; });
+            }
+            try {
+                window.dispatchEvent(new CustomEvent('recAnimationColorModeChanged', { detail: { name, mode } }));
+            } catch (_) {}
+            return true;
+        }
+
+        window.recDeleteSavedAnimation = recDeleteSavedAnimation;
+        window.recGetSavedAnimationColorMode = recGetSavedAnimationColorMode;
+        window.recSetSavedAnimationColorMode = recSetSavedAnimationColorMode;
+        window.recIsBuiltinAnimation = recIsBuiltinAnimation;
+        window.recToggleSavedAnimation = recToggleSavedAnimation;
+        window.recStopSavedAnimation = recStopSavedAnimation;
+        window.recStopAllSavedAnimations = recStopAllSavedAnimations;
+        window.recIsSavedAnimationPlaying = recIsSavedAnimationPlaying;
+        window.recListSavedAnimations = function () {
+            return Object.keys(recListLocalPresets()).sort();
+        };
+
         function setupRecUI() {
             const recModeSel = document.getElementById('recMode');
             const recDrawerEl = document.getElementById('recDrawer');
             const recMiniEl = document.getElementById('recMini');
             const recMiniRecordBtn = document.getElementById('recMiniRecordBtn');
-            const recMiniMultiBtn = document.getElementById('recMiniMultiBtn');
             const recMiniPauseBtn = document.getElementById('recMiniPauseBtn');
             const recMiniStopBtn = document.getElementById('recMiniStopBtn');
             const recMiniPlayAllBtn = document.getElementById('recMiniPlayAllBtn');
@@ -1626,8 +1852,14 @@
                 if (off) {
                     recEnabled = false;
                     if (recMiniEl) recMiniEl.style.display = 'none';
-                    if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record') window.studioDrawer.close();
-                    else if (recDrawerEl) recDrawerEl.classList.remove('open');
+                    // The drawer is shared with the Audio tab: only close it when
+                    // Record is the tab actually showing. Touching the class
+                    // directly is a fallback for studioDrawer being absent — an
+                    // unconditional else here closes the drawer mid tab-swap
+                    // (the demote to 'min' fires after the tab flips to audio).
+                    if (window.studioDrawer) {
+                        if (window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record') window.studioDrawer.close();
+                    } else if (recDrawerEl) recDrawerEl.classList.remove('open');
                     // Stop any playback/recording
                     recStopPlayback();
                     const a = recGetActiveLayer();
@@ -1641,8 +1873,9 @@
 
                 if (min) {
                     if (recMiniEl) recMiniEl.style.display = '';
-                    if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record') window.studioDrawer.close();
-                    else if (recDrawerEl) recDrawerEl.classList.remove('open');
+                    if (window.studioDrawer) {
+                        if (window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record') window.studioDrawer.close();
+                    } else if (recDrawerEl) recDrawerEl.classList.remove('open');
                     // Reflect current max into mini field
                     if (recMiniMaxInput) recMiniMaxInput.value = recFormatTime(recMaxDurationMs || 10000);
                     recRenderUI(); // update button texts for mini
@@ -1672,7 +1905,6 @@
 
     // Mini controls
     if (recMiniRecordBtn) recMiniRecordBtn.addEventListener('click', recToggleRecord);
-    if (recMiniMultiBtn) recMiniMultiBtn.addEventListener('click', () => { recToggleMultiplayerActivation(); });
     if (recMiniPauseBtn) recMiniPauseBtn.addEventListener('click', recTogglePlayback);
     if (recMiniStopBtn) recMiniStopBtn.addEventListener('click', recStopAll);
     if (recMiniPlayAllBtn) recMiniPlayAllBtn.addEventListener('click', recTogglePlaybackAll);
@@ -1706,8 +1938,6 @@
     const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
     const recBtnFull = document.getElementById('recRecordBtn');
     if (recBtnFull) recBtnFull.addEventListener('click', recToggleRecord);
-    const recMultiBtnFull = document.getElementById('recMultiRecordBtn');
-    if (recMultiBtnFull) recMultiBtnFull.addEventListener('click', () => { recToggleMultiplayerActivation(); });
     bind('recPlayBtn', recTogglePlayback);
     bind('recPlayAllBtn', recTogglePlaybackAll);
     bind('recStopBtn', recStopAll);
@@ -1736,6 +1966,7 @@
     
     const recPresetSel = document.getElementById('recPresetSelect');
     const recSavePresetBtn = document.getElementById('recSavePresetBtn');
+    const recDeletePresetBtn = document.getElementById('recDeletePresetBtn');
     const recPresetRow = document.getElementById('recPresetNameRow');
     const recPresetName = document.getElementById('recNewPresetName');
     const recPresetConfirm = document.getElementById('recPresetConfirmBtn');
@@ -1754,18 +1985,33 @@
         if (recPresetRow) recPresetRow.style.display = 'none';
         if (recPresetName) recPresetName.value = '';
     });
+    if (recDeletePresetBtn) recDeletePresetBtn.addEventListener('click', () => {
+        const name = recPresetSel ? recPresetSel.value : '';
+        if (!name) { recSetStatus('Pick an animation to delete'); return; }
+        if (recIsBuiltinAnimation(name)) { recSetStatus(`"${name}" is built in — it can't be deleted`); return; }
+        if (!window.confirm(`Delete the animation "${name}"?\n\nThis cannot be undone.`)) return;
+        if (recDeleteSavedAnimation(name)) {
+            if (recPresetSel) recPresetSel.value = '';
+            recSetStatus(`Deleted "${name}"`);
+        } else {
+            recSetStatus('Animation not found');
+        }
+    });
     if (recPresetConfirm) recPresetConfirm.addEventListener('click', () => {
         const name = (recPresetName && recPresetName.value || '').trim();
         if (!name) { recSetStatus('Name is required'); return; }
-        const result = recSaveActiveLayerAsPreset(name);
+        const result = recSaveAllLayersAsPreset(name);
         if (result === true) {
             if (recPresetRow) recPresetRow.style.display = 'none';
             recRefreshPresetSelect();
             const sel = document.getElementById('recPresetSelect');
             if (sel) sel.value = name;
-            recSetStatus('Preset saved');
+            const n = recLayers.filter(l => l && l.timeline && (l.timeline.interactions || []).length > 0).length;
+            recSetStatus(n > 1 ? `Preset saved (${n} layers)` : 'Preset saved');
         } else if (result === 'exists') {
             recSetStatus('Preset already exists');
+        } else if (result === 'empty') {
+            recSetStatus('Nothing recorded yet');
         } else {
             recSetStatus('Failed to save preset');
         }

@@ -334,12 +334,18 @@
                     hideHotkeys();
                     return;
                 }
-                // Stop all recording and playback
-                if (recEnabled && typeof recStopAll === 'function') {
-                    e.preventDefault();
-                    recStopAll();
-                    return;
+                // Stop all recording and playback. Looping slot animations
+                // are their own transport, so Esc is the one place that
+                // reaches both — it is the panic key.
+                let stopped = false;
+                if (typeof window.recStopAllSavedAnimations === 'function') {
+                    stopped = window.recStopAllSavedAnimations();
                 }
+                if (recEnabled && typeof recStopAll === 'function') {
+                    recStopAll();
+                    stopped = true;
+                }
+                if (stopped) e.preventDefault();
                 return;
             }
             // ── Recording transport: F9 ──

@@ -600,6 +600,9 @@
                 if (recEnabled) {
                     recUpdatePlayback();
                 }
+                // Slot animations run their own looping transport, so they
+                // tick whatever the recorder is doing — including Off.
+                if (typeof recAnimTick === 'function') recAnimTick();
                 // ── Physics sub-step loop (2026-08-17) ──────────────────────
                 // subSteps is 1 on every display at 50Hz and above, so this is a
                 // plain wrapper there — same passes, same order, same dt, and the

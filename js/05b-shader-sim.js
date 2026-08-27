@@ -218,10 +218,14 @@
                             ? vec2(1.6, 1.6 / max(stampAspect, 0.001))
                             : vec2(1.6 * max(stampAspect, 0.001), 1.6);
                         vec2 suv = qr / (2.0 * he) + 0.5;
-                        float cov = 0.0;
-                        if (all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0)))) {
-                            cov = texture(uStampTex, suv).a;
-                        }
+                        // Sample first, mask after. The stamp is mipmapped (33
+                        // uploadStamp) and a texture() call inside non-uniform
+                        // control flow has undefined derivatives, so the LOD it
+                        // picked would be undefined for exactly the fragments
+                        // at the stamp's own edge. Hoisting the fetch out costs
+                        // nothing and makes the mip level well defined.
+                        float inStamp = float(all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0))));
+                        float cov = texture(uStampTex, clamp(suv, 0.0, 1.0)).a * inStamp;
                         if (stampNoise > 0.0) {
                             float n2 = sn_noise(q * 3.0 + stampSeed);
                             cov *= mix(1.0, 0.75 + 0.5 * n2, stampNoise);
@@ -1724,10 +1728,10 @@
                         ? vec2(1.6, 1.6 / max(stampAspect, 0.001))
                         : vec2(1.6 * max(stampAspect, 0.001), 1.6);
                     vec2 suv = qr / (2.0 * he) + 0.5;
-                    float cov = 0.0;
-                    if (all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0)))) {
-                        cov = texture(uStampTex, suv).a;
-                    }
+                    // Same hoist as splatFrag: the mipmapped stamp needs its
+                    // fetch in uniform control flow for the LOD to be defined.
+                    float inStamp = float(all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0))));
+                    float cov = texture(uStampTex, clamp(suv, 0.0, 1.0)).a * inStamp;
                     a = cov * clamp(flow, 0.0, 1.0);
                 } else {
                     float r2 = dot(p, p) / radius;

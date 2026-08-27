@@ -319,6 +319,148 @@
     text-align: center;
 }
 
+/* ── Animation slots (curated grid: builtins + saved recordings) ── */
+.anim-slot {
+    position: relative;
+    min-height: 44px;
+    display: flex;
+}
+.anim-slot > button {
+    width: 100%;
+    margin: 0;
+}
+.anim-slot-empty {
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    border-radius: 6px;
+    font-size: 10px;
+    opacity: 0.55;
+    text-align: center;
+    padding: 4px;
+    user-select: none;
+}
+.anim-slot-over {
+    border: 1px dashed rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+}
+.anim-slot-over > button {
+    opacity: 0.5;
+}
+.anim-slot button.anim-slot-missing {
+    opacity: 0.4;
+}
+.anim-slot .anim-slot-clear {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 16px;
+    height: 16px;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    font-size: 9px;
+    line-height: 1;
+    border-radius: 50%;
+    opacity: 0;
+}
+.anim-slot:hover .anim-slot-clear {
+    opacity: 0.8;
+}
+
+/* ── Saved-animations library (dropdown under the slot grid) ── */
+#animCreateNewBtn {
+    width: 100%;
+    margin-top: 8px;
+}
+.anim-lib {
+    margin-top: 6px;
+}
+.anim-lib-head {
+    width: 100%;
+    text-align: left;
+}
+.anim-lib-list {
+    margin-top: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+.anim-lib-empty {
+    font-size: 11px;
+    opacity: 0.6;
+    padding: 6px 4px;
+}
+.anim-lib-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: grab;
+    user-select: none;
+}
+.anim-lib-row:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+.anim-lib-row.dragging {
+    opacity: 0.45;
+    cursor: grabbing;
+}
+.anim-lib-row.playing {
+    background: rgba(255, 255, 255, 0.12);
+    font-weight: 600;
+}
+.anim-lib-row.playing .anim-lib-grip {
+    opacity: 0.9;
+}
+.anim-lib-grip {
+    opacity: 0.45;
+    font-size: 11px;
+}
+.anim-lib-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Replay colour mode, per saved animation. On its own line below the name:
+   the sidebar is 250px and the three labels are long, so sharing a line left
+   the name with ~70px and every animation reading as an ellipsis. `order`
+   does the wrapping — grip, name and delete keep the first line. */
+#sidebar-right .anim-lib-mode {
+    order: 3;
+    flex: 1 0 100%;
+    width: 100%;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    cursor: pointer;
+    /* .rec-color-mode offsets the background 10px to clear a chevron this
+       control does not draw; with no-repeat that leaves the sidebar's own
+       fill showing as a strip down the left edge on hover. */
+    background-position: center;
+}
+.anim-lib-delete {
+    order: 2;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    font-size: 10px;
+    line-height: 1;
+    border-radius: 50%;
+    opacity: 0;
+}
+.anim-lib-row:hover .anim-lib-delete,
+.anim-lib-delete:focus-visible {
+    opacity: 0.8;
+}
+
 /* ── Animation toggle rows ── */
 .anim-toggle-row {
     display: flex;

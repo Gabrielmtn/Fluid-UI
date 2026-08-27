@@ -63,12 +63,6 @@
         // Glow's prefilter buffer, so with Glow off the slider is doubly dead.
         scatterAmount: ['glowToggle', 'scatterToggle'],
         scatterReach: ['glowToggle', 'scatterToggle'],
-        ssFrequency: ['shootingStarToggle'],
-        ssAngle: ['shootingStarToggle'],
-        ssLength: ['shootingStarToggle'],
-        ssSize: ['shootingStarToggle'],
-        ssVariance: ['shootingStarToggle'],
-        ssGravity: ['shootingStarToggle'],
         audioSensitivity: ['audioReactToggle'],
         audioBeatThreshold: ['audioReactToggle'],
         shadingIntensity: ['displayShadingToggle'],
@@ -352,18 +346,6 @@
                     (out.lightPos.x || 0.5) + gaussRandom() * strength * 0.25));
                 out.lightPos.y = Math.max(0, Math.min(1,
                     (out.lightPos.y || 0.5) + gaussRandom() * strength * 0.25));
-            }
-        }
-
-        // ── Shooting star origin ──
-        if (out.ssOrigin && !locks['ssOrigin'] && (scope === 'all') && _cbOn(out, 'shootingStarToggle')) {
-            if (delta && delta.ssOrigin) {
-                out.ssOrigin = delta.ssOrigin;
-            } else {
-                out.ssOrigin.xPct = Math.max(-50, Math.min(150,
-                    (out.ssOrigin.xPct || 50) + gaussRandom() * strength * 30));
-                out.ssOrigin.yPct = Math.max(-50, Math.min(150,
-                    (out.ssOrigin.yPct || 50) + gaussRandom() * strength * 30));
             }
         }
 

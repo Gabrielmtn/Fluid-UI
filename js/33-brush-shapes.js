@@ -9,10 +9,11 @@
 //   area) → the mask editor opens in adhoc mode (15-layer-masking:
 //   enterAdhocMaskMode — full stamp suite + Instant Roto) → Apply
 //   rasterizes a white/alpha stamp → cropped to its alpha bounding box,
-//   downscaled to ≤128px, persisted as a PNG dataURL.
+//   downscaled to the stamp resolution budget (see STAMP_LONG_MAX below)
+//   and persisted as a PNG dataURL.
 // STORAGE: settingsManager 'brush.shapes' = [{id, name, dataURL}] (≤24),
-//   active id in 'brush.shapeId' + config.BRUSH_SHAPE_ID. Stamps are tiny
-//   (≤128px PNGs) so they ride presets/quota comfortably.
+//   active id in 'brush.shapeId' + config.BRUSH_SHAPE_ID. Stamps are held to
+//   a ≤100KB PNG each so 24 of them ride presets/quota comfortably.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -75,10 +76,18 @@
                 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img);
                 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                // Stamps are stored at the size a MAX-size brush prints them
+                // (STAMP_LONG_MAX), so every smaller brush MINIFIES them —
+                // a 1024px stamp painted at the default Size lands on ~370
+                // dye px. Plain LINEAR undersamples that and thin detail
+                // (letter strokes, hair) sparkles; mipmaps make the small
+                // sizes as clean as the big one. WebGL2 mipmaps NPOT
+                // textures, so no power-of-two padding is needed.
+                gl.generateMipmap(gl.TEXTURE_2D);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
                 slot.texture = t;
                 slot.aspect = (img.naturalWidth || 1) / (img.naturalHeight || 1);
             } catch (e) { if (onFail) onFail(); }
@@ -108,7 +117,7 @@
     // sender's id, and are dropped when the room empties.
     var PEER = {};              // id → {texture, aspect, rev}
     var PEER_MAX = 48;          // plenty for a full room; bounds a hostile peer
-    var PEER_MAX_BYTES = 400000; // a ≤128px stamp is ~5-90KB; refuse anything wild
+    var PEER_MAX_BYTES = 400000; // our own budget caps a stamp at 100KB; refuse anything wild
 
     function peerReady(id) {
         var p = id && PEER[id];
@@ -244,8 +253,42 @@
         } catch (_) {}
     }
 
-    // Crop the stamp canvas to its alpha bounding box (+4% pad) and
-    // downscale the long side to ≤128px. Returns null for an empty stamp.
+    // ── Stamp resolution budget ──────────────────────────────────────────
+    // A stamp is not an icon: splatFrag blows its long side up to
+    // 3.2·√SPLAT_RADIUS of the canvas, which at the slider's max Size and a
+    // 2K dye buffer is ~1100 dye pixels. The old flat 128px cap therefore
+    // stored a whole line of lettering as 23 scanlines and then magnified it
+    // 9× — sharp source art came back blocky and chewed up. Store what the
+    // biggest brush will actually ask for instead, bounded three ways:
+    //   LONG_MAX   — 1:1 with that widest print; more would never be sampled.
+    //   PIXELS_MAX — so a squarish shape can't spend 1024² on area an
+    //                elongated one spends on its long side.
+    //   BYTES_MAX  — the real backstop. Stamps ride localStorage (24 of them,
+    //                alongside presets) and the multiplayer wire (06's chunked
+    //                publish tops out ~350KB, putPeer refuses over 400KB), and
+    //                flat art and a noisy photo matte differ ~10× in PNG cost
+    //                at identical dimensions. Encode, measure, and step the
+    //                resolution down until it fits — cheap art keeps every
+    //                pixel, expensive art gives some back.
+    var STAMP_LONG_MAX = 1024;
+    var STAMP_PIXELS_MAX = 768 * 768;
+    var STAMP_BYTES_MAX = 100000;
+    var STAMP_LONG_MIN = 128;   // floor for the step-down; the historical cap
+
+    function scaleStamp(canvas, sx, sy, sw, sh, longMax) {
+        var scale = Math.min(1, longMax / Math.max(sw, sh));
+        var px = (sw * scale) * (sh * scale);
+        if (px > STAMP_PIXELS_MAX) scale *= Math.sqrt(STAMP_PIXELS_MAX / px);
+        var ow = Math.max(4, Math.round(sw * scale)), oh = Math.max(4, Math.round(sh * scale));
+        var out = document.createElement('canvas');
+        out.width = ow; out.height = oh;
+        out.getContext('2d').drawImage(canvas, sx, sy, sw, sh, 0, 0, ow, oh);
+        return out;
+    }
+
+    // Crop the stamp canvas to its alpha bounding box (+4% pad) and encode it
+    // within the budget above. Returns the PNG dataURL, or null for an empty
+    // stamp.
     function processStamp(canvas) {
         var w = canvas.width, h = canvas.height;
         if (!w || !h) return null;
@@ -269,12 +312,12 @@
         var pad = Math.max(1, Math.ceil(Math.max(bw, bh) * 0.04));
         var sx = Math.max(0, minX - pad), sy = Math.max(0, minY - pad);
         var sw = Math.min(w - sx, bw + 2 * pad), sh = Math.min(h - sy, bh + 2 * pad);
-        var scale = Math.min(1, 128 / Math.max(sw, sh));
-        var ow = Math.max(4, Math.round(sw * scale)), oh = Math.max(4, Math.round(sh * scale));
-        var out = document.createElement('canvas');
-        out.width = ow; out.height = oh;
-        out.getContext('2d').drawImage(canvas, sx, sy, sw, sh, 0, 0, ow, oh);
-        return out;
+        var longMax = STAMP_LONG_MAX, url;
+        for (;;) {
+            url = scaleStamp(canvas, sx, sy, sw, sh, longMax).toDataURL('image/png');
+            if (url.length <= STAMP_BYTES_MAX || longMax <= STAMP_LONG_MIN) return url;
+            longMax = Math.max(STAMP_LONG_MIN, Math.round(longMax * 0.75));
+        }
     }
 
     function add(name, stampCanvas) {
@@ -285,7 +328,7 @@
             return null;
         }
         var id = 'bs' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        var entry = { id: id, name: name || 'Shape', dataURL: stamp.toDataURL('image/png') };
+        var entry = { id: id, name: name || 'Shape', dataURL: stamp };
         load().unshift(entry);
         if (shapes.length > 24) shapes.length = 24;
         if (!store()) {
@@ -323,7 +366,7 @@
             say('Nothing left to stamp', 'That edit came out empty, so the shape was left as it was.');
             return null;
         }
-        entry.dataURL = stamp.toDataURL('image/png');
+        entry.dataURL = stamp;
         if (name) entry.name = name;
         if (!store()) {
             say('Saved only for this session',
@@ -341,7 +384,7 @@
 
     // Reopen the mask editor on a saved shape. It edits the STAMP, not the
     // image it came from — originals are deliberately not kept (stamps are
-    // ≤128px so they ride presets/quota; originals are megabytes) — so this
+    // ≤100KB so they ride presets/quota; originals are megabytes) — so this
     // reshapes what is there rather than restoring lost area. Each pass picks
     // up where the last one left off (see the seed/pad options below), which
     // is what makes a shape something you refine over several sittings.

@@ -1586,6 +1586,50 @@ class DepthEstimator {
         }
     }
 
+    // ── Deleting a collider: the Mask that only existed to feed it ─────
+    // The Paint Collider button hides Masks entirely — from where the user
+    // sits the wall IS the layer — so deleting the layer used to leave its
+    // Mask behind with the coverage intact, and 05j paints the ACTIVE Mask's
+    // red film over the canvas for as long as BRUSH_TARGET is 'mask'. The wall
+    // left the physics instantly while the canvas still showed it; the only way
+    // to clear it was to leave collider painting and come back (which starts a
+    // fresh Mask).
+    //
+    // Which Mask dies with layer `index`, or null. Kept if anything else still
+    // reads it: another collider bound to the same Mask (createFromMask binds
+    // the ACTIVE one, so two can share) or a layer clipped to it.
+    function _orphanedColliderMaskId(layer, index) {
+        var src = layer && layer.collisionSource;
+        if (!src || src.kind !== 'mask' || src.id == null) return null;
+        if (!window.Masks || typeof window.Masks.remove !== 'function') return null;
+        if (!window.Masks.getFBO(src.id)) return null;
+        var key = 'mask:' + src.id;
+        var stillUsed = (window.layers || []).some(function (l) {
+            if (l.index === index) return false; // the one going away
+            if (l.collisionSource && l.collisionSource.kind === 'mask'
+                && l.collisionSource.id === src.id) return true;
+            return !!(window.ClipSources && window.ClipSources.keyOf(l) === key);
+        });
+        return stillUsed ? null : src.id;
+    }
+
+    // Undo has to bring back a wall, not an inert row. A source-bound collider
+    // carries no coverage of its own — the compositor reads its Mask on the GPU
+    // and skips it on the CPU path — so with the Mask gone the restored layer
+    // would collide with nothing. Bake the coverage in and cut the binding
+    // BEFORE the delete: the undo snapshot holds this same layer object, so it
+    // comes back as an ordinary baked collider. Costs one readback, on an
+    // action the user takes by hand.
+    function _bakeColliderMaskIntoLayer(layer, maskId) {
+        if (!layer) return;
+        var built = buildSketchDepth(true, window.Masks.getFBO(maskId));
+        if (built) {
+            updateLayerDepthMask(layer.index, built.depth);
+            _applyColliderPreview(layer, built);
+        }
+        layer.collisionSource = null;
+    }
+
     // Listen for layer deletion to clean up the live binding.
     // MUST poll: this file is a <script type="module"> (deferred) while
     // window.deleteLayer comes from 05l in the dynamic async chain — the
@@ -1601,6 +1645,18 @@ class DepthEstimator {
             return;
         }
         window.deleteLayer = function (index) {
+            // Read the layer BEFORE anything frees it: the room needs to know
+            // it was a collider at all, and the Mask cleanup needs the source
+            // it was bound to.
+            var wasCollider = false, deadMaskId = null;
+            try {
+                var l = window.layers && window.layers.find(function (x) { return x.index === index; });
+                wasCollider = !!(l && l.isCollision);
+                if (wasCollider) {
+                    deadMaskId = _orphanedColliderMaskId(l, index);
+                    if (deadMaskId != null) _bakeColliderMaskIntoLayer(l, deadMaskId);
+                }
+            } catch (_) {}
             // Deleting the live-bound sketch collider unbinds IMMEDIATELY
             // (the ⟳ Live button follows via __onSketchLiveChanged) — the
             // next-mutation auto-disable stays as the fallback.
@@ -1608,14 +1664,14 @@ class DepthEstimator {
                 setSketchLive(false);
                 _sketchColliderIndex = null;
             }
-            // Tell the room BEFORE the layer goes, while we can still see
-            // that it was a collider at all.
-            var wasCollider = false;
-            try {
-                var l = window.layers && window.layers.find(function (x) { return x.index === index; });
-                wasCollider = !!(l && l.isCollision);
-            } catch (_) {}
             origDeleteLayer(index);
+            if (deadMaskId != null) {
+                // Drop the binding first: setSketchLive('mask') without rebind
+                // reuses a matching _boundSrc, and a dangling one would bind the
+                // next collider to a Mask that no longer exists.
+                if (_boundSrc && _boundSrc.kind === 'mask' && _boundSrc.id === deadMaskId) _boundSrc = null;
+                try { window.Masks.remove(deadMaskId); } catch (_) {}
+            }
             updateObstacleFromLayers();
             if (wasCollider) {
                 try {
