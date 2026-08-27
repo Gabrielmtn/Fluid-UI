@@ -1341,22 +1341,30 @@
             uniform vec4 sourceTransform;
             uniform float sourceRotation;
             uniform vec2 sourceSkew; // shear tangents (tan skewX, tan skewY)
+            uniform float uAspect;   // canvas W/H — R and K act in pixel space
             uniform float strength;
             uniform vec2 texelSize; // obstacle texel (1/obsW, 1/obsH)
             uniform float covKnee; // alpha at which coverage saturates to
                                    // fully solid (config.COLLIDER_ALPHA_SOLID)
             void main() {
                 vec2 q = vUv - vec2(0.5) - sourceTransform.xy;
+                // Rotate and shear act in PIXEL space at every other site
+                // (the CSS divs, the CPU compositors) — conjugate by the
+                // canvas aspect so a rotated or skewed GPU-source wall lands
+                // on the drawn layer instead of leaning by an extra W/H.
+                q.x *= uAspect;
                 float c = cos(sourceRotation);
                 float s = sin(sourceRotation);
                 q = vec2(c * q.x + s * q.y, -s * q.x + c * q.y);
                 // Inverse shear between the rotate and the scale-divide —
                 // forward is R then K then S (02a-layer-xform contract), so
-                // the inverse order is R, then K, then S. Signed det kept:
-                // a strong two-axis skew can flip it.
+                // the inverses apply in reverse layers: rotate first, then
+                // unshear, then the scale-divide. Signed det kept: a strong
+                // two-axis skew can flip it.
                 float skDet = 1.0 - sourceSkew.x * sourceSkew.y;
-                if (abs(skDet) < 0.0001) skDet = 0.0001;
+                if (abs(skDet) < 0.0001) skDet = skDet < 0.0 ? -0.0001 : 0.0001;
                 q = vec2(q.x - sourceSkew.x * q.y, q.y - sourceSkew.y * q.x) / skDet;
+                q.x /= uAspect;
                 q /= max(abs(sourceTransform.zw), vec2(0.0001));
                 vec2 sourceUv = clamp(q + vec2(0.5), 0.0, 1.0);
                 // 4x4 box-filter downsample (2026-08-05, M-watch (a) landed):
@@ -1373,8 +1381,10 @@
                 for (int iy = 0; iy < 4; iy++) {
                     for (int ix = 0; ix < 4; ix++) {
                         vec2 off = vec2((float(ix) - 1.5) * 0.25, (float(iy) - 1.5) * 0.25) * texelSize;
+                        off.x *= uAspect;
                         vec2 so = vec2(c * off.x + s * off.y, -s * off.x + c * off.y);
                         so = vec2(so.x - sourceSkew.x * so.y, so.y - sourceSkew.y * so.x) / skDet;
+                        so.x /= uAspect;
                         so *= invScale;
                         aSum += texture(uSource, clamp(sourceUv + so, 0.0, 1.0)).a;
                     }

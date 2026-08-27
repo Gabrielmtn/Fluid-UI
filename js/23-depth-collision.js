@@ -1356,6 +1356,7 @@ class DepthEstimator {
                     scaleY: layer.scaleY || 1,
                     rotation: (layer.rotation || 0) * Math.PI / 180,
                     skewTanX: sk.tx, skewTanY: sk.ty,
+                    aspect: gpuCssW / gpuCssH,
                     strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
                 });
             });
@@ -1569,6 +1570,7 @@ class DepthEstimator {
                         scaleY: layer.scaleY || 1,
                         rotation: (layer.rotation || 0) * Math.PI / 180,
                         skewTanX: sk.tx, skewTanY: sk.ty,
+                        aspect: mixedCssW / mixedCssH,
                         strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
                     });
                 });

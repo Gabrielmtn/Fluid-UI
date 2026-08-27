@@ -410,7 +410,10 @@
             if (++cursorLiftDepth === 1) {
                 cursorLifted = Array.from(document.querySelectorAll('.hide-cursor'));
                 cursorLifted.forEach(el => el.classList.remove('hide-cursor'));
-                try { if (window.__brushCursor) window.__brushCursor.hide(); } catch (_) { }
+                // Only when Show Cursor is off — with it on, the brush ring is
+                // the visible cursor and hiding it would be the very feature-off
+                // behavior change this helper must not make.
+                try { if (!cursorToggle.checked && window.__brushCursor) window.__brushCursor.hide(); } catch (_) { }
             }
             try {
                 return await fn();

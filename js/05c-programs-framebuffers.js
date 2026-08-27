@@ -620,6 +620,7 @@
             gl.uniform1f(obstacleCompositeProg.uniforms.sourceRotation, Number(opts.rotation) || 0);
             gl.uniform2f(obstacleCompositeProg.uniforms.sourceSkew,
                 Number(opts.skewTanX) || 0, Number(opts.skewTanY) || 0);
+            gl.uniform1f(obstacleCompositeProg.uniforms.uAspect, Number(opts.aspect) || 1);
             gl.uniform1f(obstacleCompositeProg.uniforms.strength,
                 Math.max(0, Math.min(1, Number(opts.strength) || 0)));
             gl.uniform1f(obstacleCompositeProg.uniforms.covKnee,

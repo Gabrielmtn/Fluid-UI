@@ -336,7 +336,17 @@
                 : ((window.preserveRandomness &&
                     window.multiArmColors && window.multiArmColors[0] &&
                     window.multiArmColors[0].mode === 'random') ? 1 : 0);
-            if (rndOn) interaction.rnd = 1;
+            if (rndOn) {
+                interaction.rnd = 1;
+                // Flow share baked into this dab's colour (a re-recorded
+                // replay's interpolated dabs are k-scaled per frame). Playback
+                // de-dims by it to recover one grouping key per stroke, and
+                // re-dims the fresh roll by the same share.
+                const fmPin = window.__recFmPin;
+                if (typeof fmPin === 'number' && isFinite(fmPin) && Math.abs(fmPin - 1) >= 0.005) {
+                    interaction.fm = Math.round(fmPin * 1000) / 1000;
+                }
+            }
             a.timeline.interactions.push(interaction);
             // PERF: During recording, skip ALL UI updates - just record data
             // Timeline visualization updates when recording stops
@@ -502,12 +512,20 @@
                         // Regenerate per stroke: a change in the baked color
                         // marks a new stroke (random holds one color per stroke,
                         // rainbow changes per splat — both fall out naturally).
-                        const key = ((i.color[0] * 255) | 0) + ',' + ((i.color[1] * 255) | 0) + ',' + ((i.color[2] * 255) | 0);
+                        // Key on the DE-DIMMED colour: rnd dabs from a
+                        // re-recorded replay carry per-dab flow shares in fm,
+                        // so the raw baked colour changes every dab — de-
+                        // dimming restores one key per stroke, and the fresh
+                        // roll is re-dimmed by the same share.
+                        const fm = (typeof i.fm === 'number' && isFinite(i.fm) && i.fm > 0) ? i.fm : 1;
+                        const key = (((i.color[0] / fm) * 255) | 0) + ',' + (((i.color[1] / fm) * 255) | 0) + ',' + (((i.color[2] / fm) * 255) | 0);
                         if (key !== layer._repKey) {
                             layer._repKey = key;
                             layer._repColor = recGenerativeColor(iGen, genPalette, layer) || i.color;
                         }
-                        replayColor = layer._repColor;
+                        replayColor = (fm !== 1)
+                            ? [layer._repColor[0] * fm, layer._repColor[1] * fm, layer._repColor[2] * fm]
+                            : layer._repColor;
                     } else if (cMode === 'live') {
                         replayColor = liveSolid || i.color;
                     } else { // original, non-generative → the baked colors

@@ -114,16 +114,23 @@
             } else {
                 // Keep the OS cursor visible while the browser's save dialog
                 // may be up (Show Cursor off hides it page-wide otherwise).
+                // Fire-and-forget: the dialog heuristic gates ONLY the cursor
+                // restore — the export itself resolves immediately, as it
+                // always did, so toasts / _busy / idle UI never wait on focus.
                 var wrap = window.withCursorVisible || function (f) { return f(); };
-                resolve(wrap(function () {
-                    var url = URL.createObjectURL(blob);
-                    var a = document.createElement('a');
-                    a.href = url; a.download = filename;
-                    document.body.appendChild(a); a.click();
-                    document.body.removeChild(a);
-                    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-                    return dialogSettled().then(function () { return filename; });
-                }));
+                var hadFocus = document.hasFocus();
+                try {
+                    wrap(function () {
+                        var url = URL.createObjectURL(blob);
+                        var a = document.createElement('a');
+                        a.href = url; a.download = filename;
+                        document.body.appendChild(a); a.click();
+                        document.body.removeChild(a);
+                        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                        return dialogSettled(hadFocus);
+                    });
+                } catch (e) { reject(e); return; }
+                resolve(filename);
             }
         });
     }
@@ -131,9 +138,13 @@
     // An anchor download gives no dialog signal. If the "ask where to save"
     // dialog takes focus, hold until the window refocuses (save and cancel
     // both refocus); if focus never leaves, the download was silent — settle
-    // after a short poll.
-    function dialogSettled() {
+    // after a short poll. Gates only the cursor lift, never the export.
+    function dialogSettled(hadFocus) {
         return new Promise(function (resolve) {
+            // Unfocused at click time → a dialog of ours cannot have TAKEN
+            // focus, and waiting for refocus would hold the lift for however
+            // long the user stays in another app. Settle immediately.
+            if (!hadFocus) { resolve(); return; }
             var t0 = performance.now();
             var done = false;
             function finish() {
@@ -148,6 +159,7 @@
                     (function repoll() { // belt: focus events can be missed
                         if (done) return;
                         if (document.hasFocus()) return finish();
+                        if (performance.now() - t0 > 60000) return finish();
                         setTimeout(repoll, 250);
                     })();
                     return;

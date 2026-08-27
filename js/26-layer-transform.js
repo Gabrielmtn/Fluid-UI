@@ -89,28 +89,62 @@
         ];
     }
 
+    // De-rotate only — no unshear. Handles are hit-tested in THIS frame
+    // against their forward-sheared anchors (K·anchor), which is well-defined
+    // even when the shear determinant collapses. An inverse-mapped test can
+    // never match on a collapsed layer (old saves / peers can carry
+    // tan·tan ≈ 1, where K⁻¹ blows up) — and the skew diamonds staying
+    // grabbable there is the recovery path.
+    function toRotFrame(g, px, py) {
+        const dx = px - g.cx, dy = py - g.cy;
+        const cos = Math.cos(-g.rot), sin = Math.sin(-g.rot);
+        return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+    }
+    function shearFwd(g, lx, ly) {
+        return { x: lx + (g.kx || 0) * ly, y: (g.ky || 0) * lx + ly };
+    }
+
     function hitTest(px, py) {
         const g = geom();
         if (!g) return null;
-        const l = toLocal(g, px, py);
+        const u = toRotFrame(g, px, py);
         for (const c of corners(g)) {
-            if (Math.abs(l.x - c.lx) <= HANDLE_HIT && Math.abs(l.y - c.ly) <= HANDLE_HIT) {
-                return { mode: 'scale', corner: c, local: l };
+            const a = shearFwd(g, c.lx, c.ly);
+            if (Math.abs(u.x - a.x) <= HANDLE_HIT && Math.abs(u.y - a.y) <= HANDLE_HIT) {
+                return { mode: 'scale', corner: c, local: toLocal(g, px, py) };
             }
         }
         for (const s of skewHandles(g)) {
-            if (Math.abs(l.x - s.lx) <= HANDLE_HIT && Math.abs(l.y - s.ly) <= HANDLE_HIT) {
+            const a = shearFwd(g, s.lx, s.ly);
+            if (Math.abs(u.x - a.x) <= HANDLE_HIT && Math.abs(u.y - a.y) <= HANDLE_HIT) {
                 return { mode: 'skew', handle: s };
             }
         }
-        // Rotate handle above top-center (local coords)
-        if (Math.abs(l.x) <= HANDLE_HIT && Math.abs(l.y - (-g.hh - ROTATE_OFFSET)) <= HANDLE_HIT) {
+        // Rotate handle above top-center (drawn in the sheared frame too)
+        const ra = shearFwd(g, 0, -g.hh - ROTATE_OFFSET);
+        if (Math.abs(u.x - ra.x) <= HANDLE_HIT && Math.abs(u.y - ra.y) <= HANDLE_HIT) {
             return { mode: 'rotate' };
         }
+        const l = toLocal(g, px, py);
         if (Math.abs(l.x) <= g.hw + 6 && Math.abs(l.y) <= g.hh + 6) {
             return { mode: 'move' };
         }
         return null;
+    }
+
+    // Pointer → implied skew angle for a handle, in the de-rotated frame:
+    // the midpoint rides at K·(0,±hh) or K·(±hw,0), so its displacement
+    // along the edge over the half-extent IS the shear tangent.
+    function pointerToSkewDeg(g, handle, px, py, rotRad) {
+        const dx = px - g.cx, dy = py - g.cy;
+        const cos = Math.cos(-rotRad), sin = Math.sin(-rotRad);
+        const ux = dx * cos - dy * sin, uy = dx * sin + dy * cos;
+        if (handle.axis === 'x') {
+            const hh = Math.max(1e-3, Math.abs(g.hh));
+            return Math.atan((handle.id === 'n') ? (-ux / hh) : (ux / hh)) * 180 / Math.PI;
+        }
+        const hw = Math.max(1e-3, Math.abs(g.hw));
+        return Math.atan((handle.id === 'e') ? (uy / hw) : (-uy / hw)) * 180 / Math.PI;
     }
 
     function draw() {
@@ -215,6 +249,13 @@
             startLocal: hit.local || null,
             startAngle: Math.atan2(py - g.cy, px - g.cx)
         };
+        if (hit.mode === 'skew') {
+            // Grab-offset, like rotate's startAngle: the diamond's hit box is
+            // ±14 local px, so an off-center grab must not jump the value on
+            // the first move (at small scales the jump reached ~35°).
+            const pdeg = pointerToSkewDeg(g, hit.handle, px, py, (layer.rotation || 0) * Math.PI / 180);
+            drag.skewGrabOffset = ((hit.handle.axis === 'x') ? drag.start.skewX : drag.start.skewY) - pdeg;
+        }
         tCanvas.setPointerCapture(e.pointerId);
     }
 
@@ -248,28 +289,25 @@
             if (Math.abs(deg - snapped) < 4) deg = snapped;
             layer.rotation = deg;
         } else if (drag.mode === 'skew') {
-            // Work in the de-rotated (NOT de-sheared) frame: the midpoint
-            // handle rides at K·(0,±hh) or K·(±hw,0), so its displacement
-            // along the edge IS the shear tangent × the half-extent.
             const live = geom();
-            const dx0 = px - live.cx, dy0 = py - live.cy;
-            const cos = Math.cos(-drag.start.rotation * Math.PI / 180);
-            const sin = Math.sin(-drag.start.rotation * Math.PI / 180);
-            const ux = dx0 * cos - dy0 * sin, uy = dx0 * sin + dy0 * cos;
             const h = drag.handle;
-            let deg;
-            if (h.axis === 'x') {
-                const hh = Math.max(1e-3, Math.abs(live.hh));
-                deg = Math.atan((h.id === 'n') ? (-ux / hh) : (ux / hh)) * 180 / Math.PI;
-            } else {
-                const hw = Math.max(1e-3, Math.abs(live.hw));
-                deg = Math.atan((h.id === 'e') ? (uy / hw) : (-uy / hw)) * 180 / Math.PI;
-            }
+            let deg = pointerToSkewDeg(live, h, px, py, drag.start.rotation * Math.PI / 180)
+                + (drag.skewGrabOffset || 0);
             // Clamp so tan stays sane; snap flat near 0 (mirrors the 4°
             // rotation snap); Shift = 15° steps for repeatable perspectives.
             deg = Math.max(-60, Math.min(60, deg));
             if (Math.abs(deg) < 2) deg = 0;
             else if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+            // Keep the shear invertible: tan(x)·tan(y) → 1 collapses the
+            // layer to a line — and 45°/45° plus the 60°/30° Shift snaps land
+            // EXACTLY on it, after which this overlay is the only way back
+            // out. Pull this axis back so the determinant stays clear of 0.
+            const ot = Math.tan(((h.axis === 'x') ? drag.start.skewY : drag.start.skewX) * Math.PI / 180);
+            let t = Math.tan(deg * Math.PI / 180);
+            if (Math.abs(1 - t * ot) < 0.05) {
+                t = (1 - 0.05 * Math.sign(t * ot || 1)) / ot;
+                deg = Math.atan(t) * 180 / Math.PI;
+            }
             if (h.axis === 'x') layer.skewX = deg; else layer.skewY = deg;
         } else {
             // Scale about center, in the layer's local (de-rotated, de-

@@ -581,10 +581,17 @@
                 if (typeof recRecordInteraction === 'function' && recEnabled) {
                     // Randomness rides the same pin as push/footprint: the
                     // source event knows whether random rolled it, and the
-                    // re-record must not read the live panel instead.
+                    // re-record must not read the live panel instead. The fm
+                    // pin carries the flow share baked into col — partial
+                    // (interpolated) dabs are k-scaled per frame, so without
+                    // it timeline playback sees a different colour on every
+                    // dab and its stroke-grouping heuristic rolls confetti.
                     window.__recRndPin = ev.rnd ? 1 : 0;
+                    window.__recFmPin = (config.COLOR_GATE ? 1 : k) *
+                        ((typeof ev.fm === 'number' && isFinite(ev.fm)) ? ev.fm : 1);
                     try { recRecordInteraction(x, y, dx, dy, col); } catch(_){}
                     window.__recRndPin = null;
+                    window.__recFmPin = null;
                 }
             } finally {
                 window.__remoteStroke = false;
