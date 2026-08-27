@@ -791,13 +791,10 @@
                         if (layerDiv) {
                             layerDiv.style.zIndex = zIndex;
                             layerDiv.style.display = layer.visible ? 'block' : 'none';
-                            // Ensure all transform properties have default values
-                            const x = layer.x || 0;
-                            const y = layer.y || 0;
-                            const scaleX = layer.scaleX || 1;
-                            const scaleY = layer.scaleY || 1;
-                            const rotation = layer.rotation || 0;
-                            layerDiv.style.transform = `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${scaleX}, ${scaleY})`;
+                            // Shared string (02a) — must match 05l's
+                            // updateLayerPosition or this stomps its skew on
+                            // every reorder/visibility pass.
+                            layerDiv.style.transform = window.LayerXform.cssTransform(layer);
                             // Apply active class
                             if (layer.active) {
                                 layerDiv.classList.add('active');

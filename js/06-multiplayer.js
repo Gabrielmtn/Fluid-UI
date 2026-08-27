@@ -2367,6 +2367,10 @@ function serializeCollider(layerIndex) {
         sx: +(layer.scaleX || 1).toFixed(4),
         sy: +(layer.scaleY || 1).toFixed(4),
         rot: +(layer.rotation || 0).toFixed(2),
+        // Skew (degrees). An older peer ignores the fields — the wall
+        // arrives unskewed there, same class of gap as shaped strokes.
+        kx: +(layer.skewX || 0).toFixed(2),
+        ky: +(layer.skewY || 0).toFixed(2),
         vis: layer.visible !== false,
         // addCollisionLayer prefixes its own 🧱, so send the bare name or the
         // wall arrives on the peer titled "🧱 🧱 Bar Wall".
@@ -2380,7 +2384,8 @@ function serializeCollider(layerIndex) {
 function colliderRev(meta) {
     const s = meta.png.length + '|' + meta.w + 'x' + meta.h + '|' + meta.thr + '|' + meta.inv +
               '|' + meta.mode + '|' + meta.str + '|' + meta.x + ',' + meta.y +
-              '|' + meta.sx + ',' + meta.sy + '|' + meta.rot + '|' + meta.vis;
+              '|' + meta.sx + ',' + meta.sy + '|' + meta.rot + '|' + meta.kx + ',' + meta.ky +
+              '|' + meta.vis;
     let h = 0x811c9dc5;
     for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0; }
     // Fold in a sample of the bitmap so a redrawn mask of identical length
@@ -2487,7 +2492,8 @@ function applyPeerCollider(ownerId, meta, png) {
                 visible: meta.vis !== false,
                 threshold: (typeof meta.thr === 'number') ? meta.thr : 128,
                 x: (meta.x || 0) * bw, y: (meta.y || 0) * bh,
-                scaleX: meta.sx || 1, scaleY: meta.sy || 1, rotation: meta.rot || 0
+                scaleX: meta.sx || 1, scaleY: meta.sy || 1, rotation: meta.rot || 0,
+                skewX: meta.kx || 0, skewY: meta.ky || 0
             });
         } finally {
             isProcessingRemoteEvent = wasRemote;

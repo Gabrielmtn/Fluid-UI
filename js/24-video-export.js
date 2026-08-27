@@ -211,6 +211,7 @@
                         x: (layer.x || 0) * sx, y: (layer.y || 0) * sy,
                         scaleX: layer.scaleX || 1, scaleY: layer.scaleY || 1,
                         rotation: layer.rotation || 0,
+                        skewX: layer.skewX || 0, skewY: layer.skewY || 0,
                         opacity: isNaN(divOp) ? 1 : divOp
                     });
                 }
@@ -258,6 +259,7 @@
                         ctx.save();
                         ctx.translate(w / 2 + task.x, h / 2 + task.y);
                         ctx.rotate(task.rotation * Math.PI / 180);
+                        if (window.LayerXform) window.LayerXform.shearCtx(ctx, task);
                         ctx.scale(task.scaleX, task.scaleY);
                         ctx.drawImage(source, -w / 2, -h / 2, w, h);
                         ctx.restore();

@@ -467,6 +467,10 @@
 
                     rotation: 0,
 
+                    skewX: 0,
+
+                    skewY: 0,
+
                     // D3-3: clip this image layer by a unified Mask (CSS mask)
                     clipMaskId: null,
 

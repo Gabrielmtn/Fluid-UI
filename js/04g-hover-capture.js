@@ -496,7 +496,11 @@
 
                 scaleY: 1,
 
-                rotation: 0
+                rotation: 0,
+
+                skewX: 0,
+
+                skewY: 0
 
             };
 

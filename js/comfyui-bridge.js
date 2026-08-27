@@ -102,6 +102,8 @@
                         scaleX: layer.scaleX || 1,
                         scaleY: layer.scaleY || 1,
                         rotation: layer.rotation || 0,
+                        skewX: layer.skewX || 0,
+                        skewY: layer.skewY || 0,
                         opacity: isNaN(divOpacity) ? 1 : divOpacity
                     });
                 }
@@ -142,9 +144,10 @@
                         const img = images[idx];
                         if (!img) return;
                         ctx.save();
-                        // Replicate CSS: transform-origin center, then translate/rotate/scale
+                        // Replicate CSS: transform-origin center, then translate/rotate/skew/scale
                         ctx.translate(w / 2 + task.x, h / 2 + task.y);
                         ctx.rotate(task.rotation * Math.PI / 180);
+                        if (window.LayerXform) window.LayerXform.shearCtx(ctx, task);
                         ctx.scale(task.scaleX, task.scaleY);
                         ctx.drawImage(img, -w / 2, -h / 2, w, h);
                         ctx.restore();

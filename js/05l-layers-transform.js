@@ -567,8 +567,9 @@
             if (!layer) return;
             const layerDiv = document.getElementById(`layer${index}`);
             if (!layerDiv) return;
-            const rotation = layer.rotation || 0;
-            layerDiv.style.transform = `translate(${layer.x}px, ${layer.y}px) rotate(${rotation}deg) scale(${layer.scaleX}, ${layer.scaleY})`;
+            // Shared string (02a): 05k's renderLayers writes the same one, and
+            // the two must agree or a reorder stomps a live transform edit.
+            layerDiv.style.transform = window.LayerXform.cssTransform(layer);
             // Apply mask if enabled
             applyLayerMask(index);
         }
@@ -684,7 +685,7 @@
                     title: name || ('Paint ' + (layers.filter(l => l.isRaster).length + 1)),
                     data: _EMPTY_THUMB, originalData: null,
                     visible: true, active: false, threshold: 0,
-                    x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0,
+                    x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, skewX: 0, skewY: 0,
                     isRaster: true, opacity: 1, blendMode: 'normal',
                     mask: { enabled: false, mode: 'show', shapes: [] }
                 });

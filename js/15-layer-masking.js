@@ -1219,7 +1219,11 @@
         const sx = (typeof layer.scaleX === 'number') ? layer.scaleX : 1;
         const sy = (typeof layer.scaleY === 'number') ? layer.scaleY : 1;
         const rot = layer.rotation || 0;
+        const skx = layer.skewX || 0;
+        const sky = layer.skewY || 0;
         if (Math.abs(sx) < 1e-6 || Math.abs(sy) < 1e-6) return null; // not invertible
+        const ktx = Math.tan(skx * Math.PI / 180), kty = Math.tan(sky * Math.PI / 180);
+        if (Math.abs(1 - ktx * kty) < 1e-4) return null; // shear collapsed to a line
 
         // layer.x/y are CSS px of the canvas box; the editor works in the
         // display canvas's BUFFER px, which can differ (HiDPI / render cap).
@@ -1233,15 +1237,20 @@
         const tx = (layer.x || 0) * kx;
         const ty = (layer.y || 0) * ky;
 
-        if (sx === 1 && sy === 1 && !rot && !tx && !ty) return null; // identity
+        if (sx === 1 && sy === 1 && !rot && !tx && !ty && !skx && !sky) return null; // identity
 
-        // Mirrors renderLayers' `translate(x,y) rotate(r) scale(sx,sy)` with
-        // transform-origin: center center (05k updateLayerZIndices).
+        // Mirrors renderLayers' `translate(x,y) rotate(r) skew(kx,ky)
+        // scale(sx,sy)` with transform-origin: center center (05k / 02a).
+        // The shear is composed as ONE matrix (CSS skew(ax,ay)), NOT
+        // skewXSelf().skewYSelf() — their product has an extra tan·tan term
+        // that would drift from the CSS whenever both axes are nonzero.
         const cx = canvas.width / 2, cy = canvas.height / 2;
-        return new DOMMatrix()
+        const m = new DOMMatrix()
             .translateSelf(cx, cy)
             .translateSelf(tx, ty)
-            .rotateSelf(rot)
+            .rotateSelf(rot);
+        if (ktx || kty) m.multiplySelf(new DOMMatrix([1, kty, ktx, 1, 0, 0]));
+        return m
             .scaleSelf(sx, sy)
             .translateSelf(-cx, -cy);
     }

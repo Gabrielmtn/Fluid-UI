@@ -50,15 +50,23 @@
             cy: wr.top + wr.height / 2 + layer.y - cRect.top,
             hw: (wr.width / 2) * layer.scaleX,
             hh: (wr.height / 2) * layer.scaleY,
-            rot: (layer.rotation || 0) * Math.PI / 180
+            rot: (layer.rotation || 0) * Math.PI / 180,
+            kx: Math.tan((layer.skewX || 0) * Math.PI / 180),
+            ky: Math.tan((layer.skewY || 0) * Math.PI / 180)
         };
     }
 
-    // Pointer position → layer-local (de-rotated, center-origin) coords
+    // Pointer position → layer-local (de-rotated, de-sheared, center-origin)
+    // coords — the frame where the rect corners sit at (±hw, ±hh). Forward is
+    // screen = center + R·K·local, so back out R then K (02a-layer-xform).
     function toLocal(g, px, py) {
         const dx = px - g.cx, dy = py - g.cy;
         const cos = Math.cos(-g.rot), sin = Math.sin(-g.rot);
-        return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+        const rx = dx * cos - dy * sin, ry = dx * sin + dy * cos;
+        const kx = g.kx || 0, ky = g.ky || 0;
+        let det = 1 - kx * ky;
+        if (Math.abs(det) < 1e-4) det = det < 0 ? -1e-4 : 1e-4;
+        return { x: (rx - kx * ry) / det, y: (ry - ky * rx) / det };
     }
 
     function corners(g) {
@@ -70,6 +78,17 @@
         ];
     }
 
+    // Skew handles: diamonds at the edge midpoints. Top/bottom shear along X
+    // (perspective lean), left/right shear along Y.
+    function skewHandles(g) {
+        return [
+            { id: 'n', lx: 0, ly: -g.hh, axis: 'x', cursor: 'ew-resize' },
+            { id: 's', lx: 0, ly: g.hh,  axis: 'x', cursor: 'ew-resize' },
+            { id: 'w', lx: -g.hw, ly: 0, axis: 'y', cursor: 'ns-resize' },
+            { id: 'e', lx: g.hw,  ly: 0, axis: 'y', cursor: 'ns-resize' }
+        ];
+    }
+
     function hitTest(px, py) {
         const g = geom();
         if (!g) return null;
@@ -77,6 +96,11 @@
         for (const c of corners(g)) {
             if (Math.abs(l.x - c.lx) <= HANDLE_HIT && Math.abs(l.y - c.ly) <= HANDLE_HIT) {
                 return { mode: 'scale', corner: c, local: l };
+            }
+        }
+        for (const s of skewHandles(g)) {
+            if (Math.abs(l.x - s.lx) <= HANDLE_HIT && Math.abs(l.y - s.ly) <= HANDLE_HIT) {
+                return { mode: 'skew', handle: s };
             }
         }
         // Rotate handle above top-center (local coords)
@@ -98,6 +122,11 @@
         tCtx.save();
         tCtx.translate(g.cx, g.cy);
         tCtx.rotate(g.rot);
+        // Shear the chrome with the layer (rotate → skew → scale order, same
+        // as the CSS/composite contract in 02a; hw/hh already carry the scale).
+        // Everything below — rect, handles, rotate glyph — lives in the
+        // sheared frame so it matches toLocal's inverse exactly.
+        if (g.kx || g.ky) tCtx.transform(1, g.ky, g.kx, 1, 0, 0);
 
         // Layer rect (dashed amber)
         tCtx.strokeStyle = CHROME;
@@ -113,6 +142,21 @@
             tCtx.lineWidth = 1.5;
             tCtx.beginPath();
             tCtx.rect(c.lx - 5, c.ly - 5, 10, 10);
+            tCtx.fill();
+            tCtx.stroke();
+        });
+
+        // Skew handles: edge-midpoint diamonds
+        skewHandles(g).forEach(s => {
+            tCtx.fillStyle = CHROME_DIM;
+            tCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            tCtx.lineWidth = 1.5;
+            tCtx.beginPath();
+            tCtx.moveTo(s.lx, s.ly - 6);
+            tCtx.lineTo(s.lx + 6, s.ly);
+            tCtx.lineTo(s.lx, s.ly + 6);
+            tCtx.lineTo(s.lx - 6, s.ly);
+            tCtx.closePath();
             tCtx.fill();
             tCtx.stroke();
         });
@@ -163,9 +207,11 @@
         drag = {
             mode: hit.mode,
             corner: hit.corner || null,
+            handle: hit.handle || null,
             startX: px,
             startY: py,
-            start: { x: layer.x, y: layer.y, scaleX: layer.scaleX, scaleY: layer.scaleY, rotation: layer.rotation || 0 },
+            start: { x: layer.x, y: layer.y, scaleX: layer.scaleX, scaleY: layer.scaleY,
+                     rotation: layer.rotation || 0, skewX: layer.skewX || 0, skewY: layer.skewY || 0 },
             startLocal: hit.local || null,
             startAngle: Math.atan2(py - g.cy, px - g.cx)
         };
@@ -181,6 +227,7 @@
             tCanvas.style.cursor = !hit ? 'default'
                 : hit.mode === 'move' ? 'move'
                 : hit.mode === 'rotate' ? 'grab'
+                : hit.mode === 'skew' ? hit.handle.cursor
                 : hit.corner.cursor;
             return;
         }
@@ -200,12 +247,42 @@
             const snapped = Math.round(deg / 90) * 90;
             if (Math.abs(deg - snapped) < 4) deg = snapped;
             layer.rotation = deg;
-        } else {
-            // Scale about center, in the layer's local (de-rotated) space.
-            // Hold Shift for proportional scaling.
-            const g0 = { cx: 0, cy: 0 }; // local math only needs rot + center from live geom
+        } else if (drag.mode === 'skew') {
+            // Work in the de-rotated (NOT de-sheared) frame: the midpoint
+            // handle rides at K·(0,±hh) or K·(±hw,0), so its displacement
+            // along the edge IS the shear tangent × the half-extent.
             const live = geom();
-            const l = toLocal({ cx: live.cx, cy: live.cy, rot: drag.start.rotation * Math.PI / 180 }, px, py);
+            const dx0 = px - live.cx, dy0 = py - live.cy;
+            const cos = Math.cos(-drag.start.rotation * Math.PI / 180);
+            const sin = Math.sin(-drag.start.rotation * Math.PI / 180);
+            const ux = dx0 * cos - dy0 * sin, uy = dx0 * sin + dy0 * cos;
+            const h = drag.handle;
+            let deg;
+            if (h.axis === 'x') {
+                const hh = Math.max(1e-3, Math.abs(live.hh));
+                deg = Math.atan((h.id === 'n') ? (-ux / hh) : (ux / hh)) * 180 / Math.PI;
+            } else {
+                const hw = Math.max(1e-3, Math.abs(live.hw));
+                deg = Math.atan((h.id === 'e') ? (uy / hw) : (-uy / hw)) * 180 / Math.PI;
+            }
+            // Clamp so tan stays sane; snap flat near 0 (mirrors the 4°
+            // rotation snap); Shift = 15° steps for repeatable perspectives.
+            deg = Math.max(-60, Math.min(60, deg));
+            if (Math.abs(deg) < 2) deg = 0;
+            else if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+            if (h.axis === 'x') layer.skewX = deg; else layer.skewY = deg;
+        } else {
+            // Scale about center, in the layer's local (de-rotated, de-
+            // sheared) space — the START pose's inverse, so the corner
+            // being dragged is compared against where it was grabbed.
+            // Hold Shift for proportional scaling.
+            const live = geom();
+            const l = toLocal({
+                cx: live.cx, cy: live.cy,
+                rot: drag.start.rotation * Math.PI / 180,
+                kx: Math.tan(drag.start.skewX * Math.PI / 180),
+                ky: Math.tan(drag.start.skewY * Math.PI / 180)
+            }, px, py);
             const s = drag.startLocal;
             let sx = Math.abs(s.x) > 1e-3 ? drag.start.scaleX * (l.x / s.x) : drag.start.scaleX;
             let sy = Math.abs(s.y) > 1e-3 ? drag.start.scaleY * (l.y / s.y) : drag.start.scaleY;
@@ -241,7 +318,8 @@
         });
 
         layerIndex = index;
-        original = { x: layer.x, y: layer.y, scaleX: layer.scaleX, scaleY: layer.scaleY, rotation: layer.rotation || 0 };
+        original = { x: layer.x, y: layer.y, scaleX: layer.scaleX, scaleY: layer.scaleY,
+                     rotation: layer.rotation || 0, skewX: layer.skewX || 0, skewY: layer.skewY || 0 };
 
         // Make sure the layer content is actually visible while transforming —
         // collision layers are often hidden, which used to leave the user
@@ -260,7 +338,7 @@
         overlay.innerHTML = `
             <div class="draw-toolbar">
                 <span class="layer-transform-title">⤢ ${layer.title || 'Layer ' + index}</span>
-                <span class="layer-transform-hint">drag to move · corners to resize (Shift = proportional) · ↻ to rotate</span>
+                <span class="layer-transform-hint">drag to move · corners to resize (Shift = proportional) · edges to skew · ↻ to rotate</span>
                 <button id="layerTransformDone" type="button">Done</button>
                 <button id="layerTransformCancel" type="button">Cancel</button>
             </div>
@@ -328,6 +406,8 @@
             layer.scaleX = original.scaleX;
             layer.scaleY = original.scaleY;
             layer.rotation = original.rotation;
+            layer.skewX = original.skewX;
+            layer.skewY = original.skewY;
             if (typeof window.updateLayerPosition === 'function') window.updateLayerPosition(layerIndex);
             if (layer.isCollision && window.collisionLayers && window.collisionLayers.enabled) {
                 window.collisionLayers.updateObstacleFromLayers();

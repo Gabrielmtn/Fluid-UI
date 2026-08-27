@@ -441,7 +441,9 @@ class DepthEstimator {
             y: layer.y || 0,
             scaleX: layer.scaleX || 1,
             scaleY: layer.scaleY || 1,
-            rotation: layer.rotation || 0
+            rotation: layer.rotation || 0,
+            skewX: layer.skewX || 0,
+            skewY: layer.skewY || 0
         };
     }
 
@@ -712,6 +714,7 @@ class DepthEstimator {
             x: opts.x || 0, y: opts.y || 0,
             scaleX: opts.scaleX || 1, scaleY: opts.scaleY || 1,
             rotation: opts.rotation || 0,
+            skewX: opts.skewX || 0, skewY: opts.skewY || 0,
             isCollision: true,
             collisionMode: 'block',   // block | slow | deflect
             // 0.9, not 1.0 (2026-07-20). The strength response is a full-range
@@ -1297,6 +1300,7 @@ class DepthEstimator {
         ctx.globalAlpha = Math.max(0, Math.min(1, strength));
         ctx.translate(cx + lx, cy + ly);
         ctx.rotate((layer.rotation || 0) * Math.PI / 180);
+        if (window.LayerXform) window.LayerXform.shearCtx(ctx, layer);
         ctx.scale(layer.scaleX || 1, layer.scaleY || 1);
         ctx.translate(-cx, -cy);
         ctx.drawImage(cov, 0, 0, obsW, obsH);
@@ -1344,12 +1348,14 @@ class DepthEstimator {
             window.beginObstacleTexture();
             gpuEntries.forEach(function (entry) {
                 var layer = entry.layer;
+                var sk = window.LayerXform ? window.LayerXform.skewTan(layer) : { tx: 0, ty: 0 };
                 window.compositeObstacleSource(entry.source, {
                     x: (layer.x || 0) / gpuCssW,
                     y: (layer.y || 0) / gpuCssH,
                     scaleX: layer.scaleX || 1,
                     scaleY: layer.scaleY || 1,
                     rotation: (layer.rotation || 0) * Math.PI / 180,
+                    skewTanX: sk.tx, skewTanY: sk.ty,
                     strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
                 });
             });
@@ -1474,6 +1480,7 @@ class DepthEstimator {
                 obstacleCtx.globalCompositeOperation = 'lighter';
                 obstacleCtx.translate(cx + lx, cy + ly);
                 obstacleCtx.rotate(lRot);
+                if (window.LayerXform) window.LayerXform.shearCtx(obstacleCtx, layer);
                 obstacleCtx.scale(lScaleX, lScaleY);
                 obstacleCtx.translate(-cx, -cy);
                 // Honor the shape rect (same rect the visible preview draws at)
@@ -1554,12 +1561,14 @@ class DepthEstimator {
                 var mixedCssH = (mixedWrap && mixedWrap.clientHeight) || canvasEl.clientHeight || canvasEl.height || 1;
                 gpuEntries.forEach(function (entry) {
                     var layer = entry.layer;
+                    var sk = window.LayerXform ? window.LayerXform.skewTan(layer) : { tx: 0, ty: 0 };
                     window.compositeObstacleSource(entry.source, {
                         x: (layer.x || 0) / mixedCssW,
                         y: (layer.y || 0) / mixedCssH,
                         scaleX: layer.scaleX || 1,
                         scaleY: layer.scaleY || 1,
                         rotation: (layer.rotation || 0) * Math.PI / 180,
+                        skewTanX: sk.tx, skewTanY: sk.ty,
                         strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
                     });
                 });

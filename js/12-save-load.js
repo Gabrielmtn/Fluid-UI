@@ -810,6 +810,8 @@
                         scaleX: layer.scaleX || 1,
                         scaleY: layer.scaleY || 1,
                         rotation: layer.rotation || 0,
+                        skewX: layer.skewX || 0,
+                        skewY: layer.skewY || 0,
                         isCollision: !!layer.isCollision,
                         collisionMode: layer.collisionMode || 'block',
                         collisionStrength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7,
@@ -1472,6 +1474,11 @@
                         scaleX: ld.scaleX || 1,
                         scaleY: ld.scaleY || 1,
                         rotation: ld.rotation || 0,
+                        // Absent on pre-skew saves → 0, like rotation. Skew is
+                        // dimensionless, so no _boxK rescale (same rotated-shape
+                        // aspect approximation documented below).
+                        skewX: ld.skewX || 0,
+                        skewY: ld.skewY || 0,
                         isCollision: !!ld.isCollision,
                         collisionMode: ld.collisionMode || 'block',
                         collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7,

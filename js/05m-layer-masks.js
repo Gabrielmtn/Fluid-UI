@@ -257,6 +257,8 @@
                         created.scaleX = layer.scaleX || 1;
                         created.scaleY = layer.scaleY || 1;
                         created.rotation = layer.rotation || 0;
+                        created.skewX = layer.skewX || 0;
+                        created.skewY = layer.skewY || 0;
                         // Feather is already baked into the cut-out's alpha. On
                         // a layer with no mask this slider is the rudimentary
                         // luminance key instead, so inheriting it would key the
@@ -329,6 +331,7 @@
                 octx.translate(bcx + (layer.x || 0) * (mainCanvas.width / cssW),
                                bcy + (layer.y || 0) * (mainCanvas.height / cssH));
                 octx.rotate(((layer.rotation || 0) * Math.PI) / 180);
+                if (window.LayerXform) window.LayerXform.shearCtx(octx, layer);
                 octx.scale(layer.scaleX || 1, layer.scaleY || 1);
                 octx.translate(-bcx, -bcy);
                 octx.drawImage(art, 0, 0, mainCanvas.width, mainCanvas.height);

@@ -220,6 +220,7 @@
         ctx.translate(bcx + (layer.x || 0) * (mainCanvas.width / cssW),
                       bcy + (layer.y || 0) * (mainCanvas.height / cssH));
         ctx.rotate(((layer.rotation || 0) * Math.PI) / 180);
+        if (window.LayerXform) window.LayerXform.shearCtx(ctx, layer);
         ctx.scale(layer.scaleX || 1, layer.scaleY || 1);
         ctx.translate(-bcx, -bcy);
         layer.mask.shapes.forEach(function (s) { window._drawMaskShape(ctx, s); });
@@ -275,6 +276,7 @@
         const n = (layer.mask && layer.mask.shapes) ? layer.mask.shapes.length : 0;
         return [n, layer.x | 0, layer.y | 0, layer.rotation || 0,
                 (layer.scaleX || 1).toFixed(4), (layer.scaleY || 1).toFixed(4),
+                layer.skewX || 0, layer.skewY || 0,
                 layer.__clipRev || 0].join('/');
     }
 
