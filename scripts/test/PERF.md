@@ -189,3 +189,100 @@ data, and a performance setting should not resample it. Checked and it looks
 contained: the display shaders sample these with normalized UVs already, and
 only the stamp viewports in 05i hardcode the dye dimensions. Not done on this
 branch.
+
+---
+
+# Where the frame goes, and what is NOT the problem
+
+Second pass (branch `perf-density`), aimed at the slowdown that shows up in
+dense sessions. Tools added: `run-passprof.js` (per-pass GPU attribution),
+`run-density.js` (cost vs canvas content), `gen-shader-inventory.js`.
+
+## The breakdown at the top tiers
+
+`overkill` (dye 6144, sim 2048, oversample ×4), idle, per frame:
+
+| pass | ms | % | draws/frame |
+|---|---|---|---|
+| pressure | 3.79 | 49.6% | 904.8 |
+| macCorrect | 0.73 | 9.5% | 3.9 (at 6144×3397) |
+| advection | 0.57 | 7.4% | 7.8 |
+| macAdvect | 0.37 | 4.8% | 3.9 (at 6144×3397) |
+| mgRestrict / mgProlong / mgResidual | ~1.3 | ~17% | 109 each |
+| display | 0.08 | 1.1% | 1 |
+
+The pressure solve plus its multigrid scaffolding is **two thirds of the
+frame**. The display pass — the stage everyone assumes is the problem, and
+the one the 2026-07-22 render-cap experiment was built around — is 1%.
+
+## Four things that are NOT the cause of density slowdown
+
+Each measured, each a negative result, each worth not re-investigating:
+
+1. **Dye on the canvas is free.** Cost is flat from 0% to 90% coverage:
+   4.76 / 4.90 / 4.98 / 5.16 ms across the ramp, inside the noise floor.
+   Every pass is a fixed-size draw; content does not change it.
+2. **Velocity magnitude is free.** Same canvas painting (vel mean 0.42) vs
+   idle (0.006) costs the same. This rules out the texture-cache locality
+   story for semi-Lagrangian advection, which was the leading hypothesis.
+3. **Arm count, brush size and symmetry are ~free** at the rates the
+   synthetic painter reaches: 4.80 → 5.16 ms across arms 1→8, brush 4→60,
+   and radial → mirrorQuad. Dab *rate* held constant at ~1015/s throughout,
+   because the spacing walker is parameterised by distance travelled.
+4. **The display pass is 1%.** Supersampling is not what costs.
+
+Caveat on (3): the painter emits one pointermove per frame, so at 470fps it
+covers little ground per frame and reaches only ~25% of `BRUSH_DAB_BUDGET`.
+A real stroke on a 144Hz panel covers 3× the distance per frame. The dab
+path is therefore **not cleared** — only shown to be flat over the range
+this harness can currently drive.
+
+## Two measurement traps found here
+
+- **GPU clock ramp.** Six back-to-back profiles of an unchanging empty
+  canvas drifted 2.795 → 2.225 ms (−20%) while fps climbed 125 → 140, as
+  the card woke up. The first version of `run-density.js` sampled "active"
+  straight after five seconds of painting (boosted) and "settled" after six
+  seconds of near-idle (downclocked), and duly reported that painting made
+  the frame *faster* and that an empty canvas cost 3× a full one. Every
+  sample now runs uncapped for a fixed stretch first, and the first sample
+  after a tier change is discarded outright.
+- **The dye hash is not a signal for back-to-back A/B.** Two runs of the
+  *identical* configuration give different dye hashes (258156d3 vs
+  0cf81a76) while the velocity hash and dye mean match exactly — the
+  residual README.md §"Three verdicts" documents. An A/B that reads the dye
+  hash alone will report a behaviour change that is not there; it did.
+
+## DYE_FOLLOWS_SUBSTEP (new, default on = unchanged)
+
+Oversampling exists to give the *velocity* field a smaller dt. The dye is a
+passive scalar riding it, and it is the expensive half — MacCormack's two
+extra passes plus the main advection, all at dye resolution, all repeated
+per substep. Setting `config.DYE_FOLLOWS_SUBSTEP = false` runs the velocity
+chain every substep and transports dye once per frame over the frame's whole
+dt.
+
+Verified to do exactly that, by draw count at overkill:
+
+| | macAdvect | macCorrect | advection | dye transport total |
+|---|---|---|---|---|
+| default | 3.9 draws / 0.38 ms | 3.9 / 0.73 ms | 7.8 / 0.66 ms | **1.77 ms** |
+| decoupled | 0.97 / 0.09 ms | 0.97 / 0.19 ms | 4.88 / 0.17 ms | **0.45 ms** |
+
+So it removes 1.3 ms of real work. Whether that lands as a net frame win is
+another matter: `pressure` dominates at ~50% and swings ±0.8 ms run to run,
+which is most of the saving. Frame-level A/B was inconclusive (−9% one way,
++6.7% the other — both inside noise). **Not look-tested.** Treat as a
+measured option, not a recommendation.
+
+## What to do next, in order
+
+1. **The pressure solve is the whole game** — two thirds of the frame at
+   high tiers. `MG_CYCLES 4→2` already measures **−22.8%** at overkill and
+   trimming the V-cycle shape as well is **−26.2%**, config-only, no code.
+   Whether 2 cycles converge acceptably is a look question, not a perf one.
+2. `MG_COARSE 16→4` removes ~190 draws/frame for only −3.7%, so the solve is
+   fill-bound at the *fine* levels, not draw-call bound as it first appeared.
+   Optimising the coarse end is not worth it.
+3. Drive the dab path harder than the synthetic painter can before calling
+   it clear.

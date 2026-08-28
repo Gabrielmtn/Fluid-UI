@@ -406,6 +406,24 @@
                                       // exactly (the substep gate is untouched and still
                                       // free to raise the count on a low-Hz panel).
 
+            DYE_FOLLOWS_SUBSTEP: true, // Whether dye transport runs on EVERY physics
+                                      // substep (true, the shipped behaviour) or once
+                                      // per frame over the frame's whole dt (false).
+                                      // Only has an effect while SIM_OVERSAMPLE > 1 or
+                                      // the low-refresh substep gate is engaged; at one
+                                      // step per frame the two are the same thing.
+                                      //
+                                      // Oversampling exists to give the VELOCITY field a
+                                      // smaller dt. The dye is a passive scalar riding
+                                      // that field, and it is also the expensive half:
+                                      // MacCormack's two extra passes plus the main
+                                      // advection all run at DYE resolution. Measured at
+                                      // the 'overkill' tier (dye 6144, oversample x4)
+                                      // they were 39% of GPU time — MORE than the whole
+                                      // pressure solve at 36%, which is the thing the
+                                      // oversampling was bought for.
+                                      // See scripts/test/PERF.md for the numbers.
+
             SHADE_FORM_RESOLUTION: 256, // Base (long-side) of the blurred form field the
                                       // display shading derives its normals from. Was a
                                       // hardcoded 256 in 05c; promoted to config so a

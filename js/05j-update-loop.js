@@ -279,6 +279,28 @@
             // costs at most what one local brush does. See the inbound-budget
             // note in 06-multiplayer.
             if (typeof window.__mpDrainInbound === 'function') window.__mpDrainInbound(_dabBudget);
+            // ── Per-button brush pin (41-button-modes) ──────────────────
+            // A button bound to "mirror brushstroke" or "alternate brush"
+            // installs a pin at press (05d) that has to survive the WHOLE
+            // stroke: the splat-out tail and the stabilizer's catch-up dabs
+            // belong to the stroke that is ending, so they must land in that
+            // stroke's brush — restoring at pointerup paints the tail of an
+            // alternate-brush stroke with the main brush. So it lifts on the
+            // same full-idle test the deferred arm-colour advance uses.
+            //
+            // Read at the TOP of the frame, and OUTSIDE the isPaused block.
+            // Top of frame because the drain below can only emit dabs while
+            // one of these three is live, so an idle reading here holds for
+            // the rest of the frame; outside isPaused because a pause taken
+            // mid-stroke would otherwise leave the alternate brush sitting in
+            // config, where the Brush panel's next edit would be overwritten
+            // by the restore. Gated on the flag: an ordinary session pays one
+            // boolean test per frame.
+            if (window.__btnPinActive && !pointer.down && !splatOutActive &&
+                (!window.BrushEngine ||
+                    (!window.BrushEngine.isActive() && !window.BrushEngine.pending()))) {
+                window.ButtonModes.releaseIfIdle();
+            }
             if (!isPaused) {
                 // Constant-flow bookkeeping: the engine branch below stops
                 // running once a stroke's queue drains, so a reset inside it
@@ -1000,6 +1022,32 @@
                 // fullscreen dabs applied per dab — run before advection
                 // (incl. the MacCormack passes) ever samples the dye, so the
                 // frame sees exactly the state the per-dab refresh produced.
+                // ── Dye transport, decoupled from the physics substep ──────
+                // (perf-max-tiers) Oversampling exists to give the VELOCITY
+                // field a smaller dt. The dye is a passive scalar riding that
+                // field, and advecting it is the most expensive thing in the
+                // frame: MacCormack's two extra passes plus the main one, all
+                // at DYE resolution. Measured at the 'overkill' tier (dye
+                // 6144, oversample x4) those three passes were 39% of GPU time
+                // and ran four times over, while the whole pressure solve —
+                // the thing oversampling is actually for — was 36%.
+                //
+                // So when DYE_FOLLOWS_SUBSTEP is off, the velocity chain still
+                // runs every substep and the dye transports ONCE, on the last
+                // one, over the whole frame's dt. The velocity field it samples
+                // is the best one available (the final substep's), and the dye
+                // step is exactly the one it would have taken at oversample 1 —
+                // so this buys the oversampled physics at close to oversample-1
+                // transport cost.
+                //
+                // Default TRUE = every substep, i.e. untouched behaviour, and
+                // at oversample 1 the two paths are the same code either way.
+                const _dyeNow = (config.DYE_FOLLOWS_SUBSTEP !== false) || (_ss === subSteps - 1);
+                // dt for every dye-transport pass. Decoupled, one step covers
+                // the frame; the decay accumulator below is fed the same value,
+                // so dissipation still integrates over real simulated time.
+                const _dyeDt = (config.DYE_FOLLOWS_SUBSTEP !== false) ? dt : frameDt;
+                if (_dyeNow) {
                 if (window.__memRefreshPending) {
                     window.__memRefreshPending = false;
                     memRefreshProg.bind();
@@ -1029,7 +1077,7 @@
                     macAdvectProg.bind();
                     gl.uniform2f(macAdvectProg.uniforms.texelSize, 1.0, 1.0);
                     gl.uniform2f(macAdvectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
-                    gl.uniform1f(macAdvectProg.uniforms.dt, dt);
+                    gl.uniform1f(macAdvectProg.uniforms.dt, _dyeDt);
                     gl.uniform1f(macAdvectProg.uniforms.swirl, _swirl);
                     gl.uniform1f(macAdvectProg.uniforms.swirlTime, _swirlT);
                     // Obstacle-aware backtrace probes (shared snippet) — the
@@ -1063,7 +1111,7 @@
                     macCorrectProg.bind();
                     gl.uniform2f(macCorrectProg.uniforms.texelSize, 1.0, 1.0);
                     gl.uniform2f(macCorrectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
-                    gl.uniform1f(macCorrectProg.uniforms.dt, dt);
+                    gl.uniform1f(macCorrectProg.uniforms.dt, _dyeDt);
                     gl.uniform1f(macCorrectProg.uniforms.swirl, _swirl);
                     gl.uniform1f(macCorrectProg.uniforms.swirlTime, _swirlT);
                     gl.uniform1f(macCorrectProg.uniforms.uObsMax, _obsMax);
@@ -1152,7 +1200,7 @@
                     lastDyeDiss = config.DENSITY_DISSIPATION;
                     dyeDecayAccum = 0;
                 }
-                const _dyeDecay = computeDecayDt(_dyeDiss, dyeDecayAccum, dt);
+                const _dyeDecay = computeDecayDt(_dyeDiss, dyeDecayAccum, _dyeDt);
                 dyeDecayAccum = _dyeDecay.accum;
                 gl.uniform1f(advectionProg.uniforms.decayDt, _dyeDecay.decayDt);
                 // Explicit freeze flag: the shader must distinguish freeze mode
@@ -1167,6 +1215,12 @@
                     gl.activeTexture(gl.TEXTURE2);
                     gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
                 }
+                // The dye pass reuses advectionProg and until now inherited
+                // whatever dt the VELOCITY pass left on it a few hundred lines
+                // up. That was invisible while the two were always equal; it
+                // stops being true the moment dye transport is decoupled, so
+                // set it explicitly. Identical value on the default path.
+                gl.uniform1f(advectionProg.uniforms.dt, _dyeDt);
                 blit(density.write.fbo);
                 density.swap();
                 // 8b. Attractor field — dye-transport gather toward a
@@ -1193,7 +1247,7 @@
                     attractorProg.bind();
                     gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                     gl.uniform1f(attractorProg.uniforms.aspectRatio, canvas.width / Math.max(1, canvas.height));
-                    gl.uniform1f(attractorProg.uniforms.dt, dt);
+                    gl.uniform1f(attractorProg.uniforms.dt, _dyeDt);
                     gl.uniform1f(attractorProg.uniforms.uForce, (typeof _af.force === 'number') ? _af.force : 0.6);
                     gl.uniform1f(attractorProg.uniforms.uSwirl, (typeof _af.swirl === 'number') ? _af.swirl : 0.25);
                     gl.uniform1f(attractorProg.uniforms.uDensityGate, (typeof _af.densityGate === 'number') ? _af.densityGate : 0.75);
@@ -1237,7 +1291,7 @@
                     attractorProg.bind();
                     gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                     gl.uniform1f(attractorProg.uniforms.aspectRatio, canvas.width / Math.max(1, canvas.height));
-                    gl.uniform1f(attractorProg.uniforms.dt, dt);
+                    gl.uniform1f(attractorProg.uniforms.dt, _dyeDt);
                     gl.uniform1f(attractorProg.uniforms.uForce, _bp.force);
                     gl.uniform1f(attractorProg.uniforms.uSwirl, 0);
                     gl.uniform1f(attractorProg.uniforms.uDensityGate, 0);
@@ -1255,6 +1309,7 @@
                     blit(density.write.fbo);
                     density.swap();
                 }
+                } // ── end dye-transport gate (DYE_FOLLOWS_SUBSTEP) ──
                 } // ── end physics sub-step loop ──
             }
             // Post-FX passes (sharpen, micro-detail, lighting, light shift,
