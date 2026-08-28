@@ -369,6 +369,54 @@
 
             VELOCITY_INFLUENCE: 2.5,  // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
 
+            // ── Max-fidelity tiers (branch: perf-max-tiers) ───────────────
+            // Three knobs that buy fidelity a resolution number cannot, each
+            // an EXACT no-op at its default so a stock boot is bit-identical
+            // to the pre-branch build. js/42-perf-tiers.js bundles them into
+            // named tiers; scripts/test/run-perf.js measures what a given
+            // machine can actually hold.
+
+            RENDER_SCALE: 1.0,        // Supersampling factor for the DRAWING BUFFER.
+                                      // The canvas element still occupies exactly the
+                                      // same CSS box; only canvas.width/height are
+                                      // multiplied, and the compositor box-downsamples
+                                      // on present. That downsample IS the anti-alias:
+                                      // the display pass (kaleido edges, collider
+                                      // boundaries, shading relief, glow tips) is the
+                                      // one stage in the whole chain that runs per
+                                      // OUTPUT pixel and therefore aliases at native.
+                                      // Cost is O(scale^2) on that pass ONLY — the dye
+                                      // and sim grids are sized off their own budgets
+                                      // and do not move. 1.0 = untouched present.
+                                      // Console-tunable via window.setRenderScale().
+
+            SIM_OVERSAMPLE: 1,        // Forced physics steps per frame, INDEPENDENT of
+                                      // the refresh-rate gate that drives SIM_SUBSTEP.
+                                      // Substepping exists there to stop a 30Hz panel
+                                      // running the fluid at half speed; this exists for
+                                      // the opposite machine — one with frame budget to
+                                      // spare, spending it on a smaller dt. Smaller dt
+                                      // is not a cosmetic win: semi-Lagrangian advection
+                                      // backtraces a shorter distance per step, so
+                                      // numerical diffusion drops and fine vorticity
+                                      // survives instead of smearing. Costs N× the
+                                      // physics (advect + project), nothing else — the
+                                      // dye-res post-FX chain and the display pass still
+                                      // run once per frame. 1 = current behaviour
+                                      // exactly (the substep gate is untouched and still
+                                      // free to raise the count on a low-Hz panel).
+
+            SHADE_FORM_RESOLUTION: 256, // Base (long-side) of the blurred form field the
+                                      // display shading derives its normals from. Was a
+                                      // hardcoded 256 in 05c; promoted to config so a
+                                      // tier can raise it. LOOK-AFFECTING, not free
+                                      // fidelity: 256 is the smoothing scale the current
+                                      // relief was approved at, and raising it lets
+                                      // finer dye structure back into the height field
+                                      // (sharper relief, and past ~1024 the pixel-scale
+                                      // striations the fixed base was chosen to exclude).
+                                      // Left at 256 by default for that reason.
+
             MACCORMACK: true,         // Crisp advection: MacCormack error-corrected dye transport
                                       // (2 extra dye-res passes; governor sheds it with post-FX)
 

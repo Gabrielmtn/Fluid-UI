@@ -229,8 +229,18 @@
         if (s.configKey && s.hard) CONFIG_BOUNDS[s.configKey] = { min: s.hard.min, max: s.hard.max };
     });
     CONFIG_BOUNDS.SPLAT_RADIUS = { min: SLIDERS.brushSize.hard.min / 1000, max: SLIDERS.brushSize.hard.max / 1000 };
-    CONFIG_BOUNDS.DYE_RESOLUTION = { min: 64, max: 4096 };
-    CONFIG_BOUNDS.SIM_RESOLUTION = { min: 32, max: 2048 };
+    // Ceilings raised on the perf-max-tiers branch from 4096/2048. They are
+    // BOUNDS, not defaults — nothing boots here, and the dropdowns still stop
+    // at what a mainstream GPU survives. 8192 dye is ~2.4 GB of half-float
+    // buffers at 16:9 before a single raster layer, so PerfTiers.estimateVRAM()
+    // gates it and run-perf.js measures it; see js/42-perf-tiers.js.
+    CONFIG_BOUNDS.DYE_RESOLUTION = { min: 64, max: 8192 };
+    CONFIG_BOUNDS.SIM_RESOLUTION = { min: 32, max: 4096 };
+    CONFIG_BOUNDS.RENDER_SCALE = { min: 0.5, max: 4 };
+    CONFIG_BOUNDS.SIM_OVERSAMPLE = { min: 1, max: 8 };
+    CONFIG_BOUNDS.SHADE_FORM_RESOLUTION = { min: 64, max: 2048 };
+    CONFIG_BOUNDS.GLOW_RESOLUTION = { min: 64, max: 2048 };
+    CONFIG_BOUNDS.SCATTER_RESOLUTION = { min: 64, max: 4096 };
     CONFIG_BOUNDS.TEXTURE_DOWNSAMPLE = { min: 0, max: 4 };
 
     function _round(v, step) {

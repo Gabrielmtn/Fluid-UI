@@ -652,20 +652,73 @@
             refreshPaletteCarousel();
         };
 
+        // ── Drawing buffer vs CSS box (RENDER_SCALE, perf-max-tiers) ──────
+        // The canvas ELEMENT always occupies exactly the wrapper's CSS box.
+        // The drawing buffer may be larger: at RENDER_SCALE 2 we render four
+        // output samples per displayed pixel and let the compositor box-filter
+        // them down on present — supersampling, and the only anti-aliasing the
+        // display pass (kaleido seams, collider edges, shading relief) can get,
+        // because that pass is the one stage that runs per OUTPUT pixel.
+        //
+        // Everything downstream that maps between the two spaces must go
+        // through a ratio, never assume 1:1:
+        //   • getCanvasCoordinates (02-palettes) already divides by the
+        //     bounding rect, so pointer mapping is correct for free.
+        //   • the FBO settle in 05j MUST compare canvas.width against the
+        //     SCALED target, or it rebuilds every framebuffer every frame.
+        //   • hover-capture's drawImage source rect is in buffer px (04g).
+        //   • the saved canvas size is the CSS box, not the buffer (12).
+        // Clamped to MAX_TEXTURE_SIZE-ish sanity and to what the GPU will
+        // actually allocate; PerfTiers.estimateVRAM() reports the cost.
+        const RENDER_SCALE_MAX_LONG_SIDE = 16384;
+        function renderScale() {
+            const s = window.config && window.config.RENDER_SCALE;
+            return (typeof s === 'number' && isFinite(s) && s > 0) ? s : 1;
+        }
+        // The drawing-buffer size for a given CSS box. Exported so every other
+        // module derives the same number instead of re-deriving the rule.
+        function computeRenderSize(cssW, cssH) {
+            const sc = renderScale();
+            let w = Math.max(1, Math.round(cssW * sc));
+            let h = Math.max(1, Math.round(cssH * sc));
+            const long = Math.max(w, h);
+            if (long > RENDER_SCALE_MAX_LONG_SIDE) {
+                const k = RENDER_SCALE_MAX_LONG_SIDE / long;
+                w = Math.max(1, Math.round(w * k));
+                h = Math.max(1, Math.round(h * k));
+            }
+            return { w, h, scale: sc };
+        }
+        window.computeRenderSize = computeRenderSize;
+        window.getRenderScale = renderScale;
+
+        // Console/harness entry point: set the factor and force one rebuild.
+        window.setRenderScale = function (v) {
+            const n = Number(v);
+            if (!isFinite(n) || n <= 0) return renderScale();
+            window.config.RENDER_SCALE = Math.max(0.5, Math.min(4, n));
+            updateCanvasSize();
+            return window.config.RENDER_SCALE;
+        };
+
         function updateCanvasSize() {
             const newWidth = canvasWrapper.clientWidth;
             const newHeight = canvasWrapper.clientHeight;
-            
-            // Set canvas resolution (internal pixels)
-            canvas.width = newWidth;
-            canvas.height = newHeight;
-            
-            // Also set CSS size explicitly to match (fixes scaling issues)
+            const r = computeRenderSize(newWidth, newHeight);
+
+            // Set canvas resolution (internal pixels) — the SUPERSAMPLED buffer
+            canvas.width = r.w;
+            canvas.height = r.h;
+
+            // Also set CSS size explicitly (fixes scaling issues). This is what
+            // keeps the element the same size on screen no matter the factor.
             canvas.style.width = newWidth + 'px';
             canvas.style.height = newHeight + 'px';
-            
-            sizeDisplay.textContent = `${newWidth} × ${newHeight}`;
-            
+
+            sizeDisplay.textContent = r.scale === 1
+                ? `${newWidth} × ${newHeight}`
+                : `${newWidth} × ${newHeight} (${r.w}×${r.h})`;
+
             // Flag to reinitialize framebuffers after WebGL context is set up
             window.needsFramebufferReinit = true;
         }

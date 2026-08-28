@@ -384,13 +384,22 @@
 
 
 
-            const sx = Math.round(region.left - canvasRect.left);
+            // drawImage's source rect is in DRAWING-BUFFER pixels, but the
+            // region above is measured in CSS px off getBoundingClientRect.
+            // They are only equal at RENDER_SCALE 1 (see 01-config): under
+            // supersampling this grabbed the top-left quadrant of the frame.
 
-            const sy = Math.round(region.top - canvasRect.top);
+            const bsx = canvasRect.width ? canvas.width / canvasRect.width : 1;
 
-            const sw = Math.round(region.width);
+            const bsy = canvasRect.height ? canvas.height / canvasRect.height : 1;
 
-            const sh = Math.round(region.height);
+            const sx = Math.round((region.left - canvasRect.left) * bsx);
+
+            const sy = Math.round((region.top - canvasRect.top) * bsy);
+
+            const sw = Math.round(region.width * bsx);
+
+            const sh = Math.round(region.height * bsy);
 
             if (sw <= 0 || sh <= 0) return false;
 

@@ -189,7 +189,15 @@
             Settings.saveCheckboxes(checkboxes);
             Object.entries(colors).forEach(([name, val]) => Settings.saveColor(name, val));
             Object.entries(selects).forEach(([name, val]) => Settings.saveSelect(name, val));
-            if (canvas.width && canvas.height) Settings.saveCanvasSize(canvas.width, canvas.height);
+            // The CSS box, NOT the drawing buffer: under RENDER_SCALE > 1 the
+            // buffer is a multiple of the box, and saving it would restore a
+            // wrapper that grew by the factor on every single launch.
+            // (fetched by id — this function already declares its own local
+            // `canvasWrapper` further down for the serialized rect)
+            const _wrapEl = document.getElementById('canvas-wrapper');
+            const _savedW = Math.round(_wrapEl ? _wrapEl.clientWidth : canvas.width);
+            const _savedH = Math.round(_wrapEl ? _wrapEl.clientHeight : canvas.height);
+            if (_savedW && _savedH) Settings.saveCanvasSize(_savedW, _savedH);
             if (canvas.wrapperRect) sm.set('canvas.wrapperRect', canvas.wrapperRect);
         }
 

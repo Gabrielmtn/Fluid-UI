@@ -75,7 +75,34 @@
         window.__getPhotoSafe = function () {
             return { frame: safeFrame, out: safeOut, luma: safeLuma, stats: safeStats };
         };
+        // ── VRAM accounting (perf-max-tiers) ──────────────────────────────
+        // Every GPU buffer in the app is born here, so this is the one place a
+        // truthful allocation total can come from. initFramebuffers zeroes the
+        // tally before it rebuilds; window.__fboAlloc is what run-perf.js and
+        // PerfTiers.estimateVRAM() report. Bytes are the texture's own storage
+        // — drivers pad and add their own allocations, so read it as a floor.
+        var _fboBytes = 0, _fboCount = 0, _fboBiggest = null;
+        function _bytesPerTexel(internalFormat) {
+            switch (internalFormat) {
+                case gl.RGBA16F: return 8;
+                case gl.RG16F:   return 4;
+                case gl.R16F:    return 2;
+                case gl.RGBA32F: return 16;
+                case gl.RGBA8:   return 4;
+                default:         return 4;
+            }
+        }
+        window.__fboAlloc = function () {
+            return { bytes: _fboBytes, mb: +(_fboBytes / 1048576).toFixed(1),
+                     count: _fboCount, biggest: _fboBiggest };
+        };
+
         function createFBO(w, h, internalFormat, format, type, filter) {
+            var _b = w * h * _bytesPerTexel(internalFormat);
+            _fboBytes += _b; _fboCount++;
+            if (!_fboBiggest || _b > _fboBiggest.bytes) {
+                _fboBiggest = { w: w, h: h, bytes: _b, mb: +(_b / 1048576).toFixed(1) };
+            }
             const texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
@@ -125,6 +152,7 @@
         // aliases the live pressure/divergence/obstacle buffers.
         let mgRes0 = null, mgLevels = null;
         function initFramebuffers() {
+            _fboBytes = 0; _fboCount = 0; _fboBiggest = null; // VRAM tally, rebuilt below
             // Use canvas attribute dimensions (not gl.drawingBufferWidth) for aspect ratio.
             // In Electron with transparent windows or DPR scaling, the drawing buffer
             // can differ from canvas.width/height, causing wrong FBO proportions.
@@ -325,7 +353,13 @@
             // dye-relative form field re-admitted pixel-scale striations the
             // moment the user raised the quality tier. 256 long-side matches
             // the approved look at the High (1K) tier exactly.
-            const sfRes = 256;
+            // Promoted from a hardcoded 256 to a config key (perf-max-tiers)
+            // so a max-fidelity tier can raise it. The default is unchanged and
+            // the reasoning above still stands — this is a LOOK knob, not free
+            // fidelity: a bigger form field admits finer dye structure into the
+            // height field the shading lights.
+            const sfRes = Math.max(64, Math.min(2048,
+                (config.SHADE_FORM_RESOLUTION | 0) || 256));
             let sfW, sfH;
             if (displayW >= displayH) {
                 sfW = Math.min(sfRes, maxTextureSize);

@@ -112,6 +112,23 @@
                         Math.ceil(wallDt / 0.016)));
                 }
             }
+            // ── Forced oversampling (perf-max-tiers) ────────────────────────
+            // SIM_SUBSTEP above answers "the panel is too slow for the sim to
+            // keep up with the clock". This answers the opposite question: the
+            // machine has budget left, so spend it on a SMALLER dt. Same wall
+            // interval, N times as many physics steps — semi-Lagrangian
+            // advection backtraces a shorter distance per step, so numerical
+            // diffusion drops and small-scale vorticity survives instead of
+            // smearing. Multiplies the gated count rather than replacing it, so
+            // a low-Hz panel still gets its catch-up steps on top.
+            // 1 (the default) leaves every number below bit-identical.
+            const _over = Math.max(1, Math.min(8, (config.SIM_OVERSAMPLE | 0) || 1));
+            if (_over > 1) subSteps *= _over;
+            // Published because the two multiply: on a 30Hz panel the substep
+            // GATE is already returning 3, so oversample 4 is really 12 physics
+            // steps per frame, and a cost measured there does not transfer to a
+            // 60Hz machine. The perf harness reports this rather than the knob.
+            window.__lastSubSteps = subSteps;
             const rawDt = Math.min(wallDt / subSteps, 0.016);
             // Time scale: dilate physics without changing equations.
             // dt is ONE STEP; frameDt is everything this frame simulates.
@@ -163,7 +180,14 @@
             }
             const targetWidth = canvasWrapper.clientWidth;
             const targetHeight = canvasWrapper.clientHeight;
-            const canvasSizeChanged = canvas.width !== targetWidth || canvas.height !== targetHeight;
+            // The drawing buffer is the CSS box times RENDER_SCALE (01-config).
+            // Compare against the SCALED target: at any factor but 1 the raw
+            // comparison is permanently true, which re-arms the settle deadline
+            // every frame and rebuilds all 17 framebuffers, forever.
+            const _rt = window.computeRenderSize
+                ? window.computeRenderSize(targetWidth, targetHeight)
+                : { w: targetWidth, h: targetHeight };
+            const canvasSizeChanged = canvas.width !== _rt.w || canvas.height !== _rt.h;
             // Carry the layers with the box. UNCONDITIONAL, not inside the
             // changed-branch below: the tracker has to learn the box on a
             // frame where nothing moved, or the FIRST resize of a session
@@ -218,9 +242,12 @@
                 // must not clear the canvas — see canvasSizeChanged note above)
                 const settleW = canvasWrapper.clientWidth;
                 const settleH = canvasWrapper.clientHeight;
-                if (canvas.width !== settleW || canvas.height !== settleH) {
-                    canvas.width = settleW;
-                    canvas.height = settleH;
+                const settleR = window.computeRenderSize
+                    ? window.computeRenderSize(settleW, settleH)
+                    : { w: settleW, h: settleH };
+                if (canvas.width !== settleR.w || canvas.height !== settleR.h) {
+                    canvas.width = settleR.w;
+                    canvas.height = settleR.h;
                     canvas.style.width = settleW + 'px';
                     canvas.style.height = settleH + 'px';
                 }

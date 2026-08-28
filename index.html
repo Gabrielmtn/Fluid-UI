@@ -552,6 +552,8 @@
             <!-- Option VALUES are load-bearing (registry-validated, presets
                  match numerically, undo snapshots store them) — text only. -->
             <select id="visualResolution">
+                <option value="8192">8192 — Overkill (24GB VRAM class)</option>
+                <option value="6144">6144 — Extreme (12GB+ VRAM)</option>
                 <option value="4096">4096 — Sharpest (heavy GPU)</option>
                 <option value="2048" selected>2048 — Sharp (default)</option>
                 <option value="1536">1536 — Medium</option>
@@ -563,6 +565,8 @@
         <div class="control-group">
             <label for="physicsResolution">Motion Detail</label>
             <select id="physicsResolution">
+                <option value="4096">4096 — Overkill (heavy GPU)</option>
+                <option value="3072">3072 — Extreme</option>
                 <option value="2048">2048 — Ultra-fine (heavy GPU)</option>
                 <option value="1536">1536 — Extra-fine</option>
                 <option value="1024">1024 — Very fine</option>
@@ -1618,6 +1622,10 @@
     <script src="js/36-display-mode.js"></script>
     <script src="js/37-nav-idle-glow.js"></script>
     <script src="js/38-button-audit.js"></script>
+    <!-- Named max-fidelity tiers (perf-max-tiers branch). Inert until an
+         explicit PerfTiers.apply(); drives the resolution/pressure controls,
+         so it must load after 05h-slider-bindings and 08a-quality-governor. -->
+    <script src="js/42-perf-tiers.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">
