@@ -198,24 +198,37 @@
     }
 
     // ── The run ──────────────────────────────────────────────────────
-    // opts: { frames, warmupFrames, paint }
+    // opts: { frames, warmupMs }
+    //
+    // The warmup is a CLOCK warmup, not a shader warmup, and it is the
+    // difference between a measurement and a coin flip. A discrete GPU
+    // idles at a low power state and takes seconds of sustained load to
+    // reach its boost clocks. MEASURED: six back-to-back profiles of an
+    // unchanging empty canvas drifted 2.795 -> 2.225 ms (-20%) while the
+    // app's fps climbed 125 -> 140, monotonically, as the card woke up.
+    // A frame-counted warmup of 20 frames is ~0.15s and covers none of
+    // that, which is how a density experiment came to report that
+    // painting made the frame FASTER: its "active" samples ran straight
+    // after five seconds of uncapped painting on a fully boosted GPU,
+    // and its "settled" samples after six seconds of near-idle.
+    // So: run uncapped for a fixed wall-clock stretch before recording,
+    // every time, whatever the caller was doing beforehand.
     function profile(opts) {
         opts = opts || {};
         var want = opts.frames || 30;
-        var warm = opts.warmupFrames != null ? opts.warmupFrames : 20;
+        var warmMs = opts.warmupMs != null ? opts.warmupMs : 3000;
         var raf = window.requestAnimationFrame.bind(window);
 
         stats = Object.create(null);
         frames = 0; dropped = 0;
-        var seen = 0;
+        var t0 = performance.now();
         var prevCap = window.fpsCap;
         window.fpsCap = 0;
 
         patch();
         return new Promise(function (resolve) {
             function tick() {
-                seen++;
-                if (seen === warm) recording = true;   // skip shader/FBO warmup
+                if (!recording && performance.now() - t0 >= warmMs) recording = true;
                 if (recording) { frames++; drain(); }
                 if (frames >= want) {
                     recording = false;
