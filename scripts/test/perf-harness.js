@@ -496,9 +496,21 @@
                 if (window.updateCanvasSize) window.updateCanvasSize();
             }
         }
-        if (window.QualityGovernor) window.QualityGovernor.setEnabled(false);
+        // QualityGovernor.setEnabled PERSISTS to settingsManager, so turning
+        // the ladder off for a run silently rewrites the user's saved
+        // preference — the exact trap stage.js documents ("a test stage may
+        // write config and window state freely, but must NEVER call an app
+        // setter that persists"). Stash the real value once per page and put
+        // it back through restore() at the end of the run.
+        if (window.QualityGovernor) {
+            if (window.__perfOrig === undefined) {
+                window.__perfOrig = { governor: window.QualityGovernor.getState().enabled };
+            }
+            window.QualityGovernor.setEnabled(false);
+        }
         return {
             pinned: true,
+            governorWas: window.__perfOrig ? window.__perfOrig.governor : null,
             wrapper: (function () { var w = document.getElementById('canvas-wrapper');
                                     return w ? w.clientWidth + 'x' + w.clientHeight : null; })(),
             canvas: (function () { var c = document.getElementById('canvas');
@@ -506,9 +518,21 @@
         };
     }
 
+    // Put back every PERSISTED setting a run disturbed. Call once at the end.
+    function restore() {
+        var out = { restored: false };
+        if (window.__perfOrig && window.QualityGovernor) {
+            window.QualityGovernor.setEnabled(!!window.__perfOrig.governor);
+            out.governor = window.QualityGovernor.getState().enabled;
+            out.restored = true;
+        }
+        return out;
+    }
+
     window.__perf = {
         probe: probe,
         pin: pin,
+        restore: restore,
         measure: measure,
         painterStop: painterStop,
         installed: true

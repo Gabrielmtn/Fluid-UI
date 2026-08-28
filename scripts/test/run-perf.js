@@ -254,6 +254,9 @@ async function main() {
     // person with a two-second boot and a scared GPU.
     await page.eval('window.PerfTiers.reset()');
     await page.eval('window.__perf.painterStop()');
+    // The governor toggle persists, so a run that left it off would rewrite
+    // the user's saved preference on its way out.
+    const restored = await page.eval('window.__perf.restore()');
 
     summary(rows, target, lastHolding, workloads);
 
@@ -267,6 +270,9 @@ async function main() {
         path.join(OUT_DIR, 'perf-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json');
     fs.writeFileSync(file, JSON.stringify(out, null, 2));
     console.log('  report → ' + path.relative(process.cwd(), file));
+    if (restored && restored.restored) {
+        console.log('  adaptive quality governor restored to ' + restored.governor);
+    }
     console.log('');
 
     page.close();
