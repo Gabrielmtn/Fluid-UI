@@ -1,0 +1,488 @@
+{
+  "generated": "node scripts/test/gen-shader-inventory.js",
+  "shaders": 38,
+  "collisionGroups": 2,
+  "table": {
+    "uTexture": {
+      "name": "blur",
+      "uniforms": [
+        "uTexture"
+      ],
+      "alts": [
+        {
+          "token": "0.29411764",
+          "name": "blur"
+        },
+        {
+          "token": "sum * 0.25",
+          "name": "glowBlur"
+        },
+        {
+          "token": "1.0 / 16.0",
+          "name": "photoSafeLuma"
+        }
+      ]
+    },
+    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kMode|kTwist|kZoom|kaleidoEnabled|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|segments|shadeGloss|shadeInvert|shadeRelief|shadeTexelSize|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uTexture": {
+      "name": "display",
+      "uniforms": [
+        "backgroundTransparency",
+        "displayShading",
+        "gateVibrance",
+        "gateWhite",
+        "glowEnabled",
+        "igniteVibrance",
+        "kAngle",
+        "kBlend",
+        "kMode",
+        "kTwist",
+        "kZoom",
+        "kaleidoEnabled",
+        "lightShiftCeiling",
+        "lightShiftColor",
+        "lightShiftDensity",
+        "lightShiftEnabled",
+        "lightShiftIntensity",
+        "lightShiftMode",
+        "lightShiftThreshold",
+        "maskOverlayOn",
+        "preserveOpacity",
+        "scatterEnabled",
+        "segments",
+        "shadeGloss",
+        "shadeInvert",
+        "shadeRelief",
+        "shadeTexelSize",
+        "texelSize",
+        "uGlow",
+        "uMaskOverlay",
+        "uRaster0",
+        "uRaster1",
+        "uRaster2",
+        "uRaster3",
+        "uRasterC0",
+        "uRasterC1",
+        "uRasterC2",
+        "uRasterC3",
+        "uRasterM0",
+        "uRasterM1",
+        "uRasterM2",
+        "uRasterM3",
+        "uRasterP0",
+        "uRasterP1",
+        "uRasterP2",
+        "uRasterP3",
+        "uScatter",
+        "uShadeForm",
+        "uTexture"
+      ]
+    },
+    "kernelScale|sharpness|texelSize|uTexture|uVelocity": {
+      "name": "sharpen",
+      "uniforms": [
+        "kernelScale",
+        "sharpness",
+        "texelSize",
+        "uTexture",
+        "uVelocity"
+      ]
+    },
+    "clarity|kernelScale|texelSize|uTexture|uVelocity|vibrance": {
+      "name": "microDetail",
+      "uniforms": [
+        "clarity",
+        "kernelScale",
+        "texelSize",
+        "uTexture",
+        "uVelocity",
+        "vibrance"
+      ]
+    },
+    "ambient|intensity|lightPos|texelSize|uTexture|uVelocity": {
+      "name": "lighting",
+      "uniforms": [
+        "ambient",
+        "intensity",
+        "lightPos",
+        "texelSize",
+        "uTexture",
+        "uVelocity"
+      ]
+    },
+    "aspectRatio|barHalfW|barPoint|color|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|velocityInfluence|velocityScale": {
+      "name": "splat",
+      "uniforms": [
+        "aspectRatio",
+        "barHalfW",
+        "barPoint",
+        "color",
+        "gateColor",
+        "gateFlow",
+        "hasObstacle",
+        "isVelocity",
+        "point",
+        "radius",
+        "ringRadius",
+        "ringSquash",
+        "stampAngle",
+        "stampAspect",
+        "stampNoise",
+        "stampSeed",
+        "stampShape",
+        "stampTexOn",
+        "stampTipOn",
+        "uObsMax",
+        "uObstacle",
+        "uStampTex",
+        "uTarget",
+        "velocityInfluence",
+        "velocityScale"
+      ]
+    },
+    "uDye": {
+      "name": "memRefresh",
+      "uniforms": [
+        "uDye"
+      ],
+      "alts": [
+        {
+          "token": "max(d.a",
+          "name": "memRefresh"
+        },
+        {
+          "token": "clamp(texture(uDye",
+          "name": "capture"
+        }
+      ]
+    },
+    "bloomCeiling|decayDt|dissipation|dt|edgeAbsorb|edgeAbsorbBand|frozen|hasObstacle|hfFloorDye|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelocity": {
+      "name": "advection",
+      "uniforms": [
+        "bloomCeiling",
+        "decayDt",
+        "dissipation",
+        "dt",
+        "edgeAbsorb",
+        "edgeAbsorbBand",
+        "frozen",
+        "hasObstacle",
+        "hfFloorDye",
+        "isDensity",
+        "macMode",
+        "memDiss",
+        "obsDrainDilate",
+        "obsDrainRate",
+        "obsFlowKeep",
+        "obstacleTexelSize",
+        "srcGate",
+        "srcTexelSize",
+        "texelSize",
+        "uObstacle",
+        "uRestore",
+        "uRestoreGain",
+        "uSource",
+        "uVelCap",
+        "uVelocity"
+      ]
+    },
+    "dt|hasObstacle|srcTexelSize|texelSize|uObstacle|uSource|uVelocity": {
+      "name": "macAdvect",
+      "uniforms": [
+        "dt",
+        "hasObstacle",
+        "srcTexelSize",
+        "texelSize",
+        "uObstacle",
+        "uSource",
+        "uVelocity"
+      ]
+    },
+    "deband|dt|hasObstacle|srcTexelSize|texelSize|uForward|uObstacle|uSource|uVelocity": {
+      "name": "macCorrect",
+      "uniforms": [
+        "deband",
+        "dt",
+        "hasObstacle",
+        "srcTexelSize",
+        "texelSize",
+        "uForward",
+        "uObstacle",
+        "uSource",
+        "uVelocity"
+      ]
+    },
+    "dryMul|dt|hasObstacle|srcTexelSize|texelSize|uObstacle|uSource|uVelocity": {
+      "name": "wetnessAdvect",
+      "uniforms": [
+        "dryMul",
+        "dt",
+        "hasObstacle",
+        "srcTexelSize",
+        "texelSize",
+        "uObstacle",
+        "uSource",
+        "uVelocity"
+      ]
+    },
+    "amount|aspectRatio|point|radius|uTarget": {
+      "name": "wetSplat",
+      "uniforms": [
+        "amount",
+        "aspectRatio",
+        "point",
+        "radius",
+        "uTarget"
+      ]
+    },
+    "hasObstacle|openBoundary|pScale|uObstacle|uVelocity": {
+      "name": "divergence",
+      "uniforms": [
+        "hasObstacle",
+        "openBoundary",
+        "pScale",
+        "uObstacle",
+        "uVelocity"
+      ]
+    },
+    "uVelocity": {
+      "name": "curl",
+      "uniforms": [
+        "uVelocity"
+      ]
+    },
+    "curl|dt|hasObstacle|uCapSpd|uCurl|uEdgeGate|uObsMax|uObstacle|uVelocity": {
+      "name": "vorticity",
+      "uniforms": [
+        "curl",
+        "dt",
+        "hasObstacle",
+        "uCapSpd",
+        "uCurl",
+        "uEdgeGate",
+        "uObsMax",
+        "uObstacle",
+        "uVelocity"
+      ]
+    },
+    "dt|uCapSpd|uDensity|uForce|uMaxDensity|uVelocity": {
+      "name": "ambientForce",
+      "uniforms": [
+        "dt",
+        "uCapSpd",
+        "uDensity",
+        "uForce",
+        "uMaxDensity",
+        "uVelocity"
+      ]
+    },
+    "aspectRatio|dt|uAtt|uCount|uDensity|uDensityGate|uForce|uKeep|uMaxDensity|uSwirl": {
+      "name": "attractor",
+      "uniforms": [
+        "aspectRatio",
+        "dt",
+        "uAtt",
+        "uCount",
+        "uDensity",
+        "uDensityGate",
+        "uForce",
+        "uKeep",
+        "uMaxDensity",
+        "uSwirl"
+      ]
+    },
+    "dt|hasObstacle|strength|texelSize|uObsMax|uObstacle|uVelocity": {
+      "name": "hfFloor",
+      "uniforms": [
+        "dt",
+        "hasObstacle",
+        "strength",
+        "texelSize",
+        "uObsMax",
+        "uObstacle",
+        "uVelocity"
+      ]
+    },
+    "covKnee|sourceRotation|sourceSkew|sourceTransform|strength|texelSize|uAspect|uObstacle|uSource": {
+      "name": "obstacleComposite",
+      "uniforms": [
+        "covKnee",
+        "sourceRotation",
+        "sourceSkew",
+        "sourceTransform",
+        "strength",
+        "texelSize",
+        "uAspect",
+        "uObstacle",
+        "uSource"
+      ]
+    },
+    "isErode|uTexture": {
+      "name": "morphObstacle",
+      "uniforms": [
+        "isErode",
+        "uTexture"
+      ]
+    },
+    "hSq|hasObstacle|relax|uDivergence|uObstacle|uPressure": {
+      "name": "pressure",
+      "uniforms": [
+        "hSq",
+        "hasObstacle",
+        "relax",
+        "uDivergence",
+        "uObstacle",
+        "uPressure"
+      ]
+    },
+    "hSq|hasObstacle|uDivergence|uObstacle|uPressure": {
+      "name": "mgResidual",
+      "uniforms": [
+        "hSq",
+        "hasObstacle",
+        "uDivergence",
+        "uObstacle",
+        "uPressure"
+      ]
+    },
+    "fineTexelSize|maxPool|uTexture": {
+      "name": "mgRestrict",
+      "uniforms": [
+        "fineTexelSize",
+        "maxPool",
+        "uTexture"
+      ]
+    },
+    "uCoarse|uPressure": {
+      "name": "mgProlong",
+      "uniforms": [
+        "uCoarse",
+        "uPressure"
+      ]
+    },
+    "hasObstacle|openBoundary|pScale|texelSize|uObstacle|uPressure|uVelocity": {
+      "name": "gradient",
+      "uniforms": [
+        "hasObstacle",
+        "openBoundary",
+        "pScale",
+        "texelSize",
+        "uObstacle",
+        "uPressure",
+        "uVelocity"
+      ]
+    },
+    "softClamp|uTexture|value": {
+      "name": "clear",
+      "uniforms": [
+        "softClamp",
+        "uTexture",
+        "value"
+      ]
+    },
+    "texelSize|uObsMax|uObstacle|uVelocity|wallSlip": {
+      "name": "obstacleDamp",
+      "uniforms": [
+        "texelSize",
+        "uObsMax",
+        "uObstacle",
+        "uVelocity",
+        "wallSlip"
+      ]
+    },
+    "aspectRatio|color|flow|hardness|point|radius|stampAngle|stampAspect|stampTexOn|uStampTex": {
+      "name": "rasterStamp",
+      "uniforms": [
+        "aspectRatio",
+        "color",
+        "flow",
+        "hardness",
+        "point",
+        "radius",
+        "stampAngle",
+        "stampAspect",
+        "stampTexOn",
+        "uStampTex"
+      ]
+    },
+    "gain|uDye|uSketch": {
+      "name": "ignite",
+      "uniforms": [
+        "gain",
+        "uDye",
+        "uSketch"
+      ]
+    },
+    "amount|gateColor|gateFlow|hasObstacle|toneCeil|toneWhite|uImage|uObsMax|uObstacle|uTarget": {
+      "name": "imageSplat",
+      "uniforms": [
+        "amount",
+        "gateColor",
+        "gateFlow",
+        "hasObstacle",
+        "toneCeil",
+        "toneWhite",
+        "uImage",
+        "uObsMax",
+        "uObstacle",
+        "uTarget"
+      ]
+    },
+    "curve|threshold|uTexture": {
+      "name": "glowPrefilter",
+      "uniforms": [
+        "curve",
+        "threshold",
+        "uTexture"
+      ]
+    },
+    "intensity|uTexture": {
+      "name": "glowFinal",
+      "uniforms": [
+        "intensity",
+        "uTexture"
+      ]
+    },
+    "aspect|blockStrength|decay|density|dispersion|hasObstacle|origin|uObsMax|uObstacle|uTexture|weight": {
+      "name": "scatter",
+      "uniforms": [
+        "aspect",
+        "blockStrength",
+        "decay",
+        "density",
+        "dispersion",
+        "hasObstacle",
+        "origin",
+        "uObsMax",
+        "uObstacle",
+        "uTexture",
+        "weight"
+      ]
+    },
+    "areaFrac|darkFloor|dt|flashDelta|pairWindow|rateAllow|redDelta|releaseTau|slew|uLumaCur|uLumaPrev|uStatsPrev": {
+      "name": "photoSafeStats",
+      "uniforms": [
+        "areaFrac",
+        "darkFloor",
+        "dt",
+        "flashDelta",
+        "pairWindow",
+        "rateAllow",
+        "redDelta",
+        "releaseTau",
+        "slew",
+        "uLumaCur",
+        "uLumaPrev",
+        "uStatsPrev"
+      ]
+    },
+    "dt|uCur|uHist|uStats": {
+      "name": "photoSafeComposite",
+      "uniforms": [
+        "dt",
+        "uCur",
+        "uHist",
+        "uStats"
+      ]
+    }
+  }
+}
