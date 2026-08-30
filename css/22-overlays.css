@@ -968,16 +968,16 @@ body.layer-transform-active #canvas-size-display {
     opacity: 0 !important;
 }
 
-/* ── Branding overlay arrange mode ── */
-#branding-arrange-canvas {
+/* ── Text overlay arrange mode ── */
+#text-arrange-canvas {
     /* sized/positioned inline; swallows pointer events so painting is paused */
 }
-#branding-arrange-bar {
+#text-arrange-bar {
     position: fixed;
     top: 14px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 10020; /* above #branding-arrange-canvas (10010) so Done stays clickable */
+    z-index: 10020; /* above #text-arrange-canvas (10010) so Done stays clickable */
     display: flex;
     align-items: center;
     gap: 12px;
@@ -990,44 +990,41 @@ body.layer-transform-active #canvas-size-display {
     font-size: 13px;
     pointer-events: auto;
 }
-#branding-arrange-bar .ba-title {
+#text-arrange-bar .ba-title {
     font-weight: 700;
     color: rgba(255, 130, 170, 0.95);
     white-space: nowrap;
 }
-#branding-arrange-bar .ba-hint {
+#text-arrange-bar .ba-hint {
     font-size: 11px;
     color: var(--text-secondary);
     white-space: nowrap;
 }
-#brandingArrangeDone {
+/* Layout only — the colour comes from data-group="expressive" on the bar
+   (css/01-buttons.css). It used to hardcode a green fill, which is exactly
+   the per-button hue the button system exists to remove. */
+#textArrangeDone {
     padding: 6px 14px;
     font-size: 12px;
     font-weight: 600;
-    border-radius: 6px;
-    cursor: pointer;
-    border: none;
-    background: rgba(80, 200, 120, 0.9);
-    color: white;
 }
-#brandingArrangeDone:hover { background: rgba(80, 200, 120, 1); }
 
 /* While arranging, dim the sim border chrome so the pink overlay handles read
    clearly, and — critically — make every other interactive layer in the
    canvas-area non-blocking so the arrange canvas is the sole click target.
    (#canvas-wrapper has no stacking context, so these would otherwise capture
    clicks above/around the overlays.) */
-body.branding-arrange-active #canvas-wrapper .resize-handle {
+body.text-arrange-active #canvas-wrapper .resize-handle {
     opacity: 0.12;
     pointer-events: none !important;
 }
-body.branding-arrange-active .layer-resize-handle,
-body.branding-arrange-active .background-layer,
-body.branding-arrange-active .background-layer.active,
-body.branding-arrange-active .background-layer.active.dragging {
+body.text-arrange-active .layer-resize-handle,
+body.text-arrange-active .background-layer,
+body.text-arrange-active .background-layer.active,
+body.text-arrange-active .background-layer.active.dragging {
     pointer-events: none !important;
 }
-body.branding-arrange-active #canvas-size-display {
+body.text-arrange-active #canvas-size-display {
     opacity: 0 !important;
 }
 /* ================================================================

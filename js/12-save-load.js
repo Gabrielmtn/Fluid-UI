@@ -638,7 +638,7 @@
     // ── User Presets System ──
 
     // opts.lookOnly (13.5 host settings lock): skip the heavy sections —
-    // layer/mask/branding/recording serialization does full-res GPU readbacks
+    // layer/mask/text/recording serialization does full-res GPU readbacks
     // and dataURL encodes, far too costly for the lock's periodic mirror
     // broadcasts (and the relay caps messages at 16KB anyway).
     function capturePresetSnapshot(opts) {
@@ -659,10 +659,12 @@
         SELECT_IDS.forEach(function(id) { var el = $(id); if (el && el.value !== undefined && el.value !== '') selects[id] = el.value; });
 
         // ── Colors ──
+        // Text-overlay colour is NOT here: it lives per overlay in `textOverlays`
+        // below. The Text panel's picker edits the SELECTED overlay, so restoring
+        // a global value into it would repaint whatever happened to be selected.
         var colors = {
             background: valEl('backgroundColorPicker') || '#000000',
-            brush: valEl('colorPicker') || '#ffffff',
-            brandingText: valEl('brandingTextColor') || '#ffffff'
+            brush: valEl('colorPicker') || '#ffffff'
         };
 
         // ── Kaleidoscope runtime ──
@@ -887,22 +889,19 @@
             }
         } catch(_){}
 
-        // ── Branding overlays ──
-        var brandingData = null;
+        // ── Text overlays ──
+        // Whole-overlay copy minus the id. The field list used to be written out
+        // by hand (text/position/size/url/imageDataURL) and named nothing the
+        // module actually stores, so presets round-tripped empty overlays.
+        var textOverlayData = null;
         try {
-            if (!lookOnly && window.brandingOverlays && window.brandingOverlays.getAll) {
-                var all = window.brandingOverlays.getAll();
+            if (!lookOnly && window.textOverlays && window.textOverlays.getAll) {
+                var all = window.textOverlays.getAll();
                 if (all.length > 0) {
-                    brandingData = all.map(function(ov) {
-                        return {
-                            type: ov.type,
-                            text: ov.text,
-                            position: ov.position,
-                            color: ov.color,
-                            size: ov.size,
-                            url: ov.url,
-                            imageDataURL: ov.imageDataURL || null
-                        };
+                    textOverlayData = all.map(function(ov) {
+                        var copy = {};
+                        for (var k in ov) if (ov.hasOwnProperty(k) && k !== 'id') copy[k] = ov[k];
+                        return copy;
                     });
                 }
             }
@@ -983,7 +982,7 @@
             layers: layersData,
             layerOrder: layerOrderData,
             masks: masksData,
-            branding: brandingData,
+            textOverlays: textOverlayData,
             recordedLayers: recordedLayers,
             cosOscillator: cosState,
             pathLayers: pathLayersData,
@@ -1094,7 +1093,6 @@
             if (snapshot.colors) {
                 if (snapshot.colors.background) setVal('backgroundColorPicker', snapshot.colors.background, 'input');
                 if (snapshot.colors.brush) setVal('colorPicker', snapshot.colors.brush, 'input');
-                if (snapshot.colors.brandingText) setVal('brandingTextColor', snapshot.colors.brandingText, 'input');
             }
         } catch(e) { console.warn('[Preset] color restore failed:', e); }
 
@@ -1663,16 +1661,21 @@
             }
         } catch(e) { console.warn('Preset: mask restore failed', e); }
 
-        // ── Branding overlays ──
+        // ── Text overlays ──
+        // `branding` is the pre-2026-08-28 field name; anything in it that is not
+        // a text overlay was a logo or QR code, which the module no longer has.
         try {
-            if (snapshot.branding && Array.isArray(snapshot.branding) && window.brandingOverlays) {
-                if (window.brandingOverlays.clearAll) window.brandingOverlays.clearAll();
-                snapshot.branding.forEach(function(ov) {
-                    if (ov.type === 'text' && window.brandingOverlays.addText) {
-                        window.brandingOverlays.addText(ov.text, ov.position, ov.color, ov.size);
-                    } else if (ov.type === 'image' && ov.imageDataURL && window.brandingOverlays.addImageFromDataURL) {
-                        window.brandingOverlays.addImageFromDataURL(ov.imageDataURL, ov.position);
-                    }
+            var savedText = snapshot.textOverlays || snapshot.branding;
+            if (Array.isArray(savedText) && window.textOverlays) {
+                window.textOverlays.clearAll();
+                savedText.forEach(function(ov) {
+                    if (!ov || (ov.type && ov.type !== 'text')) return;
+                    var opts = {};
+                    for (var k in ov) if (ov.hasOwnProperty(k) && k !== 'id') opts[k] = ov[k];
+                    // The legacy shape carried the string on `text`, not `content`.
+                    if (opts.content === undefined && ov.text) opts.content = ov.text;
+                    if (opts.fontSize === undefined && ov.size) opts.fontSize = ov.size;
+                    window.textOverlays.add(opts);
                 });
             }
         } catch(_){}
@@ -1766,7 +1769,7 @@
     // Deliberately NOT part of a look, so never baselined:
     //  - machine/workflow-local keys (resolutions, fps cap, recording,
     //    stats, autoload) — a preset is a look, not a machine profile
-    //  - content (layers, masks, branding, recordings) and libraries
+    //  - content (layers, masks, text, recordings) and libraries
     //    (savedColors, userPalettes)
     // The multiplayer look mirror keeps using plain applyPresetSnapshot:
     // its snapshots are intentionally partial (size shedding), and filling
@@ -1778,7 +1781,7 @@
     function baselineLookSnapshot() {
         var base = {
             sliders: {}, checkboxes: {}, selects: {},
-            colors: { background: '#000000', brush: '#ffffff', brandingText: '#ffffff' },
+            colors: { background: '#000000', brush: '#ffffff' },
             kaleido: { mode: 1, segments: 12, angle: 0, twist: 0, zoom: 1, blend: 1 },
             paletteIndex: 0,
             armColors: [{ mode: 'main', color: '#ffffff', stepIndex: 0, push: false }],

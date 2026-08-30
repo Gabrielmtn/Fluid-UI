@@ -1640,7 +1640,7 @@
         sidebar.appendChild(buildAnimationsSection(controls));
         sidebar.appendChild(buildAudioSection());
         sidebar.appendChild(buildKaleidoscopeSection(controls));
-        sidebar.appendChild(buildBrandingSection());
+        sidebar.appendChild(buildTextSection());
 
         sidebar.appendChild(buildFocusSection());
         sidebar.appendChild(buildDisplaySection(controls));
@@ -4417,226 +4417,589 @@
     }
 
 
-    // \u2500\u2500 Branding panel (redesigned): create overlays + arrange (select/drag/
-    //    resize/rotate) via window.brandingOverlays. Replaces the old preset-only
-    //    panel (buildBrandingSection_OLD_UNUSED deleted 2026-07-09; git history has it). \u2500\u2500
-    function buildBrandingSection() {
-        const { sec, body } = makeSection('Branding', 'expressive', true);
+    // ── Text panel: free-positioned type over the canvas, driven by
+    //    window.textOverlays. Was "Branding" until 2026-08-28 — it carried logo
+    //    images and QR codes, which made it a social-media kit rather than a
+    //    text tool. Those overlay types are gone; in their place is a proper
+    //    typographic control set (family, weight, size, tracking, leading,
+    //    case, alignment, text + background colour) that edits the SELECTED
+    //    overlay live, the way any type tool works. ──
+    function buildTextSection() {
+        const { sec, body } = makeSection('Text', 'expressive', true);
 
-        function api() { return window.brandingOverlays; }
+        function api() { return window.textOverlays; }
+        function selId() { var a = api(); return a ? a.getSelectedId() : null; }
 
-        // \u2500\u2500 Arrange toggle (the headline feature) \u2500\u2500
+        // Style of whatever is currently in the editor, so "+ Add Text" makes
+        // another one like it rather than resetting to the module defaults —
+        // seeded on select (below) as well as on every edit, or selecting an
+        // existing line and adding would jump back to 48px system bold.
+        var lastStyle = {};
+        function rememberStyle(ov) {
+            var d = api() ? api().DEFAULTS : null;
+            if (!d || !ov) return;
+            for (var k in d) if (d.hasOwnProperty(k) && k !== 'content') lastStyle[k] = ov[k];
+        }
+        // Set while WE are the origin of a change: the module fires onChange on
+        // every update, and re-filling the controls mid-keystroke would move the
+        // caret to the end of the textarea.
+        var suppressSync = false;
+
+        var FIELD = 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);' +
+                    'color:#e6edf3;border-radius:4px;font-size:11px;padding:3px 5px;';
+
+        function rowEl(mb) {
+            var d = document.createElement('div');
+            d.style.cssText = 'display:flex;align-items:flex-end;gap:5px;margin-bottom:' + (mb === undefined ? 6 : mb) + 'px;';
+            return d;
+        }
+
+        // A control with a small caption above it — the sidebar is too narrow
+        // for inline labels once there are three fields on a line.
+        function field(caption, control, flex) {
+            var w = document.createElement('div');
+            w.style.cssText = 'flex:' + (flex || '1 1 0') + ';min-width:0;';
+            if (caption) {
+                var l = document.createElement('div');
+                l.style.cssText = 'font-size:9px;letter-spacing:0.05em;text-transform:uppercase;' +
+                                  'color:rgba(255,255,255,0.4);margin-bottom:2px;white-space:nowrap;';
+                l.textContent = caption;
+                w.appendChild(l);
+            }
+            w.appendChild(control);
+            return w;
+        }
+
+        function numInput(id, min, max, step, title, onCommit) {
+            var i = document.createElement('input');
+            i.type = 'number'; i.id = id; i.min = String(min); i.max = String(max);
+            i.step = String(step); i.title = title;
+            i.style.cssText = FIELD + 'width:100%;text-align:center;';
+            i.addEventListener('input', function () {
+                var v = parseFloat(i.value);
+                if (isNaN(v)) return;
+                onCommit(Math.max(min, Math.min(max, v)));
+            });
+            i.addEventListener('keydown', function (e) { e.stopPropagation(); });
+            return i;
+        }
+
+        function selectInput(id, options, title, onCommit) {
+            var s = document.createElement('select');
+            s.id = id; s.title = title;
+            s.style.cssText = FIELD + 'width:100%;';
+            options.forEach(function (o) {
+                var opt = document.createElement('option');
+                opt.value = o[0]; opt.textContent = o[1];
+                s.appendChild(opt);
+            });
+            s.addEventListener('change', function () { onCommit(s.value); });
+            return s;
+        }
+
+        function colorInput(id, title, onCommit) {
+            var c = document.createElement('input');
+            c.type = 'color'; c.id = id; c.title = title;
+            c.style.cssText = 'width:100%;height:22px;padding:0;border:1px solid rgba(255,255,255,0.12);' +
+                              'border-radius:4px;background:transparent;cursor:pointer;';
+            c.addEventListener('input', function () { onCommit(c.value); });
+            return c;
+        }
+
+        function slider(id, caption, min, max, step, fmt, onCommit) {
+            var g = document.createElement('div');
+            g.className = 'control-group';
+            var lbl = document.createElement('label');
+            lbl.setAttribute('for', id);
+            lbl.innerHTML = caption + ' <span class="value-display" id="' + id + 'Value"></span>';
+            var s = document.createElement('input');
+            s.type = 'range'; s.id = id;
+            s.min = String(min); s.max = String(max); s.step = String(step);
+            var disp = lbl.querySelector('.value-display');
+            s.addEventListener('input', function () {
+                var v = parseFloat(s.value);
+                disp.textContent = fmt(v);
+                onCommit(v);
+            });
+            g.appendChild(lbl); g.appendChild(s);
+            g.setValue = function (v) { s.value = String(v); disp.textContent = fmt(v); };
+            return g;
+        }
+
+        function checkboxRow(id, caption, onCommit) {
+            var g = document.createElement('div');
+            g.className = 'control-group checkbox-group';
+            var l = document.createElement('label');
+            l.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;';
+            var c = document.createElement('input');
+            c.type = 'checkbox'; c.id = id;
+            c.addEventListener('change', function () { onCommit(c.checked); });
+            var t = document.createElement('span');
+            t.textContent = caption;
+            l.appendChild(c); l.appendChild(t);
+            g.appendChild(l);
+            g.input = c;
+            return g;
+        }
+
+        // Writes to the selected overlay and remembers the style for the next add.
+        function commit(props) {
+            var a = api(); if (!a) return;
+            for (var k in props) {
+                if (props.hasOwnProperty(k) && k !== 'content') lastStyle[k] = props[k];
+            }
+            var id = selId();
+            if (id == null) return;
+            suppressSync = true;
+            try { a.update(id, props); } finally { suppressSync = false; }
+            refreshList();
+        }
+
+        // ─── Add + arrange ───────────────────────────────────────
+        var addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'btn--emphasis';
+        addBtn.textContent = '+ Add Text';
+        addBtn.style.cssText = 'width:100%;margin-bottom:4px;cursor:pointer;';
+        body.appendChild(addBtn);
+
         var arrangeBtn = document.createElement('button');
         arrangeBtn.type = 'button';
-        arrangeBtn.className = 'branding-arrange-btn';
         arrangeBtn.style.cssText = 'width:100%;margin-bottom:4px;cursor:pointer;';
         body.appendChild(arrangeBtn);
 
         var arrangeHint = document.createElement('div');
         arrangeHint.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.35);margin:0 0 10px;text-align:center;line-height:1.35;';
-        arrangeHint.textContent = 'Drag overlays on the canvas to move; corners resize, top handle rotates. Painting pauses while arranging.';
+        arrangeHint.textContent = 'Drag text on the canvas to move; corners resize, top handle rotates. Painting pauses while arranging.';
         body.appendChild(arrangeHint);
 
         function syncArrangeBtn() {
             var on = !!(api() && api().isArranging());
-            arrangeBtn.textContent = on ? 'Done Arranging' : 'Arrange Overlays';
+            arrangeBtn.textContent = on ? 'Done Arranging' : 'Arrange on Canvas';
             arrangeBtn.classList.toggle('active', on);
         }
         arrangeBtn.addEventListener('click', function () {
             var a = api(); if (!a) return;
-            if (a.isArranging()) a.closeArrange(); else a.openArrange();
+            if (a.isArranging()) a.closeArrange(); else a.openArrange(selId());
             syncArrangeBtn();
         });
 
-        // \u2500\u2500 Add: Text \u2500\u2500
-        var textLabel = document.createElement('label');
-        textLabel.className = 'brush-section-label';
-        textLabel.textContent = 'Text Overlay';
-        body.appendChild(textLabel);
+        // ─── The list of text items ──────────────────────────────
+        var listEl = document.createElement('div');
+        listEl.id = 'textOverlayList';
+        listEl.style.cssText = 'max-height:130px;overflow-y:auto;margin-bottom:8px;';
+        body.appendChild(listEl);
 
-        var textRow = document.createElement('div');
-        textRow.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
-        var textInput = document.createElement('input');
-        textInput.type = 'text';
-        textInput.id = 'brandingTextInput';
-        textInput.placeholder = '@yourhandle';
-        textInput.style.cssText = 'flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;padding:4px 6px;border-radius:3px;font-size:11px;';
-        var colorPick = document.createElement('input');
-        colorPick.type = 'color';
-        colorPick.value = '#ffffff';
-        colorPick.id = 'brandingTextColor';
-        colorPick.title = 'Text colour';
-        colorPick.style.cssText = 'width:26px;height:24px;border:none;padding:0;cursor:pointer;background:transparent;flex:none;';
-        var sizeInput = document.createElement('input');
-        sizeInput.type = 'number';
-        sizeInput.id = 'brandingTextSize';
-        sizeInput.value = '24'; sizeInput.min = '8'; sizeInput.max = '200';
-        sizeInput.title = 'Font size';
-        sizeInput.style.cssText = 'width:38px;height:24px;font-size:10px;text-align:center;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;border-radius:3px;flex:none;';
-        var textAddBtn = document.createElement('button');
-        textAddBtn.type = 'button';
-        textAddBtn.textContent = '+ Add';
-        textAddBtn.style.cssText = 'cursor:pointer;flex:none;';
-        textRow.appendChild(textInput);
-        textRow.appendChild(colorPick);
-        textRow.appendChild(sizeInput);
-        textRow.appendChild(textAddBtn);
-        body.appendChild(textRow);
-
-        var quickRow = document.createElement('div');
-        quickRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;';
-        ['\ud83d\udd34 LIVE', 'Follow me!', 'Link in bio', '\u2764\ufe0f + \ud83d\udc4d'].forEach(function (text) {
+        function mkRowBtn(txt, title, cls, fn) {
             var b = document.createElement('button');
             b.type = 'button';
-            b.textContent = text;
-            b.style.cssText = 'cursor:pointer;';
-            b.addEventListener('click', function () { textInput.value = text; textInput.focus(); });
-            quickRow.appendChild(b);
-        });
-        body.appendChild(quickRow);
-
-        // \u2500\u2500 Add: Logo / Image \u2500\u2500
-        var imgLabel = document.createElement('label');
-        imgLabel.className = 'brush-section-label';
-        imgLabel.textContent = 'Logo / Image';
-        body.appendChild(imgLabel);
-        var imgUploadBtn = document.createElement('button');
-        imgUploadBtn.type = 'button';
-        imgUploadBtn.textContent = 'Upload Logo';
-        imgUploadBtn.style.cssText = 'width:100%;margin-bottom:10px;cursor:pointer;';
-        var imgFileInput = document.createElement('input');
-        imgFileInput.type = 'file';
-        imgFileInput.accept = 'image/png,image/svg+xml,image/jpeg,image/webp';
-        imgFileInput.style.display = 'none';
-        body.appendChild(imgUploadBtn);
-        body.appendChild(imgFileInput);
-
-        // \u2500\u2500 Add: QR \u2500\u2500
-        var qrLabel = document.createElement('label');
-        qrLabel.className = 'brush-section-label';
-        qrLabel.textContent = 'QR Code';
-        body.appendChild(qrLabel);
-        var qrRow = document.createElement('div');
-        qrRow.style.cssText = 'display:flex;gap:4px;margin-bottom:10px;';
-        var qrInput = document.createElement('input');
-        qrInput.type = 'text';
-        qrInput.placeholder = 'https://your-link.example';
-        qrInput.style.cssText = 'flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;padding:4px 6px;border-radius:3px;font-size:10px;';
-        var qrAddBtn = document.createElement('button');
-        qrAddBtn.type = 'button';
-        qrAddBtn.textContent = '+ QR';
-        qrAddBtn.style.cssText = 'cursor:pointer;flex:none;';
-        qrRow.appendChild(qrInput);
-        qrRow.appendChild(qrAddBtn);
-        body.appendChild(qrRow);
-
-        // \u2500\u2500 Active Overlays list \u2500\u2500
-        var listLabel = document.createElement('label');
-        listLabel.className = 'brush-section-label';
-        listLabel.textContent = 'Active Overlays';
-        body.appendChild(listLabel);
-        var overlayList = document.createElement('div');
-        overlayList.id = 'brandingOverlayList';
-        overlayList.style.cssText = 'max-height:170px;overflow-y:auto;margin-bottom:6px;';
-        body.appendChild(overlayList);
-
-        var clearBtn = document.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.className = 'btn--destructive';
-        clearBtn.textContent = 'Clear All';
-        clearBtn.style.cssText = 'width:100%;cursor:pointer;';
-        body.appendChild(clearBtn);
-
-        function mkRowBtn(txt, title, fn) {
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'btn--ghost';
+            b.className = cls;
             b.textContent = txt;
             b.title = title;
-            b.style.cssText = 'cursor:pointer;flex:none;';
+            b.style.cssText = 'flex:none;padding:2px 6px;font-size:11px;line-height:1;cursor:pointer;';
             b.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
             return b;
         }
 
         function refreshList() {
             var a = api();
-            overlayList.innerHTML = '';
+            listEl.innerHTML = '';
             if (!a) return;
             var all = a.getAll();
             if (!all.length) {
-                overlayList.innerHTML = '<div style="font-size:9px;color:rgba(255,255,255,0.3);text-align:center;padding:8px;">No overlays yet \u2014 add one above</div>';
+                listEl.innerHTML = '<div style="font-size:9px;color:rgba(255,255,255,0.3);' +
+                    'text-align:center;padding:8px;">No text yet — add some above</div>';
                 return;
             }
-            var selId = a.getSelectedId();
+            var sid = a.getSelectedId();
             all.forEach(function (ov) {
-                var isSel = ov.id === selId;
+                var isSel = ov.id === sid;
                 var row = document.createElement('div');
-                row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px;border-radius:3px;cursor:pointer;border:1px solid ' + (isSel ? 'rgba(255,130,170,0.5)' : 'transparent') + ';background:' + (isSel ? 'rgba(255,130,170,0.12)' : 'transparent') + ';';
+                row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:3px 4px;border-radius:3px;' +
+                    'cursor:pointer;border:1px solid ' + (isSel ? 'rgba(255,130,170,0.5)' : 'transparent') +
+                    ';background:' + (isSel ? 'rgba(255,130,170,0.12)' : 'transparent') + ';';
 
-                var icon = ov.type === 'text' ? '\u2709' : ov.type === 'image' ? '\ud83d\uddbc' : '\ud83d\udcf1';
-                var desc = ov.type === 'text' ? ov.content : ov.type === 'image' ? 'Logo' : ov.url;
+                var first = String(ov.content || '').split('\n')[0];
                 var label = document.createElement('span');
-                label.style.cssText = 'flex:1;min-width:0;font-size:10px;color:rgba(255,255,255,' + (ov.visible ? '0.75' : '0.35') + ');overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-                label.textContent = icon + ' ' + desc;
+                label.style.cssText = 'flex:1;min-width:0;font-size:11px;color:rgba(255,255,255,' +
+                    (ov.visible ? '0.8' : '0.35') + ');overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                label.style.fontFamily = ov.fontFamily;   // the row previews its own face
+                label.textContent = first || '(empty)';
 
-                row.addEventListener('click', function () {
-                    a.openArrange(ov.id);
-                    syncArrangeBtn();
-                    refreshList();
-                });
-
-                var moveBtn = mkRowBtn('\u2725', 'Arrange / move', function () { a.openArrange(ov.id); syncArrangeBtn(); refreshList(); });
-                var toggleBtn = mkRowBtn(ov.visible ? '\ud83d\udc41' : '\ud83d\ude48', 'Toggle visibility', function () { a.toggle(ov.id); refreshList(); });
-                var rmBtn = mkRowBtn('\u00d7', 'Remove', function () { a.remove(ov.id); refreshList(); });
-                rmBtn.style.color = 'rgba(255,90,90,0.85)';
-                rmBtn.style.fontWeight = 'bold';
-                rmBtn.style.fontSize = '14px';
+                row.addEventListener('click', function () { a.select(ov.id); });
 
                 row.appendChild(label);
-                row.appendChild(moveBtn);
-                row.appendChild(toggleBtn);
-                row.appendChild(rmBtn);
-                overlayList.appendChild(row);
+                row.appendChild(mkRowBtn('✥', 'Arrange on canvas', 'btn--ghost', function () {
+                    a.select(ov.id); a.openArrange(ov.id); syncArrangeBtn();
+                }));
+                row.appendChild(mkRowBtn(ov.visible ? '👁' : '🙈', 'Show / hide', 'btn--ghost', function () {
+                    a.toggle(ov.id);
+                }));
+                row.appendChild(mkRowBtn('×', 'Delete', 'btn--destructive', function () { a.remove(ov.id); }));
+                listEl.appendChild(row);
             });
         }
 
-        // \u2500\u2500 Wire creation \u2500\u2500
-        function addText() {
-            var t = textInput.value.trim();
-            if (!t) { textInput.focus(); return; }
-            var a = api(); if (!a) return;
-            a.addText({ content: t, color: colorPick.value, fontSize: parseInt(sizeInput.value, 10) || 24 });
-            textInput.value = '';
-            refreshList();
+        // ─── Editor for the selected item ────────────────────────
+        var emptyNote = document.createElement('div');
+        emptyNote.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.3);text-align:center;padding:6px 0 10px;line-height:1.4;';
+        emptyNote.textContent = 'Select a line above to edit its type.';
+        body.appendChild(emptyNote);
+
+        var editor = document.createElement('div');
+        editor.style.display = 'none';
+        body.appendChild(editor);
+
+        // Content
+        var contentInput = document.createElement('textarea');
+        contentInput.id = 'textOverlayContent';
+        contentInput.rows = 2;
+        contentInput.placeholder = 'Your text — Enter starts a new line';
+        contentInput.style.cssText = FIELD + 'width:100%;box-sizing:border-box;resize:vertical;' +
+                                     'font-size:12px;line-height:1.4;margin-bottom:8px;';
+        contentInput.addEventListener('input', function () { commit({ content: contentInput.value }); });
+        contentInput.addEventListener('keydown', function (e) { e.stopPropagation(); });
+        editor.appendChild(contentInput);
+
+        // Font family
+        var fontSel = document.createElement('select');
+        fontSel.id = 'textOverlayFont';
+        fontSel.style.cssText = FIELD + 'width:100%;';
+        fontSel.addEventListener('change', function () {
+            fontPreview.style.fontFamily = fontSel.value;
+            commit({ fontFamily: fontSel.value });
+        });
+        editor.appendChild(field('Font', fontSel));
+
+        var fontPreview = document.createElement('div');
+        fontPreview.style.cssText = 'font-size:17px;line-height:1.4;padding:3px 6px;margin:4px 0 6px;' +
+            'border-radius:4px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.85);' +
+            'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        fontPreview.textContent = 'Aa Bb Cc 123';
+        editor.appendChild(fontPreview);
+
+        var fontsBuilt = false;
+        function buildFontOptions() {
+            var a = api();
+            if (!a || fontsBuilt) return;
+            fontsBuilt = true;
+            var groups = {}, order = [];
+            a.FONTS.forEach(function (f) {
+                if (f.probe && !a.fontAvailable(f.probe)) return;   // don't offer silent Arial fallbacks
+                if (!groups[f.group]) { groups[f.group] = []; order.push(f.group); }
+                groups[f.group].push(f);
+            });
+            order.forEach(function (g) {
+                var og = document.createElement('optgroup');
+                og.label = g;
+                groups[g].forEach(function (f) {
+                    var o = document.createElement('option');
+                    o.value = f.css;
+                    o.textContent = f.label;
+                    o.style.fontFamily = f.css;    // the menu previews each face
+                    og.appendChild(o);
+                });
+                fontSel.appendChild(og);
+            });
         }
-        textAddBtn.addEventListener('click', addText);
-        textInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') addText(); e.stopPropagation(); });
 
-        imgUploadBtn.addEventListener('click', function () { imgFileInput.click(); });
-        imgFileInput.addEventListener('change', function (e) {
-            var file = e.target.files && e.target.files[0];
-            if (!file) return;
-            var reader = new FileReader();
-            reader.onload = function (ev) { var a = api(); if (a) { a.addImage({ src: ev.target.result }); refreshList(); } };
-            reader.readAsDataURL(file);
-            imgFileInput.value = '';
+        function ensureFontOption(css, label) {
+            if (!css) return;
+            for (var i = 0; i < fontSel.options.length; i++) {
+                if (fontSel.options[i].value === css) return;
+            }
+            var og = fontSel.querySelector('optgroup[data-installed]');
+            if (!og) {
+                og = document.createElement('optgroup');
+                og.label = 'Installed';
+                og.setAttribute('data-installed', '1');
+                fontSel.appendChild(og);
+            }
+            var o = document.createElement('option');
+            o.value = css;
+            o.textContent = label || css.split(',')[0].replace(/['"]/g, '');
+            o.style.fontFamily = css;
+            og.appendChild(o);
+        }
+
+        // Everything the machine has, not just the curated stacks. Chromium
+        // gates queryLocalFonts behind a permission prompt that needs a user
+        // gesture, which is why this is a button and not a boot-time scan.
+        if (typeof window.queryLocalFonts === 'function') {
+            var sysBtn = document.createElement('button');
+            sysBtn.type = 'button';
+            sysBtn.className = 'btn--ghost';
+            sysBtn.textContent = '+ Fonts installed on this computer';
+            sysBtn.style.cssText = 'width:100%;margin-bottom:8px;cursor:pointer;font-size:10px;';
+            sysBtn.addEventListener('click', function () {
+                window.queryLocalFonts().then(function (list) {
+                    var seen = {}, n = 0;
+                    list.forEach(function (f) {
+                        if (!f.family || seen[f.family]) return;
+                        seen[f.family] = 1; n++;
+                        ensureFontOption("'" + f.family + "'", f.family);
+                    });
+                    sysBtn.textContent = n + ' installed fonts added';
+                    sysBtn.disabled = true;
+                }).catch(function () {
+                    sysBtn.textContent = 'Font access not permitted';
+                });
+            });
+            editor.appendChild(sysBtn);
+        }
+
+        // Size / weight / italic
+        var sizeInput = numInput('textOverlaySize', 6, 400, 1, 'Font size in pixels',
+            function (v) { commit({ fontSize: v }); });
+        var weightSel = selectInput('textOverlayWeight', [
+            ['100', 'Thin'], ['200', 'Extra Light'], ['300', 'Light'], ['400', 'Regular'],
+            ['500', 'Medium'], ['600', 'Semi Bold'], ['700', 'Bold'], ['800', 'Extra Bold'], ['900', 'Black']
+        ], 'Font weight', function (v) { commit({ fontWeight: v }); });
+        var italicBtn = document.createElement('button');
+        italicBtn.type = 'button';
+        italicBtn.title = 'Italic';
+        italicBtn.textContent = 'I';
+        italicBtn.style.cssText = 'width:26px;padding:3px 0;font-style:italic;font-weight:700;cursor:pointer;';
+        italicBtn.addEventListener('click', function () {
+            var on = !italicBtn.classList.contains('active');
+            italicBtn.classList.toggle('active', on);
+            commit({ fontStyle: on ? 'italic' : 'normal' });
         });
 
-        qrAddBtn.addEventListener('click', function () {
-            var url = qrInput.value.trim();
-            if (!url) { qrInput.focus(); return; }
-            var a = api(); if (a) { a.addQR({ url: url }); qrInput.value = ''; refreshList(); }
+        var swRow = rowEl();
+        swRow.appendChild(field('Size', sizeInput, '0 0 54px'));
+        swRow.appendChild(field('Weight', weightSel));
+        swRow.appendChild(field('', italicBtn, '0 0 26px'));
+        editor.appendChild(swRow);
+
+        // Alignment + case
+        function alignSvg(kind) {
+            var widths = [1, 0.62, 1, 0.62];
+            var out = '';
+            for (var i = 0; i < 4; i++) {
+                var w = 12 * widths[i];
+                var x = kind === 'left' ? 1 : kind === 'right' ? 13 - w : 7 - w / 2;
+                out += '<rect x="' + x.toFixed(2) + '" y="' + (1.7 + i * 3) + '" width="' + w.toFixed(2) +
+                       '" height="1.6" rx="0.8" fill="currentColor"/>';
+            }
+            return '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">' + out + '</svg>';
+        }
+
+        var alignBtns = {};
+        var alignGroup = document.createElement('div');
+        alignGroup.style.cssText = 'display:flex;gap:3px;';
+        ['left', 'center', 'right'].forEach(function (k) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.title = 'Align ' + k;
+            b.innerHTML = alignSvg(k);
+            b.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;padding:3px 0;cursor:pointer;';
+            b.addEventListener('click', function () { setAlignActive(k); commit({ align: k }); });
+            alignBtns[k] = b;
+            alignGroup.appendChild(b);
         });
-        qrInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') qrAddBtn.click(); e.stopPropagation(); });
+        function setAlignActive(k) {
+            Object.keys(alignBtns).forEach(function (key) {
+                alignBtns[key].classList.toggle('active', key === (k || 'center'));
+            });
+        }
 
-        clearBtn.addEventListener('click', function () { var a = api(); if (a) { a.clearAll(); refreshList(); } });
+        var caseSel = selectInput('textOverlayCase', [
+            ['none', 'As typed'], ['upper', 'UPPERCASE'], ['lower', 'lowercase'], ['title', 'Title Case']
+        ], 'Letter case', function (v) { commit({ textCase: v }); });
 
-        // \u2500\u2500 Init + subscribe to overlay changes (drag updates the list highlight) \u2500\u2500
+        var acRow = rowEl();
+        acRow.appendChild(field('Align', alignGroup, '0 0 96px'));
+        acRow.appendChild(field('Case', caseSel));
+        editor.appendChild(acRow);
+
+        // Tracking / leading / opacity
+        var trackSlider = slider('textOverlayTracking', 'Letter Spacing', -6, 30, 0.5,
+            function (v) { return v.toFixed(1) + ' px'; },
+            function (v) { commit({ letterSpacing: v }); });
+        editor.appendChild(trackSlider);
+
+        var leadSlider = slider('textOverlayLeading', 'Line Height', 0.7, 3, 0.05,
+            function (v) { return v.toFixed(2); },
+            function (v) { commit({ lineHeight: v }); });
+        editor.appendChild(leadSlider);
+
+        var opacitySlider = slider('textOverlayOpacity', 'Opacity', 0.05, 1, 0.05,
+            function (v) { return Math.round(v * 100) + '%'; },
+            function (v) { commit({ opacity: v }); });
+        editor.appendChild(opacitySlider);
+
+        // Colours
+        var colorPick = colorInput('textOverlayColor', 'Text colour', function (v) { commit({ color: v }); });
+        var bgColorPick = colorInput('textOverlayBgColor', 'Background colour', function (v) { commit({ bgColor: v }); });
+
+        var bgToggle = document.createElement('input');
+        bgToggle.type = 'checkbox';
+        bgToggle.id = 'textOverlayBgToggle';
+        bgToggle.title = 'Draw a filled box behind the text';
+        bgToggle.style.cssText = 'margin:0;flex:none;cursor:pointer;';
+        bgToggle.addEventListener('change', function () {
+            commit({ bgEnabled: bgToggle.checked });
+            syncBgEnabled();
+            syncColliderHint();
+        });
+
+        // The switch lives under the Background caption with its swatch, not in
+        // a column of its own — on its own it reads as an unlabelled checkbox.
+        var bgWrap = document.createElement('div');
+        bgWrap.style.cssText = 'display:flex;align-items:center;gap:5px;';
+        bgColorPick.style.flex = '1';
+        bgWrap.appendChild(bgToggle);
+        bgWrap.appendChild(bgColorPick);
+
+        var colorRow = rowEl();
+        colorRow.appendChild(field('Text', colorPick));
+        colorRow.appendChild(field('Background', bgWrap));
+        editor.appendChild(colorRow);
+
+        var bgOpacitySlider = slider('textOverlayBgOpacity', 'Background Opacity', 0, 1, 0.05,
+            function (v) { return Math.round(v * 100) + '%'; },
+            function (v) { commit({ bgOpacity: v }); });
+        editor.appendChild(bgOpacitySlider);
+
+        var padInput = numInput('textOverlayPadding', 0, 200, 1, 'Space between the text and the box edge',
+            function (v) { commit({ padding: v }); });
+        var radInput = numInput('textOverlayRadius', 0, 200, 1, 'Corner radius of the box',
+            function (v) { commit({ radius: v }); });
+        var prRow = rowEl();
+        var padField = field('Padding', padInput);
+        var radField = field('Corner', radInput);
+        prRow.appendChild(padField);
+        prRow.appendChild(radField);
+        editor.appendChild(prRow);
+
+        // Padding, corner and the background colour only mean anything once the
+        // box is on, so they read as unavailable until it is.
+        function syncBgEnabled() {
+            var on = bgToggle.checked;
+            // bgColorPick, not its wrapper — the wrapper holds the switch that
+            // turns the box back on, and dimming that would strand it off.
+            [bgColorPick, bgOpacitySlider, padField, radField].forEach(function (el) {
+                el.style.opacity = on ? '1' : '0.35';
+                el.style.pointerEvents = on ? '' : 'none';
+            });
+        }
+
+        var shadowRow = checkboxRow('textOverlayShadow', 'Drop shadow', function (v) { commit({ shadow: v }); });
+        editor.appendChild(shadowRow);
+
+        var colliderRow = checkboxRow('textOverlayCollider', 'Fluid collides with this text',
+            function (v) { commit({ collider: v }); syncColliderHint(); });
+        colliderRow.querySelector('label').title =
+            'Rasterise this text into the obstacle field so the simulation flows around it';
+        editor.appendChild(colliderRow);
+
+        var colliderHint = document.createElement('div');
+        colliderHint.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.35);margin:-2px 0 8px 20px;line-height:1.35;';
+        editor.appendChild(colliderHint);
+        function syncColliderHint() {
+            var on = colliderRow.input.checked;
+            colliderHint.style.display = on ? '' : 'none';
+            // The wall traces whatever is actually on screen, so say which.
+            colliderHint.textContent = bgToggle.checked
+                ? 'The wall follows the background box.'
+                : 'The wall traces the letterforms, not a box.';
+        }
+
+        var itemActions = rowEl(10);
+        var dupBtn = document.createElement('button');
+        dupBtn.type = 'button';
+        dupBtn.textContent = 'Duplicate';
+        dupBtn.style.cssText = 'flex:1;cursor:pointer;';
+        dupBtn.addEventListener('click', function () {
+            var a = api(); var id = selId();
+            if (!a || id == null) return;
+            var src = a.get(id);
+            if (!src) return;
+            var copy = {};
+            for (var k in src) if (src.hasOwnProperty(k) && k !== 'id') copy[k] = src[k];
+            copy.y = Math.min(1, copy.y + 0.06);
+            var made = a.add(copy);
+            a.select(made.id);
+        });
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'btn--destructive';
+        delBtn.textContent = 'Delete';
+        delBtn.style.cssText = 'flex:1;cursor:pointer;';
+        delBtn.addEventListener('click', function () {
+            var a = api(); var id = selId();
+            if (a && id != null) a.remove(id);
+        });
+        itemActions.appendChild(dupBtn);
+        itemActions.appendChild(delBtn);
+        editor.appendChild(itemActions);
+
+        // ─── Clear all ───────────────────────────────────────────
+        var clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'btn--destructive';
+        clearBtn.textContent = 'Clear All';
+        clearBtn.style.cssText = 'width:100%;cursor:pointer;';
+        clearBtn.addEventListener('click', function () { var a = api(); if (a) a.clearAll(); });
+        body.appendChild(clearBtn);
+
+        // ─── Sync controls from the selected overlay ─────────────
+        function syncEditor() {
+            var a = api();
+            var id = selId();
+            var ov = (a && id != null) ? a.get(id) : null;
+            editor.style.display = ov ? '' : 'none';
+            emptyNote.style.display = ov ? 'none' : '';
+            if (!ov) return;
+
+            rememberStyle(ov);
+            if (contentInput.value !== ov.content) contentInput.value = ov.content;
+            ensureFontOption(ov.fontFamily);
+            fontSel.value = ov.fontFamily;
+            fontPreview.style.fontFamily = ov.fontFamily;
+            sizeInput.value = String(ov.fontSize);
+            weightSel.value = String(ov.fontWeight);
+            italicBtn.classList.toggle('active', ov.fontStyle === 'italic');
+            setAlignActive(ov.align);
+            caseSel.value = ov.textCase || 'none';
+            trackSlider.setValue(ov.letterSpacing);
+            leadSlider.setValue(ov.lineHeight);
+            opacitySlider.setValue(ov.opacity);
+            colorPick.value = ov.color;
+            bgToggle.checked = !!ov.bgEnabled;
+            bgColorPick.value = ov.bgColor;
+            bgOpacitySlider.setValue(ov.bgOpacity);
+            padInput.value = String(ov.padding);
+            radInput.value = String(ov.radius);
+            shadowRow.input.checked = !!ov.shadow;
+            colliderRow.input.checked = !!ov.collider;
+            syncBgEnabled();
+            syncColliderHint();
+        }
+
+        addBtn.addEventListener('click', function () {
+            var a = api(); if (!a) return;
+            var opts = {};
+            for (var k in lastStyle) if (lastStyle.hasOwnProperty(k)) opts[k] = lastStyle[k];
+            var made = a.add(opts);
+            a.select(made.id);
+            contentInput.focus();
+            contentInput.select();
+        });
+
+        // ─── Init + subscribe (canvas drags update the list highlight) ──
         function ready() {
             if (!api()) { setTimeout(ready, 100); return; }
-            api().onChange(function () { syncArrangeBtn(); refreshList(); });
+            buildFontOptions();
+            api().onChange(function () {
+                syncArrangeBtn();
+                refreshList();
+                if (!suppressSync) syncEditor();
+            });
             syncArrangeBtn();
             refreshList();
+            syncEditor();
         }
         setTimeout(ready, 200);
 

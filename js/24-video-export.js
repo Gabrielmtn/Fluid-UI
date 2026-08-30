@@ -279,7 +279,7 @@
                     ctx.globalAlpha = 1;
                 });
 
-                if (cfg.compositeOverlays && window.brandingOverlays && window.brandingOverlays.compositeOntoCanvas) {
+                if (cfg.compositeOverlays && window.textOverlays && window.textOverlays.compositeOntoCanvas) {
                     // Overlay x/y are fractions of #canvas-area; the export
                     // frame is the wrapper. Pass the area→wrapper mapping so
                     // overlays land where the user sees them (in wrapper px;
@@ -295,7 +295,7 @@
                         opts.offsetX = wRect.left - aRect.left;
                         opts.offsetY = wRect.top - aRect.top;
                     }
-                    window.brandingOverlays.compositeOntoCanvas(ctx, opts);
+                    window.textOverlays.compositeOntoCanvas(ctx, opts);
                 }
 
                 var dt = performance.now() - t0;
