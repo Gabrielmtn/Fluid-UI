@@ -2213,6 +2213,13 @@ function brushWireFields() {
     // this client had an arm marked. Omitted at 0, like `push`.
     var _ap = (typeof window.armPushMask === 'function') ? window.armPushMask() : 0;
     if (_ap) f.ap = _ap;
+    // Per-stroke mirror (41-button-modes, 1=X 2=Y 3=both). Geometry, not
+    // styling: a stroke painted by a mirror-bound button landed in two or four
+    // places, and a peer without this saw one of them. Omitted at 0, so an
+    // ordinary dab message is exactly the size it was and an older receiver
+    // just ignores the field.
+    var _mir = window.__strokeMirrorPin | 0;
+    if (_mir) f.mir = _mir;
     const rev = publishActiveShape();
     if (rev) { f.shape = cfg.BRUSH_SHAPE_ID; f.rev = rev; }
     return f;
@@ -2924,7 +2931,16 @@ function handleRemoteSplat(data) {
             _pushPrev = [window.config.BRUSH_VELOCITY_ONLY,
                          window.config.BRUSH_VEL_MODE,
                          window.config.BRUSH_VEL_STRENGTH,
-                         window.__armPushPin];
+                         window.__armPushPin,
+                         window.__strokeMirrorPin];
+            // Per-stroke mirror: unconditional and range-checked, exactly like
+            // the arm mask beside it. Absence means "the sender did not mirror
+            // this stroke", never "keep mine" — otherwise a peer's plain stroke
+            // would fold in half whenever this client held a mirror-bound
+            // button. Out-of-range collapses to 0 rather than reaching the
+            // arm-transform builder.
+            var _mirIn = (typeof _rd.mir === 'number' && isFinite(_rd.mir)) ? (_rd.mir | 0) : 0;
+            window.__strokeMirrorPin = (_mirIn >= 1 && _mirIn <= 3) ? _mirIn : 0;
             // Same unconditional rule for the per-arm mask, and range-checked:
             // an arm index past the painter's count is harmless (no transform
             // carries it), but a non-integer would poison the bit test.
@@ -3072,6 +3088,7 @@ function handleRemoteSplat(data) {
                 window.config.BRUSH_VEL_MODE = _pushPrev[1];
                 window.config.BRUSH_VEL_STRENGTH = _pushPrev[2];
                 window.__armPushPin = _pushPrev[3];
+                window.__strokeMirrorPin = _pushPrev[4];
             }
         }
     }
@@ -3119,6 +3136,11 @@ function broadcastReplayStroke(events) {
         if (ev.push) o.push = { m: ev.push.m, s: +(+ev.push.s || 1).toFixed(2) };
         // ...and WHICH arms pushed, for a stroke whose brush was painting.
         if (ev.ap) o.ap = ev.ap | 0;
+        // Per-stroke mirror (41-button-modes) — where the stroke landed, not
+        // how it looked. Dropping it here would send peers half the mark, the
+        // same class of gap the footprint fields above close. The receiver's
+        // emitReplayDab range-checks the value (05d).
+        if (ev.mir) o.mir = ev.mir | 0;
         return o;
     });
     if (q.length <= STROKE_CHUNK_EVENTS) {

@@ -134,8 +134,14 @@
         // Centre-based lists depend only on (mode, arms) and this runs per dab,
         // so build them once per change. Rake is travel-dependent and stays
         // uncached (it is a handful of adds).
-        var symCacheKey = '';
-        var symCacheList = null;
+        // Keyed rather than a single slot (2026-08-28): the per-stroke mirror
+        // below is part of the key, and a mirror-bound stroke painting while an
+        // audio scene or path layer splats unmirrored alternates between two
+        // keys every dab — a single slot would rebuild the list on each one.
+        // The key space is tiny (mode x arms x mirror), and the guard is
+        // against a pathological session, not a real brush.
+        var symCache = Object.create(null);
+        var symCacheN = 0;
 
         // Smoothed rake heading. The bristle line used to be rebuilt from each
         // dab's raw instantaneous direction, and a dab is one pointer segment —
@@ -146,8 +152,52 @@
         // strokes, where the segments are shortest and the angle noisiest.
         var rakeUx = 0, rakeUy = 1, rakeHas = false;
 
-        function symmetryTransforms(mode, n, dx, dy) {
+        // ── Per-stroke mirror (41-button-modes) ───────────────────────────
+        // A single STROKE can carry a mirror of its own, on top of whatever
+        // Multi-Brush is set to: it was painted by a button bound to "mirror
+        // brushstroke", or it is a recorded/relayed dab that was. It rides as
+        // a pin (window.__strokeMirrorPin, 1=X 2=Y 3=both) rather than as a
+        // config value, because it belongs to the stroke and not to the panel
+        // — the same rule as the tip, the push mode and the per-arm mask.
+        //
+        // It COMPOSES with the symmetry mode instead of replacing it, by the
+        // same fold the dihedral modes already apply to the rotation family:
+        // a mirrored stroke through an 8-arm radial brush is 16 dabs of one
+        // brush folded over, not two unrelated brushes. Dedup is on the matrix
+        // alone (not matrix+arm), because two arms landing the same transform
+        // means two dabs on one spot — double-dosed dye — whichever arms they
+        // are. Mirroring an already-mirrored mode is the loud case: mirrorX
+        // folded across X lands every reflection back on a rotation.
+        function foldStrokeMirror(list, mir) {
+            var ms = mir === 1 ? [SYM_MIRROR_X]
+                   : mir === 2 ? [SYM_MIRROR_Y]
+                   : mir === 3 ? [SYM_MIRROR_X, SYM_MIRROR_Y, SYM_MIRROR_XY]
+                   : null;
+            if (!ms) return list;
+            var seen = Object.create(null);
+            var out = [];
+            function push(t) {
+                var dk = t.m.map(function (q) { return Math.round(q * 1e6); }).join(',');
+                if (seen[dk]) return;
+                seen[dk] = 1;
+                out.push(t);
+            }
+            for (var i = 0; i < list.length; i++) {
+                push(list[i]);
+                for (var j = 0; j < ms.length; j++) {
+                    // Source arm carried through: a mirrored twin reuses its
+                    // source's colour, so the pair reads as one brush folded
+                    // over rather than as two brushes in different colours.
+                    push({ m: symCompose(ms[j], list[i].m), arm: list[i].arm });
+                }
+            }
+            return out;
+        }
+
+        function symmetryTransforms(mode, n, dx, dy, mir) {
             n = Math.max(1, n | 0);
+            mir = mir | 0;
+            if (mir < 0 || mir > 3) mir = 0;
             if (mode === 'rake') {
                 // Local, not centre-based: copies ride alongside the stroke like
                 // the bristles of a rake. Pure translation, so every bristle
@@ -185,10 +235,15 @@
                     var off = (r - (n - 1) / 2) * gap;
                     rk.push({ m: [1, 0, px * off, 0, 1, py * off], arm: r });
                 }
-                return rk;
+                // Rake is travel-dependent and rebuilt every dab, so the fold
+                // happens here rather than in the cache below. A rake bristle
+                // is a pure translation in centre-relative space, so composing
+                // the mirror after it gives a properly mirrored rake line.
+                return foldStrokeMirror(rk, mir);
             }
-            var key = mode + '|' + n;
-            if (symCacheKey === key && symCacheList) return symCacheList;
+            var key = mode + '|' + n + '|' + mir;
+            var hit = symCache[key];
+            if (hit) return hit;
 
             var out = [];
             // Rotational family. Adding the mirrors to C_n generates the
@@ -219,8 +274,10 @@
                     out.push({ m: variants[v], arm: a });
                 }
             }
-            symCacheKey = key;
-            symCacheList = out;
+            out = foldStrokeMirror(out, mir);
+            if (symCacheN > 200) { symCache = Object.create(null); symCacheN = 0; }
+            symCache[key] = out;
+            symCacheN++;
             return out;
         }
         // Exposed for the dropdown's dab-count hint (and console poking)
@@ -307,7 +364,13 @@
             // symmetryTransforms block above for what each mode builds).
             const centerX = canvas.width * 0.5;
             const centerY = canvas.height * 0.5;
-            const transforms = symmetryTransforms(config.SYMMETRY_MODE, animationMultiplier, dx, dy);
+            // Per-stroke mirror rides the same gate as the tip and the arm
+            // mask: USER strokes only (live pointer, stroke replay, peer dabs,
+            // recorded playback). A programmatic dye source — an audio scene,
+            // a path layer, an animation — must keep painting where it was
+            // told even while the painter holds a mirror-bound button.
+            const strokeMir = window.__brushTipOn ? (window.__strokeMirrorPin | 0) : 0;
+            const transforms = symmetryTransforms(config.SYMMETRY_MODE, animationMultiplier, dx, dy, strokeMir);
             const relX = x - centerX;
             const relY = y - centerY;
             for (let i = 0; i < transforms.length; i++) {

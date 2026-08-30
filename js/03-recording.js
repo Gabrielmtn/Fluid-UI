@@ -326,6 +326,12 @@
                 ? window.__armPushPin
                 : ((typeof window.armPushMask === 'function') ? window.armPushMask() : 0);
             if (apMask) interaction.ap = apMask;
+            // Per-stroke mirror (41-button-modes): a dab painted by a button
+            // bound to "mirror brushstroke" landed in two (or four) places, so
+            // a recording without it plays back as half the mark that was made.
+            // Same class as `ap` — geometry, not styling — and omitted at 0.
+            const mirPin = window.__strokeMirrorPin | 0;
+            if (mirPin) interaction.mir = mirPin;
             // Preserve Randomness: mark the dab as rolled by random mode rather
             // than only freezing the roll, so 'original' playback re-rolls per
             // stroke ('exact' still freezes). Read through the pin so a replay
@@ -506,8 +512,13 @@
                 // arrive through a .fluid import or a peer's snapshot.
                 const _rp = (i.push && typeof i.push === 'object') ? i.push : null;
                 const _rap = (typeof i.ap === 'number' && isFinite(i.ap)) ? (i.ap | 0) : 0;
-                const _fp = (typeof i.tip === 'number') || !!i.shape || !!_rp || !!_rap;
-                let _tipPrev, _shapePrev, _remotePrev, _pushPrev, _apPrev;
+                // Per-stroke mirror, range-checked like the mode strings above:
+                // a recording can arrive through a .fluid import or a peer's
+                // snapshot, and the value reaches the arm-transform builder.
+                let _rmir = (typeof i.mir === 'number' && isFinite(i.mir)) ? (i.mir | 0) : 0;
+                if (_rmir < 1 || _rmir > 3) _rmir = 0;
+                const _fp = (typeof i.tip === 'number') || !!i.shape || !!_rp || !!_rap || !!_rmir;
+                let _tipPrev, _shapePrev, _remotePrev, _pushPrev, _apPrev, _mirPrev;
                 if (_fp && window.config) {
                     _tipPrev = window.config.BRUSH_TIP;
                     _shapePrev = window.config.BRUSH_SHAPE_ID;
@@ -520,6 +531,13 @@
                                  window.config.BRUSH_VEL_MODE,
                                  window.config.BRUSH_VEL_STRENGTH];
                     _apPrev = window.__armPushPin;
+                    // Pinned unconditionally, like push and the arm mask: a dab
+                    // with no `mir` was NOT mirrored, and reading absence as
+                    // "leave the live pin alone" would fold an ordinary
+                    // recording in half whenever a mirror-bound button was held
+                    // while it played.
+                    _mirPrev = window.__strokeMirrorPin;
+                    window.__strokeMirrorPin = _rmir;
                     window.config.BRUSH_VELOCITY_ONLY = !!_rp;
                     if (_rp) {
                         window.config.BRUSH_VEL_MODE =
@@ -560,6 +578,7 @@
                         window.config.BRUSH_VEL_MODE = _pushPrev[1];
                         window.config.BRUSH_VEL_STRENGTH = _pushPrev[2];
                         window.__armPushPin = _apPrev;
+                        window.__strokeMirrorPin = _mirPrev;
                     }
                 }
             }

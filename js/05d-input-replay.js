@@ -263,6 +263,13 @@
                 // whatever this says. Omitted entirely at 0 — the common case —
                 // so an ordinary dab is the same size on the wire as before.
                 ap: _apMask || undefined,
+                // Per-stroke mirror (41-button-modes): 1 = across the vertical
+                // axis, 2 = horizontal, 3 = both. Recorded for the same reason
+                // `ap` is — a button bound to "mirror brushstroke" changes WHERE
+                // the stroke landed, not how it was styled, so a replay that did
+                // not carry it would come back as half the mark that was made.
+                // Omitted at 0, the common case.
+                mir: (window.__strokeMirrorPin | 0) || undefined,
                 rnd: _rnd,
                 fm: _fm
             });
@@ -275,7 +282,7 @@
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(),
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
                      push: ev.push ? { m: ev.push.m, s: ev.push.s } : null,
-                     ap: ev.ap, rnd: ev.rnd, fm: ev.fm };
+                     ap: ev.ap, mir: ev.mir, rnd: ev.rnd, fm: ev.fm };
         }
         // Preserve Randomness: an event whose colour was rolled by random mode
         // carries rnd:1 (+ fm, the flow factor baked into its recorded colour).
@@ -421,6 +428,12 @@
                         tip: ev.tip,
                         shape: ev.shape || null
                     };
+                    // Where the stroke actually landed, not how it looked: a
+                    // mirrored stroke replayed to the room without this comes
+                    // out as half the mark the painter made. Sent only when
+                    // set; an older peer ignores it and sees the unmirrored
+                    // half, which is the honest degradation.
+                    if (ev.mir) o.mir = ev.mir | 0;
                     // Stroke boundary, so the receiver's interpolation keeps the
                     // gaps of a Time replay instead of painting across them.
                     // Sent only where true; a peer on an older build ignores it
@@ -539,6 +552,15 @@
             var savedArmPush = window.__armPushPin;
             window.__armPushPin = (typeof ev.ap === 'number' && isFinite(ev.ap))
                 ? (ev.ap | 0) : 0;
+            // The stroke's own mirror (41-button-modes), pinned unconditionally
+            // for exactly the reason the two above are: absence means "this
+            // stroke was NOT mirrored", not "leave the live pin alone". Reading
+            // it the other way would fold a plain recorded stroke in half the
+            // moment a mirror-bound button happened to be held. Range-checked —
+            // a peer's replay arrives here as raw wire JSON.
+            var savedStrokeMir = window.__strokeMirrorPin;
+            var _mir = (typeof ev.mir === 'number' && isFinite(ev.mir)) ? (ev.mir | 0) : 0;
+            window.__strokeMirrorPin = (_mir >= 1 && _mir <= 3) ? _mir : 0;
             // Replayed events are not always ours: a peer's broadcast replay
             // arrives here as raw wire JSON (06 scheduleStrokeReplay). Coerce
             // against the known set before it touches config — splat() would
@@ -602,6 +624,7 @@
                 config.BRUSH_VEL_MODE = savedVelMode;
                 config.BRUSH_VEL_STRENGTH = savedVelStr;
                 window.__armPushPin = savedArmPush;
+                window.__strokeMirrorPin = savedStrokeMir;
             }
         }
         // ── Replay interpolation (2026-08-22) ────────────────────────────────
@@ -737,7 +760,12 @@
                 // and does it for local events too.
                 push: (ev.push && typeof ev.push === 'object')
                     ? { m: ev.push.m, s: ev.push.s } : null,
-                ap: (typeof ev.ap === 'number' && isFinite(ev.ap)) ? (Math.abs(ev.ap) | 0) : undefined
+                ap: (typeof ev.ap === 'number' && isFinite(ev.ap)) ? (Math.abs(ev.ap) | 0) : undefined,
+                // Per-stroke mirror, same shape-check-only rule as `push`:
+                // emitReplayDab range-checks the value, and does it for local
+                // events too, so there is exactly one place that decides what
+                // a legal mirror code is.
+                mir: (typeof ev.mir === 'number' && isFinite(ev.mir)) ? (ev.mir | 0) : undefined
             }));
             if (!remoteEvents.length) return;
             window._activeReplayEvents = remoteEvents;
@@ -776,22 +804,50 @@
         // hold gets the same treatment (replayPointerId): a second device's
         // buttonless hover moves used to trip its self-heal and cancel it.
         let replayPointerId = null;
+        // ── Configurable button roles (41-button-modes) ───────────────
+        // Left = paint / right = replay used to be hardcoded here. It is now a
+        // per-button setting (Stroke and replay → Mouse Buttons), because the
+        // people setting up a session are not always the people painting in it:
+        // an art-therapy exercise might want both buttons on Replay so a
+        // rehearsed motion can be re-triggered and nothing new can be painted,
+        // or two different brushes bound to the two buttons.
+        //
+        // Every mode that is not 'replay' is a PAINT press — so a mode added
+        // later paints (with whatever pin it installs) rather than doing
+        // nothing at all — and a null answer means the button has no role,
+        // which is still the case for middle, back/forward and the pen eraser.
+        // The fallback keeps the historical binding if 41 failed to load.
+        function buttonMode(btn) {
+            var BM = window.ButtonModes;
+            if (BM && typeof BM.modeFor === 'function') return BM.modeFor(btn);
+            return btn === 0 ? 'paint' : (btn === 2 ? 'replay' : null);
+        }
+        // A button's bit in PointerEvent.buttons — 1 for the primary, 2 for the
+        // secondary. The replay self-heal below tests the bit of whichever
+        // button actually latched the hold, not a hardcoded 2.
+        function buttonBit(btn) { return btn === 0 ? 1 : (btn === 2 ? 2 : 0); }
+        let replayButton = null;   // which button latched the replay hold
+        let paintButton = null;    // ...and which one owns the live stroke
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'touch') return; // touchstart owns touch
+            const btnMode = buttonMode(e.button);
+            if (!btnMode) return;   // middle / back / forward / pen eraser
+            // The secondary button never opens the OS menu, whatever it is
+            // bound to (contextmenu is suppressed below as well).
+            if (e.button === 2) e.preventDefault();
             // Take-turns multiplayer: while it's someone else's turn, both
-            // painting AND right-click replay (which rebroadcasts a stroke)
-            // are gated — the relay would drop them and the local-only paint
-            // would silently desync this client from the room.
-            if (window.__mpTurnBlocked && (e.button === 0 || e.button === 2)) {
-                if (e.button === 2) e.preventDefault();
+            // painting AND replay (which rebroadcasts a stroke) are gated —
+            // the relay would drop them and the local-only paint would
+            // silently desync this client from the room.
+            if (window.__mpTurnBlocked) {
                 if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
                 return;
             }
-            // Right-click / pen-barrel replay always works, even when paused
-            if (e.button === 2) {
-                e.preventDefault();
+            // Replay always works, even when paused
+            if (btnMode === 'replay') {
                 isRightMouseDown = true;
                 replayPointerId = e.pointerId;
+                replayButton = e.button;
                 // Capture, like the paint path does: without it a release that
                 // happens off-window is never delivered here and the hold
                 // strands. (The paint branch below captures; this one never did.)
@@ -814,12 +870,12 @@
                 }
                 return;
             }
-            // Primary button only (pen TIP reports 0; middle=1, back/forward=3/4,
-            // pen ERASER=5). pointerup only finalizes buttons 0 and 2, so any
-            // other button used to start a stroke that could never end — leaving
-            // pointer.down stuck true and painting a permanent line under the
-            // cursor until the app was restarted.
-            if (e.button !== 0) return;
+            // Paint press. Only buttons 0 and 2 ever reach here (buttonMode
+            // returns null for everything else) — and both are finalized by the
+            // pointerup handler below, which is what the old "primary button
+            // only" guard was really protecting: a button that could start a
+            // stroke but never end it left pointer.down stuck true, painting a
+            // permanent line under the cursor until the app was restarted.
             // Only process presses that actually target the canvas (not click-throughs from UI)
             if (isPaused || e.target !== canvas) return;
             // Another device is already mid-stroke (pen down, mouse clicks — or
@@ -829,11 +885,27 @@
             // stale id can never permanently lock painting out.
             if (pointer.down && window.__paintPointerId != null
                 && window.__paintPointerId !== e.pointerId) return;
+            // A stroke this device already owns keeps its button and its brush.
+            // Only reachable now that BOTH buttons can paint (two brushes bound
+            // at once): pressing the second one mid-stroke would re-pin under
+            // the live stroke and swap its brush halfway through. Gated on
+            // paintButton as well as pointer.down for the same reason the guard
+            // above is gated on the id — neither alone may lock painting out.
+            if (pointer.down && paintButton != null && paintButton !== e.button) return;
             // Capture the pointer so the stroke keeps getting move/up/cancel even
             // if the pen drifts off-canvas or over an overlay, AND so pointerup /
             // pointercancel are guaranteed to reach us and end the stroke cleanly.
             try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
             window.__paintPointerId = e.pointerId;
+            paintButton = e.button;
+            // Install this button's pins (mirror axis / alternate brush) for
+            // the whole stroke. Here, AFTER every guard above has passed — a
+            // press that is rejected must never leave a pin up, because there
+            // is no stroke coming to release it. The release is at full idle
+            // in 05j, not at pointerup: the splat-out tail and the
+            // stabilizer's catch-up dabs are part of this stroke and must
+            // land in this stroke's brush.
+            if (window.ButtonModes) window.ButtonModes.beginStroke(e.button);
             const coords = getCanvasCoordinates(e);
             pointer.down = true;
             pointer.moved = false;
@@ -906,10 +978,11 @@
             // dead until the app restarts. A genuine mouse right-hold and a
             // barrel-held hover both still report bit 2, so a deliberate replay
             // hold is untouched.
-            if (isRightMouseDown && (e.buttons & 2) === 0
+            if (isRightMouseDown && (e.buttons & buttonBit(replayButton == null ? 2 : replayButton)) === 0
                 && (replayPointerId == null || e.pointerId === replayPointerId)) {
                 isRightMouseDown = false;
                 replayPointerId = null;
+                replayButton = null;
                 isReplayActive = false;
                 window._activeReplayEvents = null;
             }
@@ -976,6 +1049,7 @@
         // loss) finalizes exactly like a clean lift instead of dropping its tail.
         function finishLeftStroke() {
             var wasDown = pointer.down;
+            paintButton = null;   // cleared here so pointercancel clears it too
             if (wasDown && typeof broadcastPointerUp === 'function') {
                 broadcastPointerUp();
             }
@@ -1035,15 +1109,20 @@
             // dye where you were painting and gates all further painting down to
             // press dots: "the stylus stopped working". It also rebroadcast every
             // pass, so one stuck client locked painting for the whole room.
-            if (isRightMouseDown && (e.buttons & 2) === 0 && e.button !== 2
+            const _replayBtn = (replayButton == null) ? 2 : replayButton;
+            if (isRightMouseDown && (e.buttons & buttonBit(_replayBtn)) === 0 && e.button !== _replayBtn
                 && (replayPointerId == null || e.pointerId === replayPointerId)) {
                 isRightMouseDown = false;
                 replayPointerId = null;
+                replayButton = null;
             }
-            if (e.button === 2) {
+            // The button that latched the replay hold releases it — whichever
+            // one the user bound Replay to, not a hardcoded right-click.
+            if (isRightMouseDown && e.button === _replayBtn) {
                 // A barrel/right release from the other device isn't ours.
                 if (replayPointerId != null && e.pointerId !== replayPointerId) return;
                 replayPointerId = null;
+                replayButton = null;
                 isRightMouseDown = false;
                 isReplayActive = false;
                 window._activeReplayEvents = null;
@@ -1078,8 +1157,14 @@
                     }
                     window._pausedPointerState = null;
                 }
-            } else if (e.button === 0) {
-                if (_ownsPaint) finishLeftStroke();
+            } else if (paintButton != null && e.button === paintButton) {
+                // The button that opened the stroke closes it. Kept separate
+                // from the replay branch above so a session with BOTH buttons
+                // painting (two brushes) ends each stroke on its own lift
+                // rather than on whichever one happens to come up first.
+                // (finishLeftStroke clears paintButton, so it is also cleared
+                // on the pointercancel path.)
+                if (_ownsPaint) finishLeftStroke(); else paintButton = null;
             }
         });
         canvas.addEventListener('contextmenu', (e) => {
@@ -1095,10 +1180,17 @@
         function abortPointerStroke() {
             isRightMouseDown = false;
             replayPointerId = null;
+            replayButton = null;
+            paintButton = null;
             isReplayActive = false;
             window._activeReplayEvents = null;
             window._pausedPointerState = null;
             window.__paintPointerId = null;
+            // A hard abort throws the queued dabs away, so nothing is left to
+            // paint in the stroke's brush — drop the pin here rather than
+            // waiting for 05j's idle gate, which would otherwise leave the
+            // alternate brush live across a window blur.
+            if (window.ButtonModes) window.ButtonModes.release();
             if (window.BrushEngine) window.BrushEngine.abort();
             if (pointer.down) {
                 pointer.down = false;
@@ -1124,6 +1216,7 @@
             if (replayPointerId == null || _pid == null || replayPointerId === _pid) {
                 isRightMouseDown = false;
                 replayPointerId = null;
+                replayButton = null;
                 isReplayActive = false;
                 window._activeReplayEvents = null;
                 window._pausedPointerState = null;
@@ -1224,8 +1317,25 @@
             return { begin, move, end, isActive: () => active, isSuppressed: () => suppress };
         })();
         window.__touchGestures = TouchGestures; // harness/testing access
+        // A touch surface has no buttons, so it follows the LEFT binding — an
+        // exercise locked to Replay has to be locked on a tablet too, and two
+        // brushes bound to two buttons still leaves a tablet the left one.
+        let touchReplayHold = false;
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            // Replay sits above the isPaused gate, exactly as it does on the
+            // mouse path: a rehearsed motion must be re-triggerable on a frozen
+            // canvas. Everything below it — the gesture layer included — is a
+            // painting-time affordance and keeps its original ordering.
+            if (e.touches.length === 1 && !isReplayActive && !TouchGestures.isSuppressed()
+                && !window.__mpTurnBlocked && buttonMode(0) === 'replay') {
+                touchReplayHold = true;
+                isRightMouseDown = true;   // processReplay loops while this is held
+                isReplayActive = true;
+                window._pausedPointerState = null;
+                replayStroke(true);
+                return;
+            }
             if (isPaused) return;
             if (e.touches.length >= 2) {
                 if (!TouchGestures.isActive()) TouchGestures.begin(e);
@@ -1238,6 +1348,11 @@
                 if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
                 return;
             }
+            const _tMode = buttonMode(0);
+            if (!_tMode) return;
+            // Pins for this stroke (mirror axis / alternate brush), released at
+            // full idle in 05j — same contract as the pointerdown path.
+            if (window.ButtonModes) window.ButtonModes.beginStroke(0);
             const touch = e.touches[0];
             const coords = getCanvasCoordinates(touch);
             pointer.down = true;
@@ -1321,6 +1436,13 @@
         }, { passive: false });
         window.addEventListener('touchend', (e) => {
             TouchGestures.end(e);
+            // Lift ends a touch-held replay, like releasing the bound button.
+            if (touchReplayHold && (!e.touches || e.touches.length === 0)) {
+                touchReplayHold = false;
+                isRightMouseDown = false;
+                isReplayActive = false;
+                window._activeReplayEvents = null;
+            }
             if (pointer.down) {
                 // Same fluid-only tail gate as finishLeftStroke (audit note there)
                 if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid') {
@@ -1349,6 +1471,12 @@
         });
         window.addEventListener('touchcancel', (e) => {
             TouchGestures.end(e);
+            if (touchReplayHold) {
+                touchReplayHold = false;
+                isRightMouseDown = false;
+                isReplayActive = false;
+                window._activeReplayEvents = null;
+            }
             if (pointer.down) {
                 pointer.down = false;
                 pointer.moved = false;

@@ -2971,11 +2971,335 @@
         return sec;
     }
 
+    // Dropdowns in this section share the splat-mode select's skin. Kept as one
+    // string rather than repeated inline, so a restyle is one edit.
+    var SECTION_SELECT_CSS = 'width:100%;padding:4px;background:rgba(0,0,0,0.3);'
+        + 'border:1px solid rgba(255,200,100,0.3);color:white;border-radius:4px;margin-bottom:6px;';
+
+    // ── Mouse Buttons: what a click DOES (2026-08-28) ─────────────────────
+    // Left=paint / right=replay was hardcoded in the input handlers. It is a
+    // setting now, because the person configuring a session is not always the
+    // person painting in it: an art-therapy exercise might put BOTH buttons on
+    // Replay so a rehearsed motion can be re-triggered and nothing new can be
+    // painted, or bind two different brushes to the two buttons so a two-part
+    // exercise needs no menu trip mid-session.
+    //
+    // 41-button-modes owns the state, the persistence and the pins; this builds
+    // the doors onto it. The two sides are literally the same builder, so left
+    // and right can never drift apart.
+    var altPickerRefreshers = [];   // re-render on a brush-shape library change
+    function refreshAltPickers() {
+        for (var i = 0; i < altPickerRefreshers.length; i++) {
+            try { altPickerRefreshers[i](); } catch (_) {}
+        }
+    }
+
+    function buildButtonRolesBlock() {
+        var wrap = document.createElement('div');
+        var BM = window.ButtonModes;
+        // The section still builds without 41 — the input handlers fall back to
+        // the historical binding, so the only loss is this block.
+        if (!BM) return wrap;
+
+        var head = document.createElement('label');
+        head.className = 'brush-section-label';
+        head.textContent = 'Mouse Buttons';
+        head.title = 'What each mouse button does. A touchscreen follows the LEFT setting.';
+        wrap.appendChild(head);
+
+        // Both buttons on Replay is a deliberate, useful state (the motion is
+        // locked in and the patient cannot paint over it) and an easy accident.
+        // Say which one it is instead of leaving a canvas that ignores clicks.
+        var lock = document.createElement('div');
+        lock.className = 'button-roles-lock';
+        lock.style.cssText = 'font-size:10px;line-height:1.35;margin:-2px 0 8px;padding:5px 7px;'
+            + 'border-radius:4px;background:rgba(255,200,100,0.10);'
+            + 'border:1px solid rgba(255,200,100,0.35);color:rgba(255,225,180,0.95);';
+        lock.textContent = 'Both buttons replay — nothing new can be painted. That is the '
+            + 'painting lock: the last stroke can be re-triggered, but not added to.';
+        wrap.appendChild(lock);
+
+        function syncLock() { lock.style.display = BM.isPaintLocked() ? '' : 'none'; }
+
+        var syncAll = [];
+        ['left', 'right'].forEach(function (side) {
+            var built = buildButtonRole(side, BM, syncLock);
+            wrap.appendChild(built.el);
+            syncAll.push(built.sync);
+        });
+        syncLock();
+
+        // State can also move from outside this panel (a reset, a console poke,
+        // a second window writing the same localStorage and a reload).
+        BM.onChange(function () {
+            syncAll.forEach(function (f) { try { f(); } catch (_) {} });
+            syncLock();
+        });
+        return wrap;
+    }
+
+    function buildButtonRole(side, BM, syncLock) {
+        var box = document.createElement('div');
+        box.style.cssText = 'margin-bottom:10px;';
+
+        var lbl = document.createElement('label');
+        lbl.className = 'brush-section-label';
+        lbl.setAttribute('for', 'buttonMode_' + side);
+        lbl.textContent = (side === 'left' ? 'Left Click' : 'Right Click');
+        box.appendChild(lbl);
+
+        var sel = document.createElement('select');
+        sel.id = 'buttonMode_' + side;
+        sel.style.cssText = SECTION_SELECT_CSS;
+        BM.MODES.forEach(function (m) {
+            var o = document.createElement('option');
+            o.value = m;
+            o.textContent = BM.MODE_LABELS[m];
+            o.title = BM.MODE_HINTS[m];
+            sel.appendChild(o);
+        });
+        box.appendChild(sel);
+
+        var hint = document.createElement('div');
+        hint.style.cssText = 'font-size:10px;line-height:1.35;color:rgba(255,255,255,0.45);margin:-2px 0 6px;';
+        box.appendChild(hint);
+
+        // ── Mirror axis (shown for 'mirror') ──────────────────────────
+        var mirRow = document.createElement('div');
+        mirRow.className = 'brush-mode-row';
+        var mirBtns = {};
+        BM.MIRROR_AXES.forEach(function (ax) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'brush-mode-btn';
+            b.textContent = ax.label;
+            b.title = ax.title;
+            b.addEventListener('click', function () { BM.setMirror(side, ax.id); sync(); });
+            mirBtns[ax.id] = b;
+            mirRow.appendChild(b);
+        });
+        box.appendChild(mirRow);
+
+        // ── Alternate brush (shown for 'alt') ─────────────────────────
+        // The same picker as the Brush panel's, pointed at this button's slot
+        // instead of at the live brush: the built-in tips, then the custom
+        // stamps from the shared library. A slot stores only what it overrides,
+        // so a tip-only alternate follows the main brush's feel, size and flow
+        // — which is what "an alternate brush TIP" should mean. Copy current
+        // brush freezes the whole thing when an exercise needs that instead.
+        var altBox = document.createElement('div');
+
+        var tipRow = document.createElement('div');
+        tipRow.className = 'brush-tip-row';
+        var altTipBtns = [];
+        BRUSH_TIPS.forEach(function (t) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'brush-tip-btn';
+            b.dataset.tip = String(t.v);
+            b.textContent = t.glyph;
+            b.title = t.title;
+            b.addEventListener('click', function () {
+                // Picking a built-in tip drops any stamp on this slot, exactly
+                // as it does on the live brush.
+                BM.setAlt(side, { BRUSH_TIP: t.v, BRUSH_SHAPE_ID: null });
+                sync();
+            });
+            altTipBtns.push(b);
+            tipRow.appendChild(b);
+        });
+        altBox.appendChild(tipRow);
+
+        var shapeRow = document.createElement('div');
+        shapeRow.className = 'brush-tip-row brush-shapes-row';
+        altBox.appendChild(shapeRow);
+
+        var shapeNote = document.createElement('div');
+        shapeNote.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.35);margin:-2px 0 6px;';
+        shapeNote.textContent = 'Shapes come from the Brush panel’s library.';
+        altBox.appendChild(shapeNote);
+
+        // Size override. Off = inherit the main brush's size, which keeps the
+        // Size fader meaningful for both buttons; on = this button paints at a
+        // fixed size whatever the fader says (a broad wash and a fine liner
+        // bound to the two buttons, no fader trip between them).
+        var sizeRow = document.createElement('div');
+        sizeRow.className = 'control-group checkbox-group';
+        var sizeCb = document.createElement('input');
+        sizeCb.type = 'checkbox';
+        sizeCb.id = 'altSizeOn_' + side;
+        var sizeLbl = document.createElement('label');
+        sizeLbl.setAttribute('for', 'altSizeOn_' + side);
+        sizeLbl.style.margin = '0';
+        sizeLbl.textContent = 'Own size';
+        sizeLbl.title = 'Off: this button paints at the main Size fader. On: it always paints at the size set below.';
+        sizeRow.appendChild(sizeCb);
+        sizeRow.appendChild(sizeLbl);
+        altBox.appendChild(sizeRow);
+
+        var sizeWrap = document.createElement('div');
+        sizeWrap.style.cssText = 'display:flex;align-items:center;gap:6px;margin:-2px 0 8px;';
+        var sizeSlider = document.createElement('input');
+        sizeSlider.type = 'range';
+        // Cloned from the live Size fader so the two can never disagree on range.
+        var mainSize = document.getElementById('brushSize');
+        sizeSlider.min = mainSize ? mainSize.min : '0.001';
+        sizeSlider.max = mainSize ? mainSize.max : '100';
+        sizeSlider.step = mainSize ? mainSize.step : '0.001';
+        sizeSlider.value = mainSize ? mainSize.value : '11';
+        sizeSlider.style.cssText = 'flex:1;min-width:0;';
+        var sizeVal = document.createElement('span');
+        sizeVal.style.cssText = 'font-size:10px;font-family:monospace;color:#f2f3f5;min-width:38px;text-align:right;';
+        sizeWrap.appendChild(sizeSlider);
+        sizeWrap.appendChild(sizeVal);
+        altBox.appendChild(sizeWrap);
+
+        var actions = document.createElement('div');
+        actions.className = 'brush-mode-row';
+        var copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'brush-mode-btn';
+        copyBtn.textContent = 'Copy brush';
+        copyBtn.title = 'Freeze the CURRENT brush into this button — size, flow, hardness, spacing, '
+            + 'texture, angle, jitter, eraser and Pressure as well as the tip. The main brush is not changed.';
+        copyBtn.addEventListener('click', function () {
+            BM.replaceAlt(side, BM.captureLiveBrush());
+            sync();
+        });
+        var resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'brush-mode-btn';
+        resetBtn.textContent = 'Tip only';
+        resetBtn.title = 'Drop everything except the tip and shape, so this button follows the main brush again for size, flow and feel.';
+        resetBtn.addEventListener('click', function () {
+            var cur = BM.side(side).alt || {};
+            var keep = {};
+            if ('BRUSH_TIP' in cur) keep.BRUSH_TIP = cur.BRUSH_TIP;
+            if ('BRUSH_SHAPE_ID' in cur) keep.BRUSH_SHAPE_ID = cur.BRUSH_SHAPE_ID;
+            BM.replaceAlt(side, keep);
+            sync();
+        });
+        actions.appendChild(copyBtn);
+        actions.appendChild(resetBtn);
+        altBox.appendChild(actions);
+
+        var altSummary = document.createElement('div');
+        altSummary.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.45);margin:4px 0 0;';
+        altBox.appendChild(altSummary);
+        box.appendChild(altBox);
+
+        // ── Wiring ────────────────────────────────────────────────────
+        sel.addEventListener('change', function () {
+            BM.setMode(side, sel.value);
+            sync();
+            if (syncLock) syncLock();
+        });
+        sizeCb.addEventListener('change', function () {
+            if (sizeCb.checked) {
+                BM.setAlt(side, { SPLAT_RADIUS: parseFloat(sizeSlider.value) / 1000 });
+            } else {
+                BM.setAlt(side, { SPLAT_RADIUS: undefined });   // back to inherit
+            }
+            sync();
+        });
+        sizeSlider.addEventListener('input', function () {
+            sizeCb.checked = true;   // dragging the slider IS turning it on
+            BM.setAlt(side, { SPLAT_RADIUS: parseFloat(sizeSlider.value) / 1000 });
+            sync();
+        });
+
+        function renderAltShapes() {
+            shapeRow.innerHTML = '';
+            var lst = (window.BrushShapes && window.BrushShapes.list()) || [];
+            var act = (BM.side(side).alt || {}).BRUSH_SHAPE_ID || null;
+            if (!lst.length) {
+                shapeNote.textContent = 'No custom shapes yet — import one in the Brush panel.';
+                return;
+            }
+            shapeNote.textContent = 'Shapes come from the Brush panel’s library.';
+            lst.forEach(function (s) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'brush-tip-btn brush-shape-btn' + (s.id === act ? ' active' : '');
+                // Same inline sizing pin as renderShapeTiles: the .brush-tip-btn
+                // state rules use the `background` shorthand, which resets
+                // size/repeat/position, so the thumbnail would blow up on hover.
+                b.style.backgroundImage = 'url("' + s.dataURL + '")';
+                b.style.backgroundSize = 'contain';
+                b.style.backgroundRepeat = 'no-repeat';
+                b.style.backgroundPosition = 'center';
+                b.title = s.name + ' — use this shape for the ' + side + ' button';
+                b.addEventListener('click', function () {
+                    var on = (BM.side(side).alt || {}).BRUSH_SHAPE_ID === s.id;
+                    BM.setAlt(side, { BRUSH_SHAPE_ID: on ? null : s.id });
+                    // Get it onto the GPU now: splat() holds dabs while a
+                    // selected stamp is still decoding, so an un-warmed shape
+                    // would drop the opening of the first stroke that used it.
+                    if (!on && window.BrushShapes && window.BrushShapes.warm) {
+                        try { window.BrushShapes.warm(s.id); } catch (_) {}
+                    }
+                    sync();
+                });
+                shapeRow.appendChild(b);
+            });
+        }
+        altPickerRefreshers.push(function () { renderAltShapes(); });
+
+        function fmtSize(v) { return (v < 10 ? v.toFixed(1) : Math.round(v)) + ''; }
+
+        function sync() {
+            var st = BM.side(side);
+            if (!st) return;
+            sel.value = st.mode;
+            hint.textContent = BM.MODE_HINTS[st.mode] || '';
+            mirRow.style.display = (st.mode === 'mirror') ? '' : 'none';
+            altBox.style.display = (st.mode === 'alt') ? '' : 'none';
+            Object.keys(mirBtns).forEach(function (k) {
+                mirBtns[k].classList.toggle('active', k === st.mirror);
+            });
+            var alt = st.alt || {};
+            // One rule for "which tip reads as selected", the same one the
+            // Brush panel uses: with a stamp on the slot, NO glyph is active.
+            var hasShape = !!alt.BRUSH_SHAPE_ID;
+            var curTip = ('BRUSH_TIP' in alt) ? (alt.BRUSH_TIP | 0) : -1;
+            altTipBtns.forEach(function (b) {
+                b.classList.toggle('active', !hasShape && parseInt(b.dataset.tip, 10) === curTip);
+            });
+            renderAltShapes();
+            var hasSize = typeof alt.SPLAT_RADIUS === 'number';
+            sizeCb.checked = hasSize;
+            if (hasSize) sizeSlider.value = String(alt.SPLAT_RADIUS * 1000);
+            sizeVal.textContent = hasSize ? fmtSize(parseFloat(sizeSlider.value)) : 'main';
+            sizeSlider.style.opacity = hasSize ? '1' : '0.45';
+            sizeSlider.style.setProperty('--min', sizeSlider.min);
+            sizeSlider.style.setProperty('--max', sizeSlider.max);
+            sizeSlider.style.setProperty('--val', sizeSlider.value);
+            // Say what the slot actually overrides — "alternate brush" with an
+            // empty slot paints identically to the main brush, and that is a
+            // confusing thing to discover by painting.
+            var n = Object.keys(alt).length;
+            if (!n) {
+                altSummary.textContent = 'Nothing set yet — this button paints exactly like the main brush. '
+                    + 'Pick a tip above, or Copy brush.';
+            } else if (n <= 2 && !('SPLAT_RADIUS' in alt)) {
+                altSummary.textContent = 'Overrides the tip only; size, flow and feel follow the main brush.';
+            } else {
+                altSummary.textContent = 'Overrides ' + n + ' brush settings.';
+            }
+        }
+        sync();
+        return { el: box, sync: sync };
+    }
+
     function buildBrushSection() {
         // Everyday brush controls (target/tip/feel/presets) moved to the strip's
         // Brush dropdown (buildBrushPanel) 2026-07-16 — this section keeps the
         // rarer stroke-replay + splat-ramp machinery.
         const { sec, body } = makeSection('Stroke and replay', 'expressive', true);
+
+        // What each button DOES leads the section: everything below it is a
+        // parameter of an action one of these two chose.
+        body.appendChild(buildButtonRolesBlock());
 
         // --- Replay Mode ---
         var modeLabel = document.createElement('label');
@@ -3891,6 +4215,11 @@
             syncTipActive();   // an active stamp overrides the built-in tips
             syncTexState();
             syncTipSwatch();
+            // The per-button alternate-brush pickers draw from the SAME shape
+            // library, so an import or a delete has to reach them too — a slot
+            // still pointing at a deleted stamp would silently fall back to the
+            // built-in tip with the swatch gone from the row.
+            refreshAltPickers();
         };
         renderBrushShapes();
         var texGroup = pSlider('brushTipTexture', 'Texture', 0, 1, 0.01, 'BRUSH_TIP_TEXTURE', pct, 'tipTexture');
