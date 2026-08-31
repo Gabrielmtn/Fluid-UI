@@ -720,10 +720,15 @@
             }
         }
 
-        // Median-cut: split sample set into 256 boxes
+        // Median-cut: split sample set into 256 boxes. Split score is
+        // range × population, not raw range — a handful of outlier pixels
+        // spanning a wide range must not win split after split while a huge
+        // near-uniform gradient region (most of a fluid frame) starves.
+        // 255 boxes, not 256: index 255 is reserved as the inter-frame
+        // transparency index (see encodeGIF).
         var boxes = [samples];
-        while (boxes.length < 256) {
-            var bestBI = -1, bestRange = -1, bestCh = 0;
+        while (boxes.length < 255) {
+            var bestBI = -1, bestScore = 0, bestCh = 0;
             for (var bi = 0; bi < boxes.length; bi++) {
                 var box = boxes[bi];
                 if (box.length < 2) continue;
@@ -734,11 +739,11 @@
                         if (v < lo) lo = v;
                         if (v > hi) hi = v;
                     }
-                    var rng = hi - lo;
-                    if (rng > bestRange) { bestRange = rng; bestBI = bi; bestCh = ch; }
+                    var score = (hi - lo) * box.length;
+                    if (score > bestScore) { bestScore = score; bestBI = bi; bestCh = ch; }
                 }
             }
-            if (bestRange <= 0) break;
+            if (bestBI < 0) break; // every box is a single colour
             var target = boxes[bestBI];
             target.sort(function (a, b) { return a[bestCh] - b[bestCh]; });
             var mid = target.length >> 1;
@@ -753,8 +758,59 @@
             for (var si = 0; si < box.length; si++) { sr += box[si][0]; sg += box[si][1]; sb += box[si][2]; }
             pal.push([Math.round(sr / n), Math.round(sg / n), Math.round(sb / n)]);
         }
+
+        refinePaletteKMeans(pal, samples, 2);
+
+        // realCount marks where the true palette ends; the [0,0,0] padding
+        // below must never win a nearest-colour search or count toward the
+        // dither-strength estimate (a padding black would speckle flat dark
+        // frames with pure-black pixels).
+        pal.realCount = pal.length;
         while (pal.length < 256) pal.push([0, 0, 0]);
         return pal;
+    }
+
+    // Lloyd (k-means) refinement: median-cut seeds are box averages, which
+    // sit off-centre once neighbouring boxes compete for the same samples.
+    // A couple of reassign-and-recompute passes over the ~80k samples
+    // settles them. Empty clusters keep their seed colour.
+    function refinePaletteKMeans(pal, samples, iterations) {
+        var k = pal.length;
+        var sums = new Float64Array(k * 3);
+        var counts = new Uint32Array(k);
+        for (var it = 0; it < iterations; it++) {
+            sums.fill(0); counts.fill(0);
+            // Cache keyed at 6 bits/channel; smooth-gradient samples repeat
+            // heavily so most lookups hit. Palette moves each pass → reset.
+            var cache = new Map();
+            for (var si = 0; si < samples.length; si++) {
+                var s = samples[si];
+                var key = ((s[0] >> 2) << 12) | ((s[1] >> 2) << 6) | (s[2] >> 2);
+                var ci = cache.get(key);
+                if (ci === undefined) {
+                    var bestDist = 0x7FFFFFFF; ci = 0;
+                    for (var pi = 0; pi < k; pi++) {
+                        var dr = s[0] - pal[pi][0];
+                        var dg = s[1] - pal[pi][1];
+                        var db = s[2] - pal[pi][2];
+                        // Perceptual weights — must match findNearest
+                        var dist = 2 * dr * dr + 4 * dg * dg + 3 * db * db;
+                        if (dist < bestDist) { bestDist = dist; ci = pi; }
+                    }
+                    cache.set(key, ci);
+                }
+                var o = ci * 3;
+                sums[o] += s[0]; sums[o + 1] += s[1]; sums[o + 2] += s[2];
+                counts[ci]++;
+            }
+            for (var pi = 0; pi < k; pi++) {
+                if (!counts[pi]) continue;
+                var o = pi * 3, n = counts[pi];
+                pal[pi][0] = Math.round(sums[o] / n);
+                pal[pi][1] = Math.round(sums[o + 1] / n);
+                pal[pi][2] = Math.round(sums[o + 2] / n);
+            }
+        }
     }
 
     // Nearest-colour lookup (cached). Cache is shared across frames.
@@ -763,74 +819,80 @@
         var key = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
         if (cache.has(key)) return cache.get(key);
         var bestIdx = 0, bestDist = 0x7FFFFFFF;
-        for (var ci = 0; ci < 256; ci++) {
+        // Real entries only — never the [0,0,0] padding, and never index 255
+        // (the reserved transparency index)
+        var n = Math.min(palette.realCount || palette.length, 255);
+        for (var ci = 0; ci < n; ci++) {
             var dr = r - palette[ci][0];
             var dg = g - palette[ci][1];
             var db = b - palette[ci][2];
-            var dist = dr * dr + dg * dg + db * db;
+            // Perceptual weights (≈ luma sensitivity) — match refinePaletteKMeans
+            var dist = 2 * dr * dr + 4 * dg * dg + 3 * db * db;
             if (dist < bestDist) { bestDist = dist; bestIdx = ci; }
         }
         cache.set(key, bestIdx);
         return bestIdx;
     }
 
-    // Floyd-Steinberg error-diffusion dithering + palette quantization
-    function quantizePixels(data, width, height, palette, cache) {
-        var npix = width * height;
-        // Mutable float copy so error can be diffused to neighbours
-        var pix = new Float32Array(npix * 3);
-        for (var i = 0; i < npix; i++) {
-            var o4 = i * 4, o3 = i * 3;
-            pix[o3] = data[o4]; pix[o3 + 1] = data[o4 + 1]; pix[o3 + 2] = data[o4 + 2];
+    // Ordered (Bayer 8×8) dithering + palette quantization.
+    // Position-locked thresholds, unlike error diffusion: a pixel that is
+    // stable across frames dithers identically every frame, so animations
+    // don't shimmer ("dither crawl") and LZW keeps its runs — smaller files.
+    var BAYER8 = [
+         0, 32,  8, 40,  2, 34, 10, 42,
+        48, 16, 56, 24, 50, 18, 58, 26,
+        12, 44,  4, 36, 14, 46,  6, 38,
+        60, 28, 52, 20, 62, 30, 54, 22,
+         3, 35, 11, 43,  1, 33,  9, 41,
+        51, 19, 59, 27, 49, 17, 57, 25,
+        15, 47,  7, 39, 13, 45,  5, 37,
+        63, 31, 55, 23, 61, 29, 53, 21
+    ];
+
+    // Dither amplitude should be ≈ one palette step: less leaves banding,
+    // more is visible noise that also bloats LZW. Estimate the step as the
+    // median nearest-neighbour distance between distinct palette entries.
+    function estimateDitherStrength(palette) {
+        var uniq = [];
+        var seen = new Set();
+        var count = palette.realCount || palette.length;
+        for (var i = 0; i < count; i++) {
+            var p = palette[i];
+            var key = (p[0] << 16) | (p[1] << 8) | p[2];
+            if (!seen.has(key)) { seen.add(key); uniq.push(p); }
         }
+        if (uniq.length < 2) return 0;
+        var dists = [];
+        for (var i = 0; i < uniq.length; i++) {
+            var best = Infinity;
+            for (var j = 0; j < uniq.length; j++) {
+                if (i === j) continue;
+                var dr = uniq[i][0] - uniq[j][0];
+                var dg = uniq[i][1] - uniq[j][1];
+                var db = uniq[i][2] - uniq[j][2];
+                var d = dr * dr + dg * dg + db * db;
+                if (d < best) best = d;
+            }
+            dists.push(Math.sqrt(best));
+        }
+        dists.sort(function (a, b) { return a - b; });
+        var median = dists[dists.length >> 1];
+        return Math.max(4, Math.min(28, median));
+    }
 
-        var indexed = new Uint8Array(npix);
-
+    function quantizePixels(data, width, height, palette, cache, strength) {
+        var indexed = new Uint8Array(width * height);
         for (var y = 0; y < height; y++) {
+            var row = (y & 7) << 3;
             for (var x = 0; x < width; x++) {
                 var idx = y * width + x;
-                var p = idx * 3;
-
-                // Clamp current (error-adjusted) colour to 0-255
-                var cr = Math.max(0, Math.min(255, Math.round(pix[p])));
-                var cg = Math.max(0, Math.min(255, Math.round(pix[p + 1])));
-                var cb = Math.max(0, Math.min(255, Math.round(pix[p + 2])));
-
-                var ci = findNearest(cr, cg, cb, palette, cache);
-                indexed[idx] = ci;
-
-                // Quantization error
-                var er = cr - palette[ci][0];
-                var eg = cg - palette[ci][1];
-                var eb = cb - palette[ci][2];
-
-                // Distribute error to 4 neighbours (Floyd-Steinberg weights)
-                //   * 7/16 → right
-                //   3/16 ← ↓   5/16 ↓   1/16 → ↓
-                if (x + 1 < width) {
-                    var j = p + 3;
-                    pix[j]     += er * 0.4375; // 7/16
-                    pix[j + 1] += eg * 0.4375;
-                    pix[j + 2] += eb * 0.4375;
-                }
-                if (y + 1 < height) {
-                    if (x > 0) {
-                        var j = p + (width - 1) * 3;
-                        pix[j]     += er * 0.1875; // 3/16
-                        pix[j + 1] += eg * 0.1875;
-                        pix[j + 2] += eb * 0.1875;
-                    }
-                    var j = p + width * 3;
-                    pix[j]     += er * 0.3125; // 5/16
-                    pix[j + 1] += eg * 0.3125;
-                    pix[j + 2] += eb * 0.3125;
-                    if (x + 1 < width) {
-                        var j = p + (width + 1) * 3;
-                        pix[j]     += er * 0.0625; // 1/16
-                        pix[j + 1] += eg * 0.0625;
-                        pix[j + 2] += eb * 0.0625;
-                    }
-                }
+                var o = idx * 4;
+                // Same offset on all channels: luminance dither, no hue noise
+                var t = ((BAYER8[row | (x & 7)] + 0.5) / 64 - 0.5) * strength;
+                var cr = Math.max(0, Math.min(255, Math.round(data[o] + t)));
+                var cg = Math.max(0, Math.min(255, Math.round(data[o + 1] + t)));
+                var cb = Math.max(0, Math.min(255, Math.round(data[o + 2] + t)));
+                indexed[idx] = findNearest(cr, cg, cb, palette, cache);
             }
         }
         return indexed;
@@ -866,6 +928,7 @@
 
         // Build adaptive 256-colour palette from actual frame data
         var palette = buildAdaptivePalette(frames, width, height);
+        var ditherStrength = estimateDitherStrength(palette);
 
         // Flatten palette to byte array for the GCT
         var palFlat = [];
@@ -894,15 +957,39 @@
 
         // ── Encode each frame ──
         var colorCache = new Map(); // shared across frames for speed
+        var prevIndexed = null;
         for (var fi = 0; fi < frames.length; fi++) {
             var frame = frames[fi];
             var delayCenti = Math.max(2, Math.round(frame.delay / 10));
 
+            // Quantize RGBA → palette indices with ordered dithering
+            var indexed = quantizePixels(frame.data, width, height, palette, colorCache, ditherStrength);
+
+            // Inter-frame diff candidate: pixels identical to the previous
+            // frame become the reserved transparent index 255 (disposal 1
+            // keeps the previous frame). Ordered dither reproduces identical
+            // indices for stable pixels, so calm content collapses into huge
+            // transparent runs — but on busy gradients the diff is
+            // salt-and-pepper noise that LZW-compresses WORSE than the
+            // coherent dither pattern. So encode both and keep the smaller.
+            var lzw = lzwEncode(8, indexed);
+            var hasTransparency = false;
+            if (prevIndexed) {
+                var diffed = new Uint8Array(indexed.length);
+                for (var di = 0; di < indexed.length; di++) {
+                    diffed[di] = (indexed[di] === prevIndexed[di]) ? 255 : indexed[di];
+                }
+                var lzwDiff = lzwEncode(8, diffed);
+                if (lzwDiff.length < lzw.length) { lzw = lzwDiff; hasTransparency = true; }
+            }
+            prevIndexed = indexed;
+
             // Graphic Control Extension
             w8(0x21); w8(0xF9); w8(0x04);
-            w8(0x00);        // disposal: none
+            // packed: disposal 1 (keep frame) << 2 = 0x04, + transparency flag
+            w8(hasTransparency ? 0x05 : 0x04);
             w16(delayCenti); // delay (centiseconds)
-            w8(0x00);        // no transparency
+            w8(0xFF);        // transparent index (ignored when flag is clear)
             w8(0x00);        // terminator
 
             // Image Descriptor
@@ -911,11 +998,8 @@
             w16(width); w16(height);
             w8(0x00);                 // no local colour table
 
-            // Quantize RGBA → palette indices with Floyd-Steinberg dithering
-            var indexed = quantizePixels(frame.data, width, height, palette, colorCache);
-
-            // LZW-compress indexed pixels
-            var lzw = lzwEncode(8, indexed);
+            // lzw was chosen above (plain vs inter-frame diff, whichever
+            // compressed smaller)
             w8(8); // LZW minimum code size
 
             // Write LZW data as ≤255-byte sub-blocks
