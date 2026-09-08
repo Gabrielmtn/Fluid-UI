@@ -87,14 +87,10 @@
         "uVelocity"
       ]
     },
-    "clarity|kernelScale|texelSize|uTexture|uVelocity|vibrance": {
+    "uTexture|vibrance": {
       "name": "microDetail",
       "uniforms": [
-        "clarity",
-        "kernelScale",
-        "texelSize",
         "uTexture",
-        "uVelocity",
         "vibrance"
       ]
     },

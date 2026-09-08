@@ -30,7 +30,14 @@
 
             marble: { DENSITY_DISSIPATION: 0.9992, VELOCITY_DISSIPATION: 0.9985, PRESSURE_DISSIPATION: 0.97, PRESSURE_ITERATIONS: 35, CURL: 8, SPLAT_RADIUS: 0.018 },  // Was 100; PD was 0.98
 
-            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.935, PRESSURE_ITERATIONS: 25, CURL: 52, SPLAT_RADIUS: 0.006 }  // Was 35; PD was 0.82
+            electric: { DENSITY_DISSIPATION: 0.9965, VELOCITY_DISSIPATION: 1.0008, PRESSURE_DISSIPATION: 0.935, PRESSURE_ITERATIONS: 25, CURL: 52, SPLAT_RADIUS: 0.006 },  // Was 35; PD was 0.82
+
+            // Gel pen (2026-09-02): a line that stays where you drew it — colour
+            // never fades (density 1.0), motion dies in under a second, no
+            // curl to smear it — under a glossy lit surface. The `ui` block
+            // rides the same full-snapshot apply as the sliders above.
+            gelpen: { DENSITY_DISSIPATION: 1.0, VELOCITY_DISSIPATION: 0.985, PRESSURE_DISSIPATION: 0.95, PRESSURE_ITERATIONS: 25, CURL: 4, SPLAT_RADIUS: 0.006,
+                      ui: { checkboxes: { displayShadingToggle: true }, sliders: { shadingIntensity: 1.1, shadeGloss: 0.85, shadeRelief: 1.2, sharpness: 1.4 } } }
 
         };
 
@@ -77,7 +84,13 @@
                     if (preset[k] !== undefined) sliders[PRESET_KEY_TO_SLIDER[k]] = preset[k];
                 });
                 if (preset.SPLAT_RADIUS !== undefined) sliders.brushSize = preset.SPLAT_RADIUS * 1000;
-                window.applyPresetSnapshotFull({ sliders: sliders });
+                const snap = { sliders: sliders };
+                if (preset.ui) {
+                    if (preset.ui.sliders) Object.assign(snap.sliders, preset.ui.sliders);
+                    if (preset.ui.checkboxes) snap.checkboxes = Object.assign({}, preset.ui.checkboxes);
+                    if (preset.ui.selects) snap.selects = Object.assign({}, preset.ui.selects);
+                }
+                window.applyPresetSnapshotFull(snap);
             } else {
                 const safePreset = (window.ParamRegistry && window.ParamRegistry.clampConfigObject)
                     ? window.ParamRegistry.clampConfigObject(preset)
@@ -137,7 +150,10 @@
 
             buttons.forEach(btn => {
 
-                btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === activePreset);
+                // data-preset carries the key; the visible label is prose now
+                // ("Quick-fading brush tracer"), so text matching would never hit.
+                const key = (btn.dataset && btn.dataset.preset) ? btn.dataset.preset : btn.textContent.trim().toLowerCase();
+                btn.classList.toggle('active', key === activePreset);
 
             });
 

@@ -245,7 +245,7 @@
     // ── Post-FX toggles for the 'storm' workload ─────────────────────
     // Driven through the controls, not config, so each stage takes the
     // same path a user's click would. Saved and restored around the run.
-    var FX_IDS = ['glowToggle', 'scatterToggle', 'displayShadingToggle', 'microDetailToggle'];
+    var FX_IDS = ['glowToggle', 'scatterToggle', 'displayShadingToggle'];
 
     function fxSnapshot() {
         var out = {};

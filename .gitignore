@@ -54,3 +54,9 @@ steam_appid.txt
 steam/screenshots/
 steam/store-assets-slicebg/
 steam/about/images/
+
+# Copy sink runtime placement (regenerate: node scripts/copy-sink.js harvest)
+scripts/copy-sink/runtime.json
+
+# Headless bake run log (scripts/bake-headless.js)
+scripts/bake-headless.log

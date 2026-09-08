@@ -216,7 +216,7 @@
         if (t && t.nodeType === 1 && inUI(t)) begin('click ' + labelFor(t));
     }, { capture: true, passive: true });
 
-    // ── Stats For Nerds section (lazy: panel exists at load, section
+    // ── Debug Info section (lazy: panel exists at load, section
     //    appended once; cheap textContent updates only) ──────────────
     var rows = null;
     function ensureSection() {
@@ -422,10 +422,8 @@
         curl: function () { return window.config && window.config.CURL; },
         splatRadius: function () { return window.config && window.config.SPLAT_RADIUS; },
         sharpness: function () { return window.config && window.config.SHARPNESS; },
-        clarity: function () { return window.config && window.config.CLARITY; },
         vibrance: function () { return window.config && window.config.VIBRANCE; },
         ridges: function () { return window.config && window.config.RIDGES; },
-        swirl: function () { return window.config && window.config.SWIRL; },
         macCormack: function () { return window.config && window.config.MACCORMACK; },
         multigrid: function () { return window.config && window.config.MULTIGRID; },
         glow: function () { return window.config && window.config.GLOW; },
@@ -446,7 +444,6 @@
         // modes + gates
         materialMode: function () { var el = document.getElementById('materialMode'); return el && el.value; },
         displayShading: function () { var el = document.getElementById('displayShadingToggle'); return el && el.checked; },
-        microDetail: function () { var el = document.getElementById('microDetailToggle'); return el && el.checked; },
         lighting: function () { return !!(window.lightSource && window.lightSource.enabled); },
         lightShift: function () { return !!(window.lightShift && window.lightShift.enabled); },
         frozen: function () { return !!window.__fluidFrozen; },

@@ -261,13 +261,18 @@
             divergence = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             curl = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             pressure = createDoubleFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
-            // Obstacle texture for collision layers (single-channel, sim resolution)
-            obstacle = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.LINEAR);
-            obstacleScratch = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.LINEAR);
+            // Obstacle texture for collision layers (sim resolution). RG
+            // (2026-08-31): R = Σcoverage·strength (historic channel,
+            // unchanged meaning), G = Σcoverage·strength² — the per-texel
+            // strength channel (05b obsTexelGLSL), so each collider is
+            // judged by its OWN strength instead of the scene max.
+            obstacle = createFBO(simTexWidth, simTexHeight, rg.internalFormat, rg.format, texType, gl.LINEAR);
+            obstacleScratch = createFBO(simTexWidth, simTexHeight, rg.internalFormat, rg.format, texType, gl.LINEAR);
             // Multigrid pressure pyramid (halve until ~12 cells or 6 levels;
             // LINEAR filter — restriction box-samples and prolongation
-            // interpolates). All R16F: whole pyramid costs ~a third of one
-            // extra sim-res field per texture kind.
+            // interpolates). R16F except the obstacle pyramid (RG16F, to
+            // carry the strength channel down the levels): whole pyramid
+            // still costs ~a third of one extra sim-res field per kind.
             mgRes0 = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.LINEAR);
             mgLevels = [];
             (function () {
@@ -282,7 +287,7 @@
                         rhs: createFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR),
                         res: createFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR),
                         p: createDoubleFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR),
-                        obs: createFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR)
+                        obs: createFBO(mw, mh, rg.internalFormat, rg.format, texType, gl.LINEAR)
                     });
                 }
             })();
@@ -621,8 +626,8 @@
             _obsTempCanvas.width = w;
             _obsTempCanvas.height = h;
             _obsTempCtx = _obsTempCanvas.getContext('2d', { willReadFrequently: true });
-            _obsFloatBuf = new Float32Array(w * h);
-            _obsZeroBuf = new Float32Array(w * h); // stays zeroed
+            _obsFloatBuf = new Float32Array(w * h * 2);   // RG interleaved
+            _obsZeroBuf = new Float32Array(w * h * 2);    // stays zeroed
             _obsLastW = w;
             _obsLastH = h;
         }
@@ -737,15 +742,26 @@
                 var f = _obsFloatBuf;
                 // The obstacle canvas is composited in screen space (top-down);
                 // GL textures put row 0 at the bottom, so flip once here.
+                // R = alpha (coverage·strength, the historic channel).
+                // G = greenByte·alpha: the compositors draw each collider
+                // with green = its strength (non-premultiplied), so this
+                // premultiply lands G = coverage·strength² — the per-texel
+                // strength channel (05b obsTexelGLSL). Legacy/white content
+                // gives G = R, i.e. strength 1.0 — the safe default (text
+                // walls draw white on purpose).
                 for (var y = 0; y < h; y++) {
                     var src = y * w;
                     var dst = (h - 1 - y) * w;
                     for (var x = 0; x < w; x++) {
-                        f[dst + x] = d[(src + x) * 4 + 3] * (1 / 255);
+                        var si = (src + x) * 4;
+                        var a = d[si + 3] * (1 / 255);
+                        var di = (dst + x) * 2;
+                        f[di] = a;
+                        f[di + 1] = d[si + 1] * (1 / 255) * a;
                     }
                 }
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-                gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RED, gl.FLOAT, f);
+                gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RG, gl.FLOAT, f);
                 // Gap fill applies to the CPU-composited path too (depth-mask
                 // colliders from imported images are the main source of
                 // line-art texture pockets). Follow with the same 1-texel
@@ -777,7 +793,7 @@
                 var h = obstacle.height;
                 _obsEnsureBuffers(w, h);
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-                gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RED, gl.FLOAT, _obsZeroBuf);
+                gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RG, gl.FLOAT, _obsZeroBuf);
             } catch (e) {
                 console.warn('⚠️ Obstacle texture clear failed:', e.message);
             }

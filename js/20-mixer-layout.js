@@ -809,7 +809,7 @@
         // The Fluid gear opens the material picker (the disguised
         // #materialMode select). showPicker needs Chromium 121+; older
         // builds at least get focus so the arrow keys work.
-        var fluidGear = makeChGear('Material mode — Fluid / Paint-Wet / Paint-Thick');
+        var fluidGear = makeChGear('Material mode — Swirl / Gloss Paint (Wetness or Thickness)');
         fluidGear.addEventListener('click', function (e) {
             e.stopPropagation();
             var sel = document.getElementById('materialMode');
@@ -854,13 +854,33 @@
         // Presets
         strip.appendChild(buildPresetsChannel(controls));
 
+        // Help: the one visible way into "How do I…" (js/44-recipes.js) on
+        // desktop; the '/' key is the other. Pinned by 43-ui-visibility so
+        // Simple mode keeps it — it is the way to find what Simple hid.
+        strip.appendChild(buildHelpChannel());
+
         return strip;
+    }
+
+    function buildHelpChannel() {
+        const wrap = document.createElement('div');
+        wrap.className = 'mixer-help';
+        wrap.dataset.uiKey = 'Help';   // 43-ui-visibility (pinned)
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'recipeHelpBtn';
+        btn.className = 'btn--icon';
+        btn.textContent = '?';
+        btn.title = 'How do I… — search every task and get pointed at the control ( / )';
+        btn.setAttribute('aria-label', 'How do I…');
+        wrap.appendChild(btn);
+        return wrap;
     }
 
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
         'Brush Size': 'Brush size for painting fluid — the ⚙ opens brush settings & presets',
-        'Fluid': 'Material mode (Fluid / Paint-Wet / Paint-Thick) + amount — the ⚙ opens the material picker',
+        'Fluid': 'Material mode (Swirl / Gloss Paint — Wetness or Thickness) + amount — the ⚙ opens the material picker',
         'Viscosity': 'Sharpness/detail enhancement',
         'Isolation': 'Motion isolation - how much color follows velocity',
         'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — the ⚙ opens arm colors & symmetry',
@@ -1051,6 +1071,9 @@
         const ch = document.createElement('div');
         ch.className = 'mixer-channel';
         if (accent) ch.dataset.accent = accent;
+        // 43-ui-visibility: the show/hide key ('strip:' + label). Set on
+        // every strip cell so the Interface combo box can list it by name.
+        ch.dataset.uiKey = label;
 
         const slider = document.getElementById(sliderId);
 
@@ -1065,6 +1088,9 @@
         // control row above the fader.
         const matSel = (sliderId === 'curl') ? document.getElementById('materialMode') : null;
         if (matSel) {
+            // Its options are phrases, not one-word channel names — .ch-material
+            // buys the row the width the longest one needs (20-mixer-strip.css).
+            ch.classList.add('ch-material');
             matSel.style.cssText = '';
             lbl.appendChild(matSel);
             // Re-fit the select to its text in the strip's font — deferred a
@@ -1114,6 +1140,7 @@
         const ch = document.createElement('div');
         ch.className = 'mixer-channel ch-wide';
         ch.dataset.accent = 'pink';
+        ch.dataset.uiKey = 'Color';   // 43-ui-visibility
 
         // The swatch sits INLINE with the mode switch instead of on a row of
         // its own: the colour channel was three stacked rows (label+swatch /
@@ -1339,6 +1366,7 @@
     function buildActionsChannel(controls) {
         const wrap = document.createElement('div');
         wrap.className = 'mixer-actions';
+        wrap.dataset.uiKey = 'Transport';   // 43-ui-visibility
 
         // Transport: pause + freeze are compact icon buttons sharing one row;
         // Clear spans the full width below. Two rows instead of three keeps the
@@ -1378,10 +1406,68 @@
     // Presets as a select-style popup (Gabriel, 2026-07-29): one trigger in
     // the strip opens a vertical scrolling list of built-in + user presets,
     // with a sticky "+ New Preset" footer that can never scroll under the
-    // fold (the old flex-wrap chip area hid it once presets multiplied).
+    // fold. 2026-09-02: every preset carries a thumbnail (built-ins baked to
+    // assets/presets/<key>.png by scripts/bake-effect-previews.js, user ones
+    // captured from the canvas at save time by 12-save-load), user presets
+    // can be organised into collapsible groups (persisted in settingsManager
+    // 'presets.groups' + a `group` field on each preset), and the panel is
+    // sized to the viewport so a long list scrolls inside it instead of
+    // running off the bottom of the page.
+    function presetThumbNode(src) {
+        const t = document.createElement('span');
+        t.className = 'preset-thumb';
+        if (src) {
+            const img = document.createElement('img');
+            img.alt = '';
+            img.decoding = 'async';
+            img.addEventListener('error', function () { t.classList.add('is-empty'); });
+            img.src = src;
+            t.appendChild(img);
+        } else {
+            t.classList.add('is-empty');
+        }
+        return t;
+    }
+
+    function presetGroupsState() {
+        const sm = window.settingsManager;
+        let g = sm ? sm.get('presets.groups', null) : null;
+        if (!g || typeof g !== 'object') g = {};
+        if (!Array.isArray(g.order)) g.order = [];
+        if (!g.collapsed || typeof g.collapsed !== 'object') g.collapsed = {};
+        return g;
+    }
+    function presetGroupsSave(g) { const sm = window.settingsManager; if (sm) sm.set('presets.groups', g); }
+    function presetGroupEnsure(name) {
+        name = String(name || '').trim().slice(0, 32);
+        if (!name) return '';
+        const g = presetGroupsState();
+        if (g.order.indexOf(name) < 0) { g.order.push(name); delete g.collapsed[name]; presetGroupsSave(g); }
+        return name;
+    }
+    function presetSetGroup(presetName, group) {
+        if (!window.Settings) return;
+        const s = window.Settings.loadPreset(presetName);
+        if (!s) return;
+        if (group) s.group = group; else delete s.group;
+        // Through the same setter every save uses (the vault wraps it), so the
+        // move lands on disk as well as in localStorage.
+        window.Settings.savePreset(presetName, s);
+    }
+    function presetGroupDelete(name) {
+        const g = presetGroupsState();
+        g.order = g.order.filter(function (x) { return x !== name; });
+        delete g.collapsed[name];
+        presetGroupsSave(g);
+        if (!window.Settings) return;
+        const all = window.Settings.getAllPresets();
+        Object.keys(all).forEach(function (p) { if (all[p] && all[p].group === name) presetSetGroup(p, ''); });
+    }
+
     function buildPresetsChannel(controls) {
         const wrap = document.createElement('div');
         wrap.className = 'mixer-presets-channel';
+        wrap.dataset.uiKey = 'Presets';   // 43-ui-visibility (Simple keeps this one)
 
         // Select-style trigger, shows the active preset name when one is set
         var trigger = document.createElement('button');
@@ -1400,8 +1486,6 @@
         // non-scrolling sibling of the list, so it is ALWAYS visible).
         var panel = document.createElement('div');
         panel.className = 'arm-colors-panel mixer-presets-panel';
-        // Popovers are portaled to <body>, so they carry the paint surface's tint
-        // with them rather than inheriting the app-root system fallback.
         panel.dataset.group = 'core';
         panel.style.display = 'none';
         panel.style.position = 'fixed';
@@ -1416,79 +1500,358 @@
         list.className = 'mixer-presets-list';
         panel.appendChild(list);
 
-        // Move built-in preset buttons into the list; their inline
-        // onclick="applyPreset('…')" IS the load handler, and keeping the
-        // .mixer-preset-btn class keeps 04b updatePresetButtons highlighting.
+        // ── Built in: the legacy buttons, decorated with a thumbnail ──
+        // Their inline onclick="applyPreset('…')" IS the load handler, and the
+        // .mixer-preset-btn class keeps 04b updatePresetButtons highlighting
+        // (by data-preset now that the labels are prose).
+        const builtinBtns = [];
         const presetsDiv = controls.querySelector('.presets');
         if (presetsDiv) {
             while (presetsDiv.firstChild) {
                 var child = presetsDiv.firstChild;
                 if (child.tagName === 'BUTTON') {
                     child.classList.add('mixer-preset-btn');
+                    var label = child.textContent.trim();
+                    var key = child.dataset.preset || label.toLowerCase();
+                    child.dataset.preset = key;
+                    child.textContent = '';
+                    child.appendChild(presetThumbNode('assets/presets/' + key + '.png'));
+                    var nmEl = document.createElement('span');
+                    nmEl.className = 'preset-name';
+                    nmEl.textContent = label;
+                    child.appendChild(nmEl);
+                    child.title = label;
                     child.addEventListener('click', function (e) {
-                        setTriggerLabel(e.currentTarget.textContent.trim());
+                        var n = e.currentTarget.querySelector('.preset-name');
+                        setTriggerLabel(n ? n.textContent : e.currentTarget.textContent.trim());
                     });
+                    builtinBtns.push(child);
                 }
-                list.appendChild(child);
+                presetsDiv.removeChild(child);
             }
         }
 
-        // Separator between built-in and user presets
-        var sep = document.createElement('div');
-        sep.className = 'preset-sep';
-        list.appendChild(sep);
+        // ── Groups: one collapsible block per group ──
+        function groupBlock(id, title, count, opts) {
+            opts = opts || {};
+            const g = presetGroupsState();
+            const block = document.createElement('div');
+            block.className = 'preset-group' + (g.collapsed[id] ? ' collapsed' : '');
+            block.dataset.group = id;
+            const head = document.createElement('div');
+            head.className = 'preset-group-head';
+            head.innerHTML = '<span class="preset-group-chev">▾</span><span class="preset-group-name"></span><span class="preset-group-count"></span>';
+            head.querySelector('.preset-group-name').textContent = title;
+            head.querySelector('.preset-group-count').textContent = count;
+            head.title = 'Click to collapse or expand';
+            head.addEventListener('click', function () {
+                const st = presetGroupsState();
+                st.collapsed[id] = !block.classList.contains('collapsed');
+                presetGroupsSave(st);
+                block.classList.toggle('collapsed', !!st.collapsed[id]);
+            });
+            if (opts.menu) {
+                const more = document.createElement('button');
+                more.type = 'button';
+                more.className = 'preset-more btn--icon';
+                more.textContent = '⋯';
+                more.title = 'Rename or delete this group';
+                more.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    openPresetMenu(more, [
+                        { label: 'Rename group…', run: function () { inlineRename(head, id); } },
+                        { label: 'Delete group (keep presets)', danger: true, run: function () { presetGroupDelete(id); renderMixerUserPresets(); } }
+                    ]);
+                });
+                head.appendChild(more);
+            }
+            block.appendChild(head);
+            const body = document.createElement('div');
+            body.className = 'preset-group-body';
+            block.appendChild(body);
+            return { block: block, body: body };
+        }
+        function inlineRename(head, oldName) {
+            const nameEl = head.querySelector('.preset-group-name');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'mixer-preset-name-input';
+            input.value = oldName;
+            input.maxLength = 32;
+            nameEl.replaceWith(input);
+            input.focus(); input.select();
+            let done = false;
+            const commit = function () {
+                if (done) return; done = true;
+                const nn = presetGroupEnsure(input.value);
+                if (nn && nn !== oldName && window.Settings) {
+                    const all = window.Settings.getAllPresets();
+                    Object.keys(all).forEach(function (p) { if (all[p] && all[p].group === oldName) presetSetGroup(p, nn); });
+                    const g = presetGroupsState();
+                    g.order = g.order.filter(function (x) { return x !== oldName; });
+                    if (g.collapsed[oldName]) { g.collapsed[nn] = true; delete g.collapsed[oldName]; }
+                    presetGroupsSave(g);
+                }
+                renderMixerUserPresets();
+            };
+            input.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); commit(); } if (e.key === 'Escape') { e.preventDefault(); done = true; renderMixerUserPresets(); } });
+            input.addEventListener('click', function (e) { e.stopPropagation(); });
+            input.addEventListener('blur', commit);
+        }
 
-        // Container for dynamically rendered user presets
-        var userWrap = document.createElement('div');
-        userWrap.id = 'mixerUserPresets';
-        userWrap.className = 'mixer-user-presets';
-        list.appendChild(userWrap);
+        // Small context menu (reuses the brush-shape menu chrome, body-mounted).
+        let menuEl = null;
+        function closePresetMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+        function openPresetMenu(anchor, items) {
+            closePresetMenu();
+            const m = document.createElement('div');
+            m.className = 'brush-shape-menu preset-menu';
+            m.dataset.group = 'core';
+            items.forEach(function (it) {
+                if (it.head) {
+                    const h = document.createElement('div'); h.className = 'brush-shape-menu-head'; h.textContent = it.head; m.appendChild(h); return;
+                }
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'brush-shape-menu-item' + (it.danger ? ' btn--destructive' : '');
+                b.textContent = it.label;
+                b.addEventListener('click', function (e) { e.stopPropagation(); closePresetMenu(); it.run(); });
+                m.appendChild(b);
+            });
+            document.body.appendChild(m);
+            const z = window.UIScale ? window.UIScale.get() : 1;
+            const r = anchor.getBoundingClientRect();
+            const w = m.offsetWidth * z, h = m.offsetHeight * z;
+            let left = r.right - w, top = r.bottom + 4;
+            if (left < 4) left = 4;
+            if (top + h > window.innerHeight - 4) top = Math.max(4, r.top - h - 4);
+            m.style.left = (left / z) + 'px';
+            m.style.top = (top / z) + 'px';
+            menuEl = m;
+            setTimeout(function () { document.addEventListener('click', closePresetMenu, { once: true }); }, 0);
+        }
 
-        // Sticky footer: "+ New Preset" + inline name input
+        function renderMixerUserPresets() {
+            if (!window.Settings) return;
+            closePresetMenu();
+            list.innerHTML = '';
+            const presets = window.Settings.getAllPresets();
+            const names = Object.keys(presets).sort(function (a, b) {
+                return ((presets[b] && presets[b].timestamp) || 0) - ((presets[a] && presets[a].timestamp) || 0);
+            });
+            const gs = presetGroupsState();
+            const byGroup = {};
+            names.forEach(function (n) { const g = (presets[n] && presets[n].group) || ''; (byGroup[g] = byGroup[g] || []).push(n); });
+            // Groups that exist but are empty still show (you just made one).
+            gs.order.forEach(function (g) { if (!byGroup[g]) byGroup[g] = []; });
+
+            // Built in
+            const bi = groupBlock('__builtin', 'Built in', builtinBtns.length, {});
+            builtinBtns.forEach(function (b) { bi.body.appendChild(b); });
+            list.appendChild(bi.block);
+
+            const groupNames = gs.order.slice();
+            Object.keys(byGroup).forEach(function (g) { if (g && groupNames.indexOf(g) < 0) groupNames.push(g); });
+
+            function row(name) {
+                const r = document.createElement('div');
+                r.className = 'mixer-user-preset-row';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'mixer-user-preset-btn';
+                btn.appendChild(presetThumbNode(presets[name] && presets[name].thumb));
+                const nm = document.createElement('span');
+                nm.className = 'preset-name';
+                nm.textContent = name;
+                btn.appendChild(nm);
+                btn.title = 'Load "' + name + '"';
+                btn.addEventListener('click', function () {
+                    const snapshot = presets[name];
+                    if (snapshot && typeof window.applyPresetSnapshotFull === 'function') window.applyPresetSnapshotFull(snapshot);
+                    else if (snapshot && typeof window.applyPresetSnapshot === 'function') window.applyPresetSnapshot(snapshot);
+                    if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
+                    document.querySelectorAll('.mixer-user-preset-btn, .user-preset-btn').forEach(function (b) {
+                        const n = b.querySelector('.preset-name');
+                        b.classList.toggle('active', (n ? n.textContent : b.textContent) === name);
+                    });
+                    setTriggerLabel(name);
+                });
+                r.appendChild(btn);
+                const more = document.createElement('button');
+                more.type = 'button';
+                more.className = 'preset-more btn--icon';
+                more.textContent = '⋯';
+                more.title = 'Move, or delete';
+                more.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const cur = (presets[name] && presets[name].group) || '';
+                    const items = [{ head: name }];
+                    presetGroupsState().order.forEach(function (g) {
+                        if (g === cur) return;
+                        items.push({ label: 'Move to ' + g, run: function () { presetSetGroup(name, g); renderMixerUserPresets(); } });
+                    });
+                    items.push({ label: 'Move to a new group…', run: function () { askNewGroup(function (g) { if (g) { presetSetGroup(name, g); renderMixerUserPresets(); revealGroup(g); } }); } });
+                    if (cur) items.push({ label: 'Remove from ' + cur, run: function () { presetSetGroup(name, ''); renderMixerUserPresets(); } });
+                    items.push({ label: 'Delete preset', danger: true, run: function () {
+                        const go = function () {
+                            window.Settings.deletePreset(name);
+                            if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
+                        };
+                        if (window.appConfirm) window.appConfirm({ title: 'Delete "' + name + '"?', confirmLabel: 'Delete' }).then(function (ok) { if (ok) go(); });
+                        else if (confirm('Delete preset "' + name + '"?')) go();
+                    } });
+                    openPresetMenu(more, items);
+                });
+                r.appendChild(more);
+                return r;
+            }
+
+            groupNames.forEach(function (g) {
+                const items = byGroup[g] || [];
+                const blk = groupBlock(g, g, items.length, { menu: true });
+                items.forEach(function (n) { blk.body.appendChild(row(n)); });
+                list.appendChild(blk.block);
+            });
+            const loose = byGroup[''] || [];
+            if (loose.length) {
+                const blk = groupBlock('__loose', groupNames.length ? 'Saved' : 'Saved', loose.length, {});
+                loose.forEach(function (n) { blk.body.appendChild(row(n)); });
+                list.appendChild(blk.block);
+            }
+        }
+
+        // ── Sticky footer: "+ New Preset" → name + group, then save ──
         var footer = document.createElement('div');
         footer.className = 'mixer-presets-footer';
         panel.appendChild(footer);
 
-        var saveBtn = document.createElement('button');
-        saveBtn.className = 'mixer-preset-save';
-        saveBtn.textContent = '+ New Preset';
-        saveBtn.title = 'Save current settings as preset';
-        footer.appendChild(saveBtn);
-
+        var form = document.createElement('div');
+        form.className = 'mixer-preset-save-form';
+        form.style.display = 'none';
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.id = 'mixerPresetNameInput';
         nameInput.className = 'mixer-preset-name-input';
-        nameInput.placeholder = 'Name...';
+        nameInput.placeholder = 'Name…';
         nameInput.maxLength = 24;
         nameInput.spellcheck = false;
         nameInput.autocomplete = 'off';
-        nameInput.style.display = 'none';
-        footer.appendChild(nameInput);
+        form.appendChild(nameInput);
+        var groupSel = document.createElement('select');
+        groupSel.id = 'mixerPresetGroupSel';
+        groupSel.className = 'mixer-preset-group-sel';
+        groupSel.title = 'Which group to save it in';
+        form.appendChild(groupSel);
+        var groupInput = document.createElement('input');
+        groupInput.type = 'text';
+        groupInput.className = 'mixer-preset-name-input';
+        groupInput.placeholder = 'New group…';
+        groupInput.maxLength = 32;
+        groupInput.spellcheck = false;
+        groupInput.style.display = 'none';
+        form.appendChild(groupInput);
+        footer.appendChild(form);
 
-        // Open/close (same idiom as the arm-colors popup)
-        var PANEL_W = 210;
+        var saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'mixer-preset-save';
+        saveBtn.textContent = '+ New Preset';
+        saveBtn.title = 'Save current settings as preset';
+        footer.appendChild(saveBtn);
+        var newGroupBtn = document.createElement('button');
+        newGroupBtn.type = 'button';
+        newGroupBtn.className = 'mixer-preset-save mixer-preset-new-group';
+        newGroupBtn.textContent = '+ Group';
+        newGroupBtn.title = 'Make a new, empty group (move presets into it with their \u22EF menu)';
+        footer.appendChild(newGroupBtn);
+        newGroupBtn.addEventListener('click', function () {
+            askNewGroup(function (g) { if (g) { renderMixerUserPresets(); revealGroup(g); } });
+        });
+        // Open the group (if it was collapsed) and scroll its header into view,
+        // so "I just made a group" is answered by seeing it.
+        function revealGroup(g) {
+            const st = presetGroupsState();
+            if (st.collapsed[g]) { delete st.collapsed[g]; presetGroupsSave(st); }
+            let blk = null;
+            list.querySelectorAll('.preset-group').forEach(function (b) { if (b.dataset.group === g) blk = b; });
+            if (!blk) return;
+            blk.classList.remove('collapsed');
+            try { blk.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+        }
+
+        function fillGroupSel() {
+            groupSel.innerHTML = '';
+            const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'No group'; groupSel.appendChild(o0);
+            presetGroupsState().order.forEach(function (g) { const o = document.createElement('option'); o.value = g; o.textContent = g; groupSel.appendChild(o); });
+            const on = document.createElement('option'); on.value = '__new'; on.textContent = 'New group…'; groupSel.appendChild(on);
+            groupInput.style.display = 'none';
+        }
+        groupSel.addEventListener('change', function () {
+            const isNew = groupSel.value === '__new';
+            groupInput.style.display = isNew ? '' : 'none';
+            if (isNew) groupInput.focus();
+        });
+        // Group-only mode of the footer form: just the group-name field and a
+        // "Create" button. `groupOnlyCb` being set is what tells the shared
+        // Enter/Escape/click handlers to create a group instead of a preset.
+        // (The earlier version hung an onkeydown on the input, which fired
+        // AFTER the addEventListener Enter handler had already run doSave →
+        // cancelSave and emptied the field, so no group was ever created.)
+        var groupOnlyCb = null;
+        function askNewGroup(cb) {
+            openForm();
+            groupOnlyCb = cb;
+            nameInput.style.display = 'none';
+            groupSel.style.display = 'none';
+            groupInput.style.display = '';
+            groupInput.placeholder = 'Group name\u2026';
+            groupInput.value = '';
+            saveBtn.textContent = 'Create \u2713';
+            groupInput.focus();
+        }
+        function commitNewGroup() {
+            const cb = groupOnlyCb;
+            const g = presetGroupEnsure(groupInput.value);
+            cancelSave();
+            if (cb) cb(g);
+        }
+
+        // Open/close (same idiom as the arm-colors popup). Sized to the
+        // viewport: the list scrolls inside the panel, and a trigger that has
+        // moved down the page (mobile drawer) pushes the panel up rather than
+        // off the bottom.
+        var PANEL_W = 236;
         function positionPanel() {
             var z = window.UIScale ? window.UIScale.get() : 1;
             var rect = trigger.getBoundingClientRect();
             var left = rect.left + rect.width / 2 - (PANEL_W * z) / 2;
             left = Math.max(4, Math.min(left, window.innerWidth - PANEL_W * z - 4));
+            var top = rect.bottom + 6;
+            var maxH = window.innerHeight - top - 8;
+            if (maxH < 260) {
+                top = Math.max(8, window.innerHeight - 8 - Math.min(window.innerHeight - 16, 560));
+                maxH = window.innerHeight - top - 8;
+            }
             panel.style.left = (left / z) + 'px';
-            panel.style.top = ((rect.bottom + 6) / z) + 'px';
+            panel.style.top = (top / z) + 'px';
             panel.style.width = PANEL_W + 'px';
+            panel.style.maxHeight = (maxH / z) + 'px';
         }
         trigger.addEventListener('click', function (e) {
             e.stopPropagation();
             var open = panel.style.display !== 'none';
             panel.style.display = open ? 'none' : 'flex';
             trigger.classList.toggle('active', !open);
-            if (!open) { positionPanel(); renderMixerUserPresets(); }
+            if (!open) { renderMixerUserPresets(); positionPanel(); }
+            else closePresetMenu();
         });
         document.addEventListener('click', function (e) {
             if (panel.style.display !== 'none' && !panel.contains(e.target)
-                && e.target !== trigger && !trigger.contains(e.target)) {
+                && e.target !== trigger && !trigger.contains(e.target)
+                && !(menuEl && menuEl.contains(e.target))) {
                 panel.style.display = 'none';
                 trigger.classList.remove('active');
+                closePresetMenu();
             }
         });
         panel.addEventListener('click', function (e) { e.stopPropagation(); });
@@ -1497,34 +1860,38 @@
         });
 
         // Wire save flow
-        saveBtn.addEventListener('click', function() {
-            if (nameInput.style.display === 'none') {
-                nameInput.style.display = '';
-                nameInput.value = '';
-                nameInput.focus();
-                saveBtn.textContent = 'Save \u2713';
-            } else {
-                doSave();
-            }
+        function openForm() {
+            fillGroupSel();
+            form.style.display = '';
+            nameInput.style.display = '';
+            nameInput.value = '';
+            saveBtn.textContent = 'Save \u2713';
+        }
+        saveBtn.addEventListener('click', function () {
+            if (form.style.display === 'none') { openForm(); nameInput.focus(); }
+            else if (groupOnlyCb) commitNewGroup();
+            else doSave();
         });
-
-        nameInput.addEventListener('keydown', function(e) {
+        nameInput.addEventListener('keydown', function (e) {
+            e.stopPropagation();
             if (e.key === 'Enter') { e.preventDefault(); doSave(); }
             if (e.key === 'Escape') { e.preventDefault(); cancelSave(); }
         });
-
-        nameInput.addEventListener('blur', function() {
-            // Small delay so click on saveBtn registers first
-            setTimeout(function() {
-                if (nameInput.style.display !== 'none' && !nameInput.value.trim()) {
-                    cancelSave();
-                }
-            }, 200);
+        groupInput.addEventListener('keydown', function (e) {
+            e.stopPropagation();
+            if (e.key === 'Enter') { e.preventDefault(); if (groupOnlyCb) commitNewGroup(); else doSave(); }
+            if (e.key === 'Escape') { e.preventDefault(); const cb = groupOnlyCb; cancelSave(); if (cb) cb(''); }
         });
 
         function cancelSave() {
-            nameInput.style.display = 'none';
+            form.style.display = 'none';
+            nameInput.style.display = '';
             nameInput.value = '';
+            groupSel.style.display = '';
+            groupInput.value = '';
+            groupInput.style.display = 'none';
+            groupInput.placeholder = 'New group\u2026';
+            groupOnlyCb = null;
             saveBtn.textContent = '+ New Preset';
         }
 
@@ -1537,73 +1904,24 @@
                 nameInput.style.border = '1px solid #ff6b6b';
                 nameInput.placeholder = 'Name exists!';
                 nameInput.value = '';
-                setTimeout(function() {
+                setTimeout(function () {
                     nameInput.style.border = '';
-                    nameInput.placeholder = 'Name...';
+                    nameInput.placeholder = 'Name…';
                 }, 1500);
                 return;
             }
+            var group = groupSel.value === '__new' ? presetGroupEnsure(groupInput.value) : (groupSel.value || '');
             var snapshot = typeof window.capturePresetSnapshot === 'function' ? window.capturePresetSnapshot() : null;
             if (!snapshot) { cancelSave(); return; }
+            if (group) snapshot.group = group;
             var ok = typeof window.saveUserPreset === 'function'
                 ? window.saveUserPreset(name, snapshot)
                 : window.Settings.savePreset(name, snapshot);
+            void ok;
             cancelSave();
             if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
         }
 
-        // Render user presets into the popup list (rows: load + delete)
-        function renderMixerUserPresets() {
-            if (!userWrap || !window.Settings) return;
-            var presets = window.Settings.getAllPresets();
-            var names = Object.keys(presets).sort(function(a, b) {
-                return ((presets[b] && presets[b].timestamp) || 0) - ((presets[a] && presets[a].timestamp) || 0);
-            });
-            userWrap.innerHTML = '';
-            names.forEach(function(name) {
-                var row = document.createElement('div');
-                row.className = 'mixer-user-preset-row';
-                var btn = document.createElement('button');
-                btn.className = 'mixer-user-preset-btn'; // styled in 20-mixer-strip.css
-                btn.textContent = name;
-                btn.title = 'Load "' + name + '"';
-                btn.addEventListener('click', function() {
-                    var snapshot = presets[name];
-                    // Full-state apply — see 12-save-load: a preset click must
-                    // land on a complete deterministic state.
-                    if (snapshot && typeof window.applyPresetSnapshotFull === 'function') {
-                        window.applyPresetSnapshotFull(snapshot);
-                    } else if (snapshot && typeof window.applyPresetSnapshot === 'function') {
-                        window.applyPresetSnapshot(snapshot);
-                    }
-                    // Built-in active state clears through the real state owner
-                    // (04b activePreset), not a cosmetic class sweep.
-                    if (typeof window.clearActivePreset === 'function') window.clearActivePreset();
-                    // Highlight this preset in BOTH user-preset surfaces
-                    // (strip + sidebar list render the same presets).
-                    document.querySelectorAll('.mixer-user-preset-btn, .user-preset-btn').forEach(function(b) {
-                        b.classList.toggle('active', b.textContent === name);
-                    });
-                    setTriggerLabel(name);
-                });
-                row.appendChild(btn);
-                var del = document.createElement('button');
-                del.className = 'mixer-user-preset-delete';
-                del.textContent = '×';
-                del.title = 'Delete "' + name + '"';
-                del.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    if (!confirm('Delete preset "' + name + '"?')) return;
-                    window.Settings.deletePreset(name);
-                    if (triggerLabel.textContent === name) setTriggerLabel(null);
-                    if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
-                });
-                row.appendChild(del);
-                userWrap.appendChild(row);
-            });
-        }
-
-        // Initial render + expose for refresh
         setTimeout(renderMixerUserPresets, 500);
         window.renderMixerUserPresets = renderMixerUserPresets;
 
@@ -1988,8 +2306,8 @@
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
                          'pressureIteration', 'curl', 'sharpness', 'multiplier',
                          'velocityInfluence', 'brushSize'],
-            effects: ['enableLighting', 'enableLightShift', 'microDetailToggle',
-                      'lightIntensity', 'lightAmbient', 'lightSpeed', 'clarity', 'vibrance',
+            effects: ['enableLighting', 'enableLightShift',
+                      'lightIntensity', 'lightAmbient', 'lightSpeed', 'vibrance', 'ridges',
                       'glowToggle', 'glowIntensity', 'glowThreshold',
                       'scatterToggle', 'scatterAmount', 'scatterReach', 'scatterSource', 'scatterBlockToggle',
                       'shadingIntensity', 'displayShadingToggle',
@@ -2327,7 +2645,7 @@
         pathLayersSubsection.className = 'layers-subsection';
         var pathHeader = document.createElement('div');
         pathHeader.className = 'layers-subsection-header';
-        pathHeader.innerHTML = '<span class="layers-subsection-title">✏️ Path Layers</span>';
+        pathHeader.innerHTML = '<span class="layers-subsection-title">Path Layers</span>';
         var newPathBtn = document.createElement('button');
         newPathBtn.type = 'button';
         newPathBtn.className = 'subsection-add-btn';
@@ -2720,7 +3038,7 @@
         moveCheckboxGroup('macCormackToggle', body);
         moveCheckboxGroup('multigridToggle', body);
         // Multigrid tuning panel — same toggle+panel pattern as
-        // microDetailPanel/glowPanel in the Effects section
+        // glowPanel in the Effects section
         const multigridPanel = document.getElementById('multigridPanel');
         if (multigridPanel) body.appendChild(multigridPanel);
 
@@ -2858,57 +3176,200 @@
         })();
     }
 
+    // ── Effect rows (2026-09-02) ───────────────────────────────────────
+    // One component for every effect switch: [thumbnail][checkbox][label].
+    // The thumbnail is a still of the effect; hovering it (or tabbing to it)
+    // opens a card to the LEFT of the sidebar, over the canvas, with a short
+    // animated preview and two sentences on what the effect does. Clicking
+    // the thumbnail toggles the switch, same as the label. Assets are
+    // assets/effects/<key>.png (still, 64px square) and <key>.gif (preview),
+    // baked out of the real app by scripts/bake-effect-previews.js; a missing
+    // image leaves a plain plate, never a broken-image glyph.
+    //
+    // The copy answers "what will this do to my painting" in plain words —
+    // no emoji, no parenthetical subtitles (the old labels carried both).
+    const FX_INFO = {
+        'light-source': { title: 'Light Source',
+            text: 'A movable light above the canvas. Dense paint catches it like a relief map. Drag the dot to move the light, or let it wander.' },
+        'light-shift':  { title: 'Light Shift',
+            text: 'Blown-out, overexposed paint takes its colour from a path you draw on the wheel. The playhead loops along it, so your brightest areas keep shifting hue.' },
+        'glow':         { title: 'Glow',
+            text: 'Bright paint bleeds light into its surroundings. Intensity sets how much; Threshold sets how bright paint has to be before it glows.' },
+        'scatter':      { title: 'Scatter',
+            text: 'Light shafts. The glow travels across the canvas from the light source or your brush, and colliders cast shadows in the beams.' },
+        'shading':      { title: 'Surface Shading',
+            text: 'Lights the paint as a surface: ridges and pools pick up highlight and shadow. Relief sets the height, Gloss the shine. Clarity, Vibrance, Swirl and Ridges below refine the same surface.' },
+        'gravity':      { title: 'Gravity Direction',
+            text: 'A steady push across the whole canvas. Aim it with the pad: down is gravity, up is lift, sideways is wind. Every brush feels it.' },
+        'border':       { title: 'Border',
+            text: 'Open edges. Paint that reaches the rim drains off the canvas instead of bouncing back in. Width sets how far in the drain reaches.' },
+        'breathing':    { title: 'Breathing',
+            text: 'The canvas breathes with you: two rings grow while you breathe in and shrink while you breathe out, and the paint between them, in your brush colour, moves with them and slowly swirls. The rings are walls, so the rest of the canvas is untouched; a word keeps time. Relaxed, Box or 4-7-8.' }
+    };
+
+    let fxTipEl = null, fxTipTimer = 0;
+
+    function fxTipBuild() {
+        if (fxTipEl) return fxTipEl;
+        const el = document.createElement('div');
+        el.className = 'fx-tip';
+        el.innerHTML = '<div class="fx-tip-media"></div><div class="fx-tip-title"></div><div class="fx-tip-text"></div>';
+        document.body.appendChild(el);
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fxTipHide(); }, true);
+        // The card is anchored to a row; when the sidebar scrolls the anchor
+        // moves and the card would float free of it.
+        const sb = document.getElementById('sidebar-right');
+        if (sb) sb.addEventListener('scroll', fxTipHide, { passive: true });
+        fxTipEl = el;
+        return el;
+    }
+
+    function fxTipShow(row, key) {
+        const info = FX_INFO[key] || { title: key, text: '' };
+        const el = fxTipBuild();
+        el.querySelector('.fx-tip-title').textContent = info.title;
+        el.querySelector('.fx-tip-text').textContent = info.text;
+        // A fresh <img> every time: an animated GIF only restarts from its
+        // first frame on a new element, and the file is cached anyway.
+        const media = el.querySelector('.fx-tip-media');
+        media.innerHTML = '';
+        media.classList.remove('is-empty');
+        const img = new Image();
+        img.alt = '';
+        img.addEventListener('error', function () { media.classList.add('is-empty'); });
+        img.src = 'assets/effects/' + key + '.gif';
+        media.appendChild(img);
+        el.classList.add('show');
+        // Left of the row, over the canvas. Screen px in, zoomed CSS px out:
+        // the card carries zoom: var(--ui-scale) like every floating panel
+        // (init-responsive.css), so its left/top are divided by the scale
+        // while the row's rect is already in screen px.
+        const z = window.UIScale ? window.UIScale.get() : 1;
+        const r = row.getBoundingClientRect();
+        const w = el.offsetWidth * z, h = el.offsetHeight * z;
+        let left = r.left - w - 10;
+        if (left < 4) left = Math.min(r.right + 10, window.innerWidth - w - 4);
+        let top = r.top - 6;
+        if (top + h > window.innerHeight - 4) top = window.innerHeight - h - 4;
+        if (top < 4) top = 4;
+        el.style.left = (left / z) + 'px';
+        el.style.top = (top / z) + 'px';
+    }
+
+    function fxTipHide() {
+        clearTimeout(fxTipTimer);
+        fxTipTimer = 0;
+        if (fxTipEl) fxTipEl.classList.remove('show');
+    }
+
+    // Decorate the checkbox row for `checkboxId` as an effect row. With a
+    // parent the row is MOVED there first (moveCheckboxGroup semantics);
+    // without one it is decorated in place. The section is built DETACHED,
+    // so the checkbox is looked up BEFORE the move — afterwards
+    // getElementById cannot see it — and a row already living in a moved
+    // subtree (Scatter, inside the Glow panel) is passed in as `cbEl`.
+    // Returns the row.
+    function fxRow(checkboxId, key, label, parent, cbEl) {
+        const cb = cbEl || document.getElementById(checkboxId);
+        if (!cb) return null;
+        if (parent) moveCheckboxGroup(checkboxId, parent);
+        const row = cb.closest('.checkbox-group') || cb.closest('.control-group') || cb.parentElement;
+        if (!row || row.dataset.fx) return row;
+        row.classList.add('fx-row');
+        row.dataset.fx = key;
+        // The card explains the effect; a second, native tooltip on the row
+        // would just fight it.
+        row.removeAttribute('title');
+        const lbl = row.querySelector('label[for="' + checkboxId + '"]');
+        if (lbl) lbl.textContent = label;
+
+        const thumb = document.createElement('span');
+        thumb.className = 'fx-thumb';
+        thumb.tabIndex = 0;
+        thumb.setAttribute('role', 'img');
+        thumb.setAttribute('aria-label', 'Preview ' + label);
+        const img = document.createElement('img');
+        img.alt = '';
+        img.decoding = 'async';
+        img.loading = 'lazy';
+        img.addEventListener('error', function () { thumb.classList.add('is-empty'); });
+        img.src = 'assets/effects/' + key + '.png';
+        thumb.appendChild(img);
+        row.insertBefore(thumb, row.firstChild);
+
+        thumb.addEventListener('mouseenter', function () {
+            clearTimeout(fxTipTimer);
+            fxTipTimer = setTimeout(function () { fxTipShow(row, key); }, 160);
+        });
+        thumb.addEventListener('mouseleave', fxTipHide);
+        thumb.addEventListener('focus', function () { fxTipShow(row, key); });
+        thumb.addEventListener('blur', fxTipHide);
+        thumb.addEventListener('click', function () { cb.click(); });
+        thumb.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); cb.click(); }
+        });
+        return row;
+    }
+
     function buildEffectsSection(controls) {
         const { sec, body } = makeSection('Effects', 'expressive', true);
 
-        // Curl-noise micro-swirl (dye advection wisps)
-        moveControlGroup('swirl', body);
-        // Sharpen kernel scale (coarse emboss at high values)
-        moveControlGroup('ridges', body);
+        // ── Lighting: three switches, no headings, tight ──
+        // Light Source, Light Shift and Glow (with Scatter inside Glow's panel,
+        // where 05e nests it) are the same idea — where the light comes from
+        // and what it does to bright paint — so they sit as one cluster.
+        const lighting = document.createElement('div');
+        lighting.className = 'fx-cluster';
+        fxRow('enableLighting', 'light-source', 'Light Source', lighting);
+        const lightControls = document.getElementById('lightSourceControls');
+        if (lightControls) lighting.appendChild(lightControls);
+        fxRow('enableLightShift', 'light-shift', 'Light Shift', lighting);
+        const shiftControls = document.getElementById('lightShiftControls');
+        if (shiftControls) lighting.appendChild(shiftControls);
+        fxRow('glowToggle', 'glow', 'Glow', lighting);
+        const glowPanel = document.getElementById('glowPanel');
+        if (glowPanel) {
+            lighting.appendChild(glowPanel);
+            fxRow('scatterToggle', 'scatter', 'Scatter', null, glowPanel.querySelector('#scatterToggle'));
+        }
+        body.appendChild(lighting);
 
-        // Surface shading (Pavel-style pseudo-normal lighting)
-        moveCheckboxGroup('displayShadingToggle', body);
-        moveEl('shadingIntensityGroup', body);
+        // ── Surface: shading, with everything that refines it inside ──
+        // Ridges and Vibrance live in shadingIntensityGroup (index.html) next
+        // to Intensity, Relief and Gloss, so the Surface Shading switch shows
+        // and hides all five together (05e drives the group). Their values
+        // still apply while hidden — a preset that carries Ridges with
+        // shading off keeps its look; the switch only decides what is shown.
+        // (Swirl, Clarity and the Micro Detail switch left the panel on
+        // 2026-09-03 — they did not read as doing anything.)
+        const surface = document.createElement('div');
+        surface.className = 'fx-group';
+        fxRow('displayShadingToggle', 'shading', 'Surface Shading', surface);
+        const shadingGroup = document.getElementById('shadingIntensityGroup');
+        if (shadingGroup) surface.appendChild(shadingGroup);
+        body.appendChild(surface);
 
-        // Constant pressure field (ambient gravity / lift). Lived in the Brush
-        // panel's Pressure section while it was being built, which put a
-        // canvas-wide effect behind a brush mode — you had to hold the right
-        // tool to find the switch for something that never stops running. It is
-        // an effect, so it sits with the effects.
-        // Grab the refs BEFORE moving: these moves take the nodes out of the
-        // document (this section is detached until the caller appends it, and
-        // the sidebar it goes into is detached too), so a lookup afterwards
-        // finds nothing.
+        // ── Gravity Direction (was Constant Pressure) ──
+        // A canvas-wide push aimed with the pad. Lived in the Brush panel's
+        // Pressure section while it was being built, which put a canvas-wide
+        // effect behind a brush mode. Grab the refs BEFORE moving: these moves
+        // take the nodes out of the document (this section is detached until
+        // the caller appends it), so a lookup afterwards finds nothing.
         const pressureCheck = document.getElementById('pressureConstant');
-        moveCheckboxGroup('pressureConstant', body);
+        fxRow('pressureConstant', 'gravity', 'Gravity Direction', body);
         const pressureControls = document.getElementById('pressureFieldControls');
         if (pressureControls) body.appendChild(pressureControls);
         wirePressureField(pressureCheck, pressureControls);
 
-        // Overflow (open canvas edges) + its Border width. Sits with the
-        // pressure field because both are canvas-wide simulation behaviour,
-        // not post-FX like the lighting and glow blocks below.
-        moveCheckboxGroup('overflowToggle', body);
+        // ── Border (was Overflow): open canvas edges + the drain's width ──
+        fxRow('overflowToggle', 'border', 'Border', body);
         const overflowPanel = document.getElementById('overflowPanel');
         if (overflowPanel) body.appendChild(overflowPanel);
 
-        moveCheckboxGroup('enableLighting', body);
-        const lightControls = document.getElementById('lightSourceControls');
-        if (lightControls) body.appendChild(lightControls);
-
-        moveCheckboxGroup('enableLightShift', body);
-        const shiftControls = document.getElementById('lightShiftControls');
-        if (shiftControls) body.appendChild(shiftControls);
-
-        // Micro Detail toggle + panel
-        moveCheckboxGroup('microDetailToggle', body);
-        const microDetailPanel = document.getElementById('microDetailPanel');
-        if (microDetailPanel) body.appendChild(microDetailPanel);
-
-        // Glow toggle + panel
-        moveCheckboxGroup('glowToggle', body);
-        const glowPanel = document.getElementById('glowPanel');
-        if (glowPanel) body.appendChild(glowPanel);
+        // ── Breathing: a guided breath the canvas follows (js/45-breathing.js) ──
+        fxRow('breathingToggle', 'breathing', 'Breathing', body);
+        const breathingPanel = document.getElementById('breathingPanel');
+        if (breathingPanel) body.appendChild(breathingPanel);
 
         return sec;
     }
@@ -4474,7 +4935,9 @@
             var i = document.createElement('input');
             i.type = 'number'; i.id = id; i.min = String(min); i.max = String(max);
             i.step = String(step); i.title = title;
-            i.style.cssText = FIELD + 'width:100%;text-align:center;';
+            // height matches the 28px the sidebar select rule forces, so the
+            // Size / Weight row sits level instead of bottom-ragged.
+            i.style.cssText = FIELD + 'width:100%;text-align:center;height:28px;box-sizing:border-box;';
             i.addEventListener('input', function () {
                 var v = parseFloat(i.value);
                 if (isNaN(v)) return;
@@ -4500,6 +4963,12 @@
         function colorInput(id, title, onCommit) {
             var c = document.createElement('input');
             c.type = 'color'; c.id = id; c.title = title;
+            // .text-swatch: the global input[type=color] rules shape the round
+            // pigment discs, including a 50% radius on the ::-webkit-color-swatch
+            // pseudo-elements that inline styles cannot reach — without the class
+            // override (css/22-overlays.css) this full-width well renders as a
+            // giant ellipse.
+            c.className = 'text-swatch';
             c.style.cssText = 'width:100%;height:22px;padding:0;border:1px solid rgba(255,255,255,0.12);' +
                               'border-radius:4px;background:transparent;cursor:pointer;';
             c.addEventListener('input', function () { onCommit(c.value); });
@@ -4522,7 +4991,23 @@
                 onCommit(v);
             });
             g.appendChild(lbl); g.appendChild(s);
-            g.setValue = function (v) { s.value = String(v); disp.textContent = fmt(v); };
+            g.setValue = function (v) {
+                s.value = String(v);
+                // The fader's heat fill is painted from --min/--max/--val
+                // (css/slider-styles.css), and js/06-slider-updater.js only
+                // refreshes --val on a real input/change event. Assigning
+                // .value fires neither, so without this the orange fill stays
+                // stranded at whatever it was when the input was inserted —
+                // the range MIDPOINT — while the thumb sits at the true
+                // value. Read it back off the element so the fill tracks the
+                // thumb exactly, step-snapping included.
+                try {
+                    s.style.setProperty('--min', s.min);
+                    s.style.setProperty('--max', s.max);
+                    s.style.setProperty('--val', s.value);
+                } catch (_) {}
+                disp.textContent = fmt(v);
+            };
             return g;
         }
 
@@ -4837,7 +5322,9 @@
         bgToggle.type = 'checkbox';
         bgToggle.id = 'textOverlayBgToggle';
         bgToggle.title = 'Draw a filled box behind the text';
-        bgToggle.style.cssText = 'margin:0;flex:none;cursor:pointer;';
+        // 14px to match the panel's other checkboxes (the sidebar
+        // .checkbox-group rule) — the bare global rule would make it 18px.
+        bgToggle.style.cssText = 'margin:0;flex:none;cursor:pointer;width:14px;height:14px;';
         bgToggle.addEventListener('change', function () {
             commit({ bgEnabled: bgToggle.checked });
             syncBgEnabled();
@@ -5028,8 +5515,8 @@
         // off → three fire-and-forget scenes (30-audio-scenes.js) → min → full
         modeSel.innerHTML =
             '<option value="off" selected>Off</option>' +
-            '<option value="tunnel">🌀 Tunnel</option>' +
-            '<option value="timing">🎯 Timing Only</option>' +
+            '<option value="tunnel">Tunnel</option>' +
+            '<option value="timing">Timing Only</option>' +
             '<option value="min">Minimized</option>' +
             '<option value="full">Full</option>';
         modeGroup.appendChild(modeLbl);
@@ -5866,7 +6353,10 @@
         progressWrap.style.cssText = 'display:none;height:4px;background:rgba(0,0,0,0.3);border-radius:2px;overflow:hidden;margin-bottom:12px;';
         var progressBar = document.createElement('div');
         progressBar.id = 'exportProgressBar';
-        progressBar.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,#3fb950,#58a6ff);transition:width 0.2s;';
+        // No width transition: 24-video-export writes this per captured
+        // frame, and a perpetually running transition left style dirty on
+        // every rAF of the export (a forced style/layout pass per frame).
+        progressBar.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,#3fb950,#58a6ff);';
         progressWrap.appendChild(progressBar);
         body.appendChild(progressWrap);
 
@@ -6258,7 +6748,11 @@
 
                 var btn = document.createElement('button');
                 btn.className = 'user-preset-btn';
-                btn.textContent = name;
+                btn.appendChild(presetThumbNode(presets[name] && presets[name].thumb));
+                var nm = document.createElement('span');
+                nm.className = 'preset-name';
+                nm.textContent = name;
+                btn.appendChild(nm);
                 btn.title = 'Load "' + name + '"';
                 btn.addEventListener('click', function() {
                     // Full-state apply — see 12-save-load: a preset click must

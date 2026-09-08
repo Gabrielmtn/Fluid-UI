@@ -87,6 +87,9 @@ async function connect(port) {
         evalFile(path, opts) {
             return this.eval(fs.readFileSync(path, 'utf8'), opts);
         },
+        // Raw protocol access for the odd call eval cannot make (a
+        // Page.captureScreenshot for a bake driver, an Emulation call).
+        send: send,
         close() { try { ws.close(); } catch (_) {} },
     };
 }
@@ -100,7 +103,17 @@ async function waitReady(page, { timeoutMs = 30000 } = {}) {
         const ok = await page.eval(
             '!!(window.applyMultiSplatWith && window.clearCanvas && window.density && window.density.read)'
         ).catch(() => false);
-        if (ok) return true;
+        if (ok) {
+            // Every runner passes through here before it drives the page, so
+            // this is where the startup interface fork (js/43-ui-visibility.js)
+            // is waived for the run — non-persisting, same as harness.js does
+            // for the page-side kits. Without it a clean profile boots into a
+            // modal that sits in every screenshot and eats the hotkey tests.
+            await page.eval(
+                'window.__skipUIFork = true; (window.UIVisibility && window.UIVisibility.forkPending()) ? (window.UIVisibility.chooseLayout(null), true) : false'
+            ).catch(() => false);
+            return true;
+        }
         if (Date.now() - t0 > timeoutMs) throw new Error('app never became ready');
         await new Promise(r => setTimeout(r, 250));
     }

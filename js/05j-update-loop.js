@@ -782,6 +782,11 @@
                 gl.uniform2f(divergenceProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(divergenceProg.uniforms.pScale, _pScale);
                 gl.uniform1f(divergenceProg.uniforms.openBoundary, _openBoundary);
+                // Cut-cell RHS: mostly-solid cells contribute (1-solidity) of
+                // their divergence, so pressure can't integrate inside sealed
+                // walls (see divergenceFrag). config.OBS_DIV_MASK=false = legacy.
+                gl.uniform1f(divergenceProg.uniforms.uDivMask,
+                    config.OBS_DIV_MASK === false ? 0.0 : 1.0);
                 gl.uniform1i(divergenceProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 const _obsMax = window.__obsStrengthMax || 0.7;
                 gl.uniform1f(divergenceProg.uniforms.uObsMax, _obsMax);
@@ -982,10 +987,8 @@
                     gl.uniform2f(wetnessAdvectProg.uniforms.srcTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform1f(wetnessAdvectProg.uniforms.dt, dt);
                     gl.uniform1f(wetnessAdvectProg.uniforms.dryMul, _dry.dryMul);
-                    // The field itself rides the raw flow: swirl off, and
-                    // wetInfluence=0 so dyeMobility()==1 (no wetness self-read).
-                    gl.uniform1f(wetnessAdvectProg.uniforms.swirl, 0.0);
-                    gl.uniform1f(wetnessAdvectProg.uniforms.swirlTime, 0.0);
+                    // The field itself rides the raw flow: wetInfluence=0 so
+                    // dyeMobility()==1 (no wetness self-read).
                     gl.uniform1f(wetnessAdvectProg.uniforms.wetInfluence, 0.0);
                     gl.uniform1i(wetnessAdvectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                     gl.uniform1f(wetnessAdvectProg.uniforms.uObsMax, _obsMax);
@@ -1060,11 +1063,6 @@
                 }
                 const macActive = !!config.MACCORMACK &&
                     (window.QualityGovernor ? window.QualityGovernor.fxOn() : true);
-                // Swirl clock + strength, identical across all three dye
-                // passes (the MacCormack correction is only valid if every
-                // pass recomputes the same displacement).
-                const _swirl = config.SWIRL || 0.0;
-                const _swirlT = (nowMs % 3600000) / 1000;
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 // P15-1: bind the (freshly advected) wetness field to unit 4 for
                 // all three dye passes. Bound unconditionally — dyeMobility()
@@ -1078,8 +1076,6 @@
                     gl.uniform2f(macAdvectProg.uniforms.texelSize, 1.0, 1.0);
                     gl.uniform2f(macAdvectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                     gl.uniform1f(macAdvectProg.uniforms.dt, _dyeDt);
-                    gl.uniform1f(macAdvectProg.uniforms.swirl, _swirl);
-                    gl.uniform1f(macAdvectProg.uniforms.swirlTime, _swirlT);
                     // Obstacle-aware backtrace probes (shared snippet) — the
                     // forward pass must see the same walls as correct/main
                     gl.uniform1i(macAdvectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
@@ -1112,8 +1108,6 @@
                     gl.uniform2f(macCorrectProg.uniforms.texelSize, 1.0, 1.0);
                     gl.uniform2f(macCorrectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                     gl.uniform1f(macCorrectProg.uniforms.dt, _dyeDt);
-                    gl.uniform1f(macCorrectProg.uniforms.swirl, _swirl);
-                    gl.uniform1f(macCorrectProg.uniforms.swirlTime, _swirlT);
                     gl.uniform1f(macCorrectProg.uniforms.uObsMax, _obsMax);
                     gl.uniform1i(macCorrectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                     gl.uniform1i(macCorrectProg.uniforms.uVelocity, 0);
@@ -1148,10 +1142,6 @@
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 gl.uniform1i(advectionProg.uniforms.macMode, macActive ? 1 : 0);
-                // macMode self-fetches (coord = vUv) so swirl is moot there,
-                // but the plain-SL dye path uses it directly.
-                gl.uniform1f(advectionProg.uniforms.swirl, macActive ? 0.0 : _swirl);
-                gl.uniform1f(advectionProg.uniforms.swirlTime, _swirlT);
                 gl.uniform2f(advectionProg.uniforms.texelSize, 1.0, 1.0);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);
@@ -1337,7 +1327,13 @@
                 sharpenProg.bind();
                 gl.uniform1i(sharpenProg.uniforms.uTexture, 0);
                 gl.uniform1i(sharpenProg.uniforms.uVelocity, 1);
-                gl.uniform1f(sharpenProg.uniforms.sharpness, config.SHARPNESS);
+                // Ridges 0..1 is the AMOUNT at a one-texel radius; past 1 it is
+                // the RADIUS (coarse emboss). Before this the slider was the
+                // radius alone, and 0-0.9 was bit-dead: sub-texel taps sit
+                // inside one bilinear cell and the unsharp mask cancels to
+                // nothing (measured by the sweep harness, 2026-08-21).
+                const _ridges = config.RIDGES || 0;
+                gl.uniform1f(sharpenProg.uniforms.sharpness, config.SHARPNESS * Math.min(1, _ridges));
                 gl.uniform2f(sharpenProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 // Kernel radius normalized to the 2048 reference: the sharpen
                 // LOOK stays constant when dye resolution changes (boot ascent,
@@ -1345,7 +1341,7 @@
                 // fidelity, not character. RIDGES > 1 recreates the coarse
                 // emboss (the boot-ascent "ridges" look) deliberately.
                 gl.uniform1f(sharpenProg.uniforms.kernelScale,
-                    (config.RIDGES || 1.0) * (Math.max(dyeTexWidth, dyeTexHeight) / 2048));
+                    Math.max(1, _ridges) * (Math.max(dyeTexWidth, dyeTexHeight) / 2048));
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
                 gl.activeTexture(gl.TEXTURE1);
@@ -1353,26 +1349,16 @@
                 blit(sharpened.fbo);
                 displayTexture = sharpened.texture;
             }
-            // Apply micro detail pass if clarity or vibrance is active
-            const mdClarity = config.CLARITY || 0;
+            // Apply the vibrance pass if it is up (0 = off)
             const mdVibrance = config.VIBRANCE || 0;
-            const microDetailEnabled = _fxOn && (mdClarity > 0 || mdVibrance > 0);
+            const microDetailEnabled = _fxOn && mdVibrance > 0;
             if (microDetailEnabled) {
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 microDetailProg.bind();
                 gl.uniform1i(microDetailProg.uniforms.uTexture, 0);
-                gl.uniform1i(microDetailProg.uniforms.uVelocity, 1);
-                gl.uniform2f(microDetailProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
-                // 2048-reference kernel normalization (aesthetic-decoupling
-                // principle — see sharpen pass above)
-                gl.uniform1f(microDetailProg.uniforms.kernelScale,
-                    Math.max(dyeTexWidth, dyeTexHeight) / 2048);
-                gl.uniform1f(microDetailProg.uniforms.clarity, mdClarity);
                 gl.uniform1f(microDetailProg.uniforms.vibrance, mdVibrance);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, displayTexture);
-                gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(detailed.fbo);
                 displayTexture = detailed.texture;
             }
@@ -1601,6 +1587,12 @@
                 displayHz: displayHz,
                 budgetPct: budgetPct
             };
+            // Counts DRAWN frames only: the fps-cap early return above never
+            // reaches here. A capturer (24-video-export) keys on this rather
+            // than on rAF ticks, so a 60-cap on a 144 Hz panel is captured 60
+            // times a second, not 144 — every extra capture was a full-frame
+            // readback of a frame that had not changed.
+            window.__drawSerial = (window.__drawSerial | 0) + 1;
             // [GOVERNOR HOOK] feed the adaptive quality governor
             if (window.QualityGovernor) window.QualityGovernor.onFrame(nowMs, cpuMs);
             if (!_firstFrameDrawn) {

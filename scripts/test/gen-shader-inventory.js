@@ -13,7 +13,7 @@
 //
 // That set is a SUBSET of what the runtime sees, not an equal. Nine of
 // these shaders interpolate shared GLSL chunks — obstacleSolidityGLSL,
-// mobilityGLSL, rk2Backtrace, swirlGLSL — and those chunks declare
+// mobilityGLSL, rk2Backtrace — and those chunks declare
 // uniforms of their own. They are also exactly the hot ones (advection,
 // MacCormack, pressure, divergence, gradient, mgResidual), so matching on
 // equality dropped 82% of frame time into a single unnamed bucket on the

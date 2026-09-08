@@ -399,6 +399,7 @@
         var el = document.getElementById('stat-governor');
         if (!el) return;
         if (!enabled) { el.textContent = 'off'; return; }
+        if (held) { el.textContent = 'held (exporting)'; return; }
         var L = LEVELS[level];
         var sc = effectiveScales(level);
         var bf = bootInit ? BOOT_STAGES[bootStage] : { dye: 1, sim: 1 };
@@ -412,9 +413,36 @@
             (bootInit && !bootDone ? ' ↑warming' : '');
     }
 
+    // Export hold (2026-09-02). A media export drags fps down from OUTSIDE
+    // update() — its readback runs in its own rAF callback, so cpuMs stays
+    // healthy while the frame count falls — and the ladder read that as sim
+    // overload: pressure iterations shed within 300 ms of painting (fast
+    // relief), a resolution tier with a framebuffer reinit ~10 s in, the
+    // softer dye baked into the recording, and the level lingering after the
+    // export until 10 s of no painting. Held, the governor counts nothing:
+    // the frame that could not fit drops in the recording instead of
+    // changing the look under the brush. Release re-learns from scratch.
+    var held = false;
+
     window.QualityGovernor = {
+        // hold(true) while an export captures frames; hold(false) after.
+        hold: function (b) {
+            b = !!b;
+            if (b === held) return;
+            held = b;
+            frameCount = 0;
+            fastFrameCount = 0;
+            lastEvalMs = 0;
+            fastLastMs = 0;
+            lowStreak = 0;
+            highStreak = 0;
+            severeStreak = 0;
+            if (!b) { freezeUntilMs = 0; fastFreezeUntil = 0; }
+            updateStatusLine();
+        },
+        isHeld: function () { return held; },
         onFrame: function (nowMs, cpuMs) {
-            if (!enabled) return;
+            if (!enabled || held) return;
             frameCount++;
             fastFrameCount++;
             cpuEma = cpuEma === 0 ? cpuMs : cpuEma * 0.95 + cpuMs * 0.05;

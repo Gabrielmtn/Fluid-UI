@@ -688,20 +688,15 @@
             }
         `;
         // â”€â”€â”€ Micro Detail Pass â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        // Clarity + Vibrance only. Keeps fluid texture sharp through
-        // TikTok / H.264 encoding without color artifacts.
+        // Vibrance only (Clarity left with the Effects panel, 2026-09-03).
+        // Selective saturation on the displayed dye â€” keeps colour rich
+        // through TikTok / H.264 encoding without colour artifacts.
         const microDetailFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTexture;
-            uniform sampler2D uVelocity;
-            uniform vec2 texelSize;
-            uniform float clarity;    // 0â€“1: local contrast boost
             uniform float vibrance;   // 0â€“1: selective saturation
-            uniform float kernelScale; // 2048-reference normalization (same
-                                       // principle as sharpen): resolution
-                                       // changes must not change the look
             void main() {
                 vec3 center = texture(uTexture, vUv).rgb;
                 vec3 lumaW = vec3(0.299, 0.587, 0.114);
@@ -715,41 +710,6 @@
                 }
                 float lowFade = smoothstep(0.003, 0.03, centerLuma);
                 vec3 result = center;
-                // â”€â”€ Clarity â€” Wide-kernel unsharp mask â”€â”€
-                // Same proven additive approach as the sharpening pass
-                // but with a wider 2-ring kernel for mid-frequency contrast.
-                if (clarity > 0.0) {
-                    vec2 t = texelSize * kernelScale;
-                    vec2 t2 = t * 2.0;
-                    // 12-tap weighted blur (8 inner + 4 outer at half weight)
-                    vec3 blur = vec3(0.0);
-                    blur += texture(uTexture, vUv + vec2(-t.x, -t.y)).rgb;
-                    blur += texture(uTexture, vUv + vec2( 0.0, -t.y)).rgb;
-                    blur += texture(uTexture, vUv + vec2( t.x, -t.y)).rgb;
-                    blur += texture(uTexture, vUv + vec2(-t.x,  0.0)).rgb;
-                    blur += texture(uTexture, vUv + vec2( t.x,  0.0)).rgb;
-                    blur += texture(uTexture, vUv + vec2(-t.x,  t.y)).rgb;
-                    blur += texture(uTexture, vUv + vec2( 0.0,  t.y)).rgb;
-                    blur += texture(uTexture, vUv + vec2( t.x,  t.y)).rgb;
-                    blur += texture(uTexture, vUv + vec2(-t2.x, 0.0)).rgb * 0.5;
-                    blur += texture(uTexture, vUv + vec2( t2.x, 0.0)).rgb * 0.5;
-                    blur += texture(uTexture, vUv + vec2(0.0, -t2.y)).rgb * 0.5;
-                    blur += texture(uTexture, vUv + vec2(0.0,  t2.y)).rgb * 0.5;
-                    blur /= 10.0;
-                    // Extract detail and apply (same as sharpening pass)
-                    vec3 detail = center - blur;
-                    // Bound the swing to the local luminance so faint dye is
-                    // never more than ~doubled â€” unbounded, fp16 quantization
-                    // steps in fading dye amplify into hard speckle and lines.
-                    detail = clamp(detail, vec3(-centerLuma), vec3(centerLuma));
-                    // Velocity-adaptive strength, faded out at low luminance
-                    float velMag = length(texture(uVelocity, vUv).xy);
-                    float adaptiveStrength = clarity * (1.0 + min(velMag * 3.0, 1.5)) * lowFade;
-                    // Additive unsharp mask with clamping
-                    result = center + detail * adaptiveStrength * 1.5;
-                    vec3 maxVal = max(center * 2.0, vec3(1.0));
-                    result = clamp(result, vec3(0.0), maxVal);
-                }
                 // â”€â”€ Vibrance â€” RGB-space selective saturation â”€â”€
                 if (vibrance > 0.0) {
                     float gray = dot(result, lumaW);

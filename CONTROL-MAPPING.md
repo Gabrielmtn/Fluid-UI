@@ -58,7 +58,7 @@ All 60+ controls from the original sidebar have been mapped to the new professio
 ### Display Section
 - ✅ Show Cursor
 - ✅ Canvas Border & Handles
-- ✅ Stats For Nerds
+- ✅ Debug Info
 
 ### Effects Section
 - ✅ Kaleidoscope toggle

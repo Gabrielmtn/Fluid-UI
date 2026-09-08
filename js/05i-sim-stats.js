@@ -281,6 +281,11 @@
             gl.uniform1i(splatProg.uniforms.hasObstacle, _splatObsActive ? 1 : 0);
             if (_splatObsActive) {
                 gl.uniform1f(splatProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                // Velocity injection blocked by wall coverage like dye
+                // (default; the s³ leak was the "dye producer" pump — see
+                // splatFrag). config.OBS_VEL_COVERAGE_BLOCK=false = legacy.
+                gl.uniform1f(splatProg.uniforms.uVelCovBlock,
+                    config.OBS_VEL_COVERAGE_BLOCK === false ? 0.0 : 1.0);
                 gl.uniform1i(splatProg.uniforms.uObstacle, 1);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
@@ -335,7 +340,7 @@
                 gl.uniform1f(splatProg.uniforms.ringRadius, 0.75 * Math.sqrt(baseRadius));
                 gl.uniform1f(splatProg.uniforms.ringSquash, 1);
                 // Ring is its own analytic shape: never blend the material's
-                // clay stamp on top. Without this, Paint-Thick's STAMP_NOISE
+                // clay stamp on top. Without this, Gloss Paint - Thickness's STAMP_NOISE
                 // (0.7, shape often Chisel) reaches the shader's stamp block,
                 // which overwrites the hollow center with a square press.
                 gl.uniform1f(splatProg.uniforms.stampNoise, 0);
@@ -374,7 +379,13 @@
         //   cx/cy/ringRadiusPx — canvas pixels; thickness — SPLAT_RADIUS units
         //   (gaussian width² of the band); radialSpeed >0 pushes outward,
         //   <0 toward the center; squash <1 flattens the ellipse vertically.
-        function ringSplat(cx, cy, ringRadiusPx, thickness, radialSpeed, swirl, squash, color) {
+        //   opts (optional, Breathing 45): { velOnly: true } runs the velocity
+        //   pass only — a push-only caller must not touch dye at all, because
+        //   under the Gate a dye pass CONVERGES the paint to the band's colour
+        //   (black = erase) rather than adding nothing; { flow: 0-1 } sets the
+        //   Gate convergence for a band laid down in many thin passes (dimming
+        //   the colour instead would converge the paint to a dark hue).
+        function ringSplat(cx, cy, ringRadiusPx, thickness, radialSpeed, swirl, squash, color, opts) {
             gl.disable(gl.BLEND); // same contract as splat() above — audio scenes
                                   // call this from their own rAF tick, outside update()
             const aspectRatio = canvas.width / canvas.height;
@@ -394,10 +405,17 @@
             gl.uniform1f(splatProg.uniforms.stampTipOn, 0); // no brush-tip footprint on the band
             gl.uniform1f(splatProg.uniforms.stampAngle, 0);
             gl.uniform1i(splatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
+            // Gate flow, same default as splat() above (it used to inherit
+            // whatever the last splat() call left in the uniform).
+            const _ringFlow = (opts && typeof opts.flow === 'number') ? opts.flow
+                : (typeof window.__splatFlow === 'number') ? window.__splatFlow : 1.0;
+            gl.uniform1f(splatProg.uniforms.gateFlow, Math.max(0.0, Math.min(1.0, _ringFlow)));
             const _ringObsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
             gl.uniform1i(splatProg.uniforms.hasObstacle, _ringObsActive ? 1 : 0);
             if (_ringObsActive) {
                 gl.uniform1f(splatProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                gl.uniform1f(splatProg.uniforms.uVelCovBlock,
+                    config.OBS_VEL_COVERAGE_BLOCK === false ? 0.0 : 1.0);
                 gl.uniform1i(splatProg.uniforms.uObstacle, 1);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
@@ -411,6 +429,10 @@
             gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
             blit(velocity.write.fbo);
             velocity.swap();
+            if (opts && opts.velOnly) {
+                gl.uniform1f(splatProg.uniforms.ringRadius, 0);
+                return;
+            }
             // Dye: the visible thin band
             gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
             gl.uniform1i(splatProg.uniforms.isVelocity, 0);

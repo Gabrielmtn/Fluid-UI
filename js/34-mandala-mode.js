@@ -458,7 +458,7 @@
     }
 
     // .collapsible carries no CSS in this build, so panel visibility is
-    // driven explicitly — the same way microDetailPanel/multigridPanel do it.
+    // driven explicitly — the same way multigridPanel does it.
     function showPanel(on) {
         if (!panelEl) return;
         panelEl.style.display = on ? '' : 'none';

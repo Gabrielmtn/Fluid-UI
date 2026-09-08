@@ -146,11 +146,11 @@
     },
     {
       "name": "materialModes",
-      "activate": "window.MaterialModes.setMode('acrylic');  /* or 'clay' (Acrylic-Thick). Bundle-applies: displayShadingToggle/microDetailToggle checkboxes, shadingIntensity/sharpness/clarity/vibrance sliders, config VELOCITY_DISSIPATION/CURL/PRESSURE_ITERATIONS/PRESSURE_DISSIPATION/STAMP_NOISE/STAMP_RADIUS_SCALE(/STAMP_SHAPE for clay), window.displayShadingInvert (js/29-material-modes.js:50-94). Amount rides the #curl slider (0..60 -> 0..1). */",
+      "activate": "window.MaterialModes.setMode('acrylic');  /* or 'clay' (Acrylic-Thick). Bundle-applies: displayShadingToggle checkbox, shadingIntensity/sharpness/vibrance sliders, config VELOCITY_DISSIPATION/CURL/PRESSURE_ITERATIONS/PRESSURE_DISSIPATION/STAMP_NOISE/STAMP_RADIUS_SCALE(/STAMP_SHAPE for clay), window.displayShadingInvert (js/29-material-modes.js:50-94). Amount rides the #curl slider (0..60 -> 0..1). */",
       "deactivate": "window.MaterialModes.setMode('fluid');  /* restores the snapshot taken when leaving fluid (js/29-material-modes.js:160-177). If an external writer (preset/session load) is about to install raw config, call window.MaterialModes.yieldToExternal() instead (js/29-material-modes.js:234-252) */",
       "activeCheck": "window.MaterialModes.active()",
       "touchesSharedState": [
-        "config.CURL, VELOCITY_DISSIPATION, PRESSURE_ITERATIONS, PRESSURE_DISSIPATION, SHARPNESS, CLARITY, VIBRANCE, STAMP_NOISE, STAMP_RADIUS_SCALE, STAMP_SHAPE (js/29-material-modes.js:27-28,50-94)",
+        "config.CURL, VELOCITY_DISSIPATION, PRESSURE_ITERATIONS, PRESSURE_DISSIPATION, SHARPNESS, VIBRANCE, STAMP_NOISE, STAMP_RADIUS_SCALE, STAMP_SHAPE (js/29-material-modes.js:27-28,50-94)",
         "window.displayShading (via shadingIntensity slider + displayShadingToggle checkbox) and window.displayShadingInvert",
         "The #curl slider's MEANING (vorticity vs material amount) - 05h delegates its input to MaterialModes while active",
         "localStorage keys fluidui.materialMode / fluidui.materialAmount.* / fluidui.stampShape - PERSIST ACROSS RUNS (js/29-material-modes.js:22-24,227)",
@@ -368,6 +368,23 @@
         "OFF->ON edge clears limiter state via resetPhotoSafeState() (05i, called from 05j); buffers are allocated lazily when booted with protection off — window.__photoSafeEnsure() builds them",
         "Detection is OSCILLATION RATE, not per-frame deviation: a test that changes the frame monotonically (painting, fades, a single burst) will NOT engage the envelope by design. To exercise suppression, alternate large-area luminance at >2.5Hz for ~1s (engagement ramps over ~0.8s; WCAG permits up to 3 flashes/sec, so onset is not instant).",
         "The live rAF loop keeps running between harness tool calls and releases envelope/rate (tau 1s / PHOTOSAFE_RELEASE) — build the strobe AND read the state inside ONE evaluation."
+      ]
+    },
+    {
+      "name": "uiVisibility",
+      "activate": "window.UIVisibility.applyPreset('simple'); /* Presets + Mutate + Settings only; applyPreset('full') restores everything; setHidden('section:Layers', true) hides one */",
+      "deactivate": "window.UIVisibility.applyPreset('full');",
+      "activeCheck": "window.UIVisibility.currentPreset() === 'simple'",
+      "touchesSharedState": [
+        "settingsManager 'ui.hiddenSections' (array of keys 'strip:<label>' | 'section:<title>' | 'chrome:Quality bar') and 'ui.layoutChoice' ('simple'|'full') — wiped by Settings → Clear like every fluidUI: key",
+        "localStorage 'fluidui.uiFork.ack.v1' — the one-time startup fork was answered; clear it AND remove ui.layoutChoice to re-show the fork on next load",
+        "localStorage 'fluidui.uiFork.skip' = '1' or window.__skipUIFork = true — waives the fork for a page without persisting a choice (harness.js and cdp.waitReady set the window flag; shot-helpers.js sets the localStorage flag)",
+        "class .ui-hidden on .sidebar-section / .mixer-channel / #mixer-strip / #quality-underbar; --rows/--i re-stamped over visible sections only"
+      ],
+      "knownHazards": [
+        "Hidden is display:none only — every control keeps its id and its bindings, so presets, hotkeys, replay and multiplayer are unaffected; a test that reads layout (getBoundingClientRect) of a hidden section gets zeros",
+        "The fork is a document-level keydown CAPTURE while open (Enter/Escape/arrows/Tab, everything else stopped): harness.key() is dead until it is waived — waitReady and harness.js install do that",
+        "window.openSidebarSection() on a hidden section un-hides it (persisted) — the app's own 'surface Layers on paste' path relies on that"
       ]
     },
     {

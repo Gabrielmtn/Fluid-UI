@@ -1242,7 +1242,7 @@
             user-select: none;
         }
 
-/* Stats For Nerds Panel */
+/* Debug Info Panel */
 .stats-panel {
     position: fixed;
     top: 20px;

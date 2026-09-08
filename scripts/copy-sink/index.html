@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copy sink</title>
+<style>
+:root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2230; --line: #30363d; --line2: #3d444d;
+    --fg: #e6edf3; --muted: #8b949e; --dim: #6e7681; --accent: #58a6ff; --ok: #3fb950; --warn: #d29922; --bad: #f85149;
+    --changed: #d2a8ff; --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.45 var(--sans); }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); text-decoration: none; }
+.topbar { position: sticky; top: 0; z-index: 10; background: rgba(13,17,23,.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); padding: 10px 16px; display: grid; gap: 8px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.tight { gap: 6px; }
+h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 600; letter-spacing: .2px; }
+h1 small { color: var(--muted); font-weight: 400; margin-left: 8px; }
+.stat { color: var(--muted); font-variant-numeric: tabular-nums; }
+.stat b { color: var(--fg); font-weight: 600; }
+.stat b.ch { color: var(--changed); }
+.btn { background: var(--panel); border: 1px solid var(--line2); border-radius: 6px; padding: 5px 10px; cursor: pointer; color: var(--fg); }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+.btn.primary:disabled { opacity: .45; cursor: default; }
+.btn.ghost { background: transparent; }
+.btn.small { padding: 2px 7px; font-size: 12px; }
+.in { background: var(--bg); border: 1px solid var(--line2); border-radius: 6px; padding: 5px 8px; color: var(--fg); min-width: 0; }
+.in:focus { outline: none; border-color: var(--accent); }
+.search { width: 320px; }
+.chip { border: 1px solid var(--line2); background: transparent; color: var(--muted); border-radius: 999px; padding: 2px 9px; cursor: pointer; font-size: 12px; user-select: none; }
+.chip.on { color: var(--fg); background: var(--panel2); border-color: var(--accent); }
+.chip .n { color: var(--dim); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.chip.on .n { color: var(--muted); }
+.sep { width: 1px; height: 18px; background: var(--line2); margin: 0 4px; }
+.toggle { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); cursor: pointer; user-select: none; }
+.toggle input { accent-color: var(--accent); margin: 0; }
+.fr { display: none; }
+.fr.open { display: flex; }
+.fr .in { width: 260px; }
+.fr .count { color: var(--muted); min-width: 90px; }
+main { padding: 12px 16px 120px; max-width: 1500px; margin: 0 auto; }
+.group { margin: 18px 0 8px; }
+.group h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 6px; display: flex; align-items: baseline; gap: 10px; position: sticky; top: 118px; background: var(--bg); padding: 6px 0 4px; z-index: 5; border-bottom: 1px solid var(--line); }
+.group h2 .n { color: var(--dim); font-weight: 400; }
+.group h2 .k { color: var(--fg); }
+.entry { display: grid; grid-template-columns: 280px minmax(0, 1fr) 210px; gap: 14px; padding: 10px 10px 10px 12px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 8px; background: var(--panel); margin-bottom: 6px; }
+.entry.changed { border-left-color: var(--changed); }
+.entry.ro { opacity: .75; }
+.entry.hidden { display: none; }
+.mock { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.mock .lab { font-weight: 600; color: var(--fg); display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.mock .lab .vd { color: var(--muted); font-weight: 400; font-family: var(--mono); font-size: 11px; }
+.mock .lab.dimlab { color: var(--muted); font-weight: 500; }
+.ctl { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ctl input[type=range] { width: 100%; accent-color: var(--accent); pointer-events: none; }
+.ctl input[type=checkbox] { accent-color: var(--accent); pointer-events: none; }
+.ctl select, .ctl input[type=text] { pointer-events: none; background: var(--bg); border: 1px solid var(--line2); border-radius: 5px; padding: 3px 6px; max-width: 100%; color: var(--fg); }
+.ctl .fakebtn { display: inline-block; border: 1px solid var(--line2); background: var(--panel2); border-radius: 5px; padding: 3px 9px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctl .swatch { width: 26px; height: 18px; border-radius: 4px; background: linear-gradient(135deg,#f0a,#0af); border: 1px solid var(--line2); }
+.ctl .tag { color: var(--dim); font-family: var(--mono); font-size: 11px; }
+.ctl .fxthumb { width: 44px; height: 30px; border-radius: 4px; background: repeating-linear-gradient(45deg, #222 0 6px, #2b2b2b 6px 12px); border: 1px solid var(--line2); }
+.mock .where { color: var(--dim); font-size: 11px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edit { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.edit textarea { width: 100%; resize: vertical; min-height: 34px; background: var(--bg); border: 1px solid var(--line2); border-radius: 6px; padding: 6px 8px; line-height: 1.4; color: var(--fg); overflow: hidden; }
+.edit textarea:focus { outline: none; border-color: var(--accent); }
+.entry.changed .edit textarea { border-color: rgba(210,168,255,.55); }
+.edit .orig { color: var(--muted); font-size: 12px; white-space: pre-wrap; display: none; padding: 4px 8px; border-left: 2px solid var(--line2); }
+.entry.changed .edit .orig { display: block; }
+.edit .tools { display: flex; gap: 6px; align-items: center; color: var(--dim); font-size: 11px; flex-wrap: wrap; }
+.edit .tools .tell { color: var(--warn); }
+.edit .tools .dup { color: var(--accent); cursor: pointer; }
+.edit .tools .len { font-variant-numeric: tabular-nums; }
+.edit .tools .ro { color: var(--bad); }
+.meta { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); min-width: 0; }
+.meta .kind { display: inline-block; border: 1px solid var(--line2); border-radius: 4px; padding: 0 6px; font-family: var(--mono); color: var(--fg); background: var(--panel2); align-self: flex-start; }
+.meta .kind.title { color: #79c0ff; } .meta .kind.placeholder { color: #ffa657; } .meta .kind.answer, .meta .kind.note { color: #7ee787; } .meta .kind.html, .meta .kind.text { color: #d2a8ff; } .meta .kind.table, .meta .kind.arg { color: #f2cc60; }
+.meta .file { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.meta .file b { color: var(--fg); font-weight: 500; }
+.meta .flag { color: var(--warn); }
+.meta .path { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { color: var(--muted); padding: 40px; text-align: center; }
+.foot { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: flex; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line2); border-radius: 10px; padding: 8px 10px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line2); border-radius: 8px; padding: 8px 14px; z-index: 30; max-width: 70vw; white-space: pre-wrap; display: none; }
+.toast.show { display: block; }
+.toast.bad { border-color: var(--bad); }
+kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--muted); }
+@media (max-width: 1000px) { .entry { grid-template-columns: 1fr; } .meta { flex-direction: row; flex-wrap: wrap; gap: 10px; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+    <div class="row">
+        <h1>Copy sink <small id="stamp"></small></h1>
+        <span class="stat"><b id="nAll">0</b> strings · <b id="nVis">0</b> shown · <b id="nCh" class="ch">0</b> changed · <b id="nRt">0</b> placed</span>
+        <span style="flex:1"></span>
+        <input class="in search" id="q" type="search" placeholder="Search text, label, id, file…  ( / )" autocomplete="off" spellcheck="false">
+        <button class="btn" id="frBtn" title="Find & replace across the shown strings">Find &amp; replace</button>
+        <button class="btn" id="harvestBtn" title="Load the app in headless Chrome and attach each string to its labeled control (section, label, control type)">Place strings</button>
+        <button class="btn" id="reloadBtn" title="Re-read the source">Reload</button>
+    </div>
+    <div class="row tight" id="kinds"></div>
+    <div class="row tight" id="scopes"></div>
+    <div class="row tight">
+        <label class="toggle"><input type="checkbox" id="fChanged"> changed only</label>
+        <label class="toggle"><input type="checkbox" id="fTells"> tells only <span title="em-dash, middle dot, ellipsis, semicolon, 'so you can', 'simply', 'seamlessly', a colon that explains — the fingerprints of generated copy">(—&nbsp;·&nbsp;…&nbsp;;)</span></label>
+        <label class="toggle"><input type="checkbox" id="fDyn"> dynamic / partial</label>
+        <label class="toggle"><input type="checkbox" id="fUnplaced"> not placed</label>
+        <span class="sep"></span>
+        <label class="toggle">group by <select class="in" id="groupBy"><option value="scope">where it appears</option><option value="file">source file</option><option value="kind">kind</option></select></label>
+        <span class="sep"></span>
+        <button class="btn small ghost" id="exportJson">Export edits (JSON)</button>
+        <button class="btn small ghost" id="exportTsv">Export shown (TSV)</button>
+        <button class="btn small ghost" id="importBtn">Import…</button>
+        <input type="file" id="importFile" accept=".json,.tsv,.txt" hidden>
+        <button class="btn small ghost" id="discardBtn">Discard all edits</button>
+    </div>
+    <div class="row tight fr" id="fr">
+        <input class="in" id="frFind" placeholder="find (text or /regex/)" spellcheck="false">
+        <input class="in" id="frRepl" placeholder="replace with" spellcheck="false">
+        <label class="toggle"><input type="checkbox" id="frRe"> regex</label>
+        <label class="toggle"><input type="checkbox" id="frCase"> match case</label>
+        <span class="count" id="frCount"></span>
+        <button class="btn small" id="frGo">Replace in shown</button>
+        <span class="stat" style="font-size:11px">Quick tells: <a href="#" data-fr="—|;">em-dash → semicolon-free</a> · <a href="#" data-fr=" — | · ">— → ·</a> · <a href="#" data-fr="…|...">… → ...</a></span>
+    </div>
+</header>
+<main id="main"><div class="empty">Loading the catalog…</div></main>
+<div class="foot">
+    <span class="stat"><b id="nCh2" class="ch">0</b> to write</span>
+    <button class="btn primary" id="applyBtn" disabled title="Write every changed string back into its source file (Ctrl+S)">Write to source</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+    'use strict';
+    var $ = function (id) { return document.getElementById(id); };
+    var LS_KEY = 'copySink.edits.v1';
+    var cat = { entries: [] };
+    var edits = {};          // key → text
+    var kindOn = {}, scopeOn = {};
+    var els = new Map();     // key → row element
+    try { edits = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (_) { edits = {}; }
+    function saveEdits() { try { localStorage.setItem(LS_KEY, JSON.stringify(edits)); } catch (_) {} }
+
+    var TELLS = /—|·|…|;|\bso you can\b|\bsimply\b|\bseamlessly\b|\beffortlessly\b|\bwhether\b|\bpurely\b|\bjust\b|\bthink of\b|\bin other words\b|:\s+[a-z]/i;
+    function tellsOf(t) { var m = t.match(/—|·|…|;|\bso you can\b|\bsimply\b|\bseamlessly\b|\beffortlessly\b|\bpurely\b|\bthink of\b/gi); return m ? m.length : 0; }
+    var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
+
+    function curText(e) { return Object.prototype.hasOwnProperty.call(edits, e.key) ? edits[e.key] : e.text; }
+    function isChanged(e) { return Object.prototype.hasOwnProperty.call(edits, e.key) && edits[e.key] !== e.text; }
+    function rt(e) { return e.runtime && e.runtime[0]; }
+    function scopeOf(e) {
+        var r = rt(e); if (r) return r.scope;
+        if (e.file === 'index.html') {
+            var p = (e.ctx.path || '');
+            if (/photoWarn/.test(p)) return 'Dialog › Photosensitivity warning';
+            if (/hotkeyOverlay/.test(p)) return 'Dialog › Hotkeys';
+            if (/splash/.test(p)) return 'Splash';
+            return 'Source only › index.html' + (e.ctx.heading ? ' › ' + e.ctx.heading : '');
+        }
+        if (e.file === 'electron-main.js') return 'Desktop shell (Electron dialogs)';
+        if (/44-recipes/.test(e.file)) return 'Dialog › How do I…';
+        return 'Source only › ' + (e.file || '').replace(/^js\//, '');
+    }
+    function labelOf(e) {
+        var r = rt(e); if (r && r.label) return r.label;
+        if (e.ctx.label) return e.ctx.label;
+        if (e.ctx.key && e.kind === 'table') return e.ctx.key;
+        if (e.kind === 'answer' || e.kind === 'note') return '';
+        return '';
+    }
+    function controlOf(e) {
+        var r = rt(e); if (r) return r.control;
+        var c = e.ctx;
+        if (c.tag === 'input' && c.type === 'range') return 'slider';
+        if (c.tag === 'input' && c.type === 'checkbox') return 'checkbox';
+        if (c.tag === 'input') return 'text';
+        if (c.tag) return c.tag;
+        if (/btn|button/i.test(c.receiver || '')) return 'button';
+        if (/input|field/i.test(c.receiver || '')) return 'text';
+        if (/sel\b|select/i.test(c.receiver || '')) return 'select';
+        if (/lbl|label/i.test(c.receiver || '')) return 'label';
+        if (/hint|tip|note|msg|status/i.test(c.receiver || '')) return 'hint';
+        return '';
+    }
+
+    function mockHtml(e) {
+        var r = rt(e) || {}; var el = r.el || {}; var ctl = controlOf(e); var label = labelOf(e);
+        var lab = label ? '<div class="lab">' + esc(label) + (ctl === 'slider' && el.value != null ? ' <span class="vd">' + esc(el.value) + '</span>' : '') + '</div>'
+                        : '<div class="lab dimlab">' + esc(e.ctx.fn ? e.ctx.fn + '()' : (e.ctx.receiver || e.ctx.key || e.kind)) + '</div>';
+        var c = '';
+        switch (ctl) {
+            case 'slider': c = '<input type="range" disabled min="' + esc(el.min || 0) + '" max="' + esc(el.max || 100) + '" value="' + esc(el.value != null ? el.value : 50) + '">'; break;
+            case 'checkbox': c = '<input type="checkbox" disabled' + (el.checked ? ' checked' : '') + '> <span class="tag">checkbox</span>'; break;
+            case 'radio': c = '<input type="radio" disabled> <span class="tag">radio</span>'; break;
+            case 'select': c = '<select disabled>' + ((el.options || ['…']).map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('')) + '</select>'; break;
+            case 'option': c = '<select disabled><option>' + esc(label) + '</option></select>'; break;
+            case 'button': c = '<span class="fakebtn">' + esc(el.caption || label || 'button') + '</span>'; break;
+            case 'link': c = '<span class="fakebtn">' + esc(label || 'link') + '</span>'; break;
+            case 'text': c = '<input type="text" disabled placeholder="' + esc(e.kind === 'placeholder' ? curText(e) : (r.el && r.el.id || 'text')) + '">'; break;
+            case 'color': c = '<span class="swatch"></span> <span class="tag">color</span>'; break;
+            case 'effect card': c = '<span class="fxthumb"></span> <span class="tag">' + esc(r.fx || 'effect') + '</span>'; break;
+            case 'recipe': c = '<span class="tag">recipe · ' + esc(r.recipe || '') + '</span>'; break;
+            case 'label': c = '<span class="tag">label</span>'; break;
+            case 'hint': c = '<span class="tag">hint text</span>'; break;
+            case '': c = ''; break;
+            default: c = '<span class="tag">' + esc(ctl) + '</span>';
+        }
+        var where = r.path || e.ctx.path || (e.ctx.receiver ? e.ctx.receiver + '.' + e.kind : '') || (e.ctx.key ? e.ctx.key + ':' : '');
+        var id = (el.id || e.ctx.id) ? ' #' + (el.id || e.ctx.id) : '';
+        return '<div class="mock">' + lab + (c ? '<div class="ctl">' + c + '</div>' : '') + '<div class="where" title="' + esc(where) + '">' + esc(where) + esc(id) + '</div></div>';
+    }
+
+    var dups = {};
+    function buildDups() { dups = {}; cat.entries.forEach(function (e) { (dups[e.text] = dups[e.text] || []).push(e); }); }
+
+    function rowHtml(e) {
+        var t = curText(e); var ro = e.enc === 'runtime-only'; var n = dups[e.text] ? dups[e.text].length : 1;
+        var flags = [];
+        if (e.partial) flags.push('<span class="flag" title="Only the leading literal is bound; a dynamic part follows in the source">partial</span>');
+        if (e.enc === 'js-template-expr') flags.push('<span class="flag" title="Template literal — keep the ${…} parts">template</span>');
+        if (e.parts > 1) flags.push('<span class="flag" title="Joined from ' + e.parts + ' literals; writes back as one">' + e.parts + ' parts</span>');
+        if (ro) flags.push('<span class="flag" style="color:var(--bad)" title="Seen at runtime but no source literal matched — built from pieces">unbound</span>');
+        var fileLine = e.file ? '<span class="file" title="' + esc(e.file) + ':' + e.line + '"><b>' + esc(e.file.replace(/^js\//, '')) + '</b>:' + e.line + '</span>' : '<span class="file">runtime only</span>';
+        return '<div class="entry' + (isChanged(e) ? ' changed' : '') + (ro ? ' ro' : '') + '" data-key="' + esc(e.key) + '">' +
+            mockHtml(e) +
+            '<div class="edit"><textarea spellcheck="true"' + (ro ? ' readonly' : '') + '>' + esc(t) + '</textarea>' +
+            '<div class="orig">' + esc(e.text) + '</div>' +
+            '<div class="tools"><span class="len">' + t.length + '</span>' +
+            '<span class="tell" data-tell></span>' +
+            (n > 1 ? '<span class="dup" title="The same text appears in ' + n + ' places — click to copy this edit to all of them">×' + n + ' same · apply to all</span>' : '') +
+            '<span style="flex:1"></span><button class="btn small ghost reset" title="Back to the source text">↺</button></div></div>' +
+            '<div class="meta"><span class="kind ' + esc(e.kind) + '">' + esc(e.kind) + '</span>' + fileLine + (flags.length ? '<span>' + flags.join(' ') + '</span>' : '') +
+            (rt(e) && rt(e).path ? '<span class="path" title="' + esc(rt(e).path) + '">' + esc(rt(e).path) + '</span>' : '') + '</div></div>';
+    }
+
+    function autosize(ta) { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; }
+    function autosizeAll() { if ($('main').offsetWidth < 320) return; $('main').querySelectorAll('.entry:not(.hidden) textarea').forEach(autosize); }
+    // The pane can be laid out at a sliver of its final width on first load;
+    // sizes measured then wrap absurdly, so re-measure whenever the width changes.
+    var rsT = 0, lastW = 0;
+    window.addEventListener('resize', function () { clearTimeout(rsT); rsT = setTimeout(function () { if (innerWidth !== lastW) { lastW = innerWidth; autosizeAll(); } }, 80); });
+
+    function render() {
+        var main = $('main'); var by = $('groupBy').value;
+        var groups = {}; var orderKeys = [];
+        var sorted = cat.entries.slice().sort(function (a, b) {
+            var ra = rt(a), rb = rt(b);
+            if (ra && rb) return ra.order - rb.order;
+            if (ra) return -1; if (rb) return 1;
+            return (a.file || '').localeCompare(b.file || '') || a.start - b.start;
+        });
+        sorted.forEach(function (e) {
+            var g = by === 'scope' ? scopeOf(e) : by === 'file' ? (e.file || 'runtime only') : e.kind;
+            if (!groups[g]) { groups[g] = []; orderKeys.push(g); }
+            groups[g].push(e);
+        });
+        if (by !== 'scope') orderKeys.sort();
+        else orderKeys.sort(function (a, b) {
+            var w = function (s) { return /^Top bar/.test(s) ? 0 : /^Sidebar/.test(s) ? 1 : /^Popup/.test(s) ? 2 : /^Effect/.test(s) ? 3 : /^Dialog/.test(s) ? 4 : /^Studio/.test(s) ? 5 : /^Source only/.test(s) ? 8 : /^Desktop/.test(s) ? 9 : 6; };
+            return w(a) - w(b) || a.localeCompare(b);
+        });
+        var html = '';
+        orderKeys.forEach(function (g) {
+            var parts = g.split(' › ');
+            html += '<section class="group" data-group="' + esc(g) + '"><h2>' + esc(parts[0]) + (parts[1] ? ' › <span class="k">' + esc(parts.slice(1).join(' › ')) + '</span>' : '') + ' <span class="n">' + groups[g].length + '</span></h2>';
+            groups[g].forEach(function (e) { html += rowHtml(e); });
+            html += '</section>';
+        });
+        main.innerHTML = html || '<div class="empty">Nothing here.</div>';
+        els = new Map();
+        main.querySelectorAll('.entry').forEach(function (row) { els.set(row.dataset.key, row); });
+        applyFilter();
+        lastW = innerWidth;
+        requestAnimationFrame(autosizeAll);
+    }
+
+    function byKey(k) { for (var i = 0; i < cat.entries.length; i++) if (cat.entries[i].key === k) return cat.entries[i]; return null; }
+    function refreshRow(e) {
+        var row = els.get(e.key); if (!row) return;
+        var t = curText(e);
+        row.classList.toggle('changed', isChanged(e));
+        var ta = row.querySelector('textarea'); if (ta.value !== t) { ta.value = t; autosize(ta); }
+        row.querySelector('.len').textContent = t.length;
+        var k = tellsOf(t); var tl = row.querySelector('[data-tell]'); tl.textContent = k ? '⚠ ' + k + (k === 1 ? ' tell' : ' tells') : ''; tl.title = k ? 'em-dash / middle dot / ellipsis / semicolon / stock phrase' : '';
+    }
+    function setText(e, t) {
+        if (e.enc === 'runtime-only') return;
+        if (t === e.text) delete edits[e.key]; else edits[e.key] = t;
+        saveEdits(); refreshRow(e); counts();
+    }
+
+    function matches(e) {
+        var q = $('q').value.trim().toLowerCase();
+        if (kindOn[e.kind] === false) return false;
+        if (scopeOn[scopeOf(e).split(' › ')[0]] === false) return false;
+        if ($('fChanged').checked && !isChanged(e)) return false;
+        if ($('fTells').checked && !TELLS.test(curText(e))) return false;
+        if ($('fDyn').checked && !(e.partial || e.enc === 'js-template-expr' || e.enc === 'runtime-only')) return false;
+        if ($('fUnplaced').checked && rt(e)) return false;
+        if (q) {
+            var hay = (curText(e) + ' ' + e.text + ' ' + labelOf(e) + ' ' + (e.file || '') + ' ' + (e.ctx.id || '') + ' ' + ((rt(e) || {}).el || {}).id + ' ' + scopeOf(e) + ' ' + e.kind).toLowerCase();
+            if (hay.indexOf(q) < 0) return false;
+        }
+        return true;
+    }
+    function applyFilter() {
+        var vis = 0;
+        var perGroup = {};
+        cat.entries.forEach(function (e) {
+            var row = els.get(e.key); if (!row) return;
+            var m = matches(e); row.classList.toggle('hidden', !m);
+            if (m) { vis++; var g = row.parentElement.dataset.group; perGroup[g] = (perGroup[g] || 0) + 1; }
+        });
+        document.querySelectorAll('.group').forEach(function (s) { s.style.display = perGroup[s.dataset.group] ? '' : 'none'; s.querySelector('h2 .n').textContent = perGroup[s.dataset.group] || 0; });
+        $('nVis').textContent = vis;
+        frCount();
+    }
+    function counts() {
+        var ch = cat.entries.filter(isChanged).length;
+        $('nAll').textContent = cat.entries.length; $('nCh').textContent = ch; $('nCh2').textContent = ch;
+        $('nRt').textContent = cat.entries.filter(function (e) { return rt(e); }).length;
+        $('applyBtn').disabled = !ch;
+        $('stamp').textContent = (cat.runtimeAt ? 'placed ' + new Date(cat.runtimeAt).toLocaleString() : 'not placed yet — click “Place strings”');
+    }
+
+    function chips(host, items, state, onClick) {
+        host.innerHTML = '';
+        items.forEach(function (it) {
+            var b = document.createElement('button'); b.className = 'chip' + (state[it.k] === false ? '' : ' on');
+            b.innerHTML = esc(it.k) + '<span class="n">' + it.n + '</span>';
+            b.addEventListener('click', function (ev) {
+                if (ev.altKey || ev.shiftKey) { // solo
+                    var solo = state[it.k] !== false && items.every(function (o) { return o.k === it.k || state[o.k] === false; });
+                    items.forEach(function (o) { state[o.k] = solo ? true : (o.k === it.k); });
+                } else state[it.k] = state[it.k] === false;
+                onClick();
+            });
+            host.appendChild(b);
+        });
+    }
+    function buildChips() {
+        var kinds = {}, scopes = {};
+        cat.entries.forEach(function (e) { kinds[e.kind] = (kinds[e.kind] || 0) + 1; var s = scopeOf(e).split(' › ')[0]; scopes[s] = (scopes[s] || 0) + 1; });
+        var toList = function (o) { return Object.keys(o).sort(function (a, b) { return o[b] - o[a]; }).map(function (k) { return { k: k, n: o[k] }; }); };
+        chips($('kinds'), toList(kinds), kindOn, function () { buildChips(); applyFilter(); });
+        chips($('scopes'), toList(scopes), scopeOn, function () { buildChips(); applyFilter(); });
+    }
+
+    // ── find & replace ──
+    function frRegex() {
+        var f = $('frFind').value; if (!f) return null;
+        var flags = 'g' + ($('frCase').checked ? '' : 'i');
+        try {
+            if ($('frRe').checked) return new RegExp(f, flags);
+            var m = /^\/(.+)\/([a-z]*)$/.exec(f); if (m) return new RegExp(m[1], 'g' + m[2].replace('g', ''));
+            return new RegExp(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+        } catch (_) { return null; }
+    }
+    function frCount() {
+        var re = frRegex(); var n = 0, rows = 0;
+        if (re) cat.entries.forEach(function (e) { if (!matches(e) || e.enc === 'runtime-only') return; var m = curText(e).match(re); if (m) { n += m.length; rows++; } });
+        $('frCount').textContent = re ? n + ' hits in ' + rows : '';
+    }
+    $('frGo').addEventListener('click', function () {
+        var re = frRegex(); if (!re) return toast('Nothing to find.', true);
+        var repl = $('frRepl').value; var n = 0;
+        cat.entries.forEach(function (e) {
+            if (!matches(e) || e.enc === 'runtime-only') return;
+            var t = curText(e); var nt = t.replace(re, repl);
+            if (nt !== t) { setText(e, nt); n++; }
+        });
+        toast('Replaced in ' + n + ' string' + (n === 1 ? '' : 's') + '.');
+        applyFilter();
+    });
+    ['frFind', 'frRe', 'frCase'].forEach(function (id) { $(id).addEventListener('input', frCount); $(id).addEventListener('change', frCount); });
+    $('frBtn').addEventListener('click', function () { $('fr').classList.toggle('open'); if ($('fr').classList.contains('open')) $('frFind').focus(); });
+    document.querySelectorAll('[data-fr]').forEach(function (a) {
+        a.addEventListener('click', function (ev) { ev.preventDefault(); var p = a.dataset.fr.split('|'); $('frFind').value = p[0]; $('frRepl').value = p[1] || ''; $('frRe').checked = false; frCount(); });
+    });
+
+    // ── events on rows ──
+    $('main').addEventListener('input', function (ev) {
+        var ta = ev.target; if (ta.tagName !== 'TEXTAREA') return;
+        var e = byKey(ta.closest('.entry').dataset.key); if (!e) return;
+        autosize(ta); setText(e, ta.value);
+    });
+    $('main').addEventListener('click', function (ev) {
+        var row = ev.target.closest('.entry'); if (!row) return;
+        var e = byKey(row.dataset.key); if (!e) return;
+        if (ev.target.classList.contains('reset')) { setText(e, e.text); }
+        if (ev.target.classList.contains('dup')) {
+            var t = curText(e); var n = 0;
+            (dups[e.text] || []).forEach(function (o) { if (o !== e && o.enc !== 'runtime-only') { setText(o, t); n++; } });
+            toast('Copied to ' + n + ' other place' + (n === 1 ? '' : 's') + '.');
+        }
+    });
+
+    // ── filters ──
+    ['q', 'fChanged', 'fTells', 'fDyn', 'fUnplaced'].forEach(function (id) { $(id).addEventListener('input', applyFilter); $(id).addEventListener('change', applyFilter); });
+    $('groupBy').addEventListener('change', render);
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { ev.preventDefault(); $('q').focus(); $('q').select(); }
+        if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); $('applyBtn').click(); }
+        if (ev.key === 'Escape' && document.activeElement === $('q')) { $('q').value = ''; applyFilter(); }
+    });
+
+    // ── io ──
+    function toast(msg, bad) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : ''); clearTimeout(toast.h); toast.h = setTimeout(function () { t.className = 'toast'; }, bad ? 9000 : 3500); }
+    function download(name, text, mime) {
+        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime || 'text/plain' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    }
+    function editList() {
+        return cat.entries.filter(isChanged).map(function (e) { return { key: e.key, file: e.file, line: e.line, kind: e.kind, scope: scopeOf(e), label: labelOf(e), orig: e.text, text: curText(e) }; });
+    }
+    $('exportJson').addEventListener('click', function () { download('copy-edits-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify({ edits: editList() }, null, 1), 'application/json'); });
+    $('exportTsv').addEventListener('click', function () {
+        var rows = [['key', 'where', 'label', 'kind', 'file', 'text']];
+        cat.entries.forEach(function (e) { if (!matches(e)) return; rows.push([e.key, scopeOf(e), labelOf(e), e.kind, (e.file || '') + ':' + e.line, curText(e)]); });
+        var tsv = rows.map(function (r) { return r.map(function (c) { return String(c).replace(/\t/g, ' ').replace(/\r?\n/g, '\\n'); }).join('\t'); }).join('\n');
+        download('copy-sink-' + new Date().toISOString().slice(0, 10) + '.tsv', tsv, 'text/tab-separated-values');
+    });
+    $('importBtn').addEventListener('click', function () { $('importFile').click(); });
+    $('importFile').addEventListener('change', function () {
+        var f = this.files[0]; if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function () {
+            var s = String(rd.result); var n = 0, miss = 0;
+            var put = function (key, text) { var e = byKey(key); if (!e) { miss++; return; } if (typeof text === 'string') { text = text.replace(/\\n/g, '\n'); if (text !== curText(e)) { setText(e, text); n++; } } };
+            try {
+                if (/^\s*[\[{]/.test(s)) { var j = JSON.parse(s); (Array.isArray(j) ? j : j.edits || []).forEach(function (ed) { put(ed.key, ed.text); }); }
+                else {
+                    var lines = s.split(/\r?\n/); var head = lines.shift().split('\t'); var ki = head.indexOf('key'), ti = head.indexOf('text');
+                    if (ki < 0 || ti < 0) throw new Error('TSV needs key and text columns');
+                    lines.forEach(function (ln) { if (!ln) return; var c = ln.split('\t'); put(c[ki], c[ti]); });
+                }
+                toast('Imported ' + n + ' change' + (n === 1 ? '' : 's') + (miss ? ' · ' + miss + ' key' + (miss === 1 ? '' : 's') + ' not in this catalog' : '') + '.');
+                applyFilter();
+            } catch (err) { toast('Import failed: ' + err.message, true); }
+            $('importFile').value = '';
+        };
+        rd.readAsText(f);
+    });
+    $('discardBtn').addEventListener('click', function () {
+        var n = Object.keys(edits).length; if (!n) return;
+        if (!confirm('Discard ' + n + ' unsaved edit' + (n === 1 ? '' : 's') + '?')) return;
+        edits = {}; saveEdits(); render(); counts();
+    });
+
+    // ── write to source ──
+    $('applyBtn').addEventListener('click', function () {
+        var list = editList(); if (!list.length) return;
+        $('applyBtn').disabled = true; $('applyBtn').textContent = 'Writing…';
+        fetch('/__sink/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edits: list.map(function (e) { return { key: e.key, text: e.text, orig: e.orig }; }) }) })
+            .then(function (r) { return r.json(); })
+            .then(function (rep) {
+                if (rep.error) throw new Error(rep.error);
+                (rep.applied || []).forEach(function (a) { delete edits[a.key]; });
+                saveEdits();
+                var sk = (rep.skipped || []).filter(function (s) { return s.reason !== 'unchanged'; });
+                toast('Wrote ' + rep.applied.length + ' string' + (rep.applied.length === 1 ? '' : 's') + ' to source.' + (sk.length ? '\n' + sk.length + ' skipped:\n' + sk.map(function (s) { return '• ' + s.key.split('#')[0] + ' — ' + s.reason; }).join('\n') : ''), !!sk.length);
+                return load();
+            })
+            .catch(function (err) { toast('Write failed: ' + err.message, true); })
+            .then(function () { $('applyBtn').textContent = 'Write to source'; counts(); });
+    });
+
+    $('harvestBtn').addEventListener('click', function () {
+        var b = $('harvestBtn'); b.disabled = true; b.textContent = 'Placing… (headless Chrome, ~20 s)';
+        fetch('/__sink/harvest', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (r) {
+            if (!r.ok) throw new Error(r.error || 'harvest failed');
+            toast('Placed ' + r.items + ' runtime strings.'); return load();
+        }).catch(function (err) { toast('Placing failed: ' + err.message, true); })
+          .then(function () { b.disabled = false; b.textContent = 'Place strings'; });
+    });
+    $('reloadBtn').addEventListener('click', load);
+
+    function load() {
+        return fetch('/__sink/catalog').then(function (r) { return r.json(); }).then(function (c) {
+            cat = c;
+            // drop stale edits whose key no longer exists
+            var live = {}; cat.entries.forEach(function (e) { live[e.key] = 1; });
+            Object.keys(edits).forEach(function (k) { if (!live[k]) delete edits[k]; });
+            saveEdits();
+            buildDups(); buildChips(); render(); counts();
+            cat.entries.forEach(refreshRow);
+        }).catch(function (err) { $('main').innerHTML = '<div class="empty">Could not load the catalog: ' + esc(err.message) + '<br>Run <code>node scripts/copy-sink.js serve</code> and open this page from that server.</div>'; });
+    }
+    load();
+})();
+</script>
+</body>
+</html>

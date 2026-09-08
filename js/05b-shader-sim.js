@@ -6,6 +6,37 @@
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
 // ═══════════════════════════════════════════════════════════════════
+        // ─── Per-texel collider strength decode (2026-08-31) ────────────
+        // The obstacle texture is RG: R = Σcoverage·strength (the historic
+        // channel, unchanged meaning), G = Σcoverage·strength². G/R is
+        // therefore the coverage-weighted strength of whatever wrote each
+        // texel, and R/(G/R) its coverage — so every collider carries its
+        // OWN strength instead of being judged against the globally
+        // strongest one (uObsMax). Before this, cov = texel/uObsMax meant
+        // one strength-1.0 collider (a Text wall forces exactly that)
+        // reshaped every other collider in the scene: a 0.7 wall's
+        // interior fell to cov 0.7 — mid-window on the coverage
+        // smoothstep's steep flank — so it turned both more solid
+        // (response uses the max) and noisier (interior alpha ripple maps
+        // through slope ~2.5). G≈0 falls back to the global normalizer,
+        // so any unmigrated writer keeps the exact legacy behavior.
+        // Pure functions on a fetched texel — no uniform/sampler decls, so
+        // shaders that already declare uObsMax can interpolate this too.
+        const obsTexelGLSL = `
+            float obsTexStrength(vec2 t, float sMax) {
+                return (t.y > 1e-5) ? clamp(t.y / max(t.x, 1e-5), 0.05, 1.0)
+                                    : max(sMax, 0.05);
+            }
+            float obsTexCoverage(vec2 t, float sMax) {
+                return clamp(t.x / obsTexStrength(t, sMax), 0.0, 1.0);
+            }
+            float obsTexResponse(vec2 t, float sMax) {
+                // s³ + 0.997 ceiling — the solidity()/obsStrengthResponse
+                // curve (see obstacleSolidityGLSL), per texel.
+                float s = clamp(obsTexStrength(t, sMax), 0.0, 1.0);
+                return min(s * s * s, 0.997);
+            }
+        `;
         const splatFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
@@ -33,6 +64,10 @@
             uniform int isVelocity; // 1 for velocity, 0 for density
             uniform int hasObstacle;
             uniform float uObsMax;  // max collisionStrength (see obstacleSolidityGLSL)
+            uniform float uVelCovBlock; // 1 = velocity injection blocked by wall
+                                        // COVERAGE like dye (default); 0 = legacy
+                                        // s³ leak (config.OBS_VEL_COVERAGE_BLOCK)
+            ${obsTexelGLSL}
             float sn_hash(vec2 q) {
                 q = fract(q * vec2(123.34, 345.45));
                 q += dot(q, q + 34.345);
@@ -61,10 +96,11 @@
                     // blocking and the projection's wall must agree on where
                     // the wall IS, or paint deposits inside a wall the flow
                     // respects (burned-in rims). See the solidity() comment.
-                    float ocov = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
-                    float osr = clamp(uObsMax, 0.0, 1.0);
-                    osr = min(osr * osr * osr, 0.997); // full-range strength curve + stability ceiling (matches solidity())
-                    obsBlock = 1.0 - osr * smoothstep(0.35, 0.85, ocov);
+                    // Per-texel strength (2026-08-31): coverage and response
+                    // come from THIS texel's own strength, so painting on a
+                    // weak collider is unchanged by a strong one elsewhere.
+                    vec2 ot = texture(uObstacle, vUv).rg;
+                    float covBlock = smoothstep(0.35, 0.85, obsTexCoverage(ot, uObsMax));
                     // The BRUSH is blocked by coverage alone, with no strength
                     // term (2026-08-16). The s^3 permeability curve is right for
                     // flow — a weak wall should leak — but applying it to direct
@@ -74,7 +110,17 @@
                     // be painted over. That is why colliding did not feel like
                     // colliding. Paint now goes AROUND the shape at every
                     // strength; advection through a leaky wall is untouched.
-                    obsBlockDye = 1.0 - smoothstep(0.35, 0.85, ocov);
+                    obsBlockDye = 1.0 - covBlock;
+                    // VELOCITY now defaults to the same coverage-only block
+                    // (2026-08-31): the old s³ curve injected (1-s³) of every
+                    // dab's velocity INSIDE the wall — 66% at strength 0.7 —
+                    // and that in-wall reservoir is what pumped dye radially
+                    // out of a painted-on collider (the "dye producer" push;
+                    // measured: outward flux + escape-band dye still growing
+                    // +56% a second after the stroke stopped). Flow THROUGH a
+                    // leaky wall is advection + projection's business and is
+                    // untouched. uVelCovBlock=0 restores the legacy leak.
+                    obsBlock = 1.0 - mix(obsTexResponse(ot, uObsMax), 1.0, uVelCovBlock) * covBlock;
                 }
                 if (isVelocity == 1) {
                     // Motion Isolation: prevent new velocity from affecting areas with existing velocity
@@ -312,38 +358,6 @@
         // through the worst re-filtering regime and snapping still
         // along a moving frontier. (At rest this also zeroes the
         // MacCormack correction exactly — see macCorrectFrag.)
-        // Curl-noise micro-swirl (Bridson 2007): the curl of a scrolling
-        // value-noise potential is divergence-free by construction, so it
-        // never fights the pressure solve. Applied ONLY as an offset to the
-        // dye-sampling displacement (uniform-gated; the velocity pass sets
-        // swirl=0) — never written back into the velocity texture, so it's
-        // feedback-safe: still pure bilinear resampling, gain ≤ 1. Adds
-        // painterly sub-grid wisps below sim-grid resolution for one noise
-        // eval. Shared by all three dye advection passes — the MacCormack
-        // correction needs the exact same displacement in every pass.
-        const swirlGLSL = `
-            uniform float swirl;     // micro-swirl strength (0 = off, branch skipped)
-            uniform float swirlTime; // animation clock, seconds
-            float sw_hash(vec2 q) {
-                q = fract(q * vec2(127.1, 311.7));
-                q += dot(q, q + 19.19);
-                return fract(q.x * q.y);
-            }
-            float sw_noise(vec2 q) {
-                vec2 i = floor(q), f = fract(q);
-                f = f * f * (3.0 - 2.0 * f);
-                return mix(mix(sw_hash(i),                  sw_hash(i + vec2(1.0, 0.0)), f.x),
-                           mix(sw_hash(i + vec2(0.0, 1.0)), sw_hash(i + vec2(1.0, 1.0)), f.x), f.y);
-            }
-            vec2 swirlCurl(vec2 uv, float t) {
-                // 2D curl of the noise potential: (dN/dy, -dN/dx)
-                vec2 q = uv * 24.0 + vec2(t * 0.35, -t * 0.27);
-                float e = 0.35;
-                float dy = sw_noise(q + vec2(0.0, e)) - sw_noise(q - vec2(0.0, e));
-                float dx = sw_noise(q + vec2(e, 0.0)) - sw_noise(q - vec2(e, 0.0));
-                return vec2(dy, -dx) * (0.5 / e);
-            }
-        `;
         // Obstacle solidity: defined HERE (above the advection shaders)
         // because rk2Backtrace's obstacle-aware probes call solidity() —
         // every includer must interpolate this snippet first. Consumed by
@@ -351,23 +365,26 @@
         // further down and by all three dye advection passes.
         const obstacleSolidityGLSL = `
             uniform float uObsMax; // max collisionStrength among composited
-                                   // collision sources (JS: window.__obsStrengthMax)
-            float obsStrengthResponse() {
-                // s³: blocking COMPOUNDS over frames (a 65%-solidity wall
-                // already stops a steady jet), so a perceptually graded
-                // slider needs a response that stays low through the mid
-                // range — measured with an even S-curve the wall still
-                // cliffed between 0.5 and 0.8. Cubic spreads usable
-                // permeability across the upper half.
-                // Ceiling 0.997 (2026-07-15, Gabriel): a PERFECT seal is the
-                // degenerate extreme — dye/energy pressed against zero-leak
-                // walls pile into HDR blowout ("intense overflow destruction
-                // at 1.0, really nice at 0.999"). 0.997 is exactly the
-                // response slider-0.999 produced, so 1.0 now means "as solid
-                // as is stable" — visually rigid, never mathematically sealed.
-                float s = clamp(uObsMax, 0.0, 1.0);
-                return min(s * s * s, 0.997);
-            }
+                                   // collision sources (JS: window.__obsStrengthMax).
+                                   // Since the per-texel strength channel
+                                   // (2026-08-31, obsTexelGLSL) this is only the
+                                   // FALLBACK normalizer for legacy G=0 content.
+            ${obsTexelGLSL}
+            // s³ strength response: blocking COMPOUNDS over frames (a
+            // 65%-solidity wall already stops a steady jet), so a
+            // perceptually graded slider needs a response that stays low
+            // through the mid range — measured with an even S-curve the
+            // wall still cliffed between 0.5 and 0.8. Cubic spreads usable
+            // permeability across the upper half.
+            // Ceiling 0.997 (2026-07-15, Gabriel): a PERFECT seal is the
+            // degenerate extreme — dye/energy pressed against zero-leak
+            // walls pile into HDR blowout ("intense overflow destruction
+            // at 1.0, really nice at 0.999"). 0.997 is exactly the
+            // response slider-0.999 produced, so 1.0 now means "as solid
+            // as is stable" — visually rigid, never mathematically sealed.
+            // The curve itself lives in obsTexResponse (obsTexelGLSL) and
+            // is now evaluated per texel: each collider gets its own
+            // slider's response, not the strongest scene collider's.
             float solidity(vec2 uv) {
                 // COVERAGE and STRENGTH are different quantities (D0.5 rev 3,
                 // 2026-07-14). The obstacle texel stores coverage*strength; a
@@ -382,7 +399,8 @@
                 //  - the interior response keeps the EXACT legacy strength
                 //    curve smoothstep(0.25, 0.5, strength): 0.7 → fully
                 //    blocking, ≤0.25 → fluid, between → permeable wall.
-                float cov = clamp(texture(uObstacle, uv).r / max(uObsMax, 0.05), 0.0, 1.0);
+                vec2 obT = texture(uObstacle, uv).rg;
+                float cov = obsTexCoverage(obT, uObsMax);
                 // Ramp window 0.35→0.85 (was 0.2→0.8): the compositor's
                 // sim-scale blur bleeds coverage INTO narrow unmasked channels
                 // from both sides, and with the lower window a 2-texel channel
@@ -411,7 +429,7 @@
                 // "1.0 is still technically broken" runaway). 0.5% residual
                 // coupling keeps walls functionally rigid while the interior
                 // pressure always has a path to relax through.
-                return min(0.995, obsStrengthResponse() * smoothstep(0.35, 0.85, cov));
+                return min(0.995, obsTexResponse(obT, uObsMax) * smoothstep(0.35, 0.85, cov));
             }
         `;
         // ─── Wetness → dye mobility (P15-1) ─────────────────────────────
@@ -446,14 +464,6 @@
                 vec2 midUv = clamp(vUv - 0.5 * dt * vHalf, 0.0, 1.0);
                 vec2 disp = dt * texture(uVelocity, midUv).xy;
                 float mTexels = length(disp / srcTexelSize);
-                // Swirl magnitude rides on the LOCAL advective displacement
-                // (mTexels factor): moving paint wisps, settled paint gets
-                // exactly nothing — and the settle ease-out below multiplies
-                // the total, so the at-rest bit-stability guarantee holds
-                // with swirl active.
-                if (swirl > 0.0) {
-                    disp += swirlCurl(vUv, swirlTime) * (mTexels * swirl) * srcTexelSize;
-                }
                 // Frame-rate-honest ease-out: the thresholds were tuned as
                 // texels-per-frame AT 60FPS. At 144Hz dt halves, so the same
                 // physical speed reads 2.4x smaller and slow swirls spend
@@ -484,7 +494,7 @@
                     else if (solidity(clamp(vUv - disp, 0.0, 1.0)) > 0.5) disp *= 0.5;
                 }
                 // P15-1 wetness: dry paint holds, wet paint flows. Scales the
-                // final displacement (swirl offset included) so dry regions set
+                // final displacement so dry regions set
                 // in place. dyeMobility is EXACTLY 1.0 when wetInfluence<=0
                 // (velocity pass + feature off) — bit-identical no-op — and disp
                 // is already 0 at rest, so the settle/bit-stability guarantee is
@@ -530,7 +540,6 @@
             uniform int macMode; // 1 = uSource is the already-advected MacCormack
                                  // result (macCorrectFrag output): self-fetch it
                                  // and apply only the decay/drain logic below.
-            ${swirlGLSL}
             ${obstacleSolidityGLSL}
             ${mobilityGLSL}
             void main() {
@@ -591,18 +600,25 @@
                     if (hasObstacle == 1) {
                         // Dilate by one sim texel: sub-texel mask gaps and the
                         // thin pinned rim still count as wall-adjacent.
-                        float covOwn = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
-                        float obsD = texture(uObstacle, vUv).r;
-                        obsD = max(obsD, texture(uObstacle, vUv + vec2(obstacleTexelSize.x, 0.0)).r);
-                        obsD = max(obsD, texture(uObstacle, vUv - vec2(obstacleTexelSize.x, 0.0)).r);
-                        obsD = max(obsD, texture(uObstacle, vUv + vec2(0.0, obstacleTexelSize.y)).r);
-                        obsD = max(obsD, texture(uObstacle, vUv - vec2(0.0, obstacleTexelSize.y)).r);
-                        float covD = clamp(obsD / max(uObsMax, 0.05), 0.0, 1.0);
+                        // (Componentwise max of the RG texels — the dilated
+                        // strength ratio can mix two colliders at a seam,
+                        // which is exactly the wall-adjacent semantics the
+                        // dilation wants.)
+                        vec2 obTc = texture(uObstacle, vUv).rg;
+                        float covOwn = obsTexCoverage(obTc, uObsMax);
+                        vec2 obsD = obTc;
+                        obsD = max(obsD, texture(uObstacle, vUv + vec2(obstacleTexelSize.x, 0.0)).rg);
+                        obsD = max(obsD, texture(uObstacle, vUv - vec2(obstacleTexelSize.x, 0.0)).rg);
+                        obsD = max(obsD, texture(uObstacle, vUv + vec2(0.0, obstacleTexelSize.y)).rg);
+                        obsD = max(obsD, texture(uObstacle, vUv - vec2(0.0, obstacleTexelSize.y)).rg);
+                        float covD = obsTexCoverage(obsD, uObsMax);
                         // Scaled by the strength response: leaky (low-strength)
                         // walls legitimately let dye THROUGH — draining it
                         // there would eat paint the physics allows to pass.
-                        obsInterior = obsStrengthResponse() * smoothstep(0.55, 0.95, covD);
-                        obsCore = obsStrengthResponse()
+                        // Per texel (2026-08-31): a weak collider drains at its
+                        // OWN response even with a strength-1.0 wall elsewhere.
+                        obsInterior = obsTexResponse(obsD, uObsMax) * smoothstep(0.55, 0.95, covD);
+                        obsCore = mix(obsTexResponse(obTc, uObsMax), obsTexResponse(obsD, uObsMax), obsDrainDilate)
                                 * smoothstep(0.55, 0.95, mix(covOwn, covD, obsDrainDilate));
                         // Speed separates pinned dye from dye merely PASSING a
                         // wall. Measured on the fine dot lattice (UV/s, sim 512):
@@ -844,7 +860,6 @@
             uniform vec2 srcTexelSize; // dye-grid texel
             uniform float dt;
             uniform int hasObstacle;
-            ${swirlGLSL}
             ${obstacleSolidityGLSL}
             ${mobilityGLSL}
             void main() {
@@ -874,7 +889,6 @@
             uniform float dt;
             uniform int hasObstacle;
             uniform float deband;        // 0 = off (bit-exact); >0 softens fast-moving dye cliffs
-            ${swirlGLSL}
             ${obstacleSolidityGLSL}
             ${mobilityGLSL}
             void main() {
@@ -950,7 +964,7 @@
         `;
         // ─── Wetness field: advect + dry (P15-1) ────────────────────────
         // The wetness map is carried by the flow (semi-Lagrangian, the SAME
-        // shared rk2Backtrace as the dye — swirl=0 and wetInfluence=0 so the
+        // shared rk2Backtrace as the dye — wetInfluence=0 so the
         // field itself transports at full mobility) and dries via a batched
         // half-life decay. dryMul is accumulated CPU-side exactly like the
         // dye's decayDt so the multiply survives fp16 rounding at tiny
@@ -968,7 +982,6 @@
             uniform float dt;
             uniform float dryMul;          // batched half-life factor (1.0 = no-op)
             uniform int hasObstacle;
-            ${swirlGLSL}
             ${obstacleSolidityGLSL}
             ${mobilityGLSL}
             void main() {
@@ -1020,7 +1033,7 @@
         // backtrace probes.)
         const divergenceFrag = `#version 300 es
             precision ${PRECISION} float;
-            in vec2 vL, vR, vT, vB;
+            in vec2 vUv, vL, vR, vT, vB;
             out vec4 fragColor;
             uniform sampler2D uVelocity;
             uniform sampler2D uObstacle;
@@ -1039,6 +1052,8 @@
                                   // fp16 RELATIVE precision is scale-invariant,
                                   // so mild regimes are visually identical.
             uniform int hasObstacle;
+            uniform float uDivMask; // 1 = cut-cell RHS weighting (default),
+                                    // 0 = legacy (config.OBS_DIV_MASK)
             ${obstacleSolidityGLSL}
             vec2 sampleVelocity(vec2 uv) {
                 vec2 m = vec2(1.0);
@@ -1056,6 +1071,21 @@
             void main() {
                 float div = 0.5 * (sampleVelocity(vR).x - sampleVelocity(vL).x +
                                    sampleVelocity(vT).y - sampleVelocity(vB).y);
+                // Cut-cell RHS (2026-08-31): a mostly-solid cell holds only
+                // (1-s) of a cell's fluid, so its mass-conservation source
+                // must scale with that fraction. Without this, divergence
+                // inside a wall (splat leak, damp/projection mismatch)
+                // forces the Neumann-mixed pressure equation whose
+                // relaxation is ALSO scaled by (1-s) — the forcing wins
+                // 1/(1-s) : 1 and pressure inside near-solid walls
+                // INTEGRATES instead of relaxing (the sealed-pocket
+                // wind-up clearFrag's softClamp valve was built to
+                // survive; worst on the warm-started Jacobi path, where
+                // no coarse level ever relaxes the interior). Masking the
+                // source where solidity is high cancels that amplification
+                // exactly and zeroes the interior residual the MG pyramid
+                // would otherwise spray back out through its coarse levels.
+                if (hasObstacle == 1) div *= 1.0 - uDivMask * solidity(vUv);
                 fragColor = vec4(div * pScale, 0.0, 0.0, 1.0);
             }
         `;
@@ -1085,6 +1115,7 @@
             uniform float uObsMax;
             uniform float uCapSpd; // M1: Max Speed cap in cells/s (0 = gate off)
             uniform float uEdgeGate; // >0.5 = fade confinement at the canvas border
+            ${obsTexelGLSL}
             void main() {
                 vec2 cL = clamp(vL, 0.0, 1.0);
                 vec2 cR = clamp(vR, 0.0, 1.0);
@@ -1122,12 +1153,17 @@
                 // max of LINEAR obstacle samples widens the apron ~1 texel
                 // past the wall so the gate covers the whole discontinuity.
                 if (hasObstacle == 1) {
-                    float o = texture(uObstacle, vUv).r;
-                    o = max(o, texture(uObstacle, cL).r);
-                    o = max(o, texture(uObstacle, cR).r);
-                    o = max(o, texture(uObstacle, cT).r);
-                    o = max(o, texture(uObstacle, cB).r);
-                    float cov = clamp(o / max(uObsMax, 0.05), 0.0, 1.0);
+                    // Per-texel coverage (2026-08-31): a weak collider's
+                    // apron no longer shrinks when a strong collider exists
+                    // elsewhere (cov used to be o/uObsMax — half-open gate =
+                    // the kick→shear→curl feedback partially returning at
+                    // exactly the walls that can least afford it).
+                    vec2 o = texture(uObstacle, vUv).rg;
+                    o = max(o, texture(uObstacle, cL).rg);
+                    o = max(o, texture(uObstacle, cR).rg);
+                    o = max(o, texture(uObstacle, cT).rg);
+                    o = max(o, texture(uObstacle, cB).rg);
+                    float cov = obsTexCoverage(o, uObsMax);
                     gate *= 1.0 - smoothstep(0.05, 0.5, cov);
                 }
                 // Domain-edge apron (2026-08-16): the canvas border is a shear
@@ -1316,6 +1352,7 @@
             uniform float uObsMax;
             uniform float dt;
             uniform float strength; // per-frame HF removal fraction (pre-scaled by dt·60, ≤0.85)
+            ${obsTexelGLSL}
             void main() {
                 vec2 cL = clamp(vL, 0.0, 1.0), cR = clamp(vR, 0.0, 1.0);
                 vec2 cT = clamp(vT, 0.0, 1.0), cB = clamp(vB, 0.0, 1.0);
@@ -1330,7 +1367,7 @@
                 float energy = smoothstep(0.002, 0.02, hf);
                 float k = strength * motion * smoothstep(0.15, 0.6, rel) * energy;
                 if (hasObstacle == 1) {
-                    float cov = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
+                    float cov = obsTexCoverage(texture(uObstacle, vUv).rg, uObsMax);
                     k *= 1.0 - smoothstep(0.65, 0.98, cov);
                 }
                 fragColor = vec4(c - hfv * k, 0.0, 1.0);
@@ -1402,8 +1439,11 @@
                 // walls hold), while mostly-open texels keep an AA ramp.
                 float a = aSum * (1.0 / 16.0);
                 float coverage = smoothstep(covKnee * 0.25, covKnee, a) * strength;
-                float previous = texture(uObstacle, vUv).r;
-                fragColor = vec4(min(1.0, previous + coverage), 0.0, 0.0, 1.0);
+                vec2 previous = texture(uObstacle, vUv).rg;
+                // G = Σcoverage·strength² — the per-texel strength channel
+                // (obsTexelGLSL): G/R recovers this source's own strength.
+                fragColor = vec4(min(1.0, previous.x + coverage),
+                                 min(1.0, previous.y + coverage * strength), 0.0, 1.0);
             }
         `;
         // Obstacle gap fill — one separable step of grayscale dilate/erode
@@ -1421,14 +1461,19 @@
             uniform sampler2D uTexture;
             uniform int isErode;
             void main() {
-                float c = texture(uTexture, vUv).r;
-                float l = texture(uTexture, clamp(vL, 0.0, 1.0)).r;
-                float r = texture(uTexture, clamp(vR, 0.0, 1.0)).r;
-                float t = texture(uTexture, clamp(vT, 0.0, 1.0)).r;
-                float b = texture(uTexture, clamp(vB, 0.0, 1.0)).r;
-                float mx = max(c, max(max(l, r), max(t, b)));
-                float mn = min(c, min(min(l, r), min(t, b)));
-                fragColor = vec4(isErode == 1 ? mn : mx, 0.0, 0.0, 1.0);
+                // Componentwise over RG so the per-texel strength channel
+                // rides along; at a seam between two different-strength
+                // colliders the ratio can mix for one texel — acceptable
+                // for an opt-in solid-slab knob (COLLIDER_GAP_FILL).
+                vec2 c = texture(uTexture, vUv).rg;
+                vec2 l = texture(uTexture, clamp(vL, 0.0, 1.0)).rg;
+                vec2 r = texture(uTexture, clamp(vR, 0.0, 1.0)).rg;
+                vec2 t = texture(uTexture, clamp(vT, 0.0, 1.0)).rg;
+                vec2 b = texture(uTexture, clamp(vB, 0.0, 1.0)).rg;
+                vec2 mx = max(c, max(max(l, r), max(t, b)));
+                vec2 mn = min(c, min(min(l, r), min(t, b)));
+                vec2 v = (isErode == 1) ? mn : mx;
+                fragColor = vec4(v, 0.0, 1.0);
             }
         `;
         // Doubles as the multigrid smoother: hSq = (2^level)² converts the
@@ -1665,23 +1710,26 @@
                                     // preserves, making collisions feel sluggish
                                     // instead of fluid-sliding-around-stone.
                                     // Driven by config.WALL_SLIP (default 0.6).
+            ${obsTexelGLSL}
             void main() {
                 vec2 vel = texture(uVelocity, vUv).xy;
                 // Sample obstacle with neighbors for smooth boundary (anti-alias)
-                float c  = texture(uObstacle, vUv).r;
-                float l  = texture(uObstacle, vUv - vec2(texelSize.x, 0.0)).r;
-                float r  = texture(uObstacle, vUv + vec2(texelSize.x, 0.0)).r;
-                float t  = texture(uObstacle, vUv + vec2(0.0, texelSize.y)).r;
-                float b  = texture(uObstacle, vUv - vec2(0.0, texelSize.y)).r;
-                float obs = (c * 4.0 + l + r + t + b) * 0.125;
+                vec2 c  = texture(uObstacle, vUv).rg;
+                vec2 l  = texture(uObstacle, vUv - vec2(texelSize.x, 0.0)).rg;
+                vec2 r  = texture(uObstacle, vUv + vec2(texelSize.x, 0.0)).rg;
+                vec2 t  = texture(uObstacle, vUv + vec2(0.0, texelSize.y)).rg;
+                vec2 b  = texture(uObstacle, vUv - vec2(0.0, texelSize.y)).rg;
+                vec2 obs = (c * 4.0 + l + r + t + b) * 0.125;
                 // Coverage-normalized + strength-scaled (2026-07-15): the damp
                 // depth follows the same full-range strength S-curve as
                 // solidity(), so the Strength slider grades damping instead of
                 // cliffing at 0.5; wallSlip still narrows the curve toward the
                 // interior (its window now operates on coverage 0..1).
-                float covAvg = clamp(obs / max(uObsMax, 0.05), 0.0, 1.0);
-                float osr = clamp(uObsMax, 0.0, 1.0);
-                osr = min(osr * osr * osr, 0.997); // stability ceiling (matches solidity())
+                // Per texel (2026-08-31): the weighted RG average's ratio IS
+                // the weighted local strength, so each collider damps at its
+                // own slider's depth.
+                float covAvg = obsTexCoverage(obs, uObsMax);
+                float osr = obsTexResponse(obs, uObsMax);
                 float damp = 1.0 - osr * smoothstep(wallSlip * 0.45, 0.8 + wallSlip * 0.1, covAvg);
                 vel *= damp;
                 fragColor = vec4(vel, 0.0, 1.0);
@@ -1786,6 +1834,7 @@
             uniform float gateFlow;
             uniform int hasObstacle;
             uniform float uObsMax;
+            ${obsTexelGLSL}
             uniform float toneWhite;      // display's Reinhard white point (0 = plain)
             uniform float toneCeil;       // how much HDR headroom to allow (0 = don't pre-compensate)
             // The display tone-maps dye on the way out (05a displayFrag): plain
@@ -1811,7 +1860,7 @@
                 // image cannot deposit inside a wall the flow respects.
                 float obsBlockDye = 1.0;
                 if (hasObstacle == 1) {
-                    float ocov = clamp(texture(uObstacle, vUv).r / max(uObsMax, 0.05), 0.0, 1.0);
+                    float ocov = obsTexCoverage(texture(uObstacle, vUv).rg, uObsMax);
                     obsBlockDye = 1.0 - smoothstep(0.35, 0.85, ocov);
                 }
                 float cov = clamp(src.a, 0.0, 1.0) * clamp(amount, 0.0, 1.0);
@@ -1928,10 +1977,11 @@
             uniform float decay;         // Per-step falloff
             uniform float weight;        // Amount slider
             uniform float dispersion;    // Per-channel decay spread
-            uniform sampler2D uObstacle; // Collider coverage (R16F, sim res, same 0..1 UV)
-            uniform float uObsMax;       // window.__obsStrengthMax \u2014 the coverage normalizer
+            uniform sampler2D uObstacle; // Collider coverage (RG16F, sim res, same 0..1 UV)
+            uniform float uObsMax;       // window.__obsStrengthMax \u2014 the FALLBACK coverage normalizer
             uniform int hasObstacle;     // 0 = no colliders / occlusion off
             uniform float blockStrength; // 1 = opaque wall, <1 = translucent
+            ${obsTexelGLSL}
             #define ITERATIONS 48
             void main() {
                 // NB: stepUV, not step — 'step' is a GLSL builtin.
@@ -1982,7 +2032,7 @@
                     // splatFrag's obsBlockDye, which drops strength for the same
                     // reason (a brush is blocked by a wall's shape).
                     if (hasObstacle == 1) {
-                        float cov = clamp(texture(uObstacle, coord).r / max(uObsMax, 0.05), 0.0, 1.0);
+                        float cov = obsTexCoverage(texture(uObstacle, coord).rg, uObsMax);
                         illum *= 1.0 - blockStrength * smoothstep(0.35, 0.85, cov);
                     }
                     accum += texture(uTexture, coord).rgb * illum;

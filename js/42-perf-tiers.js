@@ -135,12 +135,13 @@
         bytes += dyeTexels * 4 * (nRaster + nMask);
 
         // sim res, per texel: velocity(2xRG16F=8) + wetness(2xR16F=4) +
-        // divergence(2) + curl(2) + pressure(2xR16F=4) + obstacle(2) +
-        // obstacleScratch(2) + mgRes0(2)
-        bytes += simTexels * 26;
-        // multigrid pyramid: 5 R16F per level, each level a quarter of
-        // the last — the geometric sum converges to a third of one level
-        bytes += simTexels * 10 / 3;
+        // divergence(2) + curl(2) + pressure(2xR16F=4) + obstacle(RG16F=4) +
+        // obstacleScratch(RG16F=4) + mgRes0(2)
+        bytes += simTexels * 30;
+        // multigrid pyramid: 4 R16F + 1 RG16F per level, each level a
+        // quarter of the last — the geometric sum converges to a third
+        // of one level
+        bytes += simTexels * 12 / 3;
 
         // fixed-base buffers: glow + its mip chain (+1/3), scatter,
         // shadeForm x2 — all RGBA16F

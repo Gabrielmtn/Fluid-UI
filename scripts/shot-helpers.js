@@ -30,6 +30,14 @@
         var _pw = document.getElementById('photoWarn');
         if (_pw) _pw.hidden = true;
     } catch (e) {}
+    // The startup interface fork (js/43-ui-visibility.js) is the next thing
+    // a clean profile boots into. Waive it the same way, before it can show:
+    // the flag stops a fork that has not fired yet, the call closes one that
+    // has. Nothing is persisted, so the profile stays clean.
+    try {
+        localStorage.setItem('fluidui.uiFork.skip', '1');
+        if (window.UIVisibility && window.UIVisibility.forkPending()) window.UIVisibility.chooseLayout(null);
+    } catch (e) {}
 
     function raf(n) {
         return new Promise(function (res) {

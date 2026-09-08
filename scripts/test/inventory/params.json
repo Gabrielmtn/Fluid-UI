@@ -179,23 +179,6 @@
       "registered": true
     },
     {
-      "id": "swirl",
-      "kind": "slider",
-      "configKey": "SWIRL",
-      "min": 0,
-      "max": 1,
-      "step": 0.01,
-      "def": 0,
-      "mapping": "config.SWIRL = parseFloat(value)",
-      "section": "effects",
-      "consumer": "sim-shader",
-      "gatedBy": null,
-      "sweepRelevant": true,
-      "expectedEffect": "Curl-noise micro-swirl in dye advection: moving paint gains fine painterly wisps; settled (still) paint is untouched (0 = off, bit-stable).",
-      "binding": "js/05e-effect-controls.js:87-94; consumed js/05j-update-loop.js:914",
-      "registered": true
-    },
-    {
       "id": "wetInfluence",
       "kind": "slider",
       "configKey": "WET_INFLUENCE",
@@ -208,7 +191,7 @@
       "consumer": "sim-shader",
       "gatedBy": null,
       "sweepRelevant": true,
-      "expectedEffect": "Dry-Wet coupling (UI label 'Dry - Wet'): 0 = feature off (bit-identical), higher = dried paint increasingly freezes in place while freshly-painted wet paint still flows.",
+      "expectedEffect": "Dry-Wet coupling (UI label 'Drying', was 'Dry - Wet'): 0 = feature off (bit-identical), higher = dried paint increasingly freezes in place while freshly-painted wet paint still flows.",
       "binding": "js/05e-effect-controls.js:96-103; consumed js/05j-update-loop.js:846-847",
       "registered": true
     },
@@ -237,7 +220,7 @@
       "max": 6,
       "step": 0.1,
       "def": 0,
-      "mapping": "config.RIDGES = parseFloat(value); sharpen kernelScale = RIDGES * max(dyeW,dyeH)/2048",
+      "mapping": "config.RIDGES = parseFloat(value); sharpen kernelScale = RIDGES * max(dyeW,dyeH)/2048; lives inside shadingIntensityGroup (shown only while displayShadingToggle is on; value still applies while hidden)",
       "section": "effects",
       "consumer": "display-shader",
       "gatedBy": "config.SHARPNESS > 0 AND governor fxOn (pass fully skipped otherwise)",
@@ -621,23 +604,6 @@
       "registered": true
     },
     {
-      "id": "clarity",
-      "kind": "slider",
-      "configKey": "CLARITY",
-      "min": 0,
-      "max": 1,
-      "step": 0.05,
-      "def": 0,
-      "mapping": "config.CLARITY = parseFloat(value); microDetailToggle unchecked zeroes it (remembers previous value)",
-      "section": "microDetail",
-      "consumer": "display-shader",
-      "gatedBy": "governor fxOn; pass runs whenever CLARITY > 0 or VIBRANCE > 0",
-      "sweepRelevant": true,
-      "expectedEffect": "Local contrast enhancement on displayed dye (micro-detail pass); stored dye unchanged.",
-      "binding": "js/05h-slider-bindings.js:569; consumed js/05j-update-loop.js:1149-1162",
-      "registered": true
-    },
-    {
       "id": "vibrance",
       "kind": "slider",
       "configKey": "VIBRANCE",
@@ -645,13 +611,13 @@
       "max": 1,
       "step": 0.05,
       "def": 0,
-      "mapping": "config.VIBRANCE = parseFloat(value); microDetailToggle unchecked zeroes it",
-      "section": "microDetail",
+      "mapping": "config.VIBRANCE = parseFloat(value); lives inside shadingIntensityGroup (shown only while displayShadingToggle is on; value still applies while hidden)",
+      "section": "effects",
       "consumer": "display-shader",
-      "gatedBy": "governor fxOn; pass runs whenever CLARITY > 0 or VIBRANCE > 0",
+      "gatedBy": "governor fxOn; pass runs whenever VIBRANCE > 0",
       "sweepRelevant": true,
-      "expectedEffect": "Selective saturation boost on displayed dye (micro-detail pass).",
-      "binding": "js/05h-slider-bindings.js:569; consumed js/05j-update-loop.js:1150-1163",
+      "expectedEffect": "Selective saturation boost on displayed dye (micro-detail pass, vibrance only since 2026-09-03).",
+      "binding": "js/05h-slider-bindings.js registry binding; consumed js/05j-update-loop.js micro-detail pass",
       "registered": true
     },
     {
@@ -1298,23 +1264,6 @@
       "sweepRelevant": true,
       "expectedEffect": "Enables Color Shift recoloring of overblown displayed dye.",
       "binding": "js/14-light-shift.js:37-50; gate js/05j-update-loop.js:1238",
-      "registered": true
-    },
-    {
-      "id": "microDetailToggle",
-      "kind": "checkbox",
-      "configKey": null,
-      "min": null,
-      "max": null,
-      "step": null,
-      "def": false,
-      "mapping": "off: remembers then zeroes CLARITY+VIBRANCE; on: restores remembered or 0.35/0.25",
-      "section": "microDetail",
-      "consumer": "display-shader",
-      "gatedBy": null,
-      "sweepRelevant": true,
-      "expectedEffect": "Toggles the micro-detail pass indirectly by zeroing/restoring clarity+vibrance config values.",
-      "binding": "js/05e-effect-controls.js:10-37",
       "registered": true
     },
     {

@@ -1,5 +1,5 @@
 /**
- * Stats For Nerds Panel
+ * Debug Info Panel
  * Reads pre-computed stats from window.__stats (populated by render loop's
  * zero-GC ring buffer). No global rAF monkey-patching.
  */

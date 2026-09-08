@@ -364,42 +364,65 @@
 
             const canvasRect = canvas.getBoundingClientRect();
 
-            // Use detached region if present and visible; fallback to full canvas if no intersection
+            // Hiding the Sim row (its show/hide checkbox sets display:none on
+            // the canvas) used to kill this button silently: a display:none
+            // element measures 0x0, every source rect below came out zero, and
+            // the `sw <= 0` guard returned false with nothing said. Hiding the
+            // sim is the NATURAL move once a few captures are stacked — they
+            // composite UNDER the canvas, so the sim is the thing covering them
+            // — which is exactly why Capture Layer looked like it stopped
+            // working after a few uses. The frame is still there either way:
+            // preserveDrawingBuffer (04a) keeps it whether or not the element
+            // has a layout box, so with no box, capture the whole buffer. The
+            // detached region is skipped for the same reason — with nothing on
+            // screen there is no rect for it to intersect.
 
-            let region = null;
+            const laidOut = canvasRect.width > 0 && canvasRect.height > 0;
 
-            if (detachToggle && detachToggle.checked && captureAreaEl && getComputedStyle(captureAreaEl).display !== 'none') {
+            let sx, sy, sw, sh;
 
-                const areaRect = captureAreaEl.getBoundingClientRect();
+            if (!laidOut) {
 
-                region = getIntersectionRect(areaRect, canvasRect);
+                sx = 0; sy = 0; sw = canvas.width; sh = canvas.height;
+
+            } else {
+
+                // Use detached region if present and visible; fallback to full canvas if no intersection
+
+                let region = null;
+
+                if (detachToggle && detachToggle.checked && captureAreaEl && getComputedStyle(captureAreaEl).display !== 'none') {
+
+                    const areaRect = captureAreaEl.getBoundingClientRect();
+
+                    region = getIntersectionRect(areaRect, canvasRect);
+
+                }
+
+                if (!region) {
+
+                    region = { left: canvasRect.left, top: canvasRect.top, width: canvasRect.width, height: canvasRect.height };
+
+                }
+
+                // drawImage's source rect is in DRAWING-BUFFER pixels, but the
+                // region above is measured in CSS px off getBoundingClientRect.
+                // They are only equal at RENDER_SCALE 1 (see 01-config): under
+                // supersampling this grabbed the top-left quadrant of the frame.
+
+                const bsx = canvas.width / canvasRect.width;
+
+                const bsy = canvas.height / canvasRect.height;
+
+                sx = Math.round((region.left - canvasRect.left) * bsx);
+
+                sy = Math.round((region.top - canvasRect.top) * bsy);
+
+                sw = Math.round(region.width * bsx);
+
+                sh = Math.round(region.height * bsy);
 
             }
-
-            if (!region) {
-
-                region = { left: canvasRect.left, top: canvasRect.top, width: canvasRect.width, height: canvasRect.height };
-
-            }
-
-
-
-            // drawImage's source rect is in DRAWING-BUFFER pixels, but the
-            // region above is measured in CSS px off getBoundingClientRect.
-            // They are only equal at RENDER_SCALE 1 (see 01-config): under
-            // supersampling this grabbed the top-left quadrant of the frame.
-
-            const bsx = canvasRect.width ? canvas.width / canvasRect.width : 1;
-
-            const bsy = canvasRect.height ? canvas.height / canvasRect.height : 1;
-
-            const sx = Math.round((region.left - canvasRect.left) * bsx);
-
-            const sy = Math.round((region.top - canvasRect.top) * bsy);
-
-            const sw = Math.round(region.width * bsx);
-
-            const sh = Math.round(region.height * bsy);
 
             if (sw <= 0 || sh <= 0) return false;
 
@@ -447,25 +470,36 @@
 
             }
 
-            // Create a new layer from this capture
-
-            if (layers.length >= MAX_LAYERS) {
-
-                alert('Maximum 10 layers reached. Delete some layers to create new ones.');
-
-                return false;
-
-            }
+            // Create a new layer from this capture.
+            //
+            // Capacity here is the ten static `layerN` divs (index 0-9), NOT
+            // layers.length: paint layers and colliders live in the same array
+            // at index >= 100 (05l _nextIndex) and back onto no div at all, so
+            // the old length test spent a capture slot on every one of them —
+            // three paint layers left room for seven captures instead of ten,
+            // and the message blamed a "maximum" the user could not see in the
+            // panel. Ask the slots directly, and honour the reservation an
+            // image upload that is still decoding holds (04f).
 
             let availableIndex = -1;
 
             for (let i = 0; i < MAX_LAYERS; i++) {
 
-                if (!layers.find(l => l.index === i)) { availableIndex = i; break; }
+                if (!layers.find(l => l.index === i) && !_pendingLayerSlots.has(i)) { availableIndex = i; break; }
 
             }
 
-            if (availableIndex === -1) { alert('No available layer slots.'); return false; }
+            if (availableIndex === -1) {
+
+                const msg = 'All ' + MAX_LAYERS + ' image-layer slots are in use. Delete a capture or image layer to make room. (Paint layers and colliders do not use these slots.)';
+
+                if (typeof window.appAlert === 'function') window.appAlert('No free layer slot', msg);
+
+                else alert(msg);
+
+                return false;
+
+            }
 
 
 

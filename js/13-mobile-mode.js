@@ -11,7 +11,6 @@
     let tapTimeout = null;
     let isMobileMode = false;
     let savedVibrance = null;
-    let savedClarity = null;
 
     // ── Accidental page-zoom guard (all touch devices, not just mobile-mode:
     // an iPad in desktop-class layout has the same problem) ──────────────
@@ -77,23 +76,17 @@
             document.body.appendChild(hkBtn);
         }
 
-        // Boost color vibrance/clarity for mobile displays (often washed out)
+        // Boost colour vibrance for mobile displays (often washed out)
         try {
             if (window.config) {
                 savedVibrance = config.VIBRANCE;
-                savedClarity = config.CLARITY;
-                // Only boost if values are low — respect user settings if already high
+                // Only boost if the value is low — respect user settings if already high
                 if (config.VIBRANCE < 0.4) config.VIBRANCE = 0.4;
-                if (config.CLARITY < 0.3) config.CLARITY = 0.3;
-                // Sync UI sliders if they exist
+                // Sync the UI slider if it exists
                 var vSlider = document.getElementById('vibrance');
-                var cSlider = document.getElementById('clarity');
                 if (vSlider) vSlider.value = config.VIBRANCE;
-                if (cSlider) cSlider.value = config.CLARITY;
                 var vVal = document.getElementById('vibranceValue');
-                var cVal = document.getElementById('clarityValue');
                 if (vVal) vVal.textContent = config.VIBRANCE.toFixed(2);
-                if (cVal) cVal.textContent = config.CLARITY.toFixed(2);
             }
         } catch(_) {}
         
@@ -113,21 +106,15 @@
             mobileMenuToggle.classList.remove('show');
         }
 
-        // Restore original vibrance/clarity values
+        // Restore the original vibrance value
         try {
             if (window.config && savedVibrance !== null) {
                 config.VIBRANCE = savedVibrance;
-                config.CLARITY = savedClarity;
                 var vSlider = document.getElementById('vibrance');
-                var cSlider = document.getElementById('clarity');
                 if (vSlider) vSlider.value = savedVibrance;
-                if (cSlider) cSlider.value = savedClarity;
                 var vVal = document.getElementById('vibranceValue');
-                var cVal = document.getElementById('clarityValue');
                 if (vVal) vVal.textContent = savedVibrance.toFixed(2);
-                if (cVal) cVal.textContent = savedClarity.toFixed(2);
                 savedVibrance = null;
-                savedClarity = null;
             }
         } catch(_) {}
 
@@ -257,7 +244,7 @@
             // children, so they are NOT inside the relocated menu — without this
             // the first tap on a preset was eaten as a dismiss and the list
             // closed instead of loading anything.
-            if (t.closest && t.closest('.arm-colors-panel, .brush-settings-panel, .mixer-presets-panel')) return;
+            if (t.closest && t.closest('.arm-colors-panel, .brush-settings-panel, .brush-tip-menu, .mixer-presets-panel')) return;
             c.classList.remove('visible');
             e.stopPropagation();   // don't also paint this dismiss tap
             e.preventDefault();

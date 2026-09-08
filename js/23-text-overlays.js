@@ -184,7 +184,8 @@
         // against the new area->wrapper mapping.
         window.addEventListener('resize', function () {
             if (arranging) { sizeArrangeCanvas(); drawArrange(); }
-            syncColliders();
+            // A window drag is a stream too — same coalescing as a text edit.
+            syncCollidersSoon();
         });
     }
 
@@ -227,7 +228,11 @@
     function addTextOverlay(opts) {
         opts = opts || {};
         var xy = coerceXY(opts);
-        var overlay = { id: nextId++, type: 'text', x: xy.x, y: xy.y, rotation: opts.rotation || 0, visible: true };
+        // visible is honoured, not hardcoded: preset restore and Duplicate
+        // both come through here with full overlay snapshots, and dropping a
+        // saved visible:false silently resurrected hidden text — with its
+        // collider wall, if it had one.
+        var overlay = { id: nextId++, type: 'text', x: xy.x, y: xy.y, rotation: opts.rotation || 0, visible: opts.visible !== false };
         for (var k in DEFAULTS) {
             if (!DEFAULTS.hasOwnProperty(k)) continue;
             overlay[k] = (opts[k] !== undefined) ? opts[k] : DEFAULTS[k];
@@ -314,7 +319,10 @@
         if (!ov) return null;
         for (var key in props) if (props.hasOwnProperty(key)) ov[key] = props[key];
         renderOverlay(ov);
-        save(); emitChange(); syncColliders();
+        // syncCollidersSoon, not syncColliders: the panel commits on every
+        // keystroke and every slider tick, and each rebuild would carve the
+        // dye again. The wall lands 160ms after the edit stops.
+        save(); emitChange(); syncCollidersSoon();
         if (arranging) drawArrange();
         return ov;
     }
@@ -582,11 +590,10 @@
             ov.fontSize = Math.max(6, Math.min(400, Math.round(drag.start.fontSize * factor)));
         }
         renderOverlay(ov);
-        // Only for a collider, and only while it is the one being dragged: the
-        // recomposite is rAF-coalesced (one per frame at worst, same as
-        // dragging a collider LAYER), but there is no reason to pay it for
-        // plain text.
-        if (ov.collider) syncColliders();
+        // Coalesced, not per-frame: a corner-resize drag rebuilt the wall on
+        // every pointermove, and each intermediate size left its own void in
+        // the dye. onUp forces the final rebuild immediately.
+        if (ov.collider) syncCollidersSoon();
         drawArrange();
     }
 
@@ -739,10 +746,17 @@
             var ov = overlays[i];
             if (!ov.visible) continue;
             ctx.save();
-            ctx.globalAlpha = ov.opacity;
-            ctx.translate(ov.x * areaW - offX, ov.y * areaH - offY);
-            ctx.rotate((ov.rotation || 0) * Math.PI / 180);
-            paintOverlay(ctx, ov, false);
+            try {
+                ctx.globalAlpha = ov.opacity;
+                ctx.translate(ov.x * areaW - offX, ov.y * areaH - offY);
+                ctx.rotate((ov.rotation || 0) * Math.PI / 180);
+                paintOverlay(ctx, ov, false);
+            } catch (e) {
+                // Same isolation as colliderDraw: one bad overlay must not
+                // abort the composite — a throw here fails the whole video
+                // export and strands the save() above on the ctx stack.
+                console.warn('⚠️ Text overlay composite failed for overlay', ov.id, e);
+            }
             ctx.restore();
         }
     }
@@ -755,14 +769,44 @@
     //   into a halo well outside the glyph.
     function paintOverlay(ctx, ov, collider) {
         var sp = ov.letterSpacing || 0;
-        var lines = displayText(ov).split('\n');
+        var text = displayText(ov);
+        var lines = text.split('\n');
+        // CSS white-space:pre lays out exactly ONE fewer line box when the
+        // content ends in a newline (measured 2026-08-31: 'A\n' is one line,
+        // 'A\n\n' is two, 'A\n\nB' is three). Match it, or the canvas box is
+        // a line taller than the DOM and every glyph — the collider wall
+        // included — lands lineHeight/2 above the text it should trace. A
+        // trailing Enter in the panel textarea is all it takes to get here.
+        if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+        // Truly empty content lays out ZERO line boxes in the DOM (no text
+        // node at all; measured pad-only height), so its bg box is just the
+        // padding — without this the canvas box was one phantom line taller.
+        // Only for '' though: a lone '\n' DOES lay out one empty line box.
+        if (text === '') lines = [];
         var lineH = ov.fontSize * (ov.lineHeight || 1.2);
         var pad = ov.bgEnabled ? (ov.padding || 0) : 0;
 
         ctx.font = (ov.fontStyle || 'normal') + ' ' + ov.fontWeight + ' ' + ov.fontSize + 'px ' + ov.fontFamily;
         if (NATIVE_LETTER_SPACING) ctx.letterSpacing = sp + 'px';
         ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
+        // Baseline, not 'middle'. Canvas 'middle' centres the EM SQUARE on the
+        // given y; CSS centres the font's CONTENT BOX (ascent+descent, which
+        // is taller than the em in most faces) in the line box. The gap is a
+        // constant downward bias of the DOM text relative to the canvas one —
+        // measured -4.3px at 60px Arial, and it scales with font size (~0.07em,
+        // so ~11px at 150px). Placing the alphabetic baseline the way CSS does
+        // removes it. Fallback to 'middle' where the metrics are unavailable.
+        ctx.textBaseline = 'alphabetic';
+        var halfDelta = 0;
+        try {
+            var fm = ctx.measureText('Hxg');
+            if (fm && typeof fm.fontBoundingBoxAscent === 'number'
+                   && typeof fm.fontBoundingBoxDescent === 'number') {
+                halfDelta = (fm.fontBoundingBoxAscent - fm.fontBoundingBoxDescent) / 2;
+            } else {
+                ctx.textBaseline = 'middle';
+            }
+        } catch (_) { ctx.textBaseline = 'middle'; }
 
         var textW = 0;
         for (var L = 0; L < lines.length; L++) textW = Math.max(textW, measureLine(ctx, lines[L], sp));
@@ -791,9 +835,9 @@
             var lx = align === 'left' ? -boxW / 2 + pad
                 : align === 'right' ? boxW / 2 - pad - lw
                 : -lw / 2;
-            // Half-leading: CSS centres the em box inside the line box, and
-            // textBaseline 'middle' lands on that same centre.
-            var ly = -boxH / 2 + pad + n * lineH + lineH / 2;
+            // Half-leading: this is the LINE BOX CENTRE. CSS puts the baseline
+            // (ascent-descent)/2 below it, which is what halfDelta carries.
+            var ly = -boxH / 2 + pad + n * lineH + lineH / 2 + halfDelta;
             drawLine(ctx, lines[n], lx, ly, sp);
         }
 
@@ -821,9 +865,16 @@
     // letter. That is why there is no strength knob.
     var colliderInstalled = false;
 
+    // An overlay at ~zero opacity is not on screen, so it must not be a wall
+    // either — the same principle (and threshold) the bg box already gets in
+    // paintOverlay. Undefined opacity counts as visible.
+    function isWallSource(ov) {
+        return ov.visible && ov.collider && !(ov.opacity <= 0.02);
+    }
+
     function anyCollider() {
         for (var i = 0; i < overlays.length; i++) {
-            if (overlays[i].visible && overlays[i].collider) return true;
+            if (isWallSource(overlays[i])) return true;
         }
         return false;
     }
@@ -849,29 +900,45 @@
     }
 
     function colliderDraw(ctx, obsW, obsH) {
+        // Mid-edit: the wall is deliberately absent until the edit settles.
+        // lastRasterSig stays null so nothing mistakes this for a current wall.
+        if (wallSuppressed) { lastRasterSig = null; return; }
         var g = colliderGeom();
         if (!g) { lastRasterSig = null; return; }
         var kx = obsW / g.cssW, ky = obsH / g.cssH;
+        var anyFailed = false;
 
         for (var i = 0; i < overlays.length; i++) {
             var ov = overlays[i];
-            if (!ov.visible || !ov.collider) continue;
+            if (!isWallSource(ov)) continue;
             ctx.save();
-            ctx.globalAlpha = 1;
-            ctx.translate((ov.x * g.areaW - g.offX) * kx, (ov.y * g.areaH - g.offY) * ky);
-            // kx and ky differ only by the integer rounding of the sim texture
-            // dimensions (well under 0.1%), so scaling ahead of the rotation
-            // costs no visible shear and keeps the layout maths in CSS px.
-            ctx.scale(kx, ky);
-            ctx.rotate((ov.rotation || 0) * Math.PI / 180);
-            paintOverlay(ctx, ov, true);
+            try {
+                ctx.globalAlpha = 1;
+                ctx.translate((ov.x * g.areaW - g.offX) * kx, (ov.y * g.areaH - g.offY) * ky);
+                // kx and ky differ only by the integer rounding of the sim texture
+                // dimensions (well under 0.1%), so scaling ahead of the rotation
+                // costs no visible shear and keeps the layout maths in CSS px.
+                ctx.scale(kx, ky);
+                ctx.rotate((ov.rotation || 0) * Math.PI / 180);
+                paintOverlay(ctx, ov, true);
+            } catch (e) {
+                // One bad overlay must not take down the other walls — and a
+                // silent throw here would strand lastRasterSig, leaving the
+                // watchdog re-rasterising at 5Hz forever with nothing to show.
+                console.warn('⚠️ Text collider raster failed for overlay', ov.id, e);
+                anyFailed = true;
+            }
             ctx.restore();
         }
         // Remember exactly what this rasterise was based on, so the watchdog
-        // below can tell whether the wall on the GPU is still current.
+        // below can tell whether the wall on the GPU is still current. The sig
+        // is recorded even when an overlay failed (a deterministic throw must
+        // not spin the watchdog at 5Hz), but a failed pass does NOT mark the
+        // obstacle as drawn-into — so the next FBO rebuild retries a throw
+        // that turned out to be transient.
         lastRasterSig = colliderSig();
         var ob = liveObstacle();
-        if (ob && rasteredObstacles) rasteredObstacles.add(ob);
+        if (ob && rasteredObstacles && !anyFailed) rasteredObstacles.add(ob);
     }
 
     // ── Staying aligned ────────────────────────────────────────
@@ -941,7 +1008,7 @@
         ];
         for (var i = 0; i < overlays.length; i++) {
             var o = overlays[i];
-            if (!o.visible || !o.collider) continue;
+            if (!isWallSource(o)) continue;
             // Every field paintOverlay reads. Miss one and that property's
             // changes stop resyncing, which is the bug class this guards.
             parts.push(o.id, o.x.toFixed(5), o.y.toFixed(5), o.rotation || 0,
@@ -952,20 +1019,37 @@
         return parts.join('\u0001');
     }
 
+    var watchdogWarned = false;
     function startWatchdog() {
         if (watchdogTimer) return;
+        watchdogWarned = false;   // a fresh install deserves a fresh warning budget
         watchdogTimer = setInterval(function () {
-            if (!colliderInstalled) { stopWatchdog(); return; }
-            var sig = colliderSig();
-            // No measurable geometry (canvas-area collapsed to zero — boot,
-            // a hidden pane, a minimised window): colliderDraw would early-out
-            // anyway, so re-running it would just spin. Wait for real layout.
-            if (sig === null) return;
-            if (sig !== lastRasterSig) { syncColliders(); return; }
-            // Geometry unchanged, but the obstacle may have been rebuilt out
-            // from under the wall — same size, empty, and invisible to sig.
-            var ob = liveObstacle();
-            if (ob && rasteredObstacles && !rasteredObstacles.has(ob)) syncColliders();
+            // The tick is guarded because an uncaught throw inside setInterval
+            // doesn't stop the interval — it just skips the rest of THIS tick,
+            // every tick, which is a wall silently frozen while the DOM text
+            // keeps moving.
+            try {
+                if (!colliderInstalled) { stopWatchdog(); return; }
+                // A rebuild is already parked behind the settle timer. The
+                // signature necessarily differs mid-edit, so "healing" it
+                // here would rebuild on every tick and defeat the coalescing.
+                if (settlePending()) return;
+                var sig = colliderSig();
+                // No measurable geometry (canvas-area collapsed to zero — boot,
+                // a hidden pane, a minimised window): colliderDraw would early-out
+                // anyway, so re-running it would just spin. Wait for real layout.
+                if (sig === null) return;
+                if (sig !== lastRasterSig) { syncColliders(); return; }
+                // Geometry unchanged, but the obstacle may have been rebuilt out
+                // from under the wall — same size, empty, and invisible to sig.
+                var ob = liveObstacle();
+                if (ob && rasteredObstacles && !rasteredObstacles.has(ob)) syncColliders();
+            } catch (e) {
+                if (!watchdogWarned) {
+                    watchdogWarned = true;
+                    console.warn('⚠️ Text collider watchdog error (reported once):', e);
+                }
+            }
         }, WATCHDOG_MS);
     }
 
@@ -979,6 +1063,8 @@
     // mutation site can just call it. setProcedural recomposites on its own;
     // when it is already installed we ask for the recomposite ourselves.
     function syncColliders() {
+        if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+        wallSuppressed = false;
         var cl = window.collisionLayers;
         if (!cl || typeof cl.setProcedural !== 'function') return;
         var want = anyCollider();
@@ -991,13 +1077,58 @@
         }
     }
 
+    // ── Coalescing a STREAM of edits ────────────────────────────
+    // Typing, dragging a corner handle and dragging the window edge all
+    // produce a change per keystroke or per frame, and rebuilding the wall on
+    // each one carves the dye field at every intermediate shape. Those voids
+    // outlive the edit — dye refills slowly — so a resize drag left the union
+    // of ~30 sizes standing on the canvas: interleaved ghost letterforms that
+    // read as corrupted text (measured 2026-08-31, 40px→150px over 1.2s).
+    //
+    // A stream therefore parks the rebuild until it stops. The wall standing
+    // DURING the drag is the last settled one: it lags, which is the right
+    // trade — one stale shape beats thirty smeared ones, and the moment the
+    // edit ends the wall is rebuilt to match.
+    //
+    // That rebuild is a full wipe by construction, not an incremental patch:
+    // _doUpdateObstacle clears its compose canvas, redraws every source and
+    // uploads the WHOLE texture (23-depth-collision.js), so no texel of the
+    // previous wall can survive it.
+    var SETTLE_MS = 160;
+    var settleTimer = null;
+    var wallSuppressed = false;
+
+    function syncCollidersSoon() {
+        // FIRST edit of a burst: take the old wall down right away. Leaving it
+        // up means a wall built for the old text sits under text that is still
+        // changing — dragging Line Height 1.2→3.0 left a 115px wall under
+        // 247px of glyphs for the whole drag, then snapped (measured
+        // 2026-08-31). An absent wall for the length of an edit is honest;
+        // a wrong one is not.
+        if (!settleTimer && colliderInstalled && !wallSuppressed) {
+            wallSuppressed = true;
+            var cl = window.collisionLayers;
+            if (cl && typeof cl.updateObstacleFromLayers === 'function') {
+                cl.updateObstacleFromLayers();
+            }
+        }
+        if (settleTimer) clearTimeout(settleTimer);
+        settleTimer = setTimeout(function () {
+            settleTimer = null;
+            wallSuppressed = false;
+            syncColliders();
+        }, SETTLE_MS);
+    }
+
+    function settlePending() { return settleTimer !== null; }
+
     // Layout can change with no window resize at all — the canvas resize
     // handles, a sidebar or drawer opening, focus mode, mobile mode. A
     // ResizeObserver catches every one of those, and keeps firing THROUGHOUT a
     // drag or a CSS transition rather than once at the start.
     function watchLayout() {
         if (typeof ResizeObserver !== 'function') return;
-        var ro = new ResizeObserver(function () { if (colliderInstalled) syncColliders(); });
+        var ro = new ResizeObserver(function () { if (colliderInstalled) syncCollidersSoon(); });
         ['canvas-area', 'canvas-wrapper', 'canvas'].forEach(function (id) {
             var el = document.getElementById(id);
             if (el) { try { ro.observe(el); } catch (_) {} }
@@ -1007,7 +1138,7 @@
         if (document.fonts && document.fonts.addEventListener) {
             try {
                 document.fonts.addEventListener('loadingdone', function () {
-                    if (colliderInstalled) syncColliders();
+                    if (colliderInstalled) syncCollidersSoon();
                 });
             } catch (_) {}
         }
@@ -1015,14 +1146,16 @@
 
     // Restored overlays can beat 23-depth-collision to the DOM, and a wall
     // that silently never installed is indistinguishable from a broken one.
+    // No retry cap: a slow boot that outlived the old 2-second window left a
+    // restored collider with no wall and no watchdog, permanently. Poll fast
+    // for the first 2s, then settle to 1Hz until the module shows up.
     function syncCollidersWhenReady(tries) {
         if (window.collisionLayers && typeof window.collisionLayers.setProcedural === 'function') {
             syncColliders();
             return;
         }
-        if ((tries || 0) < 20) {
-            setTimeout(function () { syncCollidersWhenReady((tries || 0) + 1); }, 100);
-        }
+        var n = (tries || 0) + 1;
+        setTimeout(function () { syncCollidersWhenReady(n); }, n < 20 ? 100 : 1000);
     }
 
     // ─── PUBLIC API ─────────────────────────────────────────────

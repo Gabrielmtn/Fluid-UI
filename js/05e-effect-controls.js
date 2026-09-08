@@ -1,40 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05e-effect-controls.js — part 5/14 of former 05-fluid-sim.js (lines 1741–1965)
 // LOAD ORDER: after 05d-input-replay.js, before 05f-kaleido-controls.js
-// PROVIDES: turbulence/microDetail/glow control wiring, background color, canvas opacity, display shading, capture dimming, multiplier, timeScale, setMultiplierHotkey
+// PROVIDES: turbulence/glow control wiring, background color, canvas opacity, display shading, capture dimming, multiplier, timeScale, setMultiplierHotkey
 // REQUIRES: config (04)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
 // ═══════════════════════════════════════════════════════════════════
-        // Micro Detail toggle
-        const microDetailToggle = document.getElementById('microDetailToggle');
-        const microDetailPanel = document.getElementById('microDetailPanel');
-        if (microDetailToggle) {
-            // Last non-zero values from toggle-off, restored on toggle-on so
-            // cycling the toggle doesn't discard what the user dialed in
-            let mdRemembered = null;
-            const applyMicroDetail = (vals) => {
-                Object.entries(vals).forEach(([id, val]) => {
-                    config[id.toUpperCase()] = val;
-                    const sl = document.getElementById(id);
-                    if (sl) { sl.value = val; sl.style.setProperty('--val', val); }
-                    const sp = document.getElementById(id + 'Value');
-                    if (sp) sp.textContent = val.toFixed(2);
-                });
-            };
-            microDetailToggle.addEventListener('change', (e) => {
-                const on = e.target.checked;
-                if (microDetailPanel) microDetailPanel.style.display = on ? '' : 'none';
-                if (!on) {
-                    if (config.CLARITY > 0 || config.VIBRANCE > 0) {
-                        mdRemembered = { clarity: config.CLARITY, vibrance: config.VIBRANCE };
-                    }
-                    applyMicroDetail({ clarity: 0, vibrance: 0 });
-                } else {
-                    applyMicroDetail(mdRemembered || { clarity: 0.35, vibrance: 0.25 });
-                }
-            });
-        }
         // Crisp Advection (MacCormack) toggle — checkbox follows the config
         // default (04a flips it off on mobile), then drives it on change.
         const macCormackToggle = document.getElementById('macCormackToggle');
@@ -130,15 +101,6 @@
                 const pct = parseFloat(e.target.value);
                 config.EDGE_ABSORB_BAND = pct / 100;
                 if (overflowBandValue) overflowBandValue.textContent = pct.toFixed(1) + '%';
-            });
-        }
-        // Swirl slider (curl-noise micro-swirl in dye advection)
-        const swirlSlider = document.getElementById('swirl');
-        if (swirlSlider) {
-            swirlSlider.addEventListener('input', (e) => {
-                config.SWIRL = parseFloat(e.target.value);
-                const sp = document.getElementById('swirlValue');
-                if (sp) sp.textContent = parseFloat(e.target.value).toFixed(2);
             });
         }
         // Wetness slider (P15-1: dry paint holds, wet paint flows)

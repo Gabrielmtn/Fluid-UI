@@ -10,6 +10,7 @@
     "deploy": "node scripts/build-web.js && partykit deploy",
     "party": "partykit dev",
     "serve": "npx http-server -p 8080 -c-1",
+    "copy-sink": "node scripts/copy-sink.js serve",
     "electron": "electron .",
     "electron-build": "electron-builder",
     "dist:win": "electron-builder --win",

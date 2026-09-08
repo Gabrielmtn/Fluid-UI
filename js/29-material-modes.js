@@ -6,11 +6,12 @@
 //   yieldToExternal }
 //
 // The Curl label is a <select id="materialMode">; the slider's role follows:
-//   Fluid           → Vorticity (the classic curl control, untouched behavior)
-//   Acrylic – Thin  → Flow: surface shading @0.8 + micro detail maxed; the
+//   Swirl - Vorticity       → the classic curl control, untouched behavior
+//                             (internal key 'fluid')
+//   Gloss Paint - Wetness   → Flow: surface shading @0.8 + micro detail maxed; the
 //             slider drives paint body (sharpness) and velocity damping.
 //             (internal key 'acrylic')
-//   Acrylic – Thick → Depth: inverse-chiaroscuro surface shading (shadeInvert)
+//   Gloss Paint - Thickness → Depth: inverse-chiaroscuro surface shading (shadeInvert)
 //             so strokes read as carved relief; the slider drives depth + dab
 //             size, and the value display becomes a clickable brush-shape
 //             icon (blob / chisel / streak stamp shapes in the splat shader).
@@ -25,7 +26,7 @@
     // Every config key a material bundle may touch; snapshotted when leaving
     // 'fluid' mode so returning restores the user's hand-tuned values.
     var TOUCHED = ['CURL', 'VELOCITY_DISSIPATION', 'PRESSURE_ITERATIONS', 'PRESSURE_DISSIPATION',
-                   'STAMP_NOISE', 'STAMP_RADIUS_SCALE', 'SHARPNESS', 'CLARITY', 'VIBRANCE'];
+                   'STAMP_NOISE', 'STAMP_RADIUS_SCALE', 'SHARPNESS', 'VIBRANCE'];
     var mode = 'fluid';
     var snapshot = null; // config values + effect-toggle UI state from fluid mode
     var sel = null, slider = null, span = null;
@@ -51,11 +52,9 @@
         acrylic: {
             macro: 'Flow', def: 30,
             apply: function (t) {
-                // Paint look: relief shading + maxed micro detail
+                // Paint look: relief shading + maxed vibrance
                 setCheckbox('displayShadingToggle', true);
                 setUISlider('shadingIntensity', 0.8);
-                setCheckbox('microDetailToggle', true);
-                setUISlider('clarity', 1);
                 setUISlider('vibrance', 1);
                 window.displayShadingInvert = 0;
                 // Flow: low = stiff paint (crisp, heavy damping), high = runny
@@ -69,8 +68,12 @@
             }
         },
         clay: {
-            macro: 'Flow', def: 30,
+            // Thickness, not Flow (2026-09-02): the slider used to run the
+            // same way as Wetness — up = runnier — while its label promised the
+            // opposite. Up now means thicker: stiffer, drier, motion dies sooner.
+            macro: 'Thickness', def: 30,
             apply: function (t) {
+                t = 1 - t;   // thickness → runniness, for the formulas below
                 // Carved relief look is FIXED for this material: surface shading
                 // with inverted normals (chiaroscuro — strokes read as dents).
                 // The slider is a body control like Thin's Flow, NOT a lighting
@@ -79,7 +82,7 @@
                 // second — thick paint barely travels).
                 setCheckbox('displayShadingToggle', true);
                 setUISlider('shadingIntensity', 1.2);
-                setCheckbox('microDetailToggle', false);
+                setUISlider('vibrance', 0);
                 window.displayShadingInvert = 1;
                 setUISlider('sharpness', (2.0 - 1.2 * t).toFixed(1)); // the "Viscosity" slider
                 config.VELOCITY_DISSIPATION = 0.90 + t * 0.03;        // 0.90 → 0.93
@@ -147,11 +150,11 @@
     function takeSnapshot() {
         snapshot = { cfg: {}, ui: {} };
         TOUCHED.forEach(function (k) { snapshot.cfg[k] = config[k]; });
-        ['displayShadingToggle', 'microDetailToggle'].forEach(function (id) {
+        ['displayShadingToggle'].forEach(function (id) {
             var el = document.getElementById(id);
             snapshot.ui[id] = el ? el.checked : false;
         });
-        ['shadingIntensity', 'sharpness', 'clarity', 'vibrance'].forEach(function (id) {
+        ['shadingIntensity', 'sharpness', 'vibrance'].forEach(function (id) {
             var el = document.getElementById(id);
             snapshot.ui[id] = el ? el.value : null;
         });
@@ -165,11 +168,10 @@
         // Sliders BEFORE checkboxes: the shadingIntensity input handler sets
         // window.displayShading unconditionally (05e), so the toggle's change
         // handler must run last to have the final say on on/off.
-        ['shadingIntensity', 'sharpness', 'clarity', 'vibrance'].forEach(function (id) {
+        ['shadingIntensity', 'sharpness', 'vibrance'].forEach(function (id) {
             if (snapshot.ui[id] != null) setUISlider(id, snapshot.ui[id]);
         });
         setCheckbox('displayShadingToggle', snapshot.ui.displayShadingToggle);
-        setCheckbox('microDetailToggle', snapshot.ui.microDetailToggle);
         TOUCHED.forEach(function (k) {
             if (snapshot.cfg[k] !== undefined) config[k] = snapshot.cfg[k];
         });
@@ -177,8 +179,8 @@
     }
 
     // Size the select to the SELECTED option's text: a bare <select> sizes to
-    // its widest option, which strands the dropdown arrow far right of short
-    // labels like "Fluid". The arrow (8px, right-anchored) then always sits
+    // its widest option, which strands the dropdown arrow far right of the
+    // shorter ones ("Swirl - Vorticity"). The arrow (8px, right-anchored) sits
     // 15px after the text — see the padding in 21-sidebar.css.
     var _measureCtx = null;
     function sizeSelectToLabel() {
@@ -265,7 +267,7 @@
         // used to be invisible to snapshots — its core effects live in config
         // keys with no captured control (STAMP_NOISE/RADIUS_SCALE/SHAPE,
         // displayShadingInvert), so a peer or a restored preset stayed on
-        // plain fluid while the painter was in Paint-Thick. State travels as
+        // plain swirl while the painter was in Gloss Paint - Thickness. State travels as
         // {mode, amount, shape} and re-enters through the same setMode path a
         // user click takes.
         getState: function () {

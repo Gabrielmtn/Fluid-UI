@@ -1942,3 +1942,32 @@ select option {
     color: var(--ink-500);
     font-variant-numeric: tabular-nums;
 }
+
+/* ── Effect rows (js/20-mixer-layout.js fxRow): [thumbnail][checkbox][label] ──
+   The thumbnail is a 26px still of the effect; the card it opens on hover is
+   .fx-tip in 22-overlays.css. Buttons are not involved, so nothing here
+   touches the button system. */
+#sidebar-right .fx-row { gap: 7px; }
+#sidebar-right .fx-thumb {
+    flex: none;
+    display: block;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1c2230, #0d1017);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+}
+#sidebar-right .fx-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+#sidebar-right .fx-thumb.is-empty img { display: none; }
+#sidebar-right .fx-thumb:hover,
+#sidebar-right .fx-thumb:focus-visible { border-color: rgba(255, 255, 255, 0.45); outline: none; }
+/* Lighting cluster: tight rows, one rule below the group. */
+#sidebar-right .fx-cluster .checkbox-group { margin-bottom: 4px; }
+#sidebar-right .fx-cluster {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+#sidebar-right .fx-group { margin-bottom: 10px; }

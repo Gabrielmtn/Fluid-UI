@@ -55,8 +55,10 @@
         lightShiftThreshold: ['enableLightShift'],
         lightShiftIntensity: ['enableLightShift'],
         lightShiftSaturation: ['enableLightShift'],
-        clarity: ['microDetailToggle'],
-        vibrance: ['microDetailToggle'],
+        // Ridges and Vibrance sit under the Surface Shading switch (20): a
+        // mutation there with shading off would change a hidden control.
+        ridges: ['displayShadingToggle'],
+        vibrance: ['displayShadingToggle'],
         glowIntensity: ['glowToggle'],
         glowThreshold: ['glowToggle'],
         // Two conditions, ANDed (see the loop in _gateOk): Scatter marches

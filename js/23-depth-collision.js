@@ -246,6 +246,7 @@ class DepthEstimator {
     var collisionEnabled = false;
     var obstacleCanvas = null;   // offscreen canvas for rasterizing masks
     var _obsBlurCanvas = null, _obsBlurCtx = null; // sim-scale edge smoothing (D0.5 rev 3)
+    var _shapeTintCanvas = null, _shapeTintCtx = null; // strength-tint scratch (per-texel strength G channel)
     // Long-side cap for collision maps built from layer content (threshold /
     // shapes / full image). 1024 ≥ the 2×sim obstacle compose canvas, so the
     // physics loses nothing — but the visible mask preview now upscales ~2×
@@ -256,7 +257,15 @@ class DepthEstimator {
     // over the layer-based obstacles on every recomposite (incl. resize), so
     // code-drawn colliders (e.g. audio-scene EQ lane walls) survive FBO
     // rebuilds without needing a fake collision layer.
-    var proceduralDraw = null;
+    // Keyed (2026-09-02): the text walls ('default', via setProcedural) and
+    // Breathing's rings ('breathing') are independent sources that must not
+    // clobber each other's slot; every source composites on every rebuild.
+    var proceduralSources = {};
+    function proceduralList() {
+        var a = [];
+        for (var k in proceduralSources) if (typeof proceduralSources[k] === 'function') a.push(proceduralSources[k]);
+        return a;
+    }
 
     // Expose collision API
     window.collisionLayers = {
@@ -314,11 +323,15 @@ class DepthEstimator {
         // Pass null to remove; collision auto-disables if no layer obstacles
         // remain either.
         setProcedural: setProcedural,
+        // Same, under a key of the caller's own (Breathing's rings), so two
+        // code-drawn sources can be live at once.
+        setProceduralSource: setProceduralSource,
     };
 
-    function setProcedural(fn) {
-        proceduralDraw = (typeof fn === 'function') ? fn : null;
-        if (proceduralDraw) {
+    function setProcedural(fn) { setProceduralSource('default', fn); }
+    function setProceduralSource(key, fn) {
+        if (typeof fn === 'function') proceduralSources[key] = fn; else delete proceduralSources[key];
+        if (proceduralList().length) {
             collisionEnabled = true;
             updateObstacleFromLayers();
         } else {
@@ -1293,28 +1306,51 @@ class DepthEstimator {
         var cx = obsW * 0.5, cy = obsH * 0.5;
         var strength = (layer.collisionStrength !== undefined) ? layer.collisionStrength : 0.7;
 
+        // Per-texel strength: the obstacle's G channel must carry THIS
+        // layer's strength (the upload premultiplies green by alpha →
+        // cov·strength²). The memoed coverage canvas is white, so tint its
+        // green to strength·255 through a scratch canvas at draw time —
+        // the memo itself stays strength-independent (a strength-slider
+        // drag re-tints without re-rasterizing the shapes).
+        if (!_shapeTintCanvas || _shapeTintCanvas.width !== cov.width || _shapeTintCanvas.height !== cov.height) {
+            _shapeTintCanvas = document.createElement('canvas');
+            _shapeTintCanvas.width = cov.width;
+            _shapeTintCanvas.height = cov.height;
+            _shapeTintCtx = _shapeTintCanvas.getContext('2d');
+        }
+        var tctx = _shapeTintCtx;
+        tctx.globalCompositeOperation = 'source-over';
+        tctx.clearRect(0, 0, cov.width, cov.height);
+        tctx.fillStyle = 'rgb(255,' + Math.round(Math.max(0, Math.min(1, strength)) * 255) + ',255)';
+        tctx.fillRect(0, 0, cov.width, cov.height);
+        tctx.globalCompositeOperation = 'destination-in';
+        tctx.drawImage(cov, 0, 0);
+        tctx.globalCompositeOperation = 'source-over';
+
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         // Alpha carries coverage*strength, exactly like alphaVal above — the
-        // shaders divide __obsStrengthMax back out to recover coverage.
+        // shaders recover per-texel coverage/strength from RG (G≈0 content
+        // falls back to dividing __obsStrengthMax out).
         ctx.globalAlpha = Math.max(0, Math.min(1, strength));
         ctx.translate(cx + lx, cy + ly);
         ctx.rotate((layer.rotation || 0) * Math.PI / 180);
         if (window.LayerXform) window.LayerXform.shearCtx(ctx, layer);
         ctx.scale(layer.scaleX || 1, layer.scaleY || 1);
         ctx.translate(-cx, -cy);
-        ctx.drawImage(cov, 0, 0, obsW, obsH);
+        ctx.drawImage(_shapeTintCanvas, 0, 0, obsW, obsH);
         ctx.restore();
         return true;
     }
 
     function _doUpdateObstacle() {
         _obsDirty = false;
-        if (!window.layers && !proceduralDraw) return;
+        var procs = proceduralList();
+        if (!window.layers && !procs.length) return;
 
         // Auto-enable collision if any collision layers exist (e.g. after preset restore)
         if (!collisionEnabled) {
-            var hasCollision = !!proceduralDraw ||
+            var hasCollision = !!procs.length ||
                 (window.layers && window.layers.some(function (l) { return l.isCollision; }));
             if (!hasCollision) return;
             collisionEnabled = true;
@@ -1326,8 +1362,8 @@ class DepthEstimator {
         var simW = window.simTexWidth || 128;
         var simH = window.simTexHeight || 128;
         var gpuEntries = [];
-        var gpuOnly = !proceduralDraw;
-        var gpuStrengthMax = proceduralDraw ? 1.0 : 0.0;
+        var gpuOnly = !procs.length;
+        var gpuStrengthMax = procs.length ? 1.0 : 0.0;
         (window.layers || []).forEach(function (layer) {
             if (!layer.isCollision || !layer.mask || !layer.mask.enabled) return;
             var source = layer.collisionSource ? _resolveSourceFBO(layer.collisionSource) : null;
@@ -1452,7 +1488,10 @@ class DepthEstimator {
                     if (invert) cov = 1 - cov;
                     var idx = i << 2; // *4 via shift
                     d[idx] = 255;
-                    d[idx + 1] = 255;
+                    // G byte = this layer's strength (non-premultiplied);
+                    // the upload premultiplies by alpha → G = cov·strength²,
+                    // the per-texel strength channel (05b obsTexelGLSL).
+                    d[idx + 1] = alphaVal;
                     d[idx + 2] = 255;
                     d[idx + 3] = (cov * alphaVal + 0.5) | 0;
                 }
@@ -1500,12 +1539,16 @@ class DepthEstimator {
             if (_compositeShapeCollider(layer, obstacleCtx, obsW, obsH, canvasEl)) hasAny = true;
         });
 
-        // Composite the procedural source (e.g. EQ lane walls) over the layers
-        if (proceduralDraw) {
+        // Composite the procedural source (e.g. text-overlay walls) over the
+        // layers. The catch keeps a broken source from killing layer colliders,
+        // but it must not be silent: a swallowed throw here uploads a partial
+        // wall and leaves the source's own resync logic chasing it forever.
+        for (var pi = 0; pi < procs.length; pi++) {
             hasAny = true;
             obstacleCtx.save();
             obstacleCtx.globalCompositeOperation = 'lighter';
-            try { proceduralDraw(obstacleCtx, obsW, obsH); } catch (_) {}
+            try { procs[pi](obstacleCtx, obsW, obsH); }
+            catch (e) { console.warn('⚠️ Procedural obstacle source failed:', e); }
             obstacleCtx.restore();
         }
 

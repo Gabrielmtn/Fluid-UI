@@ -241,7 +241,7 @@
     // content. setMode runs AFTER the snapshot reset — applyPresetSnapshot
     // ends by applying the snapshot's material and would revert it.
     function shotMaterials() {
-        // Internal keys: acrylic = Paint-Wet, clay = Paint-Thick
+        // Internal keys: acrylic = Gloss Paint - Wetness, clay = Gloss Paint - Thickness
         // (29-material-modes keeps old names for saved settings).
         var modes = ['fluid', 'acrylic', 'clay'];
         var caps = [];

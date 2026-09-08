@@ -36,7 +36,6 @@
         mgPost: {configKey: "MG_POST", ui: {min: 0, max: 8, step: 1}, hard: {min: 0, max: 8}, def: 2, decimals: 0, category: "simulation", perfTier: 2},
         mgCoarse: {configKey: "MG_COARSE", ui: {min: 2, max: 32, step: 1}, hard: {min: 2, max: 32}, def: 8, decimals: 0, category: "simulation", perfTier: 1},
         mgRelax: {configKey: "MG_RELAX", ui: {min: 0.5, max: 1, step: 0.01}, hard: {min: 0.5, max: 1}, def: 1, decimals: 2, category: "simulation", perfTier: 0},
-        swirl: {configKey: "SWIRL", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "effects", perfTier: 1, mut: {min: 0, max: 0.8, step: 0.01, scope: "extended"}},
         wetInfluence: {configKey: "WET_INFLUENCE", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "simulation", perfTier: 1, mut: {min: 0, max: 0.9, step: 0.01, scope: "extended"}},
         wetDrying: {configKey: "WET_DRYING", ui: {min: 0.5, max: 20, step: 0.5}, hard: {min: 0.2, max: 60}, def: 3.0, decimals: 1, category: "simulation", perfTier: 0, mut: {min: 1, max: 12, step: 0.5, scope: "extended"}},
         ridges: {configKey: "RIDGES", ui: {min: 0, max: 6, step: 0.1}, hard: {min: 0, max: 6}, def: 0, decimals: 1, category: "effects", perfTier: 1, mut: {min: 0, max: 4, step: 0.1, scope: "extended"}},
@@ -47,6 +46,8 @@
         // edges inward, which reads as the painting draining away rather than
         // as a style variant.
         overflowBand: {configKey: null, ui: {min: 0.5, max: 15, step: 0.5}, hard: {min: 0.5, max: 25}, def: 2.5, decimals: 1, category: "effects", perfTier: 0, simSlider: false},
+        // Breathing effect (js/45-breathing.js) — read live by the module, not via config.
+        breathStrength: {configKey: null, ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0.5, decimals: 2, category: "effects", perfTier: 0, simSlider: false},
         velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 2.5, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
         curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 25, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
         velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 15, max: 60, step: 1, scope: "extended"}},
@@ -89,8 +90,7 @@
         lightShiftThreshold: {configKey: null, ui: {min: 0.5, max: 1, step: 0.01}, hard: {min: 0.5, max: 1}, def: 0.85, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0.5, max: 1, step: 0.01, scope: "extended"}},
         lightShiftIntensity: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.5, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
         lightShiftSaturation: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 1, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
-        clarity: {configKey: "CLARITY", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
-        vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "microDetail", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
+        vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "effects", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
         // step 0.05 -> 0.005 (2026-08-21): 0.05 was the smallest halo you could
         // ask for and it already read as a hard pop off zero. Range, def and
         // LINEAR meaning are deliberately untouched — this value is stored raw
@@ -152,7 +152,6 @@
         kAnimateRot: {def: false, mutScope: "basic"},
         enableLighting: {def: false, mutScope: "extended"},
         enableLightShift: {def: false, mutScope: "extended"},
-        microDetailToggle: {def: false, mutScope: "extended"},
         // Render-quality plumbing, not an aesthetic param: never mutate
         // (a mutation flipping advection quality reads as a perf bug).
         macCormackToggle: {def: true, mutScope: null},
@@ -162,6 +161,10 @@
         // overflowBand carries no `mut`: flipping it vents the canvas out
         // through its own borders, which looks like a bug, not a variation.
         overflowToggle: {def: false, mutScope: null},
+        // Breathing (js/45-breathing.js). mutScope null: a guided breath is a
+        // mode you choose, not a variation to be dealt.
+        breathingToggle: {def: false, mutScope: null},
+        breathCueToggle: {def: true, mutScope: null},
         scatterToggle: {def: false, mutScope: "extended"},
         // Colliders block light. mutScope null: with no collision layer it is a
         // no-op, so mutating it would spend a variation slot on nothing.
@@ -207,6 +210,7 @@
         // Ray origin for Scatter. No `mut`: swapping the origin teleports every
         // shaft at once, which reads as a glitch rather than a variation.
         scatterSource: {options: ["light", "brush"], def: "light", mut: null},
+        breathPattern: {options: ["relaxed", "box", "478"], def: "relaxed", mut: null},
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
         recMode: {options: ["off", "min", "full"], def: "off", mut: null},
         recPlaybackSpeed: {options: ["0.25", "0.5", "1", "2", "4"], def: "0.25", mut: null},

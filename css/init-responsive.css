@@ -293,6 +293,12 @@ html.boot-fade.booting #canvas-area {
 .arm-colors-panel {
     zoom: var(--ui-scale);
 }
+.fx-tip {
+    zoom: var(--ui-scale);
+}
+#recipePill {
+    zoom: var(--ui-scale);
+}
 
 /* No canvas-wrapper cap here either. It tracked the zoomed sidebar, which was
    closer than the other two guesses, but it still capped a size 01-config had

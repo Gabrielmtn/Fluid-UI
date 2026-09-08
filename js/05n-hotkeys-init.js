@@ -601,11 +601,24 @@
                 // desktop build __scriptsReady fires while the window is still
                 // invisible, so the hint would burn its 12s dwell behind a
                 // black screen — hang it off the reveal instead.
+                // The startup interface fork (43-ui-visibility) asks its
+                // question in this same window. The hint waits for the answer,
+                // or the click that answers the fork would be the pointerdown
+                // that dismisses the hint (capture listener above) — a toast
+                // nobody got to read.
+                var afterFork = function () {
+                    var uv = window.UIVisibility;
+                    if (uv && uv.forkPending()) {
+                        document.addEventListener(uv.EVENT, function () { setTimeout(show, 900); }, { once: true });
+                    } else {
+                        show();
+                    }
+                };
                 if (window.Boot && window.Boot.afterReveal) {
-                    window.Boot.afterReveal(show, 1200);
+                    window.Boot.afterReveal(afterFork, 1200);
                 } else {
                     var poll = setInterval(function () {
-                        if (window.__scriptsReady) { clearInterval(poll); setTimeout(show, 1200); }
+                        if (window.__scriptsReady) { clearInterval(poll); setTimeout(afterFork, 1200); }
                     }, 300);
                 }
             } catch (_) {}

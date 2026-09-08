@@ -25,7 +25,6 @@
       "detectDisplayHz(nowMs) — js/05j-update-loop.js:58 -> js/05i-sim-stats.js:597-632 (rAF-interval Hz measurement; self-disables after 60 samples; result feeds only the substep gate and stats)",
       "window.cosOscillator.tick(nowMs / 1000) — js/05j-update-loop.js:77 (parameter oscillators follow the stubbed clock automatically)",
       "FBO resize settle deadline _fboSettleAtMs = nowMs + 180 — js/05j-update-loop.js:198, checked at :203",
-      "swirl clock _swirlT = (nowMs % 3600000) / 1000 — js/05j-update-loop.js:915, fed to all three dye advection passes; config.SWIRL defaults 0 (js/04a-canvas-gl-config.js:786) so inert by default, and deterministic anyway once performance.now is stubbed",
       "attractor-field staleness gate nowMs - _af.ts < 500 — js/05j-update-loop.js:1078 (ferrofluid scenes only)",
       "window.__lastPaintMs = nowMs — js/05j-update-loop.js:393,475 (governor hint only)",
       "stats: pushFrameTimestamp(nowMs) / cpuMs = performance.now() - cpuStart — js/05j-update-loop.js:1316-1330",

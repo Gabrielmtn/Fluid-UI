@@ -438,10 +438,10 @@
                     <canvas id="canvas"></canvas>
                     <div id="customCursor"></div>
                 </div>
-                <!-- Stats For Nerds Panel -->
+                <!-- Debug Info Panel -->
                 <div id="statsPanel" class="stats-panel" style="display: none;">
                     <div class="stats-header">
-                        <span class="stats-drag-handle">Stats For Nerds 🤓</span>
+                        <span class="stats-drag-handle">Debug Info</span>
                     </div>
                     <button id="statsCloseBtn" class="stats-close-btn" title="Close panel">✕</button>
                     <div class="stats-content">
@@ -649,9 +649,9 @@
         <div class="control-group">
             <label>
                 <select id="materialMode" class="material-mode-select" title="Material — swaps what this slider controls">
-                    <option value="fluid" selected>Fluid</option>
-                    <option value="acrylic">Paint-Wet</option>
-                    <option value="clay">Paint-Thick</option>
+                    <option value="fluid" selected>Swirl - Vorticity</option>
+                    <option value="acrylic">Gloss Paint - Wetness</option>
+                    <option value="clay">Gloss Paint - Thickness</option>
                 </select>
                 <span id="curlValue" class="value-display">25</span>
             </label>
@@ -662,34 +662,12 @@
             <input type="range" id="sharpness" min="0" max="2" value="0.8" step="0.1">
         </div>
         <div class="control-group">
-            <label for="swirl" title="Curl-noise micro-swirl — painterly fine-grain wisps on moving paint">Swirl <span id="swirlValue" class="value-display">0.00</span></label>
-            <input type="range" id="swirl" min="0" max="1" value="0" step="0.01">
-        </div>
-        <div class="control-group">
-            <label for="wetInfluence" title="Dry - Wet — wet paint flows, dry paint holds in place. 0 = off (pure fluid). Higher = dry regions set harder, more paint-like.">Dry - Wet <span id="wetInfluenceValue" class="value-display">0.00</span></label>
+            <label for="wetInfluence" title="Drying — wet paint flows, dry paint holds in place. 0 = off (pure fluid). Higher = dry regions set harder, more paint-like.">Drying <span id="wetInfluenceValue" class="value-display">0.00</span></label>
             <input type="range" id="wetInfluence" min="0" max="1" value="0" step="0.01">
         </div>
         <div class="control-group">
             <label for="wetDrying" title="Drying speed — half-life in seconds for wet paint to set. Lower = paint dries and holds faster.">Dry Time <span id="wetDryingValue" class="value-display">3.0s</span></label>
             <input type="range" id="wetDrying" min="0.5" max="20" value="3" step="0.5">
-        </div>
-        <div class="control-group">
-            <label for="ridges" title="Sharpen kernel scale — 0 = off (smooth), 1 = classic unsharp look, higher values carve coarse embossed ridges into moving dye">Ridges <span id="ridgesValue" class="value-display">0.0</span></label>
-            <input type="range" id="ridges" min="0" max="6" value="0" step="0.1">
-        </div>
-        <div class="control-group checkbox-group">
-            <input type="checkbox" id="microDetailToggle">
-            <label for="microDetailToggle" style="margin: 0">Micro Detail</label>
-        </div>
-        <div id="microDetailPanel" class="collapsible" style="display:none;">
-            <div class="control-group">
-                <label for="clarity">Clarity <span id="clarityValue" class="value-display">0.0</span></label>
-                <input type="range" id="clarity" min="0" max="1" value="0" step="0.05">
-            </div>
-            <div class="control-group">
-                <label for="vibrance">Vibrance <span id="vibranceValue" class="value-display">0.0</span></label>
-                <input type="range" id="vibrance" min="0" max="1" value="0" step="0.05">
-            </div>
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="displayShadingToggle">
@@ -707,6 +685,14 @@
             <div class="control-group">
                 <label for="shadeGloss">Gloss <span id="shadeGlossValue" class="value-display">0.35</span></label>
                 <input type="range" id="shadeGloss" min="0" max="1" value="0.35" step="0.05">
+            </div>
+            <div class="control-group">
+                <label for="ridges" title="Sharpening on moving paint. Up to 1 turns it up at a fine radius; past 1 the kernel widens into coarse embossed ridges. Needs Viscosity above 0.">Ridges <span id="ridgesValue" class="value-display">0.0</span></label>
+                <input type="range" id="ridges" min="0" max="6" value="0" step="0.1">
+            </div>
+            <div class="control-group">
+                <label for="vibrance" title="Selective saturation: muted colours get richer, already-vivid ones are left alone. 0 = off.">Vibrance <span id="vibranceValue" class="value-display">0.0</span></label>
+                <input type="range" id="vibrance" min="0" max="1" value="0" step="0.05">
             </div>
         </div>
         <div class="control-group checkbox-group">
@@ -749,7 +735,7 @@
             </div>
         </div>
         <div class="control-group">
-            <label for="multiplier">✨ Multiplier <span id="multiplierValue" class="value-display">1x</span></label>
+            <label for="multiplier">Multiplier <span id="multiplierValue" class="value-display">1x</span></label>
             <input type="range" id="multiplier" min="1" max="8" value="1" step="1">
         </div>
         <!-- Multi-Brush symmetry. Declared here (not built in JS) so the id
@@ -776,7 +762,7 @@
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="mandalaToggle">
-            <label for="mandalaToggle" style="margin: 0">🪷 Mandala Studio</label>
+            <label for="mandalaToggle" style="margin: 0">Mandala Studio</label>
         </div>
         <div id="mandalaPanel" class="collapsible" style="display:none;">
             <div class="control-group">
@@ -813,7 +799,7 @@
                 <input type="range" id="mandalaIsolation" min="1" max="5" value="5" step="0.001">
             </div>
             <div class="control-group">
-                <label for="mandalaWet" title="High = dry paint sets hard and holds its edge.">Dry - Wet <span id="mandalaWetValue" class="value-display">1.00</span></label>
+                <label for="mandalaWet" title="High = dry paint sets hard and holds its edge.">Drying <span id="mandalaWetValue" class="value-display">1.00</span></label>
                 <input type="range" id="mandalaWet" min="0" max="1" value="1" step="0.01">
             </div>
             <div class="control-group">
@@ -922,12 +908,12 @@
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="statsToggle">
-            <label for="statsToggle" style="margin: 0">Stats For Nerds</label>
+            <label for="statsToggle" style="margin: 0">Debug Info</label>
         </div>
         <div class="control-group checkbox-group"
              title="A steady pressure across the whole canvas, pointed with the pad below — paint drifts that way on its own. Down reads as gravity, up as lift. Applies to every brush.">
             <input type="checkbox" id="pressureConstant">
-            <label for="pressureConstant" style="margin: 0">🌬️ Constant Pressure (Gravity / Lift)</label>
+            <label for="pressureConstant" style="margin: 0">Gravity Direction</label>
         </div>
         <!-- Aim pad for the constant pressure field. Centre is off, angle is the
              direction, distance from centre is intensity; the wiring is in
@@ -950,17 +936,39 @@
         <div class="control-group checkbox-group"
              title="Open canvas edges — fluid that reaches the border vents off-canvas instead of bouncing back in.">
             <input type="checkbox" id="overflowToggle">
-            <label for="overflowToggle" style="margin: 0">Overflow</label>
+            <label for="overflowToggle" style="margin: 0">Border</label>
         </div>
         <div id="overflowPanel" class="collapsible" style="display:none;">
             <div class="control-group">
-                <label for="overflowBand" title="How much of the canvas the draining border takes. Wider = fluid is nulled further in from the rim; narrower keeps the drain a hairline at the very edge.">Border <span id="overflowBandValue" class="value-display">2.5%</span></label>
+                <label for="overflowBand" title="How much of the canvas the draining border takes. Wider = fluid is nulled further in from the rim; narrower keeps the drain a hairline at the very edge.">Width <span id="overflowBandValue" class="value-display">2.5%</span></label>
                 <input type="range" id="overflowBand" min="0.5" max="15" value="2.5" step="0.5">
             </div>
         </div>
         <div class="control-group checkbox-group">
+            <input type="checkbox" id="breathingToggle">
+            <label for="breathingToggle" style="margin: 0">Breathing</label>
+        </div>
+        <div id="breathingPanel" class="collapsible" style="display:none;">
+            <div class="control-group">
+                <label for="breathPattern">Pattern</label>
+                <select id="breathPattern" title="Seconds in, hold, out, hold">
+                    <option value="relaxed" selected>Relaxed 4 · 4</option>
+                    <option value="box">Box 4 · 4 · 4 · 4</option>
+                    <option value="478">4 · 7 · 8</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="breathStrength" title="How firmly the paint moves: the push out on the inhale and the pull back on the exhale.">Strength <span id="breathStrengthValue" class="value-display">50%</span></label>
+                <input type="range" id="breathStrength" min="0" max="1" value="0.5" step="0.05">
+            </div>
+            <div class="control-group checkbox-group">
+                <input type="checkbox" id="breathCueToggle" checked>
+                <label for="breathCueToggle" style="margin: 0" title="Breathe in / Hold / Breathe out, under the rings">Cue words</label>
+            </div>
+        </div>
+        <div class="control-group checkbox-group">
             <input type="checkbox" id="enableLighting">
-            <label for="enableLighting" style="margin: 0">💡 Light Source (Depth Effect)</label>
+            <label for="enableLighting" style="margin: 0">Light Source</label>
         </div>
         <!-- Light Source Controls (compact, inline) -->
         <div id="lightSourceControls" class="light-source-controls" style="display: none; margin-left: 20px; margin-top: 8px; padding: 12px; background: rgba(100, 150, 255, 0.05); border-left: 2px solid rgba(100, 150, 255, 0.3); border-radius: 4px;">
@@ -1003,15 +1011,15 @@
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="enableLightShift">
-            <label for="enableLightShift" style="margin: 0">🌈 Light Shift (Color Overexposure)</label>
+            <label for="enableLightShift" style="margin: 0">Light Shift</label>
         </div>
         <!-- Light Shift Controls -->
         <div id="lightShiftControls" style="display: none; margin-left: 20px; margin-top: 8px; padding: 12px; background: rgba(255, 150, 100, 0.05); border-left: 2px solid rgba(255, 150, 100, 0.3); border-radius: 4px;">
             <div style="text-align: center; margin-bottom: 8px;">
-                <label style="font-size: 11px; color: rgba(255, 255, 255, 0.7);" title="Draw a path through colors — the playhead loops along it, tinting your brightest areas.&#10;Slide off the edge mid-drag and the path hugs the border until you come back.&#10;✨ Hold Shift while drawing to lift the pen: the path leaves a gap there, and the color jumps instead of blending.">Draw a path through colors</label>
+                <label style="font-size: 11px; color: rgba(255, 255, 255, 0.7);" title="Draw a path through colors — the playhead loops along it, tinting your brightest areas.&#10;Slide off the edge mid-drag and the path hugs the border until you come back.&#10;Hold Shift while drawing to lift the pen: the path leaves a gap there, and the color jumps instead of blending.">Draw a path through colors</label>
             </div>
             <div style="display: flex; justify-content: center; margin-bottom: 12px;">
-                <canvas id="lightShiftWheel" title="Draw a path through colors — the playhead loops along it, tinting your brightest areas.&#10;Slide off the edge mid-drag and the path hugs the border until you come back.&#10;✨ Hold Shift while drawing to lift the pen: the path leaves a gap there, and the color jumps instead of blending." style="border: 1px solid rgba(255, 150, 100, 0.3); border-radius: 4px; cursor: crosshair;"></canvas>
+                <canvas id="lightShiftWheel" title="Draw a path through colors — the playhead loops along it, tinting your brightest areas.&#10;Slide off the edge mid-drag and the path hugs the border until you come back.&#10;Hold Shift while drawing to lift the pen: the path leaves a gap there, and the color jumps instead of blending." style="border: 1px solid rgba(255, 150, 100, 0.3); border-radius: 4px; cursor: crosshair;"></canvas>
             </div>
             <div class="control-group" style="margin-bottom: 8px;">
                 <label style="font-size: 12px; margin-bottom: 4px;">Blend Mode</label>
@@ -1073,14 +1081,18 @@
         <div class="control-group" id="presetsGroup">
             <label>Presets</label>
             <div class="presets">
-                <button onclick="applyPreset('silky')">Silky</button>
-                <button onclick="applyPreset('thick')">Thick</button>
-                <button onclick="applyPreset('wispy')">Wispy</button>
-                <button onclick="applyPreset('chaotic')">Chaotic</button>
-                <button onclick="applyPreset('ethereal')">Ethereal</button>
-                <button onclick="applyPreset('turbulent')">Turbulent</button>
-                <button onclick="applyPreset('marble')">Marble</button>
-                <button onclick="applyPreset('electric')">Electric</button>
+                <!-- Names say what the paint DOES (Gabriel, 2026-09-02); the keys
+                     stay the same so saved settings, hotkeys.json and the
+                     multiplayer preset broadcast keep working. -->
+                <button onclick="applyPreset('gelpen')" data-preset="gelpen">Gel pen</button>
+                <button onclick="applyPreset('silky')" data-preset="silky">Endless silk swirl</button>
+                <button onclick="applyPreset('thick')" data-preset="thick">Thick paint, still</button>
+                <button onclick="applyPreset('wispy')" data-preset="wispy">Smoke wisps</button>
+                <button onclick="applyPreset('chaotic')" data-preset="chaotic">Quick-fading brush tracer</button>
+                <button onclick="applyPreset('ethereal')" data-preset="ethereal">Drifting mist</button>
+                <button onclick="applyPreset('turbulent')" data-preset="turbulent">Gusty, fades fast</button>
+                <button onclick="applyPreset('marble')" data-preset="marble">Slow marbling</button>
+                <button onclick="applyPreset('electric')" data-preset="electric">Electric threads</button>
             </div>
             <div id="userPresetsList" class="user-presets-list" style="margin-top: 6px;"></div>
             <div id="userPresetSaveRow" style="margin-top: 6px;">
@@ -1206,7 +1218,7 @@
         <!-- Toggle animations (Ascend removed 2026-08-15 — photosensitivity) -->
         <div id="shootingStarWrap">
             <div class="anim-toggle-row" style="background:rgba(255,220,100,0.1);">
-                <span class="anim-toggle-label">🌠 Shooting Star</span>
+                <span class="anim-toggle-label">Shooting Star</span>
                 <label class="anim-switch"><input type="checkbox" id="shootingStarToggle"><span class="anim-switch-track"></span></label>
             </div>
             <div class="anim-settings" id="shootingStarSettings">
@@ -1259,7 +1271,7 @@
         <div class="preview-toggle" id="previewToggle" 
              onmouseenter="showPreview()" 
              onmouseleave="hidePreview()">
-            <div style="font-weight: bold; margin-bottom: 5px;">👁️ PREVIEW LAYERS</div>
+            <div style="font-weight: bold; margin-bottom: 5px;">PREVIEW LAYERS</div>
             <div style="font-size: 11px;">Hover to view stacked PNGs</div>
         </div>
         <div class="control-group" id="recModeGroup" style="margin-top: 10px;">
@@ -1629,6 +1641,18 @@
          explicit PerfTiers.apply(); drives the resolution/pressure controls,
          so it must load after 05h-slider-bindings and 08a-quality-governor. -->
     <script src="js/42-perf-tiers.js"></script>
+    <!-- Which parts of the interface are on screen: per-section show/hide,
+         the Simple|Everything presets, the Settings → Interface combo box and
+         the one-time startup fork. Needs the built strip + sidebar, so it
+         loads after 20-mixer-layout. -->
+    <script src="js/43-ui-visibility.js"></script>
+    <!-- "How do I…": the recipe / solution modal — searchable tasks that reveal
+         and point at the control that does them. Reveals through 43, so it
+         loads after it. -->
+    <script src="js/44-recipes.js"></script>
+    <!-- Breathing effect (Effects → Breathing): a guided breath the canvas
+         follows. Binds its controls by id after 20 has placed them. -->
+    <script src="js/45-breathing.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">

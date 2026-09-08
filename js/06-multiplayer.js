@@ -1219,7 +1219,11 @@ function updateTurnChip() {
             var t = document.getElementById('turnWheel') || document.getElementById('turnsBtn');
             if (!t) return;
             var sec = t.closest ? t.closest('.sidebar-section') : null;
-            if (sec) sec.classList.remove('collapsed');
+            // Through the mixer's opener when it exists: it un-hides a section
+            // the user tucked away (43-ui-visibility) before expanding, so the
+            // chip never scrolls to a rotation that is not on screen.
+            if (sec && typeof window.openSidebarSection === 'function') window.openSidebarSection(sec);
+            else if (sec) sec.classList.remove('collapsed');
             if (t.scrollIntoView) {
                 try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
                 catch (_) { t.scrollIntoView(); }

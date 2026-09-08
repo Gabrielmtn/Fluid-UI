@@ -48,6 +48,14 @@
         return Promise.resolve({ error: 'app not ready' });
     }
 
+    // The startup interface fork (js/43-ui-visibility.js) would otherwise
+    // sit over every shot and swallow key() through its keydown capture.
+    // Waive it for this page, persisting nothing (stage rule: a harness may
+    // never call an app setter that persists): the flag stops a fork that
+    // has not fired yet, the call closes one that has.
+    window.__skipUIFork = true;
+    try { if (window.UIVisibility && window.UIVisibility.forkPending()) window.UIVisibility.chooseLayout(null); } catch (_) {}
+
     // gl is a top-level classic-script binding (04a); reachable from the
     // global lexical scope this injected code evaluates in.
     var GL = (typeof gl !== 'undefined') ? gl : window.gl;

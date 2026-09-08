@@ -114,8 +114,8 @@
 
     // Frozen fallbacks — used ONLY if ParamRegistry failed to load (in which
     // case apply-side clamping is broken anyway). Mirrors pre-registry coverage.
-    var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','swirl','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','clarity','vibrance','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','shadingIntensity'];
-    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','microDetailToggle','macCormackToggle','multigridToggle','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
+    var FALLBACK_SLIDER_IDS = ['densityDissipation','velocityDissipation','pressureDissipation','pressureIteration','velocityInfluence','curl','sharpness','wetInfluence','wetDrying','ridges','brushSize','multiplier','timeScale','canvasOpacity','captureDimming','kSpinSpeed','kTwist','kZoom','kBlend','kAngle','kaleidoSegments','lightSpeed','lightIntensity','lightAmbient','lightShiftSpeed','lightShiftThreshold','lightShiftIntensity','lightShiftSaturation','vibrance','ssFrequency','ssAngle','ssLength','ssSize','ssVariance','ssGravity','audioSensitivity','audioBeatThreshold','shadingIntensity'];
+    var FALLBACK_CHECKBOX_IDS = ['cursorToggle','showCanvasHandles','lockCanvasBorders','statsToggle','transparentMode','randomColor','stepPalette','kaleidoToggle','kAnimateRot','enableLighting','enableLightShift','macCormackToggle','multigridToggle','shootingStarToggle','hoverCaptureToggle','detachCaptureToggle','audioReactToggle','arMapAutoSplat','arMapSize','arMapKaleido','arMapColor','focusModeToggle','streamFormatLock','autoloadSettings','displayShadingToggle'];
     var FALLBACK_SELECT_IDS = ['visualResolution','physicsResolution','kaleidoMode','fpsCap','lightMode','lightShiftMode','recMode','recPlaybackSpeed','audioMode','audioReactSource','audioAutoSplatMode','splatInMode','splatOutMode'];
 
     var _PR = window.ParamRegistry;
@@ -959,7 +959,7 @@
             lightShiftPath: lightShiftPath,
             focusState: focusState,
             brushState: brushState,
-            // Material macro layer (Fluid / Paint-Wet / Paint-Thick): its core
+            // Material macro layer (Swirl / Gloss Paint — Wetness or Thickness): its core
             // effects live in config keys with no captured control, so without
             // this section a restored preset (or a mirroring peer) stayed on
             // plain fluid while the source was in a paint material.
@@ -998,7 +998,7 @@
         if (window.__mpSettingsLocked && !window.__mpApplyingRemote) return;
         // External-writer flag for 05h's handlers: (a) an active material must
         // YIELD so the snapshot's raw CURL lands as CURL, not as a macro
-        // amount (without this, applying a preset while in Paint-Thick left
+        // amount (without this, applying a preset while in Gloss Paint - Thickness left
         // clay's curl in place); (b) programmatic writes must not clear the
         // active-preset state. The flag was checked in 05h but never raised
         // anywhere until now. Cleared in a 0-timeout too so an unexpected
@@ -1822,8 +1822,52 @@
         return window.Settings.getAllPresets();
     }
 
+    // A 64px still of the canvas for the preset lists: the luminance-weighted
+    // centre of the frame at the spread of the paint, so the thumbnail shows
+    // the look and not a black corner. Cheap (one 240px readback).
+    function presetThumbFromCanvas() {
+        try {
+            var c = document.getElementById('canvas');
+            if (!c || !c.width || !c.height) return null;
+            var W = 240, H = Math.max(1, Math.round(c.height * W / c.width));
+            var fr = document.createElement('canvas'); fr.width = W; fr.height = H;
+            var fc = fr.getContext('2d', { willReadFrequently: true });
+            fc.fillStyle = '#000'; fc.fillRect(0, 0, W, H);
+            fc.drawImage(c, 0, 0, W, H);
+            var d = fc.getImageData(0, 0, W, H).data;
+            var sum = 0, sx = 0, sy = 0, sxx = 0, syy = 0;
+            for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+                var o = (y * W + x) * 4;
+                var l = (d[o] * 0.299 + d[o + 1] * 0.587 + d[o + 2] * 0.114) / 255;
+                if (l < 0.06) continue;
+                sum += l; sx += x * l; sy += y * l; sxx += x * x * l; syy += y * y * l;
+            }
+            var cx = W / 2, cy = H / 2, side = Math.min(W, H) * 0.6;
+            if (sum > 0) {
+                cx = sx / sum; cy = sy / sum;
+                var sdx = Math.sqrt(Math.max(0, sxx / sum - cx * cx)), sdy = Math.sqrt(Math.max(0, syy / sum - cy * cy));
+                side = Math.max(Math.min(W, H) * 0.3, Math.min(Math.min(W, H), 2.6 * Math.max(sdx, sdy)));
+            }
+            var k = c.width / W, S = side * k;
+            var X = Math.max(0, Math.min(c.width - S, cx * k - S / 2)), Y = Math.max(0, Math.min(c.height - S, cy * k - S / 2));
+            var t = document.createElement('canvas'); t.width = 64; t.height = 64;
+            var tc = t.getContext('2d');
+            tc.fillStyle = '#000'; tc.fillRect(0, 0, 64, 64);
+            tc.drawImage(c, X, Y, S, S, 0, 0, 64, 64);
+            return t.toDataURL('image/png');
+        } catch (e) { return null; }
+    }
+    window.presetThumbFromCanvas = presetThumbFromCanvas;
+
     function saveUserPreset(name, snapshot) {
         if (!window.Settings || !name || !snapshot) return false;
+        // Every save path (strip footer, sidebar save/overwrite, vault restore)
+        // lands here: attach a thumbnail of what is on screen, and keep the
+        // group an overwrite would otherwise drop (a fresh snapshot has none).
+        if (!snapshot.thumb) { var th = presetThumbFromCanvas(); if (th) snapshot.thumb = th; }
+        if (!snapshot.group) {
+            try { var prev = window.Settings.loadPreset(name); if (prev && prev.group) snapshot.group = prev.group; } catch (_) {}
+        }
         // Try full save (may fail if layers make it too large for localStorage)
         var ok = window.Settings.savePreset(name, snapshot);
         if (ok === false) {

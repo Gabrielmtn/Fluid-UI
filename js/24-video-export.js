@@ -71,8 +71,51 @@
 
     // Composite-cost stats for the export perf budget (D7-3): logged at
     // finish(); a >30ms average means the compositor itself is eating the
-    // frame budget and export fps promises are fiction.
-    var _compStats = { frames: 0, totalMs: 0, worstMs: 0 };
+    // frame budget and export fps promises are fiction. `capture` times the
+    // whole per-frame capture (composite + push to the encoder), which is
+    // what the painter actually loses; `composite` is the draw work alone.
+    var _compStats = { frames: 0, totalMs: 0, worstMs: 0, capFrames: 0, capTotalMs: 0, capWorstMs: 0 };
+
+    // ── Persistent capture surfaces (2026-09-02) ───────────────────────
+    // Every captured frame used to allocate a fresh full-resolution
+    // snapshot canvas AND a fresh full-resolution composite canvas (a third
+    // for clip masks): 20-30 MB of GPU-backed canvas per frame at 60/s,
+    // never reused, so the GC ran every couple of frames on top of the
+    // create/destroy churn in the GPU process. Measured on the 4090
+    // (1920x1080, stock tier, 144 Hz): a video export put 22% of painted
+    // frames 2-4 ticks late. These are allocated once per size and reused;
+    // the snapshot is gone entirely — with preserveDrawingBuffer:true (04a)
+    // and the composite happening in the same task as the render, the
+    // WebGL buffer cannot change under us, so the sim is drawn straight
+    // into the destination.
+    var _comp = null, _scratch = null;
+    function sizedCanvas(c, w, h) {
+        if (!c) c = document.createElement('canvas');
+        if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+        return c;
+    }
+    // Canvas → CSS geometry, read at most a few times a second instead of
+    // per frame: clientWidth/clientHeight and two getBoundingClientRect()s
+    // per captured frame each forced a synchronous layout.
+    var _geom = null, _geomMs = 0;
+    function geometry(simCanvas) {
+        var now = performance.now();
+        if (_geom && now - _geomMs < 250 && _geom.w === simCanvas.width && _geom.h === simCanvas.height) return _geom;
+        var g = { w: simCanvas.width, h: simCanvas.height,
+                  displayW: simCanvas.clientWidth || simCanvas.width,
+                  displayH: simCanvas.clientHeight || simCanvas.height,
+                  areaWidth: 0, areaHeight: 0, offsetX: 0, offsetY: 0 };
+        var area = document.getElementById('canvas-area');
+        var wrap = document.getElementById('canvas-wrapper');
+        if (area && wrap) {
+            var aRect = area.getBoundingClientRect();
+            var wRect = wrap.getBoundingClientRect();
+            g.areaWidth = aRect.width; g.areaHeight = aRect.height;
+            g.offsetX = wRect.left - aRect.left; g.offsetY = wRect.top - aRect.top;
+        }
+        _geom = g; _geomMs = now;
+        return g;
+    }
 
     function finish() {
         if (_stream) { _stream.getTracks().forEach(function (t) { t.stop(); }); _stream = null; }
@@ -81,13 +124,20 @@
         _abort = false;
         window.__exporting = false; // D3-4: re-allow the mask film after export
         _imgCache.clear();
+        _comp = null; _scratch = null; _geom = null;   // free the capture surfaces
+        if (window.QualityGovernor && window.QualityGovernor.hold) window.QualityGovernor.hold(false);
         if (_compStats.frames > 0) {
             var avg = _compStats.totalMs / _compStats.frames;
             console.log('[Export] composite cost: avg ' + avg.toFixed(1) + 'ms, worst ' +
                 _compStats.worstMs.toFixed(1) + 'ms over ' + _compStats.frames + ' frames');
             if (avg > 30) console.warn('[Export] composite avg exceeds the 30ms budget — expect dropped export frames');
         }
-        _compStats = { frames: 0, totalMs: 0, worstMs: 0 };
+        if (_compStats.capFrames > 0) {
+            console.log('[Export] capture cost: avg ' + (_compStats.capTotalMs / _compStats.capFrames).toFixed(1) +
+                'ms, worst ' + _compStats.capWorstMs.toFixed(1) + 'ms over ' + _compStats.capFrames + ' frames');
+        }
+        _compStats = { frames: 0, totalMs: 0, worstMs: 0, capFrames: 0, capTotalMs: 0, capWorstMs: 0 };
+        _uiLastMs = 0;
         updateUI('idle', 0);
     }
 
@@ -95,6 +145,9 @@
         if (_busy) { toast('Export already in progress', 'warn'); return false; }
         _busy = true; _abort = false;
         window.__exporting = true; // D3-4: suppress the red mask film in captures
+        // The ladder must not read export-side frame loss as sim overload —
+        // see the hold() note in 08a. Released in finish().
+        if (window.QualityGovernor && window.QualityGovernor.hold) window.QualityGovernor.hold(true);
         return true;
     }
 
@@ -171,21 +224,19 @@
     }
 
     // ── Canvas Compositing ──────────────────────────────────────────
-    function captureCompositeFrame() {
+    // target (optional): a canvas to composite INTO — the recorder's own
+    // canvas for video, the downscaled frame for GIF — so the composite is
+    // not drawn once more to get there. Any size: the frame is fitted to it.
+    // Without a target the persistent composite canvas is returned; callers
+    // must consume it before the next capture (it is reused).
+    function captureCompositeFrame(target) {
         return new Promise(function (resolve, reject) {
             var simCanvas = document.getElementById('canvas');
             if (!simCanvas) return reject(new Error('Canvas not found'));
 
             var w = simCanvas.width, h = simCanvas.height;
-
-            // Snapshot WebGL canvas (may clear after this frame)
-            var simSnap = document.createElement('canvas');
-            simSnap.width = w; simSnap.height = h;
-            simSnap.getContext('2d').drawImage(simCanvas, 0, 0);
-
-            var displayW = simCanvas.clientWidth || w;
-            var displayH = simCanvas.clientHeight || h;
-            var sx = w / displayW, sy = h / displayH;
+            var geom = geometry(simCanvas);
+            var sx = w / geom.displayW, sy = h / geom.displayH;
 
             // Build draw list bottom-to-top
             var order = (window.layerOrder || []).slice().reverse();
@@ -203,7 +254,7 @@
                     var layer = (window.layers || []).find(function (l) { return l.index === item.id; });
                     if (!layer || !layer.visible) continue;
                     // D2 raster layers are composited inside the GL canvas —
-                    // they're already baked into simSnap; drawing them again
+                    // they're already in the WebGL canvas; drawing them again
                     // here would double-composite
                     if (layer.isRaster) continue;
                     var layerDiv = document.getElementById('layer' + layer.index);
@@ -231,21 +282,53 @@
 
             var t0 = performance.now();
 
+            // Sim-only frame (no DOM layers, no clip masks): one draw, straight
+            // from the WebGL canvas into the destination, scaled if the
+            // destination is smaller. This is the common case and it is the
+            // whole per-frame cost when it applies.
+            var overlaysOn = !!(cfg.compositeOverlays && window.textOverlays && window.textOverlays.compositeOntoCanvas);
+            var simOnly = drawList.length === 1 && drawList[0].type === 'sim';
+            if (simOnly && target && !overlaysOn) {
+                var tctx = target.getContext('2d');
+                tctx.globalAlpha = 1;
+                tctx.clearRect(0, 0, target.width, target.height);
+                tctx.globalAlpha = drawList[0].opacity;
+                tctx.drawImage(simCanvas, 0, 0, target.width, target.height);
+                tctx.globalAlpha = 1;
+                var dt0 = performance.now() - t0;
+                _compStats.frames++; _compStats.totalMs += dt0;
+                if (dt0 > _compStats.worstMs) _compStats.worstMs = dt0;
+                resolve(target);
+                return;
+            }
+
             // Decode layer + mask images through the per-export cache
             Promise.all(drawList.map(function (task) {
                 if (task.type === 'sim') return Promise.resolve(null);
                 if (!task.maskSrc) return getCachedImage(task.src);
                 return Promise.all([getCachedImage(task.src), getCachedImage(task.maskSrc)]);
             })).then(function (images) {
-                var comp = document.createElement('canvas');
-                comp.width = w; comp.height = h;
+                // Composite at canvas resolution into the persistent surface
+                // (or into the target itself when it is the same size), then
+                // fit into a smaller target at the end. The image decodes above
+                // resolve in a microtask once cached — same task as the render,
+                // so the WebGL buffer is still this frame's.
+                var direct = !!(target && target.width === w && target.height === h);
+                // Outside an export (fluidExport.captureFrame from another
+                // module, which keeps the canvas) the caller gets one of its
+                // own — the persistent surface is shared only between the
+                // frames of one export.
+                var comp = direct ? target : (_busy ? (_comp = sizedCanvas(_comp, w, h)) : sizedCanvas(null, w, h));
                 var ctx = comp.getContext('2d');
-                var scratch = null; // lazy, shared by all masked layers this frame
+                ctx.globalAlpha = 1;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.clearRect(0, 0, w, h);
+                var scratch = null; // shared by all masked layers this frame
 
                 drawList.forEach(function (task, idx) {
                     ctx.globalAlpha = task.opacity;
                     if (task.type === 'sim') {
-                        ctx.drawImage(simSnap, 0, 0);
+                        ctx.drawImage(simCanvas, 0, 0);
                     } else {
                         var img = task.maskSrc ? images[idx][0] : images[idx];
                         var maskImg = task.maskSrc ? images[idx][1] : null;
@@ -256,10 +339,7 @@
                             // BEFORE its transform (mask-size:100% 100%), so
                             // mask in untransformed space, then transform the
                             // already-clipped result.
-                            if (!scratch) {
-                                scratch = document.createElement('canvas');
-                                scratch.width = w; scratch.height = h;
-                            }
+                            if (!scratch) scratch = _busy ? (_scratch = sizedCanvas(_scratch, w, h)) : sizedCanvas(null, w, h);
                             var sctx = scratch.getContext('2d');
                             sctx.globalCompositeOperation = 'source-over';
                             sctx.clearRect(0, 0, w, h);
@@ -279,23 +359,29 @@
                     ctx.globalAlpha = 1;
                 });
 
-                if (cfg.compositeOverlays && window.textOverlays && window.textOverlays.compositeOntoCanvas) {
+                if (overlaysOn) {
                     // Overlay x/y are fractions of #canvas-area; the export
                     // frame is the wrapper. Pass the area→wrapper mapping so
                     // overlays land where the user sees them (in wrapper px;
                     // buffer px == wrapper CSS px, see 05j updateCanvasSize).
+                    // Geometry comes from the cached read above.
                     var opts = { width: w, height: h };
-                    var area = document.getElementById('canvas-area');
-                    var wrap = document.getElementById('canvas-wrapper');
-                    if (area && wrap) {
-                        var aRect = area.getBoundingClientRect();
-                        var wRect = wrap.getBoundingClientRect();
-                        opts.areaWidth = aRect.width;
-                        opts.areaHeight = aRect.height;
-                        opts.offsetX = wRect.left - aRect.left;
-                        opts.offsetY = wRect.top - aRect.top;
+                    if (geom.areaWidth) {
+                        opts.areaWidth = geom.areaWidth;
+                        opts.areaHeight = geom.areaHeight;
+                        opts.offsetX = geom.offsetX;
+                        opts.offsetY = geom.offsetY;
                     }
                     window.textOverlays.compositeOntoCanvas(ctx, opts);
+                }
+
+                var out = comp;
+                if (target && !direct) {
+                    var tc = target.getContext('2d');
+                    tc.globalAlpha = 1;
+                    tc.clearRect(0, 0, target.width, target.height);
+                    tc.drawImage(comp, 0, 0, target.width, target.height);
+                    out = target;
                 }
 
                 var dt = performance.now() - t0;
@@ -303,7 +389,7 @@
                 _compStats.totalMs += dt;
                 if (dt > _compStats.worstMs) _compStats.worstMs = dt;
 
-                resolve(comp);
+                resolve(out);
             }).catch(reject);
         });
     }
@@ -540,13 +626,15 @@
             _recorder.ondataavailable = function (e) {
                 if (!(e.data && e.data.size > 0)) return;
                 if (streamPath) {
-                    // Chain keeps chunk order; appendFileSync keeps it simple.
-                    // A failed append means the file has a HOLE — record it so
-                    // the export reports failure instead of a success toast over
-                    // a truncated video (disk full, drive ejected mid-record).
+                    // Chain keeps chunk order. The append is ASYNC on purpose:
+                    // a synchronous ~1 MB write per timeslice sat on the main
+                    // thread once a second, in the middle of painting. A failed
+                    // append means the file has a HOLE — record it so the export
+                    // reports failure instead of a success toast over a
+                    // truncated video (disk full, drive ejected mid-record).
                     writeChain = writeChain
                         .then(function () { return e.data.arrayBuffer(); })
-                        .then(function (ab) { fs.appendFileSync(streamPath, Buffer.from(ab)); })
+                        .then(function (ab) { return fs.promises.appendFile(streamPath, Buffer.from(ab)); })
                         .catch(function (err) {
                             streamWriteError = streamWriteError || err;
                             console.warn('[Export] chunk write failed:', err.message);
@@ -571,6 +659,7 @@
             var t0 = Date.now();
             var frameInterval = 1000 / fps;
             var lastFrame = 0;
+            var lastSerial = -1;
 
             while (!_abort) {
                 var elapsed = Date.now() - t0;
@@ -578,23 +667,34 @@
 
                 await rafPromise();
 
+                // Only a frame the sim actually DREW is worth a capture: under
+                // an fps cap update() early-returns most rAF ticks (60 draws a
+                // second on a 144 Hz panel), and every one of those ticks used
+                // to pay a full-frame readback for a duplicate.
+                var serial = window.__drawSerial;
+                if (typeof serial === 'number') {
+                    if (serial === lastSerial) continue;
+                    lastSerial = serial;
+                }
+
                 // Throttle to target FPS
                 var now = Date.now();
                 if (now - lastFrame < frameInterval * 0.8) continue;
                 lastFrame = now;
 
-                // Composite all visible layers onto the recording canvas
-                var comp = await captureCompositeFrame();
-                recCtx.clearRect(0, 0, recCanvas.width, recCanvas.height);
-                // Scale into the FIXED recording size: the canvas buffer can be
-                // reallocated mid-export (window resize, drawer collapse), and an
-                // unsized drawImage then cropped or black-banded every remaining
-                // frame. MediaRecorder can't change track size mid-stream, so
-                // fitting to the original size is the only correct answer.
-                recCtx.drawImage(comp, 0, 0, recCanvas.width, recCanvas.height);
+                // Composite all visible layers INTO the recording canvas. Its
+                // size is FIXED: the canvas buffer can be reallocated
+                // mid-export (window resize, drawer collapse), and MediaRecorder
+                // can't change track size mid-stream, so the frame is fitted to
+                // the original size inside the capture.
+                var c0 = performance.now();
+                await captureCompositeFrame(recCanvas);
 
                 // Push the frame to the encoder
                 if (track.requestFrame) track.requestFrame();
+                var cdt = performance.now() - c0;
+                _compStats.capFrames++; _compStats.capTotalMs += cdt;
+                if (cdt > _compStats.capWorstMs) _compStats.capWorstMs = cdt;
 
                 updateUI('recording', Math.min(100, (elapsed / duration) * 100));
             }
@@ -660,21 +760,37 @@
             updateUI('rendering', 0);
 
             // Phase 1: capture frames  (0 → 50 %)
+            // One downscaled surface for the whole capture; the composite is
+            // drawn straight into it, so the only full-resolution work per
+            // frame is the sim draw itself (none, when the frame is sim-only —
+            // then it is a single scaled draw). The readback stays: the
+            // encoder needs the bytes.
             var frames = [];
+            var small = document.createElement('canvas');
+            small.width = ow; small.height = oh;
+            var smallCtx = small.getContext('2d', { willReadFrequently: true });
             for (var i = 0; i < frameCount; i++) {
                 if (_abort) { toast('Export cancelled', 'info'); return; }
 
                 // Wait for a fresh render
                 await rafPromise();
 
-                var comp = await captureCompositeFrame();
-                var small = document.createElement('canvas');
-                small.width = ow; small.height = oh;
-                small.getContext('2d').drawImage(comp, 0, 0, ow, oh);
-                var imgData = small.getContext('2d').getImageData(0, 0, ow, oh);
+                var c0 = performance.now();
+                await captureCompositeFrame(small);
+                var imgData = smallCtx.getImageData(0, 0, ow, oh);
+                var cdt = performance.now() - c0;
+                _compStats.capFrames++; _compStats.capTotalMs += cdt;
+                if (cdt > _compStats.capWorstMs) _compStats.capWorstMs = cdt;
                 frames.push({ data: imgData.data, delay: frameDelay });
 
                 updateUI('rendering', ((i + 1) / frameCount) * 50);
+
+                // Bake hook (scripts/bake-effect-previews.js): a caller may
+                // change the scene between frames — the effect previews flip
+                // their effect on halfway through the loop.
+                if (typeof options.onFrame === 'function') {
+                    try { await options.onFrame(i, frameCount); } catch (e) { console.warn('[Export] onFrame:', e && e.message); }
+                }
 
                 // Let the simulation advance between frames
                 if (i < frameCount - 1) await sleep(frameDelay);
@@ -690,8 +806,13 @@
 
             var blob = new Blob([gifBytes], { type: 'image/gif' });
             var name = cfg.filenamePrefix + Date.now() + '.gif';
-            await saveBlob(blob, name);
-            toast('GIF exported!', 'success');
+            if (typeof options.onBlob === 'function') {
+                // Bake hook: hand the file to the caller instead of saving.
+                options.onBlob(blob, name);
+            } else {
+                await saveBlob(blob, name);
+                toast('GIF exported!', 'success');
+            }
 
         } catch (err) {
             console.error('[Export] GIF:', err);
@@ -1267,7 +1388,9 @@
                 var arrBuf = await blob.arrayBuffer();
                 var num = String(i).padStart(5, '0');
                 if (seqDir) {
-                    fs.writeFileSync(path.join(seqDir, 'frame_' + num + ext), Buffer.from(arrBuf));
+                    // Async: a 2-6 MB synchronous write per frame was a stall
+                    // on the main thread thirty times a second.
+                    await fs.promises.writeFile(path.join(seqDir, 'frame_' + num + ext), Buffer.from(arrBuf));
                 } else {
                     files.push({ name: 'frame_' + num + ext, data: new Uint8Array(arrBuf) });
                 }
@@ -1320,7 +1443,15 @@
     function rafPromise() { return new Promise(function (r) { requestAnimationFrame(r); }); }
 
     // ── UI Helpers ──────────────────────────────────────────────────
+    // Progress writes are throttled to ~10 Hz: the status text and the bar
+    // width were written on every captured frame (60/s), each a style
+    // invalidation in the sidebar during the frame the painter needs most.
+    // State changes (idle ↔ recording ↔ rendering) always go through.
+    var _uiLastMs = 0, _uiLastState = null;
     function updateUI(state, progress) {
+        var nowMs = performance.now();
+        if (state === _uiLastState && state !== 'idle' && nowMs - _uiLastMs < 100) return;
+        _uiLastMs = nowMs; _uiLastState = state;
         var statusEl    = document.getElementById('exportStatus');
         var progressEl  = document.getElementById('exportProgress');
         var progressBar = document.getElementById('exportProgressBar');

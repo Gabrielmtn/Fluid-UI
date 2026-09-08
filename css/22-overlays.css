@@ -15,6 +15,7 @@ body.focus-mode #mobileMenuToggle,
    over the otherwise-empty canvas with no visible trigger to close them. */
 body.focus-mode .arm-colors-panel,
 body.focus-mode .brush-settings-panel,
+body.focus-mode .brush-tip-menu,
 body.focus-mode .mixer-presets-panel { display: none !important; }
 
 body.focus-mode #main-area {
@@ -968,6 +969,26 @@ body.layer-transform-active #canvas-size-display {
     opacity: 0 !important;
 }
 
+/* ── Text panel colour swatches ── */
+/* Rectangular full-width wells, not the round pigment discs: the global
+   input[type="color"] rules (css/styles.css) force border-radius:50% on the
+   ::-webkit-color-swatch pseudo-elements, which the panel's inline styles
+   cannot reach — a 100%-wide 22px well was rendering as a giant ellipse.
+   Class-qualified selectors out-specify the type-only globals. */
+input[type="color"].text-swatch::-webkit-color-swatch-wrapper {
+    padding: 0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+input[type="color"].text-swatch::-webkit-color-swatch {
+    border: none;
+    border-radius: 3px;
+}
+input[type="color"].text-swatch::-moz-color-swatch {
+    border: none;
+    border-radius: 3px;
+}
+
 /* ── Text overlay arrange mode ── */
 #text-arrange-canvas {
     /* sized/positioned inline; swallows pointer events so painting is paused */
@@ -1225,3 +1246,372 @@ body.text-arrange-active #canvas-size-display {
    when you are actually performing, which is exactly when a timing guide
    earns its screen space. Close it with the header's X (or the Audio
    checkbox) when it should be out of shot. */
+
+/* ================================================================
+   UI VISIBILITY (js/43-ui-visibility.js)
+   Per-section show/hide, the Settings → Interface block, the startup fork.
+   ================================================================ */
+/* The one hide rule. !important on purpose: .sidebar-section is a grid
+   (21-sidebar.css), .mixer-channel and #mixer-strip are flex, and
+   #quality-underbar is fixed — display:none has to win over all of them
+   without knowing which one it is on. */
+.ui-hidden { display: none !important; }
+/* Mobile relocates the strip into the drawer with its own !important flex
+   rule (21-sidebar.css) that out-specifies a bare class; an all-channels-
+   hidden strip would otherwise sit there as an empty padded box. */
+body.mobile-mode #sidebar-right > #mixer-strip.ui-hidden { display: none !important; }
+
+/* ── Settings → Interface ── */
+.ui-vis-block {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ui-vis-presets { margin-bottom: 8px; }
+.ui-vis-presets .ch-text-toggle { flex: 1 1 0; height: 22px; }
+
+/* #sidebar-right on purpose: 21-sidebar.css sizes sidebar buttons by id-level
+   selectors, and this row is a flex row, not a block. */
+#sidebar-right .ui-vis-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+}
+.ui-vis-trigger-label { flex: 1 1 auto; }
+.ui-vis-trigger-count { font-size: 10px; opacity: 0.6; font-variant-numeric: tabular-nums; }
+.ui-vis-trigger-chev { opacity: 0.6; transition: transform 0.15s ease; }
+.ui-vis-trigger[aria-expanded="true"] .ui-vis-trigger-chev { transform: rotate(180deg); }
+
+.ui-vis-list {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.3);
+    max-height: 340px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.ui-vis-group {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.45);
+    margin: 8px 0 3px;
+}
+.ui-vis-group:first-child { margin-top: 0; }
+/* Rows are <label>s so the whole row toggles. Own class, not .checkbox-group:
+   that class is what the sidebar's hotkey caps and drag handlers key on. */
+#sidebar-right .ui-vis-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 0;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    margin: 0;
+}
+#sidebar-right .ui-vis-row input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    cursor: pointer;
+}
+#sidebar-right .ui-vis-row.is-pinned { opacity: 0.55; cursor: default; }
+.ui-vis-row-hint { margin-left: auto; font-size: 10px; opacity: 0.7; }
+
+/* ── The startup fork ──
+   .delete-modal chrome (styles.css) with two choice cards instead of a
+   yes/no. 10040 sits above the mask editor (10003), the perf rescue toast
+   (10005) and the multiplayer banners (10002), and below the app-close
+   confirm (10050) so a close asked during the choice stays on top. The
+   PhotoSafe warning owns the first frame at z 2147483000 and is answered
+   before this ever shows. */
+.ui-fork-modal { z-index: 10040; }
+.ui-fork-modal .delete-modal-content { max-width: 560px; }
+.ui-fork-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 4px 0 14px;
+}
+/* Layout only — the tint comes from data-group="system" on the modal
+   (css/01-buttons.css), never from here. */
+.ui-fork-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    text-align: left;
+    padding: 14px 14px 16px;
+    min-height: 118px;
+}
+.ui-fork-card-title { font-size: 15px; font-weight: 600; }
+.ui-fork-card-desc { font-size: 12px; line-height: 1.45; opacity: 0.75; }
+.ui-fork-card:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+.ui-fork-foot { font-size: 11px; opacity: 0.5; }
+@media (max-width: 600px) {
+    .ui-fork-cards { grid-template-columns: 1fr; }
+}
+
+/* ── Effect preview card (js/20-mixer-layout.js fxTipShow) ──
+   Opens to the left of an effect row, over the canvas. pointer-events:none —
+   it is a tooltip, the row underneath keeps the mouse. 10030: above the
+   sidebar/strip/underbar and the body-mounted strip popups, below modals. */
+.fx-tip {
+    position: fixed;
+    z-index: 10030;
+    width: 336px;
+    padding: 8px 8px 9px;
+    background: linear-gradient(180deg, #1a1f2a, #0f141b);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+    color: #e6edf3;
+    pointer-events: none;
+    display: none;
+}
+.fx-tip.show { display: block; }
+.fx-tip-media {
+    width: 100%;
+    aspect-ratio: 320 / 164;   /* the baked loops' frame (assets/effects), uncropped */
+    background: #05070a;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.fx-tip-media img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.fx-tip-media.is-empty img { display: none; }
+.fx-tip-media.is-empty::after { content: 'preview coming'; font-size: 10px; letter-spacing: 0.4px; opacity: 0.4; }
+.fx-tip-title { font-size: 12px; font-weight: 600; margin: 8px 0 3px; }
+.fx-tip-text { font-size: 11px; line-height: 1.45; opacity: 0.8; }
+
+/* ================================================================
+   RECIPES — "How do I…" (js/44-recipes.js)
+   .delete-modal chrome. 10042: above the fork (10040) so the two never
+   fight, below app-close (10050) and appConfirm (10060), which a demo may
+   raise on top. The guide layer is body-mounted and NOT zoomed, so raw
+   getBoundingClientRect() values place it; the pill is zoomed like every
+   floating panel (init-responsive.css).
+   ================================================================ */
+.recipe-modal { z-index: 10042; }
+.recipe-modal .delete-modal-content.recipe-content {
+    max-width: 760px;
+    width: 92%;
+    max-height: min(82vh, calc(100dvh - 40px));
+    display: flex;
+    flex-direction: column;
+    padding: 14px 16px 12px;
+}
+.recipe-head { display: flex; align-items: center; gap: 8px; }
+.recipe-slash {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--ink-500);
+    width: 14px;
+    text-align: center;
+}
+#recipeSearch {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    background: var(--ground-600);
+    border: 1px solid var(--ground-500);
+    border-radius: 6px;
+    color: var(--ink-100);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+}
+#recipeSearch:focus { border-color: rgba(255, 255, 255, 0.35); }
+#recipeSearch::-webkit-search-cancel-button { filter: invert(1); opacity: 0.6; }
+.recipe-count { font-size: 11px; color: var(--ink-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.recipe-close { width: 28px; height: 28px; font-size: 13px; }
+
+.recipe-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 8px; }
+.recipe-tags .recipe-tag { height: 22px; min-width: 0; padding: 0 9px; border-radius: 11px; }
+
+.recipe-body {
+    display: grid;
+    grid-template-columns: minmax(220px, 300px) 1fr;
+    gap: 12px;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+.recipe-results {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    height: min(52vh, 520px);
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.recipe-group {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--ink-500);
+    margin: 8px 0 2px 4px;
+}
+.recipe-group:first-child { margin-top: 0; }
+.recipe-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    padding: 7px 8px;
+    font-size: 12.5px;
+}
+.recipe-row-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recipe-row .hk-cap, .recipe-detail .hk-cap, .recipe-pill .hk-cap, #recipePill .hk-cap {
+    display: inline-block;
+    min-width: 22px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font: 600 10.5px/16px var(--font-ui);
+    text-align: center;
+    background: var(--ground-600);
+    border: 1px solid var(--ground-500);
+    color: var(--ink-300);
+    white-space: nowrap;
+}
+.recipe-detail {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 2px 4px 4px;
+}
+.recipe-empty { color: var(--ink-500); font-size: 12.5px; padding: 12px 4px; }
+.recipe-detail-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.recipe-detail-answer { font-size: 13px; line-height: 1.5; color: var(--ink-300); }
+.recipe-detail-key { margin-top: 10px; }
+.recipe-detail-where { margin-top: 8px; font-size: 11px; color: var(--ink-500); }
+.recipe-detail-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+.recipe-foot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 11px;
+    color: var(--ink-500);
+}
+.recipe-foot-title { font-weight: 600; color: var(--ink-300); }
+.recipe-foot-keys { flex: 1 1 auto; }
+
+@media (max-width: 640px) {
+    .recipe-body { grid-template-columns: 1fr; }
+    .recipe-results { max-height: 34vh; }
+    .recipe-row .hk-cap { display: none; }
+    .recipe-foot-keys { display: none; }
+}
+
+/* ── The pill: the modal folded down while it points ── */
+#recipePill {
+    position: fixed;
+    left: 50%;
+    bottom: 72px;
+    transform: translateX(-50%);
+    z-index: 10036;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    max-width: min(92vw, 720px);
+    padding: 8px 10px 8px 14px;
+    background: linear-gradient(180deg, #1a1f2a, #0f141b);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+    color: #e6edf3;
+}
+#recipePill.show { display: flex; }
+.recipe-pill-text { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
+.recipe-pill-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recipe-pill-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.recipe-pill-close { width: 24px; height: 24px; font-size: 12px; }
+
+/* ── The guide: pointer glyph + ring. No zoom, no layout, transform only. ── */
+#recipeGuide { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 10035; display: none; }
+#recipeGuide.show { display: block; }
+#recipeGuide .recipe-ring {
+    position: fixed;
+    left: 0; top: 0;
+    border: 2px solid #ffffff;
+    border-radius: 6px;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 0 18px rgba(255, 255, 255, 0.35);
+    will-change: transform;
+}
+#recipeGuide .recipe-pointer {
+    position: fixed;
+    left: 0; top: 0;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+    will-change: transform;
+}
+#recipeGuide.glide .recipe-pointer { transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1); }
+#recipeGuide.glide .recipe-ring { transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.55s, height 0.55s; }
+/* Finite: three pulses, opacity only, then still (Electron compositor rule). */
+#recipeGuide .recipe-ring.pulse { animation: recipeRingPulse 0.7s ease-out 3; }
+@keyframes recipeRingPulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.35; }
+    100% { opacity: 1; }
+}
+
+/* ── Tours: the pill as a stepper (js/44-recipes.js steps) ── */
+.recipe-pill-text { flex-direction: column; align-items: flex-start; gap: 3px; }
+.recipe-pill-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#recipePill.tour .recipe-pill-title { white-space: normal; line-height: 1.35; }
+.recipe-pill-step {
+    flex: none;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    line-height: 16px;
+    padding: 0 6px;
+    border-radius: 8px;
+    color: #0b0e14;
+    background: #e6edf3;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.recipe-pill-step.done { background: #7ee787; }
+/* The cap and the note are toggled with the hidden attribute; the shared
+   .hk-cap display rule must not win over it. */
+#recipePill [hidden] { display: none !important; }
+.recipe-pill-note { font-size: 11px; line-height: 1.35; color: var(--ink-500); }
+.recipe-pill-note button { margin-left: 6px; height: 20px; padding: 0 8px; font-size: 11px; vertical-align: middle; }
+.recipe-detail .recipe-steps { margin: 10px 0 0; padding-left: 20px; font-size: 12.5px; line-height: 1.45; color: var(--ink-300); }
+.recipe-detail .recipe-steps li { margin: 3px 0; }
+.recipe-detail .recipe-steps li::marker { color: var(--ink-500); }
+.recipe-detail .recipe-steps .hk-cap { margin-left: 2px; }
+/* The canvas as a target: no ring around a 1000px rectangle, just the
+   pointer in the middle. */
+#recipeGuide.wide .recipe-ring { display: none; }
+
+/* ── Breathing effect guide (js/45-breathing.js) ──
+   Ring drawn at its largest and scaled per frame — transform only, no
+   layout — over the canvas, under the UI. The cue word sits below it. */
+#breathCue {
+    position: fixed;
+    left: 0; top: 0;
+    display: none;
+    pointer-events: none;
+    z-index: 1150;
+    font: 500 15px/1.2 var(--font-ui);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.72);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+    will-change: transform;
+}
+#breathCue.show { display: block; }

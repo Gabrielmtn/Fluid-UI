@@ -356,8 +356,6 @@
 
             SHARPNESS: 0.8,           // Adaptive sharpness (0.0 = off, 1.0 = moderate, 2.0 = aggressive)
 
-            CLARITY: 0,               // Local contrast enhancement (0 = off, 1.0 = max)
-
             VIBRANCE: 0,              // Selective saturation boost (0 = off, 1.0 = max)
 
             DYE_RESOLUTION: 2048,     // Ultra (2K) by default on desktop — the highest real-time tier.
@@ -662,6 +660,24 @@
                                       // projection's tangential slip fully shows). Console-
                                       // tunable for feel testing; no UI slider yet.
 
+            OBS_VEL_COVERAGE_BLOCK: true, // Brush VELOCITY is blocked by wall coverage,
+                                      // the same rule dye adopted 2026-08-16. The old s³
+                                      // curve injected (1-s³) of every dab's velocity
+                                      // INSIDE the wall (66% at strength 0.7), and that
+                                      // in-wall reservoir pumped dye radially out of any
+                                      // painted-on collider — the "dye producer" push
+                                      // (measured 2026-08-31: steady outward flux under a
+                                      // neutral scribble; escape-band dye still growing
+                                      // +56% a second after the stroke stopped). Flow
+                                      // THROUGH leaky walls (advection + projection) is
+                                      // untouched. false = legacy s³ injection leak.
+
+            OBS_DIV_MASK: true,       // Cut-cell divergence RHS: a mostly-solid cell's
+                                      // mass source scales by its fluid fraction, so
+                                      // pressure cannot integrate inside sealed walls
+                                      // (the sealed-pocket fp16 wind-up class — see
+                                      // divergenceFrag). false = legacy unmasked RHS.
+
             BRUSH_STABILIZER: 0,      // D1 stroke stabilizer (weighted lag): 0 = raw input,
                                       // 1 = heavy Krita-style smoothing. Brush section slider.
 
@@ -952,10 +968,6 @@
             TIME_FADER_HOLD_A: 0.70,      // same idea for Time: everything below 1× gets
             TIME_FADER_HOLD_B: 0.76,      // 70% of the travel instead of the ~15% a linear
                                           // 0.01–3 scale gave it, with a detent on 1×.
-
-            SWIRL: 0,                 // Curl-noise micro-swirl in dye advection (0 = off).
-                                      // Painterly sub-grid wisps on moving paint; dies with
-                                      // motion so settled artwork stays bit-stable
 
             WET_INFLUENCE: 0,         // P15-1 wetness→mobility coupling (0 = feature off,
                                       // bit-identical to no wetness). 1 = bone-dry paint

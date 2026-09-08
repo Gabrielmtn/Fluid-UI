@@ -113,7 +113,7 @@ images with a line of context under each.
   |---|---|
   | 2 / 8 painters | `PUBLIC_CAP = 2`, `PRIVATE_CAP = 8` — `party/shared.ts:7` |
   | 30 sec – 5 min turns | `#turnTimerSel` options — `index.html:1040` |
-  | 3 paint materials | `#materialMode`: Fluid · Paint-Wet · Paint-Thick — `index.html:589` |
+  | 3 paint materials | `#materialMode`: Swirl · Gloss Paint (Wetness) · Gloss Paint (Thickness) — `index.html:651` |
   | 5 brush tips | gaussian · blob · chisel · streak · ring — `js/04a-canvas-gl-config.js:743` |
   | 8 arms | `multiplier` hard max 8 — `js/01a-param-registry.js:63` |
   | 5 symmetry modes | `#symmetryMode` — `index.html:699` |
@@ -194,7 +194,7 @@ with another person for a few minutes.
 [list]
 [*][b]Pushing real fluid around.[/b] A GPU simulation with vorticity, pressure and dye transport. Colour keeps moving after you lift the brush.
 [*][b]Choosing what the paint is made of.[/b] Loose fluid, wet paint that dries, or thick paint that piles up and holds a ridge.
-[*][b]Dialling the physics in.[/b] Viscosity, swirl, wetness and dry time, ridges, micro detail — or just tap Silky, Thick, Wispy, Chaotic, Ethereal, Turbulent, Marble, Electric.
+[*][b]Dialling the physics in.[/b] Viscosity, wetness and dry time, ridges — or just tap Silky, Thick, Wispy, Chaotic, Ethereal, Turbulent, Marble, Electric.
 [/list]
 
 [img]{STEAM_APP_IMAGE}/extras/about-02-materials.png[/img]
@@ -239,7 +239,7 @@ with another person for a few minutes.
 [b]Light[/b]
 [list]
 [*][b]Drawing a path through colours[/b] and letting the light shift along it as the paint moves.
-[*][b]Moving the light around.[/b] A light source you place, glow, clarity, vibrance.
+[*][b]Moving the light around.[/b] A light source you place, glow, vibrance.
 [/list]
 
 [img]{STEAM_APP_IMAGE}/extras/about-10-lightshift.png[/img]
