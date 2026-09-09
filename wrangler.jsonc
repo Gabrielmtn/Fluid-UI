@@ -1,0 +1,42 @@
+// Cloudflare deploy of the web app + multiplayer relay, on OUR account
+// (swirltogether.com). Replaces the hosted-PartyKit `partykit deploy` path,
+// which cannot create Durable Objects on new Cloudflare accounts any more
+// (its backend still requests key-value-backed namespaces; only SQLite-backed
+// ones are allowed now). The relay classes in party/index.ts + party/lobby.ts
+// are unchanged; party/worker.ts adapts them onto partyserver.
+//
+//   npm run deploy:cf   -> build public/ then `wrangler deploy`
+//   npm run party:cf    -> local relay + static bundle on http://localhost:8787
+//
+// Auth: CLOUDFLARE_API_TOKEN in the shell (or `npx wrangler login`).
+// Secret: `npx wrangler secret put INTERNAL_SECRET` once per account.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fluid-ui-multiplayer",
+  "main": "party/worker.ts",
+  "compatibility_date": "2025-10-25",
+  "account_id": "6792f2d13efef6bc9b7c499a14787f90",
+
+  // Static web bundle. Asset requests are served by the platform (free,
+  // edge-cached, honour public/_headers) and never invoke the Worker; only
+  // the relay paths run worker code.
+  "assets": {
+    "directory": "./public",
+    "run_worker_first": ["/parties/*"]
+  },
+
+  // Binding names double as the URL party names: /parties/fluid/<room> and
+  // /parties/lobby/main (routePartykitRequest matches the segment against
+  // the binding name), so the browser client is untouched.
+  "durable_objects": {
+    "bindings": [
+      { "name": "fluid", "class_name": "FluidRoom" },
+      { "name": "lobby", "class_name": "LobbyRoom" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FluidRoom", "LobbyRoom"] }],
+
+  "routes": [{ "pattern": "swirltogether.com", "custom_domain": true }],
+
+  "observability": { "enabled": true }
+}

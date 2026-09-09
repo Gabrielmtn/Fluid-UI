@@ -72,9 +72,14 @@ const PARTYKIT_HOST = (function() {
         const o = localStorage.getItem('fluidMultiplayerHost');
         if (o && /^[\w.-]+(:\d+)?$/.test(o.trim())) return o.trim();
     } catch (_) {}
+    // The web build is served from the same origin as its relay (partykit.json
+    // "serve"), whether that origin is the hosted partykit.dev name or our own
+    // domain on our own Cloudflare account. Any real (non-local, non-file)
+    // origin is therefore its own relay. Only the desktop app, which loads
+    // from file://, needs the hard-coded fallback.
     const host = window.location.host;
-    if (/\.partykit\.dev$/.test(host)) return host;
-    return 'fluid-ui-multiplayer.gabrielmtn.partykit.dev';
+    if (host && !isPlainWsHost(host) && /^https?:$/.test(window.location.protocol)) return host;
+    return 'swirltogether.com';
 })();
 
 // ws:// for local/LAN dev relays (no TLS there); wss:// for real deploys.

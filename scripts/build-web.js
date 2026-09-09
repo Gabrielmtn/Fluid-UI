@@ -82,8 +82,9 @@ if (fs.existsSync(icoSrc)) {
 // especially iOS Safari, which caches JS/CSS very aggressively — fetch fresh assets
 // after a deploy instead of running stale code. This rewrites <script src>, <link
 // href>, AND the inline async-loader array strings (the shader files 04a..06 load
-// from that array, not from <script src>). The HTML itself is served no-cache (see
-// partykit.json "serve" TTLs) so this new ?v= is always seen.
+// from that array, not from <script src>). The HTML itself is served no-cache (the
+// _headers file below on Cloudflare; partykit.json "serve" TTLs on hosted PartyKit)
+// so this new ?v= is always seen.
 const buildId = Date.now().toString(36);
 const htmlPath = path.join(OUT, "index.html");
 let html = fs.readFileSync(htmlPath, "utf8");
@@ -93,5 +94,24 @@ fs.writeFileSync(htmlPath, html);
 const busted = (before.match(/(["'])(?:js|css)\/[^"'?]+\.(?:js|css)\1/g) || []).length;
 console.log(`  cache-busted ${busted} js/css URLs with ?v=${buildId}`);
 
+// Cache policy for the Cloudflare Workers Static Assets deploy (wrangler.jsonc).
+// The platform honours this file per path, which hosted PartyKit's single
+// global TTL could not: the HTML is always revalidated so a deploy is seen at
+// once, while js/css can be immutable because every deploy stamps a fresh ?v=
+// and browsers key their cache on the full URL. assets/ (effect previews,
+// icons) is unversioned, so it gets a day.
+fs.writeFileSync(
+  path.join(OUT, "_headers"),
+  [
+    "/", "  Cache-Control: no-cache",
+    "/index.html", "  Cache-Control: no-cache",
+    "/js/*", "  Cache-Control: public, max-age=31536000, immutable",
+    "/css/*", "  Cache-Control: public, max-age=31536000, immutable",
+    "/assets/*", "  Cache-Control: public, max-age=86400",
+    "",
+  ].join("\n")
+);
+console.log("  + _headers (per-path cache policy for the Cloudflare deploy)");
+
 console.log(`\nWeb bundle ready at public/ (${files} top-level entries copied).`);
-console.log("Deploy with:  npx partykit deploy   (serves public/ + the relay from one URL)");
+console.log("Deploy with:  npm run deploy:cf   (wrangler -> swirltogether.com)  or  npx partykit deploy (hosted)");

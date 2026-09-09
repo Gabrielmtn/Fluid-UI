@@ -82,3 +82,58 @@ and set it live on a branch (e.g. `default`). To push straight to a branch, set
 - **App icon** — ✅ DONE: `build/icon.ico` (multi-res, wired via `build.win.icon`), `assets/icon.png` (window icon + web favicon), `build/icon-master-1024.png` (master for Steam capsule art).
 - **Code signing** — unsigned Windows builds trigger SmartScreen for direct downloads (Steam's own launch path bypasses SmartScreen; signing still helps against AV false positives — see the Steam plan, decision D8: Azure Trusted Signing).
 - **Mac / Linux** — the Mac build needs a real Mac or a macOS CI runner (can't be produced on Windows); add a GitHub Actions workflow when you want those channels.
+
+## Web launch: traffic headroom (measured 2026-09-09)
+
+The web build and the multiplayer relay both live on hosted PartyKit
+(Cloudflare Workers + Durable Objects) at
+`fluid-ui-multiplayer.gabrielmtn.partykit.dev`. Nothing else is in the request
+path; SAM weights come from Hugging Face only when that feature is opened.
+
+- Boot payload: 61 files, ~620 KB compressed JS+CSS plus a ~108 KB HTML page.
+  The 12 MB transformers vendor bundle and the effect preview GIFs are lazy.
+- No socket opens on page load. The lobby / room sockets connect only when a
+  visitor clicks into Swirl Together.
+- Lobby (one Durable Object, `/parties/lobby/main`): 120 seekers fired at once
+  from one machine paired in <1 s, matchmake->matched p50 ~130-180 ms, zero
+  errors. Cloudflare's soft ceiling per object is ~1,000 req/s.
+- Play rooms are one Durable Object each (2 or 8 people), so room load never
+  concentrates anywhere.
+- Static: 300 concurrent page fetches -> 300x HTTP 200. Warm single fetch of the
+  biggest chunk ~120 ms.
+
+Cache TTLs in `partykit.json` are SECONDS (the PartyKit docs example is
+misleading): `browserTTL: 300`, `edgeTTL: 3600`. JS/CSS are safe to cache
+because build-web stamps a fresh `?v=` per deploy. The cost is that a returning
+visitor can hold a stale `index.html` for up to 5 minutes after a deploy.
+
+The one unknown is the hosted PartyKit fair-use ceiling: that deploy runs in
+PartyKit's Cloudflare account, with no dashboard or plan on our side. The fix
+is our own Cloudflare account, and hosted PartyKit's own `deploy --domain`
+CANNOT do it any more (its backend still creates key-value-backed Durable
+Objects, which new Cloudflare accounts refuse). So the swirltogether.com deploy
+goes through Wrangler + partyserver instead:
+
+- `wrangler.jsonc` is the deploy config (account id, SQLite Durable Objects,
+  custom domain, static assets from `public/` with `public/_headers` for the
+  per-path cache policy that build-web writes).
+- `party/worker.ts` adapts the UNCHANGED relay classes onto partyserver; the
+  URL scheme is preserved, so the browser client and shipped desktop builds
+  need nothing.
+- Workers Paid ($5/mo) covers Durable Objects; static asset requests are free.
+
+```bash
+npx wrangler secret put INTERNAL_SECRET     # once per account, before the first deploy
+$env:CLOUDFLARE_API_TOKEN='<token>'; npm run deploy:cf   # build public/ + wrangler deploy
+npm run party:cf                            # local relay + bundle on http://localhost:8787
+```
+
+Token shape (My Profile > API Tokens): Account Workers Scripts:Edit, Account
+Settings:Read; Zone (swirltogether.com only) Workers Routes:Edit, DNS:Edit;
+User Details:Read, Memberships:Read. Give it a TTL.
+
+Client host selection: `PARTYKIT_HOST` in `js/06-multiplayer.js` uses the
+page's own origin for any real web host (partykit.dev or swirltogether.com)
+and falls back to swirltogether.com for the desktop app; already-shipped
+desktop builds can be migrated without a patch via
+`localStorage.fluidMultiplayerHost = 'swirltogether.com'`.

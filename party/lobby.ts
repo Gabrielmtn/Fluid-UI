@@ -77,6 +77,16 @@ export default class LobbyServer implements Party.Server {
       return;
     }
     this.lastSeen.set(uid, now);
+    // The alarm prunes this map, but the alarm is only armed while someone is
+    // waiting. A traffic spike of instantly-paired seekers never arms it, so
+    // the map would grow one entry per unique visitor for the life of the
+    // instance. Prune inline once it gets big; the throttle window is 3s, so
+    // anything older than WAIT_TTL_MS is long dead.
+    if (this.lastSeen.size > 2000) {
+      for (const [k, ts] of this.lastSeen) {
+        if (now - ts > WAIT_TTL_MS) this.lastSeen.delete(k);
+      }
+    }
 
     // A waiter's keep-alive names the pub- room it is already sitting in, so a
     // lost pointer (TTL expiry, restart, vacate race, dev-relay state loss) is

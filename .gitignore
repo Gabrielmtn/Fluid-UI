@@ -60,3 +60,5 @@ scripts/copy-sink/runtime.json
 
 # Headless bake run log (scripts/bake-headless.js)
 scripts/bake-headless.log
+.wrangler/
+.dev.vars
