@@ -245,8 +245,40 @@ class DepthEstimator {
     // Collision state
     var collisionEnabled = false;
     var obstacleCanvas = null;   // offscreen canvas for rasterizing masks
-    var _obsBlurCanvas = null, _obsBlurCtx = null; // sim-scale edge smoothing (D0.5 rev 3)
     var _shapeTintCanvas = null, _shapeTintCtx = null; // strength-tint scratch (per-texel strength G channel)
+
+    // ── Collider MODE + strength → obstacle canvas bytes ──────────────
+    // The obstacle canvas is RGBA and every CPU-side writer (depth masks,
+    // shape colliders, the text walls, Breathing's rings, harness probes)
+    // draws its coverage with THESE non-premultiplied colour bytes; the
+    // upload in 05c premultiplies them by alpha (= coverage·strength) into
+    // the channel contract 05b obsTexelGLSL decodes:
+    //   R = 255 for a wall (Block / Deflect), 0 for Slow
+    //   G = sqrt(strength)·255 (all modes; sqrt so a weak wall's premultiplied
+    //       byte stays above the 8-bit floor — 05b obsTexStrength squares it back)
+    //   B = 255 for Block (no-slip apron), 0 for Deflect (free slip)
+    // 'lighter' compositing keeps them coverage-weighted where colliders
+    // overlap. Draw with ctx.globalAlpha = strength (× the shape's own
+    // alpha) so alpha carries coverage·strength exactly as before.
+    var COLLIDER_MODES = ['block', 'deflect', 'slow'];
+    function normalizeMode(mode) {
+        return COLLIDER_MODES.indexOf(mode) >= 0 ? mode : 'block';
+    }
+    function wallBytes(mode, strength) {
+        mode = normalizeMode(mode);
+        var s = Math.max(0, Math.min(1, typeof strength === 'number' ? strength : 0.7));
+        return {
+            r: mode === 'slow' ? 0 : 255,
+            g: Math.round(Math.sqrt(s) * 255),
+            b: mode === 'block' ? 255 : 0,
+            strength: s,
+            mode: mode
+        };
+    }
+    function wallStyle(mode, strength) {
+        var w = wallBytes(mode, strength);
+        return 'rgb(' + w.r + ',' + w.g + ',' + w.b + ')';
+    }
     // Long-side cap for collision maps built from layer content (threshold /
     // shapes / full image). 1024 ≥ the 2×sim obstacle compose canvas, so the
     // physics loses nothing — but the visible mask preview now upscales ~2×
@@ -318,6 +350,13 @@ class DepthEstimator {
             return { data: s.depthData, width: s.depthWidth, height: s.depthHeight,
                      threshold: s.threshold, invert: !!s.invert };
         },
+
+        // Mode vocabulary + the fillStyle a procedural source must draw its
+        // coverage with so the wall carries its mode and strength (see
+        // wallBytes above). Draw with globalAlpha = strength as well.
+        MODES: COLLIDER_MODES,
+        wallStyle: wallStyle,
+        wallBytes: wallBytes,
 
         // Install/remove a procedural obstacle source (draw(ctx, simW, simH)).
         // Pass null to remove; collision auto-disables if no layer obstacles
@@ -1306,12 +1345,12 @@ class DepthEstimator {
         var cx = obsW * 0.5, cy = obsH * 0.5;
         var strength = (layer.collisionStrength !== undefined) ? layer.collisionStrength : 0.7;
 
-        // Per-texel strength: the obstacle's G channel must carry THIS
-        // layer's strength (the upload premultiplies green by alpha →
-        // cov·strength²). The memoed coverage canvas is white, so tint its
-        // green to strength·255 through a scratch canvas at draw time —
-        // the memo itself stays strength-independent (a strength-slider
-        // drag re-tints without re-rasterizing the shapes).
+        // Per-texel strength + mode: the obstacle's colour bytes must carry
+        // THIS layer's strength and mode (wallBytes; the upload premultiplies
+        // them by alpha). The memoed coverage canvas is white, so tint it
+        // through a scratch canvas at draw time — the memo itself stays
+        // strength/mode-independent (a slider drag re-tints without
+        // re-rasterizing the shapes).
         if (!_shapeTintCanvas || _shapeTintCanvas.width !== cov.width || _shapeTintCanvas.height !== cov.height) {
             _shapeTintCanvas = document.createElement('canvas');
             _shapeTintCanvas.width = cov.width;
@@ -1321,7 +1360,7 @@ class DepthEstimator {
         var tctx = _shapeTintCtx;
         tctx.globalCompositeOperation = 'source-over';
         tctx.clearRect(0, 0, cov.width, cov.height);
-        tctx.fillStyle = 'rgb(255,' + Math.round(Math.max(0, Math.min(1, strength)) * 255) + ',255)';
+        tctx.fillStyle = wallStyle(layer.collisionMode, strength);
         tctx.fillRect(0, 0, cov.width, cov.height);
         tctx.globalCompositeOperation = 'destination-in';
         tctx.drawImage(cov, 0, 0);
@@ -1393,7 +1432,8 @@ class DepthEstimator {
                     rotation: (layer.rotation || 0) * Math.PI / 180,
                     skewTanX: sk.tx, skewTanY: sk.ty,
                     aspect: gpuCssW / gpuCssH,
-                    strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
+                    strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7,
+                    mode: normalizeMode(layer.collisionMode)
                 });
             });
             // D0.5 edge quality on the GPU path too: without this the single
@@ -1406,14 +1446,17 @@ class DepthEstimator {
         }
 
         // D0.5 edge quality: compose the obstacle at 2x sim resolution — the
-        // existing drawImage in updateObstacleTexture box-filters it back
+        // bilinear resample in updateObstacleTexture box-filters it back
         // down to sim res, turning stair-steps into fractional coverage the
         // cut-cell projection already consumes correctly (solidity is a
         // smoothstep over fractions; the MG pyramid restricts fractions).
-        // Capped so the compose canvas never exceeds 2048 on a side.
-        var ss = (simW * 2 <= 2048 && simH * 2 <= 2048) ? 2 : 1;
-        var obsW = simW * ss;
-        var obsH = simH * ss;
+        // Capped at 2048 on a side (2026-09-09: a hard cap, not just "2x or
+        // 1x" — at 3072/4096 physics the canvas work, not the GPU, is what
+        // made every recomposite a half-second stall; the upload pass
+        // magnifies the capped canvas instead).
+        var ss = Math.min(2, 2048 / Math.max(simW, simH));
+        var obsW = Math.max(1, Math.round(simW * ss));
+        var obsH = Math.max(1, Math.round(simH * ss));
 
         // Reuse obstacle canvas
         if (!obstacleCanvas || obstacleCanvas.width !== obsW || obstacleCanvas.height !== obsH) {
@@ -1454,7 +1497,8 @@ class DepthEstimator {
                 var d = _shapeImgData.data;
                 var threshold = shape.threshold || 128;
                 var invert = !!shape.invert;
-                var alphaVal = Math.round((layer.collisionStrength !== undefined ? layer.collisionStrength : 0.7) * 255);
+                var wb = wallBytes(layer.collisionMode, layer.collisionStrength);
+                var alphaVal = Math.round(wb.strength * 255);
 
                 // D0.5 edge quality, rev 2 (2026-07-14): fwidth-style ADAPTIVE
                 // soft cut. The band scales with the LOCAL depth gradient, so
@@ -1487,12 +1531,13 @@ class DepthEstimator {
                     var cov = t * t * (3 - 2 * t);
                     if (invert) cov = 1 - cov;
                     var idx = i << 2; // *4 via shift
-                    d[idx] = 255;
-                    // G byte = this layer's strength (non-premultiplied);
-                    // the upload premultiplies by alpha → G = cov·strength²,
-                    // the per-texel strength channel (05b obsTexelGLSL).
-                    d[idx + 1] = alphaVal;
-                    d[idx + 2] = 255;
+                    // Colour bytes = this layer's mode + strength, NON-
+                    // premultiplied (wallBytes); the upload premultiplies
+                    // by alpha into the per-texel channels (05b
+                    // obsTexelGLSL). Alpha = coverage·strength as ever.
+                    d[idx] = wb.r;
+                    d[idx + 1] = wb.g;
+                    d[idx + 2] = wb.b;
                     d[idx + 3] = (cov * alphaVal + 0.5) | 0;
                 }
 
@@ -1553,52 +1598,16 @@ class DepthEstimator {
         }
 
         window.__obsStrengthMax = strengthMax > 0 ? strengthMax : 0.7;
-        // Coverage saturation for the CPU path (2026-08-06): the GPU
-        // compositor knees its box-filtered area coverage (05b round 3), but
-        // this path passed drawImage alpha straight through — fine while the
-        // depth data lands 1:1, but RESIZING the collider layer smears binary
-        // walls into mid-alpha during the downscale above, and those mids sit
-        // exactly in solidity()'s noisy 0.35–0.85 window: the patchy lattice
-        // returned on every resize. Same knee, same order as the GPU path
-        // (saturate BEFORE the ss-blur, so the blur still bounds edge ramps).
-        // Alpha here is coverage*strength; the shaders recover coverage as
-        // r/uObsMax, so normalize by strengthMax before the knee and rescale.
-        if (hasAny) {
-            var kneeA = (window.config && typeof window.config.COLLIDER_ALPHA_SOLID === 'number')
-                ? window.config.COLLIDER_ALPHA_SOLID : 0.45;
-            var sNorm = window.__obsStrengthMax;
-            var kImg = obstacleCtx.getImageData(0, 0, obsW, obsH);
-            var kd = kImg.data;
-            var lo = kneeA * 0.25, span = kneeA * 0.75;
-            for (var ki = 3, kn = kd.length; ki < kn; ki += 4) {
-                var kcov = kd[ki] / (255 * sNorm);
-                var kt = (kcov - lo) / span;
-                if (kt <= 0) { kd[ki] = 0; continue; }
-                if (kt > 1) kt = 1;
-                kd[ki] = Math.round(kt * kt * (3 - 2 * kt) * sNorm * 255);
-            }
-            obstacleCtx.putImageData(kImg, 0, 0);
-        }
+        // Coverage saturation (the COLLIDER_ALPHA_SOLID knee, 2026-08-06 —
+        // resized colliders smear binary walls into mid-alpha, which sits in
+        // solidity()'s noisy window) and the D0.5 rev-3 one-texel blur that
+        // bounds every edge ramp both happen on the GPU now, in
+        // updateObstacleTexture (05b obstacleUploadFrag + the blur pass).
+        // The knee normalizes by each pixel's OWN strength (the G byte every
+        // writer sets via wallBytes), not the scene max — the scene-max form
+        // deleted a weak wall outright next to a strength-1.0 text wall.
         if (hasAny && typeof window.updateObstacleTexture === 'function') {
-            // D0.5 rev 3: constant-width smoothing at SIM scale before upload.
-            // Bounds every coverage ramp to ~1.5 sim texels regardless of the
-            // depth map's local gradient: hard "coastlines" through flat
-            // near-threshold regions stop reading as ragged binary walls (the
-            // whole-canvas velocity fuzz the converged MG solve produced at
-            // high collisionStrength), while wide mushy aprons stay impossible
-            // (the blur radius, not the depth data, caps the ramp). GPU blur
-            // via canvas filter — no pixel loops.
-            if (!_obsBlurCanvas || _obsBlurCanvas.width !== obsW || _obsBlurCanvas.height !== obsH) {
-                _obsBlurCanvas = document.createElement('canvas');
-                _obsBlurCanvas.width = obsW;
-                _obsBlurCanvas.height = obsH;
-                _obsBlurCtx = _obsBlurCanvas.getContext('2d');
-            }
-            _obsBlurCtx.clearRect(0, 0, obsW, obsH);
-            _obsBlurCtx.filter = 'blur(' + (ss * 0.5) + 'px)';
-            _obsBlurCtx.drawImage(obstacleCanvas, 0, 0);
-            _obsBlurCtx.filter = 'none';
-            window.updateObstacleTexture(_obsBlurCanvas);
+            window.updateObstacleTexture(obstacleCanvas);
             if (gpuEntries.length && typeof window.compositeObstacleSource === 'function') {
                 var mixedWrap = document.getElementById('canvas-wrapper');
                 var mixedCssW = (mixedWrap && mixedWrap.clientWidth) || canvasEl.clientWidth || canvasEl.width || 1;
@@ -1614,7 +1623,8 @@ class DepthEstimator {
                         rotation: (layer.rotation || 0) * Math.PI / 180,
                         skewTanX: sk.tx, skewTanY: sk.ty,
                         aspect: mixedCssW / mixedCssH,
-                        strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7
+                        strength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7,
+                        mode: normalizeMode(layer.collisionMode)
                     });
                 });
             }

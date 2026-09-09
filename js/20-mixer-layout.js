@@ -1454,6 +1454,18 @@
         // move lands on disk as well as in localStorage.
         window.Settings.savePreset(presetName, s);
     }
+    // Re-shoot a saved preset's thumbnail from what is on screen right now,
+    // leaving its settings, group and timestamp alone (the list order stays
+    // put). Returns false when there is nothing to capture yet.
+    function presetUpdateThumb(presetName) {
+        if (!window.Settings || typeof window.presetThumbFromCanvas !== 'function') return false;
+        const s = window.Settings.loadPreset(presetName);
+        if (!s) return false;
+        const th = window.presetThumbFromCanvas();
+        if (!th) return false;
+        s.thumb = th;
+        return window.Settings.savePreset(presetName, s) !== false;
+    }
     function presetGroupDelete(name) {
         const g = presetGroupsState();
         g.order = g.order.filter(function (x) { return x !== name; });
@@ -1681,11 +1693,17 @@
                 more.type = 'button';
                 more.className = 'preset-more btn--icon';
                 more.textContent = '⋯';
-                more.title = 'Move, or delete';
+                more.title = 'Update thumbnail, move, or delete';
                 more.addEventListener('click', function (e) {
                     e.stopPropagation();
                     const cur = (presets[name] && presets[name].group) || '';
                     const items = [{ head: name }];
+                    items.push({ label: 'Update thumbnail', run: function () {
+                        if (presetUpdateThumb(name)) {
+                            if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
+                            else renderMixerUserPresets();
+                        }
+                    } });
                     presetGroupsState().order.forEach(function (g) {
                         if (g === cur) return;
                         items.push({ label: 'Move to ' + g, run: function () { presetSetGroup(name, g); renderMixerUserPresets(); } });
@@ -5384,9 +5402,33 @@
         var colliderHint = document.createElement('div');
         colliderHint.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.35);margin:-2px 0 8px 20px;line-height:1.35;';
         editor.appendChild(colliderHint);
+
+        // Mode + strength, the same two controls a collision layer has
+        // (05k), shown only while the text is a collider.
+        var colliderModeSel = selectInput('textOverlayColliderMode', [
+            ['block', 'Block'], ['deflect', 'Deflect'], ['slow', 'Slow']
+        ], 'Block: a wall the flow piles up against and paint goes around. ' +
+           'Deflect: a smooth wall the flow slides around. ' +
+           'Slow: no wall at all — fluid and paint enter and thicken, like syrup.',
+            function (v) { commit({ colliderMode: v }); });
+        var colliderStrengthSlider = slider('textOverlayColliderStrength', 'Wall Strength', 0, 1, 0.01,
+            function (v) { return Math.round(v * 100) + '%'; },
+            function (v) { commit({ colliderStrength: v }); });
+        colliderStrengthSlider.querySelector('label').title =
+            'Block / Deflect: how solid the wall is — low values leak flow and take some paint, 100% is rigid. ' +
+            'Slow: how thick the syrup is — from a faint drag to stopping dead.';
+        var colliderBox = document.createElement('div');
+        colliderBox.style.cssText = 'margin:0 0 8px 20px;';
+        var colliderModeRow = rowEl(6);
+        colliderModeRow.appendChild(field('Mode', colliderModeSel));
+        colliderBox.appendChild(colliderModeRow);
+        colliderBox.appendChild(colliderStrengthSlider);
+        editor.appendChild(colliderBox);
+
         function syncColliderHint() {
             var on = colliderRow.input.checked;
             colliderHint.style.display = on ? '' : 'none';
+            colliderBox.style.display = on ? '' : 'none';
             // The wall traces whatever is actually on screen, so say which.
             colliderHint.textContent = bgToggle.checked
                 ? 'The wall follows the background box.'
@@ -5461,6 +5503,8 @@
             radInput.value = String(ov.radius);
             shadowRow.input.checked = !!ov.shadow;
             colliderRow.input.checked = !!ov.collider;
+            colliderModeSel.value = ov.colliderMode || 'block';
+            colliderStrengthSlider.setValue(typeof ov.colliderStrength === 'number' ? ov.colliderStrength : 1);
             syncBgEnabled();
             syncColliderHint();
         }

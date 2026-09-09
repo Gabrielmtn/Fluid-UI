@@ -29,6 +29,7 @@
         const obstacleDampProg = new Program(baseVert, obstacleDampFrag);
         const obstacleCompositeProg = new Program(baseVert, obstacleCompositeFrag);
         const morphObstacleProg = new Program(baseVert, morphObstacleFrag); // collider gap fill (close)
+        const obstacleUploadProg = new Program(baseVert, obstacleUploadFrag); // CPU compose canvas → obstacle (knee + packing)
         const hfFloorProg = new Program(baseVert, hfFloorFrag); // M2 spectral floor
         const wetnessAdvectProg = new Program(baseVert, wetnessAdvectFrag); // P15-1 wetness advect+dry
         const wetSplatProg = new Program(baseVert, wetSplatFrag);           // P15-1 wetness deposit
@@ -261,17 +262,18 @@
             divergence = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             curl = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
             pressure = createDoubleFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.NEAREST);
-            // Obstacle texture for collision layers (sim resolution). RG
-            // (2026-08-31): R = Σcoverage·strength (historic channel,
-            // unchanged meaning), G = Σcoverage·strength² — the per-texel
-            // strength channel (05b obsTexelGLSL), so each collider is
-            // judged by its OWN strength instead of the scene max.
-            obstacle = createFBO(simTexWidth, simTexHeight, rg.internalFormat, rg.format, texType, gl.LINEAR);
-            obstacleScratch = createFBO(simTexWidth, simTexHeight, rg.internalFormat, rg.format, texType, gl.LINEAR);
+            // Obstacle texture for collision layers (sim resolution). RGBA
+            // (2026-09-09; RG since 2026-08-31): R = Σcoverage·strength
+            // (historic wall channel), G = Σcoverage·strength² (per-texel
+            // strength), B = Block/Deflect stick weight, A = the Slow drag
+            // channel — the channel contract is in 05b obsTexelGLSL.
+            obstacle = createFBO(simTexWidth, simTexHeight, rgba.internalFormat, rgba.format, texType, gl.LINEAR);
+            obstacleScratch = createFBO(simTexWidth, simTexHeight, rgba.internalFormat, rgba.format, texType, gl.LINEAR);
             // Multigrid pressure pyramid (halve until ~12 cells or 6 levels;
             // LINEAR filter — restriction box-samples and prolongation
-            // interpolates). R16F except the obstacle pyramid (RG16F, to
-            // carry the strength channel down the levels): whole pyramid
+            // interpolates). R16F except the obstacle pyramid (RGBA16F, to
+            // carry the strength + mode channels down the levels — the
+            // solidity decode needs R, G and A to agree): whole pyramid
             // still costs ~a third of one extra sim-res field per kind.
             mgRes0 = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, gl.LINEAR);
             mgLevels = [];
@@ -287,7 +289,7 @@
                         rhs: createFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR),
                         res: createFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR),
                         p: createDoubleFBO(mw, mh, r.internalFormat, r.format, texType, gl.LINEAR),
-                        obs: createFBO(mw, mh, rg.internalFormat, rg.format, texType, gl.LINEAR)
+                        obs: createFBO(mw, mh, rgba.internalFormat, rgba.format, texType, gl.LINEAR)
                     });
                 }
             })();
@@ -614,22 +616,35 @@
                 }
             }
         }
-        // Obstacle texture upload for collision layers
-        // Cached buffers to avoid per-frame allocations (GPU crash prevention)
-        var _obsTempCanvas = null, _obsTempCtx = null;
-        var _obsFloatBuf = null;     // cached Float32Array
-        var _obsZeroBuf = null;      // cached zeros for clear
-        var _obsLastW = 0, _obsLastH = 0;
-        function _obsEnsureBuffers(w, h) {
-            if (_obsLastW === w && _obsLastH === h && _obsTempCanvas) return;
-            _obsTempCanvas = document.createElement('canvas');
-            _obsTempCanvas.width = w;
-            _obsTempCanvas.height = h;
-            _obsTempCtx = _obsTempCanvas.getContext('2d', { willReadFrequently: true });
-            _obsFloatBuf = new Float32Array(w * h * 2);   // RG interleaved
-            _obsZeroBuf = new Float32Array(w * h * 2);    // stays zeroed
-            _obsLastW = w;
-            _obsLastH = h;
+        // Obstacle texture upload for collision layers: the CPU compositor's
+        // canvas goes up as a premultiplied RGBA8 texture and a shader does
+        // the resample + coverage knee + channel packing (obstacleUploadFrag)
+        // — no per-pixel JS loops at sim resolution any more.
+        var _obsSrcTex = null;
+        function _obsSourceTexture() {
+            if (_obsSrcTex) return _obsSrcTex;
+            _obsSrcTex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, _obsSrcTex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            return _obsSrcTex;
+        }
+        // The 1-sim-texel blur that bounds every edge ramp (D0.5 rev 3):
+        // H into scratch, V back into obstacle. Shared by both upload paths.
+        function _blurObstacle() {
+            gl.disable(gl.BLEND);
+            blurProg.bind();
+            gl.uniform1i(blurProg.uniforms.uTexture, 0);
+            gl.viewport(0, 0, obstacle.width, obstacle.height);
+            gl.uniform2f(blurProg.uniforms.texelSize, obstacle.texelSizeX, 0.0);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            blit(obstacleScratch.fbo);
+            gl.uniform2f(blurProg.uniforms.texelSize, 0.0, obstacle.texelSizeY);
+            gl.bindTexture(gl.TEXTURE_2D, obstacleScratch.texture);
+            blit(obstacle.fbo);
         }
         window.beginObstacleTexture = function () {
             if (!obstacle || gl.isContextLost()) return false;
@@ -662,6 +677,9 @@
             gl.uniform1f(obstacleCompositeProg.uniforms.uAspect, Number(opts.aspect) || 1);
             gl.uniform1f(obstacleCompositeProg.uniforms.strength,
                 Math.max(0, Math.min(1, Number(opts.strength) || 0)));
+            // Mode → the two channel weights (contract: 05b obsTexelGLSL).
+            gl.uniform1f(obstacleCompositeProg.uniforms.solid, opts.mode === 'slow' ? 0 : 1);
+            gl.uniform1f(obstacleCompositeProg.uniforms.stick, opts.mode === 'deflect' ? 0 : 1);
             gl.uniform1f(obstacleCompositeProg.uniforms.covKnee,
                 (typeof config !== 'undefined' && typeof config.COLLIDER_ALPHA_SOLID === 'number')
                     ? config.COLLIDER_ALPHA_SOLID : 0.45);
@@ -715,73 +733,42 @@
         // compositeObstacleSource of a rebuild.
         window.finishObstacleComposite = function () {
             if (!obstacle || !obstacleScratch || gl.isContextLost()) return;
-            gl.disable(gl.BLEND);
             closeObstacleGaps();
-            blurProg.bind();
-            gl.uniform1i(blurProg.uniforms.uTexture, 0);
-            gl.viewport(0, 0, obstacle.width, obstacle.height);
-            gl.uniform2f(blurProg.uniforms.texelSize, obstacle.texelSizeX, 0.0);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-            blit(obstacleScratch.fbo);
-            gl.uniform2f(blurProg.uniforms.texelSize, 0.0, obstacle.texelSizeY);
-            gl.bindTexture(gl.TEXTURE_2D, obstacleScratch.texture);
-            blit(obstacle.fbo);
+            _blurObstacle();
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         };
         window.updateObstacleTexture = function (sourceCanvas) {
-            if (!obstacle || gl.isContextLost()) return;
+            if (!obstacle || !obstacleScratch || gl.isContextLost()) return;
             try {
-                var w = obstacle.width;
-                var h = obstacle.height;
-                _obsEnsureBuffers(w, h);
-                _obsTempCtx.clearRect(0, 0, w, h);
-                _obsTempCtx.drawImage(sourceCanvas, 0, 0, w, h);
-                var imgData = _obsTempCtx.getImageData(0, 0, w, h);
-                var d = imgData.data;
-                var f = _obsFloatBuf;
-                // The obstacle canvas is composited in screen space (top-down);
-                // GL textures put row 0 at the bottom, so flip once here.
-                // R = alpha (coverage·strength, the historic channel).
-                // G = greenByte·alpha: the compositors draw each collider
-                // with green = its strength (non-premultiplied), so this
-                // premultiply lands G = coverage·strength² — the per-texel
-                // strength channel (05b obsTexelGLSL). Legacy/white content
-                // gives G = R, i.e. strength 1.0 — the safe default (text
-                // walls draw white on purpose).
-                for (var y = 0; y < h; y++) {
-                    var src = y * w;
-                    var dst = (h - 1 - y) * w;
-                    for (var x = 0; x < w; x++) {
-                        var si = (src + x) * 4;
-                        var a = d[si + 3] * (1 / 255);
-                        var di = (dst + x) * 2;
-                        f[di] = a;
-                        f[di + 1] = d[si + 1] * (1 / 255) * a;
-                    }
-                }
-                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-                gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RG, gl.FLOAT, f);
-                // Gap fill applies to the CPU-composited path too (depth-mask
-                // colliders from imported images are the main source of
-                // line-art texture pockets). Follow with the same 1-texel
-                // blur the GPU path gets so seal seams stay antialiased —
-                // gated on the close actually running, so COLLIDER_GAP_FILL 0
-                // keeps this path bit-identical to before.
-                if (closeObstacleGaps() > 0) {
-                    gl.disable(gl.BLEND);
-                    blurProg.bind();
-                    gl.uniform1i(blurProg.uniforms.uTexture, 0);
-                    gl.viewport(0, 0, w, h);
-                    gl.uniform2f(blurProg.uniforms.texelSize, obstacle.texelSizeX, 0.0);
-                    gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-                    blit(obstacleScratch.fbo);
-                    gl.uniform2f(blurProg.uniforms.texelSize, 0.0, obstacle.texelSizeY);
-                    gl.bindTexture(gl.TEXTURE_2D, obstacleScratch.texture);
-                    blit(obstacle.fbo);
-                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                }
+                // The compose canvas is screen space (top-down) and stores
+                // premultiplied colour, which is exactly the Σcov·S·(ratio)
+                // form the channel contract wants — so flip + premultiply on
+                // the way in and never touch a pixel on the CPU. Bilinear
+                // sampling in the upload pass box-filters a 2x canvas down
+                // (the D0.5 fractional-coverage edge) and smoothly magnifies
+                // a capped one at Extreme/Overkill physics.
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, _obsSourceTexture());
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+                gl.disable(gl.BLEND); // see compositeObstacleSource
+                obstacleUploadProg.bind();
+                gl.uniform1i(obstacleUploadProg.uniforms.uSource, 0);
+                gl.uniform1f(obstacleUploadProg.uniforms.covKnee,
+                    (typeof config !== 'undefined' && typeof config.COLLIDER_ALPHA_SOLID === 'number')
+                        ? config.COLLIDER_ALPHA_SOLID : 0.45);
+                gl.uniform1f(obstacleUploadProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                gl.viewport(0, 0, obstacle.width, obstacle.height);
+                blit(obstacle.fbo);
+                // Gap fill (opt-in, depth-mask line-art pockets), then the
+                // 1-texel blur that bounds every edge ramp — this used to be
+                // a canvas filter blur on the CPU side.
+                closeObstacleGaps();
+                _blurObstacle();
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             } catch (e) {
                 console.warn('⚠️ Obstacle texture upload failed:', e.message);
             }
@@ -789,11 +776,10 @@
         window.clearObstacleTexture = function () {
             if (!obstacle || gl.isContextLost()) return;
             try {
-                var w = obstacle.width;
-                var h = obstacle.height;
-                _obsEnsureBuffers(w, h);
-                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
-                gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RG, gl.FLOAT, _obsZeroBuf);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, obstacle.fbo);
+                gl.clearColor(0, 0, 0, 0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             } catch (e) {
                 console.warn('⚠️ Obstacle texture clear failed:', e.message);
             }

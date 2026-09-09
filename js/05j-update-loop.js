@@ -740,6 +740,8 @@
                     gl.uniform1f(ambientForceProg.uniforms.dt, dt);
                     gl.uniform1f(ambientForceProg.uniforms.uMaxDensity,
                         (typeof config.AMBIENT_FORCE_MAXDYE === 'number') ? config.AMBIENT_FORCE_MAXDYE : 1.6);
+                    gl.uniform1f(ambientForceProg.uniforms.uFloor,
+                        (typeof config.AMBIENT_FORCE_FLOOR === 'number') ? Math.max(0, Math.min(1, config.AMBIENT_FORCE_FLOOR)) : 0);
                     gl.uniform1f(ambientForceProg.uniforms.uCapSpd,
                         config.VEL_SOURCE_GATE === false ? 0.0 :
                         ((typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0));
@@ -888,8 +890,11 @@
                 if (window.collisionLayers && window.collisionLayers.enabled && obstacle) {
                     obstacleDampProg.bind();
                     gl.uniform1f(obstacleDampProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
-                    gl.uniform1f(obstacleDampProg.uniforms.wallSlip,
-                        (typeof config.WALL_SLIP === 'number') ? config.WALL_SLIP : 0.6);
+                    // Slip is per collider now (Block / Deflect, 05b damp
+                    // shader); dt drives the Slow mode's drag half-life.
+                    gl.uniform1f(obstacleDampProg.uniforms.dt, dt);
+                    gl.uniform1f(obstacleDampProg.uniforms.uHalo,
+                        (typeof config.OBS_BLOCK_HALO === 'number') ? Math.max(0, Math.min(1, config.OBS_BLOCK_HALO)) : 0.35);
                     gl.uniform2f(obstacleDampProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform1i(obstacleDampProg.uniforms.uVelocity, 0);
                     gl.uniform1i(obstacleDampProg.uniforms.uObstacle, 1);

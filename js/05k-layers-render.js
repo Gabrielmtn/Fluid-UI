@@ -323,9 +323,17 @@
                         ${layer.isCollision ? `
                         <div class="collision-controls" data-collision-layer="${layer.index}">
                             <div class="collision-row">
-                                <label class="collision-label">Strength</label>
+                                <label class="collision-label" title="What the fluid does when it meets this shape">Mode</label>
+                                <select class="collision-mode-select" title="Block: a wall the flow piles up against and paint goes around. Deflect: a smooth wall the flow slides around. Slow: no wall at all — fluid and paint enter and thicken, like syrup.">
+                                    <option value="block" ${(!layer.collisionMode || layer.collisionMode === 'block') ? 'selected' : ''}>Block</option>
+                                    <option value="deflect" ${layer.collisionMode === 'deflect' ? 'selected' : ''}>Deflect</option>
+                                    <option value="slow" ${layer.collisionMode === 'slow' ? 'selected' : ''}>Slow</option>
+                                </select>
+                            </div>
+                            <div class="collision-row">
+                                <label class="collision-label" title="Block / Deflect: how solid the wall is — low values leak flow and take some paint, 1 is rigid. Slow: how thick the syrup is — from a faint drag to stopping dead.">Strength</label>
                                 <div class="collision-slider-host" data-cs="${layer.index}"></div>
-                                <span class="collision-strength-val">${(layer.collisionStrength || 0.7).toFixed(1)}</span>
+                                <span class="collision-strength-val">${(layer.collisionStrength || 0.7).toFixed(2)}</span>
                             </div>
                             ${window.isPaintedColliderLayer && window.isPaintedColliderLayer(layer) ? '' : `
                             <div class="collision-row">
@@ -403,7 +411,7 @@
                             sSlider.addEventListener('input', () => {
                                 const v = parseInt(sSlider.value) / 100;
                                 layer.collisionStrength = v;
-                                if (strengthVal) strengthVal.textContent = v.toFixed(1);
+                                if (strengthVal) strengthVal.textContent = v.toFixed(2);
                                 scheduleObstacleUpdate(); // 7.6: debounced during drag
                             });
                             const dis = () => { isLayerSliderActive = true; if (headerEl) headerEl.draggable = false; };

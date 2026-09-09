@@ -655,10 +655,10 @@
                                       // pressure climb at strength 1.0). Console A/B:
                                       // false = legacy everywhere-confinement.
 
-            WALL_SLIP: 0.6,           // Collision feel: 0 = legacy sticky walls (damp pass
-                                      // kills a wide apron), 1 = interior-only damp (the
-                                      // projection's tangential slip fully shows). Console-
-                                      // tunable for feel testing; no UI slider yet.
+            WALL_SLIP: 0.6,           // RETIRED 2026-09-09 (kept so saved settings load):
+                                      // slip is now each collider's MODE — Block = 0
+                                      // (sticky apron), Deflect = 1 (interior-only damp)
+                                      // — see the damp shader in 05b. No longer read.
 
             OBS_VEL_COVERAGE_BLOCK: true, // Brush VELOCITY is blocked by wall coverage,
                                       // the same rule dye adopted 2026-08-16. The old s³
@@ -672,6 +672,11 @@
                                       // THROUGH leaky walls (advection + projection) is
                                       // untouched. false = legacy s³ injection leak.
 
+            OBS_BLOCK_HALO: 0.35,     // Block mode's no-slip boundary layer: per-frame
+                                      // momentum loss in a ~2-texel band outside a Block
+                                      // wall, scaled by the wall's strength response
+                                      // (05b obstacleDampFrag). 0 = off (Block then
+                                      // differs from Deflect only in the apron window).
             OBS_DIV_MASK: true,       // Cut-cell divergence RHS: a mostly-solid cell's
                                       // mass source scales by its fluid fraction, so
                                       // pressure cannot integrate inside sealed walls
@@ -855,6 +860,11 @@
                                       // seconds, with the low end of the pad still a slow
                                       // atmospheric drift. Above ~10 the field starts
                                       // outrunning the dye it is pushing.
+            AMBIENT_FORCE_FLOOR: 0.5, // Minimum share of the pull any visible paint gets
+                                      // (0 = legacy, purely density-proportional). With 0
+                                      // a sheet of dye spread thin over a collider hung
+                                      // there under gravity — the letter-top streaks and
+                                      // "burn" Gabriel reported 2026-09-09 (see ambientForceFrag).
             AMBIENT_FORCE_MAXDYE: 1.6,// Dye level treated as fully loaded, so a faint
                                       // wash falls slower than a saturated one.
             BRUSH_VELOCITY_ONLY: false, // Velocity-only brush ("Pressure"): the stroke runs the

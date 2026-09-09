@@ -159,7 +159,12 @@
         bgOpacity: 0.55,
         padding: 14,
         radius: 8,
-        collider: false        // letterforms become a fluid obstacle
+        collider: false,       // letterforms become a fluid obstacle
+        colliderMode: 'deflect', // block | deflect | slow (collisionLayers.MODES).
+                                 // Deflect by default: letters are smooth stones the
+                                 // fluid slides around; Block's sticky apron left dye
+                                 // hanging on the crowns of glyphs under gravity.
+        colliderStrength: 1    // 0..1, same scale as a collision layer's Strength
     };
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -764,7 +769,7 @@
     // Paints ONE overlay with the ctx already translated and rotated to its
     // centre. Shared by the capture composite and the collider rasteriser, so
     // a wall can never drift from the letterforms it is meant to trace.
-    //   collider -> flat white, no colour and no shadow: the obstacle pipeline
+    //   collider -> the wall fillStyle (collisionLayers.wallStyle), no colour and no shadow: the obstacle pipeline
     //   reads ALPHA as wall coverage, and a soft shadow would smear the wall
     //   into a halo well outside the glyph.
     function paintOverlay(ctx, ov, collider) {
@@ -817,7 +822,7 @@
         // they sit), but a box at ~zero opacity is not on screen and so must
         // not be a wall either — the letterforms still are.
         if (ov.bgEnabled && (!collider || ov.bgOpacity > 0.02)) {
-            ctx.fillStyle = collider ? '#ffffff' : hexToRgba(ov.bgColor, ov.bgOpacity);
+            ctx.fillStyle = collider ? collider : hexToRgba(ov.bgColor, ov.bgOpacity);
             roundRect(ctx, -boxW / 2, -boxH / 2, boxW, boxH, ov.radius || 0);
             ctx.fill();
         }
@@ -827,7 +832,7 @@
             ctx.shadowBlur = 4;
             ctx.shadowOffsetY = 1;
         }
-        ctx.fillStyle = collider ? '#ffffff' : ov.color;
+        ctx.fillStyle = collider ? collider : ov.color;
 
         var align = ov.align || 'center';
         for (var n = 0; n < lines.length; n++) {
@@ -859,10 +864,10 @@
     // antialiased glyph edges arrive as exactly the fractional coverage the
     // cut-cell projection already consumes.
     //
-    // FULL alpha, deliberately: alpha IS coverage here (the shaders recover it
-    // as alpha/uObsMax), and a mid-alpha wall lands inside solidity()'s noisy
-    // 0.35-0.85 window, which simulates as a porous sponge rather than as a
-    // letter. That is why there is no strength knob.
+    // Each overlay carries its own collider mode and strength (Text panel):
+    // the glyphs are drawn with collisionLayers.wallStyle() at globalAlpha =
+    // strength, exactly like a collision layer, and the per-texel strength
+    // channel means a 0.3 wall still reads as a crisp letter, not a sponge.
     var colliderInstalled = false;
 
     // An overlay at ~zero opacity is not on screen, so it must not be a wall
@@ -899,6 +904,22 @@
         };
     }
 
+    // Scratch for one overlay's glyphs. Colour-emoji fonts ignore fillStyle
+    // and paint their own colours, so drawing straight into the obstacle
+    // canvas gave an emoji the wrong wall encoding (its red became strength,
+    // its blue became "Slow"). Rasterise the glyphs here first, then keep
+    // only their ALPHA under the wall colour (source-in) — every glyph,
+    // emoji included, reaches the obstacle as the same solid wall.
+    var wallScratch = null, wallScratchCtx = null;
+    function wallScratchFor(w, h) {
+        if (!wallScratch || wallScratch.width !== w || wallScratch.height !== h) {
+            wallScratch = document.createElement('canvas');
+            wallScratch.width = w; wallScratch.height = h;
+            wallScratchCtx = wallScratch.getContext('2d');
+        }
+        return wallScratchCtx;
+    }
+
     function colliderDraw(ctx, obsW, obsH) {
         // Mid-edit: the wall is deliberately absent until the edit settles.
         // lastRasterSig stays null so nothing mistakes this for a current wall.
@@ -913,14 +934,31 @@
             if (!isWallSource(ov)) continue;
             ctx.save();
             try {
-                ctx.globalAlpha = 1;
-                ctx.translate((ov.x * g.areaW - g.offX) * kx, (ov.y * g.areaH - g.offY) * ky);
+                var cl = window.collisionLayers;
+                var wallS = (typeof ov.colliderStrength === 'number') ? ov.colliderStrength : 1;
+                var style = (cl && cl.wallStyle) ? cl.wallStyle(ov.colliderMode, wallS) : '#ffffff';
+                var sc = wallScratchFor(obsW, obsH);
+                sc.save();
+                sc.globalCompositeOperation = 'source-over';
+                sc.globalAlpha = 1;
+                sc.clearRect(0, 0, obsW, obsH);
+                sc.translate((ov.x * g.areaW - g.offX) * kx, (ov.y * g.areaH - g.offY) * ky);
                 // kx and ky differ only by the integer rounding of the sim texture
                 // dimensions (well under 0.1%), so scaling ahead of the rotation
                 // costs no visible shear and keeps the layout maths in CSS px.
-                ctx.scale(kx, ky);
-                ctx.rotate((ov.rotation || 0) * Math.PI / 180);
-                paintOverlay(ctx, ov, true);
+                sc.scale(kx, ky);
+                sc.rotate((ov.rotation || 0) * Math.PI / 180);
+                paintOverlay(sc, ov, '#ffffff');
+                sc.restore();
+                // Alpha mask → wall colour (mode + strength bytes), then onto
+                // the obstacle canvas at globalAlpha = strength, exactly what
+                // a collision layer writes (collisionLayers.wallBytes).
+                sc.globalCompositeOperation = 'source-in';
+                sc.fillStyle = style;
+                sc.fillRect(0, 0, obsW, obsH);
+                sc.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = Math.max(0, Math.min(1, wallS));
+                ctx.drawImage(wallScratch, 0, 0);
             } catch (e) {
                 // One bad overlay must not take down the other walls — and a
                 // silent throw here would strand lastRasterSig, leaving the
@@ -1014,7 +1052,8 @@
             parts.push(o.id, o.x.toFixed(5), o.y.toFixed(5), o.rotation || 0,
                 o.content, o.textCase, o.fontFamily, o.fontSize, o.fontWeight,
                 o.fontStyle, o.letterSpacing, o.lineHeight, o.align,
-                o.bgEnabled ? 1 : 0, o.bgOpacity, o.padding, o.radius);
+                o.bgEnabled ? 1 : 0, o.bgOpacity, o.padding, o.radius,
+                o.colliderMode, o.colliderStrength);
         }
         return parts.join('\u0001');
     }
