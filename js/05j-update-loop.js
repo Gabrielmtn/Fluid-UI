@@ -360,34 +360,96 @@
                             // dab past full flow — it just deposits less, as it
                             // should.
                             const _k = Math.min(1, _rateRef / _rate);
-                            let _credit = (window.__contFlowCredit || 0) + _rate * frameDt;
+                            const _c0 = window.__contFlowCredit || 0;
+                            const _credit = _c0 + _rate * frameDt;
                             let _n = Math.floor(_credit);
                             if (_n > _dabBudget) _n = _dabBudget;   // spike guard
-                            window.__contFlowCredit = _credit - _n;
                             if (_n > 0) {
                                 const cx = pointer.x, cy = pointer.y;
+                                // __contFlowLast is the LAST DAB (2026-09-10), not the
+                                // pointer at the last emitting frame. The segment from
+                                // it to the live pointer is what the credit spans:
+                                // credit 0 sits on that dab, credit c on the pointer,
+                                // so dab i belongs at i/c along it — its true
+                                // sub-frame position, not ci/n of this frame's delta.
+                                // ci/n put a lone dab at the frame END every frame
+                                // and a pair at midpoint+end whenever the carried
+                                // fraction tipped over: at 1.2 dabs/frame that is
+                                // four gaps of one frame's travel, then two of half —
+                                // a doubled spot every fifth frame, which read as
+                                // beads down the stroke at Time 0.7 on a 144Hz panel.
+                                // Uniform in credit = uniform in space under steady
+                                // motion, across frame boundaries too.
                                 const last = window.__contFlowLast;
                                 const px = last ? last.x : cx, py = last ? last.y : cy;
-                                // Momentum per unit of travel is preserved: the
-                                // frame's whole delta is split across the n dabs,
-                                // so n x (delta/n) is the single dab's old kick.
-                                const cdx = (cx - px) * 10 / _n, cdy = (cy - py) * 10 / _n;
-                                // Lay them ALONG the path travelled this frame
-                                // rather than stacking every one at the live
-                                // pointer. At 30fps that is the difference between
-                                // a bead every 40.8px and a continuous line — the
-                                // single-point version simply could not draw the
-                                // interior of a fast low-fps segment.
                                 const _interp = config.BRUSH_DAB_INTERP !== false;
-                                for (let ci = 1; ci <= _n; ci++) {
-                                    const t = _interp ? (ci / _n) : 1;
+                                // The n dabs cover the first n/c of that segment; the
+                                // rest is next frame's, whose segment starts at dab n.
+                                const _cover = _interp ? (_n / _credit) : 1;
+                                const segx = (cx - px) * _cover, segy = (cy - py) * _cover;
+                                // ── Spatial floor (2026-09-10) ──────────────────
+                                // The clock alone has no idea how far the hand moved:
+                                // 250 dabs per SIMULATED second is 175 per wall
+                                // second at Time 0.7, and 84 on a 30fps frame (the
+                                // 16ms clamp), so a 1000px/s hand leaves 6-12px
+                                // between deposits — invisible under the 226px
+                                // default tip, a dotted line under a pen-width one.
+                                // Same cure as On Move's slow-speed floor (05d0): a
+                                // dab is a SAMPLE, not a quantum. Each clock dab's
+                                // dye is laid as m samples along the gap it covers,
+                                // at no coarser than floorPx, each carrying k/m — so
+                                // paint per simulated second is untouched (the
+                                // clock still decides WHEN and HOW MUCH), only the
+                                // sampling gets finer. The floor grows with the
+                                // SQUARE of the Interval past its reference, so the
+                                // slider's "higher = visible pulses" contract
+                                // survives: a quarter diameter (solid) at or below
+                                // 8ms, one diameter (touching beads) at 16ms, four
+                                // at 32ms, and 244 at 250ms — the top of the slider
+                                // never fires, so anyone laying rare blobs with a
+                                // pen tip keeps one blob per interval (measured:
+                                // the linear version split a 250ms pulse into six
+                                // fainter ones at 1000px/s). Stationary hose:
+                                // zero-length gap, m = 1, bit-identical to before.
+                                let _m = 1;
+                                const _seglen = Math.hypot(segx, segy);
+                                if (_interp && _seglen > 0) {
+                                    const _fl = (typeof config.BRUSH_HOSE_FLOOR === 'number') ? config.BRUSH_HOSE_FLOOR : 0.25;
+                                    const _flRef = (typeof config.BRUSH_HOSE_FLOOR_REF_MS === 'number' && config.BRUSH_HOSE_FLOOR_REF_MS > 0)
+                                        ? config.BRUSH_HOSE_FLOOR_REF_MS : 8;
+                                    if (_fl > 0) {
+                                        // Painted diameter in px: 05d0's brushDiameterPx
+                                        // with the splat-in ramp folded in (the ramp
+                                        // scales SPLAT_RADIUS, whose px radius goes as
+                                        // its square root). Same formula, same 4px floor.
+                                        const _dia = Math.max(4, 2 * Math.sqrt(Math.max(0, config.SPLAT_RADIUS) * getSplatInMult()) * canvas.height);
+                                        const _fg = Math.max(1, _ivl / _flRef);
+                                        const _floorPx = _fl * _dia * _fg * _fg;
+                                        _m = Math.ceil((_seglen / _n) / _floorPx);
+                                        // Budget covers the TOTAL samples this frame, so
+                                        // a pen tip under a fast flick thins the fill
+                                        // rather than blowing the frame.
+                                        const _mMax = Math.max(1, Math.floor(_dabBudget / _n));
+                                        if (_m > _mMax) _m = _mMax;
+                                    }
+                                }
+                                const _total = _n * _m;
+                                // Momentum per unit of travel is preserved: 10 x the
+                                // distance each sample stands for, summing to 10 x the
+                                // covered segment — exactly the single dab's old kick
+                                // per pixel, however many samples carry it.
+                                const sdx = segx * 10 / _total, sdy = segy * 10 / _total;
+                                const _ks = _k / _m;
+                                for (let si = 1; si <= _total; si++) {
+                                    const t = _interp ? (si / _total) : 1;
                                     _dabs.push({
-                                        x: px + (cx - px) * t,
-                                        y: py + (cy - py) * t,
-                                        dx: cdx, dy: cdy, p: 1, k: _k
+                                        x: px + segx * t,
+                                        y: py + segy * t,
+                                        dx: sdx, dy: sdy, p: 1, k: _ks
                                     });
                                 }
-                                window.__contFlowLast = { x: cx, y: cy };
+                                window.__contFlowLast = { x: px + segx, y: py + segy };
+                                window.__contFlowCredit = _credit - _n;
                                 // Recording taps raw pointer events, which don't fire
                                 // while stationary — capture the hold here. Frames
                                 // that moved ≥0.1px were already recorded by the
@@ -396,6 +458,8 @@
                                     && ((cx - px) * (cx - px) + (cy - py) * (cy - py)) < 0.01) {
                                     recRecordInteraction(cx, cy, 0, 0, pointer.color);
                                 }
+                            } else {
+                                window.__contFlowCredit = _credit;
                             }
                             // A frame that emits nothing deliberately leaves
                             // __contFlowLast alone, so the next dab's dx/dy spans

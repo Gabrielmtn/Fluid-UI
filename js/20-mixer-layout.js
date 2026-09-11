@@ -4220,6 +4220,9 @@
             slider.value = String(cur);
             var disp = lbl.querySelector('.value-display');
             disp.textContent = fmt(cur);
+            // Re-render hook for a readout that folds in state the slider
+            // doesn't own (Interval shows the Time-scaled rate, below).
+            group.__refreshValue = function () { disp.textContent = fmt(parseFloat(slider.value)); };
             function commit(v) {
                 if (window.config) window.config[key] = v;
                 disp.textContent = fmt(v);
@@ -4821,11 +4824,29 @@
         // slider value, config value and stored value are one number with no
         // reciprocal for a preset to get backwards. 8ms = 125/sim-sec = the old
         // fixed behaviour, ~2 dabs a frame at 60fps.
+        // The rate half of the readout is what the hose delivers per WALL
+        // second (2026-09-10): the interval is simulated time, so the Time
+        // slider scales it — 4ms is 250/s at Time 1 but the screen gets 175/s
+        // at 0.70, which is what a "says 250/s but I see dots" report was
+        // comparing against. Tagged with the scale so a number that changes
+        // under an untouched slider explains itself on the spot.
+        var fmtInterval = function (v) {
+            var ts = (typeof window.timeScale === 'number' && window.timeScale > 0) ? window.timeScale : 1;
+            var s = Math.round(v) + ' ms · ' + Math.round(1000 / Math.max(1, v) * ts) + '/s';
+            if (Math.abs(ts - 1) > 0.005) s += ' @' + ts.toFixed(2) + 'x';
+            return s;
+        };
         intervalGroup = pSlider('brushDabInterval', 'Interval', 4, 250, 1, 'BRUSH_DAB_INTERVAL_MS',
-            function (v) { return Math.round(v) + ' ms · ' + Math.round(1000 / Math.max(1, v)) + '/s'; },
-            'dabInterval');
-        intervalGroup.title = 'Constant flow: simulated time between dabs. Minimum is a smooth ' +
-            'continuous hose; higher lays visibly separate pulses. Spacing is the same idea along travel.';
+            fmtInterval, 'dabInterval');
+        intervalGroup.title = 'Constant flow: simulated time between dabs, shown as the rate the ' +
+            'screen actually gets (the Time slider scales it). The low end is always a solid line; ' +
+            'higher lays visibly separate pulses. Spacing is the same idea along travel.';
+        (function () {
+            var ts = document.getElementById('timeScale');
+            if (ts) ts.addEventListener('input', function () {
+                if (intervalGroup && intervalGroup.__refreshValue) intervalGroup.__refreshValue();
+            });
+        })();
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
         (function restoreSplatMode() {
             var saved = null;
@@ -4880,6 +4901,9 @@
                 panel.classList.add('visible');
                 trigger.classList.add('active');
                 renderPresetChips();
+                // Time can move without its slider firing (the oscillator
+                // drives window.timeScale directly) — resync on open.
+                if (intervalGroup && intervalGroup.__refreshValue) intervalGroup.__refreshValue();
             }
         });
         document.addEventListener('click', function (e) {

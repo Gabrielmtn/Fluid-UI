@@ -715,7 +715,11 @@
             BRUSH_DAB_INTERVAL_MS: 8, // Constant-flow: SIMULATED milliseconds between dabs —
                                       // the time-axis twin of Spacing, and the only thing that
                                       // decides whether the hose reads as a line or as separate
-                                      // pulses. Minimum is the fine smooth hose (8ms = 125
+                                      // pulses (BRUSH_HOSE_FLOOR below keeps the low end a solid
+                                      // line whatever the hand speed or the Time slider — the
+                                      // clock alone meters SIMULATED seconds, so 250/s at Time
+                                      // 0.7 is 175 deposits per wall second, a dotted line under
+                                      // a pen-width tip). Minimum is the fine smooth hose (8ms = 125
                                       // dabs/sim-sec, ~2 per frame at 60fps, which is finer
                                       // than a display can resolve); every step UP is fewer,
                                       // further-apart deposits you can actually see.
@@ -775,6 +779,34 @@
             BRUSH_DAB_INTERP: true,   // Constant flow places its dabs along the path travelled
                                       // this frame instead of stacking them all at the live
                                       // pointer. false restores the single-point behaviour.
+                                      // Dabs sit at their true sub-frame positions (i/credit
+                                      // along the last-dab → pointer segment, 05j 2026-09-10),
+                                      // not at ci/n of the frame delta: that put a lone dab at
+                                      // the frame end and a pair at midpoint+end whenever the
+                                      // carried fraction tipped over — a doubled spot every
+                                      // fifth frame at 1.2 dabs/frame, read as beads.
+            BRUSH_HOSE_FLOOR: 0.25,   // Constant flow's spatial floor (05j, 2026-09-10): the
+                                      // coarsest sampling the hose may lay along the path, in
+                                      // painted DIAMETERS, at or below the reference interval.
+                                      // The clock still decides when and how much dye each dab
+                                      // deposits; when the hand has moved further than this
+                                      // since the previous dab, that dye is laid as m samples
+                                      // spread over the gap, k/m each — paint per simulated
+                                      // second untouched, sampling finer. Same idea as On
+                                      // Move's slow-speed floor (BRUSH_DAB_FLOOR). Without it
+                                      // the hose is metered purely in time: a 1000px/s hand at
+                                      // Time 0.7 leaves 6px between deposits, 12px on a 30fps
+                                      // frame — hidden under the 226px default tip, a dotted
+                                      // line under a pen-width one. A quarter diameter is
+                                      // solid for hard-edged tips too (Gaussian tips are
+                                      // ripple-free from half a diameter). 0 disables.
+            BRUSH_HOSE_FLOOR_REF_MS: 8, // Interval the floor is quoted at. At or below it the
+                                      // floor is BRUSH_HOSE_FLOOR flat; above it the floor
+                                      // grows with the SQUARE of the ratio (16ms = one
+                                      // diameter = touching beads, 32ms = four, 250ms = 244,
+                                      // i.e. never fires), so the Interval slider's "higher
+                                      // lays visibly separate pulses" contract survives the
+                                      // floor and the top of the slider is untouched.
             REPLAY_INTERP: true,      // Stroke replay spreads a recorded dab along the path it
                                       // covers instead of dropping it whole at its own
                                       // timestamp. At 1x that is the same one dab per frame;
