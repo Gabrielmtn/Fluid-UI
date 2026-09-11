@@ -457,20 +457,28 @@
           ] },
         { id: 'room', pillar: 'together', title: 'Invite friends to my canvas',
           tags: ['room', 'code', 'invite', 'friends', 'join', 'share', 'qr', 'link', 'host'],
-          answer: 'Swirl Together → Start a room, then share the code or QR. Friends paste it into Join. Share settings sends your look to everyone in the room.',
+          answer: 'Swirl Together → Start a room, then share the code or QR. Friends paste it into Join.',
           target: { section: 'Swirl Together', sel: '#createRoomBtn' },
           steps: [
             { say: 'Swirl Together → click Start a room.', target: { section: 'Swirl Together', sel: '#createRoomBtn' }, until: { visible: '#mpConnected' } },
             { say: 'Share the code: read it out, Copy code, or switch to QR for phones. Hide keeps it off a stream.', target: { overlay: 'mp', sel: '#copyRoomBtn' }, until: { click: true } },
-            { say: 'Friends paste the code into Join under Swirl Together. Share settings sends them your look.', target: { overlay: 'mp', sel: '#shareOpenBtn', fallback: { overlay: 'mp', sel: '#roomName' } } }
+            { say: 'Friends paste the code into Join under Swirl Together, and their strokes land on your canvas live.', target: { overlay: 'mp', sel: '#roomName' } }
           ] },
         { id: 'turns', pillar: 'together', title: 'Take turns instead of painting at once',
           tags: ['turns', 'turn', 'rotation', 'timer', 'host', 'lock', 'whose'],
-          answer: 'Swirl Together → Take turns (host only). A timer passes the brush around; the chip by the bottom bar shows whose turn it is.',
+          answer: 'Swirl Together → Take turns (host only). The brush passes around on the turn length you set; the chip by the bottom bar shows whose turn it is.',
           target: { section: 'Swirl Together', sel: '#turnsBtn' },
           steps: [
             { say: 'Swirl Together → click Take turns.', needs: 'host', target: { overlay: 'mp', sel: '#turnsBtn' }, until: { click: true } },
-            { say: 'The timer sets when the brush passes on; the chip by the bottom bar shows whose turn it is.', target: { overlay: 'mp', sel: '#turnTimerSel', fallback: { overlay: 'mp', sel: '#turnsBtn' } } }
+            { say: 'The slider sets how long each turn lasts; the chip by the bottom bar shows whose turn it is.', target: { overlay: 'mp', sel: '#turnLength', fallback: { overlay: 'mp', sel: '#turnsBtn' } } }
+          ] },
+        { id: 'call-return', pillar: 'together', title: 'Play call and return',
+          tags: ['call', 'return', 'response', 'swirl', 'one', 'each', 'turns', 'game', 'back', 'forth'],
+          answer: 'Swirl Together → Call and return. One swirl each, back and forth: make your call, they answer, and the brush comes back to you. No clock.',
+          target: { section: 'Swirl Together', sel: '#callReturnBtn' },
+          steps: [
+            { say: 'Swirl Together → click Call and return. With a stranger this asks them first.', needs: 'host', target: { overlay: 'mp', sel: '#callReturnBtn' }, until: { click: true } },
+            { say: 'Make one swirl. When it settles the brush passes on, and the chip by the bottom bar says whose call it is.', target: { overlay: 'mp', sel: '#turnWheel', fallback: { overlay: 'mp', sel: '#callReturnBtn' } } }
           ] },
 
         // ── Export ──
@@ -526,6 +534,15 @@
             { say: 'Drag the corner handles on the canvas. L locks the borders where they are.', key: 'L', target: { canvas: true } },
             { say: 'Focus → Format snaps the canvas to 9:16, 1:1, 16:9 or 21:9.', target: { section: 'Focus', sel: '.stream-format-grid' } }
           ] },
+        { id: 'pen-window', pillar: 'interface', title: 'Draw from a pen display or tablet screen',
+          tags: ['pen', 'tablet', 'wacom', 'cintiq', 'stylus', 'second', 'screen', 'monitor', 'display', 'popout', 'pop out', 'presenter', 'fps', 'frame rate'],
+          answer: 'Display → Pen Input Window → Pop Out Pen Input opens a second window on your pen display — Pen Window Screen, just below, picks which screen (and moves an open window there at once). Press Fullscreen there and draw: the paint lands here, at this monitor\'s frame rate. Hotkeys, right-click replay and the wheel work from that window too, and in the desktop app the mouse still works here while the pen is down — aim the Gravity pad mid-stroke.',
+          target: { section: 'Display', sel: '#penWindowBtn' },
+          steps: [
+            { say: 'Display → Pen Input Window → Pop Out Pen Input.', target: { section: 'Display', sel: '#penWindowBtn' }, until: { click: true } },
+            { say: 'Pen Window Screen picks which screen it lives on; change it any time and the window moves. Press Fullscreen (F11) in the window.', note: 'Pen Window Mirror sets what it shows under your pen: a light or smooth mirror of the canvas, or nothing.', target: { section: 'Display', sel: '#penWindowScreens' } },
+            { say: 'Draw on the tablet. The paint lands on this monitor, at this monitor\'s frame rate.', target: { canvas: true } }
+          ] },
         { id: 'photosafe', pillar: 'interface', title: 'Photosensitivity protection',
           tags: ['photosensitivity', 'flash', 'epilepsy', 'safe', 'strobe', 'protection', 'seizure'],
           answer: 'Display → Photosensitivity Protection is on by default: rapid flashes become fades and luminance changes are rate-limited. It only persists when you change it yourself.',
@@ -539,6 +556,15 @@
             { say: 'Type your words. Font and size are just below.', target: { sel: '#textOverlayContent' }, until: { input: '#textOverlayContent' } },
             { say: 'Arrange on Canvas: drag to move, corners resize, the top handle rotates. Painting pauses while you arrange.', target: { section: 'Text', sel: 'button', text: ['Arrange on Canvas', 'Done Arranging'] }, until: { click: true } },
             { say: '“Fluid collides with this text” makes the paint flow around the letters.', target: { sel: '#textOverlayCollider' } }
+          ] },
+        { id: 'text-fluidize', pillar: 'interface', title: 'Pour text into the fluid',
+          tags: ['text', 'pour', 'fluidize', 'dissolve', 'melt', 'dye', 'letters', 'words', 'type', 'into'],
+          answer: 'Select the line in Text and click Fluidize. The words become dye in their own colour and leave the canvas; the line stays selected, so Fluidize again pours it again. There is no undo for dye.',
+          target: { section: 'Text', sel: '#textOverlayFluidize' },
+          steps: [
+            { say: 'Pick the line in the Text list, or + Add Text to make one.', target: { section: 'Text', sel: '#textOverlayList' }, until: { visible: '#textOverlayContent' } },
+            { say: 'Fluidize pours the words in as dye and takes the text off the canvas.', target: { section: 'Text', sel: '#textOverlayFluidize' }, until: { click: true } },
+            { say: 'The words are dye now. The line is still selected: Fluidize again pours it again, and the eye in the list brings the text back. There is no undo for dye.', target: { canvas: true } }
           ] },
         { id: 'undo', pillar: 'interface', title: 'Undo',
           tags: ['undo', 'redo', 'back', 'mistake', 'ctrl', 'z', 'revert'],
@@ -615,7 +641,12 @@
     }
     function stripCell(key) {
         const strip = $('mixer-strip');
-        return strip ? strip.querySelector('[data-ui-key="' + key + '"]') : null;
+        const cell = strip ? strip.querySelector('[data-ui-key="' + key + '"]') : null;
+        if (cell) return cell;
+        // A fader the bar could not fit at this width is parked in the More
+        // panel (js/46-strip-more.js); reveal() opens that panel to point at it.
+        const more = $('mixer-more-panel');
+        return more ? more.querySelector('[data-ui-key="' + key + '"]') : null;
     }
     const POPUPS = {
         brush:   { trigger: () => { const c = stripCell('Brush Size'); return c && c.querySelector('.ch-label'); }, panel: () => document.querySelector('.brush-settings-panel'), isOpen: (p) => p && p.classList.contains('visible') },
@@ -667,6 +698,9 @@
         } else if (target.strip) {
             if (UV && UV.isHidden('strip:' + target.strip)) UV.show('strip:' + target.strip);
             container = stripCell(target.strip);
+            // Parked in the strip's More panel (narrow window): open it so
+            // the pointer has something on screen to aim at.
+            if (container && window.StripMore && typeof window.StripMore.reveal === 'function') window.StripMore.reveal(container);
         } else if (target.chrome === 'underbar') {
             if (UV && UV.isHidden('chrome:Quality bar')) UV.show('chrome:Quality bar');
             container = $('quality-underbar');

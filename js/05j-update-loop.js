@@ -277,7 +277,7 @@
             // Peer dabs land HERE, on the frame, instead of inside the
             // WebSocket message handler — the whole room's inbound paint now
             // costs at most what one local brush does. See the inbound-budget
-            // note in 06-multiplayer.
+            // note in 06d-mp-paint-wire.
             if (typeof window.__mpDrainInbound === 'function') window.__mpDrainInbound(_dabBudget);
             // ── Per-button brush pin (41-button-modes) ──────────────────
             // A button bound to "mirror brushstroke" or "alternate brush"
@@ -602,7 +602,17 @@
                         // the stroke from one sampled splat per 33ms.
                         if (typeof window.queueDab === 'function') {
                             window.__mpLastDabColor = col;
-                            window.queueDab(d.x / canvas.width, d.y / canvas.height, d.dx, d.dy, window.__lastPaintRadius);
+                            // The unbaked colour and this dab's shares ride the
+                            // wire too (2026-09-11), so a peer lays the dab at
+                            // the strength it was painted, in its own flow model
+                            // — the share is the very scalar applyPaintFlow just
+                            // took for `col`.
+                            window.__mpBaseColor = pointer.color;
+                            const _mpShare = window.__normalizePaintFlow
+                                ? window.__normalizePaintFlow(flowMul * inFlow, d.k)
+                                : flowMul * inFlow;
+                            window.queueDab(d.x / canvas.width, d.y / canvas.height, d.dx, d.dy, window.__lastPaintRadius,
+                                _mpShare, (typeof d.k === 'number' && d.k > 0) ? d.k : 1);
                         }
                     }
                     if (_dabs.length && typeof window.flushDabs === 'function') {
@@ -694,8 +704,9 @@
                         // out. The tail rides the same dab wire as the stroke.
                         if (typeof window.queueDab === 'function') {
                             window.__mpLastDabColor = tailCol;
+                            window.__mpBaseColor = splatOutColor;
                             window.queueDab(splatOutX / canvas.width, splatOutY / canvas.height,
-                                splatOutDx * decayRate, splatOutDy * decayRate, tailRadius);
+                                splatOutDx * decayRate, splatOutDy * decayRate, tailRadius, tailFlow, 1);
                         }
                         if (typeof window.flushDabs === 'function') {
                             window.flushDabs(tailCol,
@@ -1461,13 +1472,24 @@
             if (_scatterOn) {
                 let _tx = 0.5, _ty = 0.5;
                 if (config.SCATTER_SOURCE === 'brush') {
-                    // window.pointer is already canvas BACKING-STORE px, so
-                    // this divide is render-cap and Zoom-View independent —
-                    // do not re-measure via getBoundingClientRect. Its initial
-                    // value is (0,0), i.e. the top-left CORNER, not the centre,
-                    // so fall back until the first real pointer event.
+                    // The brush is wherever the HAND is: the live cursor, which
+                    // 05d keeps current even while a replay paints elsewhere or
+                    // the sim is paused (`pointer` freezes then, by design, so
+                    // a replay never moves the stroke state). So during a
+                    // replay the paint lands where it was recorded and the
+                    // light rides with the hand — "light source connected to
+                    // the current brush location, not the replay one".
+                    const _cc = window.__cursorPos;
                     const _p = window.pointer;
-                    if (_p && (_p.x !== 0 || _p.y !== 0)) {
+                    if (_cc && _cc.at && isFinite(_cc.x) && isFinite(_cc.y)) {
+                        _tx = _cc.x / canvas.width;
+                        _ty = 1.0 - _cc.y / canvas.height;
+                    } else if (_p && (_p.x !== 0 || _p.y !== 0)) {
+                        // window.pointer is already canvas BACKING-STORE px, so
+                        // this divide is render-cap and Zoom-View independent —
+                        // do not re-measure via getBoundingClientRect. Its initial
+                        // value is (0,0), i.e. the top-left CORNER, not the centre,
+                        // so fall back until the first real pointer event.
                         _tx = _p.x / canvas.width;
                         _ty = 1.0 - _p.y / canvas.height; // same flip as the splat uniform (05i)
                     }

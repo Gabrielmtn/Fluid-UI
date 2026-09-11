@@ -902,6 +902,28 @@
                 <option value="fullscreen">Borderless Fullscreen</option>
             </select>
         </div>
+        <!-- Pen Input Window: a second window to drag onto a pen display and
+             make fullscreen. It forwards pen/mouse input to the canvas here, so
+             the sim keeps THIS monitor's frame rate. Placed in Display by 20;
+             behaviour in js/47-pen-window.js. -->
+        <div class="control-group"
+             title="Opens a second window you can drag onto a pen display or tablet screen and make fullscreen. Draw there: the paint lands on this monitor, at this monitor's frame rate. Hotkeys, right-click replay and the scroll wheel work from that window too. In the desktop app the window never takes focus, so the mouse keeps working here — you can aim the Gravity pad or move a slider while the pen is still down.">
+            <label for="penWindowBtn">Pen Input Window</label>
+            <button id="penWindowBtn" type="button" style="width:100%">Pop Out Pen Input</button>
+            <div class="pen-window-hint" id="penWindowHint">A second window for your pen display. Drag it there, press Fullscreen, draw — the paint stays on this monitor.</div>
+        </div>
+        <div class="control-group">
+            <label for="penWindowMirror" title="What the pen window shows under your pen. The mirror is one small GPU copy of the canvas per update — Light redraws 12 times a second while you draw there and twice a second otherwise; Smooth 24 and 4. Off leaves a blank surface and you watch this monitor.">Pen Window Mirror</label>
+            <select id="penWindowMirror">
+                <option value="light" selected>Light — 12 fps while drawing, 2 idle</option>
+                <option value="smooth">Smooth — 24 fps while drawing, 4 idle</option>
+                <option value="off">Off — blank surface</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label title="Which screen the pen window opens on. Pick another to move it there right away — the way back if it ever lands on the wrong one. Picking the app's own screen opens it as a window instead of fullscreen.">Pen Window Screen</label>
+            <div class="pen-window-screens" id="penWindowScreens"></div>
+        </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="showCanvasHandles" checked>
             <label for="showCanvasHandles" style="margin: 0">Show Canvas Border & Handles</label>
@@ -1116,14 +1138,14 @@
             <!-- ── Not in a room ── -->
             <div id="mpDisconnected">
                 <div class="mp-hint">Paint on the same canvas as someone else, live.</div>
-                <button id="createRoomBtn" class="mp-btn-primary">Start a room</button>
+                <button id="createRoomBtn" class="mp-btn-primary btn--emphasis">Start a room</button>
                 <div class="mp-sub">You get a code to send to whoever you want.</div>
                 <div class="mp-join-row">
                     <input type="text" id="joinRoomInput" placeholder="Paste a room code" maxlength="48" spellcheck="false" autocomplete="off" aria-label="Room code to join">
                     <button id="joinRoomBtn">Join</button>
                 </div>
                 <div class="mp-or">or</div>
-                <button id="strangerBtn" class="mp-btn-primary">Swirl With a Stranger</button>
+                <button id="strangerBtn" class="mp-btn-primary btn--emphasis">Swirl With a Stranger</button>
                 <div class="mp-sub">Pairs you with one other person who is also looking. When either of you leaves, the swirl is over — ask again for a new one.</div>
                 <div id="mpError" class="mp-error" style="display:none" role="alert"></div>
                 <button id="reconnectBtn" style="display:none; width:100%; margin-top:8px;">Reconnect</button>
@@ -1163,25 +1185,11 @@
                     <button id="lockRoomBtn" class="mp-btn-lock" style="display:none" title="Stop anyone new from joining, even with the code">Lock room</button>
                     <button id="settingsLockBtn" class="mp-btn-lock" style="display:none" title="Guests mirror your look settings; their performance controls stay their own">Lock settings</button>
                     <button id="turnsBtn" class="mp-btn-lock" style="display:none" title="One artist paints at a time while everyone else watches, with the painter’s settings mirrored live">Take turns</button>
-                    <select id="turnTimerSel" class="mp-turn-timer" style="display:none" title="When the brush passes on: after a set time, when the artist hands it over, or as soon as they finish one swirl">
-                        <option value="30">30 second turns</option>
-                        <option value="60" selected>1 minute turns</option>
-                        <option value="120">2 minute turns</option>
-                        <option value="300">5 minute turns</option>
-                        <option value="stroke">One swirl each</option>
-                        <option value="0">No timer</option>
-                    </select>
-                </div>
-
-                <!-- Settings sharing. Deliberately outside the host block:
-                     anyone can open a share and anyone can join or leave one,
-                     so it is not a room control. Each row is one open circle;
-                     the button on it is whichever action applies to you. -->
-                <div class="mp-share-block" id="mpShareBlock" style="display:none">
-                    <div class="mp-subhead">Settings sharing</div>
-                    <div id="mpShareList" class="mp-share-list"></div>
-                    <button id="shareOpenBtn" class="mp-share-open" title="Open a settings share — anyone here can join, and then everyone in it changes the settings for everyone in it">Share settings</button>
-                    <div class="mp-share-note" id="mpShareNote"></div>
+                    <div class="control-group mp-turn-length" id="turnLengthRow" style="display:none">
+                        <label for="turnLength" title="How long each turn lasts before the brush passes to the next artist">Turn length <span id="turnLengthValue" class="value-display">1:00</span></label>
+                        <input type="range" id="turnLength" min="30" max="300" step="15" value="60" aria-label="Turn length in seconds">
+                    </div>
+                    <button id="callReturnBtn" class="mp-btn-lock" style="display:none" title="One swirl each, back and forth: make your call, they answer, and the brush comes back to you. No clock.">Call and return</button>
                 </div>
 
                 <div id="turnWheel" class="mp-turn-wheel" style="display:none"></div>
@@ -1451,6 +1459,7 @@
                         <li>[ / ] — Brush Size − / +</li>
                         <li>Shift+[ / Shift+] — Coarse − / +</li>
                         <li>Scroll — Brush Size − / +</li>
+                        <li>Hold right-click (Replay) — the left button still works the menus</li>
                         <li>Shift+Scroll — Rotate Brush (angle)</li>
                     </ul>
                 </div>
@@ -1496,7 +1505,12 @@
             </div>
             <div class="hotkey-footer">
                 <span>Swirl Together <span id="app-version"></span> · GPU: <span id="app-gpu-info">detecting…</span></span>
-                <span>Fluid sim after Pavel Dobryakov (MIT) · AI imports: Transformers.js (Apache-2.0) · Built on Electron</span>
+                <span class="hotkey-credits">Fluid sim after
+                    <a href="https://github.com/PavelDoGreat/WebGL-Fluid-Simulation" target="_blank" rel="noopener">Pavel Dobryakov</a> (MIT),
+                    <a href="https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu" target="_blank" rel="noopener">Mark Harris</a> (GPU Gems ch. 38),
+                    <a href="https://github.com/mharrys/fluids-2d" target="_blank" rel="noopener">Mattias Harrysson</a> (fluids-2d) and
+                    <a href="https://github.com/haxiomic/GPU-Fluid-Experiments" target="_blank" rel="noopener">George Corney</a> (GPU-Fluid-Experiments)
+                    · AI imports: Transformers.js (Apache-2.0) · Built on Electron</span>
             </div>
         </div>
     </div>
@@ -1538,7 +1552,11 @@
             'js/05n-hotkeys-init.js',
             'js/05o-masks.js',
             'js/06-slider-updater.js',
-            'js/06-multiplayer.js',
+            'js/06a-mp-core.js',
+            'js/06b-mp-look.js',
+            'js/06c-mp-turns.js',
+            'js/06d-mp-paint-wire.js',
+            'js/06e-mp-panel.js',
             'js/29-material-modes.js'
         ];
         var splash = document.getElementById('splash-screen');
@@ -1635,6 +1653,11 @@
     <script src="js/34-mandala-mode.js"></script>
     <script src="js/35-zoom-view.js"></script>
     <script src="js/36-display-mode.js"></script>
+    <!-- Pen Input Window (Display → Pen Input Window): a pop-out input surface
+         for a pen display; forwards its pen/mouse events to #canvas here so
+         the sim keeps this monitor's frame rate. Binds by id after 20 has
+         placed the controls; reads canvas/config lazily. -->
+    <script src="js/47-pen-window.js"></script>
     <script src="js/37-nav-idle-glow.js"></script>
     <script src="js/38-button-audit.js"></script>
     <!-- Named max-fidelity tiers (perf-max-tiers branch). Inert until an
@@ -1646,6 +1669,11 @@
          the one-time startup fork. Needs the built strip + sidebar, so it
          loads after 20-mixer-layout. -->
     <script src="js/43-ui-visibility.js"></script>
+    <!-- Narrow monitors: the top bar's faders park, from the right, into a
+         "More ▾" cell when the window can't fit them all; Color, Transport,
+         Presets and Help never move. Works on the built strip and hands 43
+         its cell list, so it loads after both. -->
+    <script src="js/46-strip-more.js"></script>
     <!-- "How do I…": the recipe / solution modal — searchable tasks that reveal
          and point at the control that does them. Reveals through 43, so it
          loads after it. -->

@@ -132,7 +132,7 @@ Token shape (My Profile > API Tokens): Account Workers Scripts:Edit, Account
 Settings:Read; Zone (swirltogether.com only) Workers Routes:Edit, DNS:Edit;
 User Details:Read, Memberships:Read. Give it a TTL.
 
-Client host selection: `PARTYKIT_HOST` in `js/06-multiplayer.js` uses the
+Client host selection: `PARTYKIT_HOST` in `js/06a-mp-core.js` uses the
 page's own origin for any real web host (partykit.dev or swirltogether.com)
 and falls back to swirltogether.com for the desktop app; already-shipped
 desktop builds can be migrated without a patch via

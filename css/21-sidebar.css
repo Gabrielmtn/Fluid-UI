@@ -1006,89 +1006,142 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
    Layout and typography only. Every button in here takes its colour from the
    section tokens in css/01-buttons.css — the panel sits under a [data-group]
    section, so the buttons are already the right blue. Do not add background,
-   border-color or color to a button rule below. */
+   border-color or color to a button rule below.
+
+   Readability pass (2026-09-10). Everything in here that was not a button
+   label sat at 9–10px in --ink-500 on the sidebar's 88%-black ground, and the
+   buttons themselves were 14%-lightness plates on that same ground — so the
+   social front door of the app read as a black hole with small grey print.
+   Three rules now hold:
+     1. Nothing below 11px. Body copy is --ink-300; eyebrows are --ink-300
+        with tracking; --ink-500 survives only on the masked room code, where
+        "dimmed" IS the message.
+     2. The panel carries its own plate, lit from above in the section hue, so
+        controls have something to sit ON. A plate is not a button, so it may
+        borrow --sec-h the way .pressure-pad does. The wash tops out at 21%,
+        under the 25% fill of an emphasised button (01-buttons): the two doors
+        (Start a room / Swirl With a Stranger carry .btn--emphasis in
+        index.html) rise above it, while plain buttons — Join, Copy, Leave —
+        sit a touch inset, which is the right weight for a secondary action.
+     3. Cards inside the plate are white-alpha, not hue-tinted: two tints
+        stacked read as mud. Only the room-code well goes darker than the
+        plate, so the code is the brightest thing on the darkest thing. */
 #multiArtistPanel {
     font-size: 12px;
+    line-height: 1.4;
+    color: var(--ink-100, #f2f3f5);
+    padding: 12px;
+    margin: 2px 0 4px;
+    border-radius: 8px;
+    border: 1px solid oklch(36% 0.055 var(--sec-h, 242) / 0.6);
+    background: radial-gradient(150% 95% at 50% -12%,
+        oklch(21% 0.045 var(--sec-h, 242) / 0.92) 0%,
+        oklch(14% 0.030 var(--sec-h, 242) / 0.90) 60%,
+        oklch(12% 0.020 var(--sec-h, 242) / 0.85) 100%);
 }
 
-/* One-line answer to "what is this section". */
+/* One-line answer to "what is this section" — a headline, not a footnote. */
 .mp-hint {
-    font-size: 11px;
+    font-size: 13px;
     line-height: 1.4;
-    color: var(--ink-300, #b9bec7);
-    margin-bottom: 10px;
+    font-weight: 500;
+    color: var(--ink-100, #f2f3f5);
+    margin: 0 0 12px;
 }
 /* The line under a choice that says what picking it actually does. Both
    entry points are one click, so the difference between them has to be
    readable before you commit. */
 .mp-sub {
-    font-size: 10px;
-    line-height: 1.35;
-    color: var(--ink-500, #7b828e);
-    margin: -2px 0 10px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--ink-300, #b9bec7);
+    margin: 6px 0 0;
 }
 
-/* The two ways in. Same weight: neither is the "real" one. */
+/* The two ways in. Same weight: neither is the "real" one. Sized here (the
+   container sets the button-size variables, per 01-buttons) — the emphasis
+   tint comes from the class in the markup. */
 .mp-btn-primary {
+    --btn-size: 13px;
+    --btn-pad-y: 10px;
+    --btn-pad-x: 14px;
     width: 100%;
-        margin-bottom: 4px;
+    margin: 0;
+    font-weight: 600;
 }
 
 .mp-join-row {
     display: flex;
-    gap: 6px;
-    margin-bottom: 4px;
+    gap: 8px;
+    margin: 10px 0 0;
 }
+/* A field, not a slot: raised cell ground and a hue-tinted border so it reads
+   as somewhere to type before the placeholder says so. */
 .mp-join-row input {
     flex: 1;
     min-width: 0;
-    padding: 7px 10px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--ground-500, #2a2e37);
-    border-radius: 5px;
+    padding: 8px 10px;
+    background: var(--ground-600, #232830);
+    border: 1px solid oklch(40% 0.04 var(--sec-h, 242) / 0.7);
+    border-radius: 6px;
     color: var(--ink-100, #f2f3f5);
-    font-size: 12px;
+    font-size: 13px;
     font-family: 'Courier New', monospace;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
 }
 .mp-join-row input::placeholder {
     text-transform: none;
     letter-spacing: 0;
     font-family: inherit;
-    opacity: 0.45;
+    font-size: 12px;
+    color: var(--ink-300, #b9bec7);
+    opacity: 0.85;
 }
 .mp-join-row input:focus {
     outline: none;
-    border-color: oklch(51% 0.08 var(--sec-h));
+    border-color: oklch(62% 0.12 var(--sec-h, 242));
+    box-shadow: 0 0 0 2px oklch(62% 0.12 var(--sec-h, 242) / 0.25);
 }
 .mp-join-row button {
     flex: 0 0 auto;
 }
 
+/* Rule — or — rule. A bare "or" floating between two buttons was the
+   quietest thing in the panel; the lines make it a divider. */
 .mp-or {
-    text-align: center;
-    font-size: 10px;
-    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    color: var(--ink-500, #7b828e);
-    margin: 10px 0 8px;
+    color: var(--ink-300, #b9bec7);
+    margin: 14px 0 12px;
+}
+.mp-or::before,
+.mp-or::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: oklch(45% 0.04 var(--sec-h, 242) / 0.45);
 }
 
 .mp-error {
     color: var(--danger, #ff6b6b);
-    font-size: 11px;
-    margin-top: 8px;
-    padding: 5px 8px;
-    background: rgba(255, 80, 80, 0.1);
-    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+    margin-top: 10px;
+    padding: 7px 10px;
+    background: rgba(255, 80, 80, 0.12);
+    border-radius: 6px;
 }
 /* Same slot, but for an outcome that is not anyone's fault — a stranger
    leaving ends the swirl, it does not break anything, and the danger red
    reads as "you did something wrong". */
 .mp-error.mp-notice {
-    color: var(--ink-300, #b9bec7);
-    background: rgba(255, 255, 255, 0.05);
+    color: var(--ink-100, #f2f3f5);
+    background: rgba(255, 255, 255, 0.07);
 }
 
 /* ── Connected ── */
@@ -1096,12 +1149,14 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 10px;
-    font-size: 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-100, #f2f3f5);
 }
 .mp-dot {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     flex-shrink: 0;
 }
@@ -1121,19 +1176,22 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 /* Pushed to the end of the status line: it is a count, not a heading. */
 .mp-users {
     margin-left: auto;
-    font-size: 11px;
-    color: var(--ink-500, #7b828e);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ink-300, #b9bec7);
 }
 
+/* Badge shown to non-host members of a locked room. */
 .mp-lock-badge {
-    font-size: 10px;
+    font-size: 11px;
+    line-height: 1.4;
     text-align: center;
-    padding: 4px 6px;
-    margin-bottom: 8px;
-    color: var(--ink-300, #b9bec7);
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--ground-500, #2a2e37);
-    border-radius: 4px;
+    color: var(--ink-100, #f2f3f5);
+    background: rgba(236, 48, 19, 0.12);
+    border: 1px solid rgba(236, 48, 19, 0.3);
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-bottom: 10px;
 }
 
 /* ── Invite block ──
@@ -1141,49 +1199,65 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
    displayed is a choice, not a constant: readable at a table, scannable
    across a room, or blanked when the screen is being shared. */
 .mp-invite {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--ground-500, #2a2e37);
-    border-radius: 6px;
-    padding: 8px 10px 10px;
-    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 12px;
 }
 .mp-invite-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
-.mp-room-label {
-    font-size: 9px;
+/* Eyebrows: the one place uppercase-and-tracked is allowed to be small,
+   because the shape carries it. Never below 10px, never --ink-500. */
+.mp-room-label,
+.mp-subhead {
+    font-size: 10px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--ink-500, #7b828e);
+    letter-spacing: 1.2px;
+    color: var(--ink-300, #b9bec7);
 }
+.mp-room-label { white-space: nowrap; }
+.mp-subhead { margin-bottom: 8px; }
 
 /* Segmented control: Code / QR / Hide. */
 .mp-share-modes {
+    --btn-size: 11px;
+    --btn-pad-y: 4px;
+    --btn-pad-x: 7px;
     display: flex;
-    gap: 2px;
+    gap: 3px;
 }
-.mp-share-modes { --btn-size: 11px; --btn-pad-y: 3px; --btn-pad-x: 7px; }
 
+/* The code sits in a well darker than the plate: brightest text on the
+   darkest ground, so it is the first thing a host reads out. text-indent
+   balances the trailing letter-spacing so the glyphs centre optically. */
 .mp-room-code {
     font-family: 'Courier New', monospace;
-    font-size: 22px;
+    font-size: 26px;
     font-weight: 700;
-    letter-spacing: 4px;
+    letter-spacing: 5px;
+    text-indent: 5px;
     text-align: center;
     color: var(--ink-100, #f2f3f5);
+    background: oklch(10% 0.02 var(--sec-h, 242) / 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
     /* The masked state is the same box at the same size, so switching to it
        does not make the panel jump. */
-    min-height: 26px;
-    line-height: 26px;
+    min-height: 40px;
+    line-height: 40px;
+    padding: 0 6px;
     user-select: all;
 }
 .mp-room-code.mp-code-hidden {
     color: var(--ink-500, #7b828e);
-    letter-spacing: 6px;
+    letter-spacing: 7px;
     user-select: none;
 }
 
@@ -1202,34 +1276,27 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 
 .mp-share-hint {
-    font-size: 10px;
-    line-height: 1.35;
-    color: var(--ink-500, #7b828e);
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-300, #b9bec7);
     text-align: center;
-    margin: 6px 0 8px;
+    margin: 8px 0;
 }
 .mp-btn-share {
     width: 100%;
-    }
+}
 
 /* ── Host controls ──
    Grouped and labelled. A guest never sees this block, so they are not left
    reading three switches that do nothing for them. */
 .mp-host-block {
-    margin-bottom: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--ground-500, #2a2e37);
-}
-.mp-subhead {
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--ink-500, #7b828e);
-    margin-bottom: 6px;
+    margin-bottom: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 .mp-btn-lock {
     width: 100%;
-        margin-bottom: 4px;
+    margin-bottom: 6px;
 }
 /* Non-host view of a host-only control: present, explained, inert. */
 .mp-btn-lock.mp-btn-muted,
@@ -1237,15 +1304,11 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     cursor: default;
     opacity: 0.55;
 }
-.mp-turn-timer {
-    width: 100%;
-    margin-bottom: 4px;
-    padding: 5px;
-    font-size: 11px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--ground-500, #2a2e37);
-    border-radius: 4px;
-    color: var(--ink-100, #f2f3f5);
+/* Turn-length slider, shown with the timed rhythm (Take turns). It is a
+   sidebar .control-group, so the label, value and fader come from the
+   sidebar rules; only its spacing inside the plate is set here. */
+#multiArtistPanel .mp-turn-length {
+    margin: 4px 0 8px;
 }
 
 /* Leaving is reversible — the same code gets you back in — so this is a
@@ -1253,12 +1316,14 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
    css/01-buttons.css. */
 .mp-btn-leave {
     width: 100%;
-        margin-top: 4px;
+    margin-top: 2px;
 }
+/* Pass/Skip the brush — the take-turns primary action. */
 .mp-btn-pass {
     width: 100%;
-        margin-bottom: 6px;
+    margin-bottom: 8px;
 }
+
 /* "Shall we take turns?" prompt — stranger pairs, shown to the person asked.
    Sits just under the turn banner so the whole turn conversation is in one
    place on screen. */
@@ -1324,204 +1389,107 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     pointer-events: none;
     transition: opacity 0.3s;
 }
-/* Turn-length picker shown to the host beside the Take turns toggle */
-.mp-turn-timer {
-    width: 100%;
-    padding: 6px;
-    font-size: 11px;
-    background: var(--ground-600, #232830);
-    border: 1px solid var(--ground-500, #2a2e37);
-    color: var(--ink-100, #f2f3f5);
-    border-radius: 0;
-    cursor: pointer;
-    margin-bottom: 8px;
-}
-/* ── Settings sharing ──
-   A share is an opt-in circle inside the room, so this block is NOT part of
-   the host controls: everyone sees it, and every row carries the one action
-   that applies to the reader (Join, or Leave). */
-.mp-share-block {
-    margin-bottom: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--ground-500, #2a2e37);
-}
-.mp-share-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-bottom: 6px;
-}
-.mp-share-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 6px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.03);
-}
-.mp-share-row.mine {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-}
-.mp-share-dots {
-    display: flex;
-    flex: 0 0 auto;
-    padding-right: 3px;
-}
-/* Overlapped rather than spaced, so a circle reads as one group at a glance
-   instead of as a list of separate people. */
-.mp-share-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    border: 1px solid rgba(0, 0, 0, 0.35);
-    margin-right: -3px;
-}
-.mp-share-names {
-    flex: 1 1 auto;
-    min-width: 0;
-    font-size: 11px;
-    color: var(--ink-300, #c7ccd4);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.mp-share-act {
-    flex: 0 0 auto;
-    font-size: 10px;
-    padding: 3px 8px;
-}
-.mp-share-open {
-    width: 100%;
-}
-.mp-share-note {
-    font-size: 10px;
-    line-height: 1.35;
-    color: var(--ink-500, #7b828e);
-    margin-top: 6px;
-}
-/* The offer banner carries more words than a turn invite — it has to say that
-   the sharing runs both ways — so it is allowed to wrap. */
-.mp-share-invite {
-    max-width: min(560px, 92vw);
-}
-.mp-share-invite span {
-    font-weight: 500;
-    line-height: 1.35;
-}
 
 /* Turn queue (2026-08-15, replaces the SVG wheel): Now / Next / 2nd / 3rd
    as a plain ordered list — no arrows. Transition-free (Electron rule). */
 .mp-turn-wheel {
     padding: 6px;
     margin: 2px 0 10px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--ground-500, #2a2e37);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 8px;
 }
 .mp-turn-queue {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
 }
 .mp-turn-qrow {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 6px;
-    border-radius: 4px;
+    padding: 5px 8px;
+    border-radius: 6px;
 }
 .mp-turn-qrow.now {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.16);
 }
 .mp-turn-qpos {
-    flex: 0 0 34px;
-    font-size: 9px;
+    flex: 0 0 30px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ink-500, #7b828e);
+    letter-spacing: 0.08em;
+    color: var(--ink-300, #b9bec7);
     text-align: right;
 }
 .mp-turn-qrow.now .mp-turn-qpos { color: #fff; }
 .mp-turn-qdot {
-    flex: 0 0 10px;
-    width: 10px;
-    height: 10px;
+    flex: 0 0 11px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
     border: 1px solid rgba(0, 0, 0, 0.35);
 }
-.mp-turn-qrow.now .mp-turn-qdot { flex-basis: 12px; width: 12px; height: 12px; }
+.mp-turn-qrow.now .mp-turn-qdot { flex-basis: 13px; width: 13px; height: 13px; }
 .mp-turn-qname {
     flex: 1 1 auto;
     min-width: 0;
-    font-size: 11px;
-    color: var(--ink-300, #b9bec7);
+    font-size: 12px;
+    color: var(--ink-100, #f2f3f5);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .mp-turn-qrow.now .mp-turn-qname { color: #fff; font-weight: 700; }
 .mp-turn-qname.you { font-weight: 700; }
-.mp-turn-qwait { color: var(--ink-500, #7b828e); font-style: italic; }
-.mp-turn-qbrush { flex: 0 0 auto; font-size: 12px; }
+.mp-turn-qwait { color: var(--ink-300, #b9bec7); font-style: italic; }
+/* The "painting" word on the NOW row is built by renderTurnWheel but not
+   shown: the row label already says NOW, the status line under the queue says
+   who is painting, and at the sidebar's width the word was what pushed
+   "Artist-9C (you)" into an ellipsis. Hidden rather than removed in JS so the
+   node stays available if the row ever gets a wider home. */
+.mp-turn-qbrush { display: none; }
 .mp-turn-qclock {
     flex: 0 0 auto;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
     color: #ffb347;
 }
-.mp-turn-qclock.you { color: #3fb950; }
+.mp-turn-qclock.you { color: var(--ok, #3fb950); }
 /* "One swirl each" puts a rule where the countdown normally sits — it reads as
    a caption, not a number, so it steps back a size and loses the clock weight. */
 .mp-turn-qclock.rule {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.02em;
 }
 .mp-turn-qhint {
-    font-size: 10px;
-    color: var(--ink-500, #7b828e);
-    text-align: center;
-    padding: 6px 0 2px;
-}
-/* Rotation status line ("🖌 Artist-QT painting · 3 artists in rotation") */
-.mp-turn-status {
-    font-size: 10px;
-    text-align: center;
+    font-size: 11px;
     color: var(--ink-300, #b9bec7);
-    background: rgba(255, 178, 71, 0.08);
-    border: 1px solid rgba(255, 178, 71, 0.25);
-    border-radius: 0;
-    padding: 4px 8px;
-    margin-bottom: 8px;
+    text-align: center;
+    padding: 8px 0 3px;
+}
+/* Rotation status line ("Your turn · 0:41 · 3 artists") */
+.mp-turn-status {
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--ink-100, #f2f3f5);
+    background: rgba(255, 178, 71, 0.10);
+    border: 1px solid rgba(255, 178, 71, 0.3);
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-bottom: 10px;
 }
 .mp-turn-status.mp-turn-you {
-    color: #3fb950;
-    background: rgba(63, 185, 80, 0.1);
-    border-color: rgba(63, 185, 80, 0.35);
+    color: var(--ok, #3fb950);
+    background: rgba(63, 185, 80, 0.12);
+    border-color: rgba(63, 185, 80, 0.4);
 }
-/* Pass/Skip the brush — the take-turns primary action */
-.mp-btn-pass {
-    width: 100%;
-    padding: 7px;
-    cursor: pointer;
-    margin-bottom: 8px;
-}
-.mp-btn-pass:hover {
-    opacity: 0.85;
-}
-/* Badge shown to non-host members of a locked room */
-.mp-lock-badge {
-    font-size: 10px;
-    text-align: center;
-    color: var(--ink-300, #b9bec7);
-    background: rgba(236, 48, 19, 0.12);
-    border: 1px solid rgba(236, 48, 19, 0.25);
-    border-radius: 0;
-    padding: 4px 8px;
-    margin-bottom: 8px;
-}
+
 /* Name label on a remote user's cursor (positioned beside the colored dot) */
 .remote-cursor-label {
     position: absolute;
@@ -1933,6 +1901,44 @@ select option {
     border: 2px solid oklch(98% 0.020 var(--sec-h, 250) / 0.85);
     box-shadow: 0 0 9px oklch(80% 0.150 var(--sec-h, 250) / 0.8);
     pointer-events: none;
+}
+
+/* Pen Input Window (Display): the one-line hint under the pop-out button. */
+.pen-window-hint {
+    margin-top: 6px;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--ink-500);
+}
+
+/* Pen Input Window (Display): the screen list — one radio row per display,
+   named by size and where it sits relative to the app. Built by js/47. */
+.pen-window-screens {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+#sidebar-right .control-group .pen-screen {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.3;
+    text-transform: none;
+    letter-spacing: 0;
+    opacity: 1;
+    color: var(--ink-300);
+    cursor: pointer;
+}
+#sidebar-right .control-group .pen-screen input[type="radio"] {
+    flex: none;
+    margin: 1px 0 0;
+    accent-color: var(--ink-100);
+}
+#sidebar-right .control-group .pen-screen:has(input:checked) {
+    color: var(--ink-100);
 }
 
 .pressure-pad-read {

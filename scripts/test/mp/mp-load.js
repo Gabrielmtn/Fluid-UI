@@ -1,5 +1,5 @@
 // 8-user multiplayer load probe against a local `partykit dev` relay.
-// Mirrors the real client's wire shapes (js/06-multiplayer.js flushDabs /
+// Mirrors the real client's wire shapes (js/06d-mp-paint-wire.js flushDabs /
 // broadcastCursor / ping) so the numbers describe the actual product.
 const WebSocket = require('ws');
 

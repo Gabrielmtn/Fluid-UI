@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/29-material-modes.js — material selector on the Curl slider
-// LOAD ORDER: last in the async chain (after 06-multiplayer.js);
+// LOAD ORDER: last in the async chain (after 06e-mp-panel.js);
 //   needs config (04a), the #curl slider bindings (05h) and DOM.
 // PROVIDES: window.MaterialModes { active, onSlider, displayValue, setMode,
 //   yieldToExternal }

@@ -3425,6 +3425,13 @@
         // is the only way back out of a fullscreen mode.
         moveControlGroup('windowMode', body);
 
+        // Pen Input Window (js/47-pen-window.js): the pop-out input surface
+        // for a pen display, and what it mirrors. Next to Window Mode
+        // because both are "where does this app live on my screens".
+        moveControlGroup('penWindowBtn', body);
+        moveControlGroup('penWindowMirror', body);
+        moveControlGroup('penWindowScreens', body);
+
         // Move background color group (contains color picker + transparent toggle)
         const bgPicker = document.getElementById('backgroundColorPicker');
         if (bgPicker) {
@@ -5475,6 +5482,20 @@
             var made = a.add(copy);
             a.select(made.id);
         });
+        // Fluidize: the layer row's pour button, for a line of type. The
+        // module does the work (textOverlays.fluidize — raster, deposit,
+        // hide); this is just the verb. Same label as the Layers button on
+        // purpose: it is the same act, and the How-do-I tour names it.
+        var pourBtn = document.createElement('button');
+        pourBtn.type = 'button';
+        pourBtn.id = 'textOverlayFluidize';
+        pourBtn.textContent = 'Fluidize';
+        pourBtn.title = 'Turn this text into fluid — it becomes dye in its own colour and the flow takes it from there. The text leaves the canvas once poured but stays selected here, so Fluidize again pours it again; the eye in the list brings it back. Not undoable: it dissolves on its own.';
+        pourBtn.style.cssText = 'flex:1;cursor:pointer;';
+        pourBtn.addEventListener('click', function () {
+            var a = api(); var id = selId();
+            if (a && id != null && typeof a.fluidize === 'function') a.fluidize(id);
+        });
         var delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.className = 'btn--destructive';
@@ -5485,6 +5506,7 @@
             if (a && id != null) a.remove(id);
         });
         itemActions.appendChild(dupBtn);
+        itemActions.appendChild(pourBtn);
         itemActions.appendChild(delBtn);
         editor.appendChild(itemActions);
 

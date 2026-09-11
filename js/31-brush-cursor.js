@@ -169,6 +169,12 @@
 
     // ── Render loop (runs only while hovering) ────────────────────────
     var lastX = 0, lastY = 0, visible = false, rafId = 0;
+    // The pointer the ring follows, or null for "whatever moves". Set by the
+    // Pen Input Window (js/47) while its pen is over the surface: the ring
+    // then tracks that pen only — a mouse crossing the main canvas neither
+    // moves it nor gets its own cursor hidden (see show()).
+    var owner = null;
+    function ownedBy(e) { return owner == null || (e && e.pointerId === owner); }
 
     function render() {
         rafId = 0;
@@ -211,7 +217,10 @@
             // Hide the OS arrow over the drawing surface so only the ring shows.
             // Inline style beats the stylesheet default; when Show Cursor is off
             // the canvas already carries cursor:none via .hide-cursor.
-            canvas.style.cursor = 'none';
+            // Not when a remote pen owns the ring: the arrow over the canvas is
+            // then the MOUSE, which is still in use.
+            if (owner == null) canvas.style.cursor = 'none';
+            else if (canvas.style.cursor === 'none') canvas.style.cursor = '';
         }
         requestRender();
     }
@@ -223,16 +232,20 @@
     }
 
     canvas.addEventListener('pointerenter', function (e) {
+        if (!ownedBy(e)) return;
         lastX = e.clientX; lastY = e.clientY;
         show();
     });
     canvas.addEventListener('pointermove', function (e) {
+        if (!ownedBy(e)) return;
         lastX = e.clientX; lastY = e.clientY;
         if (!visible) show(); else requestRender();
     });
-    canvas.addEventListener('pointerleave', hide);
+    canvas.addEventListener('pointerleave', function (e) { if (ownedBy(e)) hide(); });
     // Pointer capture during a stroke can suppress leave — a global up re-checks.
-    window.addEventListener('blur', hide);
+    // Not while a remote pen owns the ring: this window losing focus says
+    // nothing about a pen that is drawing through the Pen Input Window.
+    window.addEventListener('blur', function () { if (owner == null) hide(); });
 
     // React live to the Show Cursor toggle without needing a mouse move.
     var toggle = document.getElementById('cursorToggle');
@@ -242,6 +255,16 @@
         });
     }
 
-    // Expose for other modules / debugging.
-    window.__brushCursor = { show: show, hide: hide, el: el };
+    // Expose for other modules / debugging. setOwner(pointerId|null): the
+    // Pen Input Window hands the ring to its pen while the pen is over the
+    // surface and gives it back (null) when it leaves.
+    window.__brushCursor = {
+        show: show, hide: hide, el: el,
+        setOwner: function (id) {
+            owner = (id == null) ? null : id;
+            if (owner != null && canvas.style.cursor === 'none') canvas.style.cursor = '';
+            if (owner == null && visible && cursorEnabled()) canvas.style.cursor = 'none';
+        },
+        owner: function () { return owner; }
+    };
 })();

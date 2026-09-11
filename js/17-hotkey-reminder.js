@@ -41,7 +41,9 @@
             // A hidden tab parks the rAF-gated UI build entirely — don't
             // burn the give-up budget while nothing can possibly build.
             if (!document.hidden) waited += 150;
-            var header = document.querySelector('#mixer-strip .ch-header');
+            // On a narrow window every fader header may already be parked in
+            // the strip's More panel (46-strip-more) — that still counts as built.
+            var header = document.querySelector('#mixer-strip .ch-header, #mixer-more-panel .ch-header');
             var labels = document.querySelectorAll('#sidebar-right .control-group > label').length;
             var ready = header && labels > 0 && labels === lastCount;
             lastCount = labels;

@@ -314,6 +314,15 @@ body > .controls {
     display: flex;
     align-items: center;
     flex: 0 0 auto;
+    /* The row's intrinsic width must not decide the cell's. A range input is
+       129px wide by default, and with `width: 100%` counting as auto for
+       intrinsic sizing that 129px became every fader cell's flex basis —
+       150px per cell, 1711px for the whole bar, so a 1536px laptop was
+       already "too narrow" (46-strip-more parked two faders it had room
+       for). Contained, the cell's natural width is what its header needs
+       (label + value + gear, never below min-width) and the track simply
+       fills whatever the cell ends up with, exactly as before. */
+    contain: inline-size;
     /* The strip scrolls horizontally (overflow-x:auto) — without this a
        touch/pen drag starting on a fader was claimed as a strip pan and
        the slider only ever saw taps. Strip channels get no row-drag
@@ -1305,3 +1314,86 @@ body > .controls {
    going through a preset's ⋯ menu. Same chrome as the save button, but it
    does not grow — the preset action stays the wide one. */
 .mixer-presets-footer .mixer-preset-new-group { flex: 0 0 auto; }
+
+/* ── "More" overflow cell + panel (js/46-strip-more.js) ───────────────────
+   On a monitor too narrow for the whole bar the fader cells park, from the
+   right, into this cell — it takes the place of the last fader that had to
+   go. Color / Transport / Presets / Help never park. The button's colour
+   comes from 01-buttons.css (the strip's data-group="core" tint); only
+   layout lives here. Transition-free per the Electron transparent-window
+   compositor rule. */
+.mixer-more {
+    display: flex;
+    align-items: center;
+    padding: 2px 6px;
+    align-self: stretch;
+    flex: 0 0 auto;
+}
+.mixer-more-btn {
+    height: 26px;
+    padding: 0 9px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.mixer-more-chev {
+    font-size: 8px;
+    opacity: 0.6;
+}
+/* The throwaway clone measure() drops into the bar to ask "would this cell
+   fit back?" — in and out inside one synchronous block, never painted. */
+.mixer-more-probe {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* The panel wears the popover skin (.arm-colors-panel: plate, border,
+   shadow, --ui-scale zoom via init-responsive.css) and stacks the parked
+   cells as full-width rows. Its z-index sits UNDER the popovers a parked
+   cell can open — the brush drawer, the tip menu and arm colours are all
+   10005 and must paint over this — and over the strip (150), the canvas
+   layers (≤1000) and the quality underbar (1200). */
+#mixer-more-panel {
+    z-index: 10002;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+#mixer-more-panel .mixer-more-list {
+    display: flex;
+    flex-direction: column;
+}
+#mixer-more-panel .mixer-channel {
+    width: 100%;
+    min-width: 0;
+    max-width: none;            /* beats .ch-material's 244px cap */
+    flex: 0 0 auto;
+    padding: 7px 10px 8px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: none;
+}
+/* Same as the bar: the header carries the value, no printed scale. */
+#mixer-more-panel .fader-scale {
+    display: none;
+}
+/* The Brush Size label keeps its drawer-trigger affordance in here. */
+#mixer-more-panel .ch-label.brush-trigger {
+    cursor: pointer;
+    user-select: none;
+}
+#mixer-more-panel .ch-label.brush-trigger:hover,
+#mixer-more-panel .ch-label.brush-trigger.active {
+    color: var(--ink-100, #f2f3f5);
+}
+#mixer-more-panel .mixer-more-note {
+    padding: 7px 10px 8px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--ink-500, #7b828e);
+}

@@ -106,6 +106,7 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
     <div class="row tight" id="kinds"></div>
     <div class="row tight" id="scopes"></div>
     <div class="row tight">
+        <label class="toggle"><input type="checkbox" id="fPlayer" checked> player-facing only <span title="Hides what a player never reads as words: unbound read-only rows, the boot cursor CSS and jank monitor, and raw markup blobs (whole panels, templates) unless they carry a real sentence. Untick to see the full catalog.">(?)</span></label>
         <label class="toggle"><input type="checkbox" id="fChanged"> changed only</label>
         <label class="toggle"><input type="checkbox" id="fTells"> tells only <span title="em-dash, middle dot, ellipsis, semicolon, 'so you can', 'simply', 'seamlessly', a colon that explains — the fingerprints of generated copy">(—&nbsp;·&nbsp;…&nbsp;;)</span></label>
         <label class="toggle"><input type="checkbox" id="fDyn"> dynamic / partial</label>
@@ -147,6 +148,27 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
     var els = new Map();     // key → row element
     try { edits = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (_) { edits = {}; }
     function saveEdits() { try { localStorage.setItem(LS_KEY, JSON.stringify(edits)); } catch (_) {} }
+
+    // Player-facing: what someone reads in the app as words. Not player-facing: rows the sink
+    // cannot write anyway (runtime-only), dev diagnostics, and innerHTML blobs that are really
+    // whole panels or templates. A blob stays only when it carries an actual sentence.
+    var DEV_FILES = /^js\/(00a-boot|08b-jank-monitor|08-stats-panel)\.js$/;
+    var BLOCK_TAG = /<(div|span|button|h3|option|input|label|select)\b/i;
+    function isNoise(e) {
+        if (e.enc === 'runtime-only') return true;
+        if (DEV_FILES.test(e.file || '')) return true;
+        if (/\{\s*cursor:/.test(e.text)) return true;
+        if (e.kind === 'html' && BLOCK_TAG.test(e.text)) {
+            if (/\$\{/.test(e.text) || e.text.length > 1200) return true;
+            var words = e.text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().split(' ').length;
+            if (words < 6) return true;
+        }
+        return false;
+    }
+    function playerOnly() { return $('fPlayer').checked; }
+    function pool() { return playerOnly() ? cat.entries.filter(function (e) { return !isNoise(e); }) : cat.entries; }
+    try { if (localStorage.getItem('copySink.playerOnly') === '0') $('fPlayer').checked = false; } catch (_) {}
+    $('fPlayer').addEventListener('change', function () { try { localStorage.setItem('copySink.playerOnly', $('fPlayer').checked ? '1' : '0'); } catch (_) {} buildChips(); counts(); });
 
     var TELLS = /—|·|…|;|\bso you can\b|\bsimply\b|\bseamlessly\b|\beffortlessly\b|\bwhether\b|\bpurely\b|\bjust\b|\bthink of\b|\bin other words\b|:\s+[a-z]/i;
     function tellsOf(t) { var m = t.match(/—|·|…|;|\bso you can\b|\bsimply\b|\bseamlessly\b|\beffortlessly\b|\bpurely\b|\bthink of\b/gi); return m ? m.length : 0; }
@@ -298,6 +320,7 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
 
     function matches(e) {
         var q = $('q').value.trim().toLowerCase();
+        if (playerOnly() && isNoise(e)) return false;
         if (kindOn[e.kind] === false) return false;
         if (scopeOn[scopeOf(e).split(' › ')[0]] === false) return false;
         if ($('fChanged').checked && !isChanged(e)) return false;
@@ -324,7 +347,7 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
     }
     function counts() {
         var ch = cat.entries.filter(isChanged).length;
-        $('nAll').textContent = cat.entries.length; $('nCh').textContent = ch; $('nCh2').textContent = ch;
+        $('nAll').textContent = pool().length; $('nCh').textContent = ch; $('nCh2').textContent = ch;
         $('nRt').textContent = cat.entries.filter(function (e) { return rt(e); }).length;
         $('applyBtn').disabled = !ch;
         $('stamp').textContent = (cat.runtimeAt ? 'placed ' + new Date(cat.runtimeAt).toLocaleString() : 'not placed yet — click “Place strings”');
@@ -347,7 +370,7 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
     }
     function buildChips() {
         var kinds = {}, scopes = {};
-        cat.entries.forEach(function (e) { kinds[e.kind] = (kinds[e.kind] || 0) + 1; var s = scopeOf(e).split(' › ')[0]; scopes[s] = (scopes[s] || 0) + 1; });
+        pool().forEach(function (e) { kinds[e.kind] = (kinds[e.kind] || 0) + 1; var s = scopeOf(e).split(' › ')[0]; scopes[s] = (scopes[s] || 0) + 1; });
         var toList = function (o) { return Object.keys(o).sort(function (a, b) { return o[b] - o[a]; }).map(function (k) { return { k: k, n: o[k] }; }); };
         chips($('kinds'), toList(kinds), kindOn, function () { buildChips(); applyFilter(); });
         chips($('scopes'), toList(scopes), scopeOn, function () { buildChips(); applyFilter(); });
@@ -403,7 +426,7 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
     });
 
     // ── filters ──
-    ['q', 'fChanged', 'fTells', 'fDyn', 'fUnplaced'].forEach(function (id) { $(id).addEventListener('input', applyFilter); $(id).addEventListener('change', applyFilter); });
+    ['q', 'fPlayer', 'fChanged', 'fTells', 'fDyn', 'fUnplaced'].forEach(function (id) { $(id).addEventListener('input', applyFilter); $(id).addEventListener('change', applyFilter); });
     $('groupBy').addEventListener('change', render);
     document.addEventListener('keydown', function (ev) {
         if (ev.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { ev.preventDefault(); $('q').focus(); $('q').select(); }

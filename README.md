@@ -11,6 +11,7 @@ A playful painting game for two or more — a beautiful, interactive fluid simul
 - **Presets**: Multiple artistic presets (Silky, Thick, Wispy, Chaotic, etc.)
 - **Color Palettes**: Curated color palettes with step-through mode
 - **Real-time Multiplayer**: Collaborate with others in the same fluid simulation
+- **Pen Input Window**: Pop out an input surface onto a pen display or tablet screen (Display → Pen Input Window); the paint stays on your main monitor at its frame rate, with a light mirror and the brush ring under the pen — and, in the desktop app, the mouse keeps working in the main window while the pen is down
 
 ## Multiplayer Setup
 
@@ -77,7 +78,7 @@ http://localhost:1999/#my-custom-room
 
 ### Deploying to Production
 
-1. Update `PARTYKIT_HOST` in `js/06-multiplayer.js` with your PartyKit deployment URL
+1. Update `PARTYKIT_HOST` in `js/06a-mp-core.js` with your PartyKit deployment URL
 2. Deploy to PartyKit:
 
 ```bash
@@ -97,7 +98,7 @@ npm run deploy
 │   ├── 03-recording.js     # Recording/playback system
 │   ├── 04-ui-interactions.js # UI controls and interactions
 │   ├── 05-fluid-sim.js     # WebGL fluid simulation engine
-│   └── 06-multiplayer.js   # PartyKit multiplayer client
+│   └── 06a…06e-mp-*.js     # multiplayer client (core, look, turns, paint wire, panel)
 ├── party/
 │   └── index.ts            # PartyKit server code
 ├── index.html              # Main HTML file
@@ -148,4 +149,7 @@ their own licenses — see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 The fluid-dynamics core is derived from [Pavel Dobryakov's WebGL-Fluid-Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation)
 (MIT), extensively reworked and enhanced with a brush engine, layer/mask system,
 recording, audio reactivity, AI-assisted imports (Transformers.js, Apache-2.0),
-and multiplayer support.
+and multiplayer support. The solver lineage also owes to
+[Mark Harris, *Fast Fluid Dynamics Simulation on the GPU* (GPU Gems ch. 38)](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu),
+[Mattias Harrysson's fluids-2d](https://github.com/mharrys/fluids-2d) and
+[George Corney's GPU-Fluid-Experiments](https://github.com/haxiomic/GPU-Fluid-Experiments).

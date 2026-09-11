@@ -6,7 +6,18 @@
 
 export const PUBLIC_CAP = 2;            // "paint with a stranger" = a 1:1 pair
 export const PRIVATE_CAP = 8;           // invite/code rooms
-export const WAIT_TTL_MS = 60_000;      // how long a lone matchmaking waiter lingers
+// How long a lone matchmaking waiter's slot lingers without a keep-alive.
+// The client refreshes it every 40-50 s over its open lobby pin, so this is a
+// MARGIN, not a cadence: a backgrounded tab's timers are throttled (Chrome
+// aligns chained timers to one-minute wakeups after five minutes hidden), and
+// with a 60 s TTL one late refresh let the pointer lapse — the next seeker
+// then minted a fresh room and the two never met, while the waiter's screen
+// still said "Waiting for a stranger…". 150 s absorbs two late refreshes. A
+// waiter who actually leaves is cleared at once anyway: the pin's close and
+// the play room's vacate call both drop the slot, so the TTL only ever
+// decides how long a waiter that died WITHOUT a close frame can strand
+// seekers. scripts/test/mp/mp-lobby-ttl.js proves the margin.
+export const WAIT_TTL_MS = 150_000;
 export const MATCHMAKE_THROTTLE_MS = 3_000;
 export const MAX_MESSAGE_BYTES = 16 * 1024;
 

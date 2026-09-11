@@ -76,7 +76,13 @@
         items = [];
         var strip = document.getElementById('mixer-strip');
         if (strip) {
-            Array.prototype.forEach.call(strip.children, function (el) {
+            // A fader the bar could not fit at this width is parked in the
+            // More panel (46-strip-more), not a strip child — take the
+            // canonical list so it still shows up here, in its slot.
+            var kids = (window.StripMore && typeof window.StripMore.stripChildren === 'function'
+                        && window.StripMore.stripChildren())
+                    || Array.prototype.slice.call(strip.children);
+            kids.forEach(function (el) {
                 if (el.classList.contains('mixer-divider')) return;
                 var k = el.dataset && el.dataset.uiKey;
                 if (!k) return;                         // unlabelled child: leave it alone
@@ -614,6 +620,9 @@
         chooseLayout: chooseLayout,
         // Re-sync after something rebuilds the strip or sidebar
         refresh: function () { if (!ready) { init(); return; } collect(); apply(); renderList(); },
+        // Re-check the strip's dividers and its empty state after a
+        // non-registered cell came or went (46-strip-more's More cell).
+        relayout: function () { if (!ready) return; fixDividers(); fixEmptyStrip(); },
         SIMPLE_KEEP: SIMPLE_KEEP,
         EVENT: EVT_CHOSEN
     };

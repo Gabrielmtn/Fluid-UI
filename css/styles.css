@@ -1198,6 +1198,12 @@
             white-space: nowrap;
         }
         .hotkey-body li .hk-desc { flex: 1 1 auto; min-width: 0; }
+        .hotkey-footer a {
+            color: inherit;
+            text-decoration: underline dotted;
+            text-underline-offset: 2px;
+        }
+        .hotkey-footer a:hover { text-decoration-style: solid; }
         .hotkey-footer {
             padding: 8px 16px;
             border-top: 1px solid rgba(255,255,255,0.08);

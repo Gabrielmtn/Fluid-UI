@@ -292,6 +292,10 @@ console.log('   - Renderer throttling: DISABLED');
 console.log('   - Version:', app.getVersion(), isDev ? '(dev)' : '(packaged)');
 
 let mainWindow = null;
+// Pen Input Windows opened by the renderer (js/47-pen-window.js) — closed
+// with the main window so a fullscreen surface never outlives the app.
+const PEN_WINDOW_FRAME = 'swirl-pen-input';
+const penWindows = new Set();
 let quitting = false;   // set once a quit has actually been asked for
 
 // ── Launch choreography (renderer half: js/00a-boot.js) ────────────────────
@@ -680,7 +684,64 @@ function createWindow() {
     mainWindow.webContents.on('will-navigate', (event, url) => {
         if (url !== mainWindow.webContents.getURL()) event.preventDefault();
     });
-    mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    // The only outbound links are the credits in the Hotkeys footer; hand
+    // those to the system browser and still refuse the child window.
+    //
+    // ONE exception: the Pen Input Window (js/47-pen-window.js). The
+    // renderer opens an about:blank child named 'swirl-pen-input' and drives
+    // it directly (same origin, same process); it asks for a plain framed
+    // window — placed, and fullscreen, on the OTHER display when the
+    // renderer found one — through the features string, which Electron
+    // hands over verbatim. Standard keys (left/top/width/height) map to
+    // x/y/width/height; 'fullscreen=1' is ours.
+    mainWindow.webContents.setWindowOpenHandler(({ url, frameName, features }) => {
+        if (frameName === PEN_WINDOW_FRAME) {
+            const f = {};
+            String(features || '').split(',').forEach((kv) => {
+                const i = kv.indexOf('=');
+                if (i > 0) f[kv.slice(0, i).trim()] = kv.slice(i + 1).trim();
+            });
+            const num = (k) => (k in f && isFinite(parseInt(f[k], 10))) ? parseInt(f[k], 10) : undefined;
+            const opts = {
+                title: 'Swirl Together — Pen input',
+                frame: true,
+                autoHideMenuBar: true,
+                backgroundColor: '#000000',
+                minWidth: 320,
+                minHeight: 240,
+                fullscreenable: true,
+                fullscreen: f.fullscreen === '1',
+                // Never activates: the main window stays the foreground window,
+                // so a pen held down on this surface does not take the mouse
+                // with it (Win32 mouse capture by a background window only
+                // covers its own area) — the mouse can work the sidebar, the
+                // Gravity pad, anything, mid-stroke. Keyboard stays with the
+                // app too. Its toolbar is buttons only, for the same reason.
+                focusable: false,
+                // A background fullscreen window would sit under a taskbar
+                // shown on that display; topmost keeps the surface whole.
+                alwaysOnTop: f.fullscreen === '1',
+                show: true,
+            };
+            if (num('left') !== undefined) opts.x = num('left');
+            if (num('top') !== undefined) opts.y = num('top');
+            if (num('width')) opts.width = num('width');
+            if (num('height')) opts.height = num('height');
+            return { action: 'allow', overrideBrowserWindowOptions: opts };
+        }
+        if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+        return { action: 'deny' };
+    });
+    mainWindow.webContents.on('did-create-window', (child, details) => {
+        if (!details || details.frameName !== PEN_WINDOW_FRAME) return;
+        penWindows.add(child);
+        child.on('closed', () => penWindows.delete(child));
+        try { child.setMenuBarVisibility(false); } catch (_) {}
+        // Same file-drop guard as the main window: a dropped file must never
+        // navigate the input surface into an image viewer.
+        child.webContents.on('will-navigate', (event) => event.preventDefault());
+        child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    });
 
     // index.html itself failing to load is a damaged install, not a bug — and
     // it is invisible, because the window is born at ~0 alpha and the boot
@@ -826,6 +887,10 @@ function createWindow() {
     // Clean up reference when window is closed
     mainWindow.on('closed', () => {
         clearTimeout(bootWatchdog);
+        // Pen Input Windows are the renderer's, not children of this one —
+        // close them here so none is left fullscreen on the tablet.
+        penWindows.forEach((w) => { try { if (!w.isDestroyed()) w.close(); } catch (_) {} });
+        penWindows.clear();
         clearInterval(bootFadeTimer);
         bootFadeTimer = null;
         // A window that goes away without anyone asking it to is the app

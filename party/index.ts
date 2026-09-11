@@ -21,6 +21,14 @@ interface ConnState {
 // this tolerates two missed beats plus jitter). Reaping drives the normal
 // onClose cleanup: counts, host transfer, turn handoff, room reset.
 const REAP_SILENCE_MS = 65_000;
+// Stroke mode ("Call and return") has no clock for the PLAYER, but the room
+// still needs a way out of a stuck turn. The painter's own client fires the
+// pass when their swirl has settled; a dead tab, a lost pass, or someone who
+// walked away would otherwise hold the brush until the heartbeat reap above,
+// and a stranger pair has no host to skip them. So the relay keeps a quiet
+// idle backstop: the deadline moves forward on every paint message from the
+// holder, and the brush passes when they have sent nothing for this long.
+const STROKE_IDLE_MS = 45_000;
 const SWEEP_MIN_INTERVAL_MS = 10_000;
 
 // Take-turns mode: message types only the current painter may relay. Cursor and
@@ -52,6 +60,10 @@ const TURN_HOLDER_ONLY = new Set([
 // e.g. a fake 'turn-state' would gate every other member's painting and
 // settings — so the relay never forwards one (managed rooms; sys- rooms stay
 // pure passthrough for the legacy sub-app).
+// The messages that mean the holder is actually painting — the ones that
+// push the stroke-mode idle backstop out (see STROKE_IDLE_MS).
+const PAINT_TYPES = new Set(["splat", "stroke", "stroke-chunk"]);
+
 const SERVER_AUTHORED = new Set([
   "connected",
   "client-count",
@@ -61,7 +73,6 @@ const SERVER_AUTHORED = new Set([
   "turn-invite-offer",
   "turn-invite-result",
   "turn-invite-sent",
-  "share-state",
 ]);
 
 // How long a "shall we take turns?" invite stands before it goes stale.
@@ -102,11 +113,16 @@ export default class FluidPartyServer implements Party.Server {
   turnMs = 60_000; // host-chosen turn length (0 = no timer)
   turnDeadline = 0; // epoch ms when the current turn auto-passes (0 = none)
   // How a turn ENDS. "timer": the alarm auto-passes at turnDeadline. "stroke"
-  // ("One swirl each"): no clock at all — the painter tweaks, lays down one
+  // ("Call and return" in the UI): no clock at all — the painter tweaks, lays down one
   // stroke, and their own client passes the brush when that stroke has fully
   // landed. The relay stays the authority either way; it just has no deadline
   // to enforce in stroke mode, so turnMs is pinned to 0 there.
   turnMode: "timer" | "stroke" = "timer";
+  // Stroke-mode idle backstop (epoch ms; 0 = none). In memory only: it is
+  // refreshed on every paint message while the holder paints, so persisting
+  // it would be a storage write per dab. A wake simply starts a fresh grace
+  // period (see onStart). See STROKE_IDLE_MS for why it exists.
+  turnIdleAt = 0;
   // Stranger-pair consent, in memory only: it lives ~30s inside a room with two
   // live connections, so there is nothing worth persisting — and a lost invite
   // simply reads as "no answer", which the proposer's client already handles.
@@ -116,12 +132,6 @@ export default class FluidPartyServer implements Party.Server {
     mode: "timer" | "stroke";
     at: number;
   } | null = null;
-  // Settings shares: opt-in circles inside the room, keyed by uid and
-  // advertised to clients as connection ids (same rule as the rotation).
-  // A member belongs to at most one; uids[0] is the circle's ANCHOR, the
-  // member whose look a joiner converges onto.
-  shares: Map<string, string[]> = new Map();
-  shareSeq = 0; // per-room counter behind the opaque share ids
   lastSweep = 0; // zombie-reap rate limit (in-memory; a wake just sweeps again)
   lastAlarmArm = 0;
   loaded = false;
@@ -143,10 +153,7 @@ export default class FluidPartyServer implements Party.Server {
     this.turnDeadline = (await this.room.storage.get<number>("turnDeadline")) || 0;
     this.turnMode =
       (await this.room.storage.get<string>("turnMode")) === "stroke" ? "stroke" : "timer";
-    this.shares = new Map(
-      (await this.room.storage.get<[string, string[]][]>("shares")) || []
-    );
-    this.shareSeq = (await this.room.storage.get<number>("shareSeq")) || 0;
+    this.armStrokeIdle(); // fresh grace period after a wake
     this.loaded = true;
   }
 
@@ -210,6 +217,7 @@ export default class FluidPartyServer implements Party.Server {
         this.turnQueue = [uid];
         this.turnHolder = uid;
         this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+        this.armStrokeIdle();
         await this.syncTurnAlarm();
       }
     }
@@ -238,20 +246,12 @@ export default class FluidPartyServer implements Party.Server {
         locked: this.locked,
         capacity: this.capacity,
         roomKind: this.kind,
-        // Which circles were already open when this member arrived. Their
-        // client needs to tell those apart from one opened while they are
-        // here: the first is context, the second is an offer worth a prompt.
-        shares: this.shareRoster(),
       })
     );
     this.broadcastClientCount();
     // Everyone (including the joiner, and the holder whose conn id may have
     // changed across a reconnect) re-syncs the rotation.
     if (this.turnsOn) this.broadcastTurnState();
-    // Same for the settings shares: a joiner needs to see which circles are
-    // open before they can join one, and everyone else needs the newcomer's
-    // connection id in place of whatever id they held before a reconnect.
-    if (this.shares.size) this.broadcastShareState();
   }
 
   async onMessage(message: string, sender: Party.Connection) {
@@ -330,15 +330,12 @@ export default class FluidPartyServer implements Party.Server {
         this.turnHolder = null;
         this.turnDeadline = 0;
         this.turnMode = "timer";
+        this.turnIdleAt = 0;
         this.pendingInvite = null;
       }
       await this.persist(); // commit before announcing (same rule as the lock)
       await this.syncTurnAlarm();
       this.broadcastTurnState();
-      // The room's look regime just changed hands, so the share roster is
-      // announced with it: enableTurns dissolved the circles, and saying so
-      // beats leaving every client to infer it from the turn state.
-      this.broadcastShareState();
       return;
     }
 
@@ -383,7 +380,6 @@ export default class FluidPartyServer implements Party.Server {
         await this.persist();
         await this.syncTurnAlarm();
         this.broadcastTurnState();
-        this.broadcastShareState(); // the circles just dissolved — say so
         return;
       }
 
@@ -418,7 +414,6 @@ export default class FluidPartyServer implements Party.Server {
         await this.persist();
         await this.syncTurnAlarm();
         this.broadcastTurnState();
-        this.broadcastShareState(); // the circles just dissolved — say so
       } else {
         const proposer = this.connForUid(p.from);
         if (proposer) {
@@ -440,65 +435,10 @@ export default class FluidPartyServer implements Party.Server {
       if (!isHost && !isHolder) return;
       this.advanceTurn();
       this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+      this.armStrokeIdle();
       await this.persist();
       await this.syncTurnAlarm();
       this.broadcastTurnState();
-      return;
-    }
-
-    // ── Settings sharing: opt-in circles inside the room ──
-    // Not a room-wide mode and not a host power. Anyone opens a share, anyone
-    // may join it or leave it, and inside one every member's look changes
-    // reach every other member — including whoever opened it. Sharing takes
-    // nothing away (you keep every control), which is why this needs no
-    // consent handshake the way taking turns does: the offer IS the open
-    // circle, and answering it is joining.
-    if (
-      this.managed &&
-      (data.type === "share-open" ||
-        data.type === "share-join" ||
-        data.type === "share-leave" ||
-        data.type === "share-look")
-    ) {
-      await this.ensureLoaded();
-      const st = sender.state as ConnState | null;
-      if (!st) return;
-      // Take Turns owns the room's look while it runs (the painter's settings
-      // mirror to everyone, watchers are gated), so shares stand down for the
-      // duration: enableTurns dissolves them, and this refuses new ones.
-      if (this.turnsOn) return;
-
-      if (data.type === "share-look") {
-        const gid = this.shareOf(st.uid);
-        if (!gid) return; // no circle to speak into
-        // Routed, not broadcast: a look delta belongs to one circle, and the
-        // rest of the room must never be restyled by a share they are not in.
-        const out = JSON.stringify({ ...data, clientId: sender.id, timestamp: Date.now() });
-        for (const uid of this.shares.get(gid) || []) {
-          if (uid === st.uid) continue;
-          const c = this.connForUid(uid);
-          if (c) c.send(out);
-        }
-        return;
-      }
-
-      if (data.type === "share-open") {
-        this.leaveShare(st.uid);
-        this.shares.set("s" + ++this.shareSeq, [st.uid]);
-      } else if (data.type === "share-join") {
-        const gid = typeof data.group === "string" ? data.group : "";
-        const g = this.shares.get(gid);
-        // A stale offer — the circle dissolved while the prompt was still up —
-        // must leave the sender exactly where they are, not drop them out of
-        // the share they are already in for a circle that no longer exists.
-        if (!g || this.shareOf(st.uid) === gid) return;
-        this.leaveShare(st.uid);
-        g.push(st.uid);
-      } else if (!this.leaveShare(st.uid)) {
-        return; // share-leave with nothing to leave
-      }
-      await this.persist(); // commit before announcing (same rule as the lock)
-      this.broadcastShareState();
       return;
     }
 
@@ -523,6 +463,12 @@ export default class FluidPartyServer implements Party.Server {
         if (TURN_HOLDER_ONLY.has(data.type)) {
           const st = sender.state as ConnState | null;
           if (!st || st.uid !== this.turnHolder) return;
+          // The painter is painting: push the stroke-mode backstop out. The
+          // storage alarm is NOT re-armed here (that is a write per dab) — it
+          // fires at the old time, sees the deadline moved, and re-arms then.
+          if (this.turnMode === "stroke" && PAINT_TYPES.has(data.type)) {
+            this.turnIdleAt = Date.now() + STROKE_IDLE_MS;
+          }
         }
       } else if (data.type === "turn-look") {
         // No painter exists while turns are off — a stray or forged look
@@ -537,9 +483,9 @@ export default class FluidPartyServer implements Party.Server {
     // collider-remove on `clientId|lid` (so a peer could delete another peer's
     // wall from every canvas), stroke-chunk reassembly on `clientId|sid`
     // first-chunk-wins (so a forged chunk could poison someone else's in-flight
-    // stroke), plus remote cursors and gap-fill positions. share-look already
-    // force-stamped for exactly this reason; the rest of the types simply never
-    // got the same treatment.
+    // stroke), plus remote cursors and gap-fill positions. The one routed type
+    // (since removed) force-stamped for exactly this reason; the rest of the
+    // types simply never got the same treatment.
     data.clientId = sender.id;
     if (!data.timestamp) data.timestamp = Date.now();
     this.room.broadcast(JSON.stringify(data), [sender.id]);
@@ -565,9 +511,8 @@ export default class FluidPartyServer implements Party.Server {
       this.turnHolder = null;
       this.turnDeadline = 0;
       this.turnMode = "timer";
+      this.turnIdleAt = 0;
       this.pendingInvite = null;
-      this.shares.clear();
-      this.shareSeq = 0;
       await this.room.storage.deleteAll();
       try {
         await this.room.storage.deleteAlarm();
@@ -590,25 +535,6 @@ export default class FluidPartyServer implements Party.Server {
       if (!stillHereForInvite) this.pendingInvite = null;
     }
 
-    // Settings-share upkeep: a member with no remaining connection leaves
-    // their circle, and the circle dissolves if they were the last one in it.
-    if (st && this.shares.size) {
-      const stillHereForShare = remaining.some((c) => {
-        const cs = c.state as ConnState | null;
-        return !!cs && cs.uid === st.uid;
-      });
-      if (!stillHereForShare) {
-        if (this.leaveShare(st.uid)) {
-          await this.persist();
-          this.broadcastShareState(conn.id);
-        }
-      } else if (this.shareOf(st.uid)) {
-        // The uid survives on another connection (second tab, or a zombie
-        // outliving a reconnect). Clients key the circle on CONNECTION ids —
-        // re-advertise, or the roster stays keyed to a dead one.
-        this.broadcastShareState(conn.id);
-      }
-    }
 
     // Host left but others remain → transfer host so lock/unlock stays usable.
     if (st && st.uid === this.hostId) {
@@ -617,7 +543,7 @@ export default class FluidPartyServer implements Party.Server {
       await this.persist();
       if (this.hostId) {
         // Announce the new host by CONNECTION id, never by uid — the same rule
-        // the rotation and the share roster already follow, and for a sharper
+        // the rotation already follows, and for a sharper
         // reason here. A uid is the lock re-admission key (see the allowlist
         // check in onConnect), and while it is also the current hostId, a
         // connection presenting it is handed role "host" outright — so
@@ -658,6 +584,7 @@ export default class FluidPartyServer implements Party.Server {
             if (!this.turnHolder) this.turnHolder = this.turnQueue[0];
           }
           this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+          this.armStrokeIdle();
           await this.syncTurnAlarm();
         }
         await this.persist();
@@ -709,6 +636,17 @@ export default class FluidPartyServer implements Party.Server {
     if (this.turnsOn && this.turnDeadline && Date.now() >= this.turnDeadline - 250) {
       this.advanceTurn();
       this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+      await this.persist();
+      this.broadcastTurnState();
+    } else if (
+      this.turnsOn &&
+      this.turnMode === "stroke" &&
+      this.turnIdleAt &&
+      Date.now() >= this.turnIdleAt - 250
+    ) {
+      // Stroke-mode backstop: the holder went quiet (see STROKE_IDLE_MS).
+      this.advanceTurn();
+      this.armStrokeIdle();
       await this.persist();
       this.broadcastTurnState();
     }
@@ -768,10 +706,6 @@ export default class FluidPartyServer implements Party.Server {
     const wasOn = this.turnsOn;
     this.turnsOn = true;
     this.pendingInvite = null;
-    // One painter's look now mirrors to the whole room, which is what a share
-    // was for — so the circles dissolve rather than fight the rotation over
-    // the same settings. (Callers persist and broadcast right after.)
-    this.shares.clear();
     this.turnMode = mode === "stroke" ? "stroke" : "timer";
     // Turn length: 0 = no timer; otherwise clamp to something sane. "One swirl
     // each" has no clock by definition — the stroke ending is the deadline.
@@ -792,6 +726,14 @@ export default class FluidPartyServer implements Party.Server {
     }
     // A (re)enable or a timer change restarts the current turn's clock.
     this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
+    this.armStrokeIdle();
+  }
+
+  // (Re)start the stroke-mode idle backstop for the current holder; clears it
+  // whenever it does not apply. Called at every point the brush changes hands.
+  armStrokeIdle() {
+    this.turnIdleAt =
+      this.turnsOn && this.turnMode === "stroke" ? Date.now() + STROKE_IDLE_MS : 0;
   }
 
   // Advance the brush to the next connected member after the current holder.
@@ -820,6 +762,7 @@ export default class FluidPartyServer implements Party.Server {
     try {
       let next = 0;
       if (this.turnsOn && this.turnDeadline) next = this.turnDeadline;
+      else if (this.turnsOn && this.turnMode === "stroke" && this.turnIdleAt) next = this.turnIdleAt;
       let hasPinger = false;
       for (const c of this.room.getConnections()) {
         const cs = c.state as ConnState | null;
@@ -864,48 +807,6 @@ export default class FluidPartyServer implements Party.Server {
     );
   }
 
-  // The share a member belongs to, or null.
-  shareOf(uid: string): string | null {
-    for (const [id, uids] of this.shares) if (uids.includes(uid)) return id;
-    return null;
-  }
-
-  // Drop a member from whatever share they are in; a circle with nobody left
-  // dissolves rather than lingering as an empty one others could still join.
-  // Returns whether anything actually changed — callers persist + broadcast.
-  leaveShare(uid: string): boolean {
-    const id = this.shareOf(uid);
-    if (!id) return false;
-    const left = (this.shares.get(id) || []).filter((u) => u !== uid);
-    if (left.length) this.shares.set(id, left);
-    else this.shares.delete(id);
-    return true;
-  }
-
-  // Who is sharing settings with whom. Members ride as connection ids — never
-  // uids, which are the lock re-admission key — exactly as the rotation does.
-  // members[0] is the anchor; a circle whose members have all gone is omitted.
-  shareRoster(excludeConnId?: string) {
-    return [...this.shares.entries()]
-      .map(([id, uids]) => ({
-        id,
-        members: uids
-          .map((u) => this.clientIdForUid(u, excludeConnId))
-          .filter((c): c is string => !!c),
-      }))
-      .filter((g) => g.members.length > 0);
-  }
-
-  broadcastShareState(excludeConnId?: string) {
-    this.room.broadcast(
-      JSON.stringify({
-        type: "share-state",
-        groups: this.shareRoster(excludeConnId),
-        timestamp: Date.now(),
-      })
-    );
-  }
-
   persist() {
     return Promise.all([
       this.room.storage.put("locked", this.locked),
@@ -921,8 +822,6 @@ export default class FluidPartyServer implements Party.Server {
       this.turnHolder
         ? this.room.storage.put("turnHolder", this.turnHolder)
         : this.room.storage.delete("turnHolder"),
-      this.room.storage.put("shares", [...this.shares.entries()]),
-      this.room.storage.put("shareSeq", this.shareSeq),
     ]);
   }
 

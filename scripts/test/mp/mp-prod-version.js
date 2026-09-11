@@ -27,7 +27,7 @@ const S = (c, o) => c.ws.send(JSON.stringify(o));
   await wait(1200);
   const ts = b.msgs.filter(m => m.type === 'turn-state').pop();
   console.log('  turn-state:', ts ? JSON.stringify({on: ts.on, mode: ts.mode, turnMs: ts.turnMs, order: (ts.order||[]).length}) : 'NONE');
-  console.log('  "One swirl each" (mode:"stroke"):', ts && ts.mode === 'stroke' ? 'LIVE' : 'NOT DEPLOYED — live relay predates it');
+  console.log('  "Call and return" (mode:"stroke"):', ts && ts.mode === 'stroke' ? 'LIVE' : 'NOT DEPLOYED — live relay predates it');
 
   const before = b.msgs.filter(m => m.type === 'turn-state').length;
   S(a, { type: 'turn-state', on: false, order: [], holder: null, clientId: 'forged' });

@@ -388,6 +388,23 @@
       ]
     },
     {
+      "name": "stripMore",
+      "activate": "window.StripMore.measure(); /* nothing to switch on: when the top bar's natural width (~1545px at default readouts and --ui-scale 1) exceeds the window, the fader cells park into the More cell — Isolation, Viscosity, Time first (in that order), then the rest from the right (PARK_FIRST in js/46-strip-more.js); they come back in reverse. StripMore.open() shows the panel; StripMore.parked() lists what is parked */",
+      "deactivate": "window.StripMore.setEnabled(false); /* every fader back in the bar, More cell hidden, no re-measure until setEnabled(true) */",
+      "activeCheck": "window.StripMore.parked().length > 0",
+      "touchesSharedState": [
+        "DOM position of the eight fader .mixer-channel cells: parked ones live under #mixer-more-panel > .mixer-more-list (body-mounted, position:fixed), NOT under #mixer-strip — a selector scoped to #mixer-strip misses them; 43's collect() and 44's stripCell() already look in both places",
+        "class .ui-hidden on #mixer-more (the cell) — toggled by 46 itself, never by 43 (it carries no data-ui-key)",
+        "window.MaterialModes.resizeLabel() runs after every move of the Fluid cell (its select re-fits to the room it has)"
+      ],
+      "knownHazards": [
+        "Re-measure rides requestAnimationFrame + ResizeObserver + the window resize event — all three are paused or throttled in a hidden/occluded tab, so after resize_window call StripMore.measure() yourself (synchronous) instead of waiting",
+        "measure() moves real nodes only when the parked set changes; 'would it fit back' is asked with a throwaway clone (.mixer-more-probe, ids stripped) inserted and removed inside one synchronous block — a MutationObserver that reacts to added range inputs sees the detached clone afterwards (06-slider-updater does; it no-ops)",
+        "body.mobile-mode restores everything and disables parking — the whole strip is relocated into the drawer there (13-mobile-mode)",
+        "Focus mode hides the strip and the panel (clientWidth 0) — no measure runs until it comes back; the parked set is kept"
+      ]
+    },
+    {
       "name": "scatterOcclusion",
       "activate": "window.config.GLOW=true; window.config.SCATTER=true; var t=document.getElementById('scatterBlockToggle'); t.checked=true; t.dispatchEvent(new Event('change',{bubbles:true})); /* needs a collision layer to have any effect */",
       "deactivate": "var t=document.getElementById('scatterBlockToggle'); t.checked=false; t.dispatchEvent(new Event('change',{bubbles:true}));",

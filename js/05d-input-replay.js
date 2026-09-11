@@ -848,10 +848,17 @@
                 isRightMouseDown = true;
                 replayPointerId = e.pointerId;
                 replayButton = e.button;
-                // Capture, like the paint path does: without it a release that
-                // happens off-window is never delivered here and the hold
-                // strands. (The paint branch below captures; this one never did.)
-                try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+                // NO pointer capture for the hold (2026-09-11). Capturing kept
+                // every event of this pointer on the canvas, so holding Replay
+                // and left-clicking a control sent the click to the canvas
+                // instead: "I'm holding down replay, I should still be able to
+                // left click and work the menus." Without capture the pointer
+                // is free to roam the UI while the hold runs; a release over the
+                // UI reaches the window-level pointerup below, a release off-
+                // window is caught by the self-heal in pointermove (first move
+                // back over the canvas with the button's bit clear) or by the
+                // blur abort. The chorded-button mirror further down makes our
+                // pointerdown-driven controls answer that left click too.
                 if (pointer.down) {
                     // Left/tip is held — enter pause-only mode.
                     // Snapshot velocity for the fast-brush easter egg on release.
@@ -994,6 +1001,17 @@
             // idle device can still release itself.
             if (pointer.down && window.__paintPointerId != null
                 && e.pointerId !== window.__paintPointerId) return;
+            // The live cursor, in canvas px, whatever else is going on. The
+            // gate right below freezes `pointer` for a replay or a pause — the
+            // stroke state must not move while a replay paints — but the brush
+            // is still wherever the hand is, and Scatter's Brush source lights
+            // from here (05j): "the paint in the right spot, the light
+            // connected to the current brush location, not the replay one".
+            {
+                const _cc = getCanvasCoordinates(e);
+                const _cp = window.__cursorPos || (window.__cursorPos = { x: 0, y: 0, at: 0 });
+                _cp.x = _cc.x; _cp.y = _cc.y; _cp.at = Date.now();
+            }
             if (isPaused || isReplayActive) return;
             // Engine feed: replay every coalesced sub-frame sample (position)
             // while a stroke is live. Density is governed by BRUSH_SPACING.
@@ -1124,6 +1142,10 @@
                 replayPointerId = null;
                 replayButton = null;
                 isRightMouseDown = false;
+                // The hold ran without capture: this release may be over the
+                // UI, where it would open a context menu (see the chorded
+                // section below the contextmenu handler).
+                if (e.button === 2 && typeof window.__armReplayContextMenuSwallow === 'function') window.__armReplayContextMenuSwallow();
                 isReplayActive = false;
                 window._activeReplayEvents = null;
                 customCursor.style.opacity = '0';
@@ -1164,12 +1186,107 @@
                 // rather than on whichever one happens to come up first.
                 // (finishLeftStroke clears paintButton, so it is also cleared
                 // on the pointercancel path.)
-                if (_ownsPaint) finishLeftStroke(); else paintButton = null;
+                //
+                // Only the OWNER's lift ends it. A release on the other
+                // device — the mouse let go of the Gravity pad while the pen
+                // is still drawing through the Pen Input Window (2026-09-11)
+                // — used to clear paintButton here, so the pen's own lift no
+                // longer matched and the stroke stayed down for good.
+                if (_ownsPaint) finishLeftStroke();
             }
         });
         canvas.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });
+        // ── Chorded buttons during a replay hold (2026-09-11) ─────────
+        // Hold Replay on the right button and the left button is free to
+        // work the UI. Pointer Events fire a pointermove (button = 0, never a
+        // pointerdown) for a button pressed while another is held; native
+        // controls survive that (they run on mousedown / click) but our
+        // pointerdown-driven faders, pads and draggables do not. While the
+        // hold's pointer is over the UI, mirror each chorded press / release
+        // as a pointerdown / pointerup on the element under it — capture
+        // phase, so the control sees the press before the move that follows.
+        // A native <input type=range> is the one control the mirror cannot
+        // reach: Blink keeps the legacy mouse pipeline (mousedown / mousemove,
+        // which the slider thumb drags on) glued to the node of the FIRST
+        // press — the canvas — for the whole chord, so the slider never sees
+        // the left press at all. Drive it here with 06's own thumb-travel
+        // math: value from the press, follow the pointer (captured to the
+        // input, so the drag may leave its box), 'change' on the release.
+        let chordSlider = null;   // { el, id, button }
+        function chordSliderStart(el, e) {
+            chordSlider = { el: el, id: e.pointerId, button: e.button };
+            try { el.setPointerCapture(e.pointerId); } catch (_) {}
+            if (typeof window.__sliderApplyFraction === 'function') window.__sliderApplyFraction(el, e.clientX);
+        }
+        function chordSliderEnd(e) {
+            const cs = chordSlider;
+            chordSlider = null;
+            if (!cs) return;
+            try { cs.el.releasePointerCapture(cs.id); } catch (_) {}
+            if (typeof window.__sliderApplyFraction === 'function') window.__sliderApplyFraction(cs.el, e.clientX);
+            cs.el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        document.addEventListener('pointermove', (e) => {
+            if (chordSlider && e.pointerId === chordSlider.id) {
+                if (typeof e.button !== 'number' || e.button < 0) {
+                    if (typeof window.__sliderApplyFraction === 'function') window.__sliderApplyFraction(chordSlider.el, e.clientX);
+                    return;
+                }
+                if (e.button === chordSlider.button && !(e.buttons & buttonBit(e.button))) { chordSliderEnd(e); return; }
+            }
+            if (!isRightMouseDown || e.pointerId !== replayPointerId) return;
+            if (typeof e.button !== 'number' || e.button < 0) return;   // a plain move
+            const bit = buttonBit(e.button);
+            if (!bit || e.button === replayButton) return;               // the hold's own button
+            const t = e.target;
+            if (!t || t === canvas || t === document || t === document.documentElement) return;
+            const type = (e.buttons & bit) ? 'pointerdown' : 'pointerup';
+            if (type === 'pointerdown' && t.matches && t.matches('input[type="range"]') && !t.disabled) {
+                chordSliderStart(t, e);
+                return;
+            }
+            // A <select> opens its list on the compat mousedown, which the
+            // chord never delivers to it. Open it ourselves: showPicker()
+            // wants a user activation, which this trusted press grants — but
+            // the press's own mousedown is dispatched AFTER this pointermove,
+            // so try now and once more a task later. If the browser still
+            // refuses, step to the next option: the click does something.
+            const sel = (type === 'pointerdown' && t.closest) ? t.closest('select') : null;
+            if (sel && !sel.disabled) {
+                const openPicker = () => { if (typeof sel.showPicker !== 'function') throw new Error('no showPicker'); sel.showPicker(); };
+                const stepOption = () => {
+                    if (sel.options.length < 2) return;
+                    sel.selectedIndex = (sel.selectedIndex + 1) % sel.options.length;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                };
+                try { sel.focus({ preventScroll: true }); } catch (_) {}
+                try { openPicker(); }
+                catch (_) {
+                    setTimeout(() => { try { openPicker(); } catch (_) { stepOption(); } }, 0);
+                }
+                return;
+            }
+            try {
+                t.dispatchEvent(new PointerEvent(type, {
+                    bubbles: true, cancelable: true, composed: true, view: window,
+                    clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+                    ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey,
+                    button: e.button, buttons: e.buttons,
+                    pointerId: e.pointerId, pointerType: e.pointerType, isPrimary: e.isPrimary,
+                    pressure: e.pressure, width: e.width, height: e.height
+                }));
+            } catch (_) {}
+        }, true);
+        // Letting go of the hold over the UI would open the browser's context
+        // menu (the canvas suppresses its own). The release lands first, so the
+        // flag is armed there and consumed here.
+        let swallowContextMenu = false;
+        window.__armReplayContextMenuSwallow = function () { swallowContextMenu = true; };
+        document.addEventListener('contextmenu', (e) => {
+            if (isRightMouseDown || swallowContextMenu) { e.preventDefault(); swallowContextMenu = false; }
+        }, true);
         // ── Pointer-state safety net ──
         // pointerup is normally enough to clear pointer.down, but a few events
         // skip it and would otherwise strand the stroke (so the next press reads
@@ -1178,6 +1295,7 @@
         // mid-press. Force-end any in-progress stroke on those so it can never
         // stick. This is a HARD abort (no catch-up tail) — the user has left.
         function abortPointerStroke() {
+            if (chordSlider) { try { chordSlider.el.releasePointerCapture(chordSlider.id); } catch (_) {} chordSlider = null; }
             isRightMouseDown = false;
             replayPointerId = null;
             replayButton = null;

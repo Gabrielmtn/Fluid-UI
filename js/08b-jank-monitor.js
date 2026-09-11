@@ -202,7 +202,7 @@
     }
     function inUI(el) {
         return !!(el.closest && (el.closest('#sidebar-right') || el.closest('#mixer-strip')
-            || el.closest('.rec-drawer') || el.closest('#statsPanel')));
+            || el.closest('#mixer-more-panel') || el.closest('.rec-drawer') || el.closest('#statsPanel')));
     }
     var hoverLabel = '(none)'; // whatever is under the pointer right now
     document.addEventListener('mouseover', function (e) {

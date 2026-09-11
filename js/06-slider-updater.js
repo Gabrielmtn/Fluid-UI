@@ -209,6 +209,10 @@
     el.value = v.toFixed(Math.min(d, 6));
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
+  // 05d drives a range input from a CHORDED press (a left press while the
+  // right button holds Replay) with this same math — Blink's mouse pipeline
+  // never lets a native slider see that press. One source of truth.
+  window.__sliderApplyFraction = applyFraction;
 
   function startRowForwarding() {
     var dragEl = null, dragId = null;

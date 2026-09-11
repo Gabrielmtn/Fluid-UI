@@ -26,9 +26,13 @@
  * source, so the simulation flows around the letterforms themselves rather
  * than around a bounding box. See the collider section near the bottom.
  *
+ * Fluidize — the Text panel's twin of the button on a layer row — pours an
+ * overlay into the dye through the same image-splat path a layer takes,
+ * then hides it. See fluidize() after the composite section.
+ *
  * window.textOverlays = {
  *   add, remove, update, toggle, clearAll, getAll, renderAll,
- *   compositeOntoCanvas, hasCollider, refreshColliders,
+ *   compositeOntoCanvas, fluidize, hasCollider, refreshColliders,
  *   FONTS, DEFAULTS, POSITIONS,
  *   openArrange, closeArrange, isArranging, select, getSelectedId, onChange
  * }
@@ -332,14 +336,23 @@
         return ov;
     }
 
+    // Show or hide without touching the selection — the shared half of
+    // toggleOverlay, and what Fluidize uses so the line stays in the editor
+    // after its text leaves the canvas.
+    function setVisible(ov, v) {
+        ov.visible = !!v;
+        renderOverlay(ov);
+        save(); emitChange(); syncColliders();
+        if (arranging) drawArrange();
+    }
+
     function toggleOverlay(id) {
         var ov = findOverlay(id);
         if (!ov) return null;
-        ov.visible = !ov.visible;
-        renderOverlay(ov);
-        if (!ov.visible && selectedId === id) selectedId = null;
-        save(); emitChange(); syncColliders();
-        if (arranging) drawArrange();
+        // Hiding from the eye drops the selection too: a hidden line has
+        // nothing to arrange, and the editor closing says so.
+        if (ov.visible && selectedId === id) selectedId = null;
+        setVisible(ov, !ov.visible);
         return ov;
     }
 
@@ -850,6 +863,89 @@
     }
 
     // ===========================================================
+    //  FLUIDIZE - the text becomes dye
+    // ===========================================================
+    // The Text panel's twin of Fluidize on a layer row (05m splatLayerToSim):
+    // paint the overlay exactly as the capture composite does, at the dye's
+    // own resolution, deposit it through the same image-splat path a poured
+    // layer takes, then hide the overlay — the words are IN the fluid now,
+    // and a flat copy left on top would hide the thing you asked for. Hidden
+    // on the canvas only: the line stays selected, so the editor stays open
+    // and Fluidize again pours again (a hidden line pours fine) — Gabriel
+    // asked for exactly that, 2026-09-09. The eye in the list brings the
+    // text itself back.
+    //
+    // Hide FIRST, pour two frames later. A collider overlay's wall IS its
+    // letterforms, and the image splat refuses to deposit dye inside a wall
+    // (05i hasObstacle) — poured with its own wall standing, nothing would
+    // land. Hiding takes the wall out of the obstacle (isWallSource needs
+    // visible), but the recomposite that follows is rAF-deferred
+    // (23-depth-collision updateObstacleFromLayers → _doUpdateObstacle →
+    // updateObstacleTexture, all inside that one frame), so a pour queued
+    // behind it by two rAFs sees the wall-free texture. Every OTHER collider
+    // keeps gating the pour, as it gates every dab. Should the sim then
+    // refuse the image, the line is shown again: a hidden line with nothing
+    // poured is the one outcome this button must never leave behind.
+    function fluidize(id) {
+        var ov = findOverlay(id);
+        if (!ov) return false;
+        var say = function (t, m) {
+            if (typeof window.appAlert === 'function') window.appAlert(t, m);
+            else alert(t + '\n\n' + m);
+        };
+        if (typeof window.__splatImageToDye !== 'function' || typeof window.__dyeTexSize !== 'function') {
+            say('The simulation is still starting', 'Give it a moment and try again.');
+            return false;
+        }
+        if (!colliderGeom()) {
+            say('Could not fluidize that text', 'The canvas has no size yet. Try again in a moment.');
+            return false;
+        }
+        var wasVisible = !!ov.visible;
+        if (wasVisible) setVisible(ov, false);
+
+        function pour() {
+            var live = findOverlay(id);
+            if (!live) return;                       // deleted while we waited
+            var ok = false;
+            try {
+                var g = colliderGeom();
+                var dye = window.__dyeTexSize();
+                if (g && dye && dye.w > 0 && dye.h > 0) {
+                    // Same mapping as colliderDraw, with the dye texture
+                    // standing in for the obstacle: overlay fractions of
+                    // #canvas-area → CSS px of #canvas → dye texels. Alpha
+                    // is the on-screen opacity, as the composite paints it.
+                    var out = document.createElement('canvas');
+                    out.width = dye.w; out.height = dye.h;
+                    var ctx = out.getContext('2d');
+                    var kx = dye.w / g.cssW, ky = dye.h / g.cssH;
+                    ctx.translate((live.x * g.areaW - g.offX) * kx, (live.y * g.areaH - g.offY) * ky);
+                    ctx.scale(kx, ky);
+                    ctx.rotate((live.rotation || 0) * Math.PI / 180);
+                    ctx.globalAlpha = (typeof live.opacity === 'number') ? live.opacity : 1;
+                    paintOverlay(ctx, live, false);
+                    // The console tunable a poured layer reads too:
+                    // config.SPLAT_TO_FLUID_AMOUNT = 0.4 pours a fainter ghost.
+                    var amount = (window.config && typeof window.config.SPLAT_TO_FLUID_AMOUNT === 'number')
+                        ? window.config.SPLAT_TO_FLUID_AMOUNT : 1;
+                    ok = !!window.__splatImageToDye(out, amount);
+                }
+            } catch (e) {
+                console.warn('⚠️ Text fluidize failed for overlay', id, e);
+                ok = false;
+            }
+            if (ok) return;
+            // Put it back the way it was. Selection was never touched, so
+            // the editor the click came from is still open.
+            if (wasVisible && !live.visible) setVisible(live, true);
+            say('Could not fluidize that text', 'The simulation refused the image. Try again, or reload if it keeps happening.');
+        }
+        requestAnimationFrame(function () { requestAnimationFrame(pour); });
+        return true;
+    }
+
+    // ===========================================================
     //  FLUID COLLIDER - the letterforms as a wall
     // ===========================================================
     // Registered as the collisionLayers PROCEDURAL obstacle source, which is
@@ -1209,6 +1305,7 @@
         get: function (id) { var o = findOverlay(id); return o ? o : null; },
         renderAll: renderAll,
         compositeOntoCanvas: compositeOntoCanvas,
+        fluidize: fluidize,                 // pour one line into the dye and hide it
         hasCollider: anyCollider,
         refreshColliders: syncColliders,
         colliderSignature: colliderSig,     // harness: what the wall was built from
