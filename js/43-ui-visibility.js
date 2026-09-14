@@ -5,8 +5,9 @@
 // PROVIDES: window.UIVisibility
 //   - per-section show/hide for every sidebar section, every mixer-strip
 //     channel and the quality underbar, persisted per user;
-//   - two named presets: Simple (Presets + Mutate, nothing else) and
-//     Everything (the whole mixer);
+//   - two named presets: Simple (the canvas, Color, Transport, Presets,
+//     Mutate, Swirl Together and Export — the painting basics plus the two
+//     doors out, invite and save) and Everything (the whole mixer);
 //   - the Settings → Interface block: the Simple|Everything switch and the
 //     "Visible sections" checkbox combo box that brings anything back;
 //   - the one-time startup fork: on a profile that has never chosen, a
@@ -36,8 +37,24 @@
     // itself stays a setting (ui.layoutChoice), so it resets with the rest.
     var LS_FORK_ACK = 'fluidui.uiFork.ack.v1';
 
-    // What Simple keeps on screen. Everything else is hidden.
-    var SIMPLE_KEEP = { 'section:Mutate shader': true, 'strip:Presets': true };
+    // What Simple keeps on screen. Everything else is hidden. Widened
+    // 2026-09-12 (was Presets + Mutate only): a first-time painter has to be
+    // able to pick a colour, pause or clear, invite someone and keep what
+    // they made without finding Settings first — Together and Save are what
+    // a stranger demo is for. SIMPLE_VERSION bumps whenever this set grows,
+    // so a profile that already chose Simple un-hides the newly kept items
+    // once (migrateSimple); a profile on Everything or a hand-made custom
+    // set is never touched.
+    var SIMPLE_KEEP = {
+        'section:Mutate shader': true,
+        'strip:Presets': true,
+        'strip:Color': true,
+        'strip:Transport': true,
+        'section:Swirl Together': true,
+        'section:Export': true
+    };
+    var SIMPLE_VERSION = 2;
+    var KEY_SIMPLE_VER = 'ui.simpleVersion';   // last SIMPLE_VERSION this profile's Simple was reconciled to
     // Never hideable: Settings is the way back, and the ? cell is how you
     // find what Simple hid.
     var PINNED = { 'section:Settings': true, 'strip:Help': true };
@@ -66,6 +83,22 @@
         var m = sm(); if (!m) return null;
         var c = m.get(KEY_CHOICE, null);
         return (c === 'simple' || c === 'full') ? c : null;
+    }
+    // A profile that chose Simple before SIMPLE_KEEP grew still carries the
+    // newly kept items in its hidden list. Un-hide exactly those, once, and
+    // stamp the version. Runs after loadHidden and before the first apply,
+    // so the wider Simple is what such a profile boots into.
+    function migrateSimple() {
+        var m = sm(); if (!m) return;
+        if (savedChoice() !== 'simple') return;
+        var v = m.get(KEY_SIMPLE_VER, 1);
+        if (typeof v === 'number' && v >= SIMPLE_VERSION) return;
+        var changed = false;
+        Object.keys(SIMPLE_KEEP).forEach(function (k) {
+            if (hidden[k]) { delete hidden[k]; changed = true; }
+        });
+        if (changed) saveHidden();
+        m.set(KEY_SIMPLE_VER, SIMPLE_VERSION);
     }
 
     // ── Registry ──────────────────────────────────────────────────────
@@ -267,7 +300,11 @@
         if (ready) apply();
         saveHidden();
         if (opts.persistChoice !== false) {
-            var m = sm(); if (m) m.set(KEY_CHOICE, name);
+            var m = sm();
+            if (m) {
+                m.set(KEY_CHOICE, name);
+                if (name === 'simple') m.set(KEY_SIMPLE_VER, SIMPLE_VERSION);
+            }
             try { localStorage.setItem(LS_FORK_ACK, '1'); } catch (_) {}
         }
         return true;
@@ -309,7 +346,7 @@
         // Simple | Everything — the same two-cell switch the Mutate scope uses.
         var seg = document.createElement('div');
         seg.className = 'ch-seg-switch ui-vis-presets';
-        [['simple', 'Simple', 'Presets and Mutate only. Everything else waits here, in Settings.'],
+        [['simple', 'Simple', 'The painting basics: colour, pause and clear, Presets, Mutate, Swirl Together and Export. Everything else waits here, in Settings.'],
          ['full',   'Everything', 'The whole mixer: every section, every fader.']
         ].forEach(function (p) {
             var b = document.createElement('button');
@@ -437,7 +474,7 @@
                 '<div class="ui-fork-cards">' +
                     '<button type="button" class="ui-fork-card" data-choice="simple">' +
                         '<span class="ui-fork-card-title">Simple</span>' +
-                        '<span class="ui-fork-card-desc">Just the canvas, Presets and Mutate. Paint, pick a look, twist it. Everything else waits in Settings.</span>' +
+                        '<span class="ui-fork-card-desc">The canvas and the basics: colour, Presets, Mutate, Swirl Together, Export. Paint, pick a look, share it. Everything else waits in Settings.</span>' +
                     '</button>' +
                     '<button type="button" class="ui-fork-card" data-choice="full">' +
                         '<span class="ui-fork-card-title">Everything</span>' +
@@ -508,8 +545,9 @@
         forkPending = false;
         if (choice === 'simple' || choice === 'full') {
             applyPreset(choice, { persistChoice: opts.persist !== false });
-            // Simple lands on two collapsed headers; open the one that does
-            // something, so the first thing on screen is the Mutate button.
+            // Simple lands on collapsed headers; open Mutate, so the first
+            // thing on screen is the Mutate button (Gabriel's call, 2026-09-02;
+            // Swirl Together and Export stay shut until wanted).
             if (choice === 'simple' && wasPending && typeof window.openSidebarSection === 'function') {
                 window.openSidebarSection('#mutation-section');
             }
@@ -574,6 +612,7 @@
         if (!strip || !sidebar) return;
         collect();
         loadHidden();
+        migrateSimple();
         ready = true;
         apply();
         mountBlock();

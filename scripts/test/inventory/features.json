@@ -372,7 +372,7 @@
     },
     {
       "name": "uiVisibility",
-      "activate": "window.UIVisibility.applyPreset('simple'); /* Presets + Mutate + Settings only; applyPreset('full') restores everything; setHidden('section:Layers', true) hides one */",
+      "activate": "window.UIVisibility.applyPreset('simple'); /* Color + Transport + Presets strip cells, Mutate + Swirl Together + Export + Settings sections, Help; applyPreset('full') restores everything; setHidden('section:Layers', true) hides one */",
       "deactivate": "window.UIVisibility.applyPreset('full');",
       "activeCheck": "window.UIVisibility.currentPreset() === 'simple'",
       "touchesSharedState": [

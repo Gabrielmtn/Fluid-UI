@@ -213,18 +213,32 @@ process.on('unhandledRejection', (reason) => {
     handleFault('unhandledRejection', (reason instanceof Error) ? reason : new Error(String(reason)));
 });
 
+// ── Edition ─────────────────────────────────────────────────────────────────
+// "Swirl Together Demo" (Steam app 5162690) is this same app plus a
+// five-minute clock and a wishlist ask (js/52-demo-clock.js). `npm run
+// dist:demo` (scripts/dist-demo.js) stamps "swirlEdition": "demo" into the
+// packaged package.json; a dev run asks for it with --demo. Anything else is
+// the full game.
+const EDITION = (() => {
+    try { if (require('./package.json').swirlEdition === 'demo') return 'demo'; } catch (_) {}
+    return process.argv.includes('--demo') ? 'demo' : 'full';
+})();
+
 // ── Steamworks (Steam plan S5-1) ───────────────────────────────────────────
-// App ID for "Swirl Together" (Steamworks app created 2026-08-06).
+// App IDs: "Swirl Together" 5068940 (Steamworks app created 2026-08-06) and
+// its demo 5162690 (steamcmd app_info: type Demo, parent 5068940). A demo
+// that initialised as the parent would report itself to Steam as the full
+// game, which its players do not own.
 // Dev testing: drop a steam_appid.txt next to package.json (gitignored and
 // excluded from the depot) and init() reads it with no argument.
-const STEAM_APP_ID = 5068940;
+const STEAM_APP_ID = EDITION === 'demo' ? 5162690 : 5068940;
 let steamClient = null;
 try {
     const hasDevAppId = require('fs').existsSync(path.join(__dirname, 'steam_appid.txt'));
     if (STEAM_APP_ID || hasDevAppId) {
         const steamworks = require('steamworks.js');
         steamClient = STEAM_APP_ID ? steamworks.init(STEAM_APP_ID) : steamworks.init();
-        console.log('[Steam] initialized as', steamClient.localplayer.getName());
+        console.log('[Steam] initialized as', steamClient.localplayer.getName(), '— app', STEAM_APP_ID, '(' + EDITION + ')');
     } else {
         console.log('[Steam] no App ID configured — running without Steamworks');
     }
@@ -556,6 +570,16 @@ function photoCacheArgs() {
             '--photo-protect=' + (c.protect === null ? 'unset' : c.protect)];
 }
 
+// The page's half of EDITION (read in index.html's boot script): a demo
+// build shows its clock, and when Steamworks started, the wishlist link
+// opens in the Steam client instead of a browser.
+function editionArgs() {
+    const a = [];
+    if (EDITION === 'demo') a.push('--swirl-edition=demo');
+    if (steamClient) a.push('--swirl-steam=1');
+    return a;
+}
+
 // Written only from the renderer's trusted-consent path — see index.html.
 ipcMain.on('photo-safe-cache', (_evt, payload) => {
     try {
@@ -586,6 +610,62 @@ ipcMain.on('boot-ready', () => {
     revealWindow('renderer ready');
 });
 
+// ── Deep links (2026-09-14) ─────────────────────────────────────────────
+// swirltogether://join/ABC123 and swirltogether://look/opal?v=1 — the web
+// build's "Open in desktop" (js/51-open-in-desktop.js) hands the same room
+// or look to this app. The renderer end (same file) parses and acts; this
+// end only carries the string:
+//   • cold start: the URL is on OUR command line (process.argv); it is held
+//     until the renderer says it is ready (deep-link-ready), then sent —
+//     a pull, so nothing can land on a page that is still loading.
+//   • already running: Windows launches a second copy with the URL and the
+//     single-instance lock hands its argv to 'second-instance' below.
+//   • macOS would use 'open-url' (no Mac build ships; registered anyway).
+// The unpacked Steam/itch build has no installer to write registry keys,
+// so the scheme is registered at runtime, per user (HKCU\Software\Classes\
+// swirltogether → this exe); the copy launched last owns it. Dev runs
+// (electron .) register nothing unless asked with --register-scheme, so a
+// dev machine's registry is not left pointing at electron.exe.
+const DEEP_LINK_SCHEME = 'swirltogether';
+function deepLinkFromArgv(argv) {
+    for (const a of (argv || [])) {
+        // A settings link carries the encoded look (~1 KB); refuse anything
+        // far past what 51-open-in-desktop accepts rather than truncate it.
+        if (typeof a === 'string' && /^swirltogether:\/\//i.test(a)) return a.length <= 16384 ? a : null;
+    }
+    return null;
+}
+let pendingDeepLink = deepLinkFromArgv(process.argv);
+let rendererTakesLinks = false;
+function deliverDeepLink(url) {
+    if (!url) return;
+    if (rendererTakesLinks && mainWindow && !mainWindow.isDestroyed()) {
+        try { mainWindow.webContents.send('deep-link', url); return; } catch (_) {}
+    }
+    pendingDeepLink = url;   // handed over on the renderer's next deep-link-ready
+}
+ipcMain.on('deep-link-ready', () => {
+    rendererTakesLinks = true;
+    const u = pendingDeepLink;
+    pendingDeepLink = null;
+    if (u) deliverDeepLink(u);
+});
+function registerDeepLinkScheme() {
+    try {
+        if (app.isPackaged) {
+            app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+        } else if (process.argv.includes('--register-scheme')) {
+            app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+        }
+    } catch (e) {
+        console.warn('[deep-link] scheme registration failed:', e && e.message);
+    }
+}
+app.on('open-url', (event, url) => {
+    event.preventDefault();
+    deliverDeepLink(url);
+});
+
 // Single instance: a second launch (e.g. double-clicking in Steam) focuses
 // the existing window instead of spawning a second app fighting over the GPU
 // and the Preset Vault on disk. gotLock also gates window creation below —
@@ -594,7 +674,10 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
     app.quit();
 } else {
-    app.on('second-instance', () => {
+    app.on('second-instance', (_event, argv) => {
+        // A deep link opened while the app is running arrives as the second
+        // copy's command line.
+        deliverDeepLink(deepLinkFromArgv(argv));
         if (mainWindow && !mainWindow.isDestroyed()) {
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
@@ -634,7 +717,7 @@ function createWindow() {
             // paying the ~490ms storage-service cold start before it can paint.
             // Nothing is passed when the cache is missing, and the gate then
             // falls back to localStorage — see readPhotoCache() above.
-            additionalArguments: photoCacheArgs(),
+            additionalArguments: photoCacheArgs().concat(editionArgs()),
         },
         transparent: USE_TRANSPARENT_WINDOW,
         frame: false, // Use custom title bar (frameless window)
@@ -673,6 +756,15 @@ function createWindow() {
 
     // Load the app
     mainWindow.loadFile('index.html');
+
+    // A reload (dev F5, hard reload) rebuilds the renderer; a deep link must
+    // wait for its next deep-link-ready instead of landing on a page that is
+    // mid-load. Same-document navigations (hash changes) are not reloads.
+    mainWindow.webContents.on('did-start-navigation', (ev, details) => {
+        const d = (details && typeof details === 'object') ? details : ev;
+        if (d && (d.isSameDocument || d.isMainFrame === false)) return;
+        rendererTakesLinks = false;
+    });
 
     // Open DevTools in development (optional)
     // mainWindow.webContents.openDevTools();
@@ -992,6 +1084,7 @@ app.whenReady().then(() => {
     // what packaged builds run, so the two behave the same.
     Menu.setApplicationMenu(null);
 
+    registerDeepLinkScheme();
     createWindow();
 
     app.on('activate', () => {

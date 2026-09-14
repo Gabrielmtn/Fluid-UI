@@ -96,7 +96,7 @@
     },
     {
       "name": "hotkey-freeze-toggle",
-      "comment": "Space transport. The pre-freeze settle drops 20 → 10 so the 'frozen' checkpoint lands at 12 frames post-stroke, inside the stable window. The 30 post-freeze frames are DELIBERATELY kept even though that puts 'still-frozen' at 42 frames post-stroke, outside it: that checkpoint exists only to be compared against 'frozen' WITHIN this run, where residuals A and B (a same-boot ratchet and a cross-boot drift) do not apply. Shortening it would also blunt the assertion — the drift it is meant to detect is ~2% of coverage over 30 frames, so at 8 frames it would read as ~0.5% and land inside tolerance as a NEAR, hiding the very thing the checkpoint is for.",
+      "comment": "Space transport. The pre-freeze settle drops 20 → 10 so the 'frozen' checkpoint lands at 12 frames post-stroke, inside the stable window. The 30 post-freeze frames are DELIBERATELY kept even though that puts 'still-frozen' at 42 frames post-stroke, outside it: that checkpoint exists only to be compared against 'frozen' WITHIN this run, where residuals A and B (a same-boot ratchet and a cross-boot drift) do not apply. Shortening it would also blunt the assertion — the drift it is meant to detect is ~2% of coverage over 30 frames, so at 8 frames it would read as ~0.5% and land inside tolerance as a NEAR, hiding the very thing the checkpoint is for. 2026-09-12: two more checkpoints, 'braked' (92 frames after Space — the 0.9/frame velocity brake is down to ~0.01% of its start) and 'held' 30 frames later. Those are the pair freeze-halts-the-sim compares now that Space stands vorticity confinement and the Gravity pad down (05j): 'frozen' → 'still-frozen' is the stroke's own momentum braking out, which is the design, and only the post-brake pair says whether anything ELSE is still moving the paint.",
       "seed": 48879,
       "actions": [
         { "do": "stroke" },
@@ -106,6 +106,53 @@
         { "do": "snapshot", "name": "frozen" },
         { "do": "step", "frames": 30 },
         { "do": "snapshot", "name": "still-frozen" },
+        { "do": "step", "frames": 60 },
+        { "do": "snapshot", "name": "braked" },
+        { "do": "step", "frames": 30 },
+        { "do": "snapshot", "name": "held" },
+        { "do": "key", "spec": { "key": " ", "code": "Space" } },
+        { "do": "step", "frames": 2 }
+      ]
+    },
+    {
+      "name": "hotkey-freeze-gravity",
+      "comment": "Space with the Gravity Direction pad aimed straight down (config.AMBIENT_FORCE plus a unit SCREEN-space vector — the same keys the pad writes in 20-mixer-layout; the 05j pass flips y). The ambient force is dye-weighted and never decays on its own, so it is the one force the freeze brake could never outlast: before 2026-09-12 a frozen painting kept sinking for as long as the freeze held. Same checkpoint shape as hotkey-freeze-toggle, and the invariant reads the same post-brake pair. AMBIENT_FORCE is not registry-covered, so setup() would not reset it — the last action switches gravity off again so it cannot leak into the next scenario.",
+      "seed": 48879,
+      "actions": [
+        { "do": "eval", "js": "window.config.AMBIENT_FORCE = true; window.config.AMBIENT_FORCE_X = 0; window.config.AMBIENT_FORCE_Y = 1" },
+        { "do": "stroke" },
+        { "do": "step", "frames": 10 },
+        { "do": "key", "spec": { "key": " ", "code": "Space" } },
+        { "do": "step", "frames": 2 },
+        { "do": "snapshot", "name": "frozen" },
+        { "do": "step", "frames": 30 },
+        { "do": "snapshot", "name": "still-frozen" },
+        { "do": "step", "frames": 60 },
+        { "do": "snapshot", "name": "braked" },
+        { "do": "step", "frames": 30 },
+        { "do": "snapshot", "name": "held" },
+        { "do": "key", "spec": { "key": " ", "code": "Space" } },
+        { "do": "step", "frames": 2 },
+        { "do": "eval", "js": "window.config.AMBIENT_FORCE = false; window.config.AMBIENT_FORCE_X = 0; window.config.AMBIENT_FORCE_Y = 0" }
+      ]
+    },
+    {
+      "name": "hotkey-freeze-swirl",
+      "comment": "Space with Swirl (vorticity confinement, config.CURL) at the top of its slider. Confinement adds velocity in proportion to the curl already there, so at the default 25 it dies with the brake and the plain freeze scenario barely sees it; at 60 it has the most it can feed on. Same checkpoint shape as hotkey-freeze-toggle; curl is registry-covered, so setup() puts it back for the next scenario.",
+      "seed": 48879,
+      "actions": [
+        { "do": "slider", "id": "curl", "value": 60 },
+        { "do": "stroke" },
+        { "do": "step", "frames": 10 },
+        { "do": "key", "spec": { "key": " ", "code": "Space" } },
+        { "do": "step", "frames": 2 },
+        { "do": "snapshot", "name": "frozen" },
+        { "do": "step", "frames": 30 },
+        { "do": "snapshot", "name": "still-frozen" },
+        { "do": "step", "frames": 60 },
+        { "do": "snapshot", "name": "braked" },
+        { "do": "step", "frames": 30 },
+        { "do": "snapshot", "name": "held" },
         { "do": "key", "spec": { "key": " ", "code": "Space" } },
         { "do": "step", "frames": 2 }
       ]
@@ -122,12 +169,28 @@
     },
     {
       "name": "freeze-halts-the-sim",
-      "why": "scenarios.json has claimed since the day it was written that a snapshot taken while frozen must equal a snapshot taken after more steps, because nothing advances. Nothing ever checked it.",
-      "left": { "scenario": "hotkey-freeze-toggle", "checkpoint": "frozen" },
-      "right": { "scenario": "hotkey-freeze-toggle", "checkpoint": "still-frozen" },
+      "why": "Space is the stop key: once its velocity brake has run out, nothing may keep moving the paint. Until 2026-09-12 two of the fluid's own forces did — vorticity confinement fed on the curl that was still braking out, and the Gravity pad re-pushed the dye every step — so a frozen painting went on spreading and brightening for as long as the freeze held. 05j now skips both passes while window.__fluidFrozen is up; the projection, the brake and the splat path stay live so painting on a frozen canvas is unchanged.",
+      "left": { "scenario": "hotkey-freeze-toggle", "checkpoint": "braked" },
+      "right": { "scenario": "hotkey-freeze-toggle", "checkpoint": "held" },
       "assert": { "dye": "equal", "vel": "equal", "display": "equal" },
-      "assertComment": "display is asserted too, and not as padding: it is the only one of the three that carries an independent magnitude here. Velocity has no scalar at all, and dye's +2.05% coverage sits a hair inside the 2% tolerance, so on those two alone the failure would rest on an absence rather than on evidence. meanLum moves +3.03% and is outside — the picture demonstrably brightened during the freeze.",
-      "note": "THIS IS EXPECTED TO FAIL, and the cause is neither a lost keypress nor a bug — the assertion is mis-specified. Space reaches window.toggleFreeze (05n:372-393 → 04b:170), which does not stop the loop: it sets config.DENSITY_DISSIPATION = 1.0 and config.VELOCITY_DISSIPATION = 0.9 and raises window.__fluidFrozen. Dye stops FADING; advection keeps running, and velocity decays hard at 0.9/frame. The gate that actually halts the sim step is isPaused (05j:237), driven by window.togglePause (04f:73) on SHIFT+Space. The committed goldens agree with that mechanism and not with the prose: frozen → still-frozen moves dye 70c06c8d → 05182583 and coverage 0.23912 → 0.24402 (+2.05%), meanLum 0.10143 → 0.10450 (+3.03%) — the field spread and brightened over 30 supposedly-frozen frames, which is what a dissipation-only freeze does. Left failing on purpose. Closing it is a product decision, not a test edit: either 'Freeze' should hold the picture still (fix 04b:170 or route Space to togglePause) or it should not, in which case retarget this invariant at Shift+Space and rename the button. Do not silence it by loosening the tolerance."
+      "assertComment": "Compared AFTER the brake, not right after the keypress. Freeze is a brake, not a hard stop — toggleFreeze (04b) sets VELOCITY_DISSIPATION 0.9 and the stroke's momentum runs out over the next second — so 'frozen' → 'still-frozen' legitimately moves: velMean falls ~94% over those 30 frames and the stroke's open ends carry some dye off the canvas as they settle. By 'braked' (92 frames after Space) the residual is 0.9^92 ≈ 0.006% of its start and its mean speed sits under velMean's 0.001 absolute tolerance, so the brake's own tail no longer registers; from there to 'held' the field has to sit still to the scalar tolerances. Expect NEAR rather than PASS: the residual is geometric, never exactly zero, so the hashes move by a bit while every scalar stays inside tolerance.",
+      "note": "MEASURED 2026-09-12 in one Electron boot, pre-fix vs fix. Pre-fix (HEAD 05j, Swirl at its default 25, no gravity) over the SAME braked → held window: coverage +0.04%, dye mean −0.56%, mean luminance +0.05%, velMean 0.00578 → 0.00584 — the velocity had stopped braking out and sat on a confinement-fed plateau (NEAR on the scalars, but the paint was still creeping). With the gate: coverage and dye mean identical to five decimals (0.28709 / 0.34683), display hash identical, velMean 0.00015 → 0.00001. If this FAILS again, something new is adding velocity or dye while frozen — look for a pass in the 05j sub-step loop that does not read _frozen (window.__fluidFrozen), or a splat caller that fires with no pointer down. Do not silence it by loosening the tolerance."
+    },
+    {
+      "name": "freeze-stops-gravity",
+      "why": "Same contract with the Gravity Direction pad aimed down. The ambient-force pass (05j, ambientForceFrag) is dye-weighted and never runs dry, so it is the one force the brake could never outlast: with it live a frozen painting sank for as long as the freeze held.",
+      "left": { "scenario": "hotkey-freeze-gravity", "checkpoint": "braked" },
+      "right": { "scenario": "hotkey-freeze-gravity", "checkpoint": "held" },
+      "assert": { "dye": "equal", "vel": "equal", "display": "equal" },
+      "note": "MEASURED 2026-09-12 in one Electron boot, pre-fix vs fix, braked → held with the pad straight down: pre-fix coverage 0.32698 → 0.37608 (+15.0%), mean luminance +15.4%, dye mean +2.15%, velMean held at ~0.086 — FAIL, the sink never stops; with the gate coverage and dye mean identical to five decimals (0.28586 / 0.35304), display hash identical, velMean 0.00007 → 0. Expect NEAR (see freeze-halts-the-sim). A FAIL here with freeze-halts-the-sim passing means the gravity gate specifically regressed — the ambient pass in 05j must stay behind !_frozen."
+    },
+    {
+      "name": "freeze-stops-swirl",
+      "why": "Same contract with vorticity confinement at its maximum. Confinement is the other force the fluid applies to itself with no hand on the canvas; while frozen it must not be allowed to feed on the curl that is still braking out.",
+      "left": { "scenario": "hotkey-freeze-swirl", "checkpoint": "braked" },
+      "right": { "scenario": "hotkey-freeze-swirl", "checkpoint": "held" },
+      "assert": { "dye": "equal", "vel": "equal", "display": "equal" },
+      "note": "MEASURED 2026-09-12 in one Electron boot, pre-fix vs fix, braked → held at Swirl 60: pre-fix coverage +0.01%, dye mean −0.44%, mean luminance +0.16%, velMean 0.00697 → 0.00803 (+15%) — the residual was GROWING, a swirl feeding on itself against the brake (NEAR on the scalars, moving forever); with the gate coverage and dye mean identical to five decimals (0.28730 / 0.35266), display hash identical, velMean 0.00016 → 0.00001. Expect NEAR (see freeze-halts-the-sim). A FAIL here with freeze-halts-the-sim passing means the confinement gate specifically regressed — the curl and vorticity passes in 05j must stay behind !_frozen."
     }
   ]
 }

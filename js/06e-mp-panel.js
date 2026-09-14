@@ -117,7 +117,7 @@ function showMatchmaking() {
     var dot = document.getElementById('connectionDot');
     if (dot) dot.className = 'mp-dot mp-dot-connecting';
     updateMultiplayerStatus('Finding a stranger…');
-    ['roomDisplay', 'shareHint', 'copyRoomBtn', 'lockRoomBtn', 'lockBadge'].forEach(function(id) { setShown(id, false); });
+    ['roomDisplay', 'shareHint', 'copyRoomRow', 'lockRoomBtn', 'lockBadge'].forEach(function(id) { setShown(id, false); });
 }
 
 function showConnecting() {
@@ -177,7 +177,7 @@ function updateConnectedView() {
     // Room code / share / copy: private rooms only (you can't invite to a 1:1 pairing).
     setShown('roomDisplay', !stranger);
     setShown('shareHint', !stranger);
-    setShown('copyRoomBtn', !stranger);
+    setShown('copyRoomRow', !stranger);
     // Through renderShareMode, never straight to textContent: a direct write
     // would unmask a room the user deliberately hid.
     if (!stranger) renderShareMode();
@@ -275,12 +275,14 @@ function setShareMode(mode) {
     renderShareMode();
 }
 
+// A one-line cue that outlives the next renderShareMode (the connection
+// itself re-renders the block a moment after createRoom copied the link).
+var hintOverride = null;   // { text, until }
 function renderShareMode() {
     var codeEl = document.getElementById('roomName');
     if (!codeEl) return;
     var qrEl = document.getElementById('roomQr');
     var hintEl = document.getElementById('shareHint');
-    var copyEl = document.getElementById('copyRoomBtn');
 
     var ids = { code: 'shareModeCode', qr: 'shareModeQr', hidden: 'shareModeHidden' };
     Object.keys(ids).forEach(function (k) {
@@ -310,11 +312,11 @@ function renderShareMode() {
 
     if (hintEl) {
         hintEl.textContent =
+            (hintOverride && Date.now() < hintOverride.until) ? hintOverride.text :
             mode === 'qr'     ? 'Point a phone camera at this to join.' :
             mode === 'hidden' ? 'Hidden — safe to show on a stream. Copy still works.' :
-                                'Send this code to a friend so they can join.';
+                                'Send a friend the link, or read them the code.';
     }
-    if (copyEl) copyEl.textContent = mode === 'qr' ? 'Copy link' : 'Copy code';
 }
 
 // The room-wide controls hide as a group when nothing inside them applies, so
@@ -329,9 +331,14 @@ function syncHostBlock() {
     block.style.display = any ? '' : 'none';
 }
 
-// Copy the invite. What gets copied follows the share mode: the code in
-// Code and Hide, the full link in QR. Hide is the case that matters — the
-// code reaches the clipboard without ever being drawn on screen.
+// Copy the invite. Two buttons, independent of how the code is DISPLAYED
+// (Code / QR / Hide only decide what is drawn): #copyRoomBtn copies the
+// full join link — what goes into a chat, and the join box accepts a
+// pasted link too (extractRoomCode) — and #copyRoomCodeBtn the bare
+// six-character code for reading out or typing. Both work in Hide: the
+// clipboard is not the screen, which is the point of Hide. Until 2026-09-12
+// one button followed the display mode and copied the link only in QR, so a
+// host showing the code had no one-click link to send.
 function fallbackCopy(text) {
     var ta = document.createElement('textarea');
     ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
@@ -339,16 +346,26 @@ function fallbackCopy(text) {
     try { document.execCommand('copy'); } catch (_) {}
     document.body.removeChild(ta);
 }
-function copyRoomCode(fromCreate) {
+function copyRoomCode(fromCreate, what) {
     if (!currentRoom) return;
-    var asLink = shareMode === 'qr';
+    var asLink = what !== 'code';
     var text = asLink ? roomJoinUrl() : currentRoom;
+    var btnId = asLink ? 'copyRoomBtn' : 'copyRoomCodeBtn';
     var idle = asLink ? 'Copy link' : 'Copy code';
     var flash = function () {
-        var btn = document.getElementById('copyRoomBtn');
-        if (!btn) return;
-        btn.textContent = fromCreate ? 'Copied — send it to a friend' : 'Copied';
-        setTimeout(function () { btn.textContent = idle; }, 2000);
+        var btn = document.getElementById(btnId);
+        if (btn) {
+            btn.textContent = 'Copied';
+            setTimeout(function () { btn.textContent = idle; }, 2000);
+        }
+        // Creating a room copies the link unasked; the hint says so, since a
+        // button half the panel wide cannot. renderShareMode puts the mode's
+        // own hint back.
+        if (fromCreate) {
+            hintOverride = { text: 'Link copied — send it to a friend.', until: Date.now() + 3000 };
+            renderShareMode();
+            setTimeout(function () { hintOverride = null; renderShareMode(); }, 3100);
+        }
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(flash).catch(function () { fallbackCopy(text); flash(); });
@@ -380,6 +397,8 @@ function initMultiplayerUI() {
 
     var copyBtn = document.getElementById('copyRoomBtn');
     if (copyBtn) copyBtn.addEventListener('click', function() { copyRoomCode(false); });
+    var copyCodeBtn = document.getElementById('copyRoomCodeBtn');
+    if (copyCodeBtn) copyCodeBtn.addEventListener('click', function() { copyRoomCode(false, 'code'); });
 
     // Code / QR / Hide. Re-rendered rather than toggled so the QR is only
     // ever built when it is about to be looked at.

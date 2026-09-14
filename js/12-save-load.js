@@ -480,17 +480,18 @@
         const autoloadChk = $('autoloadSettings');
         if (!saveBtn || !loadBtn) { console.warn('Save/Load buttons not found'); return; }
 
+        const saveIdle = saveBtn.textContent;   // "Save settings" (index.html)
         saveBtn.addEventListener('click', () => {
             try {
                 const state = scanAppState();
                 // Also store a collapsed snapshot for debugging
                 window.settingsManager?.set('app.lastSnapshot', state);
                 saveBtn.textContent = 'Saved';
-                setTimeout(() => saveBtn.textContent = 'Save', 1500);
+                setTimeout(() => saveBtn.textContent = saveIdle, 1500);
             } catch (err) {
                 console.error('Save error:', err);
                 saveBtn.textContent = 'Error';
-                setTimeout(() => saveBtn.textContent = 'Save', 2000);
+                setTimeout(() => saveBtn.textContent = saveIdle, 2000);
             }
         });
 
@@ -1110,7 +1111,9 @@
                     armArr.push({ mode: mode, color: c.color || '#ffffff', stepIndex: c.stepIndex || 0,
                                   push: !!c.push });
                 });
-                if (window.settingsManager) {
+                // A look opened from a link (js/50-look-links.js) is applied
+                // live and never written into the recipient's saved session.
+                if (window.settingsManager && !window.__lookLinkApplying) {
                     // Persist the SANITIZED arms, not the raw snapshot — an
                     // old preset's 'rainbow' would otherwise reseed
                     // localStorage and resurrect on the next launch.
@@ -1171,7 +1174,7 @@
             if (snapshot.savedColors && Array.isArray(snapshot.savedColors)) {
                 if (typeof window.savedColors !== 'undefined') window.savedColors = snapshot.savedColors.slice();
                 if (typeof savedColors !== 'undefined') savedColors = snapshot.savedColors.slice();
-                if (typeof colorStorage !== 'undefined' && colorStorage.save) colorStorage.save(snapshot.savedColors);
+                if (typeof colorStorage !== 'undefined' && colorStorage.save && !window.__lookLinkApplying) colorStorage.save(snapshot.savedColors);
                 if (typeof renderSavedColors === 'function') renderSavedColors();
             }
         } catch(_){}
@@ -1712,7 +1715,7 @@
                     window.config.BRUSH_TIP = Math.max(0, Math.min(4, bt.tip | 0));
                     // Mirror the painter's tip live, but never let a REMOTE
                     // snapshot rewrite the local user's saved tip preference.
-                    if (!window.__mpApplyingRemote) {
+                    if (!window.__mpApplyingRemote && !window.__lookLinkApplying) {
                         try { if (window.settingsManager) window.settingsManager.set('brush.tip', window.config.BRUSH_TIP); } catch (_) {}
                     }
                 }
@@ -1816,6 +1819,9 @@
         applyPresetSnapshot(merged);
     }
     window.applyPresetSnapshotFull = applyPresetSnapshotFull;
+    // 50-look-links trims a shared-settings link against this, so only what
+    // differs from it travels.
+    window.baselineLookSnapshot = baselineLookSnapshot;
 
     function getUserPresets() {
         if (!window.Settings) return {};

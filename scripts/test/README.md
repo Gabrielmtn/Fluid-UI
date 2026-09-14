@@ -122,13 +122,22 @@ comments that nothing had ever checked:
   so its sim hashes must equal `plain-stroke`'s. Reports **NEAR**: the
   dye hash differs while coverage is identical to 5 decimals. That is
   standing bug #2 (display→sim coupling) with no measurable magnitude.
-- **`freeze-halts-the-sim`** — reports **FAIL**, and the committed
-  goldens already violate it. Not a lost keypress and not a bug: Space
-  runs `toggleFreeze` (04b:170), which sets `DENSITY_DISSIPATION = 1.0`
-  and `VELOCITY_DISSIPATION = 0.9` — dye stops *fading*, advection keeps
-  running. `isPaused` (05j:237), on **Shift+Space**, is the gate that
-  actually halts the step. Left failing until someone decides whether
-  "Freeze" is meant to hold the picture still.
+- **`freeze-halts-the-sim`** — answered 2026-09-12: Freeze IS meant to
+  hold the picture still, brake included. Space runs `toggleFreeze`
+  (04b), which pins `DENSITY_DISSIPATION = 1.0` and brakes velocity at
+  `VELOCITY_DISSIPATION = 0.9` — dye stops fading and the stroke's own
+  momentum runs out over about a second — and the sim step (05j) now
+  skips the two forces the fluid applies to itself while
+  `window.__fluidFrozen` is up: vorticity confinement (with its curl
+  pass) and the Gravity Direction pad's ambient force. The invariant
+  compares `braked` → `held`, a 30-frame window that opens 92 frames
+  after the keypress, once the brake's tail sits under the velocity
+  tolerance; it reports **NEAR** by design (the hashes move by the
+  geometric residual, the scalars are identical). Its siblings
+  `freeze-stops-gravity` (pad aimed straight down) and
+  `freeze-stops-swirl` (Swirl at 60) guard each gate on its own; the
+  pre-fix and post-fix measurements live in each invariant's note.
+  `isPaused` (05j), on **Shift+Space**, remains the hard halt.
 
 ## GL errors
 

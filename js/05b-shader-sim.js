@@ -2011,6 +2011,7 @@
             uniform sampler2D uTarget;    // dye
             uniform sampler2D uObstacle;
             uniform sampler2D uImage;     // canvas-aligned cut-out, straight alpha
+            uniform vec4 uImageRect;      // where it lands in dye UV: xy = lower-left, zw = size
             uniform float amount;         // deposit strength (0-1)
             uniform int gateColor;        // mirrors splatFrag's COLOR_GATE branch
             uniform float gateFlow;
@@ -2036,7 +2037,13 @@
                 vec4 base4 = texture(uTarget, vUv);
                 vec3 base = base4.xyz;
                 float baseMem = base4.w;
-                vec4 src = texture(uImage, vUv);
+                // (0,0,1,1) is the whole dye at 1:1, exactly the old lookup, so
+                // a canvas-sized pour is unchanged. A smaller rect places a
+                // small bitmap (a line of text) anywhere with no dye-sized
+                // upload; outside it nothing is deposited.
+                vec2 iuv = (vUv - uImageRect.xy) / uImageRect.zw;
+                float inImage = float(all(greaterThanEqual(iuv, vec2(0.0))) && all(lessThanEqual(iuv, vec2(1.0))));
+                vec4 src = texture(uImage, clamp(iuv, 0.0, 1.0)) * inImage;
                 // Same coverage-only wall test as splatFrag's obsBlockDye —
                 // paint goes AROUND a collider at every strength, so a poured
                 // image cannot deposit inside a wall the flow respects.

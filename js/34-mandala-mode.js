@@ -499,9 +499,18 @@
     });
 
     // ── Capture ──────────────────────────────────────────────────────
-    // Guides are a DOM overlay, never part of the drawing buffer, so the
-    // PNG is clean whether or not they're showing.
+    // Same path as Export → Save picture (js/24-video-export.js) since
+    // 2026-09-14: the PNG carries what is on screen — the ground colour,
+    // image layers and text — and the collider film is held off for the
+    // capture. A raw canvas.toBlob used to save the fluid alone over
+    // transparent black. Guides are a DOM overlay, never part of the drawing
+    // buffer, so they stay out either way; the raw path is only the fallback
+    // for a build where the exporter failed to load.
     if (captureBtn) captureBtn.addEventListener('click', function () {
+        if (window.fluidExport && typeof window.fluidExport.still === 'function') {
+            window.fluidExport.still({ prefix: 'mandala-' });
+            return;
+        }
         canvas.toBlob(function (blob) {
             if (!blob) return;
             const a = document.createElement('a');

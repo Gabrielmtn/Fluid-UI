@@ -306,7 +306,9 @@
             const swatches = getCurrentPaletteHexList();
             if (typeof colorStorage !== 'undefined') {
                 savedColors = swatches.slice();
-                colorStorage.save(savedColors);
+                // A look opened from a link (js/50-look-links.js) selects its
+                // palette live and must not rewrite the saved tray.
+                if (!window.__lookLinkApplying) colorStorage.save(savedColors);
             }
             renderPalettePreview(i);
             refreshPaletteCarousel();

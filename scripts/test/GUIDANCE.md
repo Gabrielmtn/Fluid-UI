@@ -169,7 +169,10 @@ obstacle texture is live before the dye arrives, and cutting them tests
 nothing — and `hotkey-freeze-toggle/still-frozen` keeps its 30
 post-freeze frames, because it is compared to `frozen` *within* the run
 where neither residual applies, and at 8 frames the ~2% drift it exists
-to detect would fall inside tolerance and read as a pass.
+to detect would fall inside tolerance and read as a pass. (2026-09-12:
+the freeze invariant now reads the later `braked` → `held` pair, 92 and
+122 frames after the keypress, so that scenario and its two new siblings
+run 90 frames longer; `frozen` / `still-frozen` stay for the goldens.)
 
 The mitigation was also measured NOT to be the whole story. Compared
 run-to-run in one boot, 9 of 11 checkpoints hold their scalars to the
@@ -252,13 +255,13 @@ refactor's safety net and the whole point.
 | 4 | Pigment memory survives clear → baseline drift | 05c/05i, wipe TBD |
 | 5 | Collision-1.0 destruction unreproduced yet; fp16 suspect documented | 04a:416 |
 | 6 | Ctrl+Enter ComfyUI post fires with no typing guard | comfyui-bridge.js:231 |
-| 7 | "Freeze" (Space) does not freeze — it zeroes dye decay and damps velocity 0.9/frame; advection keeps running. Shift+Space (`isPaused`) is the real halt. Product decision, not a test edit | 04b:170, 05j:237 |
+| 7 | CLOSED 2026-09-12 — "Freeze" (Space) now holds the picture still once its 0.9/frame velocity brake runs out: the 05j sub-step loop skips vorticity confinement (and its curl pass) and the Gravity pad's ambient force while `window.__fluidFrozen` is up. Product answer: yes, Freeze means still. The invariant reads a post-brake window and lands NEAR by design; `freeze-stops-gravity` and `freeze-stops-swirl` guard each gate. Shift+Space (`isPaused`) remains the hard halt | 04b, 05j sub-step loop |
 | 8 | `pointer-stroke` deposits bimodally: 155% coverage swing between two runs in ONE boot. Not residual A or B | harness `pointerStroke`, 05d |
 
 Findings 7 and 8 landed 2026-08-26 while adding tolerance comparison and
 the first executable invariants. Both are encoded — 7 as the
-`freeze-halts-the-sim` invariant, which FAILS by design until someone
-answers the product question; 8 in `pointer-stroke`'s scenario comment,
+`freeze-halts-the-sim` invariant (it FAILED by design until the product
+question was answered on 2026-09-12 — see its row); 8 in `pointer-stroke`'s scenario comment,
 which says plainly that its deltas mean nothing yet.
 
 ## 7. Working style that worked (keep it)

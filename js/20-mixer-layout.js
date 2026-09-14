@@ -1698,6 +1698,9 @@
                     e.stopPropagation();
                     const cur = (presets[name] && presets[name].group) || '';
                     const items = [{ head: name }];
+                    // The whole preset as a link that opens in the browser or
+                    // the desktop app (js/50-look-links.js).
+                    if (window.LookLinks) items.push({ label: 'Copy link', run: function () { window.LookLinks.copySnapshot(presets[name], name); } });
                     items.push({ label: 'Update thumbnail', run: function () {
                         if (presetUpdateThumb(name)) {
                             if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
@@ -4017,7 +4020,9 @@
             } else {
                 window.splatInDist = v;
                 inRamp.val.textContent = fmtRamp(v);
-                try { if (window.settingsManager) window.settingsManager.set('brush.splatInDist', v); } catch(_) {}
+                // A look applied from a link (js/50-look-links.js) drives this
+                // slider too; it must not rewrite the saved ramp.
+                try { if (window.settingsManager && !window.__lookLinkApplying) window.settingsManager.set('brush.splatInDist', v); } catch(_) {}
             }
         });
         outRamp.slider.addEventListener('input', function() {
@@ -4029,7 +4034,7 @@
             } else {
                 window.splatOutDist = v;
                 outRamp.val.textContent = fmtRamp(v);
-                try { if (window.settingsManager) window.settingsManager.set('brush.splatOutDist', v); } catch(_) {}
+                try { if (window.settingsManager && !window.__lookLinkApplying) window.settingsManager.set('brush.splatOutDist', v); } catch(_) {}
             }
         });
 
@@ -5163,6 +5168,16 @@
                 row.addEventListener('click', function () { a.select(ov.id); });
 
                 row.appendChild(label);
+                // The line's key, so the list reads as the typewriter's keyboard.
+                if (ov.hotkey && window.Hotkeys) {
+                    var cap = document.createElement('span');
+                    cap.className = 'hk-cap';
+                    cap.textContent = window.Hotkeys.format(ov.hotkey);
+                    cap.title = ov.hotkeyAction === 'toggle' ? 'Press ' + cap.textContent + ' to show or hide this text'
+                        : 'Press ' + cap.textContent + (ov.hotkeyAt === 'arranged' ? ' to pour this text where it is arranged'
+                            : ' to pour this text at the brush') + ' — hold it to keep pouring';
+                    row.appendChild(cap);
+                }
                 row.appendChild(mkRowBtn('✥', 'Arrange on canvas', 'btn--ghost', function () {
                     a.select(ov.id); a.openArrange(ov.id); syncArrangeBtn();
                 }));
@@ -5466,6 +5481,65 @@
                 : 'The wall traces the letterforms, not a box.';
         }
 
+        // Hotkey: a key that fires this line from anywhere — pours it into
+        // the fluid (Fluidize) or shows and hides it. The picker, the app's
+        // reserved keys and the dispatcher are js/48-hotkeys.js; the line
+        // stores the combo (textOverlays.setHotkey). "When pressed" only
+        // appears once there is a key to press.
+        var hotkeyPicker = null, hotkeyShownFor = null, hotkeyAtRow = null;
+        var hotkeyActionSel = selectInput('textOverlayHotkeyAction', [
+            ['pour', 'Pour into fluid'], ['toggle', 'Show / hide']
+        ], 'Pour: the text drops into the fluid, at the brush or where it is arranged — every press pours it again, ' +
+           'and holding the key keeps pouring, like the Constant-flow brush. ' +
+           'Show / hide: the text itself appears and disappears on the canvas.',
+            function (v) { commitHotkey({ hotkeyAction: v }); });
+        var hotkeyActionField = field('When pressed', hotkeyActionSel);
+        if (window.Hotkeys && typeof window.Hotkeys.picker === 'function') {
+            var hotkeyNote = document.createElement('div');
+            hotkeyPicker = window.Hotkeys.picker({
+                noteEl: hotkeyNote,
+                selfId: function () { var id = selId(); return id == null ? null : 'text:' + id; },
+                hint: 'Pressing it anywhere, except while typing in a box, fires this text — like a typewriter that types whole lines. Hold it to keep pouring.',
+                onChange: function (combo) { commitHotkey({ hotkey: combo }); }
+            });
+            var hotkeyRow = rowEl(8);
+            hotkeyRow.appendChild(field('Hotkey', hotkeyPicker.el));
+            hotkeyRow.appendChild(hotkeyActionField);
+            editor.appendChild(hotkeyRow);
+            editor.appendChild(hotkeyNote);
+            // Where a pour lands. Off is Fluidize exactly: where the line is
+            // arranged, and the line leaves the canvas.
+            hotkeyAtRow = checkboxRow('textOverlayHotkeyAtBrush', 'Pour at the brush location',
+                function (v) { commitHotkey({ hotkeyAt: v ? 'brush' : 'arranged' }); });
+            hotkeyAtRow.querySelector('label').title =
+                'On: the text lands centred on your brush, wherever it is when you press the key, and the line itself stays put. ' +
+                'Off: it pours where the text is arranged on the canvas and leaves the canvas, the same as Fluidize.';
+            editor.appendChild(hotkeyAtRow);
+        }
+
+        function commitHotkey(props) {
+            var a = api(); var id = selId();
+            if (!a || id == null || typeof a.setHotkey !== 'function') return;
+            suppressSync = true;
+            try { a.setHotkey(id, props); } finally { suppressSync = false; }
+            syncHotkeyRow(a.get(id));
+        }
+
+        // Re-seat the picker only when the line or its key changed under it:
+        // a message it is showing ("Moved from …") must outlive the change
+        // notification its own edit sets off.
+        function syncHotkeyRow(ov) {
+            if (!hotkeyPicker || !ov) return;
+            var hk = ov.hotkey || '';
+            if (hotkeyShownFor !== ov.id || hotkeyPicker.getValue() !== hk) hotkeyPicker.setValue(hk);
+            hotkeyShownFor = ov.id;
+            hotkeyActionSel.value = ov.hotkeyAction === 'toggle' ? 'toggle' : 'pour';
+            hotkeyActionField.style.display = hk ? '' : 'none';
+            // Only a pour lands somewhere; Show / hide leaves the line where it is.
+            hotkeyAtRow.input.checked = ov.hotkeyAt !== 'arranged';
+            hotkeyAtRow.style.display = (hk && ov.hotkeyAction !== 'toggle') ? '' : 'none';
+        }
+
         var itemActions = rowEl(10);
         var dupBtn = document.createElement('button');
         dupBtn.type = 'button';
@@ -5553,6 +5627,7 @@
             colliderStrengthSlider.setValue(typeof ov.colliderStrength === 'number' ? ov.colliderStrength : 1);
             syncBgEnabled();
             syncColliderHint();
+            syncHotkeyRow(ov);
         }
 
         addBtn.addEventListener('click', function () {
@@ -6461,6 +6536,7 @@
 
         var videoBtn = document.createElement('button');
         videoBtn.textContent = 'Video';
+        videoBtn.title = 'Record a clip of the canvas as it moves (E). MP4 where the browser can, WebM otherwise; the background goes under the paint.';
         videoBtn.style.cssText = 'cursor:pointer;';
         videoBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.video();
@@ -6469,14 +6545,19 @@
 
         var gifBtn = document.createElement('button');
         gifBtn.textContent = 'GIF';
+        gifBtn.title = 'Record a short looping GIF (640 px wide, background included).';
         gifBtn.style.cssText = 'cursor:pointer;';
         gifBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.gif();
         });
         quickGrid.appendChild(gifBtn);
 
+        // "Save picture", not "Still" (2026-09-14): the one-click way to keep
+        // what is on screen has to say so — "Save" elsewhere in the app means
+        // settings, a preset or a project.
         var stillBtn = document.createElement('button');
-        stillBtn.textContent = 'Still';
+        stillBtn.textContent = 'Save picture';
+        stillBtn.title = 'Save a PNG of what you see — background, layers and text included. Background, below, switches between As seen and Transparent.';
         stillBtn.style.cssText = 'cursor:pointer;';
         stillBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.still();
@@ -6485,6 +6566,7 @@
 
         var seqBtn = document.createElement('button');
         seqBtn.textContent = 'Sequence';
+        seqBtn.title = 'Save every frame of a few seconds as numbered PNGs (a ZIP in the browser, a folder in the desktop app).';
         seqBtn.style.cssText = 'cursor:pointer;';
         seqBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.sequence();
@@ -6492,6 +6574,27 @@
         quickGrid.appendChild(seqBtn);
 
         body.appendChild(quickGrid);
+
+        // Background policy (2026-09-14): what a picture carries under the
+        // paint — the exporter's cfg.ground (js/24-video-export.js). GIF, JPG
+        // and video have no alpha and always get the colour.
+        var groundRow = document.createElement('div');
+        groundRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin:-6px 0 12px;';
+        var groundLabel = document.createElement('label');
+        groundLabel.htmlFor = 'exportGround';
+        groundLabel.textContent = 'Background';
+        groundLabel.style.cssText = 'margin:0;flex:1;font-size:11px;';
+        groundRow.appendChild(groundLabel);
+        var groundSel = document.createElement('select');
+        groundSel.id = 'exportGround';
+        groundSel.title = 'As seen: the background colour goes under the paint, so the file matches the screen. Transparent: a PNG keeps the paint alone with its alpha. GIF, JPG and video always get a background, since they cannot hold transparency: the Background Color, or black when Display → Transparent Background is on.';
+        [['seen', 'As seen'], ['transparent', 'Transparent (PNG)']].forEach(function (o) {
+            var opt = document.createElement('option');
+            opt.value = o[0]; opt.textContent = o[1];
+            groundSel.appendChild(opt);
+        });
+        groundRow.appendChild(groundSel);
+        body.appendChild(groundRow);
 
         // Stop button (hidden until export starts)
         var stopBtn = document.createElement('button');
@@ -6636,6 +6739,7 @@
                 fpsSelect.value = String(c.videoFPS);
                 gifDurationInput.value = Math.round(c.gifDuration / 1000);
                 gifFpsSelect.value = String(c.gifFPS);
+                groundSel.value = (c.ground === 'transparent') ? 'transparent' : 'seen';
             }
         }, 500);
 
@@ -6662,6 +6766,10 @@
             if (window.fluidExport) {
                 window.fluidExport.setConfig('gifFPS', parseInt(gifFpsSelect.value));
             }
+        });
+
+        groundSel.addEventListener('change', function () {
+            if (window.fluidExport) window.fluidExport.setConfig('ground', groundSel.value);
         });
 
         return sec;

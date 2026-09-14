@@ -624,8 +624,9 @@
         // The dye is the live simulation, not a document — like every dab, this
         // is not undoable; it dissolves on its own.
         window.__dyeTexSize = function () { return { w: dyeTexWidth, h: dyeTexHeight }; };
-        window.__splatImageToDye = function (src, amount) {
-            if (!density || !src) return false;
+        // Uploads a canvas/image on unit 2, the way the image splat samples
+        // it. Null if the upload throws.
+        function uploadDyeImage(src) {
             let tex = null;
             try {
                 tex = gl.createTexture();
@@ -646,12 +647,62 @@
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                return tex;
             } catch (e) {
+                // A throw mid-upload must not leave FLIP_Y set for the next
+                // upload anywhere else in the app.
+                try { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); } catch (_) {}
                 if (tex) { try { gl.deleteTexture(tex); } catch (_) {} }
                 gl.activeTexture(gl.TEXTURE0);
-                return false;
+                return null;
+            }
+        }
+        // A bitmap uploaded ONCE to be poured many times — a held text hotkey
+        // pours the same line on every Constant-flow tick. Hand it to
+        // __splatImageToDye in place of a canvas and the upload is skipped;
+        // dispose() when done with it.
+        window.__dyeStamp = function (src) {
+            if (!src || !(src.width > 0) || !(src.height > 0)) return null;
+            const tex = uploadDyeImage(src);
+            gl.activeTexture(gl.TEXTURE0);
+            if (!tex) return null;
+            return {
+                tex: tex, width: src.width, height: src.height,
+                dispose: function () {
+                    if (this.tex) { try { gl.deleteTexture(this.tex); } catch (_) {} this.tex = null; }
+                }
+            };
+        };
+        // rect (optional): where the image lands, { x, y, w, h } in dye texels
+        // from the TOP-left, like a canvas. Omitted, the image covers the whole
+        // dye at 1:1 — the one placement there used to be. A small bitmap at a
+        // rect is what lets a line of text pour without a dye-sized upload.
+        window.__splatImageToDye = function (src, amount, rect) {
+            if (!density || !src) return false;
+            const stamp = (src.tex !== undefined && typeof src.dispose === 'function') ? src : null;
+            let tex = null;
+            if (stamp) {
+                if (!stamp.tex) return false;
+                tex = stamp.tex;
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, tex);
+            } else {
+                tex = uploadDyeImage(src);
+                if (!tex) return false;
             }
             imageSplatProg.bind();
+            // Lower-left corner and size in dye UV. Guarded: a shader build
+            // without the uniform draws the image full-dye as before, and
+            // placesRects tells callers not to hand it a small bitmap.
+            if (imageSplatProg.uniforms.uImageRect) {
+                if (rect) {
+                    gl.uniform4f(imageSplatProg.uniforms.uImageRect,
+                        rect.x / dyeTexWidth, 1 - (rect.y + rect.h) / dyeTexHeight,
+                        rect.w / dyeTexWidth, rect.h / dyeTexHeight);
+                } else {
+                    gl.uniform4f(imageSplatProg.uniforms.uImageRect, 0, 0, 1, 1);
+                }
+            }
             gl.disable(gl.BLEND);
             gl.uniform1i(imageSplatProg.uniforms.uTarget, 0);
             gl.uniform1i(imageSplatProg.uniforms.uObstacle, 1);
@@ -686,10 +737,11 @@
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
             blit(density.write.fbo);
             density.swap();
-            try { gl.deleteTexture(tex); } catch (_) {}
+            if (!stamp) { try { gl.deleteTexture(tex); } catch (_) {} }
             gl.activeTexture(gl.TEXTURE0);
             return true;
         };
+        window.__splatImageToDye.placesRects = !!imageSplatProg.uniforms.uImageRect;
         // Capture: freeze the current fluid dye into the sketch layer —
         // over-composited (captureFrag emits premultiplied color with
         // alpha = max channel), so existing sketch content shows through

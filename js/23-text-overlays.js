@@ -30,9 +30,16 @@
  * overlay into the dye through the same image-splat path a layer takes,
  * then hides it. See fluidize() after the composite section.
  *
+ * Any overlay can carry a HOTKEY (js/48-hotkeys.js): a key that fires the
+ * line from anywhere — pours the whole block into the fluid, centred on the
+ * brush or where the line is arranged, a typewriter whose keys type
+ * paragraphs — or shows and hides it. See the hotkey section after the
+ * collider.
+ *
  * window.textOverlays = {
  *   add, remove, update, toggle, clearAll, getAll, renderAll,
  *   compositeOntoCanvas, fluidize, hasCollider, refreshColliders,
+ *   setHotkey, triggerHotkey,
  *   FONTS, DEFAULTS, POSITIONS,
  *   openArrange, closeArrange, isArranging, select, getSelectedId, onChange
  * }
@@ -185,6 +192,7 @@
             canvasArea.appendChild(container);
         }
         loadSaved();
+        registerHotkeys();
         watchLayout();
         syncCollidersWhenReady();
         // Keep overlays anchored proportionally when the canvas-area resizes —
@@ -248,6 +256,12 @@
         }
         // Legacy field name from the branding era.
         if (opts.textShadow !== undefined && opts.shadow === undefined) overlay.shadow = !!opts.textShadow;
+        overlay.hotkey = hotkeyOf(opts.hotkey);
+        overlay.hotkeyAction = hotkeyActionOf(opts.hotkeyAction);
+        overlay.hotkeyAt = hotkeyAtOf(opts.hotkeyAt);
+        // One key, one line. A copy (Duplicate) arrives without the key its
+        // source holds, rather than firing alongside it.
+        if (hotkeyHolder(overlay.hotkey)) overlay.hotkey = '';
         overlays.push(overlay);
         renderOverlay(overlay);
         save(); emitChange(); syncColliders();
@@ -370,6 +384,9 @@
         for (var i = 0; i < changeListeners.length; i++) {
             try { changeListeners[i](); } catch (_) {}
         }
+        // A line's key, words or visibility may have moved; the Settings
+        // list of hotkeys shows all three (coalesced there, once a frame).
+        if (window.Hotkeys && typeof window.Hotkeys.changed === 'function') window.Hotkeys.changed();
     }
 
     // ─── PERSISTENCE ────────────────────────────────────────────
@@ -406,6 +423,9 @@
             ov[k] = (o[k] !== undefined && o[k] !== null) ? o[k] : DEFAULTS[k];
         }
         if (o.shadow === undefined && o.textShadow !== undefined) ov.shadow = !!o.textShadow;
+        ov.hotkey = hotkeyOf(o.hotkey);
+        ov.hotkeyAction = hotkeyActionOf(o.hotkeyAction);
+        ov.hotkeyAt = hotkeyAtOf(o.hotkeyAt);
         return ov;
     }
 
@@ -420,6 +440,7 @@
                 if (data[i] && data[i].type && data[i].type !== 'text') { migrated = true; continue; }
                 var ov = hydrate(data[i]);
                 if (!ov) continue;
+                if (hotkeyHolder(ov.hotkey)) ov.hotkey = '';   // first line on a key keeps it
                 overlays.push(ov);
                 renderOverlay(ov);
             }
@@ -860,6 +881,9 @@
         }
 
         if (NATIVE_LETTER_SPACING) ctx.letterSpacing = '0px';
+        // The unrotated box it laid out, in the ctx's own units — what a pour
+        // sizes its bitmap from, so it never has to guess the text's extent.
+        return { w: boxW, h: boxH };
     }
 
     // ===========================================================
@@ -889,16 +913,12 @@
     function fluidize(id) {
         var ov = findOverlay(id);
         if (!ov) return false;
-        var say = function (t, m) {
-            if (typeof window.appAlert === 'function') window.appAlert(t, m);
-            else alert(t + '\n\n' + m);
-        };
         if (typeof window.__splatImageToDye !== 'function' || typeof window.__dyeTexSize !== 'function') {
-            say('The simulation is still starting', 'Give it a moment and try again.');
+            tell('The simulation is still starting', 'Give it a moment and try again.');
             return false;
         }
         if (!colliderGeom()) {
-            say('Could not fluidize that text', 'The canvas has no size yet. Try again in a moment.');
+            tell('Could not fluidize that text', 'The canvas has no size yet. Try again in a moment.');
             return false;
         }
         var wasVisible = !!ov.visible;
@@ -909,28 +929,10 @@
             if (!live) return;                       // deleted while we waited
             var ok = false;
             try {
+                // Centred where the line is arranged: overlay fractions of
+                // #canvas-area → CSS px of #canvas.
                 var g = colliderGeom();
-                var dye = window.__dyeTexSize();
-                if (g && dye && dye.w > 0 && dye.h > 0) {
-                    // Same mapping as colliderDraw, with the dye texture
-                    // standing in for the obstacle: overlay fractions of
-                    // #canvas-area → CSS px of #canvas → dye texels. Alpha
-                    // is the on-screen opacity, as the composite paints it.
-                    var out = document.createElement('canvas');
-                    out.width = dye.w; out.height = dye.h;
-                    var ctx = out.getContext('2d');
-                    var kx = dye.w / g.cssW, ky = dye.h / g.cssH;
-                    ctx.translate((live.x * g.areaW - g.offX) * kx, (live.y * g.areaH - g.offY) * ky);
-                    ctx.scale(kx, ky);
-                    ctx.rotate((live.rotation || 0) * Math.PI / 180);
-                    ctx.globalAlpha = (typeof live.opacity === 'number') ? live.opacity : 1;
-                    paintOverlay(ctx, live, false);
-                    // The console tunable a poured layer reads too:
-                    // config.SPLAT_TO_FLUID_AMOUNT = 0.4 pours a fainter ghost.
-                    var amount = (window.config && typeof window.config.SPLAT_TO_FLUID_AMOUNT === 'number')
-                        ? window.config.SPLAT_TO_FLUID_AMOUNT : 1;
-                    ok = !!window.__splatImageToDye(out, amount);
-                }
+                ok = !!g && pourAt(live, live.x * g.areaW - g.offX, live.y * g.areaH - g.offY, g);
             } catch (e) {
                 console.warn('⚠️ Text fluidize failed for overlay', id, e);
                 ok = false;
@@ -939,10 +941,128 @@
             // Put it back the way it was. Selection was never touched, so
             // the editor the click came from is still open.
             if (wasVisible && !live.visible) setVisible(live, true);
-            say('Could not fluidize that text', 'The simulation refused the image. Try again, or reload if it keeps happening.');
+            tell('Could not fluidize that text', 'The simulation refused the image. Try again, or reload if it keeps happening.');
         }
         requestAnimationFrame(function () { requestAnimationFrame(pour); });
         return true;
+    }
+
+    // Pours one line centred on (cx, cy), in CSS px of #canvas — the shared
+    // half of Fluidize and a hotkey's pour at the brush. The line becomes a
+    // bitmap just big enough for it (makeStamp), placed on the dye by the
+    // image splat's rect; only a shader build that cannot place one falls
+    // back to painting the whole dye.
+    function pourAt(ov, cx, cy, g) {
+        if (!canStamp()) return pourWhole(ov, cx, cy, g);
+        var ps = makeStamp(ov, g, cx, cy);
+        if (!ps) return false;
+        try { return pourStamp(ps, cx, cy, g, pourAmount()); }
+        finally { ps.stamp.dispose(); }
+    }
+
+    // The console tunable a poured layer reads too:
+    // config.SPLAT_TO_FLUID_AMOUNT = 0.4 pours a fainter ghost.
+    function pourAmount() {
+        return (window.config && typeof window.config.SPLAT_TO_FLUID_AMOUNT === 'number')
+            ? window.config.SPLAT_TO_FLUID_AMOUNT : 1;
+    }
+
+    function canStamp() {
+        return typeof window.__dyeStamp === 'function' && !!(window.__splatImageToDye && window.__splatImageToDye.placesRects);
+    }
+
+    // A line as a pour-ready bitmap: its own box, rotated, plus a margin — a
+    // glyph can overhang its advance box (italics, swashes) and the shadow
+    // blurs past it — in dye texels, uploaded ONCE (05i __dyeStamp) so a
+    // held key can pour it again and again. Same mapping as colliderDraw,
+    // with the dye standing in for the obstacle: CSS px of #canvas → dye
+    // texels; alpha is the on-screen opacity, as the composite paints it.
+    //
+    // (cx, cy), when given, is the spot this bitmap is FOR: the text is drawn
+    // at that spot's sub-texel phase, so it rasterises exactly as it would on
+    // a dye-sized canvas — canvas text snaps its baseline to whole pixels, and
+    // the wrong phase moved a pour a full texel (measured). A held key reuses
+    // one bitmap at every spot and is within half a texel instead.
+    var measureCtx = null;
+    function makeStamp(ov, g, cx, cy) {
+        var dye = window.__dyeTexSize();
+        if (!g || !dye || !(dye.w > 0) || !(dye.h > 0)) return null;
+        var kx = dye.w / g.cssW, ky = dye.h / g.cssH;
+        if (!measureCtx) {
+            var one = document.createElement('canvas');
+            one.width = one.height = 1;
+            measureCtx = one.getContext('2d');
+        }
+        measureCtx.save();
+        var box;
+        try { box = paintOverlay(measureCtx, ov, false); } finally { measureCtx.restore(); }
+        var m = (ov.fontSize || 48) + 12;
+        var bw = box.w + 2 * m, bh = box.h + 2 * m;
+        var rot = (ov.rotation || 0) * Math.PI / 180;
+        var c = Math.abs(Math.cos(rot)), s = Math.abs(Math.sin(rot));
+        var W = Math.max(1, Math.min(dye.w * 2, Math.ceil((bw * c + bh * s) * kx) + 2));
+        var H = Math.max(1, Math.min(dye.h * 2, Math.ceil((bw * s + bh * c) * ky) + 2));
+        // Where the text's centre sits in the bitmap: the middle, nudged by
+        // the target spot's fractional texel so placement (below) is exact.
+        var ox = W / 2, oy = H / 2;
+        if (typeof cx === 'number' && typeof cy === 'number') {
+            var ax = cx * kx - ox, ay = cy * ky - oy;
+            ox += ax - Math.floor(ax);
+            oy += ay - Math.floor(ay);
+        }
+        var cv = document.createElement('canvas');
+        cv.width = W; cv.height = H;
+        var ctx = cv.getContext('2d');
+        ctx.translate(ox, oy);
+        ctx.scale(kx, ky);
+        ctx.rotate(rot);
+        ctx.globalAlpha = (typeof ov.opacity === 'number') ? ov.opacity : 1;
+        paintOverlay(ctx, ov, false);
+        var st = window.__dyeStamp(cv);
+        return st ? { stamp: st, w: W, h: H, ox: ox, oy: oy, dw: dye.w, dh: dye.h } : null;
+    }
+
+    // Snapped to whole texels, so the bitmap's texels land exactly on the
+    // dye's and a pour is a copy, not a resample. At the spot the bitmap was
+    // built for that is exact; anywhere else the centre moves under half a
+    // texel for it.
+    function pourStamp(ps, cx, cy, g, amount) {
+        var kx = ps.dw / g.cssW, ky = ps.dh / g.cssH;
+        var x = Math.round(cx * kx - ps.ox), y = Math.round(cy * ky - ps.oy);
+        return !!window.__splatImageToDye(ps.stamp, amount, { x: x, y: y, w: ps.w, h: ps.h });
+    }
+
+    // The pre-stamp path: the line painted into a dye-sized canvas at its
+    // spot, poured at 1:1. One scratch canvas, reused.
+    var pourCanvas = null, pourCtx = null;
+    function pourWhole(ov, cx, cy, g) {
+        var dye = window.__dyeTexSize();
+        if (!g || !dye || !(dye.w > 0) || !(dye.h > 0)) return false;
+        if (!pourCanvas || pourCanvas.width !== dye.w || pourCanvas.height !== dye.h) {
+            pourCanvas = document.createElement('canvas');
+            pourCanvas.width = dye.w; pourCanvas.height = dye.h;
+            pourCtx = pourCanvas.getContext('2d');
+        }
+        var ctx = pourCtx;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, dye.w, dye.h);
+        var kx = dye.w / g.cssW, ky = dye.h / g.cssH;
+        ctx.save();
+        try {
+            ctx.translate(cx * kx, cy * ky);
+            ctx.scale(kx, ky);
+            ctx.rotate((ov.rotation || 0) * Math.PI / 180);
+            ctx.globalAlpha = (typeof ov.opacity === 'number') ? ov.opacity : 1;
+            paintOverlay(ctx, ov, false);
+        } finally {
+            ctx.restore();   // a reused context must not carry the shadow to the next pour
+        }
+        return !!window.__splatImageToDye(pourCanvas, pourAmount());
+    }
+
+    function tell(title, msg) {
+        if (typeof window.appAlert === 'function') window.appAlert(title, msg);
+        else alert(title + '\n\n' + msg);
     }
 
     // ===========================================================
@@ -1293,6 +1413,220 @@
         setTimeout(function () { syncCollidersWhenReady(n); }, n < 20 ? 100 : 1000);
     }
 
+    // ===========================================================
+    //  HOTKEYS - a key that fires a line from anywhere
+    // ===========================================================
+    // `hotkey` is a js/48-hotkeys.js combo ('KeyQ', 'Shift+Digit9'; '' is
+    // none). `hotkeyAction` says what the press does: 'pour' drops the whole
+    // block into the fluid, every press pours again and a held key keeps
+    // pouring (see "Holding the key" below), and 'toggle' shows and hides
+    // the line. `hotkeyAt` says where a pour lands: 'brush' — centred
+    // on the brush, wherever it is when the key goes down, like a stamp the
+    // shape of the text — or 'arranged', where the line sits on the canvas,
+    // which is Fluidize exactly. All three are kept OUT of DEFAULTS on
+    // purpose: DEFAULTS is the look a new line inherits (+ Add Text carries
+    // the last one over), and a key is not a look.
+    //
+    // Hotkeys.js asks for this module's bindings on every press (the source
+    // registered below), so a deleted line, Clear All or a preset load can
+    // never leave a key firing at nothing.
+    var HOTKEY_ACTIONS = { pour: 1, toggle: 1 };
+
+    function hotkeyOf(v) {
+        if (!v) return '';
+        var H = window.Hotkeys;
+        return (H && typeof H.normalize === 'function') ? H.normalize(String(v)) : String(v);
+    }
+
+    function hotkeyActionOf(v) { return HOTKEY_ACTIONS[v] ? v : 'pour'; }
+
+    function hotkeyAtOf(v) { return v === 'arranged' ? 'arranged' : 'brush'; }
+
+    function hotkeyHolder(combo) {
+        if (!combo) return null;
+        for (var i = 0; i < overlays.length; i++) {
+            if (overlays[i].hotkey === combo) return overlays[i];
+        }
+        return null;
+    }
+
+    // The key fields change nothing on screen, so they skip update()'s
+    // re-render and — the part that matters — its collider resync, which
+    // takes a text wall down for the settle window and carves the dye again
+    // when it comes back.
+    function setHotkey(id, props) {
+        var ov = findOverlay(id);
+        if (!ov || !props) return null;
+        if (props.hasOwnProperty('hotkey')) ov.hotkey = hotkeyOf(props.hotkey);
+        if (props.hasOwnProperty('hotkeyAction')) ov.hotkeyAction = hotkeyActionOf(props.hotkeyAction);
+        if (props.hasOwnProperty('hotkeyAt')) ov.hotkeyAt = hotkeyAtOf(props.hotkeyAt);
+        save(); emitChange();
+        return ov;
+    }
+
+    // Toggle goes through setVisible, not toggleOverlay: that one drops the
+    // selection on hide, so a key pressed with the line open in the editor
+    // would fold the editor shut, and the sidebar would jump on every press.
+    function triggerHotkey(id) {
+        var ov = findOverlay(id);
+        if (!ov) return false;
+        if (ov.hotkeyAction === 'toggle') { setVisible(ov, !ov.visible); return true; }
+        return ov.hotkeyAt === 'arranged' ? fluidize(id) : pourAtBrush(ov);
+    }
+
+    // A pour at the brush, in the line's own font, size, colour and angle.
+    // Unlike Fluidize the line is left alone: here it is the stamp, not the
+    // thing being poured, and printing a copy somewhere else must not make
+    // the original vanish. With nothing hidden there is no wall to wait out
+    // either, so it lands on the press, not two frames later. Until the
+    // pointer has been over the canvas there is no brush spot, and the pour
+    // lands where the line is arranged.
+    function pourAtBrush(ov) {
+        if (typeof window.__splatImageToDye !== 'function' || typeof window.__dyeTexSize !== 'function') {
+            tell('The simulation is still starting', 'Give it a moment and try again.');
+            return false;
+        }
+        var g = colliderGeom();
+        if (!g) return false;
+        var p = brushSpot(g) || arrangedSpot(ov, g);
+        try { return pourAt(ov, p.x, p.y, g); }
+        catch (e) { console.warn('⚠️ Text pour at the brush failed for overlay', ov.id, e); return false; }
+    }
+
+    // The brush, in CSS px of #canvas. 05d keeps window.__cursorPos (canvas
+    // px) current on every pointer move over the canvas — hovering too, and
+    // the Pen Input Window's pen — so this is where the ring is, or last was.
+    function brushSpot(g) {
+        var p = window.__cursorPos, cv = document.getElementById('canvas');
+        if (!p || !p.at || !cv || !cv.width || !cv.height) return null;
+        return { x: p.x / cv.width * g.cssW, y: p.y / cv.height * g.cssH };
+    }
+
+    // Where the line is arranged, in CSS px of #canvas.
+    function arrangedSpot(ov, g) {
+        return { x: ov.x * g.areaW - g.offX, y: ov.y * g.areaH - g.offY };
+    }
+
+    // ── Holding the key: a constant pour ────────────────────────
+    // A tap is one strike. Held past HOLD_DELAY_MS, the line keeps pouring on
+    // the Constant-flow brush's own rhythm, not the OS key repeat's: its
+    // Interval (config.BRUSH_DAB_INTERVAL_MS) on the SIMULATED clock, each
+    // pour carrying the brush's per-dab share of the reference dye
+    // (BRUSH_DAB_RATE_REF / rate, never above full, 05j). So a held line lays
+    // paint at the rate a held brush does at any Interval, the Time slider
+    // meters it, and a paused sim takes none. At the brush it follows the
+    // hand, the pours spread along the path moved since the last one the way
+    // the hose spreads its dabs, so a held key paints with the text;
+    // arranged, the line is a fountain at its own spot. One upload per hold:
+    // every pour reuses the stamp.
+    var HOLD_DELAY_MS = 200;
+    var HOLD_POURS_PER_FRAME = 8;     // spike guard, the text twin of BRUSH_DAB_BUDGET
+    var holds = {};                   // overlay id → { t0, sim, credit, ps, last }
+    var holdRaf = 0;
+
+    function pressHotkey(id) {
+        var ov = findOverlay(id);
+        if (!ov) return;
+        triggerHotkey(id);                                   // the strike (or the toggle)
+        endHold(id);
+        if (ov.hotkeyAction === 'toggle') return;            // nothing to keep doing
+        holds[id] = { t0: performance.now(), sim: null, credit: 0, ps: null, last: null };
+        if (!holdRaf) holdRaf = requestAnimationFrame(holdTick);
+    }
+
+    function endHold(id) {
+        var h = holds[id];
+        if (!h) return;
+        delete holds[id];
+        if (h.ps) { try { h.ps.stamp.dispose(); } catch (_) {} }
+    }
+
+    function holdTick() {
+        holdRaf = 0;
+        var ids = Object.keys(holds);
+        if (!ids.length) return;
+        var now = performance.now();
+        var simNow = window.__simTimeMs;
+        // 01-config's flag, shared by every classic script. __simTimeMs keeps
+        // counting through a pause (05j), so the pause has to be asked.
+        var paused = (typeof isPaused !== 'undefined') && !!isPaused;
+        var cfg = window.config || {};
+        var ivl = (typeof cfg.BRUSH_DAB_INTERVAL_MS === 'number' && cfg.BRUSH_DAB_INTERVAL_MS > 0) ? cfg.BRUSH_DAB_INTERVAL_MS : 8;
+        var rate = 1000 / ivl;
+        var rateRef = (typeof cfg.BRUSH_DAB_RATE_REF === 'number' && cfg.BRUSH_DAB_RATE_REF > 0) ? cfg.BRUSH_DAB_RATE_REF : 62.5;
+        var amount = pourAmount() * Math.min(1, rateRef / rate);
+        var g = colliderGeom();
+        var dye = window.__dyeTexSize ? window.__dyeTexSize() : null;
+        ids.forEach(function (key) {
+            var h = holds[key];
+            var ov = findOverlay(+key);
+            if (!ov || ov.hotkeyAction === 'toggle') { endHold(key); return; }
+            var dt = (typeof simNow === 'number' && typeof h.sim === 'number') ? Math.max(0, simNow - h.sim) : 0;
+            h.sim = simNow;
+            // Still a tap, or nothing to pour into: no flow, and no credit
+            // piling up to arrive all at once later.
+            if (now - h.t0 < HOLD_DELAY_MS || paused || !g || !dye || !canStamp()) return;
+            h.credit += rate * dt / 1000;
+            var n = Math.floor(h.credit);
+            h.credit -= n;
+            if (n > HOLD_POURS_PER_FRAME) n = HOLD_POURS_PER_FRAME;
+            if (n <= 0) return;
+            // Rebuilt when the dye resolution moves under the hold, or a pour
+            // would land at the old texel size.
+            if (!h.ps || h.ps.dw !== dye.w || h.ps.dh !== dye.h) {
+                if (h.ps) { try { h.ps.stamp.dispose(); } catch (_) {} }
+                h.ps = makeStamp(ov, g);
+                if (!h.ps) return;
+            }
+            var spot = (ov.hotkeyAt === 'arranged') ? arrangedSpot(ov, g) : (brushSpot(g) || arrangedSpot(ov, g));
+            var from = h.last || spot;
+            try {
+                for (var i = 1; i <= n; i++) {
+                    var t = i / n;
+                    pourStamp(h.ps, from.x + (spot.x - from.x) * t, from.y + (spot.y - from.y) * t, g, amount);
+                }
+            } catch (e) {
+                console.warn('⚠️ Text held pour failed for overlay', ov.id, e);
+                endHold(key);
+                return;
+            }
+            h.last = spot;
+        });
+        if (Object.keys(holds).length) holdRaf = requestAnimationFrame(holdTick);
+    }
+
+    // How a binding names its line in messages ("Q is on “Hello”").
+    function hotkeyLabel(ov) {
+        var first = String(ov.content || '').split('\n')[0].trim();
+        if (!first) return 'an empty line of text';
+        if (first.length > 24) first = first.slice(0, 23) + '…';
+        return '“' + first + '”';
+    }
+
+    function registerHotkeys() {
+        var H = window.Hotkeys;
+        if (!H || typeof H.addSource !== 'function') return;
+        H.addSource('text', function () {
+            var out = [];
+            overlays.forEach(function (ov) {
+                if (!ov.hotkey) return;
+                var id = ov.id;
+                out.push({
+                    id: 'text:' + id,
+                    combo: ov.hotkey,
+                    label: hotkeyLabel(ov),
+                    does: ov.hotkeyAction === 'toggle' ? 'shows and hides'
+                        : ov.hotkeyAt === 'arranged' ? 'pours where it is arranged' : 'pours at the brush',
+                    run: function () { pressHotkey(id); },
+                    release: function () { endHold(id); },
+                    set: function (combo) { setHotkey(id, { hotkey: combo }); },
+                    clear: function () { setHotkey(id, { hotkey: '' }); }
+                });
+            });
+            return out;
+        });
+    }
+
     // ─── PUBLIC API ─────────────────────────────────────────────
     var api = {
         add: addTextOverlay,
@@ -1306,6 +1640,8 @@
         renderAll: renderAll,
         compositeOntoCanvas: compositeOntoCanvas,
         fluidize: fluidize,                 // pour one line into the dye and hide it
+        setHotkey: setHotkey,               // { hotkey, hotkeyAction } without a re-render
+        triggerHotkey: triggerHotkey,       // what pressing a line's key does
         hasCollider: anyCollider,
         refreshColliders: syncColliders,
         colliderSignature: colliderSig,     // harness: what the wall was built from

@@ -1,0 +1,13 @@
+"appbuild"
+{
+	"appid"	"5162690"
+	"desc"	"Swirl Together Demo Windows build"
+	"buildoutput"	"..\dist\steam-build-output-demo"
+	"contentroot"	"..\dist\demo\win-unpacked"
+	"setlive"	""
+	"preview"	"0"
+	"depots"
+	{
+		"5162691"	"depot_build_demo.vdf"
+	}
+}

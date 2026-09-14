@@ -76,6 +76,29 @@ The build lands unset (`"setlive" ""`) — go to the Steamworks **Builds** page
 and set it live on a branch (e.g. `default`). To push straight to a branch, set
 `"setlive"` in `app_build.vdf`.
 
+### The demo — "Swirl Together Demo"
+
+App **5162690** (type Demo, parent 5068940), depot **5162691** — both read off
+Steam with `steamcmd +app_info_print 5162690` on 2026-09-14, filled into
+`steam/app_build_demo.vdf` and `steam/depot_build_demo.vdf`.
+
+The demo is the whole app plus a five-minute clock on the right of the quality
+underbar and a wishlist ask at 0:00 that opens the full game's store page
+(`js/52-demo-clock.js`). `scripts/dist-demo.js` builds it: the same files as
+`dist:win`, with productName `Swirl Together Demo`, output `dist/demo/`, and
+`"swirlEdition": "demo"` stamped into the packaged package.json — which is what
+makes electron-main.js start Steamworks as 5162690 and the page show its clock.
+
+```
+npm run dist:demo
+npm run publish:steam:demo -- <builder-login>
+```
+The upload script refuses a demo build in the full game's depot and the other
+way round (it reads the edition stamp). Dashboard, once: the demo's launch
+option is Executable `Swirl Together Demo.exe`, OS Windows — then **Publish**,
+because SteamPipe and the client only honour published config. To try the demo
+from a dev checkout: `electron . --demo`.
+
 ---
 
 ## Polish before a public launch (not blockers)

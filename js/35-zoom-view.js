@@ -212,7 +212,9 @@
         if (window.__isTypingTarget ? window.__isTypingTarget(t)
             : (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable))) return;
         if (e.ctrlKey || e.metaKey || e.altKey) return;
-        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); setZoomMode(!zoomMode); }
+        // Z alone — 'Z' is Caps Lock, not Shift. Shift+Z was a silent copy
+        // of Z; it is left free for the hotkeys people bind (js/48-hotkeys.js).
+        if ((e.key === 'z' || e.key === 'Z') && !e.shiftKey) { e.preventDefault(); setZoomMode(!zoomMode); }
         // Reset works whenever the view is transformed, NOT only inside Zoom
         // Mode. Painting is suppressed while the mode is on, so the normal
         // workflow is zoom in -> leave the mode -> paint — which is exactly the

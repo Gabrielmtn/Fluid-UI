@@ -122,7 +122,7 @@ function extractRoomCode(input) {
     return s.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 }
 
-// Create a new room, connect, and copy the # so the host can paste it to a friend.
+// Create a new room, connect, and copy the invite link so the host can paste it to a friend.
 function createRoom() {
     const code = generateRoomCode();
     connectToRoom(code);

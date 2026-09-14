@@ -751,13 +751,38 @@
                 gl.disable(gl.BLEND);
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
                 // ── Standard Chorin projection order: forces → project → advect ──
+                // ── Freeze (Space) stands the fluid's OWN forces down ──────
+                // toggleFreeze (04b) pins dye dissipation at 1.0 and brakes
+                // velocity at 0.9/frame, but two passes below add velocity
+                // back every step with no hand on the canvas: vorticity
+                // confinement feeds on whatever curl is still braking out,
+                // and the Gravity Direction pad re-injects a push from the
+                // dye itself, so it never runs dry. Measured in the harness
+                // (scripts/test/scenarios.json, the freeze-stops-* invariants:
+                // a 30-frame window opening 92 frames after the keypress,
+                // once the brake's own tail is gone): with the pad aimed down
+                // a frozen painting's coverage and mean luminance both grew
+                // +15% inside that window and velocity held at ~0.086 instead
+                // of braking out; at Swirl 60 the residual velocity GREW +15%
+                // (0.0070 → 0.0080) while the dye crept (−0.44% dye mean per
+                // 30 frames) — a swirl feeding on itself; even at the default
+                // 25 the field plateaued at ~0.006 rather than dying. Both
+                // are skipped while frozen: the residual then reaches ~1e-5
+                // and the dye scalars hold to five decimals. Strokes laid on a
+                // frozen canvas keep their splat velocity, the projection
+                // and the brake, so painting-while-frozen is unchanged;
+                // only the autonomous forces go quiet. The curl texture has
+                // no reader but confinement, so its pass is skipped too.
+                const _frozen = !!window.__fluidFrozen;
                 // 1. Curl computation
+                if (!_frozen) {
                 curlProg.bind();
                 gl.uniform2f(curlProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1i(curlProg.uniforms.uVelocity, 0);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 blit(curl.fbo);
+                }
                 // Obstacle participation in the projection (divergence /
                 // pressure / gradient): solids become walls the solve flows
                 // around, instead of relying solely on the post-projection
@@ -765,7 +790,8 @@
                 // vorticity pass — confinement is gated off at walls (its
                 // wall-curl feedback loop was the strength-1.0 fuzz engine).
                 const obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
-                // 2. Vorticity confinement → velocity
+                // 2. Vorticity confinement → velocity (skipped while frozen — see above)
+                if (!_frozen) {
                 vorticityProg.bind();
                 gl.uniform2f(vorticityProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1i(vorticityProg.uniforms.uVelocity, 0);
@@ -794,6 +820,7 @@
                 gl.bindTexture(gl.TEXTURE_2D, curl.texture);
                 blit(velocity.write.fbo);
                 velocity.swap();
+                }
                 // 2b. Constant pressure field — ambient gravity / lift, aimed by
                 // the pad in the Pressure brush section. A velocity force, and it
                 // belongs HERE (after confinement, before the projection) for the
@@ -802,9 +829,11 @@
                 // Dye-weighted so there is something for the projection to leave
                 // behind — see ambientForceFrag. Skipped whole when off or aimed
                 // nowhere, so it costs nothing until someone points it somewhere.
+                // Skipped while frozen too (see the freeze note above): this is
+                // the one force that never decays on its own.
                 const _ambX = (typeof config.AMBIENT_FORCE_X === 'number') ? config.AMBIENT_FORCE_X : 0;
                 const _ambY = (typeof config.AMBIENT_FORCE_Y === 'number') ? config.AMBIENT_FORCE_Y : 0;
-                if (config.AMBIENT_FORCE && (_ambX !== 0 || _ambY !== 0)) {
+                if (!_frozen && config.AMBIENT_FORCE && (_ambX !== 0 || _ambY !== 0)) {
                     const _ambRef = (typeof config.AMBIENT_FORCE_REF === 'number')
                         ? config.AMBIENT_FORCE_REF : 0.5;
                     ambientForceProg.bind();

@@ -201,6 +201,24 @@
         };
     }
 
+    // strokes(list) — separate strokes with the pen UP between them, so a
+    // Step look advances its tray colour per stroke (advanceColor runs on
+    // pointerup). Each {pts, at, len}: a Bezier through pts (canvas
+    // fractions, eased) drawn over loop phase [at, at + len).
+    function strokes(list) {
+        const bezN = (pts, t) => { let p = pts.map((q) => q.slice()); for (let k = p.length - 1; k > 0; k--) for (let i = 0; i < k; i++) p[i] = [p[i][0] + (p[i + 1][0] - p[i][0]) * t, p[i][1] + (p[i + 1][1] - p[i][1]) * t]; return p[0]; };
+        return (p) => {
+            for (const s of list) {
+                if (p >= s.at && p < s.at + s.len) {
+                    const t = (p - s.at) / s.len, e = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+                    const q = bezN(s.pts, e);
+                    return { u: q[0], v: q[1] };
+                }
+            }
+            return null;
+        };
+    }
+
     // ── Stages ────────────────────────────────────────────────────────
     // color/size: brush for the loop. pen: the stroke (null = none).
     // pre(): scene setup before the warm-up. warm: seconds of the scene run
@@ -359,10 +377,36 @@
     // ── Preset thumbnails: assets/presets/<key>.png ───────────────────
     // The built-in looks, each painted with the same stroke for ~2.4 s after
     // applyPreset(key), then the 64px still (same crop as the effects).
-    const PRESET_KEYS = ['gelpen', 'silky', 'thick', 'wispy', 'chaotic', 'ethereal', 'turbulent', 'marble', 'electric'];
+    const PRESET_KEYS = ['opal', 'bloom', 'currents', 'gelpen', 'silky', 'thick', 'wispy', 'chaotic', 'ethereal', 'turbulent', 'marble', 'electric'];
+    // The curated looks (2026-09-12, js/04b-presets.js) bring their own
+    // colours and brush, so the bake must not paint them orange at size 6 —
+    // and one unbroken stroke would show a single colour, so each gets its
+    // multi-stroke composition (the same strokes bake-og-card.js paints,
+    // over the 2.6 s loop). The bloom is an eight-arm radial brush, so two
+    // petal strokes from the rim inward are the whole flower.
+    const LOOK_STROKES = {
+        opal: [
+            { pts: [[0.08, 0.78], [0.30, 0.50], [0.50, 0.62], [0.68, 0.36]], at: 0.02, len: 0.30 },
+            { pts: [[0.92, 0.20], [0.72, 0.36], [0.54, 0.28], [0.36, 0.44]], at: 0.34, len: 0.30 },
+            { pts: [[0.44, 0.72], [0.62, 0.76], [0.68, 0.52], [0.54, 0.40]], at: 0.66, len: 0.24 },
+            { pts: [[0.56, 0.56], [0.61, 0.50], [0.59, 0.45]], at: 0.91, len: 0.07 }
+        ],
+        bloom: [
+            { pts: [[0.50, 0.06], [0.54, 0.20], [0.52, 0.34]], at: 0.02, len: 0.24 },
+            { pts: [[0.36, 0.12], [0.42, 0.24], [0.48, 0.36]], at: 0.30, len: 0.24 }
+        ],
+        currents: [
+            { pts: [[0.06, 0.80], [0.28, 0.56], [0.50, 0.64], [0.70, 0.40]], at: 0.02, len: 0.30 },
+            { pts: [[0.94, 0.18], [0.72, 0.34], [0.50, 0.30], [0.30, 0.50]], at: 0.34, len: 0.30 },
+            { pts: [[0.40, 0.76], [0.60, 0.80], [0.70, 0.56], [0.56, 0.42]], at: 0.66, len: 0.24 },
+            { pts: [[0.54, 0.54], [0.60, 0.48], [0.58, 0.44]], at: 0.91, len: 0.06 }
+        ]
+    };
+    const PRESET_BAKE = {};
+    Object.keys(LOOK_STROKES).forEach((k) => { PRESET_BAKE[k] = { color: false, size: false, pen: strokes(LOOK_STROKES[k]) }; });
     const wallPhase = (secs) => { const t0 = performance.now(); return () => ((performance.now() - t0) / 1000 / secs) % 1; };
     async function runPreset(key, opts) {
-        opts = opts || {};
+        opts = Object.assign({}, PRESET_BAKE[key] || {}, opts || {});
         if (typeof window.applyPreset !== 'function') throw new Error('applyPreset missing');
         const hidden = document.visibilityState === 'hidden';
         const pump = hidden ? installPump() : null;
@@ -376,17 +420,20 @@
             if (typeof window.clearCanvas === 'function') window.clearCanvas();
             window.applyPreset(key);
             await sleep(120);
-            setColor(opts.color || '#ff9a4d');
+            // A curated look keeps its own colours and brush (color/size
+            // false); the physics bundles are painted with one stroke in one
+            // colour so the fade, curl and shading are what differ.
+            if (opts.color !== false) setColor(opts.color || '#ff9a4d');
             // The preset's own brush size is part of the look but not of a
             // 22px thumbnail: at size 11-18 every look is the same blob. A
             // thin stroke lets the fade, curl and shading read.
-            setSlider('brushSize', opts.size || 6);
+            if (opts.size !== false) setSlider('brushSize', opts.size || 6);
             const errs = [];
             const onErr = (e) => errs.push(String(e && (e.message || e.reason || e)).slice(0, 160));
             window.addEventListener('error', onErr);
             window.addEventListener('unhandledrejection', onErr);
             const serial0 = window.__drawSerial | 0;
-            const pen = lissajous(0.32, 0.28, 1, 2);
+            const pen = opts.pen || lissajous(0.32, 0.28, 1, 2);
             paintStart(pen, wallPhase(2.6));
             // Still taken WHILE the stroke is still going: a fast-fading look
             // (Gusty) is an empty canvas a moment after the brush lifts. The

@@ -1,5 +1,17 @@
 # Demo architecture — Swirl Together Demo
 
+> **2026-09-14 — what actually shipped for the Press Preview: the five-minute
+> version.** The demo build is the whole app plus a clock: 5:00 counting down on
+> the right of the quality underbar, then a wishlist ask that opens the full
+> game's store page; "Keep painting" winds it back to 5:00 (`js/52-demo-clock.js`).
+> None of the gate schedule below was built. Demo **AppID 5162690**, depot
+> **5162691** (from `steamcmd +app_info_print 5162690`: type Demo, parent
+> 5068940) — §9 item 1 is answered. Build and upload: `npm run dist:demo`, then
+> `npm run publish:steam:demo -- <builder-login>` (RELEASE.md §3). The edition
+> flag is a stamp in the packaged package.json (`swirlEdition`), read by
+> electron-main.js and handed to the page on argv, not the `js/00b-edition.js`
+> module sketched in §3.
+
 **Written 2026-08-23**, the day the demo app was created on Steamworks (store
 item `1299084`; the demo **AppID itself is still needed** — see §9).
 

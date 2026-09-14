@@ -461,7 +461,7 @@
           target: { section: 'Swirl Together', sel: '#createRoomBtn' },
           steps: [
             { say: 'Swirl Together → click Start a room.', target: { section: 'Swirl Together', sel: '#createRoomBtn' }, until: { visible: '#mpConnected' } },
-            { say: 'Share the code: read it out, Copy code, or switch to QR for phones. Hide keeps it off a stream.', target: { overlay: 'mp', sel: '#copyRoomBtn' }, until: { click: true } },
+            { say: 'Share it: Copy link for a chat, Copy code to read out, or switch to QR for phones. Hide keeps it off a stream.', target: { overlay: 'mp', sel: '#copyRoomBtn' }, until: { click: true } },
             { say: 'Friends paste the code into Join under Swirl Together, and their strokes land on your canvas live.', target: { overlay: 'mp', sel: '#roomName' } }
           ] },
         { id: 'turns', pillar: 'together', title: 'Take turns instead of painting at once',
@@ -484,16 +484,16 @@
         // ── Export ──
         { id: 'export-video', pillar: 'export', title: 'Save a video or GIF',
           tags: ['export', 'video', 'gif', 'mp4', 'webm', 'record', 'share', 'clip'],
-          answer: 'Export → Quick Export: Video, GIF, Still or Sequence. E starts a video export straight away. Painting keeps working while it records.',
+          answer: 'Export → Quick Export: Video, GIF, Save picture or Sequence. E starts a video export straight away. Painting keeps working while it records.',
           hotkey: 'E', target: { section: 'Export', sel: 'button', text: 'Video' },
           steps: [
-            { say: 'Export → Quick Export → Video, or press E. GIF, Still and Sequence sit beside it.', key: 'E', target: { section: 'Export', sel: 'button', text: ['Video', 'GIF'] }, until: { click: true } },
+            { say: 'Export → Quick Export → Video, or press E. GIF, Save picture and Sequence sit beside it.', key: 'E', target: { section: 'Export', sel: 'button', text: ['Video', 'GIF'] }, until: { click: true } },
             { say: 'It records while you keep painting; Cancel Export stops it early. The file downloads when it finishes.', target: { sel: '#exportStopBtn', fallback: { section: 'Export', sel: '#exportStatus' } } }
           ] },
         { id: 'export-still', pillar: 'export', title: 'Save a picture of the canvas',
-          tags: ['screenshot', 'still', 'png', 'jpg', 'image', 'picture', 'save'],
-          answer: 'Export → Still saves a PNG or JPG of what you see, layers included.',
-          target: { section: 'Export', sel: 'button', text: 'Still' } },
+          tags: ['screenshot', 'still', 'png', 'jpg', 'image', 'picture', 'save', 'keep', 'background', 'transparent'],
+          answer: 'Export → Save picture saves a PNG of what you see — background, layers and text included. Background, just under the buttons, switches to Transparent for the paint alone.',
+          target: { section: 'Export', sel: 'button', text: 'Save picture' } },
         { id: 'project', pillar: 'export', title: 'Save everything to open later',
           tags: ['project', 'save', 'load', 'file', 'fluid', 'later', 'keep', 'reopen'],
           answer: 'Export → Project saves a .fluid file with layers, colliders and settings; Load Project brings it all back.',
@@ -514,10 +514,10 @@
           ] },
         { id: 'simple-ui', pillar: 'interface', title: 'Show fewer controls, or bring them back',
           tags: ['simple', 'everything', 'sections', 'hidden', 'visible', 'missing', 'gone', 'menu', 'where', 'panel'],
-          answer: 'Settings → Interface. Simple keeps only Presets and Mutate; Everything shows the whole mixer; Visible sections lets you pick one by one.',
+          answer: 'Settings → Interface. Simple keeps the painting basics, Presets, Mutate, Swirl Together and Export; Everything shows the whole mixer; Visible sections lets you pick one by one.',
           target: { section: 'Settings', sel: '.ui-vis-presets' },
           steps: [
-            { say: 'Settings → Interface. Simple keeps only Presets and Mutate; Everything shows the whole mixer.', target: { section: 'Settings', sel: '.ui-vis-presets' }, until: { click: true } },
+            { say: 'Settings → Interface. Simple keeps the painting basics, Presets, Mutate, Swirl Together and Export; Everything shows the whole mixer.', target: { section: 'Settings', sel: '.ui-vis-presets' }, until: { click: true } },
             { say: 'Visible sections lets you pick one by one.', target: { sel: '.ui-vis-trigger' } }
           ] },
         { id: 'hotkeys', pillar: 'interface', title: 'See every keyboard shortcut',

@@ -356,6 +356,11 @@
             const isEditable = window.__isTypingTarget ? window.__isTypingTarget(t)
                 : (tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable));
             if (isEditable) return;
+            // Shift+digit is left free for the hotkeys people bind themselves
+            // (js/48-hotkeys.js). This handler reads the physical key, so
+            // Shift+1..8 used to set the multiplier too: a second copy of
+            // every bare digit that nothing else could ever use.
+            if (e.shiftKey) return;
             const code = e.code;
             if (code && (code.startsWith('Digit') || code.startsWith('Numpad'))) {
                 const d = code.replace(/^(Digit|Numpad)/, '');

@@ -75,8 +75,8 @@
       "keys": "Space",
       "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": false, "altKey": false },
       "guard": "typing target; e.repeat ignored (js/05n-hotkeys-init.js:343); routed to rec transport instead when recEnabled===true (js/05n-hotkeys-init.js:344-353)",
-      "effect": "window.toggleFreeze() (js/04b-presets.js:170-218): freeze saves DENSITY_DISSIPATION/VELOCITY_DISSIPATION then sets them to 1.0/0.9; unfreeze restores",
-      "assertion": "window.__fluidFrozen toggles (js/04b-presets.js:196); #freezeBtn.classList.contains('active') toggles; while frozen window.config.DENSITY_DISSIPATION===1.0 && window.config.VELOCITY_DISSIPATION===0.9",
+      "effect": "window.toggleFreeze() (js/04b-presets.js:170-218): freeze saves DENSITY_DISSIPATION/VELOCITY_DISSIPATION then sets them to 1.0/0.9; unfreeze restores. 2026-09-12: while window.__fluidFrozen the 05j sub-step loop also skips the curl + vorticity-confinement passes and the ambient-force (Gravity Direction pad) pass, so once the 0.9/frame brake runs out no autonomous force moves the paint; the projection, the brake and the splat path stay live, so painting on a frozen canvas is unchanged",
+      "assertion": "window.__fluidFrozen toggles (js/04b-presets.js:196); #freezeBtn.classList.contains('active') toggles; while frozen window.config.DENSITY_DISSIPATION===1.0 && window.config.VELOCITY_DISSIPATION===0.9; the picture holds still after the brake — scenarios.json invariants freeze-halts-the-sim / freeze-stops-gravity / freeze-stops-swirl (braked → held window, NEAR by design)",
       "source": "js/05n-hotkeys-init.js:338-360",
       "sheet": "index.html:1059"
     },

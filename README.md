@@ -12,6 +12,10 @@ A playful painting game for two or more — a beautiful, interactive fluid simul
 - **Color Palettes**: Curated color palettes with step-through mode
 - **Real-time Multiplayer**: Collaborate with others in the same fluid simulation
 - **Pen Input Window**: Pop out an input surface onto a pen display or tablet screen (Display → Pen Input Window); the paint stays on your main monitor at its frame rate, with a light mirror and the brush ring under the pen — and, in the desktop app, the mouse keeps working in the main window while the pen is down
+- **Save picture that matches the screen**: Export → Save picture (and Mandala's Save picture) composite the background colour, image layers and text the way you see them; Export → Background switches a PNG to Transparent; GIF, JPG and video always carry the background
+- **Shared-settings links**: Presets → Copy link to these settings (or Copy link on a saved preset) makes a link that carries the whole look — colours, palette, brush, fluid, symmetry, finish — and rebuilds it exactly in the browser or the desktop app, on top of the recipient's own session and never saved into it
+- **Open in the desktop app**: a room or look link opened in a Windows browser offers to hand off to the Steam/itch build (`swirltogether://join/CODE`, `swirltogether://look/<settings>`), with the Steam page as the fallback
+- **Mobile action row**: Look · Color · Together · Save on screen without opening the drawer; the "?" pill opens How do I…
 
 ## Multiplayer Setup
 

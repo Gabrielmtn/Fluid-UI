@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Pushes dist/win-unpacked to the Steam depot via SteamPipe.
+// Pushes dist/win-unpacked to the Steam depot via SteamPipe — or, with
+// --demo, dist/demo/win-unpacked to the demo's (app 5162690, depot 5162691).
 //
 // Replaces the old inline `steamcmd +login ... %CD%\steam\app_build.vdf` npm
 // script, which only worked when npm happened to spawn cmd.exe.
@@ -24,6 +25,7 @@
 //
 // Usage:
 //   npm run publish:steam -- <builder-login>
+//   npm run publish:steam:demo -- <builder-login>     (the demo, app 5162690)
 //   STEAM_BUILDER=<builder-login> npm run publish:steam
 //
 // steamcmd is found on PATH, or point STEAMCMD at the exe. stdio is inherited
@@ -35,8 +37,15 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
-const CONTENT = path.join(ROOT, "dist", "win-unpacked");
-const EXE = "Swirl Together.exe";
+const argv = process.argv.slice(2);
+const DEMO = argv.includes("--demo");
+const TARGET = DEMO
+  ? { name: "Swirl Together Demo", appid: 5162690, rel: "dist/demo/win-unpacked", exe: "Swirl Together Demo.exe",
+      vdf: "app_build_demo.vdf", rebuild: "npm run dist:demo", edition: "demo" }
+  : { name: "Swirl Together", appid: 5068940, rel: "dist/win-unpacked", exe: "Swirl Together.exe",
+      vdf: "app_build.vdf", rebuild: "npm run dist:win", edition: undefined };
+const CONTENT = path.join(ROOT, ...TARGET.rel.split("/"));
+const EXE = TARGET.exe;
 
 function die(msg) {
   console.error("\n  " + msg + "\n");
@@ -47,25 +56,42 @@ function die(msg) {
 // isn't rebuilt is the specific failure that ships a depot nobody can launch:
 // the Steamworks launch option points at an exe that isn't in the build.
 if (!fs.existsSync(CONTENT)) {
-  die("No dist/win-unpacked — run `npm run dist:win` first.");
+  die("No " + TARGET.rel + " — run `" + TARGET.rebuild + "` first.");
 }
 if (!fs.existsSync(path.join(CONTENT, EXE))) {
   const found = fs.readdirSync(CONTENT).filter((f) => f.endsWith(".exe"));
   die(
-    'dist/win-unpacked has no "' + EXE + '" (found: ' +
+    TARGET.rel + ' has no "' + EXE + '" (found: ' +
       (found.join(", ") || "no .exe at all") +
-      ").\n  The build is stale — rebuild with `npm run dist:win`."
+      ").\n  The build is stale — rebuild with `" + TARGET.rebuild + "`."
   );
 }
-if (!fs.existsSync(path.join(ROOT, "steam", "app_build.vdf"))) {
-  die("Missing steam/app_build.vdf");
+// The edition stamp (scripts/dist-demo.js) decides what the build IS: the
+// demo with its clock, or the full game. Either one in the other's depot
+// would ship the wrong app to every player, so they must match.
+{
+  let edition;
+  try {
+    edition = JSON.parse(fs.readFileSync(path.join(CONTENT, "resources", "app", "package.json"), "utf8")).swirlEdition;
+  } catch (e) {
+    die("Could not read " + TARGET.rel + "/resources/app/package.json — rebuild with `" + TARGET.rebuild + "`.");
+  }
+  if (edition !== TARGET.edition) {
+    die(
+      TARGET.rel + " is a " + (edition === "demo" ? "DEMO" : "full-game") + " build, but this uploads " +
+        TARGET.name + " (app " + TARGET.appid + ").\n  Rebuild with `" + TARGET.rebuild + "`."
+    );
+  }
+}
+if (!fs.existsSync(path.join(ROOT, "steam", TARGET.vdf))) {
+  die("Missing steam/" + TARGET.vdf);
 }
 
-const login = process.argv[2] || process.env.STEAM_BUILDER;
+const login = argv.filter((a) => a !== "--demo")[0] || process.env.STEAM_BUILDER;
 if (!login) {
   die(
     "No builder account.\n" +
-      "  npm run publish:steam -- <builder-login>\n" +
+      "  npm run " + (DEMO ? "publish:steam:demo" : "publish:steam") + " -- <builder-login>\n" +
       "  (or set STEAM_BUILDER). This is the Steamworks BUILDER account, not\n" +
       "  your personal Steam login."
   );
@@ -87,7 +113,7 @@ function unlinkJunction(p) {
 
 let junction = null;
 function vdfPath() {
-  const direct = path.join(ROOT, "steam", "app_build.vdf");
+  const direct = path.join(ROOT, "steam", TARGET.vdf);
   if (!/\s/.test(direct)) return direct;
 
   const candidates = [
@@ -105,7 +131,7 @@ function vdfPath() {
     try {
       unlinkJunction(link);
       fs.symlinkSync(ROOT, link, "junction");
-      const via = path.join(link, "steam", "app_build.vdf");
+      const via = path.join(link, "steam", TARGET.vdf);
       if (fs.existsSync(via)) {
         junction = link;
         console.log("  note     : repo path contains a space — routing steamcmd");
@@ -126,6 +152,7 @@ if (process.platform === "win32" && !path.extname(steamcmd)) steamcmd += ".exe";
 const APP_BUILD = vdfPath();
 const runDir = path.dirname(APP_BUILD);
 
+console.log("  target   : " + TARGET.name + " (app " + TARGET.appid + ")");
 console.log("  steamcmd : " + steamcmd);
 console.log("  builder  : " + login);
 console.log("  content  : " + CONTENT);
@@ -157,5 +184,5 @@ if (r.status !== 0) die("steamcmd exited " + r.status + " — build NOT uploaded
 // straight to players; it lands as an unset build in the Steamworks Builds page.
 console.log(
   "\n  Uploaded. The build is NOT live — set it on a branch from the\n" +
-    "  Steamworks Builds page (app 5068940).\n"
+    "  Steamworks Builds page (app " + TARGET.appid + ").\n"
 );

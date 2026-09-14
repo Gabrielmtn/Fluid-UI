@@ -45,6 +45,50 @@
             || (window.innerHeight <= 500 && window.innerWidth <= 1200);
     }
 
+    // A single tap fires a pointer/touch event AND a synthetic click ~ms apart;
+    // firing the toggle on both flips it twice (open→closed) so touch "does
+    // nothing". Route every activation through one handler that swallows the
+    // duplicate from the same tap. pointerup covers mouse + touch; click is the
+    // keyboard/fallback path. (Each button gets its own debounce closure.)
+    // stopPropagation also keeps the click from the document's
+    // close-menu-on-outside-click handler, which would otherwise shut a
+    // drawer the same tap just opened.
+    function tapHandler(action) {
+        var last = 0;
+        return function (e) {
+            e.stopPropagation();
+            var now = Date.now();
+            if (now - last < 500) return; // duplicate event from the same tap
+            last = now;
+            action();
+        };
+    }
+
+    // Open the drawer if it is shut, then run fn once it has slid in.
+    function openDrawerThen(fn) {
+        controls = getControls();
+        if (!controls) return;
+        var wasOpen = controls.classList.contains('visible');
+        if (!wasOpen) toggleMenu();
+        setTimeout(fn, wasOpen ? 0 : 350);
+    }
+
+    // The sidebar sections carry no ids; find one by its title the way
+    // 44-recipes does, open it (43's wrapped opener un-hides it in Simple)
+    // and scroll it into view.
+    function openSectionByTitle(title) {
+        var secs = document.querySelectorAll('#sidebar-right .sidebar-section');
+        for (var i = 0; i < secs.length; i++) {
+            var t = secs[i].querySelector('.section-title');
+            if (!t || t.textContent.trim() !== title) continue;
+            if (typeof window.openSidebarSection === 'function') window.openSidebarSection(secs[i]);
+            else secs[i].classList.remove('collapsed');
+            try { secs[i].scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {}
+            return secs[i];
+        }
+        return null;
+    }
+
     // Enable mobile mode
     function enableMobileMode() {
         isMobileMode = true;
@@ -60,20 +104,86 @@
             mobileMenuToggle.classList.add('show');
         }
 
-        // Mobile has NO path to the hotkeys modal otherwise: F1/? are
-        // keyboard-only and the clickable reminder row is display:none under
-        // 768px. A small '?' pill under the ☰ opens it (05n exposes
-        // window.toggleHotkeys; modal already scrolls at 85vh).
+        // The '?' pill under the ☰ opens "How do I…" (js/44-recipes.js):
+        // searchable tasks that open the drawer and point at the control.
+        // It used to open the keyboard-shortcut sheet — a list of keys is
+        // the wrong first answer on a touch screen (2026-09-14). The sheet
+        // is still one tap away, from the modal's "Hotkeys (F1)" button.
         if (!document.getElementById('mobileHotkeysBtn')) {
             var hkBtn = document.createElement('button');
             hkBtn.id = 'mobileHotkeysBtn';
             hkBtn.type = 'button';
-            hkBtn.setAttribute('aria-label', 'Shortcuts & help');
+            hkBtn.setAttribute('aria-label', 'How do I… (help)');
+            hkBtn.title = 'How do I…';
             hkBtn.textContent = '?';
             hkBtn.addEventListener('click', function () {
-                if (typeof window.toggleHotkeys === 'function') window.toggleHotkeys();
+                if (window.Recipes && typeof window.Recipes.open === 'function') window.Recipes.open();
+                else if (typeof window.toggleHotkeys === 'function') window.toggleHotkeys();
             });
             document.body.appendChild(hkBtn);
+        }
+
+        // Bottom action row (2026-09-14): the four things a first-time
+        // painter reaches for, on screen without the drawer — Look (the
+        // presets list), Color, Together (the room panel) and Save (a
+        // picture). Each opens the drawer to its control except Save, which
+        // saves at once. Undo is not here: fluid strokes have no undo
+        // (05i's ring covers raster layers and masks only).
+        if (!document.getElementById('mobileActionRow')) {
+            var row = document.createElement('div');
+            row.id = 'mobileActionRow';
+            row.dataset.group = 'core';   // button tint (css/01-buttons.css)
+            row.setAttribute('role', 'toolbar');
+            row.setAttribute('aria-label', 'Quick actions');
+            var addAction = function (id, label, title, action) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.id = id;
+                b.textContent = label;
+                b.title = title;
+                var h = tapHandler(action);
+                // Only a press that STARTED on this button counts: a replay
+                // hold begun on the canvas takes no pointer capture (05d), so
+                // its release can land here — that must neither fire the
+                // action nor be swallowed before 05d's window pointerup.
+                var downAt = 0;
+                b.addEventListener('pointerdown', function () { downAt = Date.now(); });
+                b.addEventListener('pointerup', function (e) {
+                    var ok = downAt && (Date.now() - downAt) < 2000;
+                    downAt = 0;
+                    if (ok) h(e);
+                });
+                b.addEventListener('click', h);
+                row.appendChild(b);
+                return b;
+            };
+            // A strip cell hidden under Settings → Interface comes back first,
+            // the way 44-recipes' reveal does — a hidden trigger has no box.
+            var unhide = function (key) {
+                var uv = window.UIVisibility;
+                if (uv && typeof uv.isHidden === 'function' && uv.isHidden(key)) uv.show(key);
+            };
+            addAction('mobileLookBtn', 'Look', 'Pick a look — a complete set of colours, brush and finish', function () {
+                openDrawerThen(function () {
+                    unhide('strip:Presets');
+                    var t = document.getElementById('mixerPresetsTrigger');
+                    if (t && !t.classList.contains('active')) t.click();   // the trigger toggles: open, never shut
+                });
+            });
+            addAction('mobileColorBtn', 'Color', 'Brush colour and palette', function () {
+                openDrawerThen(function () {
+                    unhide('strip:Color');
+                    var cell = document.querySelector('#mixer-strip [data-ui-key="Color"]');
+                    if (cell) { try { cell.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }
+                });
+            });
+            addAction('mobileTogetherBtn', 'Together', 'Start a room or join one — paint on the same canvas as someone else', function () {
+                openDrawerThen(function () { openSectionByTitle('Swirl Together'); });
+            });
+            addAction('mobileSaveBtn', 'Save', 'Save a picture of what you see — background, layers and text included', function () {
+                if (window.fluidExport && typeof window.fluidExport.still === 'function') window.fluidExport.still();
+            });
+            document.body.appendChild(row);
         }
 
         // Boost colour vibrance for mobile displays (often washed out)
@@ -183,21 +293,6 @@
             enableMobileMode();
         }
 
-        // A single tap fires a pointer/touch event AND a synthetic click ~ms apart;
-        // firing the toggle on both flips it twice (open→closed) so touch "does
-        // nothing". Route every activation through one handler that swallows the
-        // duplicate from the same tap. pointerup covers mouse + touch; click is the
-        // keyboard/fallback path. (Each button gets its own debounce closure.)
-        function tapHandler(action) {
-            var last = 0;
-            return function (e) {
-                e.stopPropagation();
-                var now = Date.now();
-                if (now - last < 500) return; // duplicate event from the same tap
-                last = now;
-                action();
-            };
-        }
         if (mobileMenuToggle) {
             var onToggle = tapHandler(toggleMenu);
             mobileMenuToggle.addEventListener('pointerup', onToggle);
@@ -240,11 +335,18 @@
             var t = e.target;
             if (c.contains(t)) return;                                    // inside the menu
             if (mobileMenuToggle && mobileMenuToggle.contains(t)) return; // the toggle
+            if (t.closest && t.closest('#mobileActionRow')) return;        // the bottom row's own handlers decide
             // Strip popups (brush drawer, presets list, arm colors) are <body>
             // children, so they are NOT inside the relocated menu — without this
             // the first tap on a preset was eaten as a dismiss and the list
             // closed instead of loading anything.
             if (t.closest && t.closest('.arm-colors-panel, .brush-settings-panel, .brush-tip-menu, .mixer-presets-panel')) return;
+            // The presets list opened from inside the drawer (Look) is a
+            // <body> child: shut it with the drawer, or it floats on over
+            // the canvas with its trigger gone (clicking the open trigger
+            // closes it — 43's rule for strip popups).
+            var openTrig = document.querySelector('#mixerPresetsTrigger.active');
+            if (openTrig) openTrig.click();
             c.classList.remove('visible');
             e.stopPropagation();   // don't also paint this dismiss tap
             e.preventDefault();

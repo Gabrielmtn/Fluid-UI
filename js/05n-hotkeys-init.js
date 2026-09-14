@@ -431,11 +431,18 @@
                 // 't' was bound to a 'trailToggle' element that does not exist
                 // anywhere (removed long ago) — the key silently did nothing and
                 // the help surfaces advertised it. Left unbound deliberately.
-                if (lower === 'c') { toggleCheckbox('cursorToggle'); return; }
-                if (lower === 'h') { toggleCheckbox('showCanvasHandles'); return; }
-                if (lower === 'l') { toggleCheckbox('lockCanvasBorders'); return; }
-                if (lower === 'r') { toggleCheckbox('randomColor'); return; }
-                if (lower === 'a') { toggleCheckbox('stepPalette'); return; }
+                // Plain keys only: Shift+C/H/L/R/A were silent copies of the
+                // bare letter, now left free for the hotkeys people bind
+                // (js/48-hotkeys.js). `lower` still keeps them Caps-Lock-proof —
+                // Caps Lock changes e.key, never e.shiftKey. N, S and X below
+                // are different: Shift gives them their own meaning.
+                if (!e.shiftKey) {
+                    if (lower === 'c') { toggleCheckbox('cursorToggle'); return; }
+                    if (lower === 'h') { toggleCheckbox('showCanvasHandles'); return; }
+                    if (lower === 'l') { toggleCheckbox('lockCanvasBorders'); return; }
+                    if (lower === 'r') { toggleCheckbox('randomColor'); return; }
+                    if (lower === 'a') { toggleCheckbox('stepPalette'); return; }
+                }
                 // E: Quick export (video)
                 if (lower === 'e' && !e.shiftKey) {
                     e.preventDefault();

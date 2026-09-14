@@ -34,9 +34,49 @@
         sequenceFormat: 'png',
         outputFolder: '',
         filenamePrefix: 'fluid_',
-        compositeOverlays: true
+        compositeOverlays: true,
+        ground: 'seen'
     };
     let cfg = { ...DEFAULTS };
+
+    // ── Ground (background) policy (2026-09-14) ───────────────────────
+    // The background colour the user sees is CSS on #canvas-area (Display →
+    // Background Color); it is never in the GL buffer, so every capture used
+    // to come out over transparent black — an ivory ground on screen, a dark
+    // picture in the download (measured 2026-09-12: an empty canvas over
+    // #e8d8b8 exported as [0,0,0,51]). cfg.ground says what a picture
+    // carries under the paint:
+    //   'seen'        — what is on screen: the ground colour goes under it
+    //   'transparent' — the paint alone, alpha kept (PNG only)
+    // Formats with no alpha (JPG, GIF, MP4/WebM) always get the ground:
+    // flattened against the chosen colour, never against an implicit black.
+    // Display → Transparent Background is the third voice: with it checked
+    // the user asked for no ground on screen, so a PNG stays transparent
+    // even under 'seen', and a format with no alpha flattens onto black.
+    // Alpha-less exporters (video, GIF, JPG) ask for the ground per capture —
+    // captureCompositeFrame(target, { opaque: true }) — never through module
+    // state, so another module's captureFrame() during an export is not
+    // forced opaque.
+    function groundColor(forOpaque) {
+        var picker = document.getElementById('backgroundColorPicker');
+        var color = (picker && picker.value) || '#000000';
+        var tm = document.getElementById('transparentMode');
+        var noGround = !!(tm && tm.checked);
+        // Under Transparent Background no colour is on screen beneath the
+        // paint, so a format that cannot hold alpha flattens onto black
+        // (Gabriel, 2026-09-14), not onto a picker colour nobody sees.
+        if (forOpaque) return noGround ? '#000000' : color;
+        if (cfg.ground === 'transparent' || noGround) return null;
+        return color;
+    }
+    function fillGround(ctx, w, h, forOpaque) {
+        var g = groundColor(forOpaque);
+        if (!g) return;
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+    }
 
     function loadSettings() {
         if (!window.settingsManager) return;
@@ -229,10 +269,14 @@
     // not drawn once more to get there. Any size: the frame is fitted to it.
     // Without a target the persistent composite canvas is returned; callers
     // must consume it before the next capture (it is reused).
-    function captureCompositeFrame(target) {
+    function captureCompositeFrame(target, opts) {
         return new Promise(function (resolve, reject) {
             var simCanvas = document.getElementById('canvas');
             if (!simCanvas) return reject(new Error('Canvas not found'));
+            // The ground goes under everything unless the picture is meant to
+            // stay transparent — see groundColor(). opts.opaque forces it for
+            // a caller whose destination cannot hold alpha.
+            var forOpaque = !!(opts && opts.opaque);
 
             var w = simCanvas.width, h = simCanvas.height;
             var geom = geometry(simCanvas);
@@ -292,8 +336,17 @@
                 var tctx = target.getContext('2d');
                 tctx.globalAlpha = 1;
                 tctx.clearRect(0, 0, target.width, target.height);
+                fillGround(tctx, target.width, target.height, forOpaque);
                 tctx.globalAlpha = drawList[0].opacity;
-                tctx.drawImage(simCanvas, 0, 0, target.width, target.height);
+                // Within a pixel of the source (the even-clamped recording
+                // canvas): crop, never resample — a 465→464 squeeze
+                // bilinear-blurs the middle of every frame.
+                if (Math.abs(target.width - w) <= 1 && Math.abs(target.height - h) <= 1) {
+                    var cw0 = Math.min(w, target.width), ch0 = Math.min(h, target.height);
+                    tctx.drawImage(simCanvas, 0, 0, cw0, ch0, 0, 0, cw0, ch0);
+                } else {
+                    tctx.drawImage(simCanvas, 0, 0, target.width, target.height);
+                }
                 tctx.globalAlpha = 1;
                 var dt0 = performance.now() - t0;
                 _compStats.frames++; _compStats.totalMs += dt0;
@@ -323,6 +376,7 @@
                 ctx.globalAlpha = 1;
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.clearRect(0, 0, w, h);
+                fillGround(ctx, w, h, forOpaque);
                 var scratch = null; // shared by all masked layers this frame
 
                 drawList.forEach(function (task, idx) {
@@ -380,7 +434,12 @@
                     var tc = target.getContext('2d');
                     tc.globalAlpha = 1;
                     tc.clearRect(0, 0, target.width, target.height);
-                    tc.drawImage(comp, 0, 0, target.width, target.height);
+                    if (Math.abs(target.width - w) <= 1 && Math.abs(target.height - h) <= 1) {
+                        var cw1 = Math.min(w, target.width), ch1 = Math.min(h, target.height);
+                        tc.drawImage(comp, 0, 0, cw1, ch1, 0, 0, cw1, ch1);   // crop, see the fast path
+                    } else {
+                        tc.drawImage(comp, 0, 0, target.width, target.height);
+                    }
                     out = target;
                 }
 
@@ -551,15 +610,21 @@
         options = options || {};
         var duration = options.duration || cfg.videoDuration;
         var fps     = options.fps || cfg.videoFPS;
+        var OPAQUE = { opaque: true };   // no alpha in a video container: the ground goes under the paint
 
         try {
             var simCanvas = document.getElementById('canvas');
             if (!simCanvas) throw new Error('Canvas not found');
 
             // Offscreen 2D canvas for compositing — avoids WebGL buffer issues
+            // Even dimensions: H.264 (the MP4 path) wants them, and an odd
+            // working-canvas width (a fitted 9:16 comes out 465 wide) used to
+            // go straight to the encoder. The compositor crops a frame within a
+            // pixel of this size (an odd canvas loses its last column or row)
+            // rather than resampling it.
             var recCanvas = document.createElement('canvas');
-            recCanvas.width = simCanvas.width;
-            recCanvas.height = simCanvas.height;
+            recCanvas.width = Math.max(2, simCanvas.width & ~1);
+            recCanvas.height = Math.max(2, simCanvas.height & ~1);
             var recCtx = recCanvas.getContext('2d');
 
             // captureStream(0) = manual frame control via requestFrame()
@@ -688,7 +753,7 @@
                 // can't change track size mid-stream, so the frame is fitted to
                 // the original size inside the capture.
                 var c0 = performance.now();
-                await captureCompositeFrame(recCanvas);
+                await captureCompositeFrame(recCanvas, OPAQUE);
 
                 // Push the frame to the encoder
                 if (track.requestFrame) track.requestFrame();
@@ -698,6 +763,14 @@
 
                 updateUI('recording', Math.min(100, (elapsed / duration) * 100));
             }
+
+            // What actually reached the encoder — the toast reports this, not
+            // the requested rate: captures follow the sim's own draws, so a
+            // 60 fps ask on a busy frame lands lower, and the size is the
+            // even-clamped recording canvas, not the working canvas.
+            var recordedMs = Math.max(1, Date.now() - t0);
+            var fpsActual = Math.round(_compStats.capFrames * 1000 / recordedMs);
+            var sizeNote = ext.toUpperCase() + ', ' + recCanvas.width + '×' + recCanvas.height + ', ' + fpsActual + ' fps';
 
             // Stop the recorder (fires onstop → resolves blobReady)
             if (_recorder && _recorder.state === 'recording') _recorder.stop();
@@ -716,7 +789,7 @@
                     throw new Error('could not finish writing the video (' +
                         streamWriteError.message + ') — the file at ' + streamPath + ' is incomplete');
                 }
-                toast('Video exported! (MP4)', 'success');
+                toast('Video exported! (' + sizeNote + ')', 'success');
             } else {
                 // WebM needs post-processing for seeking; MP4 is fine as-is
                 if (ext === 'webm') {
@@ -725,7 +798,7 @@
                 }
                 var name = cfg.filenamePrefix + Date.now() + '.' + ext;
                 await saveBlob(blob, name);
-                toast('Video exported! (' + ext.toUpperCase() + ')', 'success');
+                toast('Video exported! (' + sizeNote + ')', 'success');
             }
 
         } catch (err) {
@@ -740,6 +813,7 @@
     async function exportGIF(options) {
         if (!guard()) return;
         options = options || {};
+        var OPAQUE = { opaque: true };   // GIF has no alpha: the ground goes under the paint
         var duration   = options.duration || cfg.gifDuration;
         var fps        = options.fps      || cfg.gifFPS;
         var maxW       = options.width    || cfg.gifMaxWidth;
@@ -776,7 +850,7 @@
                 await rafPromise();
 
                 var c0 = performance.now();
-                await captureCompositeFrame(small);
+                await captureCompositeFrame(small, OPAQUE);
                 var imgData = smallCtx.getImageData(0, 0, ow, oh);
                 var cdt = performance.now() - c0;
                 _compStats.capFrames++; _compStats.capTotalMs += cdt;
@@ -1217,12 +1291,13 @@
 
         try {
             toast('Capturing image...', 'info');
-            // Wait for a fresh render so the WebGL buffer isn't cleared
-            await rafPromise();
-            var composite = await captureCompositeFrame();
             var format  = options.format  || cfg.imageFormat;
             var quality = options.quality || cfg.imageQuality;
             var mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
+            var capOpts = { opaque: format === 'jpg' };   // JPEG cannot hold alpha
+            // Wait for a fresh render so the WebGL buffer isn't cleared
+            await rafPromise();
+            var composite = await captureCompositeFrame(null, capOpts);
 
             // toBlob is callback-based; wrap in a promise
             var blob = await new Promise(function (resolve, reject) {
@@ -1232,9 +1307,9 @@
             });
 
             var ext = format === 'jpg' ? '.jpg' : '.png';
-            var name = cfg.filenamePrefix + Date.now() + ext;
+            var name = (options.prefix || cfg.filenamePrefix) + Date.now() + ext;
             await saveBlob(blob, name);
-            toast('Image exported!', 'success');
+            toast('Picture saved (' + composite.width + '×' + composite.height + ')', 'success');
 
         } catch (err) {
             console.error('[Export] Still:', err);
@@ -1345,6 +1420,7 @@
         var duration   = options.duration || cfg.sequenceDuration;
         var fps        = options.fps      || cfg.sequenceFPS;
         var format     = options.format   || cfg.sequenceFormat;
+        var capOpts = { opaque: format === 'jpg' };   // JPEG cannot hold alpha
         var interval   = 1000 / fps;
         var frameCount = Math.ceil(duration / interval);
 
@@ -1377,7 +1453,7 @@
                 if (_abort) { toast('Export cancelled', 'info'); return; }
 
                 await rafPromise();
-                var comp = await captureCompositeFrame();
+                var comp = await captureCompositeFrame(null, capOpts);
 
                 var blob = await new Promise(function (resolve, reject) {
                     comp.toBlob(function (b) {
@@ -1528,7 +1604,11 @@
         setConfig:   function (key, val) { cfg[key] = val; saveSettings(); },
         pickFolder:  pickOutputFolder,
         openFolder:  openOutputFolder,
-        captureFrame: captureCompositeFrame
+        // captureFrame(target?, {opaque?}): the composite as the user sees it
+        // (ground included under cfg.ground); groundColor(forOpaque) is the
+        // colour a caller flattening on its own should use.
+        captureFrame: captureCompositeFrame,
+        groundColor: groundColor
     };
 
     // ── Init ────────────────────────────────────────────────────────

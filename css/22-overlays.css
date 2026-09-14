@@ -991,6 +991,313 @@ input[type="color"].text-swatch::-moz-color-swatch {
     border-radius: 3px;
 }
 
+/* ── Hotkey picker (js/48-hotkeys.js) ──
+   Click, press the keys. Shape only: the colour is the panel's
+   (01-buttons.css), and the listening state is aria-pressed, the same
+   pressed plate every button gets. No pulse while it listens — nothing
+   animates forever beside the canvas (Electron compositor rule). */
+.hk-picker { min-width: 0; }
+.hk-picker-row {
+    display: flex;
+    gap: 3px;
+}
+.hk-picker-key {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 28px;              /* level with the sidebar's 28px selects */
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.hk-picker.is-empty .hk-picker-key,
+.hk-picker.is-listening .hk-picker-key {
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+.hk-picker-clear {
+    flex: none;
+    width: 24px;
+    height: 28px;
+    padding: 0;
+    font-size: 15px;
+    line-height: 1;
+}
+/* The hidden attribute has to beat the button display rules. */
+.hk-picker [hidden],
+.hk-picker-note[hidden] { display: none !important; }
+.hk-picker-note {
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--ink-500, #7b828e);
+    margin: -4px 0 8px;
+}
+.hk-picker .hk-picker-note { margin: 4px 0 0; }
+.hk-picker-note[data-tone="warn"] { color: var(--warn, #ffa500); }
+
+/* ── Hotkey binds (js/49-hotkey-binds.js) ──
+   Ctrl+Shift+H's bar, the outline that shows what a click would bind, the
+   word a key leaves when its control is gone, and Settings → Hotkeys. The
+   bar's buttons take the system tint from its data-group; nothing here
+   animates (Electron compositor rule). */
+#hkBindBar {
+    position: fixed;
+    top: 0;                    /* placed by JS: inside the canvas top, or below a colour picker */
+    left: 0;
+    z-index: 10030;            /* over the arrange bar (10020), under dialogs (10060) */
+    width: 460px;              /* fixed, so the bar never jumps between steps */
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    padding: 10px 14px 12px;
+    border-radius: 10px;
+    background: rgba(15, 20, 27, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    color: #e6edf3;
+    font-size: 12px;
+}
+#hkBindBar [hidden] { display: none !important; }
+
+/* 1 Choose a control › 2 Press a key › 3 Done */
+.hk-steps {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+}
+.hk-step { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.hk-step-n {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    font-size: 10px;
+    font-weight: 700;
+}
+.hk-step-sep { opacity: 0.6; }
+.hk-step.is-done { color: rgba(255, 255, 255, 0.62); }
+.hk-step.is-done .hk-step-n { background: var(--ok, #2ea043); border-color: transparent; color: #fff; }
+.hk-step.is-now { color: #fff; font-weight: 700; }
+.hk-step.is-now:not(.is-done) .hk-step-n {
+    background: oklch(62% 0.12 var(--sec-h));
+    border-color: transparent;
+    color: #fff;
+}
+
+.hk-say { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.hk-pair { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.hk-pair:empty { display: none; }
+.hk-pair .hk-picker { flex: 0 0 150px; }
+.hk-pair .hk-picker-key { height: 38px; font-size: 14px; }
+.hk-arrow { flex: none; font-size: 16px; opacity: 0.55; }
+.hk-keycap {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 46px;
+    height: 38px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--ok, #2ea043);
+    border-bottom-width: 3px;
+    border-radius: 7px;
+    background: rgba(46, 160, 67, 0.16);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+.hk-chip {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 5px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.05);
+}
+#hkBindBar[data-step="2"] .hk-chip { border-color: var(--warn, #ffa500); }
+#hkBindBar[data-step="3"] .hk-chip { border-color: var(--ok, #2ea043); }
+.hk-chip-where {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.5);
+}
+.hk-chip-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Step 1's offer: "Hotkey to #A1B2C3", the hex drawn in its own colour.
+   Shape only on the button; the swatch and the hex are its children. */
+.hk-offer {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 700;
+}
+.hk-offer-swatch {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.hk-offer-val {
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+}
+.hk-offer-val.is-dark { text-shadow: 0 0 3px rgba(255, 255, 255, 0.85), 0 0 1px #fff; }
+.hk-sub { font-size: 11px; line-height: 1.45; color: var(--text-secondary, #b9bec7); }
+#hkBindBar .hk-picker-note { margin: -2px 0 8px; font-size: 11px; }
+.hk-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+.hk-actions button { padding: 5px 14px; font-size: 12px; }
+
+/* On the page: what a click would bind, what was chosen, and what it got. */
+.hk-outline {
+    position: fixed;
+    z-index: 10029;
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 5px;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+}
+.hk-outline.is-chosen { border-color: var(--warn, #ffa500); }
+.hk-outline.is-done { border-color: var(--ok, #2ea043); }
+/* An opener: it will open, not bind — dashed and quiet. */
+.hk-outline.is-opener { border-style: dashed; border-color: rgba(255, 255, 255, 0.5); }
+.hk-tag.is-opener { border-style: dashed; border-color: rgba(255, 255, 255, 0.4); color: rgba(255, 255, 255, 0.8); }
+.hk-outline[hidden] { display: none; }
+.hk-tag {
+    position: fixed;
+    z-index: 10029;
+    pointer-events: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 320px;
+    padding: 3px 8px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(13, 17, 23, 0.96);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 11px;
+    white-space: nowrap;
+}
+.hk-tag[hidden] { display: none; }
+.hk-tag.is-chosen { border-color: var(--warn, #ffa500); }
+.hk-tag.is-done { border-color: var(--ok, #2ea043); background: rgba(16, 44, 24, 0.97); }
+.hk-tag-verb { color: rgba(255, 255, 255, 0.55); }
+.hk-tag-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.hk-tag-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    padding: 1px 6px;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font-weight: 800;
+}
+.hk-tag.is-done .hk-tag-key { border-color: var(--ok, #2ea043); }
+
+#hkToast {
+    position: fixed;
+    left: 50%;
+    bottom: 96px;
+    transform: translateX(-50%);
+    z-index: 10030;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: rgba(13, 17, 23, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #e6edf3;
+    font-size: 12px;
+    pointer-events: none;
+}
+#hkToast[hidden] { display: none; }
+
+/* Settings → Hotkeys: the same fold-open list Interface uses above it. */
+.hk-block {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+#sidebar-right .hk-bind-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    margin-bottom: 6px;
+}
+.hk-bind-btn .hk-cap { margin-left: 0; }
+#sidebar-right .hk-list-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+}
+.hk-list-trigger-label { flex: 1 1 auto; }
+.hk-list-trigger-count { font-size: 10px; opacity: 0.6; font-variant-numeric: tabular-nums; }
+.hk-list-trigger-chev { opacity: 0.6; }
+.hk-list-trigger[aria-expanded="true"] .hk-list-trigger-chev { transform: rotate(180deg); }
+.hk-list {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.3);
+    max-height: 340px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.hk-list[hidden] { display: none; }
+.hk-group {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.45);
+    margin: 8px 0 4px;
+}
+.hk-group:first-child { margin-top: 0; }
+.hk-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+.hk-row .hk-picker { flex: 0 0 72px; }
+.hk-row .hk-picker-key { height: 24px; padding: 0 6px; font-size: 11px; }
+.hk-row-text { flex: 1 1 auto; min-width: 0; }
+.hk-row-name,
+.hk-row-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hk-row-name { font-size: 11px; color: rgba(255, 255, 255, 0.85); }
+.hk-row-sub { font-size: 10px; color: rgba(255, 255, 255, 0.4); }
+.hk-row.is-missing .hk-row-name { color: rgba(255, 255, 255, 0.45); }
+.hk-row-del { flex: none; width: 22px; height: 22px; padding: 0; font-size: 14px; line-height: 1; }
+.hk-empty { font-size: 10px; line-height: 1.4; color: rgba(255, 255, 255, 0.45); padding: 2px 0; }
+.hk-block > .hk-picker-note { margin: 6px 0 0; }
+
 /* ── Text overlay arrange mode ── */
 #text-arrange-canvas {
     /* sized/positioned inline; swallows pointer events so painting is paused */
@@ -1617,3 +1924,93 @@ body.mobile-mode #sidebar-right > #mixer-strip.ui-hidden { display: none !import
     will-change: transform;
 }
 #breathCue.show { display: block; }
+
+/* ── "Open in the desktop app?" (js/51-open-in-desktop.js) ──
+   .delete-modal chrome. Same tier as the startup fork (10040): it is asked
+   after the fork, never over it, and stays under the app-close confirm
+   (10050). */
+.open-desktop-modal { z-index: 10040; }
+.open-desktop-modal .delete-modal-content { max-width: 440px; }
+.open-desktop-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    opacity: 0.75;
+    margin: -8px 0 16px;
+    cursor: pointer;
+}
+.open-desktop-remember input { margin: 0; }
+.open-desktop-modal .delete-modal-actions { flex-wrap: wrap; }
+.open-desktop-modal button:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+
+/* ── "Copy link to this look" (js/50-look-links.js) ──
+   Foot of the Presets popup, after the re-rendered list. */
+.look-link-foot {
+    padding: 6px 8px 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.look-link-foot button { width: 100%; }
+
+/* ── Demo clock + wishlist ask (js/52-demo-clock.js) ──
+   Steam demo builds only. The clock takes the right end of the quality
+   underbar — order puts it after the turn chip too, margin-left:auto pushes
+   it to the edge — and floats in the bottom-right corner whenever the bar is
+   hidden. Transition-free (Electron transparent-window compositor rule).
+   The pill's tint is btn--ghost + the :root system hue (css/01-buttons.css),
+   never set here. */
+#quality-underbar > .demo-clock {
+    order: 99;
+    margin-left: auto;
+    /* The bar lets paint through its empty space; only the pill takes clicks. */
+    pointer-events: none;
+}
+.demo-clock {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    user-select: none;
+}
+.demo-clock.floating {
+    position: fixed;
+    right: 14px;
+    bottom: 8px;
+    z-index: 1200;
+    pointer-events: none;
+}
+/* Clear of the mobile bottom action row (13-mobile-mode). */
+body.mobile-mode .demo-clock.floating {
+    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 60px);
+}
+/* Same micro-label as the underbar's dropdowns (.qub-dd-cap). */
+.demo-clock-cap {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(200, 205, 212, 0.6);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    padding: 0 8px 1px;
+    pointer-events: none;
+}
+.demo-clock-btn {
+    pointer-events: auto;
+    height: 22px;
+    min-width: 52px;
+    padding: 1px 8px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    cursor: pointer;
+    /* No plate on the painting, so the shadow keeps it legible on light dye. */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.55);
+}
+.demo-clock-btn:hover { text-shadow: none; }
+
+/* The ask: .delete-modal chrome. Above the startup fork (10040) and the
+   How-do-I modal (10042) — it is the one question the demo must get to —
+   and below the app-close confirm (10050), so quitting still works. */
+.demo-wishlist-modal { z-index: 10045; }
+.demo-wishlist-modal .delete-modal-content { max-width: 440px; }
+.demo-wishlist-modal .delete-modal-message { line-height: 1.5; }
+.demo-wishlist-modal .delete-modal-actions { flex-wrap: wrap; }
+.demo-wishlist-modal button:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }

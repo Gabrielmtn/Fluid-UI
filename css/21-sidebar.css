@@ -1285,6 +1285,22 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 .mp-btn-share {
     width: 100%;
 }
+/* Copy link / Copy code side by side: the link is the one that goes into a
+   chat, so it takes the width; the code button keeps its natural size. Same
+   face on both — buttons take their colour from the panel, never per button. */
+.mp-share-row {
+    display: flex;
+    gap: 6px;
+}
+.mp-share-row .mp-btn-share {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
+}
+.mp-share-row .mp-btn-share-code {
+    flex: 0 0 auto;
+}
 
 /* ── Host controls ──
    Grouped and labelled. A guest never sees this block, so they are not left
