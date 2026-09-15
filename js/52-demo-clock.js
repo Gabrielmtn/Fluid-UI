@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/52-demo-clock.js — the Steam demo's five-minute clock (2026-09-14).
+// js/52-demo-clock.js — the Steam demo's five-minute clock (2026-09-14),
+//   and the web build's playtest label in the same spot.
 // LOAD ORDER: last, after 51-open-in-desktop.js. Needs the quality underbar
 //   (20-mixer-layout builds it after DOMContentLoaded) and waits for the
 //   startup prompts the way 51 does.
@@ -25,7 +26,9 @@
 //
 // Edition: window.SWIRL_EDITION, from the --swirl-edition=demo argument
 // electron-main.js hands a demo build (read in index.html's boot script).
-// The full game and the web build return below before touching anything.
+// The web build (swirltogether.com) is a playtest, and says so where the
+// demo keeps its clock (PLAYTEST_LABEL below). The full game returns below
+// before touching anything.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -109,14 +112,15 @@
 
     // The right end of the underbar when it is on screen; the bottom-right
     // corner of the window when it is not (the media queries hide the bar on
-    // narrow and short windows, and Settings → Interface can hide it).
-    function place() {
+    // narrow and short windows, and Settings → Interface can hide it). The
+    // clock and the playtest label both live here.
+    function place(el) {
         var bar = document.getElementById('quality-underbar');
         var shown = false;
         if (bar) { try { shown = getComputedStyle(bar).display !== 'none'; } catch (_) {} }
         var parent = shown ? bar : document.body;
-        if (clock.parentElement !== parent) parent.appendChild(clock);
-        clock.classList.toggle('floating', !shown);
+        if (el.parentElement !== parent) parent.appendChild(el);
+        el.classList.toggle('floating', !shown);
         // Floating, it keeps to the painting's corner rather than the window's
         // (the sidebar owns the window's): the same right-edge trim the bar
         // takes in 20-mixer-layout, plus the bar's own 14px padding.
@@ -130,14 +134,15 @@
             }
             right = (edge + 14) + 'px';
         }
-        if (clock.style.right !== right) clock.style.right = right;
+        if (el.style.right !== right) el.style.right = right;
+        return !shown;
     }
 
     function render() {
         // Nothing on screen until the app is: the clock would otherwise float
         // over the boot for the second before the underbar is built.
         if (!clock || !window.__scriptsReady) return;
-        place();
+        place(clock);
         var t = fmt(remainingMs());
         if (btnEl.textContent !== t) {
             btnEl.textContent = t;
@@ -281,6 +286,9 @@
     function init() {
         if (api.active) return;
         api.active = true;
+        // enable() on the web (a test hook) hands the playtest label's spot
+        // to the clock.
+        if (playtest) playtest.remove();
         document.body.classList.add('edition-demo');
         document.title = 'Swirl Together Demo';
         var tt = document.querySelector('.titlebar-title');
@@ -320,7 +328,89 @@
         enable: init
     };
 
-    if (window.SWIRL_EDITION !== 'demo') return;
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
+    // ── The web build: the playtest label ────────────────────────────
+    // swirltogether.com is a playtest, and says so on the right end of the
+    // underbar, where the demo keeps its clock. Plain text: there is nothing
+    // to click, so painting runs straight through it. Change the number here
+    // when a new playtest goes out.
+    var PLAYTEST_LABEL = '0.01 playtest';
+    var playtest = null;
+
+    // Floating on a desktop layout (Simple hides the bar), the canvas runs
+    // down to its 24px margin (01-config CANVAS_MARGIN) and the frame's
+    // corner handle hangs into that margin, right on the corner spot. The
+    // label then sits in the margin under the frame's edge, left of the
+    // handle. The clock's two lines would not fit there; it keeps the corner.
+    function tuck(el) {
+        el.style.bottom = '';                 // measure from the corner spot
+        var bottom = '';
+        var wrap = document.getElementById('canvas-wrapper');
+        if (wrap && !document.body.classList.contains('mobile-mode')) {
+            var w = wrap.getBoundingClientRect();
+            var r = el.getBoundingClientRect();
+            var se = wrap.querySelector('.resize-se');
+            // Settings → Display can hide the border and its handles.
+            var h = se && se.offsetParent ? se.getBoundingClientRect() : null;
+            var hits = function (b) {
+                return !!b && r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top;
+            };
+            var band = window.innerHeight - w.bottom;
+            if ((hits(w) || hits(h)) && band >= r.height) {
+                var b = Math.floor((band - r.height) / 2);
+                bottom = b + 'px';
+                var top = window.innerHeight - b - r.height;
+                if (h && h.top < top + r.height && h.bottom > top &&
+                    h.left < r.right + 6 && h.right > r.left - 6) {
+                    el.style.right = Math.round(window.innerWidth - h.left + 6) + 'px';
+                }
+            }
+        }
+        if (el.style.bottom !== bottom) el.style.bottom = bottom;
+    }
+
+    function initPlaytest() {
+        playtest = document.createElement('div');
+        playtest.id = 'playtestLabel';
+        playtest.className = 'playtest-label';
+        playtest.textContent = PLAYTEST_LABEL;
+        var sync = function () {
+            if (api.active) return;
+            if (place(playtest)) tuck(playtest);
+            else if (playtest.style.bottom) playtest.style.bottom = '';
+        };
+        // Nothing on screen until the app is, as with the clock. The clock
+        // re-places itself every tick; the label has no tick, so it follows
+        // what moves its spot: a resize (the media queries that hide the
+        // bar), Settings → Interface hiding the bar (a class on it), the
+        // sidebar's width (the floating label keeps to #canvas-area's edge)
+        // and the canvas frame's size (the tuck above).
+        (function wait() {
+            if (!window.__scriptsReady || !document.getElementById('sidebar-right')) {
+                setTimeout(wait, 250);
+                return;
+            }
+            sync();
+            window.addEventListener('resize', sync);
+            var bar = document.getElementById('quality-underbar');
+            if (bar && window.MutationObserver) {
+                new MutationObserver(sync).observe(bar, { attributes: true, attributeFilter: ['class'] });
+            }
+            if (window.ResizeObserver) {
+                try {
+                    var ro = new ResizeObserver(sync);
+                    ['canvas-area', 'canvas-wrapper'].forEach(function (id) {
+                        var el = document.getElementById(id);
+                        if (el) ro.observe(el);
+                    });
+                } catch (_) {}
+            }
+        })();
+    }
+
+    var boot = window.SWIRL_EDITION === 'demo' ? init
+             : window.IS_ELECTRON ? null            // the full game
+             : initPlaytest;                        // the web build
+    if (!boot) return;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
 })();

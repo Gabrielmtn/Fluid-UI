@@ -1952,14 +1952,16 @@ body.mobile-mode #sidebar-right > #mixer-strip.ui-hidden { display: none !import
 }
 .look-link-foot button { width: 100%; }
 
-/* ── Demo clock + wishlist ask (js/52-demo-clock.js) ──
-   Steam demo builds only. The clock takes the right end of the quality
+/* ── Demo clock + wishlist ask, and the web playtest label (js/52-demo-clock.js) ──
+   The clock is Steam demo builds only; the web build shows its playtest
+   label in the same spot. Either takes the right end of the quality
    underbar — order puts it after the turn chip too, margin-left:auto pushes
    it to the edge — and floats in the bottom-right corner whenever the bar is
    hidden. Transition-free (Electron transparent-window compositor rule).
    The pill's tint is btn--ghost + the :root system hue (css/01-buttons.css),
    never set here. */
-#quality-underbar > .demo-clock {
+#quality-underbar > .demo-clock,
+#quality-underbar > .playtest-label {
     order: 99;
     margin-left: auto;
     /* The bar lets paint through its empty space; only the pill takes clicks. */
@@ -1971,7 +1973,8 @@ body.mobile-mode #sidebar-right > #mixer-strip.ui-hidden { display: none !import
     align-items: flex-end;
     user-select: none;
 }
-.demo-clock.floating {
+.demo-clock.floating,
+.playtest-label.floating {
     position: fixed;
     right: 14px;
     bottom: 8px;
@@ -1979,8 +1982,30 @@ body.mobile-mode #sidebar-right > #mixer-strip.ui-hidden { display: none !import
     pointer-events: none;
 }
 /* Clear of the mobile bottom action row (13-mobile-mode). */
-body.mobile-mode .demo-clock.floating {
+body.mobile-mode .demo-clock.floating,
+body.mobile-mode .playtest-label.floating {
     bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 60px);
+}
+/* The playtest label is the clock's digits without the pill: same size,
+   weight and colour as the ghost pill's text, on the pills' line rather than
+   centred on the captions above them. Nothing to click. */
+#quality-underbar > .playtest-label { align-self: flex-end; }
+.playtest-label {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    height: 22px;
+    /* The pill's 8px padding plus its 1px border: the text ends where the
+       clock's digits would. */
+    padding: 0 9px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: oklch(96% calc(var(--sec-c) * 0.20) var(--sec-h));
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.55);
+    user-select: none;
+    pointer-events: none;
 }
 /* Same micro-label as the underbar's dropdowns (.qub-dd-cap). */
 .demo-clock-cap {
