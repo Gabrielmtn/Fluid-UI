@@ -5145,7 +5145,10 @@
             listEl.innerHTML = '';
             if (!a) return;
             var all = a.getAll();
-            if (!all.length) {
+            // Other painters' lines in a Swirl Together room — editable here,
+            // and the edit goes back to whoever wrote them (23 SWIRL TOGETHER).
+            var room = (typeof a.getRoomLines === 'function') ? a.getRoomLines() : [];
+            if (!all.length && !room.length) {
                 listEl.innerHTML = '<div style="font-size:9px;color:rgba(255,255,255,0.3);' +
                     'text-align:center;padding:8px;">No text yet — add some above</div>';
                 return;
@@ -5185,6 +5188,39 @@
                     a.toggle(ov.id);
                 }));
                 row.appendChild(mkRowBtn('×', 'Delete', 'btn--destructive', function () { a.remove(ov.id); }));
+                listEl.appendChild(row);
+            });
+            if (!room.length) return;
+            var head = document.createElement('div');
+            head.textContent = 'In the room';
+            head.title = 'Other painters’ text. Edit or move it on your turn and the change goes back to them.';
+            head.style.cssText = 'font-size:9px;letter-spacing:0.08em;text-transform:uppercase;' +
+                'color:rgba(255,255,255,0.45);margin:6px 4px 2px;';
+            listEl.appendChild(head);
+            room.forEach(function (pl) {
+                var isSel = pl.id === sid;
+                var who = (typeof shortName === 'function') ? shortName(pl.owner) : 'another painter';
+                var row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:3px 4px;border-radius:3px;' +
+                    'cursor:pointer;border:1px solid ' + (isSel ? 'rgba(255,130,170,0.5)' : 'transparent') +
+                    ';background:' + (isSel ? 'rgba(255,130,170,0.12)' : 'transparent') + ';';
+                row.title = who + '’s text';
+                var dot = document.createElement('span');
+                dot.style.cssText = 'flex:none;width:7px;height:7px;border-radius:50%;';
+                dot.style.background = (typeof colorForClient === 'function') ? colorForClient(pl.owner) : '#9aa';
+                row.appendChild(dot);
+                var label = document.createElement('span');
+                label.style.cssText = 'flex:1;min-width:0;font-size:11px;color:rgba(255,255,255,0.8);' +
+                    'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                label.style.fontFamily = pl.fontFamily;
+                label.textContent = String(pl.content || '').split('\n')[0] || '(empty)';
+                row.appendChild(label);
+                row.addEventListener('click', function () { a.select(pl.id); });
+                row.appendChild(mkRowBtn('✥', 'Arrange on canvas', 'btn--ghost', function () {
+                    a.select(pl.id); a.openArrange(pl.id); syncArrangeBtn();
+                }));
+                row.appendChild(mkRowBtn('×', 'Take it out of the room — ' + who + ' keeps it, hidden',
+                    'btn--destructive', function () { a.remove(pl.id); }));
                 listEl.appendChild(row);
             });
         }
@@ -5530,6 +5566,12 @@
         // notification its own edit sets off.
         function syncHotkeyRow(ov) {
             if (!hotkeyPicker || !ov) return;
+            // Someone else's line takes no key here: a key is this user's
+            // binding on a line they own.
+            var room = !!ov.room;
+            if (hotkeyRow) hotkeyRow.style.display = room ? 'none' : '';
+            if (hotkeyNote) hotkeyNote.style.display = room ? 'none' : '';
+            if (room) { hotkeyAtRow.style.display = 'none'; hotkeyShownFor = null; return; }
             var hk = ov.hotkey || '';
             if (hotkeyShownFor !== ov.id || hotkeyPicker.getValue() !== hk) hotkeyPicker.setValue(hk);
             hotkeyShownFor = ov.id;

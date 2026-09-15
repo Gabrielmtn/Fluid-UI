@@ -480,6 +480,10 @@ window.publishBrushShape = publishShape;
 // 23-depth-collision calls these when a wall is built, changed, or deleted.
 window.publishCollider = publishCollider;
 window.broadcastColliderRemove = broadcastColliderRemove;
+// 23-text-overlays calls these: our lines changed (or the layout under them),
+// and one pour of a line landed on our dye. Both no-ops outside a room.
+window.__mpTextChanged = scheduleTextLines;
+window.__mpTextPour = queueTextPour;
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
 window.swirlWithStranger = swirlWithStranger;

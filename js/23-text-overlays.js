@@ -51,6 +51,11 @@
     var nextId = 1;
     var container = null;       // pointer-events:none DOM layer holding overlay elements
     var changeListeners = [];   // panel subscribes to redraw its list / button state
+    // Other painters' lines and pour bitmaps in a Swirl Together room — see
+    // SWIRL TOGETHER near the bottom. Never in `overlays`: not saved, not in
+    // the panel, not arrangeable, gone when the room is.
+    var peerLines = new Map();  // 'owner|id' → a cleaned line + where it stands
+    var peerStamps = new Map(); // pour bitmap key → { ps, owner }, oldest first
 
     var STORE_KEY = 'text.overlays';
     var LEGACY_STORE_KEY = 'branding.overlays';
@@ -192,6 +197,7 @@
             canvasArea.appendChild(container);
         }
         loadSaved();
+        renderPeerLines();          // a room joined before this layer existed
         registerHotkeys();
         watchLayout();
         syncCollidersWhenReady();
@@ -203,6 +209,8 @@
             if (arranging) { sizeArrangeCanvas(); drawArrange(); }
             // A window drag is a stream too — same coalescing as a text edit.
             syncCollidersSoon();
+            layoutPeerLines();
+            mpTextChanged();
         });
     }
 
@@ -285,9 +293,17 @@
         el.style.top = (ov.y * 100) + '%';
         el.style.transformOrigin = 'center center';
         el.style.transform = 'translate(-50%,-50%) rotate(' + (ov.rotation || 0) + 'deg)';
-        el.style.opacity = ov.opacity;
         el.style.zIndex = '51';
+        styleTextEl(el, ov);
 
+        container.appendChild(el);
+    }
+
+    // The typography half of an overlay's element — everything but where it
+    // stands. Shared with a peer's line (see SWIRL TOGETHER below), so the
+    // two can never set type differently.
+    function styleTextEl(el, ov) {
+        el.style.opacity = ov.opacity;
         el.style.color = ov.color;
         el.style.fontSize = ov.fontSize + 'px';
         el.style.fontFamily = ov.fontFamily;
@@ -308,14 +324,13 @@
             el.style.textShadow = '0 1px 4px rgba(0,0,0,0.7), 0 0 12px rgba(0,0,0,0.4)';
         }
         el.textContent = displayText(ov);
-
-        container.appendChild(el);
     }
 
     function renderAll() {
         if (!container) return;
         container.innerHTML = '';
         for (var i = 0; i < overlays.length; i++) renderOverlay(overlays[i]);
+        renderPeerLines();   // the wipe took the room's lines too
     }
 
     function getEl(id) {
@@ -328,7 +343,14 @@
         return null;
     }
 
+    // A line by id, this user's or the room's: own lines have numeric ids,
+    // a room line's id is its 'owner|id' key (see SWIRL TOGETHER).
+    function lineById(id) {
+        return (typeof id === 'string') ? (peerLines.get(id) || null) : findOverlay(id);
+    }
+
     function removeOverlay(id) {
+        if (typeof id === 'string') return removeRoomLine(id);
         overlays = overlays.filter(function (o) { return o.id !== id; });
         var el = getEl(id);
         if (el) el.remove();
@@ -338,6 +360,7 @@
     }
 
     function updateOverlay(id, props) {
+        if (typeof id === 'string') return updateRoomLine(id, props);
         var ov = findOverlay(id);
         if (!ov) return null;
         for (var key in props) if (props.hasOwnProperty(key)) ov[key] = props[key];
@@ -361,6 +384,9 @@
     }
 
     function toggleOverlay(id) {
+        // Hiding someone else's line hides it for the whole room — it is
+        // theirs to bring back (see removeRoomLine).
+        if (typeof id === 'string') return removeRoomLine(id);
         var ov = findOverlay(id);
         if (!ov) return null;
         // Hiding from the eye drops the selection too: a hidden line has
@@ -374,6 +400,7 @@
         overlays = [];
         selectedId = null;
         if (container) container.innerHTML = '';
+        renderPeerLines();   // Clear All is this user's lines, not the room's
         save(); emitChange(); syncColliders();
         if (arranging) drawArrange();
     }
@@ -387,6 +414,15 @@
         // A line's key, words or visibility may have moved; the Settings
         // list of hotkeys shows all three (coalesced there, once a frame).
         if (window.Hotkeys && typeof window.Hotkeys.changed === 'function') window.Hotkeys.changed();
+        // ...and a Swirl Together room wants the lines as they now stand
+        // (06d, throttled there; a no-op outside a room).
+        mpTextChanged();
+    }
+
+    function mpTextChanged() {
+        if (typeof window.__mpTextChanged === 'function') {
+            try { window.__mpTextChanged(); } catch (_) {}
+        }
     }
 
     // ─── PERSISTENCE ────────────────────────────────────────────
@@ -461,6 +497,7 @@
 
     // Geometry of an overlay in arrange-canvas pixel coords.
     function overlayGeom(ov) {
+        if (ov && ov.room) return roomGeom(ov);
         var el = getEl(ov.id);
         if (!el || !aCanvas) return null;
         var W = aCanvas.width, H = aCanvas.height;
@@ -490,10 +527,28 @@
         ];
     }
 
+    // A room line in the same terms: its spot is a fraction of the canvas, and
+    // its box is the element's layout box stretched the way it is drawn (the
+    // painter's canvas size over this one, per axis).
+    function roomGeom(pl) {
+        if (!pl.el || !aCanvas) return null;
+        var g = colliderGeom();
+        if (!g) return null;
+        var kx = aCanvas.width / g.areaW, ky = aCanvas.height / g.areaH;
+        return {
+            cx: (g.offX + pl.cx * g.cssW) * kx,
+            cy: (g.offY + pl.cy * g.cssH) * ky,
+            hw: pl.el.offsetWidth / 2 * (g.cssW / pl.cw) * kx,
+            hh: pl.el.offsetHeight / 2 * (g.cssH / pl.ch) * ky,
+            rot: (pl.rotation || 0) * Math.PI / 180
+        };
+    }
+
     // Hit-test the SELECTED overlay's handles first, then any overlay's body
-    // (top-most = last drawn = last in array).
+    // (top-most = last drawn = last in array; the room's lines are drawn
+    // after this user's own, so they are searched first).
     function hitTest(px, py) {
-        var sel = selectedId != null ? findOverlay(selectedId) : null;
+        var sel = selectedId != null ? lineById(selectedId) : null;
         if (sel && sel.visible) {
             var g = overlayGeom(sel);
             if (g) {
@@ -510,6 +565,15 @@
             }
         }
         // Body hit — search top-most first.
+        var room = Array.from(peerLines.values());
+        for (var r = room.length - 1; r >= 0; r--) {
+            var rg = overlayGeom(room[r]);
+            if (!rg) continue;
+            var rl = toLocal(rg, px, py);
+            if (Math.abs(rl.x) <= rg.hw + 4 && Math.abs(rl.y) <= rg.hh + 4) {
+                return { id: room[r].id, mode: 'move' };
+            }
+        }
         for (var i = overlays.length - 1; i >= 0; i--) {
             var ov = overlays[i];
             if (!ov.visible) continue;
@@ -526,7 +590,7 @@
     function drawArrange() {
         if (!aCtx || !aCanvas) return;
         aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
-        var sel = selectedId != null ? findOverlay(selectedId) : null;
+        var sel = selectedId != null ? lineById(selectedId) : null;
         if (!sel || !sel.visible) return;
         var g = overlayGeom(sel);
         if (!g) return;
@@ -579,15 +643,16 @@
             return;
         }
         if (hit.id !== selectedId) { selectedId = hit.id; emitChange(); }
-        var ov = findOverlay(hit.id);
+        var ov = lineById(hit.id);
         if (!ov) return;
         var g = overlayGeom(ov);
+        if (!g) return;
         drag = {
             id: hit.id,
             mode: hit.mode,
             corner: hit.corner || null,
             startX: px, startY: py,
-            start: { x: ov.x, y: ov.y, rotation: ov.rotation || 0, fontSize: ov.fontSize },
+            start: { x: ov.x, y: ov.y, cx: ov.cx, cy: ov.cy, rotation: ov.rotation || 0, fontSize: ov.fontSize },
             startDist: Math.hypot(px - g.cx, py - g.cy),
             startAngle: Math.atan2(py - g.cy, px - g.cx)
         };
@@ -608,13 +673,22 @@
             return;
         }
         e.preventDefault();
-        var ov = findOverlay(drag.id);
+        var ov = lineById(drag.id);
         if (!ov) return;
 
         if (drag.mode === 'move') {
             var W = aCanvas.width, H = aCanvas.height;
-            ov.x = clamp01(drag.start.x + (px - drag.startX) / W);
-            ov.y = clamp01(drag.start.y + (py - drag.startY) / H);
+            if (ov.room) {
+                // A room line stands at a fraction of the CANVAS.
+                var rg = colliderGeom();
+                if (rg) {
+                    ov.cx = Math.max(-1, Math.min(2, drag.start.cx + (px - drag.startX) / W * rg.areaW / rg.cssW));
+                    ov.cy = Math.max(-1, Math.min(2, drag.start.cy + (py - drag.startY) / H * rg.areaH / rg.cssH));
+                }
+            } else {
+                ov.x = clamp01(drag.start.x + (px - drag.startX) / W);
+                ov.y = clamp01(drag.start.y + (py - drag.startY) / H);
+            }
         } else if (drag.mode === 'rotate') {
             var g = overlayGeom(ov);
             var ang = Math.atan2(py - g.cy, px - g.cx);
@@ -628,7 +702,7 @@
             var factor = drag.startDist > 2 ? dist / drag.startDist : 1;
             ov.fontSize = Math.max(6, Math.min(400, Math.round(drag.start.fontSize * factor)));
         }
-        renderOverlay(ov);
+        if (ov.room) renderPeerLine(ov); else renderOverlay(ov);
         // Coalesced, not per-frame: a corner-resize drag rebuilt the wall on
         // every pointermove, and each intermediate size left its own void in
         // the dye. onUp forces the final rebuild immediately.
@@ -638,8 +712,12 @@
 
     function onUp(e) {
         if (!drag) return;
+        var ov = lineById(drag.id);
         drag = null;
         try { aCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+        // A room line's move goes back to its author (and the room) once,
+        // when the drag ends — same as a local line's wall rebuild.
+        if (ov && ov.room) { ov.rev = ''; mpRoomEdit(ov); emitChange(); syncColliders(); return; }
         save(); emitChange(); syncColliders();
     }
 
@@ -798,6 +876,28 @@
             }
             ctx.restore();
         }
+
+        // A room's lines are on screen too, so they are in the capture. Their
+        // spot is a fraction of the CANVAS; the live layout turns it into the
+        // area fraction this composite speaks, and the painter's canvas size
+        // into the same per-axis stretch the DOM element carries.
+        var g = peerLines.size ? colliderGeom() : null;
+        if (g) {
+            peerLines.forEach(function (pl) {
+                ctx.save();
+                try {
+                    ctx.globalAlpha = pl.opacity;
+                    var xa = (g.offX + pl.cx * g.cssW) / g.areaW, ya = (g.offY + pl.cy * g.cssH) / g.areaH;
+                    ctx.translate(xa * areaW - offX, ya * areaH - offY);
+                    ctx.scale(g.cssW / pl.cw, g.cssH / pl.ch);
+                    ctx.rotate((pl.rotation || 0) * Math.PI / 180);
+                    paintOverlay(ctx, pl, false);
+                } catch (e) {
+                    console.warn('⚠️ Text composite failed for a room line', pl.key, e);
+                }
+                ctx.restore();
+            });
+        }
     }
 
     // Paints ONE overlay with the ctx already translated and rotated to its
@@ -910,9 +1010,17 @@
     // keeps gating the pour, as it gates every dab. Should the sim then
     // refuse the image, the line is shown again: a hidden line with nothing
     // poured is the one outcome this button must never leave behind.
-    function fluidize(id) {
+    //
+    // `landed(ok)`, if given, hears how the pour went on the frame it lands
+    // — a held hotkey starts its flow there, so strike and flow are one pour.
+    function fluidize(id, landed) {
+        if (typeof id === 'string') return fluidizeRoomLine(id, landed);
         var ov = findOverlay(id);
         if (!ov) return false;
+        // A pour is paint: out of turn in a Swirl Together room it is refused
+        // exactly like a stroke (05d's pointerdown gate), or it would land on
+        // this canvas and on nobody else's.
+        if (mpPaintBlocked()) return false;
         if (typeof window.__splatImageToDye !== 'function' || typeof window.__dyeTexSize !== 'function') {
             tell('The simulation is still starting', 'Give it a moment and try again.');
             return false;
@@ -926,7 +1034,7 @@
 
         function pour() {
             var live = findOverlay(id);
-            if (!live) return;                       // deleted while we waited
+            if (!live) { if (landed) landed(false); return; }   // deleted while we waited
             var ok = false;
             try {
                 // Centred where the line is arranged: overlay fractions of
@@ -937,6 +1045,7 @@
                 console.warn('⚠️ Text fluidize failed for overlay', id, e);
                 ok = false;
             }
+            if (landed) landed(ok);
             if (ok) return;
             // Put it back the way it was. Selection was never touched, so
             // the editor the click came from is still open.
@@ -953,11 +1062,17 @@
     // image splat's rect; only a shader build that cannot place one falls
     // back to painting the whole dye.
     function pourAt(ov, cx, cy, g) {
-        if (!canStamp()) return pourWhole(ov, cx, cy, g);
-        var ps = makeStamp(ov, g, cx, cy);
-        if (!ps) return false;
-        try { return pourStamp(ps, cx, cy, g, pourAmount()); }
-        finally { ps.stamp.dispose(); }
+        var ok = false;
+        if (!canStamp()) {
+            ok = pourWhole(ov, cx, cy, g);
+        } else {
+            var ps = makeStamp(ov, g, cx, cy);
+            if (!ps) return false;
+            try { ok = pourStamp(ps, cx, cy, g, pourAmount()); }
+            finally { ps.stamp.dispose(); }
+        }
+        if (ok) mpPoured(ov, cx, cy, g, pourAmount());
+        return ok;
     }
 
     // The console tunable a poured layer reads too:
@@ -1033,9 +1148,10 @@
     }
 
     // The pre-stamp path: the line painted into a dye-sized canvas at its
-    // spot, poured at 1:1. One scratch canvas, reused.
+    // spot, poured at 1:1. One scratch canvas, reused. `amount` defaults to
+    // the console tunable; a room's pour brings the painter's own.
     var pourCanvas = null, pourCtx = null;
-    function pourWhole(ov, cx, cy, g) {
+    function pourWhole(ov, cx, cy, g, amount) {
         var dye = window.__dyeTexSize();
         if (!g || !dye || !(dye.w > 0) || !(dye.h > 0)) return false;
         if (!pourCanvas || pourCanvas.width !== dye.w || pourCanvas.height !== dye.h) {
@@ -1057,7 +1173,7 @@
         } finally {
             ctx.restore();   // a reused context must not carry the shadow to the next pour
         }
-        return !!window.__splatImageToDye(pourCanvas, pourAmount());
+        return !!window.__splatImageToDye(pourCanvas, (typeof amount === 'number') ? amount : pourAmount());
     }
 
     function tell(title, msg) {
@@ -1097,7 +1213,13 @@
         for (var i = 0; i < overlays.length; i++) {
             if (isWallSource(overlays[i])) return true;
         }
-        return false;
+        return anyPeerWall();
+    }
+
+    function anyPeerWall() {
+        var any = false;
+        peerLines.forEach(function (pl) { if (!any && isWallSource(pl)) any = true; });
+        return any;
     }
 
     // The mapping from overlay space to obstacle space, read live every time
@@ -1148,42 +1270,20 @@
         for (var i = 0; i < overlays.length; i++) {
             var ov = overlays[i];
             if (!isWallSource(ov)) continue;
-            ctx.save();
-            try {
-                var cl = window.collisionLayers;
-                var wallS = (typeof ov.colliderStrength === 'number') ? ov.colliderStrength : 1;
-                var style = (cl && cl.wallStyle) ? cl.wallStyle(ov.colliderMode, wallS) : '#ffffff';
-                var sc = wallScratchFor(obsW, obsH);
-                sc.save();
-                sc.globalCompositeOperation = 'source-over';
-                sc.globalAlpha = 1;
-                sc.clearRect(0, 0, obsW, obsH);
-                sc.translate((ov.x * g.areaW - g.offX) * kx, (ov.y * g.areaH - g.offY) * ky);
-                // kx and ky differ only by the integer rounding of the sim texture
-                // dimensions (well under 0.1%), so scaling ahead of the rotation
-                // costs no visible shear and keeps the layout maths in CSS px.
-                sc.scale(kx, ky);
-                sc.rotate((ov.rotation || 0) * Math.PI / 180);
-                paintOverlay(sc, ov, '#ffffff');
-                sc.restore();
-                // Alpha mask → wall colour (mode + strength bytes), then onto
-                // the obstacle canvas at globalAlpha = strength, exactly what
-                // a collision layer writes (collisionLayers.wallBytes).
-                sc.globalCompositeOperation = 'source-in';
-                sc.fillStyle = style;
-                sc.fillRect(0, 0, obsW, obsH);
-                sc.globalCompositeOperation = 'source-over';
-                ctx.globalAlpha = Math.max(0, Math.min(1, wallS));
-                ctx.drawImage(wallScratch, 0, 0);
-            } catch (e) {
-                // One bad overlay must not take down the other walls — and a
-                // silent throw here would strand lastRasterSig, leaving the
-                // watchdog re-rasterising at 5Hz forever with nothing to show.
-                console.warn('⚠️ Text collider raster failed for overlay', ov.id, e);
-                anyFailed = true;
-            }
-            ctx.restore();
+            // kx and ky differ only by the integer rounding of the sim texture
+            // dimensions (well under 0.1%), so scaling ahead of the rotation
+            // costs no visible shear and keeps the layout maths in CSS px.
+            if (!drawWall(ctx, obsW, obsH, ov,
+                    (ov.x * g.areaW - g.offX) * kx, (ov.y * g.areaH - g.offY) * ky, kx, ky)) anyFailed = true;
         }
+        // A room's lines: placed at their fraction of the canvas, set in the
+        // painter's CSS px and stretched per axis onto this obstacle — the
+        // same mapping their strokes and pours get, so the wall stays under
+        // the words wherever the painter's window differs from this one.
+        peerLines.forEach(function (pl) {
+            if (!isWallSource(pl)) return;
+            if (!drawWall(ctx, obsW, obsH, pl, pl.cx * obsW, pl.cy * obsH, obsW / pl.cw, obsH / pl.ch)) anyFailed = true;
+        });
         // Remember exactly what this rasterise was based on, so the watchdog
         // below can tell whether the wall on the GPU is still current. The sig
         // is recorded even when an overlay failed (a deterministic throw must
@@ -1193,6 +1293,46 @@
         lastRasterSig = colliderSig();
         var ob = liveObstacle();
         if (ob && rasteredObstacles && !anyFailed) rasteredObstacles.add(ob);
+    }
+
+    // One line's glyphs onto the obstacle: centred at (tx, ty) in obstacle
+    // texels, kx/ky obstacle texels per CSS px of the line's own layout.
+    // False if it threw.
+    function drawWall(ctx, obsW, obsH, ov, tx, ty, kx, ky) {
+        var ok = true;
+        ctx.save();
+        try {
+            var cl = window.collisionLayers;
+            var wallS = (typeof ov.colliderStrength === 'number') ? ov.colliderStrength : 1;
+            var style = (cl && cl.wallStyle) ? cl.wallStyle(ov.colliderMode, wallS) : '#ffffff';
+            var sc = wallScratchFor(obsW, obsH);
+            sc.save();
+            sc.globalCompositeOperation = 'source-over';
+            sc.globalAlpha = 1;
+            sc.clearRect(0, 0, obsW, obsH);
+            sc.translate(tx, ty);
+            sc.scale(kx, ky);
+            sc.rotate((ov.rotation || 0) * Math.PI / 180);
+            paintOverlay(sc, ov, '#ffffff');
+            sc.restore();
+            // Alpha mask → wall colour (mode + strength bytes), then onto
+            // the obstacle canvas at globalAlpha = strength, exactly what
+            // a collision layer writes (collisionLayers.wallBytes).
+            sc.globalCompositeOperation = 'source-in';
+            sc.fillStyle = style;
+            sc.fillRect(0, 0, obsW, obsH);
+            sc.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = Math.max(0, Math.min(1, wallS));
+            ctx.drawImage(wallScratch, 0, 0);
+        } catch (e) {
+            // One bad overlay must not take down the other walls — and a
+            // silent throw here would strand lastRasterSig, leaving the
+            // watchdog re-rasterising at 5Hz forever with nothing to show.
+            console.warn('⚠️ Text collider raster failed for overlay', ov.id != null ? ov.id : ov.key, e);
+            ok = false;
+        }
+        ctx.restore();
+        return ok;
     }
 
     // ── Staying aligned ────────────────────────────────────────
@@ -1271,6 +1411,12 @@
                 o.bgEnabled ? 1 : 0, o.bgOpacity, o.padding, o.radius,
                 o.colliderMode, o.colliderStrength);
         }
+        // A room's walls: the painter's rev covers every field their wall
+        // was set from, and the placement rides beside it.
+        peerLines.forEach(function (pl) {
+            if (!isWallSource(pl)) return;
+            parts.push(pl.key, pl.rev, pl.cx, pl.cy, pl.cw, pl.ch);
+        });
         return parts.join('\u0001');
     }
 
@@ -1383,7 +1529,14 @@
     // drag or a CSS transition rather than once at the start.
     function watchLayout() {
         if (typeof ResizeObserver !== 'function') return;
-        var ro = new ResizeObserver(function () { if (colliderInstalled) syncCollidersSoon(); });
+        var ro = new ResizeObserver(function () {
+            if (colliderInstalled) syncCollidersSoon();
+            // A room's lines stand at fractions of the CANVAS, and so do the
+            // positions ours are sent at — both move when the canvas moves
+            // inside the area (borders on, a resize handle dragged).
+            layoutPeerLines();
+            mpTextChanged();
+        });
         ['canvas-area', 'canvas-wrapper', 'canvas'].forEach(function (id) {
             var el = document.getElementById(id);
             if (el) { try { ro.observe(el); } catch (_) {} }
@@ -1455,6 +1608,7 @@
     // takes a text wall down for the settle window and carves the dye again
     // when it comes back.
     function setHotkey(id, props) {
+        if (typeof id === 'string') return null;   // a key on someone else's line is not ours to bind
         var ov = findOverlay(id);
         if (!ov || !props) return null;
         if (props.hasOwnProperty('hotkey')) ov.hotkey = hotkeyOf(props.hotkey);
@@ -1467,11 +1621,16 @@
     // Toggle goes through setVisible, not toggleOverlay: that one drops the
     // selection on hide, so a key pressed with the line open in the editor
     // would fold the editor shut, and the sidebar would jump on every press.
-    function triggerHotkey(id) {
+    // A pour tells `landed(ok)` once it is down: at once at the brush, two
+    // frames on where the line is arranged (fluidize's wait).
+    function triggerHotkey(id, landed) {
         var ov = findOverlay(id);
         if (!ov) return false;
         if (ov.hotkeyAction === 'toggle') { setVisible(ov, !ov.visible); return true; }
-        return ov.hotkeyAt === 'arranged' ? fluidize(id) : pourAtBrush(ov);
+        if (ov.hotkeyAt === 'arranged') return fluidize(id, landed);
+        var ok = pourAtBrush(ov);
+        if (landed) landed(ok);
+        return ok;
     }
 
     // A pour at the brush, in the line's own font, size, colour and angle.
@@ -1507,31 +1666,55 @@
         return { x: ov.x * g.areaW - g.offX, y: ov.y * g.areaH - g.offY };
     }
 
+    // Where the line's key pours it right now, in CSS px of #canvas.
+    function pourSpot(ov, g) {
+        return (ov.hotkeyAt === 'arranged') ? arrangedSpot(ov, g) : (brushSpot(g) || arrangedSpot(ov, g));
+    }
+
     // ── Holding the key: a constant pour ────────────────────────
-    // A tap is one strike. Held past HOLD_DELAY_MS, the line keeps pouring on
-    // the Constant-flow brush's own rhythm, not the OS key repeat's: its
-    // Interval (config.BRUSH_DAB_INTERVAL_MS) on the SIMULATED clock, each
-    // pour carrying the brush's per-dab share of the reference dye
+    // The press prints the line (the strike), and from that moment the line
+    // keeps pouring until the key comes up, on the Constant-flow brush's own
+    // rhythm, not the OS key repeat's: its Interval
+    // (config.BRUSH_DAB_INTERVAL_MS) on the SIMULATED clock, each pour
+    // carrying the brush's per-dab share of the reference dye
     // (BRUSH_DAB_RATE_REF / rate, never above full, 05j). So a held line lays
     // paint at the rate a held brush does at any Interval, the Time slider
     // meters it, and a paused sim takes none. At the brush it follows the
-    // hand, the pours spread along the path moved since the last one the way
-    // the hose spreads its dabs, so a held key paints with the text;
-    // arranged, the line is a fountain at its own spot. One upload per hold:
-    // every pour reuses the stamp.
-    var HOLD_DELAY_MS = 200;
+    // hand, the pours spread along the path moved since the last one — the
+    // strike's spot, to begin with — the way the hose spreads its dabs, so a
+    // held key paints with the text; arranged, the line is a fountain at its
+    // own spot. One upload per hold: every pour reuses the stamp.
+    //
+    // The flow starts with the strike, not after a wait. It used to wait
+    // 200ms so that a tap stayed one strike, and in moving fluid the wait
+    // showed: the strike drifted off and dissolved before the flow came in,
+    // so a held key read as print, gone, print again ("it shows hides then
+    // holds", Gabriel 2026-09-15; by dye readback in a steady current, all
+    // of the strike's letters had left the brush by 200ms). The brush has no
+    // wait either. A tap is now what a click on the hose is: a short pour.
     var HOLD_POURS_PER_FRAME = 8;     // spike guard, the text twin of BRUSH_DAB_BUDGET
-    var holds = {};                   // overlay id → { t0, sim, credit, ps, last }
+    var holds = {};                   // overlay id → { sim, credit, ps, last, flowing }
     var holdRaf = 0;
 
     function pressHotkey(id) {
         var ov = findOverlay(id);
         if (!ov) return;
-        triggerHotkey(id);                                   // the strike (or the toggle)
         endHold(id);
-        if (ov.hotkeyAction === 'toggle') return;            // nothing to keep doing
-        holds[id] = { t0: performance.now(), sim: null, credit: 0, ps: null, last: null };
-        if (!holdRaf) holdRaf = requestAnimationFrame(holdTick);
+        if (ov.hotkeyAction === 'toggle') { triggerHotkey(id); return; }   // nothing to keep doing
+        if (mpPaintBlocked()) return;                        // someone else's turn: no strike, no flow
+        var h = holds[id] = { sim: null, credit: 0, ps: null, last: null, flowing: false };
+        // The flow picks up where and when the strike lands; a strike that
+        // fails takes its flow with it.
+        function landed(ok) {
+            if (holds[id] !== h) return;                     // already let go
+            var live = findOverlay(id), g = colliderGeom();
+            if (!ok || !live || !g) { endHold(id); return; }
+            h.last = pourSpot(live, g);
+            h.sim = window.__simTimeMs;
+            h.flowing = true;
+        }
+        if (!triggerHotkey(id, landed)) { endHold(id); return; }
+        if (holds[id] === h && !holdRaf) holdRaf = requestAnimationFrame(holdTick);
     }
 
     function endHold(id) {
@@ -1545,7 +1728,6 @@
         holdRaf = 0;
         var ids = Object.keys(holds);
         if (!ids.length) return;
-        var now = performance.now();
         var simNow = window.__simTimeMs;
         // 01-config's flag, shared by every classic script. __simTimeMs keeps
         // counting through a pause (05j), so the pause has to be asked.
@@ -1557,15 +1739,18 @@
         var amount = pourAmount() * Math.min(1, rateRef / rate);
         var g = colliderGeom();
         var dye = window.__dyeTexSize ? window.__dyeTexSize() : null;
+        // The brush left us mid-hold (the clock ran out, the call was spent,
+        // a host skip): the flow stops where a stroke would have been cut.
+        var blocked = !!window.__mpTurnBlocked;
         ids.forEach(function (key) {
             var h = holds[key];
             var ov = findOverlay(+key);
-            if (!ov || ov.hotkeyAction === 'toggle') { endHold(key); return; }
+            if (!ov || ov.hotkeyAction === 'toggle' || blocked) { endHold(key); return; }
             var dt = (typeof simNow === 'number' && typeof h.sim === 'number') ? Math.max(0, simNow - h.sim) : 0;
             h.sim = simNow;
-            // Still a tap, or nothing to pour into: no flow, and no credit
-            // piling up to arrive all at once later.
-            if (now - h.t0 < HOLD_DELAY_MS || paused || !g || !dye || !canStamp()) return;
+            // The strike not down yet, or nothing to pour into: no flow, and
+            // no credit piling up to arrive all at once later.
+            if (!h.flowing || paused || !g || !dye || !canStamp()) return;
             h.credit += rate * dt / 1000;
             var n = Math.floor(h.credit);
             h.credit -= n;
@@ -1578,12 +1763,13 @@
                 h.ps = makeStamp(ov, g);
                 if (!h.ps) return;
             }
-            var spot = (ov.hotkeyAt === 'arranged') ? arrangedSpot(ov, g) : (brushSpot(g) || arrangedSpot(ov, g));
+            var spot = pourSpot(ov, g);
             var from = h.last || spot;
             try {
                 for (var i = 1; i <= n; i++) {
                     var t = i / n;
-                    pourStamp(h.ps, from.x + (spot.x - from.x) * t, from.y + (spot.y - from.y) * t, g, amount);
+                    var px = from.x + (spot.x - from.x) * t, py = from.y + (spot.y - from.y) * t;
+                    if (pourStamp(h.ps, px, py, g, amount)) mpPoured(ov, px, py, g, amount);
                 }
             } catch (e) {
                 console.warn('⚠️ Text held pour failed for overlay', ov.id, e);
@@ -1627,6 +1813,479 @@
         });
     }
 
+    // ===========================================================
+    //  SWIRL TOGETHER - text in a shared room (js/06d text wire)
+    // ===========================================================
+    // In a room, text is two things everyone needs: LINES standing on the
+    // canvas (a wall, when the line is a collider) and POURS — a line poured
+    // into the dye by Fluidize, a hotkey's strike, or a held key's flow.
+    // 06d carries both; this is where they are set in type.
+    //
+    // A line travels as its look plus where it stands, never as a bitmap:
+    // a few hundred bytes per edit where a picture of it would be tens of KB.
+    // Where it stands is a fraction of the painter's CANVAS, and its type is
+    // in the painter's CSS px beside their canvas size, so this side stretches
+    // it per axis exactly as it stretches their strokes — words and the paint
+    // around them stay in register between windows of different shapes. The
+    // face is this machine's: a family it lacks falls back, the same words in
+    // another face.
+    //
+    // Everything a peer sends is untrusted, so every field goes through
+    // cleanLook before it can reach the DOM, a canvas, or the obstacle.
+    var LOOK_KEYS = ['content', 'textCase', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle',
+        'letterSpacing', 'lineHeight', 'align', 'color', 'opacity', 'shadow',
+        'bgEnabled', 'bgColor', 'bgOpacity', 'padding', 'radius', 'rotation'];
+    var TEXT_WIRE_MAX = 2000;       // characters of one line a room carries
+    var PEER_LINES_PER_OWNER = 64;  // a room is 8 people; this is plenty and bounds a flood
+    var PEER_STAMPS_MAX = 12;       // pour bitmaps kept on the GPU, oldest dropped first
+
+    // Out of turn, a pour is refused like a stroke (05d pointerdown), with
+    // the same "it's their turn" hint.
+    function mpPaintBlocked() {
+        if (!window.__mpTurnBlocked) return false;
+        if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
+        return true;
+    }
+
+    function round(v, k) { return Math.round(v * k) / k; }
+
+    // This line's look as it goes on the wire. Every field paintOverlay and
+    // makeStamp read, in a fixed order (06d batches pours by its JSON).
+    function wireLook(ov) {
+        var o = {};
+        for (var i = 0; i < LOOK_KEYS.length; i++) {
+            var k = LOOK_KEYS[i], v = ov[k];
+            if (v === undefined) continue;
+            o[k] = (typeof v === 'number') ? round(v, 1000) : v;
+        }
+        o.content = String(ov.content || '').slice(0, TEXT_WIRE_MAX);
+        return o;
+    }
+
+    // Every visible line of ours, placed for the wire; null when there is no
+    // layout to measure against (then 06d says nothing, rather than telling
+    // the room all our lines are gone).
+    function wireLines() {
+        var g = colliderGeom();
+        if (!g) return null;
+        var cw = round(g.cssW, 2), ch = round(g.cssH, 2);
+        var out = [];
+        for (var i = 0; i < overlays.length; i++) {
+            var ov = overlays[i];
+            if (!ov.visible) continue;
+            var line = wireLook(ov);
+            line.cx = round((ov.x * g.areaW - g.offX) / g.cssW, 1e5);
+            line.cy = round((ov.y * g.areaH - g.offY) / g.cssH, 1e5);
+            line.cw = cw; line.ch = ch;
+            if (ov.collider) {
+                line.col = 1;
+                line.cm = ov.colliderMode || 'deflect';
+                line.cs = (typeof ov.colliderStrength === 'number') ? round(ov.colliderStrength, 1000) : 1;
+            }
+            out.push({ id: ov.id, line: line });
+        }
+        return out;
+    }
+
+    // One pour of ours, told to the room: the line's look, this canvas's CSS
+    // size, and the pour's centre as a fraction of it.
+    function mpPoured(ov, cx, cy, g, amount) {
+        if (typeof window.__mpTextPour !== 'function' || !g || !(g.cssW > 0) || !(g.cssH > 0)) return;
+        try {
+            window.__mpTextPour(wireLook(ov), round(g.cssW, 2), round(g.cssH, 2),
+                cx / g.cssW, cy / g.cssH, amount);
+        } catch (_) {}
+    }
+
+    function num(v, lo, hi, d) {
+        return (typeof v === 'number' && isFinite(v)) ? Math.max(lo, Math.min(hi, v)) : d;
+    }
+    function pick(v, set, d) { return set.indexOf(v) >= 0 ? v : d; }
+    function hexColour(v, d) {
+        return (typeof v === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) ? v : d;
+    }
+    // A font list is only ever assigned through CSSOM and ctx.font, which
+    // parse it as a family list and drop anything else — but it is also the
+    // one free-text field that reaches both, so the obvious breakouts are
+    // refused outright.
+    function familyOk(v) {
+        if (typeof v !== 'string' || !v.length || v.length > 300) return false;
+        if (/[;{}<>]/.test(v) || v.indexOf(String.fromCharCode(92)) >= 0) return false;
+        for (var i = 0; i < v.length; i++) if (v.charCodeAt(i) < 32) return false;
+        return true;
+    }
+    var WEIGHTS = ['100', '200', '300', '400', '500', '600', '700', '800', '900', 'normal', 'bold'];
+
+    // A peer's look → a line paintOverlay can set. Ranges are the Text
+    // panel's own, widened a little for older or newer builds.
+    function cleanLook(src) {
+        src = src || {};
+        return {
+            content: (typeof src.content === 'string') ? src.content.slice(0, TEXT_WIRE_MAX) : '',
+            textCase: pick(src.textCase, ['none', 'upper', 'lower', 'title'], 'none'),
+            fontFamily: familyOk(src.fontFamily) ? src.fontFamily : DEFAULTS.fontFamily,
+            fontSize: num(src.fontSize, 6, 400, DEFAULTS.fontSize),
+            fontWeight: pick(String(src.fontWeight), WEIGHTS, DEFAULTS.fontWeight),
+            fontStyle: pick(src.fontStyle, ['normal', 'italic', 'oblique'], 'normal'),
+            letterSpacing: num(src.letterSpacing, -50, 200, 0),
+            lineHeight: num(src.lineHeight, 0.3, 6, DEFAULTS.lineHeight),
+            align: pick(src.align, ['left', 'center', 'right'], 'center'),
+            color: hexColour(src.color, DEFAULTS.color),
+            opacity: num(src.opacity, 0, 1, 1),
+            shadow: !!src.shadow,
+            bgEnabled: !!src.bgEnabled,
+            bgColor: hexColour(src.bgColor, DEFAULTS.bgColor),
+            bgOpacity: num(src.bgOpacity, 0, 1, DEFAULTS.bgOpacity),
+            padding: num(src.padding, 0, 200, DEFAULTS.padding),
+            radius: num(src.radius, 0, 200, DEFAULTS.radius),
+            rotation: num(src.rotation, -36000, 36000, 0)
+        };
+    }
+
+    // ── The room's lines ───────────────────────────────────────
+    // Upsert one (06d text-line). Same rev as the one standing: nothing to
+    // do — a painter re-sends every line when the brush comes back to them.
+    function putPeerLine(owner, id, d) {
+        if (typeof owner !== 'string' || !owner || id == null || !d || typeof d !== 'object') return;
+        var key = owner + '|' + String(id).slice(0, 24);
+        var prev = peerLines.get(key) || null;
+        var rev = (typeof d.rev === 'string') ? d.rev.slice(0, 40) : '';
+        if (prev && rev && prev.rev === rev) return;
+        var cw = num(d.cw, 20, 20000, 0), ch = num(d.ch, 20, 20000, 0);
+        if (!cw || !ch) return;
+        if (!prev) {
+            var mine = 0;
+            peerLines.forEach(function (pl) { if (pl.owner === owner) mine++; });
+            if (mine >= PEER_LINES_PER_OWNER) return;
+        }
+        var line = cleanLook(d);
+        line.key = key;
+        line.id = key;                // the id the panel and arrange mode use for it
+        line.room = true;
+        line.owner = owner;
+        line.theirId = String(id).slice(0, 24);   // the author's own id for it
+        line.rev = rev;
+        line.visible = true;          // only visible lines are ever sent
+        line.cx = num(d.cx, -1, 2, 0.5);
+        line.cy = num(d.cy, -1, 2, 0.5);
+        line.cw = cw;
+        line.ch = ch;
+        line.collider = !!d.col;
+        var modes = (window.collisionLayers && window.collisionLayers.MODES) || ['block', 'deflect', 'slow'];
+        line.colliderMode = pick(d.cm, modes, 'deflect');
+        line.colliderStrength = num(d.cs, 0, 1, 1);
+        if (prev && prev.el) prev.el.remove();
+        peerLines.set(key, line);
+        renderPeerLine(line);
+        // The room's version of a line wins over a tweak of ours that is
+        // still waiting for our turn (see mpRoomEdit).
+        if (typeof window.__mpRoomLineSettled === 'function') {
+            try { window.__mpRoomLineSettled(key); } catch (_) {}
+        }
+        // A new wall lands at once. An edited one takes the same settle as a
+        // local edit: a painter typing sends a line every ~120ms, and
+        // rebuilding on each would carve every intermediate shape into this
+        // canvas's dye — the wall comes down for the burst and is rebuilt
+        // once when it stops.
+        if (prev && isWallSource(prev)) syncCollidersSoon();
+        else if (isWallSource(line)) syncColliders();
+        if (arranging) drawArrange();
+        emitChange();   // the panel lists the room's lines too
+    }
+
+    // The room took a line away (its author hid it, someone removed it):
+    // any tweak of ours still waiting for our turn is moot with it.
+    function removePeerLine(owner, id) {
+        if (typeof owner !== 'string' || id == null) return;
+        var key = owner + '|' + String(id).slice(0, 24);
+        if (!peerLines.has(key)) return;
+        if (typeof window.__mpRoomLineSettled === 'function') {
+            try { window.__mpRoomLineSettled(key); } catch (_) {}
+        }
+        dropRoomLine(key);
+    }
+
+    function dropRoomLine(key) {
+        var pl = peerLines.get(key);
+        if (!pl) return;
+        peerLines.delete(key);
+        if (pl.el) pl.el.remove();
+        if (selectedId === key) selectedId = null;
+        // At once, not settled: Fluidize hides a line two frames before it
+        // pours, and the pour must not meet the line's own wall here.
+        if (isWallSource(pl)) syncColliders();
+        if (arranging) drawArrange();
+        emitChange();
+    }
+
+    // One painter's lines (they left), or every room line (we left).
+    function dropPeerLines(owner) {
+        var hadWall = false, had = false;
+        peerLines.forEach(function (pl, key) {
+            if (owner && pl.owner !== owner) return;
+            if (pl.el) pl.el.remove();
+            if (isWallSource(pl)) hadWall = true;
+            if (selectedId === key) selectedId = null;
+            peerLines.delete(key);
+            had = true;
+        });
+        if (hadWall) syncColliders();
+        if (had) { if (arranging) drawArrange(); emitChange(); }
+    }
+
+    function renderPeerLine(pl) {
+        if (pl.el) { pl.el.remove(); pl.el = null; }
+        if (!container) return;
+        var el = document.createElement('div');
+        el.dataset.peerLine = pl.key;
+        el.style.position = 'absolute';
+        el.style.pointerEvents = 'none';
+        el.style.transformOrigin = 'center center';
+        el.style.zIndex = '51';
+        styleTextEl(el, pl);
+        pl.el = el;
+        placePeerLine(pl, null);
+        container.appendChild(el);
+    }
+
+    function renderPeerLines() {
+        peerLines.forEach(function (pl) { renderPeerLine(pl); });
+    }
+
+    // Its canvas fraction → this area's fraction, and the painter's canvas
+    // size → a per-axis stretch. CSS applies transforms right to left, so
+    // the text is rotated in its own space and then stretched, exactly as
+    // the wall and a pour are (ctx.scale, then ctx.rotate).
+    function placePeerLine(pl, g) {
+        var el = pl.el;
+        if (!el) return;
+        g = g || colliderGeom();
+        if (!g) { el.style.visibility = 'hidden'; return; }
+        el.style.visibility = '';
+        // x/y (fractions of the area) kept beside cx/cy: Duplicate copies a
+        // room line into one of this user's own, which lives in area terms.
+        pl.x = (g.offX + pl.cx * g.cssW) / g.areaW;
+        pl.y = (g.offY + pl.cy * g.cssH) / g.areaH;
+        el.style.left = (pl.x * 100) + '%';
+        el.style.top = (pl.y * 100) + '%';
+        el.style.transform = 'translate(-50%,-50%) scale(' + (g.cssW / pl.cw).toFixed(4) + ',' +
+            (g.cssH / pl.ch).toFixed(4) + ') rotate(' + (pl.rotation || 0) + 'deg)';
+    }
+
+    function layoutPeerLines() {
+        if (!peerLines.size) return;
+        var g = colliderGeom();
+        peerLines.forEach(function (pl) { placePeerLine(pl, g); });
+    }
+
+    // ── Editing the room's lines ───────────────────────────────
+    // Someone else's line is editable here like one of this user's own —
+    // the Text panel lists it under "In the room", arrange mode moves it —
+    // and the edit goes back to its author and on to everyone (06d). The
+    // line stays the author's: they own it, it is saved on their machine
+    // only, and it leaves with them. Out of turn the tweak shows here and
+    // waits for the brush, and if the author changes the line first, their
+    // version wins (putPeerLine settles it).
+
+    // A room line as the wire carries it: its look, where it stands, and
+    // its wall — the same shape a line of our own is sent in.
+    function roomWire(pl) {
+        var line = wireLook(pl);
+        line.cx = round(pl.cx, 1e5);
+        line.cy = round(pl.cy, 1e5);
+        line.cw = pl.cw;
+        line.ch = pl.ch;
+        if (pl.collider) {
+            line.col = 1;
+            line.cm = pl.colliderMode || 'deflect';
+            line.cs = round(typeof pl.colliderStrength === 'number' ? pl.colliderStrength : 1, 1000);
+        }
+        return line;
+    }
+
+    function mpRoomEdit(pl) {
+        if (typeof window.__mpRoomLineEdit !== 'function') return;
+        try { window.__mpRoomLineEdit(pl.owner, pl.theirId, pl.key, roomWire(pl)); } catch (_) {}
+    }
+
+    // The Text panel's commit on a room line (and snapTo): look fields,
+    // the wall fields, and a move given in area terms.
+    function updateRoomLine(key, props) {
+        var pl = peerLines.get(key);
+        if (!pl || !props) return null;
+        var wasWall = isWallSource(pl);
+        var merged = {};
+        for (var i = 0; i < LOOK_KEYS.length; i++) {
+            var k = LOOK_KEYS[i];
+            merged[k] = (props[k] !== undefined) ? props[k] : pl[k];
+        }
+        var look = cleanLook(merged);
+        for (var lk in look) if (look.hasOwnProperty(lk)) pl[lk] = look[lk];
+        if (props.collider !== undefined) pl.collider = !!props.collider;
+        var modes = (window.collisionLayers && window.collisionLayers.MODES) || ['block', 'deflect', 'slow'];
+        if (props.colliderMode !== undefined) pl.colliderMode = pick(props.colliderMode, modes, pl.colliderMode);
+        if (props.colliderStrength !== undefined) pl.colliderStrength = num(props.colliderStrength, 0, 1, pl.colliderStrength);
+        if (typeof props.x === 'number' && typeof props.y === 'number') {
+            var g = colliderGeom();
+            if (g) {
+                pl.cx = num((props.x * g.areaW - g.offX) / g.cssW, -1, 2, pl.cx);
+                pl.cy = num((props.y * g.areaH - g.offY) / g.cssH, -1, 2, pl.cy);
+            }
+        }
+        pl.rev = '';                  // ours now; whatever the room sends next applies
+        renderPeerLine(pl);
+        if (wasWall || isWallSource(pl)) syncCollidersSoon();
+        if (arranging) drawArrange();
+        emitChange();
+        mpRoomEdit(pl);
+        return pl;
+    }
+
+    // Delete, or hide, on someone else's line: it leaves the room, and on
+    // its author's machine it is HIDDEN rather than deleted — a line is
+    // saved content there, and nothing a partner does should destroy it.
+    // The eye in their list brings it back.
+    function removeRoomLine(key) {
+        var pl = peerLines.get(key);
+        if (!pl) return null;
+        if (typeof window.__mpRoomLineHide === 'function') {
+            try { window.__mpRoomLineHide(pl.owner, pl.theirId, key); } catch (_) {}
+        }
+        dropRoomLine(key);            // not removePeerLine: the hide just staged must stand
+        return pl;
+    }
+
+    // Fluidize on a room line: pour it where it stands (our pour — a turn
+    // gate like any), then it leaves the canvas for everyone, as a Fluidize
+    // of one's own does. Set in the author's type at the author's canvas
+    // size, like every other room line, so the pour lands under the words.
+    function fluidizeRoomLine(key, landed) {
+        var pl = peerLines.get(key);
+        if (!pl) return false;
+        if (mpPaintBlocked()) return false;
+        if (typeof window.__splatImageToDye !== 'function' || typeof window.__dyeTexSize !== 'function') return false;
+        var snap = {};
+        for (var k in pl) if (pl.hasOwnProperty(k) && k !== 'el') snap[k] = pl[k];
+        removeRoomLine(key);          // its wall comes down before the pour lands
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                var ok = false;
+                try {
+                    ok = pourAt(snap, snap.cx * snap.cw, snap.cy * snap.ch, { cssW: snap.cw, cssH: snap.ch });
+                } catch (e) { console.warn('⚠️ Text fluidize failed for a room line', key, e); }
+                if (landed) landed(ok);
+            });
+        });
+        return true;
+    }
+
+    // ── The author's side: a partner edited one of OUR lines ──
+    // d is a room line as roomWire sends it. Their copy stood at our canvas
+    // size as we last sent it, so the type is rescaled by our canvas now
+    // over that (1 unless this window changed shape since). Returns the
+    // line's new wire form so 06d can record that the room holds it.
+    function applyRoomEdit(id, d) {
+        var ov = findOverlay(id);
+        var g = colliderGeom();
+        if (!ov || !d || !g) return null;
+        var look = cleanLook(d);
+        var props = {};
+        for (var k in look) if (look.hasOwnProperty(k)) props[k] = look[k];
+        var ch = num(d.ch, 20, 20000, g.cssH);
+        props.fontSize = Math.max(6, Math.min(400, Math.round(look.fontSize * (g.cssH / ch) * 1000) / 1000));
+        props.x = clamp01((g.offX + num(d.cx, -1, 2, 0.5) * g.cssW) / g.areaW);
+        props.y = clamp01((g.offY + num(d.cy, -1, 2, 0.5) * g.cssH) / g.areaH);
+        props.collider = !!d.col;
+        var modes = (window.collisionLayers && window.collisionLayers.MODES) || ['block', 'deflect', 'slow'];
+        if (d.col) {
+            props.colliderMode = pick(d.cm, modes, ov.colliderMode || 'deflect');
+            props.colliderStrength = num(d.cs, 0, 1, (typeof ov.colliderStrength === 'number') ? ov.colliderStrength : 1);
+        }
+        updateOverlay(id, props);
+        return wireLineOf(id);
+    }
+
+    // A partner hid (or deleted) one of our lines: hidden here, kept.
+    function hideOwnLine(id) {
+        var ov = findOverlay(id);
+        if (!ov || !ov.visible) return false;
+        setVisible(ov, false);
+        return true;
+    }
+
+    // One of our visible lines in wire form, or null.
+    function wireLineOf(id) {
+        var all = wireLines();
+        if (!all) return null;
+        for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i].line;
+        return null;
+    }
+
+    // The room's lines for the Text panel's "In the room" list.
+    function getRoomLines() {
+        var out = [];
+        peerLines.forEach(function (pl) { out.push(pl); });
+        return out;
+    }
+
+    // ── The room's pours ───────────────────────────────────────
+    // A batch of one painter's pours of one line (06d, from its paced queue):
+    // [x, y, amount] per pour, x/y fractions of their canvas. The bitmap is
+    // built once at this dye's resolution and kept while the pours keep
+    // coming — a held key sends ~125 a second — then dropped oldest-first.
+    function peerPour(owner, look, cw, ch, pours) {
+        if (typeof window.__splatImageToDye !== 'function' || typeof window.__dyeTexSize !== 'function') return false;
+        cw = num(cw, 20, 20000, 0);
+        ch = num(ch, 20, 20000, 0);
+        if (!cw || !ch || !Array.isArray(pours) || !pours.length) return false;
+        var line = cleanLook(look);
+        // makeStamp and pourStamp read only these two: set in the painter's
+        // CSS px, landed on this dye.
+        var g = { cssW: cw, cssH: ch };
+        var ok = false, i, p;
+        if (!canStamp()) {
+            for (i = 0; i < pours.length; i++) {
+                p = pours[i];
+                if (pourWhole(line, p[0] * cw, p[1] * ch, g, p[2])) ok = true;
+            }
+            return ok;
+        }
+        var dye = window.__dyeTexSize();
+        if (!dye || !(dye.w > 0) || !(dye.h > 0)) return false;
+        var key = owner + '|' + cw + 'x' + ch + '|' + JSON.stringify(line);
+        var e = peerStamps.get(key) || null;
+        if (e) peerStamps.delete(key);        // re-set below: the map runs oldest first
+        if (e && (e.ps.dw !== dye.w || e.ps.dh !== dye.h)) { disposePeerStamp(e); e = null; }
+        if (!e) {
+            var ps = makeStamp(line, g, pours[0][0] * cw, pours[0][1] * ch);
+            if (!ps) return false;
+            e = { ps: ps, owner: owner };
+        }
+        peerStamps.set(key, e);
+        while (peerStamps.size > PEER_STAMPS_MAX) {
+            var oldest = peerStamps.keys().next().value;
+            disposePeerStamp(peerStamps.get(oldest));
+            peerStamps.delete(oldest);
+        }
+        for (i = 0; i < pours.length; i++) {
+            p = pours[i];
+            if (pourStamp(e.ps, p[0] * cw, p[1] * ch, g, p[2])) ok = true;
+        }
+        return ok;
+    }
+
+    function disposePeerStamp(e) {
+        if (e && e.ps && e.ps.stamp) { try { e.ps.stamp.dispose(); } catch (_) {} }
+    }
+
+    function dropPeerStamps(owner) {
+        peerStamps.forEach(function (e, key) {
+            if (owner && e.owner !== owner) return;
+            disposePeerStamp(e);
+            peerStamps.delete(key);
+        });
+    }
+
     // ─── PUBLIC API ─────────────────────────────────────────────
     var api = {
         add: addTextOverlay,
@@ -1636,7 +2295,9 @@
         toggle: toggleOverlay,
         clearAll: clearAll,
         getAll: function () { return overlays.slice(); },
-        get: function (id) { var o = findOverlay(id); return o ? o : null; },
+        // Own lines by number; a room line by its 'owner|id' key (the panel
+        // selects and edits those too — see getRoomLines).
+        get: function (id) { var o = lineById(id); return o ? o : null; },
         renderAll: renderAll,
         compositeOntoCanvas: compositeOntoCanvas,
         fluidize: fluidize,                 // pour one line into the dye and hide it
@@ -1660,7 +2321,28 @@
             var p = PRESET_XY[presetKey];
             if (p) updateOverlay(id, { x: p.x, y: p.y });
         },
-        onChange: onChange
+        onChange: onChange,
+        // Swirl Together (06d): our lines for the wire, the room's lines and
+        // pours set here. getAll() stays this user's own lines only.
+        wireLines: wireLines,
+        putPeerLine: putPeerLine,
+        removePeerLine: removePeerLine,
+        dropPeerLines: dropPeerLines,
+        peerPour: peerPour,
+        dropPeerStamps: dropPeerStamps,
+        getRoomLines: getRoomLines,         // the Text panel's "In the room" rows
+        applyRoomEdit: applyRoomEdit,       // a partner edited one of our lines
+        hideOwnLine: hideOwnLine,           // ...or took it out of the room
+        wireLineOf: wireLineOf,
+        getPeerLines: function () {
+            var out = [];
+            peerLines.forEach(function (pl) {
+                var c = {};
+                for (var k in pl) if (pl.hasOwnProperty(k) && k !== 'el') c[k] = pl[k];
+                out.push(c);
+            });
+            return out;
+        }
     };
 
     window.textOverlays = api;

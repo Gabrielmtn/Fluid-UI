@@ -89,7 +89,10 @@ full teardown. A stranger pair ends when either person leaves
 | `clear` / `preset` | `{}` / `{data:{preset}}` | holder only | broadcast |
 | `stroke`, `stroke-chunk` | `{data:{events}}` ≤80 events / `{sid,seq,total,events}` | holder only | broadcast; both count as paint for the backstop |
 | `brush-shape` | `{id,rev,name,seq,total,part}` 11 000-char parts, ≤32 | anyone — deliberately ungated | broadcast |
-| `collider-add` / `collider-remove` | geometry + PNG coverage parts / `{lid}` | holder only | broadcast |
+| `collider-add` / `collider-remove` | geometry + PNG coverage parts / `{lid}`; with `own` it is someone else's wall (a reshape / a take-out) | holder only | broadcast |
+| `collider-edit` | `{own, lid, x, y, sx, sy, rot, kx, ky, str, mode, vis, on}` — a change to someone else's wall (2026-09-15) | holder only | broadcast |
+| `text-line` / `text-line-remove` | a visible line's look + `{id, rev, cx, cy, cw, ch, col, cm, cs}` / `{id}`; with `own` it is an edit / a hide of someone else's line (2026-09-15) | holder only | broadcast |
+| `text-pour` | `{look, cw, ch, pours:[[x,y,amount,t]…]}` ≤48 pours — Fluidize, a hotkey strike, a held key's flow (2026-09-15) | holder only | broadcast; counts as paint for the backstop |
 | `lock` | `{locked}` | host only | `lock-state` to all |
 | `settings-lock` | `{locked, snapshot?}` | host only; refused while turns run | broadcast |
 | `turn-look` | `{snapshot}` | holder only; dropped when turns are off | broadcast |
@@ -113,17 +116,23 @@ waiter that died without a close frame can strand seekers. The `share-*` family 
 
 `connected` (carries `clientId, role, locked, capacity, roomKind`),
 `client-count`, `lock-state`, `host-changed`, `turn-state`,
-`turn-invite-offer`, `turn-invite-result`, `turn-invite-sent`. The client
-double-checks `turn-state` with `if (data.clientId) break;` because an older
-relay forwards anything.
+`turn-invite-offer`, `turn-invite-result`, `turn-invite-sent`, and
+`peer-left {id}` (2026-09-15: a connection closed — clients drop the walls,
+text lines, pour bitmaps and cursor keyed on that id; connection ids only,
+never a uid). The client double-checks `turn-state` and `peer-left` with
+`if (data.clientId) break;` because an older relay forwards anything.
 
 ### Gates, in one place
 
 - **Size cap** 16 KB, silent drop (`shared.ts:11`). Only the look-snapshot
   path (`fitLookSnapshot`, `06b:190`) handles it.
 - **Take-turns gate** `TURN_HOLDER_ONLY` (`index.ts:36`): splat, stroke,
-  stroke-chunk, clear, preset, turn-look, collider-add, collider-remove.
-  `cursor` / `pointer-up` stay open so watchers keep a cursor.
+  stroke-chunk, clear, preset, turn-look, collider-add, collider-remove,
+  collider-edit, text-line, text-line-remove, text-pour.
+  `cursor` / `pointer-up` stay open so watchers keep a cursor. The
+  Call-and-return backstop counts paint AND setup as holder activity
+  (`PAINT_TYPES`: the paint types plus text and wall messages) — typing a
+  line for 45 s is not being away.
 - **Host gates**: `lock`, `settings-lock`, `turns` on.
 - **Default relay** force-stamps `data.clientId = sender.id` — load-bearing:
   every client-side reassembly keys on it.
@@ -186,8 +195,44 @@ Replay strokes normalised at `05d:411` → `broadcastReplayStroke` (`06d:985`)
 → chunks of 80 events by `sid/seq` → `handleStrokeChunk` (1045) →
 `scheduleStrokeReplay` (`05d:734`).
 
+**Text and walls (2026-09-15).** Gabriel: "people have to be able to send
+their dye and colliders" during turns. Before this, text never left the
+machine it was made on, a Paint Collider wall only ever sent its empty
+first snapshot, an edited collider mask sent nothing, and a wall made or
+deleted while waiting was never sent at all. Now:
+
+- *Lines* travel as their look plus where they stand (`text-line`);
+  positions are fractions of the painter's canvas and type is in their CSS
+  px beside their canvas size, so a receiver stretches text per axis exactly
+  as it stretches strokes (23-text-overlays "SWIRL TOGETHER"). A collider
+  line is a wall there too. *Pours* ride like dabs (`text-pour`), through the
+  same paced inbound queue. Fluidize's removal is flushed before its pour, so
+  a receiver never meets the line's own wall.
+- *Walls* publish what the obstacle actually draws (`collisionLayers.
+  coverageOf`: bound Mask/Sketch surfaces read back, edited masks unioned),
+  cached so the per-recomposite publish pass costs a comparison.
+- *Staging*: out of turn, a watcher's line and wall edits show on their own
+  canvas and go out when the gate opens (`flushStagedWork`, 06c) — forced,
+  with receivers skipping revs they hold; deletes wait in the ledger. Pours
+  are refused like strokes. A note says "Saved for your turn" once per wait.
+- *Editing each other's*: the room's lines appear in the Text panel ("In
+  the room") and in arrange mode; the room's walls are ordinary layers. An
+  edit to someone else's object goes out in its author's name (`own`), lands
+  on the author's own object and on everyone's copy. Walls are compared to a
+  baseline (the copy as the room last had it) since layer edits have no
+  single hook. Delete/hide never destroys: the author's wall is switched
+  off, their line hidden. Out of turn such an edit waits; the author's own
+  change arriving first wins.
+- *Leaving*: `peer-left` drops a departed painter's lines and walls. It also
+  fixed duplicate walls after a reconnect (new connection id, republished
+  beside the old copies).
+
+Probes: `scripts/test/mp/mp-text.js` (relay gates, Node) and
+`scripts/test/mp/mp-text-e2e.js` (two real browsers, reads what landed on
+each canvas — 49 checks).
+
 **Not synced, by decision:** the canvas itself (a late joiner starts blank);
-layers, masks, recordings; per-arm push flags; recording/stats/autoload and
+image layers (the pictures — their walls travel), masks, recordings; per-arm push flags; recording/stats/autoload and
 the sketch-workflow toggles (`MP_PERF_LOCAL_KEYS`, `06b`); PhotoSafe (a
 snapshot can never switch protection off); peer asset cleanup on a peer's
 departure. **Resolution and the fps cap DO ride the mirror since 2026-09-11**:
@@ -292,9 +337,10 @@ canvas sync for a late joiner (say so in the UI rather than solve it now).
 - `updateRemoteCursors` (`06e:51`) calls `clearRemoteCursors()` before its
   reuse branch, so every cursor element is recreated on every message.
   Audit §1.3 still open.
-- `layer.__peerOwner` is set "for cleanup when they leave" but only ever read
-  as a publish filter; nothing cleans peer assets up on departure. Audit
-  §1.6 still open.
+- ~~`layer.__peerOwner` is set "for cleanup when they leave" but nothing
+  cleans peer assets up on departure (audit §1.6).~~ Closed 2026-09-15 by
+  `peer-left` (walls, text lines, pour bitmaps, cursor). Peer brush-shape
+  bitmaps are still kept until we leave the room ourselves.
 - `onClose` broadcasts `client-count` before the careful `remaining` filter.
 - `scripts/test/inventory/determinism.json` still names
   `js/06-multiplayer.js` with line numbers; the file is gone.

@@ -350,6 +350,14 @@ class DepthEstimator {
             return { data: s.depthData, width: s.depthWidth, height: s.depthHeight,
                      threshold: s.threshold, invert: !!s.invert };
         },
+        // What the obstacle actually draws for a collider — bound surfaces
+        // and edited masks included — which is what a room needs. See
+        // coverageOf for the three answers it gives.
+        coverageOf: function (layerIndex) { return coverageOf(layerIndex); },
+        // A partner's reshape of one of our walls (06d applyOwnWallReshape).
+        setCoverage: function (layerIndex, depth, threshold, invert) {
+            return setCoverage(layerIndex, depth, threshold, invert);
+        },
 
         // Mode vocabulary + the fillStyle a procedural source must draw its
         // coverage with so the wall carries its mode and strength (see
@@ -842,7 +850,9 @@ class DepthEstimator {
     // Any change that recomposites the obstacle is a change worth sharing:
     // Strength / Threshold / Invert, a transform, a re-edited mask. Coalesced
     // because a slider drag calls this per frame, and 06 additionally drops
-    // resends whose content hash is unchanged.
+    // resends whose content hash is unchanged. A peer's wall is asked too:
+    // 06 never republishes it as ours, but sends an edit made to it back to
+    // its author (06d "Editing someone else's wall").
     var _pubTimer = null;
     function schedulePublishAll() {
         if (typeof window.publishCollider !== 'function') return;
@@ -851,9 +861,44 @@ class DepthEstimator {
             _pubTimer = null;
             if (!window.layers) return;
             window.layers.forEach(function (l) {
-                if (l && l.isCollision && !l.__peerOwner) publishToRoom(l.index);
+                if (l && l.isCollision) publishToRoom(l.index);
             });
         }, 400);
+    }
+
+    // Replace a collider's wall with this coverage map (06d: a partner
+    // reshaped one of our walls on their turn). The layer keeps its name,
+    // place and settings; a bound one (Paint Collider, ⟳ Live) is unbound
+    // and keeps the shape it was given — writing a partner's map into the
+    // surface would paint over the art of a bound Sketch layer.
+    function setCoverage(layerIndex, depth, threshold, invert) {
+        if (!window.layers || !depth || !depth.data || !depth.width || !depth.height) return false;
+        var layer = window.layers.find(function (l) { return l.index === layerIndex; });
+        if (!layer || !layer.isCollision || !layer.mask) return false;
+        if (_sketchColliderIndex === layerIndex) { setSketchLive(false); _sketchColliderIndex = null; }
+        layer.collisionSource = null;
+        var canvasEl = document.getElementById('canvas');
+        layer.mask.shapes = [{
+            type: 'depth-mask', x: 0, y: 0,
+            width: canvasEl ? canvasEl.width : depth.width,
+            height: canvasEl ? canvasEl.height : depth.height,
+            depthData: new Uint8Array(depth.data),
+            depthWidth: depth.width, depthHeight: depth.height,
+            threshold: (typeof threshold === 'number') ? threshold : 128,
+            invert: !!invert
+        }];
+        layer.mask.enabled = true;
+        layer.__maskDirty = true;
+        layer.__wireCov = null;
+        try {
+            layer.data = _depthToOpaqueUrl(depth);
+            layer.thumb = layer.data;
+            layer.filmData = _depthToFilmUrl(depth);
+            _setColliderFilm(layer.index, layer.filmData);
+        } catch (_) {}
+        if (typeof window.renderLayers === 'function') window.renderLayers();
+        updateObstacleFromLayers();
+        return true;
     }
 
     // Update depth mask data for an existing layer
@@ -923,7 +968,9 @@ class DepthEstimator {
     // fboOverride: read THAT buffer instead of the bound one (the collider
     // mask editor refreshes one specific layer's source, which may not be
     // the live-bound surface at all).
-    function buildSketchDepth(allowEmpty, fboOverride) {
+    // opts.maxSide caps the map's long side (coverageOf asks for the wire's
+    // 512); opts.noPreview skips the preview PNG nobody will look at.
+    function buildSketchDepth(allowEmpty, fboOverride, opts) {
         // D3/D4: read the BOUND source's buffer (raster layer OR mask;
         // falls back to the active paint layer) — switching the active
         // surface must not silently re-target an existing live binding.
@@ -940,7 +987,8 @@ class DepthEstimator {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         // Downsample alpha to a resolution-proportional long-side cap (box filter), flipping Y:
         // GL rows are bottom-up, depth-mask data is stored top-down.
-        var maxSketchSide = Math.min(2048, Math.max(512, Math.round(Math.max(sw, sh) * 0.75)));
+        var maxSketchSide = (opts && opts.maxSide > 0) ? opts.maxSide
+            : Math.min(2048, Math.max(512, Math.round(Math.max(sw, sh) * 0.75)));
         var scale = Math.min(1, maxSketchSide / Math.max(sw, sh));
         var tw = Math.max(1, Math.round(sw * scale));
         var th = Math.max(1, Math.round(sh * scale));
@@ -972,6 +1020,9 @@ class DepthEstimator {
             }
         }
         if (!any && !allowEmpty) return null;
+        if (opts && opts.noPreview) {
+            return { depth: { width: tw, height: th, data: depthData }, previewUrl: null, any: any };
+        }
         // Grayscale preview PNG for the layer div
         var pc = document.createElement('canvas');
         pc.width = tw; pc.height = th;
@@ -1188,8 +1239,11 @@ class DepthEstimator {
         }, 120);
     }
     // 05i fires these on every paint-surface mutation; cheap no-ops unless live.
-    window.__onSketchMutated = function (rid) { scheduleSketchRefresh('raster', rid); };
-    window.__onMaskMutated = function (mid) { scheduleSketchRefresh('mask', mid); };
+    // The count is what tells coverageOf a bound surface has changed since
+    // the room last got it — counted whether or not the binding is live, so
+    // a one-shot bound collider painted into later still reaches peers.
+    window.__onSketchMutated = function (rid) { _bumpSrc('raster', rid); scheduleSketchRefresh('raster', rid); };
+    window.__onMaskMutated = function (mid) { _bumpSrc('mask', mid); scheduleSketchRefresh('mask', mid); };
 
     // Live binding: the collider keeps tracking its source surface.
     // kind (optional) = 'raster' | 'mask': which ACTIVE surface a fresh
@@ -1276,11 +1330,68 @@ class DepthEstimator {
     // is what baked these colliders in the first place, so re-compositing an
     // edited mask lands where the original bake landed.
     function _compositeShapeCollider(layer, ctx, obsW, obsH, canvasEl) {
-        if (typeof window._drawMaskShape !== 'function') return false;
+        var cov = _shapeCoverage(layer, canvasEl);
+        if (!cov) return false;
+        var bufW = canvasEl.width || 1, bufH = canvasEl.height || 1;
+
+        // Same CSS-transform mapping as the depth-mask branch, over the full
+        // canvas rect (these shapes are stored in canvas-buffer space).
+        var wrap = document.getElementById('canvas-wrapper');
+        var cssW = (wrap && wrap.clientWidth) || canvasEl.clientWidth || bufW;
+        var cssH = (wrap && wrap.clientHeight) || canvasEl.clientHeight || bufH;
+        var lx = (layer.x || 0) * (obsW / cssW);
+        var ly = (layer.y || 0) * (obsH / cssH);
+        var cx = obsW * 0.5, cy = obsH * 0.5;
+        var strength = (layer.collisionStrength !== undefined) ? layer.collisionStrength : 0.7;
+
+        // Per-texel strength + mode: the obstacle's colour bytes must carry
+        // THIS layer's strength and mode (wallBytes; the upload premultiplies
+        // them by alpha). The memoed coverage canvas is white, so tint it
+        // through a scratch canvas at draw time — the memo itself stays
+        // strength/mode-independent (a slider drag re-tints without
+        // re-rasterizing the shapes).
+        if (!_shapeTintCanvas || _shapeTintCanvas.width !== cov.width || _shapeTintCanvas.height !== cov.height) {
+            _shapeTintCanvas = document.createElement('canvas');
+            _shapeTintCanvas.width = cov.width;
+            _shapeTintCanvas.height = cov.height;
+            _shapeTintCtx = _shapeTintCanvas.getContext('2d');
+        }
+        var tctx = _shapeTintCtx;
+        tctx.globalCompositeOperation = 'source-over';
+        tctx.clearRect(0, 0, cov.width, cov.height);
+        tctx.fillStyle = wallStyle(layer.collisionMode, strength);
+        tctx.fillRect(0, 0, cov.width, cov.height);
+        tctx.globalCompositeOperation = 'destination-in';
+        tctx.drawImage(cov, 0, 0);
+        tctx.globalCompositeOperation = 'source-over';
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        // Alpha carries coverage*strength, exactly like alphaVal above — the
+        // shaders recover per-texel coverage/strength from RG (G≈0 content
+        // falls back to dividing __obsStrengthMax out).
+        ctx.globalAlpha = Math.max(0, Math.min(1, strength));
+        ctx.translate(cx + lx, cy + ly);
+        ctx.rotate((layer.rotation || 0) * Math.PI / 180);
+        if (window.LayerXform) window.LayerXform.shearCtx(ctx, layer);
+        ctx.scale(layer.scaleX || 1, layer.scaleY || 1);
+        ctx.translate(-cx, -cy);
+        ctx.drawImage(_shapeTintCanvas, 0, 0, obsW, obsH);
+        ctx.restore();
+        return true;
+    }
+
+    // A collision layer's non-depth mask shapes as ONE white coverage canvas
+    // (alpha = coverage, ≤COLLISION_MAP_MAX on its long side) over the full
+    // canvas rect, before the layer transform. Shared by the compositor above
+    // and coverageOf below, so the wall a room receives is the wall drawn
+    // here. Memoized on the layer; null when the mask has no such shapes.
+    function _shapeCoverage(layer, canvasEl) {
+        if (typeof window._drawMaskShape !== 'function') return null;
         var shapes = (layer.mask.shapes || []).filter(function (s) {
             return s && s.type !== 'depth-mask';
         });
-        if (!shapes.length) return false;
+        if (!shapes.length) return null;
 
         var bufW = canvasEl.width || 1, bufH = canvasEl.height || 1;
         var mode = layer.mask.mode || 'show';
@@ -1334,52 +1445,177 @@ class DepthEstimator {
             }
             layer.__shapeColliderMemo = { key: key, shapes: layer.mask.shapes, canvas: cov };
         }
+        return cov;
+    }
 
-        // Same CSS-transform mapping as the depth-mask branch, over the full
-        // canvas rect (these shapes are stored in canvas-buffer space).
-        var wrap = document.getElementById('canvas-wrapper');
-        var cssW = (wrap && wrap.clientWidth) || canvasEl.clientWidth || bufW;
-        var cssH = (wrap && wrap.clientHeight) || canvasEl.clientHeight || bufH;
-        var lx = (layer.x || 0) * (obsW / cssW);
-        var ly = (layer.y || 0) * (obsH / cssH);
-        var cx = obsW * 0.5, cy = obsH * 0.5;
-        var strength = (layer.collisionStrength !== undefined) ? layer.collisionStrength : 0.7;
-
-        // Per-texel strength + mode: the obstacle's colour bytes must carry
-        // THIS layer's strength and mode (wallBytes; the upload premultiplies
-        // them by alpha). The memoed coverage canvas is white, so tint it
-        // through a scratch canvas at draw time — the memo itself stays
-        // strength/mode-independent (a slider drag re-tints without
-        // re-rasterizing the shapes).
-        if (!_shapeTintCanvas || _shapeTintCanvas.width !== cov.width || _shapeTintCanvas.height !== cov.height) {
-            _shapeTintCanvas = document.createElement('canvas');
-            _shapeTintCanvas.width = cov.width;
-            _shapeTintCanvas.height = cov.height;
-            _shapeTintCtx = _shapeTintCanvas.getContext('2d');
+    // The depth-mask cut: one depth map → RGBA bytes, colour r,g,b and
+    // alpha = coverage × alphaMax, top-down. Shared by the compositor and
+    // coverageOf, so a wall sent to a room is cut exactly as it is here.
+    //
+    // D0.5 edge quality, rev 2 (2026-07-14): fwidth-style ADAPTIVE soft cut.
+    // The band scales with the LOCAL depth gradient, so steep edges get
+    // ~0.75px of antialiasing (sub-texel collider edges) while flat midtone
+    // regions get a hard cut. The first rev's FIXED ±band turned every flat
+    // region hovering near the threshold — common in real photo/webcam depth
+    // — into a huge porous half-solidity field, and the converged MG solve
+    // read it as a noisy sponge: whole-canvas velocity fuzz that got worse
+    // with collisionStrength. config.DEPTH_EDGE_BAND is now the CAP on the
+    // band (0.5 ≈ fully hard everywhere).
+    function _cutDepthInto(shape, d, r, g, b, alphaMax) {
+        var tw = shape.depthWidth;
+        var th = shape.depthHeight;
+        var threshold = shape.threshold || 128;
+        var invert = !!shape.invert;
+        var bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
+            ? window.config.DEPTH_EDGE_BAND : 12;
+        if (bandCap < 0.5) bandCap = 0.5;
+        var dd = shape.depthData;
+        // Composite in screen space (top-down). GL orientation is handled by
+        // a single vertical flip in updateObstacleTexture, so transforms here
+        // behave exactly like the CSS transform on the layer div.
+        for (var i = 0, n = tw * th; i < n; i++) {
+            var dv = dd[i] || 0;
+            var xI = i - ((i / tw) | 0) * tw; // i % tw without modulo
+            var gx = Math.abs((dd[i + (xI < tw - 1 ? 1 : 0)] || 0) - (dd[i - (xI > 0 ? 1 : 0)] || 0)) * 0.5;
+            var gy = Math.abs((dd[i + (i < n - tw ? tw : 0)] || 0) - (dd[i - (i >= tw ? tw : 0)] || 0)) * 0.5;
+            var band = (gx > gy ? gx : gy) * 0.75;
+            if (band < 0.5) band = 0.5;
+            if (band > bandCap) band = bandCap;
+            var t = (dv - (threshold - band)) / (band * 2);
+            if (t < 0) t = 0; else if (t > 1) t = 1;
+            var cov = t * t * (3 - 2 * t);
+            if (invert) cov = 1 - cov;
+            var idx = i << 2; // *4 via shift
+            d[idx] = r;
+            d[idx + 1] = g;
+            d[idx + 2] = b;
+            d[idx + 3] = (cov * alphaMax + 0.5) | 0;
         }
-        var tctx = _shapeTintCtx;
-        tctx.globalCompositeOperation = 'source-over';
-        tctx.clearRect(0, 0, cov.width, cov.height);
-        tctx.fillStyle = wallStyle(layer.collisionMode, strength);
-        tctx.fillRect(0, 0, cov.width, cov.height);
-        tctx.globalCompositeOperation = 'destination-in';
-        tctx.drawImage(cov, 0, 0);
-        tctx.globalCompositeOperation = 'source-over';
+    }
 
-        ctx.save();
+    // ── The wall as a room should get it (06d publishes this) ──────────
+    // depthOf hands out the CPU depth map a collider was BUILT from, which is
+    // the whole wall only for a plain depth-mask collider. Two kinds outgrew
+    // it, and neither reached anyone else in a room:
+    //   * Source-bound colliders (Paint Collider, ⟳ Live sketch or Mask)
+    //     collide straight off a GPU surface. Their CPU map is the snapshot
+    //     taken when the layer was made — for Paint Collider an EMPTY Mask —
+    //     so a painted wall never left this machine.
+    //   * A collider whose mask was edited (stamps, SAM cutouts, Filter, the
+    //     Touch up flatten) composites those shapes as well, and a flatten
+    //     drops the depth map outright, so depthOf returned nothing at all.
+    // coverageOf answers with what _doUpdateObstacle actually draws for the
+    // layer, in the layer's own canvas space before its transform — the
+    // transform travels beside it, so it lands the same way on every canvas.
+    //   {data, width, height, threshold, invert} — a map to cut at threshold
+    //   {none: true} — the layer draws no wall (Collision OFF, source gone)
+    //   null         — can't tell right now; try again on the next publish
+    // Both computed paths are cached on the layer, so the per-recomposite
+    // publish check (Breathing moves its rings every few frames) costs a
+    // comparison, not a readback.
+    var WIRE_COV_MAX = 512;       // = 06d COLLIDER_WIRE_MAX: physics never resolves finer
+    var GPU_COV_MAX_AGE_MS = 10000; // re-read a bound surface at least this often
+    var _srcVer = {};             // 'raster:3' / 'mask:7' → mutation count
+    function _srcKey(src) { return src ? (src.kind + ':' + src.id) : ''; }
+    function _bumpSrc(kind, id) {
+        var k = kind + ':' + id;
+        _srcVer[k] = (_srcVer[k] || 0) + 1;
+    }
+
+    function coverageOf(layerIndex) {
+        if (!window.layers) return null;
+        var layer = window.layers.find(function (l) { return l.index === layerIndex; });
+        if (!layer || !layer.isCollision) return null;
+        if (!layer.mask || !layer.mask.enabled) return { none: true };
+        var canvasEl = document.getElementById('canvas');
+        if (!canvasEl || !canvasEl.width || !canvasEl.height) return null;
+        if (layer.collisionSource) {
+            // The compositor skips a bound layer whose surface is gone, so
+            // there is no wall to send either.
+            var fbo = _resolveSourceFBO(layer.collisionSource);
+            return fbo ? _gpuCoverage(layer, fbo) : { none: true };
+        }
+        var dms = [], others = false;
+        (layer.mask.shapes || []).forEach(function (s) {
+            if (!s) return;
+            if (s.type !== 'depth-mask') { others = true; return; }
+            if (s.depthData && s.depthWidth && s.depthHeight) dms.push(s);
+        });
+        if (!dms.length && !others) return { none: true };
+        var bufW = canvasEl.width, bufH = canvasEl.height;
+        // The common case, sent exactly as it always was: one depth map
+        // filling the canvas rect, cut by the receiver at its own threshold.
+        if (dms.length === 1 && !others) {
+            var s0 = dms[0];
+            if (!(s0.x || 0) && !(s0.y || 0)
+                && (s0.width || bufW) === bufW && (s0.height || bufH) === bufH) {
+                return { data: s0.depthData, width: s0.depthWidth, height: s0.depthHeight,
+                         threshold: s0.threshold, invert: !!s0.invert };
+            }
+        }
+        return _combinedCoverage(layer, canvasEl, dms);
+    }
+
+    function _gpuCoverage(layer, fbo) {
+        var k = _srcKey(layer.collisionSource);
+        var ver = _srcVer[k] || 0;
+        var now = Date.now();
+        var m = layer.__wireCov;
+        if (m && m.kind === 'gpu' && m.src === k && m.ver === ver
+            && m.w === fbo.width && m.h === fbo.height && now - m.at < GPU_COV_MAX_AGE_MS) return m.cov;
+        var built = buildSketchDepth(true, fbo, { maxSide: WIRE_COV_MAX, noPreview: true });
+        if (!built) return null;
+        // Already coverage (buildSketchDepth saturates alpha through the same
+        // knee as the GPU compositor), so the receiver's cut at the midpoint
+        // keeps the wall where it stands here.
+        var cov = { data: built.depth.data, width: built.depth.width, height: built.depth.height,
+                    threshold: 128, invert: false };
+        layer.__wireCov = { kind: 'gpu', src: k, ver: ver, w: fbo.width, h: fbo.height, at: now, cov: cov };
+        return cov;
+    }
+
+    // Every depth map (cut) and every other shape, unioned the way the
+    // compositor unions them ('lighter'), at the wire's resolution over the
+    // canvas rect. Cut here, so it travels as coverage with a midpoint cut.
+    function _combinedCoverage(layer, canvasEl, dms) {
+        var bufW = canvasEl.width, bufH = canvasEl.height;
+        var sig = [bufW, bufH, layer.mask.mode || 'show', layer.threshold || 0,
+            (window.config && window.config.DEPTH_EDGE_BAND) || 12].concat(dms.map(function (s) {
+            return [s.x || 0, s.y || 0, s.width || 0, s.height || 0, s.threshold || 128,
+                    s.invert ? 1 : 0, s.depthWidth, s.depthHeight].join(',');
+        })).join('|');
+        var m = layer.__wireCov;
+        if (m && m.kind === 'cpu' && m.sig === sig && m.shapes === layer.mask.shapes
+            && m.dd.length === dms.length
+            && m.dd.every(function (d, i) { return d === dms[i].depthData; })) return m.cov;
+
+        var sc = Math.min(1, WIRE_COV_MAX / Math.max(bufW, bufH));
+        var W = Math.max(1, Math.round(bufW * sc)), H = Math.max(1, Math.round(bufH * sc));
+        var c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        var ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.globalCompositeOperation = 'lighter';
-        // Alpha carries coverage*strength, exactly like alphaVal above — the
-        // shaders recover per-texel coverage/strength from RG (G≈0 content
-        // falls back to dividing __obsStrengthMax out).
-        ctx.globalAlpha = Math.max(0, Math.min(1, strength));
-        ctx.translate(cx + lx, cy + ly);
-        ctx.rotate((layer.rotation || 0) * Math.PI / 180);
-        if (window.LayerXform) window.LayerXform.shearCtx(ctx, layer);
-        ctx.scale(layer.scaleX || 1, layer.scaleY || 1);
-        ctx.translate(-cx, -cy);
-        ctx.drawImage(_shapeTintCanvas, 0, 0, obsW, obsH);
-        ctx.restore();
-        return true;
+        var sx = W / bufW, sy = H / bufH;
+        dms.forEach(function (s) {
+            var dc = document.createElement('canvas');
+            dc.width = s.depthWidth; dc.height = s.depthHeight;
+            var dctx = dc.getContext('2d');
+            var img = dctx.createImageData(s.depthWidth, s.depthHeight);
+            _cutDepthInto(s, img.data, 255, 255, 255, 255);
+            dctx.putImageData(img, 0, 0);
+            ctx.drawImage(dc, (s.x || 0) * sx, (s.y || 0) * sy, (s.width || bufW) * sx, (s.height || bufH) * sy);
+        });
+        var shapeCov = _shapeCoverage(layer, canvasEl);
+        if (shapeCov) ctx.drawImage(shapeCov, 0, 0, W, H);
+        var px = ctx.getImageData(0, 0, W, H).data;
+        var out = new Uint8Array(W * H);
+        for (var i = 0, p = 3; i < out.length; i++, p += 4) out[i] = px[p];
+        var cov = { data: out, width: W, height: H, threshold: 128, invert: false };
+        layer.__wireCov = { kind: 'cpu', sig: sig, shapes: layer.mask.shapes,
+                            dd: dms.map(function (s) { return s.depthData; }), cov: cov };
+        return cov;
     }
 
     function _doUpdateObstacle() {
@@ -1494,52 +1730,12 @@ class DepthEstimator {
                 // Reuse cached canvas/ImageData when dimensions match
                 _ensureShapeCanvas(tw, th);
 
-                var d = _shapeImgData.data;
-                var threshold = shape.threshold || 128;
-                var invert = !!shape.invert;
                 var wb = wallBytes(layer.collisionMode, layer.collisionStrength);
-                var alphaVal = Math.round(wb.strength * 255);
-
-                // D0.5 edge quality, rev 2 (2026-07-14): fwidth-style ADAPTIVE
-                // soft cut. The band scales with the LOCAL depth gradient, so
-                // steep edges get ~0.75px of antialiasing (sub-texel collider
-                // edges) while flat midtone regions get a hard cut. The first
-                // rev's FIXED ±band turned every flat region hovering near the
-                // threshold — common in real photo/webcam depth — into a huge
-                // porous half-solidity field, and the converged MG solve read
-                // it as a noisy sponge: whole-canvas velocity fuzz that got
-                // worse with collisionStrength. config.DEPTH_EDGE_BAND is now
-                // the CAP on the band (0.5 ≈ fully hard everywhere).
-                var bandCap = (window.config && typeof window.config.DEPTH_EDGE_BAND === 'number')
-                    ? window.config.DEPTH_EDGE_BAND : 12;
-                if (bandCap < 0.5) bandCap = 0.5;
-                var dd = shape.depthData;
-                // Composite in screen space (top-down). GL orientation is
-                // handled by a single vertical flip in updateObstacleTexture,
-                // so transforms here behave exactly like the CSS transform
-                // on the layer div.
-                for (var i = 0, n = tw * th; i < n; i++) {
-                    var dv = dd[i] || 0;
-                    var xI = i - ((i / tw) | 0) * tw; // i % tw without modulo
-                    var gx = Math.abs((dd[i + (xI < tw - 1 ? 1 : 0)] || 0) - (dd[i - (xI > 0 ? 1 : 0)] || 0)) * 0.5;
-                    var gy = Math.abs((dd[i + (i < n - tw ? tw : 0)] || 0) - (dd[i - (i >= tw ? tw : 0)] || 0)) * 0.5;
-                    var band = (gx > gy ? gx : gy) * 0.75;
-                    if (band < 0.5) band = 0.5;
-                    if (band > bandCap) band = bandCap;
-                    var t = (dv - (threshold - band)) / (band * 2);
-                    if (t < 0) t = 0; else if (t > 1) t = 1;
-                    var cov = t * t * (3 - 2 * t);
-                    if (invert) cov = 1 - cov;
-                    var idx = i << 2; // *4 via shift
-                    // Colour bytes = this layer's mode + strength, NON-
-                    // premultiplied (wallBytes); the upload premultiplies
-                    // by alpha into the per-texel channels (05b
-                    // obsTexelGLSL). Alpha = coverage·strength as ever.
-                    d[idx] = wb.r;
-                    d[idx + 1] = wb.g;
-                    d[idx + 2] = wb.b;
-                    d[idx + 3] = (cov * alphaVal + 0.5) | 0;
-                }
+                // Colour bytes = this layer's mode + strength, NON-
+                // premultiplied (wallBytes); the upload premultiplies by
+                // alpha into the per-texel channels (05b obsTexelGLSL).
+                // Alpha = coverage·strength as ever.
+                _cutDepthInto(shape, _shapeImgData.data, wb.r, wb.g, wb.b, Math.round(wb.strength * 255));
 
                 _shapeCtx.putImageData(_shapeImgData, 0, 0);
 

@@ -33,8 +33,8 @@
  * build claims a key an older binding already had.
  *
  * A binding can be HELD: give it a release() and it hears its key come back
- * up, so holding a key can mean something (a line of text keeps pouring,
- * like the Constant-flow brush) while a tap stays a single strike.
+ * up, so holding a key can mean something (a line of text keeps pouring
+ * until the key comes up, like the Constant-flow brush).
  *
  * window.Hotkeys = {
  *   fromEvent, normalize, format, reservedBy,

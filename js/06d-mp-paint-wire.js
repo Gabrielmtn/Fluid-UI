@@ -162,6 +162,8 @@ const COLLIDER_MAX_CHUNKS = 32;  // ≈350KB of coverage PNG
 var _colliderPublished = new Map(); // our layer index → rev last sent
 var peerColliders = new Map();      // "ownerId|theirIndex" → our local layer index
 
+var peerColliderRevs = new Map();   // "ownerId|theirIndex" → rev we built it from
+
 function resetPublishedColliders() {
     _colliderPublished.clear();
 }
@@ -171,12 +173,25 @@ function resetPublishedColliders() {
 // before they arrived has no natural trigger to resend it — so a late
 // joiner would sit in a room whose obstacles they cannot see and whose
 // physics they cannot reproduce.
-function republishColliders() {
+//
+// force: send even what the ledger says the room already has. Used when the
+// brush comes back to us (see flushStagedWork, 06c): a send that raced a
+// hand-over was dropped by the relay after the ledger recorded it, and
+// receivers skip a wall whose rev they already hold, so a resend costs the
+// bytes and nothing on screen. The sweep at the end tells the room about
+// walls that are gone here — deleted or switched off while it was someone
+// else's turn, when nothing could be sent.
+function republishColliders(force) {
     if (!window.layers || !isMultiplayerEnabled) return;
+    var own = new Set();
     window.layers.forEach(function (l) {
         if (l && l.isCollision && !l.__peerOwner) {
-            try { publishCollider(l.index); } catch (_) {}
+            own.add(l.index);
+            try { publishCollider(l.index, force); } catch (_) {}
         }
+    });
+    Array.from(_colliderPublished.keys()).forEach(function (idx) {
+        if (!own.has(idx)) { try { retractCollider(idx); } catch (_) {} }
     });
 }
 
@@ -228,18 +243,42 @@ function pngToCoverage(dataURL, w, h) {
     });
 }
 
+// The PNG a coverage map encodes to, kept per map. Every obstacle recomposite
+// asks for a publish (a Breathing ring moving, a text wall settling), and a
+// wall that has not changed must cost a hash compare, not a canvas encode.
+// coverageOf hands back the SAME map object until the wall really changes,
+// so its data array is the key.
+var _colliderPngCache = new WeakMap(); // coverage data → {png, w, h, thr, inv}
+function pngForCoverage(depth) {
+    var hit = _colliderPngCache.get(depth.data);
+    if (hit && hit.srcW === depth.width && hit.srcH === depth.height) return hit;
+    var enc = coverageToPng(depth);
+    if (!enc || !enc.png) return null;
+    enc.srcW = depth.width; enc.srcH = depth.height;
+    _colliderPngCache.set(depth.data, enc);
+    return enc;
+}
+
 // Everything a peer needs to reproduce one wall. Geometry rides NORMALIZED
 // (fractions of the sender's canvas box) because layer.x/y are CSS pixels of
 // a box whose size differs per client — the same reason splat positions are
 // normalized.
+//
+// The map is what the obstacle actually draws for the layer (coverageOf,
+// 23-depth-collision): a Paint Collider wall straight off its Mask, an edited
+// mask's shapes, not just the depth map the layer was first built from.
+// Returns null when there is nothing to say yet, {none:true} when the layer
+// is no wall at all (Collision OFF, its surface gone).
 function serializeCollider(layerIndex) {
     const cl = window.collisionLayers;
-    if (!cl || typeof cl.depthOf !== 'function' || !window.layers) return null;
+    if (!cl || !window.layers) return null;
     const layer = window.layers.find(l => l.index === layerIndex);
     if (!layer || !layer.isCollision) return null;
-    const depth = cl.depthOf(layerIndex);
-    if (!depth) return null;                 // live source-bound: GPU-only, skip
-    const enc = coverageToPng(depth);
+    const depth = (typeof cl.coverageOf === 'function') ? cl.coverageOf(layerIndex)
+        : (typeof cl.depthOf === 'function' ? cl.depthOf(layerIndex) : null);
+    if (!depth) return null;
+    if (depth.none) return { none: true };
+    const enc = pngForCoverage(depth);
     if (!enc || !enc.png) return null;
     const box = document.getElementById('canvas-wrapper') || (window.canvas || {});
     const bw = box.clientWidth || (window.canvas && canvas.width) || 1;
@@ -283,20 +322,30 @@ function colliderRev(meta) {
     return h.toString(36);
 }
 
-function publishCollider(layerIndex) {
+function publishCollider(layerIndex, force) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
     if (isProcessingRemoteEvent) return;               // never echo a peer's wall back
-    if (isPeerCollider(layerIndex)) return;            // ...including later edits to it
-    // Watchers do not reshape the painter's fluid. The relay drops these while
-    // turns run (TURN_HOLDER_ONLY), and stopping here as well is what keeps the
-    // room's canvases agreeing: a send the relay silently discards would leave
-    // this client with a wall nobody else has, and there is no resync path to
-    // reconcile that afterwards.
-    if (window.__mpTurnBlocked) return;
+    // Someone else's wall: never republished as ours — but a change we made
+    // to it goes back to its author (see "Editing someone else's wall").
+    if (isPeerCollider(layerIndex)) { publishPeerEdit(layerIndex); return; }
     const meta = serializeCollider(layerIndex);
     if (!meta) return;
+    // Watchers do not reshape the painter's fluid. The relay drops these while
+    // turns run (TURN_HOLDER_ONLY), so the wall waits here, STAGED: the
+    // ledger keeps the last version the room got, and flushStagedWork (06c)
+    // sends the current one the moment the brush reaches us. Until then it
+    // stands on this canvas only — the price of letting a watcher get their
+    // next move ready. The hint is for a real difference only: every obstacle
+    // recomposite asks, edit or not.
+    if (window.__mpTurnBlocked) {
+        const pending = meta.none ? _colliderPublished.has(layerIndex)
+            : _colliderPublished.get(layerIndex) !== colliderRev(meta);
+        if (pending) mpStagedHint();
+        return;
+    }
+    if (meta.none) { retractCollider(layerIndex); return; }
     const rev = colliderRev(meta);
-    if (_colliderPublished.get(layerIndex) === rev) return;
+    if (!force && _colliderPublished.get(layerIndex) === rev) return;
     const total = Math.ceil(meta.png.length / COLLIDER_CHUNK_CHARS) || 1;
     if (total > COLLIDER_MAX_CHUNKS) {
         console.warn('[Multiplayer] Collider too large to share (' + total + ' chunks) — kept local');
@@ -312,10 +361,37 @@ function publishCollider(layerIndex) {
 }
 
 function broadcastColliderRemove(layerIndex) {
+    if (isProcessingRemoteEvent) return;
+    // The user deleted someone else's wall: it leaves the room (and is only
+    // switched off on its author's machine — see retractPeerWall).
+    const peerKey = peerKeyOfIndex(layerIndex);
+    if (peerKey) { retractPeerWall(peerKey); return; }
+    if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
+        _colliderPublished.delete(layerIndex);
+        return;
+    }
+    // Out of turn the removal is STAGED like any other wall edit: the ledger
+    // entry stays, so republishColliders' sweep sends it when the brush
+    // reaches us. Dropping the entry here (as this used to, before the gate)
+    // meant a wall deleted while waiting stood on everyone else's canvas for
+    // the rest of the session.
+    if (window.__mpTurnBlocked) {
+        if (_colliderPublished.has(layerIndex)) mpStagedHint();
+        return;
+    }
+    retractCollider(layerIndex, true);
+}
+
+// Tell the room a wall of ours is gone — deleted, switched off, or its
+// surface removed. Only walls the room was actually told about are
+// retracted, unless `always` (a delete: the ledger may have been reset by a
+// reconnect, and an extra remove for a wall nobody holds costs nothing).
+function retractCollider(layerIndex, always) {
+    if (window.__mpTurnBlocked) return;   // staged: the sweep sends it later
+    const had = _colliderPublished.has(layerIndex);
     _colliderPublished.delete(layerIndex);
+    if (!had && !always) return;
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
-    if (isProcessingRemoteEvent || isPeerCollider(layerIndex)) return;
-    if (window.__mpTurnBlocked) return; // same rotation gate as publishCollider
     partySocket.send(JSON.stringify({
         type: 'collider-remove', data: { lid: layerIndex }, timestamp: Date.now()
     }));
@@ -340,7 +416,15 @@ function handleColliderAdd(data) {
     for (const [k, v] of colliderChunkBuffers) {
         if (now - v.at > 20000) colliderChunkBuffers.delete(k);
     }
-    const key = data.clientId + '|' + d.lid + '|' + d.rev;
+    // Whose wall: the sender's own, or (own) someone else's that the sender
+    // reshaped on their turn — see "Editing someone else's wall".
+    const owner = (typeof d.own === 'string' && d.own) ? d.own : data.clientId;
+    // Already standing here at this exact version: a painter re-sends every
+    // wall when the brush comes back to them (republishColliders force), and
+    // rebuilding an identical wall would only churn the layer list.
+    if (owner !== clientId && peerColliderRevs.get(owner + '|' + d.lid) === d.rev
+        && peerColliderLayer(owner + '|' + d.lid)) return;
+    const key = data.clientId + '|' + owner + '|' + d.lid + '|' + d.rev;
     let buf = colliderChunkBuffers.get(key);
     if (!buf) {
         if (colliderChunkBuffers.size >= 8) return;
@@ -354,7 +438,32 @@ function handleColliderAdd(data) {
 
     const png = buf.parts.join('');
     if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(png)) return;
-    applyPeerCollider(data.clientId, buf.meta, png);
+    if (owner === clientId) { applyOwnWallReshape(data.clientId, buf.meta, png); return; }
+    applyPeerCollider(owner, buf.meta, png);
+}
+
+// A partner reshaped one of OUR walls on their turn: its new coverage and
+// transform land on our own layer, which stays ours (and bakes: a wall
+// that was painting itself live from a Mask now keeps the shape it was
+// given — collisionLayers.setCoverage).
+function applyOwnWallReshape(editorId, meta, png) {
+    const layer = ownColliderLayer(meta.lid);
+    const cl = window.collisionLayers;
+    if (!layer || !cl || typeof cl.setCoverage !== 'function') return;
+    pngToCoverage(png, meta.w, meta.h).then(depth => {
+        if (!depth || !ownColliderLayer(meta.lid)) return;
+        const wasRemote = isProcessingRemoteEvent;
+        isProcessingRemoteEvent = true;
+        try {
+            cl.setCoverage(meta.lid, depth, (typeof meta.thr === 'number') ? meta.thr : 128, !!meta.inv);
+        } finally {
+            isProcessingRemoteEvent = wasRemote;
+        }
+        applyColliderProps(layer, sanitizeColliderProps(Object.assign({}, meta, { on: true })));
+        const m2 = serializeCollider(meta.lid);
+        if (m2 && !m2.none) _colliderPublished.set(meta.lid, colliderRev(m2));
+        noticeOwnEdited(editorId, 'reshaped your wall', String(layer.title || '').replace(/^\s*🧱\s*/, ''));
+    });
 }
 
 function applyPeerCollider(ownerId, meta, png) {
@@ -390,20 +499,45 @@ function applyPeerCollider(ownerId, meta, png) {
         if (idx == null) return;
         const layer = window.layers && window.layers.find(l => l.index === idx);
         if (layer) {
-            layer.collisionMode = meta.mode || 'block';
-            if (typeof meta.str === 'number') layer.collisionStrength = meta.str;
+            // Coerced: a raw peer string reaching the compositor would be
+            // read as Block anyway (normalizeMode), but the layer panel shows
+            // this field, and the strength scales every texel of the wall.
+            layer.collisionMode = (meta.mode === 'deflect' || meta.mode === 'slow') ? meta.mode : 'block';
+            if (typeof meta.str === 'number' && isFinite(meta.str)) {
+                layer.collisionStrength = Math.max(0, Math.min(1, meta.str));
+            }
             layer.__peerOwner = ownerId;   // marks it for cleanup when they leave
         }
         peerColliders.set(key, idx);
+        if (typeof meta.rev === 'string') peerColliderRevs.set(key, meta.rev);
+        // What the room just gave us is the baseline our own edits to this
+        // wall are measured against (publishPeerEdit).
+        setPeerBaseline(key, idx);
         try { cl.updateObstacleFromLayers(); } catch (_) {}
         if (typeof window.renderLayers === 'function') window.renderLayers();
     });
 }
 
+// The layer a peer wall of ours still lives in, or null if it is gone (the
+// user deleted it from their own Layers panel).
+function peerColliderLayer(key) {
+    const idx = peerColliders.get(key);
+    if (idx == null || !window.layers) return null;
+    const owner = key.slice(0, key.lastIndexOf('|'));
+    return window.layers.find(l => l.index === idx && l.__peerOwner === owner) || null;
+}
+
 function removePeerCollider(key) {
     const idx = peerColliders.get(key);
     if (idx == null) return;
+    // Only if that slot still holds THEIR wall. A user who deleted it by hand
+    // freed the index, and the next layer made here may have taken it — a
+    // stale entry must never delete someone's own layer.
+    const layer = peerColliderLayer(key);
     peerColliders.delete(key);
+    peerColliderRevs.delete(key);
+    peerColliderBase.delete(key);
+    if (!layer) return;
     const wasRemote = isProcessingRemoteEvent;
     isProcessingRemoteEvent = true;
     try {
@@ -416,7 +550,15 @@ function removePeerCollider(key) {
 function handleColliderRemove(data) {
     const d = data.data || {};
     if (typeof d.lid !== 'number') return;
-    removePeerCollider(data.clientId + '|' + d.lid);
+    // own: someone took a wall out of the room on their turn. If it is ours,
+    // it is switched off here, not deleted; everyone else drops their copy.
+    if (typeof d.own === 'string' && d.own) {
+        if (d.own === clientId) { switchOffOwnWall(d.lid, data.clientId); return; }
+        _peerWallRemovesStaged.delete(d.own + '|' + d.lid);
+        removePeerCollider(d.own + '|' + d.lid);
+    } else {
+        removePeerCollider(data.clientId + '|' + d.lid);
+    }
     try { if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers(); } catch (_) {}
 }
 
@@ -426,6 +568,34 @@ function dropPeerColliders() {
     for (const key of Array.from(peerColliders.keys())) removePeerCollider(key);
     colliderChunkBuffers.clear();
     try { if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers(); } catch (_) {}
+}
+
+// ...and when one PEER leaves, what they brought leaves with them. Until the
+// relay said who left (peer-left, 2026-09-15) nothing did: a departed
+// painter's walls stayed in everyone's simulation, and because a reconnect
+// hands out a new connection id, a painter whose socket blipped republished
+// every wall under the new id and the room ended up holding two of each.
+function dropPeerAssetsOf(ownerId) {
+    if (!ownerId) return;
+    const pre = ownerId + '|';
+    let any = false;
+    for (const key of Array.from(peerColliders.keys())) {
+        if (key.indexOf(pre) === 0) { removePeerCollider(key); any = true; }
+    }
+    for (const key of Array.from(colliderChunkBuffers.keys())) {
+        if (key.indexOf(pre) === 0) colliderChunkBuffers.delete(key);
+    }
+    if (any) {
+        try { if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers(); } catch (_) {}
+    }
+    try {
+        const T = window.textOverlays;
+        if (T && typeof T.dropPeerLines === 'function') T.dropPeerLines(ownerId);
+        if (T && typeof T.dropPeerStamps === 'function') T.dropPeerStamps(ownerId);
+    } catch (_) {}
+    remoteCursors.delete(ownerId);
+    remoteLastPositions.delete(ownerId);
+    try { updateRemoteCursors(); } catch (_) {}
 }
 
 // Everything the room lent us: peer stamps and peer walls. Called from BOTH
@@ -444,6 +614,247 @@ function dropPeerAssets() {
     _shapePublished.clear();
     _colliderPublished.clear();
     try { dropPeerColliders(); } catch (_) {}
+    // Text: everyone else's lines off the canvas (and out of the wall), their
+    // pour bitmaps off the GPU, and our own ledger emptied — the next room
+    // has seen none of our lines.
+    try {
+        const T = window.textOverlays;
+        if (T && typeof T.dropPeerLines === 'function') T.dropPeerLines();
+        if (T && typeof T.dropPeerStamps === 'function') T.dropPeerStamps();
+    } catch (_) {}
+    resetTextWire();
+}
+
+// ── Editing someone else's wall (2026-09-15) ─────────────────────────────
+// "I can't edit and tweak the collider during my turn, then have it persist
+// back to the original author" (Gabriel). A peer's wall sits in our Layers
+// panel like any collider, and every control on it worked — locally. Now an
+// edit to it goes back to its author and on to the room, and the wall stays
+// the author's: they own it, it is saved on their machine only, and it
+// leaves with them.
+//
+// Nothing marks a layer edit as one (a slider, a drag, the mask editor, the
+// Collision switch all just recomposite), so the check is by comparison: the
+// state of our copy as the room last had it is its BASELINE, and the
+// per-recomposite publish pass (23 schedulePublishAll → publishCollider)
+// compares against it. Transform, strength, mode, visibility and the
+// Collision switch ride as one small collider-edit; a changed mask sends the
+// wall's coverage again, as a collider-add in the author's name. Out of turn
+// the change waits (the baseline stays put), and if the author changes the
+// wall first, their version replaces our copy and our tweak with it.
+//
+// Delete on someone else's wall takes it out of the ROOM; on the author's
+// machine it is switched off (Collision OFF), not deleted — a partner must
+// never be able to destroy a layer someone saved.
+var peerColliderBase = new Map();   // "ownerId|theirIndex" → {props, cov} as the room last had it
+var _peerWallRemovesStaged = new Set(); // keys of peer walls deleted out of turn
+
+function colliderPropsOf(layer) {
+    const box = document.getElementById('canvas-wrapper') || (window.canvas || {});
+    const bw = box.clientWidth || (window.canvas && canvas.width) || 1;
+    const bh = box.clientHeight || (window.canvas && canvas.height) || 1;
+    return {
+        x: +((layer.x || 0) / bw).toFixed(4),
+        y: +((layer.y || 0) / bh).toFixed(4),
+        sx: +(layer.scaleX || 1).toFixed(4),
+        sy: +(layer.scaleY || 1).toFixed(4),
+        rot: +(layer.rotation || 0).toFixed(2),
+        kx: +(layer.skewX || 0).toFixed(2),
+        ky: +(layer.skewY || 0).toFixed(2),
+        str: +((typeof layer.collisionStrength === 'number') ? layer.collisionStrength : 0.9).toFixed(3),
+        mode: layer.collisionMode || 'block',
+        vis: layer.visible !== false,
+        on: !!(layer.mask && layer.mask.enabled)
+    };
+}
+
+// Our copy's state: its props, and the identity of the coverage it collides
+// with (coverageOf hands back the same array until the wall's shape really
+// changes — see the PNG cache above).
+function peerCopyState(idx) {
+    const layer = window.layers && window.layers.find(l => l.index === idx);
+    if (!layer) return null;
+    const props = colliderPropsOf(layer);
+    let cov = null;
+    if (props.on && window.collisionLayers && typeof window.collisionLayers.coverageOf === 'function') {
+        const c = window.collisionLayers.coverageOf(idx);
+        if (c && !c.none) cov = c.data;
+    }
+    return { props: JSON.stringify(props), cov };
+}
+
+function setPeerBaseline(key, idx) {
+    const st = peerCopyState(idx);
+    if (st) peerColliderBase.set(key, st);
+}
+
+function peerKeyOfIndex(idx) {
+    for (const [k, v] of peerColliders) if (v === idx) return k;
+    return null;
+}
+
+function splitPeerKey(key) {
+    const bar = key.lastIndexOf('|');
+    return { own: key.slice(0, bar), lid: +key.slice(bar + 1) };
+}
+
+// The publish pass reached one of the room's walls: send what we changed.
+function publishPeerEdit(idx) {
+    if (!mpSocketOpen() || isProcessingRemoteEvent) return;
+    const key = peerKeyOfIndex(idx);
+    if (!key) return;
+    const base = peerColliderBase.get(key);
+    if (!base) return;                       // still being built from the room's copy
+    const cur = peerCopyState(idx);
+    if (!cur) return;
+    const propsChanged = cur.props !== base.props;
+    const covChanged = !!cur.cov && cur.cov !== base.cov;
+    if (!propsChanged && !covChanged) return;
+    if (window.__mpTurnBlocked) { mpStagedHint(); return; }
+    const o = splitPeerKey(key);
+    if (covChanged) {
+        sendPeerCoverage(o.own, o.lid, idx);
+    } else {
+        partySocket.send(JSON.stringify({
+            type: 'collider-edit',
+            data: Object.assign({ own: o.own, lid: o.lid }, JSON.parse(cur.props)),
+            timestamp: Date.now()
+        }));
+    }
+    peerColliderBase.set(key, cur);
+}
+
+// A reshaped wall of someone else's: its coverage again, in the author's
+// name (own + their index), through the ordinary chunked collider-add.
+function sendPeerCoverage(own, lid, idx) {
+    const meta = serializeCollider(idx);
+    if (!meta || meta.none) return;
+    const rev = colliderRev(meta);
+    const total = Math.ceil(meta.png.length / COLLIDER_CHUNK_CHARS) || 1;
+    if (total > COLLIDER_MAX_CHUNKS) return;
+    for (let i = 0; i < total; i++) {
+        const part = meta.png.slice(i * COLLIDER_CHUNK_CHARS, (i + 1) * COLLIDER_CHUNK_CHARS);
+        const d = Object.assign({}, meta, { own, lid, rev, seq: i, total, part });
+        delete d.png;
+        partySocket.send(JSON.stringify({ type: 'collider-add', data: d, timestamp: Date.now() }));
+    }
+}
+
+// Delete on someone else's wall (deleteLayer → broadcastColliderRemove).
+function retractPeerWall(key) {
+    peerColliderBase.delete(key);
+    peerColliderRevs.delete(key);
+    peerColliders.delete(key);
+    if (!mpSocketOpen()) return;
+    if (window.__mpTurnBlocked) { _peerWallRemovesStaged.add(key); mpStagedHint(); return; }
+    const o = splitPeerKey(key);
+    partySocket.send(JSON.stringify({ type: 'collider-remove', data: { own: o.own, lid: o.lid }, timestamp: Date.now() }));
+}
+
+// Edits to the room's walls made out of turn, now that the brush is ours.
+function flushPeerWallEdits() {
+    if (!mpSocketOpen() || window.__mpTurnBlocked) return;
+    _peerWallRemovesStaged.forEach(function (key) {
+        const o = splitPeerKey(key);
+        partySocket.send(JSON.stringify({ type: 'collider-remove', data: { own: o.own, lid: o.lid }, timestamp: Date.now() }));
+    });
+    _peerWallRemovesStaged.clear();
+    for (const idx of Array.from(peerColliders.values())) {
+        try { publishPeerEdit(idx); } catch (_) {}
+    }
+}
+
+function sanitizeColliderProps(d) {
+    const n = (v, lo, hi, dflt) => (typeof v === 'number' && isFinite(v)) ? Math.max(lo, Math.min(hi, v)) : dflt;
+    return {
+        x: n(d.x, -4, 4, 0), y: n(d.y, -4, 4, 0),
+        sx: n(d.sx, 0.01, 50, 1), sy: n(d.sy, 0.01, 50, 1),
+        rot: n(d.rot, -36000, 36000, 0),
+        kx: n(d.kx, -89, 89, 0), ky: n(d.ky, -89, 89, 0),
+        str: n(d.str, 0, 1, 0.9),
+        mode: (d.mode === 'deflect' || d.mode === 'slow') ? d.mode : 'block',
+        vis: d.vis !== false,
+        on: d.on !== false
+    };
+}
+
+function applyColliderProps(layer, p) {
+    const box = document.getElementById('canvas-wrapper') || (window.canvas || {});
+    const bw = box.clientWidth || (window.canvas && canvas.width) || 1;
+    const bh = box.clientHeight || (window.canvas && canvas.height) || 1;
+    layer.x = p.x * bw; layer.y = p.y * bh;
+    layer.scaleX = p.sx; layer.scaleY = p.sy;
+    layer.rotation = p.rot;
+    layer.skewX = p.kx; layer.skewY = p.ky;
+    layer.collisionStrength = p.str;
+    layer.collisionMode = p.mode;
+    layer.visible = p.vis;
+    if (layer.mask && layer.mask.enabled !== p.on) {
+        layer.mask.enabled = p.on;
+        layer.__maskDirty = true;   // renderLayers re-applies the film
+    }
+    const wasRemote = isProcessingRemoteEvent;
+    isProcessingRemoteEvent = true;
+    try {
+        if (typeof window.renderLayers === 'function') window.renderLayers();
+        if (window.collisionLayers) window.collisionLayers.updateObstacleFromLayers();
+    } finally {
+        isProcessingRemoteEvent = wasRemote;
+    }
+}
+
+// Our own layer, by the index we published it under.
+function ownColliderLayer(lid) {
+    return (window.layers || []).find(l => l.index === lid && l.isCollision && !l.__peerOwner) || null;
+}
+
+// The author learns their wall changed hands for a moment. Once per editor
+// per few seconds — a slider drag is many edits.
+var _wallNoticeAt = new Map();
+function noticeOwnEdited(editorId, what, name) {
+    const now = Date.now();
+    if (now - (_wallNoticeAt.get(editorId) || 0) < 4000) return;
+    _wallNoticeAt.set(editorId, now);
+    if (typeof showTurnToast === 'function') {
+        showTurnToast(shortName(editorId) + ' ' + what + (name ? ' “' + name + '”' : ''));
+    }
+}
+
+function handleColliderEdit(data) {
+    const d = data.data || {};
+    if (typeof d.own !== 'string' || !d.own || typeof d.lid !== 'number') return;
+    const p = sanitizeColliderProps(d);
+    if (d.own === clientId) {
+        const layer = ownColliderLayer(d.lid);
+        if (!layer) return;
+        applyColliderProps(layer, p);
+        // The room holds this state now (the editor's copy, and everyone
+        // else's from the same message), so our ledger says so too — or our
+        // own next publish pass would send the same wall straight back.
+        const meta = serializeCollider(d.lid);
+        if (meta && meta.none) _colliderPublished.delete(d.lid);
+        else if (meta) _colliderPublished.set(d.lid, colliderRev(meta));
+        noticeOwnEdited(data.clientId, p.on ? 'edited your wall' : 'switched off your wall',
+            String(layer.title || '').replace(/^\s*🧱\s*/, ''));
+        return;
+    }
+    const key = d.own + '|' + d.lid;
+    const layer = peerColliderLayer(key);
+    if (!layer) return;
+    applyColliderProps(layer, p);
+    setPeerBaseline(key, layer.index);
+}
+
+// A partner took one of OUR walls out of the room: switched off here, kept.
+function switchOffOwnWall(lid, editorId) {
+    const layer = ownColliderLayer(lid);
+    if (!layer || !layer.mask) return;
+    _colliderPublished.delete(lid);        // the room holds none of it now
+    if (!layer.mask.enabled) return;
+    const p = sanitizeColliderProps(colliderPropsOf(layer));
+    p.on = false;
+    applyColliderProps(layer, p);
+    noticeOwnEdited(editorId, 'switched off your wall', String(layer.title || '').replace(/^\s*🧱\s*/, ''));
 }
 
 // down=true marks a stroke-opening press stamp so the receiver starts a fresh
@@ -709,24 +1120,37 @@ function dabTime(d) {
 
 function enqueueRemoteSplat(data) {
     if (window.config && window.config.MP_INBOUND_QUEUE === false) { handleRemoteSplat(data); return; }
-    var now = Date.now();
-    var ts = (data && typeof data.timestamp === 'number' && isFinite(data.timestamp)) ? data.timestamp : now;
-    if (_paceOffset === null || now - _paceLastArrival > PACE_STREAM_GAP_MS) _paceOffset = now - ts;
-    else _paceOffset = Math.min(_paceOffset, now - ts);
-    _paceLastArrival = now;
     var n = inboundDabCount(data);
     var dabs = data && data.data && data.data.dabs;
     // The message was flushed right after its last dab, so the sender's clock
     // for dab i is (timestamp − span + t_i); shift that onto ours and add the
     // jitter buffer. A message without offsets has span 0 and plays whole.
     var span = (Array.isArray(dabs) && dabs.length) ? dabTime(dabs[Math.min(dabs.length, DAB_MAX_PER_MSG) - 1]) : 0;
-    _inboundSplats.push({ data: data, n: n, idx: 0, base: ts - span + _paceOffset + DAB_PACE_JITTER_MS });
+    _inboundSplats.push({ data: data, n: n, idx: 0, base: paceBase(data, span) });
     _inboundQueuedDabs += n;
-    // Overflow drops from the FRONT. Dropping paint diverges this canvas from
-    // the sender's permanently (there is no resync path), so it is a genuine
-    // loss either way — but dropping the OLDEST keeps the visible stroke head
-    // moving with the peer's cursor, where dropping the newest would show a
-    // stroke lagging further behind reality the longer the overload lasts.
+    trimInbound();
+}
+
+// Local ms at which element t=0 of this message plays: the sender's clock
+// for its last element is the message timestamp, so element i is at
+// (timestamp − span + t_i) there — shifted onto ours through the stream
+// clock, plus the jitter buffer. Shared by dab trains and text pours, so a
+// painter's strokes and pours keep their relative timing here.
+function paceBase(data, span) {
+    var now = Date.now();
+    var ts = (data && typeof data.timestamp === 'number' && isFinite(data.timestamp)) ? data.timestamp : now;
+    if (_paceOffset === null || now - _paceLastArrival > PACE_STREAM_GAP_MS) _paceOffset = now - ts;
+    else _paceOffset = Math.min(_paceOffset, now - ts);
+    _paceLastArrival = now;
+    return ts - span + _paceOffset + DAB_PACE_JITTER_MS;
+}
+
+// Overflow drops from the FRONT. Dropping paint diverges this canvas from
+// the sender's permanently (there is no resync path), so it is a genuine
+// loss either way — but dropping the OLDEST keeps the visible stroke head
+// moving with the peer's cursor, where dropping the newest would show a
+// stroke lagging further behind reality the longer the overload lasts.
+function trimInbound() {
     while (_inboundQueuedDabs > INBOUND_QUEUE_MAX_DABS && _inboundSplats.length > 1) {
         var gone = _inboundSplats.shift();
         _inboundQueuedDabs -= (gone.n - gone.idx);
@@ -743,8 +1167,24 @@ window.__mpDrainInbound = function (budget) {
     var now = Date.now();
     var bud = Math.max(1, budget | 0);
     var spent = 0;
+    var poured = 0;
     while (_inboundSplats.length && spent < bud) {
         var e = _inboundSplats[0];
+        if (e.kind === 'text') {
+            // A pour is one dye-sized image pass, so beside the shared budget
+            // it keeps the local hold's own ceiling per frame.
+            var room = Math.min(bud - spent, TEXT_POURS_PER_FRAME - poured);
+            var jt = e.idx;
+            while (jt < e.n && (jt - e.idx) < room && e.base + e.pours[jt][3] <= now) jt++;
+            if (jt === e.idx) break; // not due yet, or this frame's pours are spent
+            applyRemoteTextPours(e, e.idx, jt);
+            poured += (jt - e.idx);
+            spent += (jt - e.idx);
+            _inboundQueuedDabs -= (jt - e.idx);
+            e.idx = jt;
+            if (e.idx >= e.n) _inboundSplats.shift();
+            continue;
+        }
         var dabs = e.data && e.data.data && e.data.data.dabs;
         if (!Array.isArray(dabs) || !dabs.length) {
             // Legacy single splat (press stamp, or a peer on the old wire).
@@ -1184,4 +1624,336 @@ function handleStrokeChunk(data) {
     // GC stale partial buffers (peer left mid-stroke)
     const now = Date.now();
     strokeChunkBuffers.forEach((b, k) => { if (now - b.at > 15000) strokeChunkBuffers.delete(k); });
+}
+
+// ── Text over the wire (2026-09-15) ──────────────────────────────────────
+// "People have to be able to send their dye and colliders" (Gabriel): text
+// was the one mark that never left the machine it was made on. Nothing a
+// line did — standing on the canvas, walling the fluid off, pouring into it
+// — reached anyone else in the room. Text is two things there, and both
+// travel now:
+//   * LINES (text-line / text-line-remove): each visible line's look plus
+//     where it stands. 23-text-overlays sets it in type on every receiving
+//     canvas, and a collider line is a wall there too. A few hundred bytes a
+//     line; an edit re-sends only the lines whose rev changed.
+//   * POURS (text-pour): a line poured into the dye — Fluidize, a hotkey's
+//     strike, each pour of a held key's flow. They ride like dabs: the look
+//     once per message and [x, y, amount, t] per pour, played back at the
+//     painter's cadence through the same paced queue as the dab train.
+// Positions are fractions of the painter's CANVAS and type is in their CSS
+// px beside their canvas size, so a receiver maps text per axis exactly as it
+// maps strokes (see SWIRL TOGETHER in 23-text-overlays).
+//
+// Turns gate both like paint (TURN_HOLDER_ONLY on the relay). A watcher's
+// line edits are STAGED — they show on their own canvas and go out when the
+// brush reaches them (flushStagedWork, 06c); a watcher's pours are refused,
+// like a stroke out of turn (23 asks __mpTurnBlocked before it pours).
+var TEXT_LINE_THROTTLE_MS = 120;  // typing sends at most ~8 line updates a second
+var TEXT_POUR_FLUSH_MS = 33;      // the dab train's cadence
+var TEXT_POUR_MAX_PER_MSG = 48;   // a held key pours up to ~125/s; ~30 bytes a pour
+var TEXT_POURS_PER_FRAME = 8;     // receive ceiling per frame = 23's HOLD_POURS_PER_FRAME
+var TEXT_LINE_MAX_BYTES = 15500;  // under the relay's 16KB cap (shared.ts MAX_MESSAGE_BYTES)
+var _textLineSent = new Map();    // our overlay id → rev the room holds
+var _textLineTimer = null;
+var _textLineLastAt = 0;
+var _textPourQ = null;            // { key, look, cw, ch, pours: [[x,y,a,t]…], t0, last }
+var _textPourTimer = null;
+
+function mpSocketOpen() {
+    return isMultiplayerEnabled && !!partySocket && partySocket.readyState === WebSocket.OPEN;
+}
+
+// A fresh socket is a fresh audience (and leaving takes our queue with us).
+function resetTextWire() {
+    _textLineSent.clear();
+    if (_textLineTimer) { clearTimeout(_textLineTimer); _textLineTimer = null; }
+    _textPourQ = null;
+    if (_textPourTimer) { clearTimeout(_textPourTimer); _textPourTimer = null; }
+    // Edits to another room's lines and walls mean nothing in the next one.
+    _roomEdits.clear();
+    if (_roomEditTimer) { clearTimeout(_roomEditTimer); _roomEditTimer = null; }
+    _peerWallRemovesStaged.clear();
+    peerColliderBase.clear();
+}
+
+// FNV-1a of the line as sent — any field changing is a new rev.
+function textLineRev(line) {
+    var s = JSON.stringify(line);
+    var h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h.toString(36) + '.' + s.length.toString(36);
+}
+
+// 23 calls this (window.__mpTextChanged) on every change to our lines and on
+// layout changes. Throttled, not debounced: a peer watches the words appear
+// as they are typed, not only when the typist pauses.
+function scheduleTextLines() {
+    if (!mpSocketOpen() || _textLineTimer) return;
+    var wait = Math.max(0, TEXT_LINE_THROTTLE_MS - (Date.now() - _textLineLastAt));
+    _textLineTimer = setTimeout(function () {
+        _textLineTimer = null;
+        publishTextLines(false);
+    }, wait);
+}
+
+// Bring the room's copy of our lines up to date: every line whose rev moved
+// (every line, when forced), then a removal for each line it holds that is
+// no longer here or no longer visible.
+function publishTextLines(force) {
+    if (_textLineTimer) { clearTimeout(_textLineTimer); _textLineTimer = null; }
+    if (!mpSocketOpen()) return;
+    var T = window.textOverlays;
+    if (!T || typeof T.wireLines !== 'function') return;
+    var lines = T.wireLines();
+    if (!lines) return; // no layout to measure yet — say nothing, rather than "all gone"
+    var i, id, rev;
+    if (window.__mpTurnBlocked) {
+        // Staged. Only say so when something really differs from what the
+        // room holds — selecting a line is a change event too.
+        var differs = false;
+        var here = new Set();
+        for (i = 0; i < lines.length; i++) {
+            here.add(lines[i].id);
+            if (_textLineSent.get(lines[i].id) !== textLineRev(lines[i].line)) differs = true;
+        }
+        _textLineSent.forEach(function (_, sentId) { if (!here.has(sentId)) differs = true; });
+        if (differs) mpStagedHint();
+        return;
+    }
+    _textLineLastAt = Date.now();
+    var seen = new Set();
+    for (i = 0; i < lines.length; i++) {
+        id = lines[i].id;
+        seen.add(id);
+        rev = textLineRev(lines[i].line);
+        if (!force && _textLineSent.get(id) === rev) continue;
+        var msg = JSON.stringify({ type: 'text-line', data: Object.assign({ id: id, rev: rev }, lines[i].line), timestamp: Date.now() });
+        // A line is capped at 2,000 characters (23), which fits even in
+        // four-byte script — this is the belt for whatever grows next.
+        if (msg.length * 3 > TEXT_LINE_MAX_BYTES && new TextEncoder().encode(msg).length > TEXT_LINE_MAX_BYTES) {
+            console.warn('[Multiplayer] Text line too large to share — kept local');
+            continue;
+        }
+        partySocket.send(msg);
+        _textLineSent.set(id, rev);
+    }
+    Array.from(_textLineSent.keys()).forEach(function (sentId) {
+        if (seen.has(sentId)) return;
+        partySocket.send(JSON.stringify({ type: 'text-line-remove', data: { id: sentId }, timestamp: Date.now() }));
+        _textLineSent.delete(sentId);
+    });
+}
+
+// 23 calls this (window.__mpTextPour) for every pour it lays. Batched per
+// line like the dab train; a different line (or a canvas resize) flushes.
+function queueTextPour(look, cw, ch, nx, ny, amount) {
+    if (!mpSocketOpen() || isProcessingRemoteEvent) return;
+    if (window.__mpTurnBlocked) return; // 23 refused it first; this is the belt
+    // Fluidize hides its line two frames before it pours. That removal has
+    // to reach the room FIRST: a receiver still holding the line's wall (a
+    // collider line) would refuse the dye inside it (05i image splat), and
+    // the pour would land as its own outline.
+    if (_textLineTimer) publishTextLines(false);
+    if (!(cw > 0 && ch > 0) || !isFinite(nx) || !isFinite(ny)) return;
+    var key = JSON.stringify(look) + '|' + cw + 'x' + ch;
+    if (_textPourQ && _textPourQ.key !== key) flushTextPours();
+    var now = Date.now();
+    if (!_textPourQ) _textPourQ = { key: key, look: look, cw: cw, ch: ch, pours: [], t0: now, last: now };
+    var a = (typeof amount === 'number' && isFinite(amount)) ? Math.max(0, Math.min(1, amount)) : 1;
+    _textPourQ.pours.push([+nx.toFixed(4), +ny.toFixed(4), +a.toFixed(4), now - _textPourQ.t0]);
+    _textPourQ.last = now;
+    if (_textPourQ.pours.length >= TEXT_POUR_MAX_PER_MSG || now - _textPourQ.t0 >= TEXT_POUR_FLUSH_MS) {
+        flushTextPours();
+    } else if (!_textPourTimer) {
+        _textPourTimer = setTimeout(flushTextPours, TEXT_POUR_FLUSH_MS);
+    }
+}
+
+function flushTextPours() {
+    if (_textPourTimer) { clearTimeout(_textPourTimer); _textPourTimer = null; }
+    var q = _textPourQ;
+    _textPourQ = null;
+    // No turn check here: these pours are already on this canvas (23 only
+    // pours when the gate is open), and a call that was just spent still
+    // holds the brush on the relay until its pass goes out — the same window
+    // the stroke's tail dabs ride out in.
+    if (!q || !q.pours.length || !mpSocketOpen()) return;
+    partySocket.send(JSON.stringify({
+        type: 'text-pour',
+        data: { look: q.look, cw: q.cw, ch: q.ch, pours: q.pours },
+        // Stamped with its LAST pour, not the flush: the receiver paces from
+        // "timestamp = the last element" exactly as it does a dab train, so a
+        // timer flush a few ms later must not push the pours late.
+        timestamp: q.last
+    }));
+}
+
+function pourTime(p) {
+    var t = Array.isArray(p) ? p[3] : undefined;
+    return (typeof t === 'number' && isFinite(t) && t >= 0) ? Math.min(t, 5000) : 0;
+}
+
+// A peer's pours: sanitized here (numbers) and in 23 (the look), then
+// queued behind their dabs so strokes and pours keep their order and timing.
+function enqueueRemoteTextPour(data) {
+    var d = data && data.data;
+    if (!d || !Array.isArray(d.pours) || !d.pours.length || !d.look || typeof d.look !== 'object') return;
+    var cw = sanitizeRemoteNum(d.cw, 0), ch = sanitizeRemoteNum(d.ch, 0);
+    if (!(cw >= 20 && cw <= 20000 && ch >= 20 && ch <= 20000)) return;
+    var pours = [];
+    for (var i = 0; i < d.pours.length && pours.length < TEXT_POUR_MAX_PER_MSG; i++) {
+        var p = d.pours[i];
+        if (!Array.isArray(p)) continue;
+        pours.push([
+            Math.max(-1, Math.min(2, sanitizeRemoteNum(p[0], 0.5))),
+            Math.max(-1, Math.min(2, sanitizeRemoteNum(p[1], 0.5))),
+            Math.max(0, Math.min(1, sanitizeRemoteNum(p[2], 1))),
+            pourTime(p)
+        ]);
+    }
+    if (!pours.length) return;
+    var e = { kind: 'text', owner: data.clientId, look: d.look, cw: cw, ch: ch, pours: pours, n: pours.length, idx: 0, base: 0 };
+    if (window.config && window.config.MP_INBOUND_QUEUE === false) { applyRemoteTextPours(e, 0, e.n); return; }
+    e.base = paceBase(data, pours[pours.length - 1][3]);
+    _inboundSplats.push(e);
+    _inboundQueuedDabs += e.n;
+    trimInbound();
+}
+
+function applyRemoteTextPours(e, from, to) {
+    var T = window.textOverlays;
+    if (!T || typeof T.peerPour !== 'function') return;
+    try { T.peerPour(e.owner, e.look, e.cw, e.ch, e.pours.slice(from, to)); }
+    catch (err) { console.warn('[Multiplayer] Text pour from a peer failed', err); }
+}
+
+function handleTextLine(data) {
+    var d = data && data.data;
+    var T = window.textOverlays;
+    if (!d || !T || typeof T.putPeerLine !== 'function') return;
+    if (typeof d.id !== 'number' && typeof d.id !== 'string') return;
+    // own: an edit someone made on their turn to a line that is not theirs.
+    if (typeof d.own === 'string' && d.own) {
+        if (d.own === clientId) { applyOwnLineEdit(data.clientId, d); return; }
+        T.putPeerLine(d.own, String(d.id), d);
+        return;
+    }
+    T.putPeerLine(data.clientId, String(d.id), d);
+}
+
+function handleTextLineRemove(data) {
+    var d = data && data.data;
+    var T = window.textOverlays;
+    if (!d || !T || typeof T.removePeerLine !== 'function') return;
+    if (typeof d.id !== 'number' && typeof d.id !== 'string') return;
+    if (typeof d.own === 'string' && d.own) {
+        if (d.own === clientId) {
+            // One of OUR lines, taken out of the room: hidden here, kept.
+            var ownId = ownLineId(d.id);
+            if (ownId != null && typeof T.hideOwnLine === 'function' && T.hideOwnLine(ownId)) {
+                _textLineSent.delete(ownId);   // the room holds none of it now
+                noticeOwnLine(data.clientId, 'hid your text', ownId);
+            }
+            return;
+        }
+        T.removePeerLine(d.own, String(d.id));
+        return;
+    }
+    T.removePeerLine(data.clientId, String(d.id));
+}
+
+// Our lines have numeric ids; a partner echoes the id back as a string.
+function ownLineId(v) {
+    var n = (typeof v === 'number') ? v : parseInt(v, 10);
+    return (isFinite(n) && String(n) === String(v)) ? n : null;
+}
+
+// A partner edited one of OUR lines on their turn.
+function applyOwnLineEdit(editorId, d) {
+    var T = window.textOverlays;
+    var ownId = ownLineId(d.id);
+    if (ownId == null || !T || typeof T.applyRoomEdit !== 'function') return;
+    var wire = T.applyRoomEdit(ownId, d);
+    if (!wire) return;
+    // The room holds this version now (the editor's, from the same message
+    // everyone else got) — record it, or our next publish pass would send
+    // the same line straight back and, out of turn, call it staged.
+    _textLineSent.set(ownId, textLineRev(wire));
+    noticeOwnLine(editorId, 'edited your text', ownId);
+}
+
+var _lineNoticeAt = new Map();
+function noticeOwnLine(editorId, what, ownId) {
+    var now = Date.now();
+    if (now - (_lineNoticeAt.get(editorId) || 0) < 4000) return;
+    _lineNoticeAt.set(editorId, now);
+    var T = window.textOverlays, ov = T && T.get ? T.get(ownId) : null;
+    var first = ov ? String(ov.content || '').split('\n')[0].trim() : '';
+    if (first.length > 24) first = first.slice(0, 23) + '…';
+    if (typeof showTurnToast === 'function') {
+        showTurnToast(shortName(editorId) + ' ' + what + (first ? ' “' + first + '”' : ''));
+    }
+}
+
+// ── Our edits to the room's lines (23 updateRoomLine / removeRoomLine) ──
+// Sent in the author's name (own) with the whole line as it now stands,
+// throttled per line like our own. Out of turn they wait here, and the
+// room's version of a line arriving first settles them (__mpRoomLineSettled
+// — the author's change wins over a tweak that never went out).
+var _roomEdits = new Map();        // key → {own, id, line, hide}
+var _roomEditTimer = null;
+var _roomEditLastAt = 0;
+
+window.__mpRoomLineEdit = function (own, id, key, line) {
+    if (!mpSocketOpen()) return;
+    _roomEdits.set(key, { own: own, id: id, line: line, hide: false });
+    if (window.__mpTurnBlocked) { mpStagedHint(); return; }
+    scheduleRoomEdits();
+};
+
+window.__mpRoomLineHide = function (own, id, key) {
+    if (!mpSocketOpen()) return;
+    _roomEdits.set(key, { own: own, id: id, line: null, hide: true });
+    if (window.__mpTurnBlocked) { mpStagedHint(); return; }
+    flushRoomEdits();                   // at once: a Fluidize pour follows it
+};
+
+window.__mpRoomLineSettled = function (key) {
+    _roomEdits.delete(key);
+};
+
+function scheduleRoomEdits() {
+    if (_roomEditTimer) return;
+    var wait = Math.max(0, TEXT_LINE_THROTTLE_MS - (Date.now() - _roomEditLastAt));
+    _roomEditTimer = setTimeout(function () { _roomEditTimer = null; flushRoomEdits(); }, wait);
+}
+
+function flushRoomEdits() {
+    if (_roomEditTimer) { clearTimeout(_roomEditTimer); _roomEditTimer = null; }
+    if (!mpSocketOpen() || window.__mpTurnBlocked || !_roomEdits.size) return;
+    _roomEditLastAt = Date.now();
+    _roomEdits.forEach(function (e) {
+        if (e.hide) {
+            partySocket.send(JSON.stringify({ type: 'text-line-remove', data: { own: e.own, id: e.id }, timestamp: Date.now() }));
+        } else if (e.line) {
+            partySocket.send(JSON.stringify({
+                type: 'text-line',
+                data: Object.assign({ own: e.own, id: e.id, rev: textLineRev(e.line) }, e.line),
+                timestamp: Date.now()
+            }));
+        }
+    });
+    _roomEdits.clear();
+}
+
+// The whole of our text and our walls, as the room should hold it. On a
+// fresh socket (after the layer system wakes), for a newcomer, and when the
+// brush reaches us. Forced: receivers skip what they already hold at that
+// rev, so a resend costs bytes and nothing on screen.
+function republishOwnContent() {
+    try { republishColliders(true); } catch (_) {}
+    try { publishTextLines(true); } catch (_) {}
+    // ...and what we changed of other people's, if it waited for our turn.
+    try { flushPeerWallEdits(); } catch (_) {}
+    try { flushRoomEdits(); } catch (_) {}
 }

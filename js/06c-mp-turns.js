@@ -51,6 +51,7 @@ function syncTurnGates() {
 }
 
 function applyTurnState(wasMyTurn) {
+    var wasBlocked = !!window.__mpTurnBlocked;
     // Any authoritative rotation update settles an outstanding invite —
     // an accept arrives as turn-state, not as a separate result message.
     clearInviteWait();
@@ -89,7 +90,34 @@ function applyTurnState(wasMyTurn) {
     // and a join/leave/pass resync catches late joiners who would otherwise
     // keep their own look until our next edit.
     if (isMyTurn()) broadcastTurnLook();
+    // The gate just opened — the brush reached us, or the rotation ended.
+    if (wasBlocked && !window.__mpTurnBlocked) flushStagedWork();
     updateConnectedView();
+}
+
+// ── Staged work ──────────────────────────────────────────────────────
+// Out of turn, walls and text lines are not refused the way a stroke is:
+// they are the setup a painter gets ready while they wait. They show on
+// their own canvas and hold there, STAGED (06d publishCollider /
+// publishTextLines), and the moment the gate opens everything goes out as it
+// now stands — including what was deleted meanwhile, and anything sent in
+// the instant before a hand-over that the relay then dropped (the resend is
+// forced; receivers skip what they already hold at that rev).
+var _stagedHintShown = false;
+
+function flushStagedWork() {
+    _stagedHintShown = false;
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    try { republishOwnContent(); } catch (_) {}
+}
+
+// Said once per wait, the first time something is actually held back.
+function mpStagedHint() {
+    if (_stagedHintShown || !turnsOn) return;
+    _stagedHintShown = true;
+    showTurnToast(isOneSwirlMode()
+        ? 'Saved for your call — the room sees it when the brush reaches you.'
+        : 'Saved for your turn — the room sees it when the brush reaches you.');
 }
 
 function resetTurnState() {
@@ -105,6 +133,7 @@ function resetTurnState() {
     // painter's first stroke with nothing left to answer it.
     _oneSwirlSpent = false;
     _oneSwirlPassSent = false;
+    _stagedHintShown = false;
     clearInviteWait();
     dismissTurnInvitePrompt();
     stopTurnTick();
@@ -672,7 +701,11 @@ window.__mpTurnHint = function () {
             'color:#9db8ff;font-size:12px;font-weight:600;pointer-events:none;transition:opacity 0.3s;';
         document.body.appendChild(el);
     }
-    el.textContent = turnHolderId
+    // Our own call, already spent: the gate is shut because the swirl is
+    // down and its pass is on the way, not because someone else holds it.
+    el.textContent = (isMyTurn() && _oneSwirlSpent)
+        ? 'Your swirl is down — the brush is on its way to the next artist'
+        : turnHolderId
         ? ('It\'s ' + shortName(turnHolderId) + '\'s ' + (isOneSwirlMode() ? 'call' : 'turn'))
         : 'Waiting for the next painter…';
     el.style.opacity = '1';

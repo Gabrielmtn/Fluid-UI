@@ -47,6 +47,17 @@ const TURN_HOLDER_ONLY = new Set([
   // turn — the exact out-of-turn influence the rotation exists to prevent.
   "collider-add",
   "collider-remove",
+  // An edit to someone else's wall (2026-09-15) — the holder may reshape any
+  // wall in the room on their turn, and only the holder.
+  "collider-edit",
+  // Text (2026-09-15): a line standing on the canvas is a wall when it is a
+  // collider, and a pour is dye — the same out-of-turn influence as the
+  // two above and a stroke. Watchers' line edits wait on their own client
+  // until the brush reaches them (06c flushStagedWork), so nothing honest
+  // is lost here.
+  "text-line",
+  "text-line-remove",
+  "text-pour",
 ]);
 
 // Deliberately NOT gated by the rotation, though it shipped alongside the
@@ -60,9 +71,21 @@ const TURN_HOLDER_ONLY = new Set([
 // e.g. a fake 'turn-state' would gate every other member's painting and
 // settings — so the relay never forwards one (managed rooms; sys- rooms stay
 // pure passthrough for the legacy sub-app).
-// The messages that mean the holder is actually painting — the ones that
-// push the stroke-mode idle backstop out (see STROKE_IDLE_MS).
-const PAINT_TYPES = new Set(["splat", "stroke", "stroke-chunk"]);
+// The messages that mean the holder is actually at work — the ones that push
+// the stroke-mode idle backstop out (see STROKE_IDLE_MS). Painting, and since
+// 2026-09-15 the setup a call is made of: pouring text, typing a line,
+// placing a wall. A painter spending 45 s typing their words is not AFK.
+const PAINT_TYPES = new Set([
+  "splat",
+  "stroke",
+  "stroke-chunk",
+  "text-pour",
+  "text-line",
+  "text-line-remove",
+  "collider-add",
+  "collider-remove",
+  "collider-edit",
+]);
 
 const SERVER_AUTHORED = new Set([
   "connected",
@@ -73,6 +96,7 @@ const SERVER_AUTHORED = new Set([
   "turn-invite-offer",
   "turn-invite-result",
   "turn-invite-sent",
+  "peer-left",
 ]);
 
 // How long a "shall we take turns?" invite stands before it goes stale.
@@ -494,6 +518,16 @@ export default class FluidPartyServer implements Party.Server {
   async onClose(conn: Party.Connection) {
     this.broadcastClientCount();
     if (!this.managed) return;
+    // Say WHO left. Clients key everything a peer brought — walls, text
+    // lines, cursors — on the connection id, and until this nothing ever
+    // told them an id was gone: a departed painter's walls stayed in every
+    // simulation, and a reconnect (new connection id) republished them
+    // beside the old copies. Connection ids only, never the uid (see
+    // host-changed below for why).
+    this.room.broadcast(
+      JSON.stringify({ type: "peer-left", id: conn.id, timestamp: Date.now() }),
+      [conn.id]
+    );
     await this.ensureLoaded(); // host-transfer / reset must act on durable state
 
     // Count remaining EXCLUDING the closing connection (robust to whether

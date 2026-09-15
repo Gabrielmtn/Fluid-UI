@@ -499,9 +499,11 @@ function onMultiplayerOpen(event) {
     // now rather than assuming the last room's members carried over.
     resetPublishedShapes();
     resetPublishedColliders();
-    // Walls we already have are ours to contribute to the room we just
-    // joined; a moment's delay lets the layer system finish waking up.
-    setTimeout(function () { try { republishColliders(); } catch (_) {} }, 1200);
+    resetTextWire();
+    // Walls and text lines we already have are ours to contribute to the
+    // room we just joined; a moment's delay lets the layer system finish
+    // waking up. (Out of turn this stages them for our turn instead.)
+    setTimeout(function () { try { republishOwnContent(); } catch (_) {} }, 1200);
     startPing();
     // Sync the hidden toggle
     var toggle = document.getElementById('multiplayerToggle');
@@ -540,11 +542,13 @@ function onMultiplayerMessage(event) {
                 // long as they stay in the room.
                 if (typeof data.count === 'number' && data.count > connectedClients) {
                     resetPublishedShapes();
-                    // Same for walls — but a newcomer has no way to ask for
-                    // them, and nothing else would ever resend, so push them
-                    // now rather than waiting for an edit that may never come.
-                    resetPublishedColliders();
-                    republishColliders();
+                    // Same for walls and text lines — but a newcomer has no
+                    // way to ask for them, and nothing else would ever resend,
+                    // so push them now rather than waiting for an edit that
+                    // may never come. Forced, with the ledger kept: the people
+                    // already here skip what they hold, and the ledger still
+                    // knows what they hold if we are out of turn right now.
+                    republishOwnContent();
                 }
                 connectedClients = data.count;
                 updateConnectedView();
@@ -600,6 +604,47 @@ function onMultiplayerMessage(event) {
             case 'collider-remove':
                 if (data.clientId !== clientId) {
                     handleColliderRemove(data);
+                }
+                break;
+
+            case 'collider-edit':
+                // Someone moved, re-weighted or switched a wall that is not
+                // theirs, on their turn — ours included (06d).
+                if (data.clientId !== clientId) {
+                    handleColliderEdit(data);
+                }
+                break;
+
+            case 'text-line':
+                // A peer's line of text: set in type here, and a wall here
+                // too when it is a collider (see the text wire in 06d).
+                if (data.clientId !== clientId) {
+                    handleTextLine(data);
+                }
+                break;
+
+            case 'text-line-remove':
+                if (data.clientId !== clientId) {
+                    handleTextLineRemove(data);
+                }
+                break;
+
+            case 'text-pour':
+                // A peer's text poured into the dye. Queued behind their dabs
+                // and drained on the frame, like a stroke.
+                if (data.clientId !== clientId) {
+                    enqueueRemoteTextPour(data);
+                }
+                break;
+
+            case 'peer-left':
+                // Server-authored: someone's connection closed. What they
+                // brought — walls, text, their cursor — leaves with them. A
+                // client-relayed message always carries a clientId (the relay
+                // stamps it), so one here is a forgery through an old relay.
+                if (data.clientId) break;
+                if (typeof data.id === 'string' && data.id && data.id !== clientId) {
+                    dropPeerAssetsOf(data.id);
                 }
                 break;
 
