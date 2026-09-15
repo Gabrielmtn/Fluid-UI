@@ -196,7 +196,10 @@
     var SELECTS = {
         visualResolution: {options: ["4096", "2048", "1536", "1024", "512", "256"], def: "2048", mut: null},
         physicsResolution: {options: ["2048", "1536", "1024", "512", "384", "256", "192", "128", "64", "32"], def: "512", mut: null},
-        kaleidoMode: {options: ["1", "2", "3", "4", "5", "0"], def: "1", mut: {options: ["0", "1", "2", "3", "4", "5"], scope: "basic"}},
+        // Mutate never deals mode "0": that is Off (05a doK), and a card that
+        // switched the kaleidoscope off under an ON switch hid every other
+        // kaleido change it listed. Turning it off is kaleidoToggle's job.
+        kaleidoMode: {options: ["1", "2", "3", "4", "5", "0"], def: "1", mut: {options: ["1", "2", "3", "4", "5"], scope: "basic"}},
         // Multi-Brush arm layout. No `mut`: symmetry only shapes FUTURE
         // strokes, so a mutation would leave the preview frame identical
         // and then silently change how the user's next stroke lands.

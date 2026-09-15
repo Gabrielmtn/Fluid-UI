@@ -35,20 +35,29 @@
 
     // ── Feature Gates ───────────────────────────────────────────────
     // A param only mutates when its owning feature toggle is ON in the
-    // VARIANT (checkboxes are rolled first, so a variant that flips a
-    // feature on gets its params varied too). Mutating a param whose
-    // feature is off inflates the card's change count while altering
-    // nothing on screen — the "mutate did nothing" complaint. Params
-    // not listed here are always eligible.
+    // VARIANT (checkboxes are rolled first, then selects, so a variant
+    // that flips a feature on gets its params varied too). Mutating a
+    // param whose feature is off inflates the card's change count while
+    // altering nothing on screen — the "mutate did nothing" complaint.
+    // A condition is a switch id, or 'selectId=value' / 'selectId!=value'
+    // for a mode. Params not listed here are always eligible.
+    //
+    // The kaleidoscope shows only with its switch on AND a real mode: mode 0
+    // is Off (05a doK). Mutate no longer deals it, but a user can pick it.
+    var KALEIDO = ['kaleidoToggle', 'kaleidoMode!=0'];
     var FEATURE_GATES = {
+        // switches that live inside another feature's panel
+        kAnimateRot: KALEIDO,
+        scatterToggle: ['glowToggle'],     // Scatter sits inside Glow's panel
         // sliders
-        kSpinSpeed: ['kaleidoToggle', 'kAnimateRot'],
-        kTwist: ['kaleidoToggle'],
-        kZoom: ['kaleidoToggle'],
-        kBlend: ['kaleidoToggle'],
-        kAngle: ['kaleidoToggle'],
-        kaleidoSegments: ['kaleidoToggle'],
-        lightSpeed: ['enableLighting'],
+        kSpinSpeed: KALEIDO.concat('kAnimateRot'),
+        kTwist: KALEIDO,
+        kZoom: KALEIDO,
+        kBlend: KALEIDO,
+        kAngle: KALEIDO,
+        kaleidoSegments: KALEIDO,
+        // Speed only drives Random mode's wander (13), and is hidden in Manual.
+        lightSpeed: ['enableLighting', 'lightMode=random'],
         lightIntensity: ['enableLighting'],
         lightAmbient: ['enableLighting'],
         lightShiftSpeed: ['enableLightShift'],
@@ -61,7 +70,7 @@
         vibrance: ['displayShadingToggle'],
         glowIntensity: ['glowToggle'],
         glowThreshold: ['glowToggle'],
-        // Two conditions, ANDed (see the loop in _gateOk): Scatter marches
+        // Two conditions, ANDed (see the loop in gateOpen): Scatter marches
         // Glow's prefilter buffer, so with Glow off the slider is doubly dead.
         scatterAmount: ['glowToggle', 'scatterToggle'],
         scatterReach: ['glowToggle', 'scatterToggle'],
@@ -73,8 +82,27 @@
         // selects
         kaleidoMode: ['kaleidoToggle'],
         lightMode: ['enableLighting'],
-        lightShiftMode: ['enableLightShift']
+        lightShiftMode: ['enableLightShift'],
+        // the light's pad position: Random mode moves the light itself and
+        // overwrites a varied position on its first frame
+        lightPos: ['enableLighting', 'lightMode=manual']
     };
+
+    // What a Gloss Paint material drives itself (29-material-modes: its
+    // TOUCHED config keys plus the shading controls its apply() writes).
+    // applyPresetSnapshot re-enters the material LAST, so while one is active
+    // a mutation to any of these is overwritten before it is ever seen — the
+    // card listed "curl 20%, sharpness 15%" and nothing moved. The material's
+    // own amount (the Curl slider as Flow / Thickness) is varied instead.
+    var MATERIAL_OWNED = {
+        curl: 1, sharpness: 1, vibrance: 1, velocityDissipation: 1,
+        pressureIteration: 1, pressureDissipation: 1,
+        shadingIntensity: 1, displayShadingToggle: 1
+    };
+
+    function materialActive(out) {
+        return !!(out.material && out.material.mode && out.material.mode !== 'fluid');
+    }
 
     // Variant checkbox state; params whose toggle was not captured in the
     // snapshot fail OPEN (mutate as before) rather than silently vanishing.
@@ -83,11 +111,21 @@
         return v === undefined ? true : !!v;
     }
 
+    // Same fail-open rule for a 'selectId=value' / 'selectId!=value' condition.
+    function _condOn(out, cond) {
+        var m = /^(\w+)(!?=)(.*)$/.exec(cond);
+        if (!m) return _cbOn(out, cond);
+        var v = out.selects ? out.selects[m[1]] : undefined;
+        if (v === undefined) return true;
+        return (String(v) === m[3]) === (m[2] === '=');
+    }
+
     function gateOpen(out, id) {
+        if (MATERIAL_OWNED[id] && materialActive(out)) return false;
         var gates = FEATURE_GATES[id];
         if (!gates) return true;
         for (var i = 0; i < gates.length; i++) {
-            if (!_cbOn(out, gates[i])) return false;
+            if (!_condOn(out, gates[i])) return false;
         }
         return true;
     }
@@ -105,13 +143,34 @@
     // Clamp value to slider range, quantised to step
     function clampToSchema(schema, value) {
         var clamped = Math.max(schema.min, Math.min(schema.max, value));
-        if (schema.step >= 1) return Math.round(clamped);
-        var inv = 1 / schema.step;
-        return Math.round(clamped * inv) / inv;
+        if (schema.step >= 1) clamped = Math.round(clamped);
+        else {
+            var inv = 1 / schema.step;
+            clamped = Math.round(clamped * inv) / inv;
+        }
+        // Land on a value the control can actually hold: applyPresetSnapshot
+        // re-clamps through the registry (its ui step, e.g. 0.1 against a
+        // 0.05 mut step), so the card would otherwise promise one number and
+        // the slider show another.
+        var reg = window.ParamRegistry;
+        if (reg && reg.clampSlider) {
+            var held = reg.clampSlider(schema.id, clamped);
+            if (held !== null) clamped = held;
+        }
+        return clamped;
     }
 
-    // Random hex colour with optional hue shift from a base
-    function mutateColor(baseHex, strength) {
+    // One random colour move per variant, applied to every colour the variant
+    // shifts, so a multi-arm brush keeps its scheme and turns as a whole.
+    function colorShift(strength) {
+        return {
+            h: gaussRandom() * strength * 0.3,
+            s: gaussRandom() * strength * 0.3,
+            l: gaussRandom() * strength * 0.2
+        };
+    }
+
+    function shiftColor(baseHex, shift) {
         var r, g, b;
         if (baseHex && baseHex.length >= 7) {
             r = parseInt(baseHex.substr(1, 2), 16);
@@ -122,9 +181,9 @@
         }
         // Convert to HSL, shift, convert back
         var hsl = rgbToHsl(r, g, b);
-        hsl[0] = (hsl[0] + gaussRandom() * strength * 0.3 + 1) % 1;
-        hsl[1] = Math.max(0, Math.min(1, hsl[1] + gaussRandom() * strength * 0.3));
-        hsl[2] = Math.max(0.05, Math.min(0.95, hsl[2] + gaussRandom() * strength * 0.2));
+        hsl[0] = ((hsl[0] + shift.h) % 1 + 1) % 1;
+        hsl[1] = Math.max(0, Math.min(1, hsl[1] + shift.s));
+        hsl[2] = Math.max(0.05, Math.min(0.95, hsl[2] + shift.l));
         var rgb = hslFrac01ToRgb255(hsl[0], hsl[1], hsl[2]);
         return '#' + toHex(rgb[0]) + toHex(rgb[1]) + toHex(rgb[2]);
     }
@@ -191,7 +250,10 @@
             out = mutateOnce(base, opts);
             tries++;
         }
-        if (diffSummary(base, out).length === 0) forceNudge(out, opts);
+        if (diffSummary(base, out).length === 0) {
+            forceNudge(out, opts);
+            syncKaleido(base, out);   // the nudge may have moved a kaleido slider
+        }
         return out;
     }
 
@@ -239,34 +301,18 @@
                     out.checkboxes[schema.id] = !!delta.checkboxes[schema.id];
                     return;
                 }
+                if (!gateOpen(out, schema.id)) return;
 
                 // Flip probability scales with strength (max ~25% at full strength)
                 if (Math.random() < strength * 0.25) {
                     out.checkboxes[schema.id] = !out.checkboxes[schema.id];
                 }
             });
+            settleBrushSwitches(base, out);
         }
 
-        // ── Sliders ──
-        if (out.sliders) {
-            SLIDER_SCHEMA.forEach(function (schema) {
-                if (locks[schema.id]) return;
-                if (scope === 'basic' && schema.scope !== 'basic') return;
-                if (out.sliders[schema.id] === undefined) return;
-
-                if (delta && delta.sliders && delta.sliders[schema.id] !== undefined) {
-                    out.sliders[schema.id] = clampToSchema(schema, delta.sliders[schema.id]);
-                    return;
-                }
-                if (!gateOpen(out, schema.id)) return;
-
-                var range = schema.max - schema.min;
-                var noise = gaussRandom() * strength * range * 0.3;
-                out.sliders[schema.id] = clampToSchema(schema, out.sliders[schema.id] + noise);
-            });
-        }
-
-        // ── Selects ──
+        // ── Selects ── (SECOND, for the same reason: a mode is a gate too —
+        // Light Speed only exists in Random mode)
         if (out.selects) {
             SELECT_SCHEMA.forEach(function (schema) {
                 if (locks[schema.id]) return;
@@ -295,78 +341,81 @@
             });
         }
 
+        // ── Sliders ──
+        if (out.sliders) {
+            SLIDER_SCHEMA.forEach(function (schema) {
+                if (locks[schema.id]) return;
+                if (scope === 'basic' && schema.scope !== 'basic') return;
+                if (out.sliders[schema.id] === undefined) return;
+
+                if (delta && delta.sliders && delta.sliders[schema.id] !== undefined) {
+                    out.sliders[schema.id] = clampToSchema(schema, delta.sliders[schema.id]);
+                    return;
+                }
+                if (!gateOpen(out, schema.id)) return;
+
+                var range = schema.max - schema.min;
+                var noise = gaussRandom() * strength * range * 0.3;
+                out.sliders[schema.id] = clampToSchema(schema, out.sliders[schema.id] + noise);
+            });
+        }
+
         // ── Colors ──
         // Background is a FUNDAMENTAL DISPLAY SETTING, not a style variant
         // (Gabriel 2026-08-05): random mutation kept washing black canvases
-        // to grey — mutateColor's 0.05 lightness floor means black can only
+        // to grey — shiftColor's 0.05 lightness floor means black can only
         // get LIGHTER. Only an explicit external delta may set it now.
         if (out.colors && scope !== 'extended_only') {
             if (out.colors.background && delta && delta.colors && delta.colors.background) {
                 out.colors.background = delta.colors.background;
             }
-            if (!locks['color.brush'] && out.colors.brush) {
-                if (delta && delta.colors && delta.colors.brush) {
-                    out.colors.brush = delta.colors.brush;
-                } else if (scope === 'basic' || scope === 'all') {
-                    out.colors.brush = mutateColor(out.colors.brush, strength);
-                }
-            }
         }
 
-        // ── Kaleidoscope runtime ──
-        if (out.kaleido && (scope === 'basic' || scope === 'all') && _cbOn(out, 'kaleidoToggle')) {
-            if (!locks['kaleido.mode'] && Math.random() < strength * 0.3) {
-                out.kaleido.mode = Math.floor(Math.random() * 6);
-            }
-            if (!locks['kaleido.segments']) {
-                out.kaleido.segments = Math.max(1, Math.min(24,
-                    Math.round((out.kaleido.segments || 6) + gaussRandom() * strength * 6)));
-            }
-            if (!locks['kaleido.angle']) {
-                out.kaleido.angle = Math.round(((out.kaleido.angle || 0) + gaussRandom() * strength * 60) % 360);
-            }
-            if (!locks['kaleido.twist']) {
-                out.kaleido.twist = Math.max(0, Math.min(10,
-                    (out.kaleido.twist || 0) + gaussRandom() * strength * 2));
-            }
-            if (!locks['kaleido.zoom']) {
-                out.kaleido.zoom = Math.max(0.5, Math.min(2,
-                    (out.kaleido.zoom || 1) + gaussRandom() * strength * 0.3));
-            }
-            if (!locks['kaleido.blend']) {
-                out.kaleido.blend = Math.max(0, Math.min(1,
-                    (out.kaleido.blend || 1) + gaussRandom() * strength * 0.3));
+        // Brush colour. Only a solid brush has a colour to vary: with Rnd or
+        // Step on (after the flips above) every stroke picks its own, and a
+        // varied picker would only be the next stroke's throwaway.
+        var zeroMode = armZeroMode(out);
+        var shift = (scope === 'basic' || scope === 'all') ? colorShift(strength) : null;
+        if (out.colors && out.colors.brush && !locks['color.brush']) {
+            if (delta && delta.colors && delta.colors.brush) {
+                out.colors.brush = delta.colors.brush;
+            } else if (shift && (zeroMode === 'fixed' || zeroMode === 'main')) {
+                out.colors.brush = shiftColor(out.colors.brush, shift);
             }
         }
+        // A multi-brush's other solid arms turn with it, keeping the scheme.
+        if (shift && !locks['color.arms']) shiftSolidArms(out, shift);
+        // Arm 0 is the brush's canonical colour (05g). The apply restores
+        // armColors AFTER colors.brush and the Rnd/Step switches, then
+        // reflects arm 0 back into the picker and both switches — so while
+        // this only changed colors.brush, every colour change was reverted
+        // on apply and the brush stayed the same colour.
+        syncArmZero(out, zeroMode);
 
         // ── Light source position ──
-        if (out.lightPos && !locks['lightPos'] && (scope === 'all') && _cbOn(out, 'enableLighting')) {
+        if (out.lightPos && !locks['lightPos'] && (scope === 'all') && gateOpen(out, 'lightPos')) {
             if (delta && delta.lightPos) {
                 out.lightPos = delta.lightPos;
             } else {
-                out.lightPos.x = Math.max(0, Math.min(1,
-                    (out.lightPos.x || 0.5) + gaussRandom() * strength * 0.25));
-                out.lightPos.y = Math.max(0, Math.min(1,
-                    (out.lightPos.y || 0.5) + gaussRandom() * strength * 0.25));
+                // typeof, not ||: a light parked on an edge (0) is a position,
+                // not a missing one to re-centre.
+                var lx = typeof out.lightPos.x === 'number' ? out.lightPos.x : 0.5;
+                var ly = typeof out.lightPos.y === 'number' ? out.lightPos.y : 0.5;
+                out.lightPos.x = Math.max(0, Math.min(1, lx + gaussRandom() * strength * 0.25));
+                out.lightPos.y = Math.max(0, Math.min(1, ly + gaussRandom() * strength * 0.25));
             }
         }
 
         // ── Palette index ──
         if (!locks['palette'] && (scope === 'basic' || scope === 'all')) {
             if (delta && typeof delta.paletteIndex === 'number') {
-                out.paletteIndex = delta.paletteIndex;
+                setPalette(out, delta.paletteIndex);
             } else if (Math.random() < strength * 0.3) {
                 var paletteCount = 1;
                 try {
                     if (window.curatedPalettes) paletteCount = window.curatedPalettes.length;
                 } catch (_) {}
-                if (paletteCount > 1) {
-                    out.paletteIndex = Math.floor(Math.random() * paletteCount);
-                    try {
-                        out.paletteName = window.curatedPalettes[out.paletteIndex]
-                            ? window.curatedPalettes[out.paletteIndex].name : '';
-                    } catch (_) { out.paletteName = ''; }
-                }
+                if (paletteCount > 1) setPalette(out, Math.floor(Math.random() * paletteCount));
             }
         }
 
@@ -377,11 +426,25 @@
             } else if (Math.random() < strength * 0.4) {
                 out.lightShiftPath = generateProceduralColorPath(strength);
                 // Pair with a gentle speed so the arc sweeps slowly
-                if (out.sliders && !locks['lightShiftSpeed']) {
-                    out.sliders.lightShiftSpeed = 0.1 + Math.random() * 0.2; // 0.1-0.3
+                if (out.sliders && !locks['lightShiftSpeed'] && _sliderMap.lightShiftSpeed) {
+                    out.sliders.lightShiftSpeed = clampToSchema(_sliderMap.lightShiftSpeed,
+                        0.1 + Math.random() * 0.2); // 0.1-0.3
                 }
             }
         }
+
+        // ── Material amount ──
+        // In a Gloss Paint material the Curl slider is the material's Flow /
+        // Thickness macro and the params it drives are gated off above, so
+        // this is the paint-body knob a variant varies instead.
+        if (materialActive(out) && !locks['material.amount'] && (scope === 'basic' || scope === 'all')) {
+            var cs = _sliderMap.curl || { min: 0, max: 60 };
+            var amt = typeof out.material.amount === 'number' ? out.material.amount : 30;
+            out.material.amount = Math.max(cs.min, Math.min(cs.max,
+                Math.round(amt + gaussRandom() * strength * (cs.max - cs.min) * 0.3)));
+        }
+
+        syncKaleido(base, out);
 
         // Stamp metadata
         out._mutationMeta = {
@@ -392,6 +455,116 @@
         };
 
         return out;
+    }
+
+    // ── Keeping a variant consistent with itself ────────────────────
+    // A snapshot carries some state twice: a control and the live value the
+    // apply restores after it. A variant has to change both, or the apply
+    // quietly undoes the change the card promised.
+
+    // Rnd and Step are exclusive in the UI (ticking one unticks the other);
+    // independent flips can land both on — keep the one that just came on.
+    function settleBrushSwitches(base, out) {
+        var cb = out.checkboxes;
+        if (!cb || !cb.randomColor || !cb.stepPalette) return;
+        var was = (base && base.checkboxes) || {};
+        if (was.randomColor && !was.stepPalette) cb.randomColor = false;
+        else if (was.stepPalette && !was.randomColor) cb.stepPalette = false;
+        else if (Math.random() < 0.5) cb.randomColor = false;
+        else cb.stepPalette = false;
+    }
+
+    // Arm 0's mode once the variant is applied — what 05g's switch handlers
+    // make of the variant's Rnd/Step state.
+    function armZeroMode(out) {
+        var cb = out.checkboxes || {};
+        var a0 = Array.isArray(out.armColors) ? out.armColors[0] : null;
+        var cur = a0 && a0.mode;
+        if (cb.randomColor === undefined && cb.stepPalette === undefined) return cur || 'fixed';
+        if (cb.randomColor) return 'random';
+        if (cb.stepPalette) return 'step';
+        return cur === 'main' ? 'main' : 'fixed';
+    }
+
+    function syncArmZero(out, mode) {
+        var a0 = Array.isArray(out.armColors) ? out.armColors[0] : null;
+        if (!a0) return;
+        a0.mode = mode;
+        if ((mode === 'fixed' || mode === 'main') && out.colors && out.colors.brush) {
+            a0.color = out.colors.brush;
+        }
+    }
+
+    // Solid arms past the first, as far as the variant's Multiply reaches:
+    // an arm beyond it paints nothing, so moving it would be a silent change.
+    function shiftSolidArms(out, shift) {
+        if (!Array.isArray(out.armColors)) return;
+        var mult = (out.sliders && out.sliders.multiplier) || 1;
+        var n = Math.min(out.armColors.length, Math.max(1, Math.round(mult)));
+        for (var i = 1; i < n; i++) {
+            var a = out.armColors[i];
+            if (a && a.mode === 'fixed' && a.color) a.color = shiftColor(a.color, shift);
+        }
+    }
+
+    // A palette pick re-seeds the swatch tray (01 applyPalette) and Step
+    // paints from the tray, but the apply restores savedColors straight after
+    // the palette — so the tray has to change with it, or Step goes on
+    // painting the old palette. The name travels too: the apply looks the
+    // palette up by name first.
+    function setPalette(out, idx) {
+        var pals = window.curatedPalettes;
+        out.paletteIndex = idx;
+        out.paletteName = (pals && pals[idx]) ? pals[idx].name : '';
+        if (typeof window.getPaletteColorsForIndex === 'function') {
+            var tray = window.getPaletteColorsForIndex(idx);
+            if (tray && tray.length) out.savedColors = tray.slice();
+        }
+    }
+
+    // snapshot.kaleido holds the live globals behind the kaleido controls
+    // (05f), written AFTER the sliders on apply. It used to be mutated on its
+    // own: segments and mode came out different from the sliders, twist /
+    // zoom / blend ran at values no slider showed, the angle was varied in
+    // degrees on a radians value, and the spin switch never took. Now it
+    // follows the controls — only the ones that moved, since the spin
+    // animates kAngle away from its slider and an untouched one keeps its
+    // live value.
+    function syncKaleido(base, out) {
+        var k = out.kaleido;
+        if (!k || !base) return;
+        function moved(sec, id) {
+            return !!(out[sec] && base[sec]) && out[sec][id] !== undefined && out[sec][id] !== base[sec][id];
+        }
+        if (moved('sliders', 'kaleidoSegments')) k.segments = out.sliders.kaleidoSegments;
+        if (moved('selects', 'kaleidoMode')) {
+            var m = parseInt(out.selects.kaleidoMode, 10);
+            if (isFinite(m)) k.mode = m;
+        }
+        if (moved('sliders', 'kAngle')) k.angle = out.sliders.kAngle * Math.PI / 180;
+        if (moved('sliders', 'kTwist')) k.twist = out.sliders.kTwist;
+        if (moved('sliders', 'kZoom')) k.zoom = out.sliders.kZoom;
+        if (moved('sliders', 'kBlend')) k.blend = out.sliders.kBlend;
+        if (moved('checkboxes', 'kAnimateRot')) k.animate = !!out.checkboxes.kAnimateRot;
+    }
+
+    // What a variant carries: the look sections of a snapshot — the set a
+    // shared-settings link carries (50-look-links SECTIONS). Content (layers,
+    // masks, text, recordings), libraries (user palettes) and the workspace
+    // (canvas geometry, collapsed sections, focus mode) stay out, so picking
+    // a variant, or Undo / Reset back to where you started, never rewinds a
+    // layer painted or a canvas resized after Mutate was pressed.
+    var LOOK_SECTIONS = ['version', 'timestamp', 'sliders', 'checkboxes', 'selects', 'colors',
+        'kaleido', 'paletteIndex', 'paletteName', 'savedColors', 'armColors', 'lightPos',
+        'lightShiftPath', 'brushState', 'material', 'brushTip', 'ssOrigin', 'cosOscillator'];
+
+    function lookOf(snapshot) {
+        if (!snapshot) return null;
+        var look = {};
+        LOOK_SECTIONS.forEach(function (k) {
+            if (snapshot[k] !== undefined) look[k] = snapshot[k];
+        });
+        return look;
     }
 
     // ── Procedural Color Path Generator ──────────────────────────────
@@ -555,15 +728,24 @@
             });
         }
 
-        // Kaleido runtime (only mutated when kaleidoToggle is on, so these
-        // are real on-screen changes — without them a kaleido-only variant
-        // read as "0 changes" and the retry loop discarded it)
-        if (base.kaleido && variant.kaleido) {
-            ['mode', 'segments', 'angle', 'twist', 'zoom', 'blend'].forEach(function (k) {
-                if (base.kaleido[k] !== variant.kaleido[k]) {
-                    changes.push({ param: 'kaleido.' + k, from: base.kaleido[k], to: variant.kaleido[k], type: 'slider' });
+        // The other solid arms of a multi-brush (arm 0 is color.brush). The
+        // kaleido runtime is not listed: it only ever follows its sliders now,
+        // which are counted above.
+        if (Array.isArray(base.armColors) && Array.isArray(variant.armColors)) {
+            for (var ai = 1; ai < variant.armColors.length; ai++) {
+                var ba = base.armColors[ai], va = variant.armColors[ai];
+                if (ba && va && ba.color !== va.color) {
+                    changes.push({ param: 'color.arms', from: ba.color, to: va.color, type: 'color' });
+                    break;
                 }
-            });
+            }
+        }
+
+        // Material amount (Flow / Thickness)
+        if (base.material && variant.material && base.material.amount !== variant.material.amount) {
+            var amtRange = _sliderMap.curl ? (_sliderMap.curl.max - _sliderMap.curl.min) : 60;
+            changes.push({ param: 'material.amount', from: base.material.amount, to: variant.material.amount, type: 'slider',
+                pct: Math.round(Math.abs((variant.material.amount || 0) - (base.material.amount || 0)) / amtRange * 100) });
         }
 
         // Light position
@@ -616,6 +798,7 @@
         mutate: mutate,
         generateVariations: generateVariations,
         diffSummary: diffSummary,
+        lookOf: lookOf,
         getSchema: getSchema,
 
         // Chain

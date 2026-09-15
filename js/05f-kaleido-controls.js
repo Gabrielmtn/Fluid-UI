@@ -96,10 +96,15 @@
                 const now = Date.now();
                 const withinTol = Math.abs(deg) <= ANGLE_STICK_TOL;
                 const stickActive = (now - lastAngleSnapTime) < ANGLE_STICK_MS;
-                if (!stickActive && withinTol) {
+                // The sticky zero is a drag aid. A snapshot apply (preset,
+                // Mutate variant, look mirror) takes its angle as given:
+                // every apply re-writes a 0° angle, which armed the stick,
+                // and the next variant picked within 1.5 s came out at 0°.
+                const applying = !!window._profileApplying;
+                if (!applying && !stickActive && withinTol) {
                     deg = 0;
                     lastAngleSnapTime = now;
-                } else if (stickActive) {
+                } else if (!applying && stickActive) {
                     deg = 0;
                 }
                 if (!Number.isNaN(deg)) {

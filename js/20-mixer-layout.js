@@ -2320,20 +2320,21 @@
 
         // Lock group → parameter ID mapping
         var LOCK_GROUPS = {
-            colors: ['color.background', 'color.brush', 'randomColor', 'stepPalette', 'palette'],
+            colors: ['color.background', 'color.brush', 'color.arms', 'randomColor', 'stepPalette', 'palette'],
             kaleido: ['kaleidoToggle', 'kAnimateRot', 'kaleidoSegments', 'kAngle', 'kSpinSpeed',
                       'kTwist', 'kZoom', 'kBlend', 'kaleidoMode',
                       'kaleido.mode', 'kaleido.segments', 'kaleido.angle', 'kaleido.twist', 'kaleido.zoom', 'kaleido.blend'],
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
                          'pressureIteration', 'curl', 'sharpness', 'multiplier',
-                         'velocityInfluence', 'brushSize'],
+                         'velocityInfluence', 'brushSize', 'velocityCap', 'wetInfluence', 'wetDrying',
+                         'material.amount'],
             effects: ['enableLighting', 'enableLightShift',
-                      'lightIntensity', 'lightAmbient', 'lightSpeed', 'vibrance', 'ridges',
+                      'lightIntensity', 'lightAmbient', 'lightSpeed', 'lightMode', 'vibrance', 'ridges',
                       'glowToggle', 'glowIntensity', 'glowThreshold',
                       'scatterToggle', 'scatterAmount', 'scatterReach', 'scatterSource', 'scatterBlockToggle',
-                      'shadingIntensity', 'displayShadingToggle',
+                      'shadingIntensity', 'displayShadingToggle', 'shadeRelief', 'shadeGloss',
                       'lightShiftSpeed', 'lightShiftThreshold', 'lightShiftIntensity', 'lightShiftSaturation',
-                      'lightPos', 'lightShiftPath'],
+                      'lightShiftMode', 'lightPos', 'lightShiftPath'],
             audio: ['audioReactToggle', 'arMapAutoSplat', 'arMapSize', 'arMapKaleido', 'arMapColor',
                     'audioSensitivity', 'audioBeatThreshold']
         };
@@ -2367,7 +2368,11 @@
         // Generate variants
         function doMutate() {
             if (!window.capturePresetSnapshot) return;
-            _baseSnapshot = window.capturePresetSnapshot();
+            // The look only (engine.lookOf): variants and the chain never
+            // carry layers, text, masks or canvas geometry, so picking a card
+            // cannot rewind content made after Mutate — and the capture skips
+            // the full-resolution layer readbacks.
+            _baseSnapshot = engine.lookOf(window.capturePresetSnapshot({ lookOnly: true }));
             if (!_baseSnapshot) return;
 
             // Push base to chain if chain is empty
@@ -2455,9 +2460,10 @@
             // Update chain display
             renderChain();
             updateNavButtons();
-
-            // Use this variant as new base for next mutation
-            _baseSnapshot = variant;
+            // _baseSnapshot stays the snapshot these cards were dealt from:
+            // the next card clicked is diffed against it, as its label was
+            // (it used to become this variant, so a second pick listed its
+            // differences from the first). The next Mutate recaptures anyway.
         }
 
         // Show diff panel
