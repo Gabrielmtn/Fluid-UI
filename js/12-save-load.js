@@ -2195,6 +2195,27 @@
                 return true;
             } catch (e) { console.warn('[Project] export failed', e); return false; }
         }
+        // Brush presets ride along in project and preset files. Merge them in
+        // by name with existing entries winning, under the brush drawer's cap
+        // of 24 (BrushShapes.importList's rule): an older file must never
+        // replace or drop brushes made since. Returns how many were added.
+        function mergeBrushPresets(incoming) {
+            if (!Array.isArray(incoming) || !window.settingsManager) return 0;
+            var cur = window.settingsManager.get('brush.presets');
+            var list = Array.isArray(cur) ? cur.slice() : [];
+            var have = {};
+            list.forEach(function (p) { if (p && p.name) have[p.name] = 1; });
+            var added = 0;
+            incoming.forEach(function (p) {
+                if (!p || typeof p.name !== 'string' || have[p.name] || list.length >= 24) return;
+                list.push(p); have[p.name] = 1; added++;
+            });
+            if (added) {
+                window.settingsManager.set('brush.presets', list);
+                if (typeof window.__refreshBrushPresets === 'function') window.__refreshBrushPresets();
+            }
+            return added;
+        }
         function importProjectFile(file, cb) {
             if (!file) { if (cb) cb(new Error('No file')); return; }
             var reader = new FileReader();
@@ -2211,12 +2232,7 @@
                     }
                     applyPresetSnapshot(env.snapshot);
                     try { window.__unsavedWork = false; } catch (_) {}
-                    if (env.brushPresets && window.settingsManager) {
-                        try {
-                            window.settingsManager.set('brush.presets', env.brushPresets);
-                            if (typeof window.__refreshBrushPresets === 'function') window.__refreshBrushPresets();
-                        } catch (_) {}
-                    }
+                    try { mergeBrushPresets(env.brushPresets); } catch (_) {}
                     if (env.brushShapes && window.BrushShapes) {
                         try { window.BrushShapes.importList(env.brushShapes); } catch (_) {}
                     }
@@ -2250,14 +2266,43 @@
                 };
                 if (brushPresets) env.brushPresets = brushPresets;
                 if (brushShapes && brushShapes.length) env.brushShapes = brushShapes;
-                var blob = new Blob([JSON.stringify(env)], { type: 'application/json' });
+                var json = JSON.stringify(env);
+                var fileName = 'fluid-presets-' + new Date().toISOString().slice(0, 10) + '.fluidpresets';
+                var doneMsg = 'Exported ' + names.length + ' preset' + (names.length === 1 ? '' : 's');
+
+                // Electron: an <a download> writes nothing in the desktop app
+                // (see exportProjectFile above), so save through fs and only
+                // report what actually reached the disk.
+                if (window.IS_ELECTRON) {
+                    try {
+                        var remote = require('@electron/remote');
+                        var fs = require('fs');
+                        var path = require('path');
+                        var dir = '';
+                        try { dir = remote.app.getPath('documents'); } catch (_) { dir = ''; }
+                        var target = remote.dialog.showSaveDialogSync(remote.getCurrentWindow(), {
+                            title: 'Export presets',
+                            defaultPath: dir ? path.join(dir, fileName) : fileName,
+                            filters: [{ name: 'Fluid presets', extensions: ['fluidpresets'] }]
+                        });
+                        if (!target) return false; // cancelled
+                        fs.writeFileSync(target, json, 'utf8');
+                        showPresetStatus(doneMsg, '#3fb950');
+                        return true;
+                    } catch (e) {
+                        console.warn('[Presets] Electron export failed', e);
+                        showPresetStatus('Export failed', '#ff6b6b');
+                        return false;
+                    }
+                }
+
+                var blob = new Blob([json], { type: 'application/json' });
                 var url = URL.createObjectURL(blob);
                 var a = document.createElement('a');
-                var stamp = new Date().toISOString().slice(0, 10);
-                a.href = url; a.download = 'fluid-presets-' + stamp + '.fluidpresets';
+                a.href = url; a.download = fileName;
                 document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-                showPresetStatus('Exported ' + names.length + ' preset' + (names.length === 1 ? '' : 's'), '#3fb950');
+                showPresetStatus(doneMsg, '#3fb950');
                 return true;
             } catch (e) {
                 console.warn('[Presets] export failed', e);
@@ -2290,12 +2335,7 @@
                         if (ok) { imported++; if (window._lastPresetSaveWarning) degraded++; }
                         else failed++;
                     });
-                    if (data.brushPresets && window.settingsManager) {
-                        try {
-                            window.settingsManager.set('brush.presets', data.brushPresets);
-                            if (typeof window.__refreshBrushPresets === 'function') window.__refreshBrushPresets();
-                        } catch (_) {}
-                    }
+                    try { mergeBrushPresets(data.brushPresets); } catch (_) {}
                     if (data.brushShapes && window.BrushShapes) {
                         try { window.BrushShapes.importList(data.brushShapes); } catch (_) {}
                     }

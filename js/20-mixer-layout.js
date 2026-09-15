@@ -6831,6 +6831,14 @@
         presetList.className = 'user-presets-list';
         presetSection.appendChild(presetList);
 
+        // Export / Import, their status line, and the desktop's Open Presets
+        // Folder. They were built into #presetsGroup, which stays in the
+        // hidden legacy panel, so nothing could reach them. 12-save-load and
+        // 12b wire them by id, so moving the nodes keeps them working.
+        moveEl('userPresetBulkRow', presetSection);
+        moveEl('userPresetStatus', presetSection);
+        moveEl('openPresetsFolderBtn', presetSection);
+
         body.appendChild(presetSection);
 
         // ── ComfyUI Bridge ──
@@ -7315,25 +7323,17 @@
                     // Repaints the row from cfg — the mode buttons, the Pressure
                     // toggle AND the swatch, in one place, so no widget can end
                     // up describing a state the others have moved on from.
+                    // State only: the buttons take the panel's tint
+                    // (css/01-buttons.css) and "selected" is its shared .active
+                    // plate — their layout lives in 20-mixer-strip.css.
                     function paintRow() {
                         btns.forEach(function(b) {
-                            var on = b.dataset.mode === cfg.mode;
-                            b.classList.toggle('active', on);
-                            b.style.cssText = 'all:unset;box-sizing:border-box;padding:4px 6px;'
-                                + 'font-size:10px;border-radius:0;background:'
-                                + (on ? '#ec3013' : 'rgba(255,255,255,0.08)') + ';color:'
-                                + (on ? '#fff' : 'rgba(255,255,255,0.6)') + ';border:1px solid '
-                                + (on ? '#ec3013' : 'rgba(255,255,255,0.1)') + ';cursor:pointer;';
+                            b.classList.toggle('active', b.dataset.mode === cfg.mode);
                         });
 
                         var push = !!cfg.push;
                         pushBtn.classList.toggle('active', push);
-                        pushBtn.style.cssText = 'all:unset;box-sizing:border-box;margin-left:auto;'
-                            + 'padding:4px 7px;font-size:11px;line-height:1;border-radius:0;background:'
-                            + (push ? '#ec3013' : 'rgba(255,255,255,0.08)') + ';color:'
-                            + (push ? '#fff' : 'rgba(255,255,255,0.6)') + ';border:1px solid '
-                            + (push ? '#ec3013' : 'rgba(255,255,255,0.1)')
-                            + ';cursor:pointer;opacity:' + (brushPush ? '0.45' : '1') + ';';
+                        pushBtn.style.opacity = brushPush ? '0.45' : '';
                         pushBtn.title = brushPush
                             ? 'Pressure arm — the whole brush is already in Pressure mode, '
                               + 'so every arm pushes. Switch the brush back to Fluid to mix '

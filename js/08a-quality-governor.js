@@ -314,6 +314,10 @@
         if (rescueEl) return;
         rescueEl = document.createElement('div');
         rescueEl.id = 'perfRescueToast';
+        // Portaled to <body>, so no panel tints its buttons — take the group
+        // the governor's own controls sit in. The amber plate is the toast's;
+        // the buttons inherit (css/01-buttons.css), the ✕ as a ghost on it.
+        rescueEl.dataset.group = 'system';
         rescueEl.style.cssText =
             'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:10005;' +
             'display:none;align-items:center;gap:10px;padding:10px 12px;' +
@@ -323,10 +327,9 @@
         rescueEl.innerHTML =
             '<span>🐌 Running very slowly</span>' +
             '<button id="perfRescueBtn" style="padding:6px 12px;border-radius:8px;cursor:pointer;' +
-                'font-weight:700;font-size:12px;background:linear-gradient(#4a3a1a,#33280f);' +
-                'color:#ffd699;border:1px solid rgba(255,178,71,0.6);">Boost performance</button>' +
-            '<button id="perfRescueClose" title="Dismiss" style="padding:4px 8px;border-radius:6px;' +
-                'cursor:pointer;background:transparent;color:rgba(255,255,255,0.5);border:none;font-size:13px;">✕</button>';
+                'font-weight:700;font-size:12px;">Boost performance</button>' +
+            '<button id="perfRescueClose" class="btn--ghost" title="Dismiss" style="padding:4px 8px;' +
+                'border-radius:6px;cursor:pointer;font-size:13px;">✕</button>';
         document.body.appendChild(rescueEl);
         rescueEl.querySelector('#perfRescueBtn').addEventListener('click', applyRescue);
         rescueEl.querySelector('#perfRescueClose').addEventListener('click', function () {

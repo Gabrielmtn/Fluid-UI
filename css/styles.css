@@ -1497,7 +1497,9 @@ body.mobile-mode .controls.visible ~ #mobileMenuToggle::after {
 
 /* Mobile '?' → hotkeys modal (created by 13-mobile-mode; the only mobile
    entry point — F1 is keyboard-only and the reminder row is hidden <768px).
-   Sits under the ☰ pill, same ghost treatment. */
+   Sits under the ☰ pill. Layout only: its dark plate is the standard button
+   from 01-buttons.css, tinted by the :root system fallback (it is a <body>
+   child, outside any panel). */
 #mobileHotkeysBtn {
     display: none;
     position: fixed;
@@ -1508,9 +1510,6 @@ body.mobile-mode .controls.visible ~ #mobileMenuToggle::after {
     height: 40px;
     font-size: 18px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.8);
-    background: rgba(11, 14, 20, 0.92);
-    border: none;
     border-radius: 8px;
     cursor: pointer;
 }

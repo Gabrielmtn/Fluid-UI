@@ -908,6 +908,21 @@ body > .controls {
     display: flex;
     gap: 3px;
 }
+/* Per-arm colour-mode buttons and the Pressure toggle (20-mixer paintRow).
+   Layout only — colour comes from the panel tint, and the selected mode / a
+   set Pressure toggle wear 01-buttons.css's .active plate. */
+.arm-mode-btn {
+    padding: 4px 6px;
+    font-size: 10px;
+}
+/* line-height 1 keeps the larger glyph from outgrowing the mode buttons;
+   margin-left:auto parks it at the row's far right, clear of the group. */
+.arm-push-btn {
+    margin-left: auto;
+    padding: 4px 7px;
+    font-size: 11px;
+    line-height: 1;
+}
 
 
 /* ── Brush settings panel (D1): left slide-in off the Brush Size label ── */

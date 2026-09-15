@@ -229,11 +229,13 @@
             try { ls = window.Settings.getAllPresets() || {}; } catch (_) {}
 
             // disk → localStorage mirror (restore). origSave avoids re-writing disk.
+            // A file's own brushPresets list is only noted here, never applied:
+            // see the no-sidecar branch below.
+            var legacyFile = null;
             disk.forEach(function (p) {
                 try { origSave(p.name, p.snapshot); restored++; } catch (_) {}
-                if (p.brushPresets && window.settingsManager) {
-                    try { window.settingsManager.set('brush.presets', p.brushPresets); } catch (_) {}
-                }
+                if (Array.isArray(p.brushPresets) && p.brushPresets.length &&
+                    (!legacyFile || p.savedAt > legacyFile.savedAt)) legacyFile = p;
             });
             // localStorage → disk (seed anything not already on disk).
             Object.keys(ls).forEach(function (name) {
@@ -245,10 +247,10 @@
             // (per-preset envelope ride-alongs were tried first and did
             // exactly that: divergent vintages, alphabetical-order wins).
             var lib = readLibrary();
+            var curP = null, curS = null;
+            try { curP = window.settingsManager && window.settingsManager.get('brush.presets'); } catch (_) {}
+            try { curS = window.settingsManager && window.settingsManager.get('brush.shapes'); } catch (_) {}
             if (lib) {
-                var curP = null, curS = null;
-                try { curP = window.settingsManager && window.settingsManager.get('brush.presets'); } catch (_) {}
-                try { curS = window.settingsManager && window.settingsManager.get('brush.shapes'); } catch (_) {}
                 if ((!Array.isArray(curP) || !curP.length) && Array.isArray(lib.brushPresets) && lib.brushPresets.length && window.settingsManager) {
                     try {
                         window.settingsManager.set('brush.presets', lib.brushPresets);
@@ -262,6 +264,19 @@
                     } catch (_) {}
                 }
             } else {
+                // No sidecar (a vault older than it, or the file was lost).
+                // Some vault files carry a whole brushPresets list of their own
+                // (the 2026-07-19 recovery wrote one). The newest is then the
+                // best copy on disk, so it restores under the same rule. With a
+                // sidecar those lists never count: it is rewritten on every
+                // change. (Until 2026-09-14 they were set wholesale at every
+                // launch, which reset desktop brush presets to a July list.)
+                if (legacyFile && (!Array.isArray(curP) || !curP.length) && window.settingsManager) {
+                    try {
+                        window.settingsManager.set('brush.presets', legacyFile.brushPresets);
+                        if (typeof window.__refreshBrushPresets === 'function') window.__refreshBrushPresets();
+                    } catch (_) {}
+                }
                 writeLibrarySoon(); // first run with the sidecar: seed it
             }
             return { restored: restored, seeded: seeded };
