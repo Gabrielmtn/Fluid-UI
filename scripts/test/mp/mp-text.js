@@ -4,6 +4,7 @@
 // say who left (peer-left) so clients can drop what a departed peer brought?
 //   node scripts/test/mp/mp-text.js                  (partykit dev, :1999)
 //   MP_HOST=127.0.0.1:8787 node scripts/test/mp/mp-text.js   (wrangler dev)
+//   MP_HOST=swirltogether.com node scripts/test/mp/mp-text.js    (the live relay, wss)
 // BACKSTOP=1 adds the slow check (~70 s): a text-line from the holder at
 // 0.6 × STROKE_IDLE_MS keeps the brush past the original deadline.
 const WebSocket = require('ws');
@@ -16,9 +17,12 @@ const log = (...a) => console.log(((Date.now() - t0) / 1000).toFixed(1).padStart
 let fails = 0;
 const check = (ok, msg) => { log((ok ? 'PASS ' : 'FAIL ') + msg); if (!ok) fails++; };
 
+// ws:// for a local relay, wss:// for a deployed one (the client's rule).
+const PROTO = /^(localhost|127\.|10\.|192\.168\.)/.test(HOST) ? 'ws' : 'wss';
+
 function connect(uid) {
   return new Promise((res, rej) => {
-    const ws = new WebSocket(`ws://${HOST}/parties/fluid/${ROOM}?uid=${uid}`);
+    const ws = new WebSocket(`${PROTO}://${HOST}/parties/fluid/${ROOM}?uid=${uid}`);
     const c = { uid, ws, id: null, turn: null, msgs: [] };
     ws.on('message', (b) => {
       const d = JSON.parse(b.toString());
