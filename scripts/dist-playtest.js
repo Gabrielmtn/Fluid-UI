@@ -7,15 +7,22 @@
 // Steamworks, so this is `npm run dist:win` with these overrides, deep-merged
 // over package.json's "build" block by electron-builder itself:
 //
-//   productName    "Swirl Together Playtest" → the exe, the window title and
-//                  the profile folder (%APPDATA%\Swirl Together Playtest),
-//                  so it never shares settings with a Steam copy
+//   productName    "Swirl Together Playtest" → the exe and its file details
 //   directories    dist/playtest         → never touches the full game's
 //                  .output                              dist/win-unpacked
 //   extraMetadata  swirlEdition "playtest" → electron-main.js EDITION: no
 //                                          Steam, and the page's label
 //                  version               → what the splash, F1 and crash
 //                                          reports say (not the Steam 1.0.0)
+//                  productName           → Electron's app name, so the
+//                                          profile is %APPDATA%\Swirl Together
+//                                          Playtest. Every other build runs as
+//                                          package.json's "name" and shares
+//                                          %APPDATA%\fluid-ui-multiplayer; the
+//                                          playtest must not read or write a
+//                                          dev machine's real settings, and
+//                                          testers' crash.log sits in a folder
+//                                          named after what they installed
 //   win.icon       build/icon-demo.ico   → the S, not Electron's atom
 //   win.target     + zip                 → win-unpacked plus the zip
 //   win.artifactName                     → Swirl-Together-Playtest-<n>-win64.zip,
@@ -60,7 +67,7 @@ build({
   config: {
     productName: "Swirl Together Playtest",
     directories: { output: "dist/playtest" },
-    extraMetadata: { swirlEdition: "playtest", version: PLAYTEST_VERSION },
+    extraMetadata: { swirlEdition: "playtest", version: PLAYTEST_VERSION, productName: "Swirl Together Playtest" },
     win: { icon: ICON, target: ["zip"], artifactName: ZIP },
   },
 })
@@ -74,6 +81,7 @@ build({
     if (!fs.existsSync(exe)) throw new Error("no " + EXE + " in " + UNPACKED);
     if (pkg.swirlEdition !== "playtest") throw new Error("packaged package.json has swirlEdition=" + pkg.swirlEdition + ", expected playtest");
     if (pkg.version !== PLAYTEST_VERSION) throw new Error("packaged version is " + pkg.version + ", expected " + PLAYTEST_VERSION);
+    if (pkg.productName !== "Swirl Together Playtest") throw new Error("packaged productName is " + pkg.productName + " — the profile would be shared");
     if (!fs.existsSync(zip)) throw new Error("no " + ZIP + " in " + OUT);
     const mb = (fs.statSync(zip).size / 1048576).toFixed(0);
     console.log("\n  Playtest build ready: " + exe);
