@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/52-demo-clock.js — the Steam demo's five-minute clock (2026-09-14),
-//   and the web build's playtest label in the same spot.
+//   and the playtest label (web build, itch playtest) in the same spot.
 // LOAD ORDER: last, after 51-open-in-desktop.js. Needs the quality underbar
 //   (20-mixer-layout builds it after DOMContentLoaded) and waits for the
 //   startup prompts the way 51 does.
@@ -26,7 +26,8 @@
 //
 // Edition: window.SWIRL_EDITION, from the --swirl-edition=demo argument
 // electron-main.js hands a demo build (read in index.html's boot script).
-// The web build (swirltogether.com) is a playtest, and says so where the
+// The web build (swirltogether.com) and the itch playtest (SWIRL_EDITION
+// 'playtest', scripts/dist-playtest.js) are playtests, and say so where the
 // demo keeps its clock (PLAYTEST_LABEL below). The full game returns below
 // before touching anything.
 // ═══════════════════════════════════════════════════════════════════
@@ -328,11 +329,13 @@
         enable: init
     };
 
-    // ── The web build: the playtest label ────────────────────────────
-    // swirltogether.com is a playtest, and says so on the right end of the
-    // underbar, where the demo keeps its clock. Plain text: there is nothing
-    // to click, so painting runs straight through it. Change the number here
-    // when a new playtest goes out.
+    // ── The playtest label: the web build and the itch playtest ─────
+    // swirltogether.com and "Swirl Together Playtest" (itch.io) are
+    // playtests, and say so on the right end of the underbar, where the demo
+    // keeps its clock. Plain text: there is nothing to click, so painting
+    // runs straight through it. Change the number here when a new playtest
+    // goes out (the itch zip is named after it; scripts/dist-playtest.js
+    // keeps a matching app version).
     var PLAYTEST_LABEL = '0.01 playtest';
     var playtest = null;
 
@@ -369,6 +372,13 @@
     }
 
     function initPlaytest() {
+        if (window.SWIRL_EDITION === 'playtest') {
+            // The desktop playtest names itself, like the demo does; the web
+            // keeps its title (the tab and the social cards read it).
+            document.title = 'Swirl Together Playtest';
+            var tt = document.querySelector('.titlebar-title');
+            if (tt) tt.textContent = 'Swirl Together Playtest';
+        }
         playtest = document.createElement('div');
         playtest.id = 'playtestLabel';
         playtest.className = 'playtest-label';
@@ -408,8 +418,9 @@
     }
 
     var boot = window.SWIRL_EDITION === 'demo' ? init
-             : window.IS_ELECTRON ? null            // the full game
-             : initPlaytest;                        // the web build
+             : window.SWIRL_EDITION === 'playtest' ? initPlaytest   // itch
+             : window.IS_ELECTRON ? null                            // the full game
+             : initPlaytest;                                        // the web build
     if (!boot) return;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();

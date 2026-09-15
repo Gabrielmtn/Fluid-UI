@@ -16,6 +16,7 @@
     "electron-build": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:demo": "node scripts/dist-demo.js",
+    "dist:playtest": "node scripts/dist-playtest.js",
     "publish:itch": "butler push \"dist/win-unpacked\" YOUR_ITCH_USER/YOUR_GAME:windows",
     "publish:steam": "node scripts/steam-upload.js",
     "publish:steam:demo": "node scripts/steam-upload.js --demo",

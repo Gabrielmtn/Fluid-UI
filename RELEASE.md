@@ -41,6 +41,24 @@ npm run publish:itch        # = butler push "dist/win-unpacked" YOUR_USER/YOUR_G
 ```
 butler uploads only changed bytes; the itch app auto-updates players on the `windows` channel.
 
+### The playtest — "Swirl Together Playtest"
+
+The itch playtest is the whole app with the playtest label in the bottom bar
+(the web build's "0.01 playtest", `PLAYTEST_LABEL` in `js/52-demo-clock.js`)
+and no Steamworks. `scripts/dist-playtest.js` builds it: the same files as
+`dist:win`, with productName `Swirl Together Playtest`, output
+`dist/playtest/`, `"swirlEdition": "playtest"` and the playtest's app version
+stamped into the packaged package.json, the S icon, and a zip named after the
+label.
+
+```
+npm run dist:playtest       # → dist/playtest/Swirl-Together-Playtest-<n>-win64.zip
+```
+Upload the zip on the itch dashboard (Windows), or push the folder with
+butler: `butler push dist/playtest/win-unpacked <user>/<game>:windows`. The
+build is unsigned, so a browser download meets Windows SmartScreen ("More
+info → Run anyway") on first launch. From a dev checkout: `electron . --playtest`.
+
 ---
 
 ## 3. Publish to Steam

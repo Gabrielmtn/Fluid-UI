@@ -50,8 +50,9 @@
         window.IS_ELECTRON = !!(typeof process !== 'undefined' && process.versions && process.versions.electron);
 
         // Which build this is. The Steam demo is the whole app plus a
-        // five-minute clock (js/52-demo-clock.js); electron-main.js tells a
-        // demo build's page so on argv, and says whether Steamworks started
+        // five-minute clock (js/52-demo-clock.js); the itch playtest is the
+        // whole app plus the web build's playtest label. electron-main.js
+        // tells their pages so on argv, and says whether Steamworks started
         // (--swirl-steam=1: a store link can open in the Steam client).
         // The full game and the web build are both 'full'.
         window.SWIRL_EDITION = 'full';
@@ -60,6 +61,7 @@
             var editionArgv = (typeof process !== 'undefined' && process.argv) || [];
             for (var ei = 0; ei < editionArgv.length; ei++) {
                 if (editionArgv[ei] === '--swirl-edition=demo') window.SWIRL_EDITION = 'demo';
+                else if (editionArgv[ei] === '--swirl-edition=playtest') window.SWIRL_EDITION = 'playtest';
                 else if (editionArgv[ei] === '--swirl-steam=1') window.SWIRL_STEAM = true;
             }
         } catch (e) {}
@@ -1761,9 +1763,9 @@
     <script src="js/51-open-in-desktop.js"></script>
     <!-- Steam demo only (window.SWIRL_EDITION === 'demo'): a five-minute
          clock on the right of the quality underbar, then a wishlist ask.
-         The web build shows its playtest label in that spot instead. Needs
-         the built underbar and the startup prompts, so it loads last; the
-         full game returns before touching anything. -->
+         The web build and the itch playtest show the playtest label in that
+         spot instead. Needs the built underbar and the startup prompts, so it
+         loads last; the full game returns before touching anything. -->
     <script src="js/52-demo-clock.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">

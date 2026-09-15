@@ -217,11 +217,19 @@ process.on('unhandledRejection', (reason) => {
 // "Swirl Together Demo" (Steam app 5162690) is this same app plus a
 // five-minute clock and a wishlist ask (js/52-demo-clock.js). `npm run
 // dist:demo` (scripts/dist-demo.js) stamps "swirlEdition": "demo" into the
-// packaged package.json; a dev run asks for it with --demo. Anything else is
-// the full game.
+// packaged package.json; a dev run asks for it with --demo.
+// "Swirl Together Playtest" is the itch.io playtest (`npm run dist:playtest`,
+// scripts/dist-playtest.js, stamp "playtest", dev: --playtest): the app with
+// the web build's playtest label and no Steamworks at all.
+// Anything else is the full game.
 const EDITION = (() => {
-    try { if (require('./package.json').swirlEdition === 'demo') return 'demo'; } catch (_) {}
-    return process.argv.includes('--demo') ? 'demo' : 'full';
+    try {
+        const stamped = require('./package.json').swirlEdition;
+        if (stamped === 'demo' || stamped === 'playtest') return stamped;
+    } catch (_) {}
+    if (process.argv.includes('--demo')) return 'demo';
+    if (process.argv.includes('--playtest')) return 'playtest';
+    return 'full';
 })();
 
 // ── Steamworks (Steam plan S5-1) ───────────────────────────────────────────
@@ -231,11 +239,15 @@ const EDITION = (() => {
 // game, which its players do not own.
 // Dev testing: drop a steam_appid.txt next to package.json (gitignored and
 // excluded from the depot) and init() reads it with no argument.
-const STEAM_APP_ID = EDITION === 'demo' ? 5162690 : 5068940;
+// The itch playtest never starts Steamworks: it is not a Steam app, and a
+// tester with Steam running must not show up as playing one.
+const STEAM_APP_ID = EDITION === 'demo' ? 5162690 : EDITION === 'full' ? 5068940 : 0;
 let steamClient = null;
 try {
     const hasDevAppId = require('fs').existsSync(path.join(__dirname, 'steam_appid.txt'));
-    if (STEAM_APP_ID || hasDevAppId) {
+    if (EDITION === 'playtest') {
+        console.log('[Steam] playtest edition — running without Steamworks');
+    } else if (STEAM_APP_ID || hasDevAppId) {
         const steamworks = require('steamworks.js');
         steamClient = STEAM_APP_ID ? steamworks.init(STEAM_APP_ID) : steamworks.init();
         console.log('[Steam] initialized as', steamClient.localplayer.getName(), '— app', STEAM_APP_ID, '(' + EDITION + ')');
@@ -571,11 +583,12 @@ function photoCacheArgs() {
 }
 
 // The page's half of EDITION (read in index.html's boot script): a demo
-// build shows its clock, and when Steamworks started, the wishlist link
-// opens in the Steam client instead of a browser.
+// build shows its clock, a playtest build its playtest label, and when
+// Steamworks started, the wishlist link opens in the Steam client instead of
+// a browser.
 function editionArgs() {
     const a = [];
-    if (EDITION === 'demo') a.push('--swirl-edition=demo');
+    if (EDITION !== 'full') a.push('--swirl-edition=' + EDITION);
     if (steamClient) a.push('--swirl-steam=1');
     return a;
 }
