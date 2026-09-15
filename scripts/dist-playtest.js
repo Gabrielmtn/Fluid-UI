@@ -42,9 +42,9 @@ const EXE = "Swirl Together Playtest.exe";
 const ICON = path.join("build", "icon-demo.ico");
 
 // The number testers see is PLAYTEST_LABEL in js/52-demo-clock.js. An app
-// version has to be three numbers, so "0.01 playtest" ships as 0.0.1 —
+// version has to be three numbers, so "0.02 playtest" ships as 0.0.2 —
 // bump the two together.
-const PLAYTEST_VERSION = "0.0.1";
+const PLAYTEST_VERSION = "0.0.2";
 const labelSrc = fs.readFileSync(path.join(ROOT, "js", "52-demo-clock.js"), "utf8");
 const labelMatch = /PLAYTEST_LABEL = '([^']+)'/.exec(labelSrc);
 if (!labelMatch) {

@@ -336,7 +336,7 @@
     // runs straight through it. Change the number here when a new playtest
     // goes out (the itch zip is named after it; scripts/dist-playtest.js
     // keeps a matching app version).
-    var PLAYTEST_LABEL = '0.01 playtest';
+    var PLAYTEST_LABEL = '0.02 playtest';
     var playtest = null;
 
     // Floating on a desktop layout (Simple hides the bar), the canvas runs

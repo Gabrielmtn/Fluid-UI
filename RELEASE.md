@@ -44,7 +44,7 @@ butler uploads only changed bytes; the itch app auto-updates players on the `win
 ### The playtest — "Swirl Together Playtest"
 
 The itch playtest is the whole app with the playtest label in the bottom bar
-(the web build's "0.01 playtest", `PLAYTEST_LABEL` in `js/52-demo-clock.js`)
+(the web build's "0.02 playtest", `PLAYTEST_LABEL` in `js/52-demo-clock.js`)
 and no Steamworks. `scripts/dist-playtest.js` builds it: the same files as
 `dist:win`, with productName `Swirl Together Playtest`, output
 `dist/playtest/`, `"swirlEdition": "playtest"` and the playtest's app version
@@ -164,11 +164,15 @@ goes through Wrangler + partyserver instead:
 - Workers Paid ($5/mo) covers Durable Objects; static asset requests are free.
 
 ```bash
+npx wrangler login                          # once per machine: signs in through the browser
 npx wrangler secret put INTERNAL_SECRET     # once per account, before the first deploy
-$env:CLOUDFLARE_API_TOKEN='<token>'; npm run deploy:cf   # build public/ + wrangler deploy
+npm run deploy:cf                           # build public/ + wrangler deploy
 npm run party:cf                            # local relay + bundle on http://localhost:8787
 ```
 
+`npx wrangler whoami` shows whether this machine is still signed in. No API
+token is needed after `wrangler login`; a token is only for a headless or CI
+deploy (`$env:CLOUDFLARE_API_TOKEN='<token>'` before `npm run deploy:cf`).
 Token shape (My Profile > API Tokens): Account Workers Scripts:Edit, Account
 Settings:Read; Zone (swirltogether.com only) Workers Routes:Edit, DNS:Edit;
 User Details:Read, Memberships:Read. Give it a TTL.
