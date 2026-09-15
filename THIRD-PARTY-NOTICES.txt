@@ -47,7 +47,16 @@ MIT License. Copyright (c) contributors to the @electron/remote project.
 License text: https://github.com/electron/remote/blob/main/LICENSE
 
 
-4. Transformers.js (@huggingface/transformers)
+4. Koffi
+--------
+The Windows desktop build calls a few system cursor and monitor
+functions through Koffi (Pen Input Window: the mouse picks up where it
+left off).
+MIT License. Copyright (C) 2026 Niels Martignène.
+Source: https://github.com/Koromix/koffi
+
+
+5. Transformers.js (@huggingface/transformers)
 ----------------------------------------------
 The optional AI-assisted import features (image segmentation, depth
 estimation) use Transformers.js by Hugging Face, under the
@@ -55,7 +64,7 @@ Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
 Source: https://github.com/huggingface/transformers.js
 
 
-5. AI model weights (optional import features)
+6. AI model weights (optional import features)
 ----------------------------------------------
 - EdgeTAM (onnx-community/EdgeTAM-ONNX, from facebook/EdgeTAM — Meta's
   on-device Track Anything Model, Segment Anything 2 family) — Apache

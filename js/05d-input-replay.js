@@ -1012,6 +1012,20 @@
                 const _cp = window.__cursorPos || (window.__cursorPos = { x: 0, y: 0, at: 0 });
                 _cp.x = _cc.x; _cp.y = _cc.y; _cp.at = Date.now();
             }
+            // The paint button let go while another button stays down — tip
+            // lifted with the barrel still pressed, left released under a held
+            // right. Pointer Events report that chorded release as a MOVE
+            // naming the button, never a pointerup, so the stroke used to paint
+            // on with the pen in the air until the last button came up (and
+            // then stuck — see the pointerup below). End it here.
+            if (pointer.down && paintButton != null && e.button === paintButton
+                && e.pointerId === window.__paintPointerId
+                && (e.buttons & buttonBit(paintButton)) === 0) {
+                try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+                window.__paintPointerId = null;
+                finishLeftStroke();
+                return;
+            }
             if (isPaused || isReplayActive) return;
             // Engine feed: replay every coalesced sub-frame sample (position)
             // while a stroke is live. Density is governed by BRUSH_SPACING.
@@ -1179,13 +1193,21 @@
                     }
                     window._pausedPointerState = null;
                 }
-            } else if (paintButton != null && e.button === paintButton) {
+            } else if (paintButton != null && (e.button === paintButton
+                || (e.buttons & buttonBit(paintButton)) === 0)) {
                 // The button that opened the stroke closes it. Kept separate
                 // from the replay branch above so a session with BOTH buttons
                 // painting (two brushes) ends each stroke on its own lift
                 // rather than on whichever one happens to come up first.
                 // (finishLeftStroke clears paintButton, so it is also cleared
                 // on the pointercancel path.)
+                //
+                // ...or a lift naming ANOTHER button once the paint button is
+                // already up: after a chorded release (tip up, barrel still
+                // held) the last pointerup names the barrel. Matching the
+                // button alone left that stroke down with no owner — the next
+                // hover dragged it across the canvas and Constant flow kept
+                // pouring (2026-09-14, mouse and pen alike).
                 //
                 // Only the OWNER's lift ends it. A release on the other
                 // device — the mouse let go of the Gravity pad while the pen

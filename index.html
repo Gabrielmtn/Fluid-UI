@@ -968,6 +968,14 @@
             <label title="Which screen the pen window opens on. Pick another to move it there right away — the way back if it ever lands on the wrong one. Picking the app's own screen opens it as a window instead of fullscreen.">Pen Window Screen</label>
             <div class="pen-window-screens" id="penWindowScreens"></div>
         </div>
+        <!-- Desktop app on Windows only (47 removes it elsewhere): the first
+             mouse move after the pen puts the arrow back where the mouse left
+             off; electron-pen-cursor.js moves the real cursor. -->
+        <div class="control-group checkbox-group"
+             title="Windows has one cursor, so the pen drags it onto the tablet. With this on, the moment you move the mouse after using the pen, the arrow jumps back to where the mouse left off, so you never drag it home from the pen display. Needs the pen window on a screen of its own.">
+            <input type="checkbox" id="penWindowMouseReturn" checked>
+            <label for="penWindowMouseReturn" style="margin: 0">Mouse Picks Up Where It Left Off</label>
+        </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="showCanvasHandles" checked>
             <label for="showCanvasHandles" style="margin: 0">Show Canvas Border & Handles</label>

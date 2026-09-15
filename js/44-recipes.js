@@ -536,8 +536,8 @@
             { say: 'Focus → Format snaps the canvas to 9:16, 1:1, 16:9 or 21:9.', target: { section: 'Focus', sel: '.stream-format-grid' } }
           ] },
         { id: 'pen-window', pillar: 'interface', title: 'Draw from a pen display or tablet screen',
-          tags: ['pen', 'tablet', 'wacom', 'cintiq', 'stylus', 'second', 'screen', 'monitor', 'display', 'popout', 'pop out', 'presenter', 'fps', 'frame rate'],
-          answer: 'Display → Pen Input Window → Pop Out Pen Input opens a second window on your pen display — Pen Window Screen, just below, picks which screen (and moves an open window there at once). Press Fullscreen there and draw: the paint lands here, at this monitor\'s frame rate. Hotkeys, right-click replay and the wheel work from that window too, and in the desktop app the mouse still works here while the pen is down — aim the Gravity pad mid-stroke.',
+          tags: ['pen', 'tablet', 'wacom', 'cintiq', 'stylus', 'second', 'screen', 'monitor', 'display', 'popout', 'pop out', 'presenter', 'fps', 'frame rate', 'mouse'],
+          answer: 'Display → Pen Input Window → Pop Out Pen Input opens a second window on your pen display — Pen Window Screen, just below, picks which screen (and moves an open window there at once). Press Fullscreen there and draw: the paint lands here, at this monitor\'s frame rate. Hotkeys, right-click replay and the wheel work from that window too, and in the desktop app the mouse still works here while the pen is down — aim the Gravity pad mid-stroke — and on Windows it picks up where it left off after the pen instead of starting from the tablet.',
           target: { section: 'Display', sel: '#penWindowBtn' },
           steps: [
             { say: 'Display → Pen Input Window → Pop Out Pen Input.', target: { section: 'Display', sel: '#penWindowBtn' }, until: { click: true } },

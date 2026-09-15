@@ -3434,6 +3434,7 @@
         moveControlGroup('penWindowBtn', body);
         moveControlGroup('penWindowMirror', body);
         moveControlGroup('penWindowScreens', body);
+        moveCheckboxGroup('penWindowMouseReturn', body);
 
         // Move background color group (contains color picker + transparent toggle)
         const bgPicker = document.getElementById('backgroundColorPicker');

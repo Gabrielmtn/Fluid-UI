@@ -33,6 +33,11 @@
 //   re-dispatched on document.body here, wheel on the canvas, so [ ] size,
 //   Space freeze, Ctrl+Z, right-click replay all behave as at home.
 //
+//   The mouse picks up where it left off (desktop app, Windows): the pen
+//   drags Windows' one cursor onto the tablet, so the first mouse move
+//   after the pen puts the arrow back where the mouse last was, off the pen
+//   display (see "Cursor return" below; main half: electron-pen-cursor.js).
+//
 // HOW IT IS BUILT
 //   window.open('', 'swirl-pen-input') → an about:blank popup that inherits
 //   our origin. We document.write its markup and attach OUR listener
@@ -58,6 +63,11 @@
 //     at load; the fallback dispatches each sample as its own move).
 //   • Touch on the pen display is ignored on purpose (05d's touch path
 //     needs raw TouchLists for gestures; a resting palm must not paint).
+//   • The mirror is opaque and #canvas is not: every blit paints the ground
+//     first, or paint that faded or was wiped stays on the tablet (2026-09-14).
+//   • A press we forwarded is ALWAYS let go. The stray-mouse filter drops a
+//     device's presses and moves, never the release of a press it let
+//     through — a lost release is a main stroke stuck down (2026-09-14).
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -69,10 +79,12 @@
     var MIRROR_KEY = 'display.penWindowMirror';
     var SCREEN_KEY = 'display.penWindowScreen';   // Electron display id the window last lived on
     var SCREEN_KEY_WEB = 'display.penWindowScreenWeb';   // browser: label or "left,top" of the chosen screen
+    var RETURN_KEY = 'display.penWindowMouseReturn';     // "Mouse Picks Up Where It Left Off"
     var ID_OFFSET = 5000;          // synthetic pointerIds never collide with real ones
     var BAR_ZONE = 56;             // px from the top edge that reveals the toolbar
     var BAR_LINGER = 1400;         // ms the toolbar stays after the pointer leaves it
     var ACTIVE_WINDOW_MS = 2000;   // input this recent = "drawing": mirror at the active rate
+    var RETURN_QUIET_MS = 200;     // pen silence before the mouse may take the cursor back
     // Mirror modes: redraw rate while drawing / idle, and the backing-store
     // width cap (CSS scales it to the box). Resolution is nearly free on the
     // GPU; the rate is what costs, and idle time is most of the session.
@@ -90,6 +102,10 @@
         try { remote = require('@electron/remote'); }
         catch (e) { console.warn('Pen window: @electron/remote unavailable, using web behaviour:', e); isElectron = false; }
     }
+    // Moving the OS cursor takes the main process and Win32 (electron-pen-cursor.js).
+    var ipc = null;
+    if (isElectron) { try { ipc = require('electron').ipcRenderer; } catch (_) { ipc = null; } }
+    var RETURN_PLATFORM = !!(ipc && typeof process !== 'undefined' && process.platform === 'win32');
 
     var pop = null;        // the popup Window
     var pdoc = null;       // its document
@@ -102,10 +118,13 @@
     var lastDownTs = -1e9;
     var lastInputTs = -1e9;    // any pen/mouse/wheel input on the popup (mirror active/idle)
     var penActiveTs = -1e9;    // last PEN event on the popup: mouse events are dropped while the pen is live
+    var penOwnsCursor = false; // cursor return: the pen moved the OS cursor last (on this window)
+    var penGone = false;       // ...and has left since (out of range / off the window)
+    var cursorReturn = { on: false, available: null, reason: '', returns: 0, last: null };
     var pendingCancel = {};    // real pen pointerId → timer: a pointercancel we are not yet sure about
     var ownerId = null;        // the synthetic id that currently owns the main brush ring
     var barTimer = 0, fitTimer = 0, pollTimer = 0;
-    var mirrorTimer = 0, mirrorCtx = null;
+    var mirrorTimer = 0, mirrorCtx = null, mirrorSpec = null;
     var mirrorStats = { draws: 0, drawMs: 0, lastRate: 0 };   // drawMs = EMA of one blit's main-thread cost
     var screenDetails = null;   // Window Management API details, when granted
 
@@ -729,13 +748,25 @@
         if (bc && typeof bc.setOwner === 'function') bc.setOwner(id);
     }
     function enterCanvas(e) {
-        if (hoverInside) return;
+        var id = ID_OFFSET + (e.pointerId || 0);
+        if (hoverInside) {
+            // Already over the surface under the other device: the ring goes
+            // to whichever moved last. The pen coming back after the mouse
+            // wandered over the tablet found the main ring still pinned to the
+            // mouse's spot (31 follows its owner only). A device mid-press
+            // keeps it.
+            if (ownerId !== id && !(ownerId != null && held[ownerId - ID_OFFSET])) setRingOwner(id);
+            return;
+        }
         hoverInside = true;
-        setRingOwner(ID_OFFSET + (e.pointerId || 0));
+        setRingOwner(id);
         dispatch(synth('pointerenter', e, e, { bubbles: false, button: -1 }));
     }
     function leaveCanvas(e) {
         if (!hoverInside) return;
+        // Only the device the ring follows ends the hover: the mouse sliding
+        // off the box must not blank the ring under a pen still hovering it.
+        if (ownerId != null && ownerId !== ID_OFFSET + (e.pointerId || 0)) return;
         hoverInside = false;
         dispatch(synth('pointerleave', e, e, { bubbles: false, button: -1 }));
         setRingOwner(null);
@@ -754,17 +785,158 @@
     }
     function notePen(e) { if (e.pointerType === 'pen') penActiveTs = performance.now(); }
 
+    // A button's bit in PointerEvent.buttons: tip/left 1, barrel/right 2,
+    // middle 4, back 8, forward 16, eraser 32 (0 = cannot tell).
+    function buttonBit(btn) { return btn === 0 ? 1 : btn === 1 ? 4 : btn === 2 ? 2 : (btn > 2 && btn < 31 ? (1 << btn) : 0); }
+
+    // ── Forwarded presses that must end without their own release ──
+    function forget(id) {
+        if (!held[id]) return;
+        delete held[id];
+        heldCount = Math.max(0, heldCount - 1);
+        if (pendingCancel[id]) { clearTimeout(pendingCancel[id]); delete pendingCancel[id]; }
+    }
+    // Let go of a forwarded press at its last forwarded point, named by the
+    // button that opened it (05d ends a stroke on that button only).
+    function releaseHeld(id) {
+        id = Number(id);
+        var h = held[id];
+        if (!h) return;
+        forget(id);
+        var m = mapPoint(h.x, h.y);
+        try {
+            canvas.dispatchEvent(new PointerEvent('pointerup', {
+                bubbles: true, cancelable: true, composed: true, view: window,
+                clientX: m.cx, clientY: m.cy, button: h.button, buttons: 0,
+                pointerId: ID_OFFSET + id, pointerType: h.type || 'pen', isPrimary: true, pressure: 0
+            }));
+        } catch (_) {}
+        if (ui) { try { ui.stage.releasePointerCapture(id); } catch (_) {} }
+    }
+    // One pen: a report under a NEW pen pointerId means the old one is gone
+    // (Chrome hands out fresh ids, e.g. when a pen comes back into range), so
+    // a press still held under the old id will never hear its release.
+    function retireStalePens(e) {
+        if (e.pointerType !== 'pen' || !heldCount) return;
+        for (var id in held) if (held[id].type === 'pen' && Number(id) !== e.pointerId) releaseHeld(id);
+    }
+    // One mouse, one pen. A real press or release of a device in THIS
+    // window means that device is not held on the pen window any more — its
+    // release went somewhere we never saw (the desktop pen window never takes
+    // the mouse capture, so a drag off its edge lets go over the app). The
+    // OTHER device's press is untouched: pen down on the tablet while the
+    // mouse works the app is the point of the window.
+    function onMainPointer(e) {
+        if (!heldCount || !e.isTrusted || e.pointerType === 'touch') return;
+        for (var id in held) if (held[id].type === e.pointerType) releaseHeld(id);
+    }
+
+    // ── Cursor return: the mouse picks up where it left off ──────────
+    // The same one cursor, the other way round: after a stretch of drawing
+    // the arrow sits on the tablet, and reaching for a slider meant dragging
+    // the mouse all the way back from the pen display, every time. Now the
+    // first mouse move on this window after the pen hands over to the main
+    // process (electron-pen-cursor.js), which puts the arrow back where the
+    // mouse last was — off the pen display. This side knows pen from mouse
+    // (pointerType); main knows the real cursor (physical pixels). Messages
+    // only on hand-overs: 'pen' when the pen takes the cursor, 'return' when
+    // the mouse wakes up after it. A deliberate trip onto the tablet is never
+    // bounced back: main samples the cursor, and once it has seen the arrow
+    // off the pen display after the pen it says 'mouse-away' and disarms.
+    function returnBox() { return document.getElementById('penWindowMouseReturn'); }
+    function returnWanted() { var b = returnBox(); return b ? !!b.checked : true; }
+    function loadReturnSetting() {
+        var b = returnBox();
+        if (!b) return;
+        var v = null;
+        try { if (window.settingsManager) v = window.settingsManager.get(RETURN_KEY, null); } catch (_) {}
+        if (v == null) { try { v = localStorage.getItem('fluidUI:' + RETURN_KEY); } catch (_) {} }
+        if (v != null) b.checked = !(v === false || v === 'false' || v === '0' || v === 0);
+    }
+    function saveReturnSetting() {
+        var v = returnWanted();
+        try { if (window.settingsManager) { window.settingsManager.set(RETURN_KEY, v); return; } } catch (_) {}
+        try { localStorage.setItem('fluidUI:' + RETURN_KEY, v ? '1' : '0'); } catch (_) {}
+    }
+    function ipcSend(channel) { try { if (ipc) ipc.send(channel); } catch (_) {} }
+
+    // Capture phase on the popup document: ahead of the stage handlers, so
+    // the mouse move that sends the cursor home is not also forwarded as a
+    // hover or a press at the pen's old spot.
+    function onCursorHandover(e) {
+        if (!cursorReturn.on) return;
+        var now = performance.now();
+        if (e.pointerType === 'pen') {
+            penActiveTs = now;             // over the toolbar too: every pen packet moves the cursor
+            penGone = false;
+            if (!penOwnsCursor) { penOwnsCursor = true; ipcSend('pen-cursor-pen'); }
+            return;
+        }
+        if (e.pointerType !== 'mouse' || !penOwnsCursor) return;
+        // A pen still streaming would take the cursor straight back: wait
+        // until it goes quiet or leaves (isStrayMouse drops these meanwhile).
+        if (!penGone && now - penActiveTs < RETURN_QUIET_MS) return;
+        penOwnsCursor = false;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        var p = null;
+        try { p = ipc.invoke('pen-cursor-return'); } catch (_) {}
+        if (p && p.then) p.then(function (r) {
+            cursorReturn.last = r || null;
+            if (r && r.moved) cursorReturn.returns++;
+        }, function () {});
+    }
+    // A pen leaving the window for nowhere = out of range: the mouse may
+    // take over at once instead of after the quiet gap.
+    function onPenOut(e) {
+        if (e.pointerType === 'pen' && !e.relatedTarget) penGone = true;
+    }
+    // The main-process half runs while the window is open and the box is ticked.
+    function cursorReturnSync() {
+        penOwnsCursor = false;
+        penGone = false;
+        if (!(RETURN_PLATFORM && isOpen() && returnWanted())) {
+            if (cursorReturn.on) ipcSend('pen-cursor-stop');
+            cursorReturn.on = false;
+            return;
+        }
+        var p = null;
+        try { p = ipc.invoke('pen-cursor-start'); } catch (_) {}
+        if (!p || !p.then) { cursorReturn.on = false; return; }
+        cursorReturn.on = true;
+        p.then(function (r) {
+            cursorReturn.available = !!(r && r.ok);
+            cursorReturn.reason = (r && r.reason) || '';
+            if (!cursorReturn.available) cursorReturn.on = false;
+        }, function (err) {
+            // A main process from before this feature (no handler), or no koffi.
+            cursorReturn.available = false;
+            cursorReturn.reason = String((err && err.message) || err);
+            cursorReturn.on = false;
+        });
+    }
+    if (RETURN_PLATFORM) {
+        try { ipc.on('pen-cursor-mouse-away', function () { penOwnsCursor = false; }); } catch (_) {}
+    }
+
     // ── Popup pointer handlers (the real pen lives here) ─────────────
 
     function onDown(e) {
-        if (e.pointerType === 'touch' || isStrayMouse(e)) return;
+        if (e.pointerType === 'touch') return;
+        retireStalePens(e);
+        if (isStrayMouse(e)) return;
         notePen(e);
         lastInputTs = performance.now();
+        mirrorWake();
         fit();
         var m = mapPoint(e.clientX, e.clientY);
         if (!m.inside) return;
+        // A press from a pointer still counted as held: its release never
+        // reached us. Close that stroke first, so this one starts fresh
+        // instead of silently re-adopting it.
+        if (held[e.pointerId]) releaseHeld(e.pointerId);
         try { ui.stage.setPointerCapture(e.pointerId); } catch (_) {}
-        if (!held[e.pointerId]) heldCount++;
+        heldCount++;
         held[e.pointerId] = { button: e.button, x: e.clientX, y: e.clientY, type: e.pointerType };
         lastDownTs = performance.now();
         enterCanvas(e);
@@ -774,28 +946,37 @@
     }
 
     function onMove(e) {
-        if (e.pointerType === 'touch' || isStrayMouse(e)) return;
+        if (e.pointerType === 'touch') return;
+        retireStalePens(e);
+        if (isStrayMouse(e)) return;
         notePen(e);
         lastInputTs = performance.now();
+        mirrorWake();
         var h = held[e.pointerId];
         var m = mapPoint(e.clientX, e.clientY);
-        if (h && pendingCancel[e.pointerId]) {
-            // A cancel came in but the pen is still reporting: pressed = the
-            // cancel was a capture hiccup, keep drawing; released = it really
-            // ended, close the stroke now.
-            if (e.buttons & 1) {
+        if (h) {
+            var bit = buttonBit(h.button);
+            var pressed = !bit || (e.buttons & bit) !== 0;
+            if (pendingCancel[e.pointerId]) {
+                // A cancel came in but the pen is still reporting: pressed = the
+                // cancel was a capture hiccup, keep drawing; released = it
+                // really ended (below).
                 clearTimeout(pendingCancel[e.pointerId]);
                 delete pendingCancel[e.pointerId];
-                try { ui.stage.setPointerCapture(e.pointerId); } catch (_) {}
-            } else {
-                clearTimeout(pendingCancel[e.pointerId]);
-                delete pendingCancel[e.pointerId];
+                if (pressed) { try { ui.stage.setPointerCapture(e.pointerId); } catch (_) {} }
+            }
+            if (!pressed) {
+                // The button that opened this press is up and no pointerup
+                // said so: a chorded release (the tip lifts while the barrel
+                // stays down — Pointer Events report that as a move, and the
+                // pointerup after it names the OTHER button, which 05d would
+                // not end this stroke on), a cancel that really was the end,
+                // or a release that landed in another window. End it here.
                 endHeld(e, 'pointerup');
                 return;
             }
-        }
-        if (h) { h.x = e.clientX; h.y = e.clientY; }
-        else {
+            h.x = e.clientX; h.y = e.clientY;
+        } else {
             if (!m.inside) { leaveCanvas(e); return; }
             enterCanvas(e);
         }
@@ -814,23 +995,34 @@
         ringMove(e);
     }
 
-    // Close a forwarded stroke: pointerup (graceful) or pointercancel.
-    function endHeld(e, type) {
+    // Close a forwarded stroke: pointerup (graceful) or pointercancel. The
+    // release is named by the button that OPENED the press — 05d ends a
+    // stroke on that button only. `at` is where to let go when e's own
+    // position cannot be trusted (a mouse event while the pen owns the one
+    // Windows cursor sits at the pen's spot).
+    function endHeld(e, type, at) {
         var h = held[e.pointerId];
         if (!h) return;
-        delete held[e.pointerId];
-        heldCount = Math.max(0, heldCount - 1);
-        dispatch(synth(type, e, e));
+        forget(e.pointerId);
+        dispatch(synth(type, e, at || e, { button: h.button }));
         try { ui.stage.releasePointerCapture(e.pointerId); } catch (_) {}
+        if (at) { leaveCanvas(e); return; }
         var m = mapPoint(e.clientX, e.clientY);
         if (!m.inside) leaveCanvas(e); else ringMove(e);
     }
     function onUp(e) {
-        if (e.pointerType === 'touch' || isStrayMouse(e)) return;
-        notePen(e);
-        lastInputTs = performance.now();
+        if (e.pointerType === 'touch') return;
+        var stray = isStrayMouse(e);
+        if (!stray) { notePen(e); lastInputTs = performance.now(); }
         var h = held[e.pointerId];
-        if (!h) return;   // a press that began outside the canvas box was never forwarded
+        if (!h) return;   // a press that began outside the canvas box (or a dropped stray) was never forwarded
+        // A press we forwarded is let go EVEN while the pen is live. The stray
+        // filter used to drop this release too: a mouse press forwarded while
+        // the pen was quiet, the pen coming into range, then the button let go
+        // — and the main stroke stayed down for good. Constant flow kept
+        // pouring on the spot, the pen could not paint (another device owned
+        // the stroke), and the blur safety net stayed swallowed because the
+        // press still counted as held (2026-09-14, "clicking stops working").
         if (pendingCancel[e.pointerId]) { clearTimeout(pendingCancel[e.pointerId]); delete pendingCancel[e.pointerId]; }
         if (e.type === 'pointercancel' && h.type === 'pen') {
             // Windows delivers a cancel when the window's mouse capture changes
@@ -844,7 +1036,8 @@
             }, 300);
             return;
         }
-        endHeld(e, e.type);
+        if (stray) endHeld(e, e.type, { clientX: h.x, clientY: h.y });   // where the mouse last was, not the pen
+        else endHeld(e, e.type);
     }
 
     function onLeave(e) {
@@ -857,6 +1050,7 @@
         e.preventDefault();
         if (isStrayMouse(e)) return;
         lastInputTs = performance.now();
+        mirrorWake();
         var m = mapPoint(e.clientX, e.clientY);
         if (!m.inside) return;
         try {
@@ -1059,7 +1253,29 @@
 
     function stopMirror() {
         clearTimeout(mirrorTimer); mirrorTimer = 0;
-        mirrorCtx = null;
+        mirrorCtx = null; mirrorSpec = null;
+    }
+    // What sits under the paint on the main screen: Display → Background
+    // Color (CSS on #canvas-area, never in the GL buffer), or black under
+    // Transparent Background — the exporter's rule for a picture that cannot
+    // hold alpha (24's groundColor(true)).
+    function mirrorGround() {
+        var fe = window.fluidExport;
+        if (fe && typeof fe.groundColor === 'function') {
+            try { var g = fe.groundColor(true); if (g) return g; } catch (_) {}
+        }
+        var tm = document.getElementById('transparentMode');
+        if (tm && tm.checked) return '#000000';
+        var p = document.getElementById('backgroundColorPicker');
+        return (p && p.value) || '#000000';
+    }
+    // Input after an idle stretch: go to the active rate NOW. The idle tick
+    // can be half a second away, and the first dabs of a new stroke used to
+    // land on a mirror still frozen on the old frame until it came round.
+    function mirrorWake() {
+        if (!mirrorTimer || !mirrorSpec || mirrorStats.lastRate === mirrorSpec.active) return;
+        clearTimeout(mirrorTimer);
+        mirrorTick();
     }
     // Backing store ≤ maxW wide at the box's aspect; CSS stretches it to
     // the box. Re-run by fit() — only touches the canvas when it changes
@@ -1081,7 +1297,25 @@
         if (pdoc.visibilityState !== 'visible') return false;   // minimised / covered: nothing to see
         var t0 = performance.now();
         try {
-            mirrorCtx.drawImage(canvas, 0, 0, ui.mirror.width, ui.mirror.height);
+            var W = ui.mirror.width, H = ui.mirror.height;
+            // The ground first, EVERY blit. The mirror is opaque, #canvas is
+            // not (alpha:true; with Empty Alpha Locked the empty field is only
+            // 1 − Background Transparency opaque: 20% by default, 0% at 100).
+            // Drawn straight over the last blit, every clear texel kept the
+            // OLD mirror pixel: paint that faded or was wiped stayed on the
+            // tablet (measured 2026-09-14: 40% of a cleared stroke still there
+            // 0.3 s after Clear and a 2/255 residue for good; at 100% the
+            // whole stroke, forever).
+            mirrorCtx.globalAlpha = 1;
+            mirrorCtx.globalCompositeOperation = 'source-over';
+            mirrorCtx.fillStyle = mirrorGround();
+            mirrorCtx.fillRect(0, 0, W, H);
+            if (canvas.style.display !== 'none') {
+                var op = parseFloat(canvas.style.opacity);   // Canvas Opacity (05e) is CSS on #canvas
+                mirrorCtx.globalAlpha = (op >= 0 && op < 1) ? op : 1;
+                mirrorCtx.drawImage(canvas, 0, 0, W, H);
+                mirrorCtx.globalAlpha = 1;
+            }
         } catch (e) {
             console.warn('Pen window: mirror draw failed:', e);
             stopMirror();
@@ -1129,6 +1363,7 @@
             setStatus('Mirror unavailable here — watch your main monitor.');
             return;
         }
+        mirrorSpec = spec;
         ui.mirror.hidden = false;
         ui.blank.hidden = true;
         sizeMirror();
@@ -1188,6 +1423,9 @@
         st.addEventListener('wheel', onWheel, { passive: false });
         st.addEventListener('contextmenu', onContextMenu);
         st.addEventListener('dragstart', function (e) { e.preventDefault(); });
+        pdoc.addEventListener('pointerdown', onCursorHandover, true);
+        pdoc.addEventListener('pointermove', onCursorHandover, true);
+        pdoc.addEventListener('pointerout', onPenOut, true);
         pdoc.addEventListener('keydown', onKey);
         pdoc.addEventListener('keyup', onKey);
         pdoc.addEventListener('pointermove', onBarTrack);
@@ -1218,6 +1456,7 @@
         startMirror();
         syncFsButton();
         syncScreenRadios();
+        cursorReturnSync();
         showBar();
         clearInterval(fitTimer);
         fitTimer = setInterval(fit, 1000);          // canvas aspect can change under us (resize, zoom view)
@@ -1245,17 +1484,7 @@
         clearInterval(fitTimer); fitTimer = 0;
         clearInterval(pollTimer); pollTimer = 0;
         clearTimeout(barTimer); barTimer = 0;
-        for (var id in held) {
-            var h = held[id];
-            var m = mapPoint(h.x, h.y);
-            try {
-                canvas.dispatchEvent(new PointerEvent('pointerup', {
-                    bubbles: true, cancelable: true, composed: true, view: window,
-                    clientX: m.cx, clientY: m.cy, button: h.button, buttons: 0,
-                    pointerId: ID_OFFSET + Number(id), pointerType: h.type || 'pen', isPrimary: true, pressure: 0
-                }));
-            } catch (_) {}
-        }
+        Object.keys(held).forEach(function (id) { releaseHeld(id); });
         held = {}; heldCount = 0;
         for (var pc in pendingCancel) clearTimeout(pendingCancel[pc]);
         pendingCancel = {};
@@ -1268,6 +1497,7 @@
         clearInterval(ringTimer); ringTimer = 0; ringState = null;
         var w = pop;
         pop = null; pdoc = null; ui = null; childWin = null;
+        cursorReturnSync();   // closed → the main-process half stops sampling
         if (w && !w.closed && reason !== 'closed') { try { w.close(); } catch (_) {} }
         syncButton();
         syncScreenRadios();
@@ -1295,8 +1525,16 @@
     // target runs before 05d's bubble-phase listener.
     window.addEventListener('blur', function (e) {
         if (!isOpen()) return;
+        // Only a stroke this window forwarded is protected. One a real
+        // pointer owns here (or a stale id with no live press behind it)
+        // keeps 05d's abort: the app's own net for a release that went missing.
+        var pid = window.__paintPointerId;
+        if (pid != null && !held[pid - ID_OFFSET]) return;
         if (heldCount > 0 || (performance.now() - lastDownTs) < 500) e.stopImmediatePropagation();
     }, true);
+    // Capture phase, ahead of 05d's own window listeners (see onMainPointer).
+    window.addEventListener('pointerdown', onMainPointer, true);
+    window.addEventListener('pointerup', onMainPointer, true);
 
     // The popup dies with us (a stranded fullscreen window on the tablet
     // with nothing behind it is the worst possible leftover).
@@ -1308,6 +1546,15 @@
         if (b) b.addEventListener('click', function () { toggle(); });
         var sel = mirrorSelect();
         if (sel) sel.addEventListener('change', function () { saveMirrorSetting(); if (isOpen()) startMirror(); });
+        var rb = returnBox();
+        if (rb && !RETURN_PLATFORM) {
+            // The browser cannot move the OS cursor (and only Windows is wired).
+            var rg = rb.closest('.control-group');
+            if (rg && rg.parentNode) rg.parentNode.removeChild(rg);
+        } else if (rb) {
+            loadReturnSetting();
+            rb.addEventListener('change', function () { saveReturnSetting(); cursorReturnSync(); });
+        }
         syncButton();
         buildScreenRadios();
         primeScreenDetails();
@@ -1327,6 +1574,11 @@
                 open: isOpen(), box: box, heldCount: heldCount, hoverInside: hoverInside,
                 ringOwner: ownerId, pendingCancels: Object.keys(pendingCancel).length,
                 coalescedOK: COALESCED_OK, childWin: !!childWin, electron: isElectron,
+                cursorReturn: {
+                    on: cursorReturn.on, available: cursorReturn.available, reason: cursorReturn.reason,
+                    penOwnsCursor: penOwnsCursor, penGone: penGone,
+                    returns: cursorReturn.returns, last: cursorReturn.last
+                },
                 mirror: {
                     mode: mirrorMode(), running: !!mirrorCtx,
                     activeFps: spec ? spec.active : 0, idleFps: spec ? spec.idle : 0,

@@ -322,6 +322,12 @@ let mainWindow = null;
 // with the main window so a fullscreen surface never outlives the app.
 const PEN_WINDOW_FRAME = 'swirl-pen-input';
 const penWindows = new Set();
+// After the pen, the mouse picks up where it left off instead of on the
+// tablet (Windows' one cursor) — electron-pen-cursor.js, renderer half in 47.
+const penCursor = require('./electron-pen-cursor').install(ipcMain, {
+    getMainWindow: () => mainWindow,
+    getPenWindow: () => { let w = null; penWindows.forEach((x) => { if (!x.isDestroyed()) w = x; }); return w; }
+});
 let quitting = false;   // set once a quit has actually been asked for
 
 // ── Launch choreography (renderer half: js/00a-boot.js) ────────────────────
@@ -996,6 +1002,7 @@ function createWindow() {
         // close them here so none is left fullscreen on the tablet.
         penWindows.forEach((w) => { try { if (!w.isDestroyed()) w.close(); } catch (_) {} });
         penWindows.clear();
+        penCursor.stop();
         clearInterval(bootFadeTimer);
         bootFadeTimer = null;
         // A window that goes away without anyone asking it to is the app

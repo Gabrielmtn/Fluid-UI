@@ -24,6 +24,29 @@ remoteMain.initialize();
 
 const PEN_WINDOW_FRAME = 'swirl-pen-input';
 const penWindows = new Set();
+let mainWindowRef = null;
+
+// The cursor-return half, installed exactly as electron-main.js does.
+const { ipcMain } = require('electron');
+require(path.join(REPO, 'electron-pen-cursor.js')).install(ipcMain, {
+    getMainWindow: () => mainWindowRef,
+    getPenWindow: () => { let w = null; penWindows.forEach((x) => { if (!x.isDestroyed()) w = x; }); return w; }
+});
+// TEST-ONLY hooks for cursor-return.js: read / move the REAL cursor in
+// physical px from this (per-monitor DPI aware) process.
+let probeCursor = null;
+function probeCursorApi() {
+    if (probeCursor) return probeCursor;
+    const koffi = require('koffi');
+    const user32 = koffi.load('user32.dll');
+    koffi.struct('PROBE_POINT', { x: 'long', y: 'long' });
+    const get = user32.func('bool __stdcall GetCursorPos(_Out_ PROBE_POINT *pt)');
+    const set = user32.func('bool __stdcall SetCursorPos(int x, int y)');
+    probeCursor = { get() { const p = {}; get(p); return { x: p.x, y: p.y }; }, set(x, y) { return !!set(x, y); } };
+    return probeCursor;
+}
+ipcMain.handle('probe-cursor-get', () => probeCursorApi().get());
+ipcMain.handle('probe-cursor-set', (_e, x, y) => probeCursorApi().set(x, y));
 
 function liftHandlerFromRealMain() {
     const src = fs.readFileSync(path.join(REPO, 'electron-main.js'), 'utf8');
@@ -40,6 +63,7 @@ app.whenReady().then(() => {
         webPreferences: { nodeIntegration: true, contextIsolation: false, webSecurity: true, webgl: true, experimentalFeatures: true }
     });
     remoteMain.enable(mainWindow.webContents);
+    mainWindowRef = mainWindow;
     const code = liftHandlerFromRealMain();
     new Function('mainWindow', 'PEN_WINDOW_FRAME', 'penWindows', 'shell', code)(mainWindow, PEN_WINDOW_FRAME, penWindows, shell);
     mainWindow.on('closed', () => {

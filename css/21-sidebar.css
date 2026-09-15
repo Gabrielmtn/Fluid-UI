@@ -1956,6 +1956,11 @@ select option {
 #sidebar-right .control-group .pen-screen:has(input:checked) {
     color: var(--ink-100);
 }
+/* "Mouse Picks Up Where It Left Off" sits right under the screen list —
+   a little air so it reads as its own setting, not a fifth screen. */
+#sidebar-right .checkbox-group:has(> #penWindowMouseReturn) {
+    margin-top: 10px;
+}
 
 .pressure-pad-read {
     margin-top: 4px;
