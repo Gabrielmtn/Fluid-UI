@@ -1471,26 +1471,11 @@
                 blit(detailed.fbo);
                 displayTexture = detailed.texture;
             }
-            // Apply lighting pass if enabled
-            const lightingEnabled = window.lightSource && window.lightSource.enabled;
-            if (lightingEnabled) {
-                gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
-                lightingProg.bind();
-                gl.uniform1i(lightingProg.uniforms.uTexture, 0);
-                gl.uniform1i(lightingProg.uniforms.uVelocity, 1);
-                gl.uniform2f(lightingProg.uniforms.lightPos, 
-                    window.lightSource.x || 0.5, 
-                    1.0 - (window.lightSource.y || 0.5)); // Flip Y for GL coords
-                gl.uniform1f(lightingProg.uniforms.intensity, window.lightSource.intensity || 0.5);
-                gl.uniform1f(lightingProg.uniforms.ambient, window.lightSource.ambient || 0.3);
-                gl.uniform2f(lightingProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
-                gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, displayTexture);
-                gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
-                blit(lit.fbo);
-                displayTexture = lit.texture;
-            }
+            // Light Source has no pass here any more (2026-09-14): the display
+            // pass lights the frame with it, below. The old dye-res pass sat in
+            // this chain, so Glow and the shading form field were fed its
+            // dimmed, 1.2-clamped copy — Light Source weakened the very relief
+            // it was supposed to light.
             // ── Glow (HDR bloom) ── mip-chain halo off the pre-tone-map HDR
             // frame; display adds it after the tone-map.
             const _glowOn = _fxOn && !!config.GLOW; // [GOVERNOR HOOK]
@@ -1573,6 +1558,22 @@
             gl.uniform1f(displayProg.uniforms.shadeInvert, window.displayShadingInvert || 0.0);
             gl.uniform1f(displayProg.uniforms.shadeRelief, (typeof config.SHADE_RELIEF === 'number') ? config.SHADE_RELIEF : 1.0);
             gl.uniform1f(displayProg.uniforms.shadeGloss, (typeof config.SHADE_GLOSS === 'number') ? config.SHADE_GLOSS : 0.35);
+            // Light Source: one lamp for relief, gloss and the pool (05a).
+            // Explicit number checks, not `|| default`: the pad's left and top
+            // edges are 0, and `x || 0.5` threw the lamp back to the centre
+            // the moment the dot reached them (Intensity and Ambient 0 too).
+            const _lamp = window.lightSource;
+            const _lampOn = !!(_lamp && _lamp.enabled);
+            gl.uniform1f(displayProg.uniforms.lampOn, _lampOn ? 1.0 : 0.0);
+            if (_lampOn) {
+                const _lx = (typeof _lamp.x === 'number' && isFinite(_lamp.x)) ? _lamp.x : 0.5;
+                const _ly = (typeof _lamp.y === 'number' && isFinite(_lamp.y)) ? _lamp.y : 0.5;
+                const _li = (typeof _lamp.intensity === 'number' && isFinite(_lamp.intensity)) ? _lamp.intensity : 0.5;
+                const _la = (typeof _lamp.ambient === 'number' && isFinite(_lamp.ambient)) ? _lamp.ambient : 0.3;
+                gl.uniform2f(displayProg.uniforms.lampPos, _lx, 1.0 - _ly); // pad y runs down, GL y up
+                gl.uniform1f(displayProg.uniforms.lampPower, 2.0 * Math.max(0, _li));
+                gl.uniform1f(displayProg.uniforms.lampAmbient, Math.max(0, Math.min(1, _la)));
+            }
             gl.uniform1f(displayProg.uniforms.gateVibrance, (config.BLOOM_CEILING > 0) ? 1.0 : 0.0);
             // Gate tone-map: display already-bounded gated dye through extended
             // Reinhard with the ceiling as its white point, so the picked colour

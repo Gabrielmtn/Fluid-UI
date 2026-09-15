@@ -202,18 +202,18 @@
     },
     {
       "name": "lightSource",
-      "activate": "window.lightSource.enabled = true; window.lightSource.mode = 'manual'; window.lightSource.x = 0.3; window.lightSource.y = 0.3; window.lightSource.intensity = 0.5; window.lightSource.ambient = 0.3;  /* the update loop reads only window.lightSource (js/05j-update-loop.js:1172-1190). UI path (#enableLighting checkbox + change) additionally persists to settingsManager (js/13-light-source.js:52-65,284-294). */",
+      "activate": "window.lightSource.enabled = true; window.lightSource.mode = 'manual'; window.lightSource.x = 0.3; window.lightSource.y = 0.3; window.lightSource.intensity = 0.5; window.lightSource.ambient = 0.3;  /* the update loop reads only window.lightSource (display-pass lamp uniforms, js/05j-update-loop.js:1565-1576). UI path (#enableLighting checkbox + change) additionally persists to settingsManager (js/13-light-source.js:52-65,284-294). */",
       "deactivate": "window.lightSource.enabled = false;",
       "activeCheck": "!!(window.lightSource && window.lightSource.enabled)",
       "touchesSharedState": [
-        "lit FBO (dye-res): the lighting pass rewrites the display texture chain - displayTexture becomes lit.texture, changing input to glow/shading/display (js/05j-update-loop.js:1171-1190)",
+        "display pass only (since 2026-09-14; the dye-res lit FBO and its pass are gone): lamp uniforms lampOn/lampPos/lampPower/lampAmbient on displayProg. Glow, the shading form field and Light Shift keying all see the UNLIT frame; the lamp is Surface Shading's key light (relief + gloss) while on, and a pool multiplier after Light Shift, before Glow (js/05a-shader-core.js displayFrag)",
         "window.lightSource.x/y/intensity/ambient/mode/speed",
         "settingsManager lightSource.* keys on the UI/checkbox path (persist across runs, js/13-light-source.js:284-294)"
       ],
       "knownHazards": [
         "mode 'random' animates x/y on the module's OWN rAF loop with a 15ms performance.now gate and Date.now()-seeded sines (js/13-light-source.js:212-282) - nondeterministic under a stepped sim clock unless performance.now/Date.now are pinned; keep mode 'manual' for reproducibility",
-        "Lighting pass y is flipped for GL (1.0 - y, js/05j-update-loop.js:1180)",
-        "Post-FX blend-ghosting bug class: post-FX passes must overwrite, never alpha-blend (comment js/05j-update-loop.js:1107-1118) - lighting is one of the passes whose early-exit writes faded alpha"
+        "lampPos y is flipped for GL (1.0 - y, js/05j-update-loop.js:1573); x/y/intensity/ambient are read with explicit number checks - 0 is a real value (the pad edges), which the old || defaults snapped back to 0.5",
+        "Surface Shading OFF: the lamp is only the pool (flat paint has no relief to light). Kaleido: the lamp stays in SCREEN space (the pool sits under the dot) and, while it is on, the folded relief gradient goes through the fold Jacobian (dFdx/dFdy of kUv) so mirrored faces are lit from the dot too; lamp off = the studio rig and its source-space gradient, bit-identical to before"
       ]
     },
     {

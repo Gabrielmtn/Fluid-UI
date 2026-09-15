@@ -235,7 +235,10 @@
     const FX_STAGES = {
         // The light orbits the canvas once per loop over a stroke that keeps
         // laying relief: highlights and shadow sweep across the paint. Live
-        // from the first frame — the effect IS the moving light.
+        // from the first frame — the effect IS the moving light. Surface
+        // Shading is on (2026-09-14): the lamp is its key light now, and the
+        // relief turning with the dot is the point of the card; without it
+        // the lamp is only the pool.
         'light-source': {
             color: '#ff8a3d', size: 1.4, gate: true, flow: 0.7, warm: 1.6, still: 0.62,
             pen: lissajous(0.30, 0.26, 1, 2),
@@ -243,7 +246,9 @@
                 setCheck('enableLighting', true);
                 if (window.lightSource) window.lightSource.mode = 'manual';
                 setSelect('lightMode', 'manual');
-                setSlider('lightIntensity', 1); setSlider('lightAmbient', 0.3);
+                setSlider('lightIntensity', 0.7); setSlider('lightAmbient', 0.3);
+                setSlider('shadingIntensity', 1.0); setSlider('shadeRelief', 1.2); setSlider('shadeGloss', 0.5);
+                setCheck('displayShadingToggle', true);
             },
             frame(p) {
                 if (!window.lightSource) return;
@@ -284,7 +289,9 @@
             pen: lissajous(0.30, 0.26, 1, 2),
             pre() {
                 setCheck('glowToggle', true); setSlider('glowIntensity', 0.18); setSlider('glowThreshold', 0.8);
-                setCheck('enableLighting', true);
+                // Only the POSITION: Scatter aims from the lamp's dot whether
+                // or not Light Source is on, and switching the lamp on would
+                // lay its pool over the shafts (2026-09-14).
                 if (window.lightSource) { window.lightSource.mode = 'manual'; window.lightSource.x = 0.1; window.lightSource.y = 0.12; }
             },
             on() { setCheck('scatterToggle', true); setSlider('scatterAmount', 0.5); setSlider('scatterReach', 1); }

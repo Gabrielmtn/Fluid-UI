@@ -3211,7 +3211,7 @@
     // no emoji, no parenthetical subtitles (the old labels carried both).
     const FX_INFO = {
         'light-source': { title: 'Light Source',
-            text: 'A movable light above the canvas. Dense paint catches it like a relief map. Drag the dot to move the light, or let it wander.' },
+            text: 'A lamp above the canvas: paint near the dot is lit, paint far from it falls into shade. With Surface Shading on, the relief and gloss catch the lamp too, so their highlights follow the dot.' },
         'light-shift':  { title: 'Light Shift',
             text: 'Blown-out, overexposed paint takes its colour from a path you draw on the wheel. The playhead loops along it, so your brightest areas keep shifting hue.' },
         'glow':         { title: 'Glow',
@@ -3219,7 +3219,7 @@
         'scatter':      { title: 'Scatter',
             text: 'Light shafts. The glow travels across the canvas from the light source or your brush, and colliders cast shadows in the beams.' },
         'shading':      { title: 'Surface Shading',
-            text: 'Lights the paint as a surface: ridges and pools pick up highlight and shadow. Relief sets the height, Gloss the shine. Clarity, Vibrance, Swirl and Ridges below refine the same surface.' },
+            text: 'Lights the paint as a surface: ridges and pools pick up highlight and shadow. Relief sets the height and Gloss the shine; turn on Light Source to aim the light.' },
         'gravity':      { title: 'Gravity Direction',
             text: 'A steady push across the whole canvas. Aim it with the pad: down is gravity, up is lift, sideways is wind. Every brush feels it.' },
         'border':       { title: 'Border',

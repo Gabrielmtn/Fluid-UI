@@ -497,7 +497,7 @@
       "consumer": "display-shader",
       "gatedBy": "enableLighting (window.lightSource.enabled); speed only matters in lightMode 'random' (auto movement)",
       "sweepRelevant": true,
-      "expectedEffect": "How fast the light position wanders in random mode; changes the lighting pass over time.",
+      "expectedEffect": "How fast the light position wanders in random mode; the pool (and, with Surface Shading on, the relief and gloss) move with it.",
       "binding": "js/13-light-source.js:78-86",
       "registered": true
     },
@@ -514,8 +514,8 @@
       "consumer": "display-shader",
       "gatedBy": "enableLighting (window.lightSource.enabled)",
       "sweepRelevant": true,
-      "expectedEffect": "Directional light strength in the dye-res lighting pass (rendered output only).",
-      "binding": "js/13-light-source.js:88-97; consumed js/05j-update-loop.js:1181",
+      "expectedEffect": "Lamp strength (lampPower = 2 x value): the pool at the dot and, with Surface Shading on, the key-light relief and gloss (display pass, rendered output only).",
+      "binding": "js/13-light-source.js:88-97; consumed js/05j-update-loop.js:1571",
       "registered": true
     },
     {
@@ -531,8 +531,8 @@
       "consumer": "display-shader",
       "gatedBy": "enableLighting (window.lightSource.enabled)",
       "sweepRelevant": true,
-      "expectedEffect": "Ambient floor of the lighting pass: higher = shadowed regions stay brighter.",
-      "binding": "js/13-light-source.js:99-108; consumed js/05j-update-loop.js:1182",
+      "expectedEffect": "Light the lamp does not supply: the level far from the dot. 1 = no pool at all (relief and gloss still follow the lamp).",
+      "binding": "js/13-light-source.js:99-108; consumed js/05j-update-loop.js:1572",
       "registered": true
     },
     {
@@ -1245,8 +1245,8 @@
       "consumer": "display-shader",
       "gatedBy": null,
       "sweepRelevant": true,
-      "expectedEffect": "Enables the dye-res lighting pass (rendered output only).",
-      "binding": "js/13-light-source.js:52-65; consumed js/05j-update-loop.js:1172",
+      "expectedEffect": "Turns the lamp on in the display pass: a pool around the dot, and Surface Shading's key light while shading is on (rendered output only).",
+      "binding": "js/13-light-source.js:52-65; consumed js/05j-update-loop.js:1566",
       "registered": true
     },
     {
@@ -1770,7 +1770,7 @@
       "consumer": "display-shader",
       "gatedBy": "enableLighting",
       "sweepRelevant": true,
-      "expectedEffect": "Manual (dragged dot) vs auto-wandering light position for the lighting pass.",
+      "expectedEffect": "Manual (dragged dot) vs auto-wandering lamp position.",
       "binding": "js/13-light-source.js:68-75",
       "registered": true
     },

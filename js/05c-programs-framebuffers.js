@@ -9,7 +9,8 @@
         const displayProg = new Program(baseVert, displayFrag);
         const sharpenProg = new Program(baseVert, sharpenFrag);
         const microDetailProg = new Program(baseVert, microDetailFrag);
-        const lightingProg = new Program(baseVert, lightingFrag);
+        // (No lighting program: Light Source is lit inside displayFrag since
+        // 2026-09-14, as Surface Shading's key light and the pool — 05a.)
         const splatProg = new Program(baseVert, splatFrag);
         const memRefreshProg = new Program(baseVert, memRefreshFrag); // splat-scissor memory companion (05b)
         const advectionProg = new Program(baseVert, advectionFrag);
@@ -127,7 +128,7 @@
                 swap() { [fbo1, fbo2] = [fbo2, fbo1]; }
             };
         }
-        let density, velocity, divergence, curl, pressure, sharpened, detailed, lit, obstacle, obstacleScratch;
+        let density, velocity, divergence, curl, pressure, sharpened, detailed, obstacle, obstacleScratch;
         let wetness; // P15-1: R16F sim-res double-FBO, 0 dry … 1 wet
         // D2 raster paint layers: layer index -> single RGBA8 dye-res FBO,
         // persistent (no decay/advection). Entries are created/owned by
@@ -192,7 +193,7 @@
                 if (f.texture) gl.deleteTexture(f.texture);
                 if (f.fbo) gl.deleteFramebuffer(f.fbo);
             }
-            [sharpened, detailed, lit, divergence, curl, obstacle, obstacleScratch,
+            [sharpened, detailed, divergence, curl, obstacle, obstacleScratch,
              glow, scatter, shadeForm, shadeFormTemp, safeFrame].forEach(_deleteFBO);
             [safeOut, safeLuma, safeStats].forEach(function (d) {
                 if (d) { _deleteFBO(d.read); _deleteFBO(d.write); }
@@ -252,8 +253,6 @@
             sharpened = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Micro detail buffer at dye resolution
             detailed = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
-            // Lighting buffer at dye resolution
-            lit = createFBO(dyeTexWidth, dyeTexHeight, rgba.internalFormat, rgba.format, texType, filter);
             // Physics buffers at simulation resolution
             velocity = createDoubleFBO(simTexWidth, simTexHeight, rg.internalFormat, rg.format, texType, filter);
             // P15-1 wetness map: sim-res R16F, LINEAR (advected by semi-Lagrangian
@@ -385,7 +384,7 @@
                 velocity.read, velocity.write,
                 divergence, curl,
                 pressure.read, pressure.write,
-                sharpened, detailed, lit, obstacle, obstacleScratch,
+                sharpened, detailed, obstacle, obstacleScratch,
                 glow, scatter, shadeForm, shadeFormTemp,
                 safeFrame,
                 safeOut && safeOut.read, safeOut && safeOut.write,

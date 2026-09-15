@@ -23,7 +23,7 @@
         }
       ]
     },
-    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kMode|kTwist|kZoom|kaleidoEnabled|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|segments|shadeGloss|shadeInvert|shadeRelief|shadeTexelSize|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uTexture": {
+    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kMode|kTwist|kZoom|kaleidoEnabled|lampAmbient|lampOn|lampPos|lampPower|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|segments|shadeGloss|shadeInvert|shadeRelief|shadeTexelSize|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uTexture": {
       "name": "display",
       "uniforms": [
         "backgroundTransparency",
@@ -38,6 +38,10 @@
         "kTwist",
         "kZoom",
         "kaleidoEnabled",
+        "lampAmbient",
+        "lampOn",
+        "lampPos",
+        "lampPower",
         "lightShiftCeiling",
         "lightShiftColor",
         "lightShiftDensity",
@@ -94,18 +98,7 @@
         "vibrance"
       ]
     },
-    "ambient|intensity|lightPos|texelSize|uTexture|uVelocity": {
-      "name": "lighting",
-      "uniforms": [
-        "ambient",
-        "intensity",
-        "lightPos",
-        "texelSize",
-        "uTexture",
-        "uVelocity"
-      ]
-    },
-    "aspectRatio|barHalfW|barPoint|color|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|velocityInfluence|velocityScale": {
+    "aspectRatio|barHalfW|barPoint|color|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|uVelCovBlock|velocityInfluence|velocityScale": {
       "name": "splat",
       "uniforms": [
         "aspectRatio",
@@ -131,6 +124,7 @@
         "uObstacle",
         "uStampTex",
         "uTarget",
+        "uVelCovBlock",
         "velocityInfluence",
         "velocityScale"
       ]
@@ -230,12 +224,13 @@
         "uTarget"
       ]
     },
-    "hasObstacle|openBoundary|pScale|uObstacle|uVelocity": {
+    "hasObstacle|openBoundary|pScale|uDivMask|uObstacle|uVelocity": {
       "name": "divergence",
       "uniforms": [
         "hasObstacle",
         "openBoundary",
         "pScale",
+        "uDivMask",
         "uObstacle",
         "uVelocity"
       ]
@@ -260,12 +255,13 @@
         "uVelocity"
       ]
     },
-    "dt|uCapSpd|uDensity|uForce|uMaxDensity|uVelocity": {
+    "dt|uCapSpd|uDensity|uFloor|uForce|uMaxDensity|uVelocity": {
       "name": "ambientForce",
       "uniforms": [
         "dt",
         "uCapSpd",
         "uDensity",
+        "uFloor",
         "uForce",
         "uMaxDensity",
         "uVelocity"
@@ -298,17 +294,27 @@
         "uVelocity"
       ]
     },
-    "covKnee|sourceRotation|sourceSkew|sourceTransform|strength|texelSize|uAspect|uObstacle|uSource": {
+    "covKnee|solid|sourceRotation|sourceSkew|sourceTransform|stick|strength|texelSize|uAspect|uObstacle|uSource": {
       "name": "obstacleComposite",
       "uniforms": [
         "covKnee",
+        "solid",
         "sourceRotation",
         "sourceSkew",
         "sourceTransform",
+        "stick",
         "strength",
         "texelSize",
         "uAspect",
         "uObstacle",
+        "uSource"
+      ]
+    },
+    "covKnee|uObsMax|uSource": {
+      "name": "obstacleUpload",
+      "uniforms": [
+        "covKnee",
+        "uObsMax",
         "uSource"
       ]
     },
@@ -375,14 +381,15 @@
         "value"
       ]
     },
-    "texelSize|uObsMax|uObstacle|uVelocity|wallSlip": {
+    "dt|texelSize|uHalo|uObsMax|uObstacle|uVelocity": {
       "name": "obstacleDamp",
       "uniforms": [
+        "dt",
         "texelSize",
+        "uHalo",
         "uObsMax",
         "uObstacle",
-        "uVelocity",
-        "wallSlip"
+        "uVelocity"
       ]
     },
     "aspectRatio|color|flow|hardness|point|radius|stampAngle|stampAspect|stampTexOn|uStampTex": {
@@ -408,7 +415,7 @@
         "uSketch"
       ]
     },
-    "amount|gateColor|gateFlow|hasObstacle|toneCeil|toneWhite|uImage|uObsMax|uObstacle|uTarget": {
+    "amount|gateColor|gateFlow|hasObstacle|toneCeil|toneWhite|uImage|uImageRect|uObsMax|uObstacle|uTarget": {
       "name": "imageSplat",
       "uniforms": [
         "amount",
@@ -418,6 +425,7 @@
         "toneCeil",
         "toneWhite",
         "uImage",
+        "uImageRect",
         "uObsMax",
         "uObstacle",
         "uTarget"

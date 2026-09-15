@@ -302,16 +302,17 @@
           demo: { label: 'Start breathing', run() { const was = !!($('breathingToggle') || {}).checked; setCheck('breathingToggle', true); return () => setCheck('breathingToggle', was); } } },
         { id: 'surface-shading', pillar: 'effects', title: 'Give the paint relief and gloss',
           tags: ['shading', 'relief', 'gloss', '3d', 'surface', 'emboss', 'depth', 'vibrance', 'ridges'],
-          answer: 'Effects → Surface Shading lights the paint as a surface. Relief sets the height, Gloss the shine. Ridges and Vibrance under it refine the same surface.',
+          answer: 'Effects → Surface Shading lights the paint as a surface. Relief sets the height, Gloss the shine. Ridges and Vibrance under it refine the same surface, and Light Source aims the light.',
           target: { section: 'Effects', sel: '#displayShadingToggle' },
           demo: { label: 'Switch shading on', run() { const was = !!($('displayShadingToggle') || {}).checked; setCheck('displayShadingToggle', true); return () => setCheck('displayShadingToggle', was); } } },
         { id: 'light-source', pillar: 'effects', title: 'Light the painting from one side',
           tags: ['light', 'source', 'lamp', 'direction', 'shadow', 'depth'],
-          answer: 'Effects → Light Source. Drag the dot on the pad to move the light; Random lets it wander. Dense paint catches it like a relief map.',
+          answer: 'Effects → Light Source. Drag the dot on the pad to move the light; Random lets it wander. With Surface Shading on, the relief and gloss catch it too, so their highlights follow the dot.',
           target: { section: 'Effects', sel: '#enableLighting' },
           steps: [
             { say: 'Effects → switch Light Source on.', target: { section: 'Effects', sel: '#enableLighting' }, until: { checked: '#enableLighting' } },
-            { say: 'Drag the dot on the pad to move the light. Random lets it wander on its own.', target: { sel: '#lightGridContainer', fallback: { sel: '#lightMode' } } }
+            { say: 'Drag the dot on the pad to move the light. Random lets it wander on its own.', target: { sel: '#lightGridContainer', fallback: { sel: '#lightMode' } } },
+            { say: 'Switch on Surface Shading too: the relief and gloss turn toward the dot.', target: { section: 'Effects', sel: '#displayShadingToggle' } }
           ] },
         { id: 'light-shift', pillar: 'effects', title: 'Recolour the brightest paint',
           tags: ['light', 'shift', 'overexposed', 'hue', 'white', 'rainbow', 'tint', 'colour'],

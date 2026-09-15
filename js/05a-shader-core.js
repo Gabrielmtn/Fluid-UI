@@ -1,7 +1,7 @@
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // js/05a-shader-core.js â€” part 1/14 of former 05-fluid-sim.js (lines 1â€“653)
 // LOAD ORDER: after 04-ui-interactions.js (async loader), before 05b-shader-sim.js
-// PROVIDES: compileShader, Program, PRECISION, baseVert/blur/display/sharpen/microDetail/lighting/lightShift frag sources
+// PROVIDES: compileShader, Program, PRECISION, baseVert/blur/display/sharpen/microDetail frag sources
 // REQUIRES: gl (04)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order â€” do not reorder.
@@ -140,6 +140,15 @@
             uniform float shadeInvert;    // 1 = flip relief normals (clay chiaroscuro: strokes read as carved dents)
             uniform float shadeRelief;    // SHADE_RELIEF x slider: relief strength (redistributes light across the form)
             uniform float shadeGloss;     // SHADE_GLOSS  x slider: specular gloss strength (the plastic sheen)
+            // Light Source (2026-09-14): the one lamp over the canvas. While it
+            // is on it IS Surface Shading's key light (relief and gloss turn
+            // toward the dot), and it lights the canvas itself as a pool that
+            // falls off to Ambient. It used to be a separate dye-res pass that
+            // mostly dimmed the frame, under a shading rig that never moved.
+            uniform float lampOn;         // 1 = Light Source on
+            uniform vec2  lampPos;        // the pad's dot, GL UV (y up)
+            uniform float lampPower;      // 2 x Intensity: 1.0 at the default 0.5
+            uniform float lampAmbient;    // Ambient: the share of light the lamp does not supply
             uniform float gateVibrance;   // 1 = Gate on: re-add the saturation the Reinhard tone-map strips from HDR dye
             uniform float gateWhite;      // >0 = Gate on: extended-Reinhard white point (ceiling x GATE_WHITE_MULT); 0 = plain Reinhard
             uniform float igniteVibrance; // 0-1 Ignite envelope: enrich rather than lighten (see below)
@@ -293,6 +302,19 @@
                 float gy = ((lTL + 2.0 * lT + lTR) - (lBL + 2.0 * lB + lBR)) * 0.0625;
                 return vec2(gx, gy);
             }
+            // Unit vector from one canvas UV toward the lamp. Its z is also
+            // the lamp's light on flat paint (Lambert: 1 at the foot, 0.71 one
+            // lamp height out), so the pool and the relief share one falloff.
+            // Distances are in short-side units, so the pool is round on any
+            // canvas shape (texelSize is the dye grid: the canvas's aspect).
+            const float LAMP_H = 0.55;    // lamp height above the canvas, short side = 1
+            const float LAMP_PEAK = 1.3;  // pool at the lamp's foot, x (1 - Ambient), at Intensity 0.5
+            const float LAMP_TOP = 0.5;   // share of the relief's slope-darkening kept under the lamp
+            vec3 lampDir(vec2 uv) {
+                float asp = texelSize.y / texelSize.x;
+                vec2 d = (lampPos - uv) * ((asp >= 1.0) ? vec2(asp, 1.0) : vec2(1.0, 1.0 / asp));
+                return normalize(vec3(d, LAMP_H));
+            }
             void main() {
                 vec4 base = texture(uTexture, vUv);
                 vec4 kcol = base;
@@ -322,6 +344,12 @@
                     kcol = texture(uTexture, uv2);
                     kUv = uv2;
                 }
+                // The fold's screen-space Jacobian (source-UV change per
+                // screen-UV change; identity with kaleido off), for Light
+                // Source's relief below. Taken here, in uniform control flow,
+                // where derivatives are defined.
+                vec2 kJx = dFdx(kUv) / dFdx(vUv).x;
+                vec2 kJy = dFdy(kUv) / dFdy(vUv).y;
                 vec4 color = mix(base, kcol, clamp(kBlend, 0.0, 1.0));
                 float hdrMax = max(color.r, max(color.g, color.b));
                 // Tone map HDR to displayable range (per-channel Reinhard).
@@ -371,6 +399,12 @@
                     float gv = dot(color.rgb, lw);
                     color.rgb = clamp(mix(vec3(gv), color.rgb, 1.0 + satW), 0.0, 1.0);
                 }
+                // Light Source: where the lamp is, from this pixel -- in
+                // SCREEN space, kaleido or not, so the pool sits where the pad
+                // puts the dot. (Looked up through the fold, a Wedge showed
+                // only whatever sliver of the lamp its facet sampled, and the
+                // dot mostly just dimmed the mandala.)
+                vec3 lampL = (lampOn > 0.5) ? lampDir(vUv) : vec3(0.0, 0.0, 1.0);
                 // Surface shading -- luminance-preserving relief + specular gloss.
                 // Sculpts a smooth-plastic surface out of the dye WITHOUT dimming it
                 // (rebalanced 2026-07-21; see the relief/gloss notes below).
@@ -399,7 +433,20 @@
                     vec2 g = shadeSobel(vUv, t2);
                     if (doK) {
                         float kw = clamp(kBlend, 0.0, 1.0);
-                        if (kw > 0.0) g = mix(g, shadeSobel(kUv, t2), kw);
+                        if (kw > 0.0) {
+                            vec2 gk = shadeSobel(kUv, t2);
+                            // Under the lamp the relief is lit as SEEN: the
+                            // folded gradient goes through the fold's Jacobian
+                            // into screen space, so a mirrored face's slopes
+                            // flip with it and every face catches the dot the
+                            // same way. (The studio rig keeps the source-space
+                            // gradient: presets look as they did.)
+                            if (lampOn > 0.5) {
+                                vec2 gUv = gk / t2;
+                                gk = t2 * vec2(dot(kJx, gUv), dot(kJy, gUv));
+                            }
+                            g = mix(g, gk, kw);
+                        }
                     }
                     float dx = g.x;
                     float dy = g.y;
@@ -411,6 +458,32 @@
                     vec3 fillDir = normalize(vec3( 0.4, -0.5, 0.7));
                     vec3 warmKey  = vec3(1.0, 0.97, 0.92);
                     vec3 coolFill = vec3(0.9, 0.94, 1.0);
+                    float keyW = 0.62, fillW = 0.24, glossW = 1.0;
+                    // Light Source on: the lamp takes the key. N tilts UP the
+                    // luminance slope (the relief's historic sign, the one
+                    // shadeInvert flips), so the lamp enters mirrored in x/y --
+                    // that is what lights the rim of a stroke that FACES the
+                    // dot and puts the gloss there. The cool fill swings to the
+                    // far side. keyW = 0.86 x L.z peaks one lamp height from
+                    // the foot (45 degrees) at the studio key's strength at
+                    // Intensity 0.5: flatter right under the lamp (top light),
+                    // raking and fading beyond it.
+                    if (lampOn > 0.5) {
+                        keyDir  = vec3(-lampL.xy, lampL.z);
+                        fillDir = normalize(vec3(lampL.xy, 0.75));
+                        keyW   = 0.86 * lampPower * lampL.z;
+                        // The fill is the lamp's bounce: it fades with the lamp
+                        // (Intensity 0 would otherwise light the relief from the
+                        // far side only) and right under it, where "the far
+                        // side" has no direction.
+                        fillW  = 0.24 * min(1.0, lampPower) * min(1.0, length(lampL.xy) * 1.4142);
+                        // A point lamp mirrors in flat paint right under its
+                        // foot, and at full strength that washed every stroke
+                        // there toward white. Kept to a faint sheen on the
+                        // flats; slopes glint in full -- they are what shows
+                        // which way the light comes from.
+                        glossW = lampPower * mix(0.3, 1.0, smoothstep(0.02, 0.25, 1.0 - N.z));
+                    }
                     // -- Relief (luminance-PRESERVING) --------------------------
                     // The old pass lit the dye with max(N.L,0) diffuse + a Laplacian
                     // AO term; both SUBTRACT light, so flat dye came out ~12% dim and
@@ -423,7 +496,13 @@
                     // overall level untouched. No global dim; the hue is preserved.
                     float dK = dot(N, keyDir)  - keyDir.z;
                     float dF = dot(N, fillDir) - fillDir.z;
-                    vec3 relief = dK * 0.62 * warmKey + dF * 0.24 * coolFill;
+                    // dK = (N.xy . K.xy) - K.z (1 - N.z): the side term, which
+                    // is what reads as direction, and a top term that darkens
+                    // every slope. Under a lamp the key climbs toward vertical
+                    // and the top term takes over -- a dark outline round all
+                    // paint near the dot. Give half of it back for the lamp.
+                    if (lampOn > 0.5) dK += keyDir.z * (1.0 - N.z) * (1.0 - LAMP_TOP);
+                    vec3 relief = dK * keyW * warmKey + dF * fillW * coolFill;
                     float reliefAmt = displayShading * shadeRelief * shadeFade;
                     color.rgb *= max(vec3(0.0), 1.0 + relief * reliefAmt);
                     // -- Saturation lift (luminance-neutral) -------------------
@@ -440,7 +519,7 @@
                     // mid-tones read glossy too.
                     vec3 H = normalize(keyDir + vec3(0.0, 0.0, 1.0));
                     float spec = pow(max(dot(N, H), 0.0), 48.0);
-                    color.rgb += spec * warmKey * (displayShading * shadeGloss) * shadeFade;
+                    color.rgb += spec * warmKey * (displayShading * shadeGloss * glossW) * shadeFade;
                     color.rgb = max(color.rgb, vec3(0.0));
                 }
                 // â”€â”€ Light Shift â”€â”€ recolor overblown/white areas of the fluid.
@@ -495,6 +574,19 @@
                         }
                         color.rgb = clamp(res, 0.0, 1.0);
                     }
+                }
+                // Light Source pool: the lamp's own light on the canvas --
+                // brighter toward the dot, falling off to Ambient away from it
+                // (Ambient 1 = no pool at all; the relief and gloss above still
+                // follow the lamp). After Light Shift, so recoloured paint is
+                // lit like the rest; before Glow and Scatter, which are light in
+                // their own right. Where the lamp pushes paint past full, all
+                // three channels scale together: brighter, never a hue shift.
+                if (lampOn > 0.5) {
+                    vec3 lampTint = vec3(1.03, 1.0, 0.945);   // a warm lamp, luma ~1
+                    color.rgb *= lampAmbient + (1.0 - lampAmbient) * lampPower * lampL.z * LAMP_PEAK * lampTint;
+                    float lampMax = max(color.r, max(color.g, color.b));
+                    if (lampMax > 1.0) color.rgb /= lampMax;
                 }
                 // Glow (HDR bloom): add the mip-chain halo of the overbright dye
                 // ON TOP of the tone-mapped image — additive light, so hot cores
@@ -721,85 +813,5 @@
                     result = max(result, vec3(0.0));
                 }
                 fragColor = vec4(result, 1.0);
-            }
-        `;
-        const lightingFrag = `#version 300 es
-            precision ${PRECISION} float;
-            in vec2 vUv, vL, vR, vT, vB;
-            out vec4 fragColor;
-            uniform sampler2D uTexture;
-            uniform sampler2D uVelocity;
-            uniform vec2 lightPos;
-            uniform float intensity;
-            uniform float ambient;
-            uniform vec2 texelSize;
-            // Light Shift moved to the unified pass in displayFrag (2026-07-18)
-            // Calculate very subtle pseudo-normal from color gradients
-            vec3 calculateNormal(vec2 uv) {
-                float left = dot(texture(uTexture, vL).rgb, vec3(0.299, 0.587, 0.114));
-                float right = dot(texture(uTexture, vR).rgb, vec3(0.299, 0.587, 0.114));
-                float top = dot(texture(uTexture, vT).rgb, vec3(0.299, 0.587, 0.114));
-                float bottom = dot(texture(uTexture, vB).rgb, vec3(0.299, 0.587, 0.114));
-                // Very subtle gradients
-                float dx = (right - left) * 0.3;
-                float dy = (top - bottom) * 0.3;
-                // Mostly flat normal with slight tilt
-                return normalize(vec3(dx, dy, 1.0));
-            }
-            void main() {
-                vec4 color = texture(uTexture, vUv);
-                vec2 vel = texture(uVelocity, vUv).xy;
-                // Skip lighting where there is nothing lit. This used to test
-                // color.a, which tracked the dye's decay closely enough to
-                // stand in for "empty" — but alpha is pigment memory now and
-                // outlives the visible dye by design, so the test would stop
-                // firing on faded areas and light near-black texels. The
-                // brightness it actually meant to check is in rgb.
-                if (max(color.r, max(color.g, color.b)) < 0.01) {
-                    fragColor = color;
-                    return;
-                }
-                // Direction and distance to light
-                vec2 toLight = lightPos - vUv;
-                float dist = length(toLight);
-                vec2 lightDir = normalize(toLight + 0.0001);
-                // Pseudo-depth
-                float colorDepth = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-                float velMag = length(vel);
-                float depth = colorDepth * (1.0 + velMag * 0.15);
-                // Soft distance falloff
-                float falloff = 1.0 / (1.0 + dist * dist * 4.0);
-                // === DIFFUSE LIGHTING (main effect) ===
-                vec3 normal = calculateNormal(vUv);
-                vec3 lightDir3D = normalize(vec3(lightDir.x, lightDir.y, 0.5));
-                // Lambertian diffuse (N Â· L) - this is the key lighting term
-                float diffuse = max(0.0, dot(normal, lightDir3D));
-                diffuse = mix(1.0, diffuse, 0.5); // More directional influence
-                // === COMBINE LIGHTING ===
-                // Diffuse is the primary lighting component (shadows removed for performance)
-                float lightContribution = falloff * diffuse * intensity * 0.6;
-                // Brightness: ambient + subtle directional boost
-                float brightness = ambient + lightContribution * (1.0 - ambient);
-                // === SUBTLE COLOR TEMPERATURE ===
-                vec3 warmShift = vec3(1.03, 1.015, 0.99);  // Very subtle warm
-                vec3 coolShift = vec3(0.98, 0.99, 1.02);   // Very subtle cool
-                float colorShiftAmount = lightContribution * 0.4;
-                vec3 colorShift = mix(coolShift, warmShift, colorShiftAmount);
-                // Apply base lighting
-                vec3 litColor = color.rgb * brightness * colorShift;
-                // === SUBTLE RIM LIGHT (complementary) ===
-                vec3 viewDir = vec3(0.0, 0.0, 1.0);
-                float rimDot = 1.0 - max(0.0, dot(normal, viewDir));
-                float rimLight = pow(rimDot, 4.0) * diffuse * falloff * intensity * 0.1;
-                litColor += vec3(rimLight) * vec3(1.1, 1.05, 1.0);
-                // === SUBTLE SPECULAR (complementary) ===
-                vec3 halfVec = normalize(lightDir3D + viewDir);
-                float specular = pow(max(0.0, dot(normal, halfVec)), 24.0);
-                specular *= falloff * intensity * depth * 0.08;
-                litColor += vec3(specular) * 0.5;
-                // Soft clamp
-                litColor = min(litColor, vec3(1.2));
-                // (Light Shift now runs once in displayFrag, on the displayed color)
-                fragColor = vec4(litColor, color.a);
             }
         `;

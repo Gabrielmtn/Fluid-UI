@@ -125,8 +125,9 @@
         var dye = grid(t.dye), sim = grid(t.sim);
         var dyeTexels = dye.w * dye.h, simTexels = sim.w * sim.h;
 
-        // dye res: density(x2) + sharpened + detailed + lit, all RGBA16F
-        var bytes = dyeTexels * 8 * 5;
+        // dye res: density(x2) + sharpened + detailed, all RGBA16F (the
+        // Light Source buffer went 2026-09-14 — it lights in the display pass)
+        var bytes = dyeTexels * 8 * 4;
 
         // raster paint layers + mask coverage, RGBA8 at dye res — priced
         // off what is actually open, since an empty canvas has none
