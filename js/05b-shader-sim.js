@@ -2173,6 +2173,7 @@
             uniform float blockStrength; // 1 = opaque wall, <1 = translucent
             ${obsTexelGLSL}
             #define ITERATIONS 48
+            #define OCC_TAPS 5
             void main() {
                 // NB: stepUV, not step — 'step' is a GLSL builtin.
                 vec2 stepUV = (vUv - origin) * (density / float(ITERATIONS));
@@ -2200,6 +2201,28 @@
                 // between light moving through a medium and a radial blur.
                 vec3 dec = clamp(vec3(decay + dispersion, decay, decay - dispersion), 0.0, 1.0);
                 vec3 illum = vec3(1.0);
+                // Occlusion is tested along the WHOLE path, not at the march's
+                // sample points only (2026-09-15, Gabriel: "hatching in the
+                // collider space"). The samples are up to ~15 obstacle texels
+                // apart far from the origin — wider than a letter's stroke —
+                // and the dither above sets where they land per pixel, so a
+                // thin wall was hit by one pixel's march and stepped over by
+                // its neighbour's: light speckled INSIDE walls (measured: a
+                // quarter of a text wall's texels lit, at two thirds of the
+                // light just outside it) and every shadow edge came out in
+                // the dither's diagonal saw-tooth. So: the pixel's own spot is
+                // tested first — light does not live inside a wall — and each
+                // step is swept every ~2 texels, taking the densest wall it
+                // crosses. One attenuation per step, as before, so a
+                // translucent wall (blockStrength < 1) dims light exactly as
+                // much as it did; it just can no longer be missed.
+                vec2 obsTexels = vec2(1.0);
+                vec2 prev = vUv;
+                if (hasObstacle == 1) {
+                    obsTexels = vec2(textureSize(uObstacle, 0));
+                    float own = obsTexCoverage(texture(uObstacle, vUv), uObsMax);
+                    illum *= 1.0 - blockStrength * smoothstep(0.35, 0.85, own);
+                }
                 for (int i = 0; i < ITERATIONS; i++) {
                     coord -= stepUV;
                     // Colliders block light. illum is already the transmittance
@@ -2222,9 +2245,22 @@
                     // splatFrag's obsBlockDye, which drops strength for the same
                     // reason (a brush is blocked by a wall's shape).
                     if (hasObstacle == 1) {
-                        float cov = obsTexCoverage(texture(uObstacle, coord), uObsMax);
+                        // A march already in full shadow gathers nothing more
+                        // — stop (inside a wall that is the first iteration).
+                        if (max(illum.r, max(illum.g, illum.b)) < 0.001) break;
+                        // Sweep (prev, coord]: one tap per ~2.5 obstacle
+                        // texels, at least one, at most OCC_TAPS.
+                        float seg = length((prev - coord) * obsTexels);
+                        float taps = clamp(ceil(seg * 0.4), 1.0, float(OCC_TAPS));
+                        float cov = 0.0;
+                        for (int k = 1; k <= OCC_TAPS; k++) {
+                            if (float(k) > taps) break;
+                            vec2 at = mix(prev, coord, float(k) / taps);
+                            cov = max(cov, obsTexCoverage(texture(uObstacle, at), uObsMax));
+                        }
                         illum *= 1.0 - blockStrength * smoothstep(0.35, 0.85, cov);
                     }
+                    prev = coord;
                     accum += texture(uTexture, coord).rgb * illum;
                     illum *= dec;
                 }
