@@ -267,6 +267,7 @@
                 startPing();
                 hello();
                 keepAwake();
+                rememberRoom(room.code);
                 render();
                 break;
             case 'client-count':
@@ -937,7 +938,8 @@
         $('padView').hidden = !inRoom;
         $('fullLinkLanding').href = fullAppHref();
         $('fullLinkRoom').href = fullAppHref();
-        if (!inRoom) return;
+        if (!inRoom) { renderLanding(); return; }
+        renderInstall();
         renderChrome();
         renderVeil();
         // The chrome may have changed size; the pad keeps clear of it.
@@ -1116,6 +1118,108 @@
     });
     document.addEventListener('fullscreenchange', function () { syncFullscreenLabel(); queueLayout(); });
 
+    // ── The installed app (manifest.webmanifest, sw.js) ─────────────
+    // Saved to the home screen, the pad opens full screen and starts at the
+    // landing page (no scanned link to open it with), so it offers the room
+    // it was in lately. Until then the landing says how to install it: a
+    // button where the browser hands us its install prompt (Android), the
+    // Share-sheet steps on iOS, the browser menu elsewhere.
+    function isInstalled() {
+        try {
+            return window.matchMedia('(display-mode: fullscreen)').matches ||
+                window.matchMedia('(display-mode: standalone)').matches ||
+                window.navigator.standalone === true;
+        } catch (_) { return false; }
+    }
+    var IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var IS_TOUCH = (function () {
+        try { return window.matchMedia('(pointer: coarse)').matches; } catch (_) { return false; }
+    })();
+
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('sw.js').catch(function () {});
+        });
+    }
+    // Installed, the page already has the whole screen.
+    if (isInstalled()) fsBtn.hidden = true;
+
+    var installPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();          // offered on the page instead of the browser's own bar
+        installPrompt = e;
+        renderInstall();
+    });
+    window.addEventListener('appinstalled', function () {
+        installPrompt = null;
+        renderInstall();
+        toast('Added. Open Swirl Together from your home screen.');
+    });
+    function promptInstall() {
+        var p = installPrompt;
+        closeMenu();
+        if (!p) return;
+        installPrompt = null;
+        try {
+            p.prompt();
+            p.userChoice.then(renderInstall, renderInstall);
+        } catch (_) {}
+        renderInstall();
+    }
+    $('installBtn').addEventListener('click', promptInstall);
+    $('installMenuBtn').addEventListener('click', promptInstall);
+
+    function renderInstall() {
+        var installed = isInstalled();
+        $('installMenuBtn').hidden = installed || !installPrompt;
+        var card = $('installCard');
+        if (installed || !(IS_TOUCH || IS_IOS || installPrompt)) { card.hidden = true; return; }
+        var text = $('installText');
+        if (installPrompt) {
+            text.innerHTML = 'Keep <b>Swirl Together</b> on your home screen. It opens full screen, ready to paint.';
+        } else if (IS_IOS) {
+            text.innerHTML = 'Keep it on your home screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. It opens full screen.';
+        } else {
+            text.innerHTML = 'Keep it on your home screen: in your browser’s menu, choose <b>Add to Home screen</b> or <b>Install app</b>.';
+        }
+        $('installBtn').hidden = !installPrompt;
+        card.hidden = false;
+    }
+
+    // The room this phone was in lately.
+    var LAST_ROOM_KEY = 'swirlPad.lastRoom';
+    var REJOIN_MS = 12 * 3600 * 1000;
+    function rememberRoom(code) {
+        try { localStorage.setItem(LAST_ROOM_KEY, JSON.stringify({ code: code, at: Date.now() })); } catch (_) {}
+    }
+    function lastRoom() {
+        try {
+            var v = JSON.parse(localStorage.getItem(LAST_ROOM_KEY) || 'null');
+            if (v && typeof v.code === 'string' && /^[A-Z0-9]{6}$/.test(v.code) &&
+                typeof v.at === 'number' && Date.now() - v.at < REJOIN_MS) return v.code;
+        } catch (_) {}
+        return null;
+    }
+    $('rejoinBtn').addEventListener('click', function () {
+        var code = lastRoom();
+        if (code) tryJoin(code);
+    });
+
+    function renderLanding() {
+        var code = lastRoom();
+        $('rejoinBtn').hidden = !code;
+        $('rejoinCode').textContent = code || '';
+        // An app on an iPhone's home screen is not where the camera sends a
+        // scanned link (that opens Safari), so there the code is typed.
+        var typeIt = IS_IOS && isInstalled();
+        $('step3').textContent = typeIt
+            ? 'Type the code shown on the screen below.'
+            : 'Point this phone’s camera at the code on the screen.';
+        $('codeLabel').textContent = typeIt ? 'Room code' : 'Or type the room code';
+        renderInstall();
+    }
+
     var toastTimer = 0;
     function toast(text) {
         var t = $('toast');
@@ -1228,7 +1332,12 @@
                 count: room.count, turns: JSON.parse(JSON.stringify(room.turns)), spent: room.spent,
                 info: room.info, brush: { radius: radius(), colour: colourMode(), cycle: brush.cycle },
                 queued: queue.length, stroking: !!stroke,
-                pad: { w: pad.offsetWidth, h: pad.offsetHeight }
+                pad: { w: pad.offsetWidth, h: pad.offsetHeight },
+                app: {
+                    installed: isInstalled(), installable: !!installPrompt,
+                    sw: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+                    lastRoom: lastRoom()
+                }
             };
         },
         join: function (code) { tryJoin(code); },

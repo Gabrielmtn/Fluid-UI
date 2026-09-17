@@ -65,6 +65,7 @@
       "!party/**",
       "!public/**",
       "!phone/**",
+      "!assets/pwa/**",
       "!interaction-design-concept/**",
       "!scripts/**",
       "!steam/**",

@@ -38,10 +38,12 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
     '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.svg': 'image/svg+xml',
     '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.onnx': 'application/octet-stream',
-    '.mp3': 'audio/mpeg', '.webp': 'image/webp' };
+    '.mp3': 'audio/mpeg', '.webp': 'image/webp', '.webmanifest': 'application/manifest+json' };
+const net = { offline: false };
 function serve() {
     return new Promise((res) => {
         const srv = http.createServer((req, resp) => {
+            if (net.offline) { req.socket.destroy(); return; }
             let p = decodeURIComponent(req.url.split('?')[0]);
             if (p.endsWith('/')) p += 'index.html';
             const file = path.join(REPO, p);
@@ -422,6 +424,73 @@ async function tap(b, sel) {
         check(await b.eval("!document.getElementById('landing').hidden && location.hash === ''"), 'Leave returns the phone to the start');
         check(!!(await until(a, 'PhonePads.count() === 0', 5000)), 'the computer drops the phone when it leaves');
         await shot(b, 'phone-landing.png');
+
+        // ── The phone brush as an installed app ──────────────────────
+        const LAND = "({rejoin: !document.getElementById('rejoinBtn').hidden, code: document.getElementById('rejoinCode').textContent," +
+            " card: !document.getElementById('installCard').hidden, btn: !document.getElementById('installBtn').hidden," +
+            " text: document.getElementById('installText').textContent, installable: SwirlPad.state().app.installable})";
+        const land = await b.eval(LAND);
+        check(land.rejoin && land.code === code, 'the landing offers the room this phone was just in', land);
+        // Chrome hands an installable page its install prompt (Android does
+        // the same); then the card is a button. Safari never does.
+        check(land.card && (land.installable ? (land.btn && /home screen/.test(land.text)) : /Add to Home Screen/.test(land.text)),
+            'and a way to put it on the home screen', land);
+        check(await b.eval("(function(){var m=document.getElementById('installMenuBtn'); return m.hidden === !SwirlPad.state().app.installable;})()"),
+            'the menu offers the install only when the browser can do it');
+        const man = await b.send('Page.getAppManifest', {});
+        let mj = null;
+        try { mj = JSON.parse(man.data || 'null'); } catch (_) {}
+        check(!!mj && (!man.errors || !man.errors.length) && /\/phone\/manifest\.webmanifest$/.test(man.url || ''), 'the manifest is linked and parses', { url: man.url, errors: man.errors });
+        const sizes = mj ? mj.icons.map((i) => i.sizes + ':' + (i.purpose || 'any')) : [];
+        check(!!mj && mj.display === 'fullscreen' && mj.start_url === './' && mj.scope === './' &&
+            sizes.includes('192x192:any') && sizes.includes('512x512:any') && sizes.includes('512x512:maskable'),
+            'it opens full screen, scoped to the pad, with 192/512 and maskable icons', mj && { display: mj.display, start: mj.start_url, scope: mj.scope, icons: sizes });
+        const iconDims = await b.eval("Promise.all(['../assets/pwa/icon-192.png','../assets/pwa/icon-512.png','../assets/pwa/icon-maskable-512.png','../assets/pwa/apple-touch-icon.png']" +
+            ".map(function(u){ return fetch(u).then(function(r){ if(!r.ok) return u+':'+r.status; return r.blob().then(createImageBitmap).then(function(b){ return b.width+'x'+b.height; }); }); }))");
+        check(iconDims.join() === '192x192,512x512,512x512,180x180', 'the icons load at their sizes', iconDims);
+        const inst = await b.send('Page.getInstallabilityErrors', {});
+        check(Array.isArray(inst.installabilityErrors) && inst.installabilityErrors.length === 0, 'Chrome finds the pad installable', inst.installabilityErrors);
+        const swScope = await until(b, "navigator.serviceWorker.getRegistration().then(function(r){ return r && r.active ? r.scope : null; })", 8000);
+        check(/\/phone\/$/.test(swScope || ''), 'the service worker is active, scoped to phone/', swScope);
+        // Back into the room through Rejoin, now under the service worker.
+        await b.send('Page.reload', {});
+        await until(b, "!!window.SwirlPad && !document.getElementById('landing').hidden", 10000);
+        check(await b.eval('!!navigator.serviceWorker.controller'), 'after a reload the service worker controls the page');
+        await tap(b, '#rejoinBtn');
+        const back2 = await until(b, "(function(){var s=SwirlPad.state(); return s.phase==='open' && s.count===2 && s.code;})()", 10000);
+        check(back2 === code, 'Rejoin takes the phone back into that room', back2);
+        await tap(b, '#moreBtn');
+        await tap(b, '#leaveBtn');
+        await until(a, 'PhonePads.count() === 0', 5000);
+        // No network: the service worker's page, and back again (the local
+        // server can drop its connections; a deployed site cannot be cut off).
+        if (!APP_URL) {
+        net.offline = true;
+        await b.send('Page.reload', {}).catch(() => {});
+        const offlineText = await until(b, "document.body && /offline/i.test(document.body.textContent) ? document.body.textContent.trim().slice(0, 40) : null", 10000);
+        check(!!offlineText, 'offline, the installed pad says so instead of a browser error', offlineText);
+        await shot(b, 'phone-offline.png');
+        net.offline = false;
+        await b.eval("document.querySelector('button').click(); 1").catch(() => {});
+        check(!!(await until(b, "!!window.SwirlPad && !document.getElementById('landing').hidden", 10000)), 'Try again brings the pad back once the network returns');
+        }
+        // A browser with no install prompt (Safari): the Share-sheet steps.
+        await b.send('Page.addScriptToEvaluateOnNewDocument', { source:
+            "if (/[?&]no-bip=1/.test(location.search)) window.addEventListener('beforeinstallprompt', function (e) { e.stopImmediatePropagation(); }, true);" });
+        await b.send('Page.navigate', { url: url + 'phone/?no-bip=1' });
+        await until(b, "!!window.SwirlPad && !document.getElementById('landing').hidden", 10000);
+        await sleep(1500);
+        const safari = await b.eval(LAND);
+        check(safari.card && !safari.btn && !safari.installable && /Share/.test(safari.text) && /Add to Home Screen/.test(safari.text),
+            'on an iPhone the card says: Share, then Add to Home Screen', safari);
+        // Opened from the home screen of an iPhone: no install card, and the
+        // code is typed (the camera would open Safari, not the app).
+        await b.send('Page.addScriptToEvaluateOnNewDocument', { source:
+            "if (/[?&]pwa-test=1/.test(location.search)) Object.defineProperty(Navigator.prototype, 'standalone', { get: function () { return true; }, configurable: true });" });
+        await b.send('Page.navigate', { url: url + 'phone/?pwa-test=1' });
+        const home = await until(b, "window.SwirlPad && SwirlPad.state().app.installed ? ({card: !document.getElementById('installCard').hidden, step: document.getElementById('step3').textContent, label: document.getElementById('codeLabel').textContent, fs: !document.getElementById('fullscreenBtn').hidden}) : null", 10000);
+        check(!!home && !home.card && /Type the code/.test(home.step) && home.label === 'Room code' && !home.fs,
+            'from the home screen: no install card, the code is typed, no Full screen item', home);
 
         // ── The full app is one link away ────────────────────────────
         await b.send('Page.navigate', { url: url + '?full=1#' + code });

@@ -140,6 +140,36 @@ button { border-radius: 10px; }
     color: var(--danger);
 }
 
+/* The room this phone was in lately: the likeliest next tap, so it leads. */
+.rejoin {
+    display: block;
+    width: 100%;
+    margin: 0 0 20px;
+    --btn-size: 16px;
+    --btn-pad-y: 14px;
+    font-weight: 600;
+}
+.rejoin span { letter-spacing: 0.08em; }
+
+.install-card {
+    margin: 22px 0 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.install-card p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--ink-300);
+}
+.install-card b { color: var(--ink-100); font-weight: 600; }
+.install-card button {
+    margin-top: 10px;
+    width: 100%;
+}
+
 .fineprint {
     margin: 28px 0 0;
     font-size: 14px;

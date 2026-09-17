@@ -120,6 +120,10 @@ fs.writeFileSync(
     "/index.html", "  Cache-Control: no-cache",
     "/phone/", "  Cache-Control: no-cache",
     "/phone/index.html", "  Cache-Control: no-cache",
+    // The installed phone app: a service worker and a manifest must never
+    // be held in a cache, or an update would not reach phones.
+    "/phone/sw.js", "  Cache-Control: no-cache",
+    "/phone/manifest.webmanifest", "  Cache-Control: no-cache",
     "/js/*", "  Cache-Control: public, max-age=31536000, immutable",
     "/css/*", "  Cache-Control: public, max-age=31536000, immutable",
     "/assets/*", "  Cache-Control: public, max-age=86400",
