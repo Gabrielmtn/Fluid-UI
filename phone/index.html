@@ -57,29 +57,15 @@
 
     <!-- ── In a room: the pad ── -->
     <main id="padView" class="pad-view" hidden>
-        <header class="bar">
-            <span id="meDot" class="me-dot" aria-hidden="true"></span>
-            <div class="bar-text">
-                <div id="barTitle" class="bar-title">Room</div>
-                <div id="barSub" class="bar-sub" aria-live="polite">Joining…</div>
-            </div>
-            <button type="button" id="moreBtn" class="btn--ghost bar-more" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" aria-label="More">
-                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-            </button>
-        </header>
-
-        <div id="turnBanner" class="turn-banner" hidden>
-            <span id="turnText" class="turn-text"></span>
-            <button type="button" id="passBtn" class="turn-pass" hidden>Pass</button>
-        </div>
-
-        <!-- The pad and its tools sit together in the middle of the screen
-             (side by side when the phone is sideways). -->
+        <!-- The whole screen is the pad: it takes the computer's canvas shape
+             and as much of the screen as fits. The few other things sit in
+             the corners, over the margin the pad leaves (phone.js layoutPad
+             keeps them off the pad). Size, colour and everything else about
+             the brush come from the computer. -->
         <section id="stage" class="stage">
             <div class="pad-wrap">
                 <div id="pad" class="pad" role="application" aria-label="Paint pad. Your strokes appear on the computer's screen.">
                     <canvas id="trail" class="trail" aria-hidden="true"></canvas>
-                    <div id="sizeRing" class="size-ring" aria-hidden="true" hidden></div>
                     <p id="padHint" class="pad-hint">Paint here — watch the big screen</p>
                     <div id="veil" class="veil" hidden>
                         <p id="veilText" class="veil-text"></p>
@@ -88,23 +74,28 @@
                 </div>
                 <p id="rotateHint" class="rotate-hint" hidden>Turn your phone sideways for a bigger pad.</p>
             </div>
-
-            <!-- The phone paints with the computer's brush: its colours, tip and
-                 arms. The one thing to set here is how big a stroke is. -->
-            <section id="tools" class="tools" aria-label="Brush">
-                <div class="colour-now">
-                    <span id="colourDots" class="colour-dots" aria-hidden="true"></span>
-                    <span id="colourText" class="colour-text">Colours come from the computer</span>
-                </div>
-                <div class="size-row">
-                    <span class="size-label" aria-hidden="true">Size</span>
-                    <input type="range" id="sizeRange" min="0" max="1" step="0.001" value="0.41" aria-label="Brush size">
-                    <span id="sizeValue" class="size-value" aria-hidden="true"></span>
-                </div>
-            </section>
         </section>
 
+        <!-- Top left: who is here, or whose turn it is. The dot is this
+             phone's cursor colour on the big screen. -->
+        <div id="chipLeft" class="chrome chrome-left" aria-live="polite">
+            <span id="meDot" class="me-dot" aria-hidden="true"></span>
+            <span class="chip-text">
+                <span id="chipMain" class="chip-main">Joining…</span>
+                <span id="chipSub" class="chip-sub"></span>
+            </span>
+        </div>
+
+        <!-- Top right: Pass (only while turns run) and the menu. -->
+        <div id="chipRight" class="chrome chrome-right">
+            <button type="button" id="passBtn" class="chrome-pass" hidden>Pass</button>
+            <button type="button" id="moreBtn" class="btn--ghost chrome-more" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" aria-label="More">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+            </button>
+        </div>
+
         <div id="moreMenu" class="menu" role="menu" hidden>
+            <div id="menuHead" class="menu-head"></div>
             <button type="button" role="menuitem" id="fullscreenBtn" hidden>Full screen</button>
             <button type="button" role="menuitem" id="clearBtn">Clear the canvas</button>
             <a role="menuitem" id="fullLinkRoom" href="../?full=1">Open the full canvas here</a>

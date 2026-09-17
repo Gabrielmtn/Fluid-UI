@@ -148,14 +148,11 @@ button { border-radius: 10px; }
 .fineprint a,
 .veil a { color: oklch(82% 0.09 242); }
 
-/* ── The pad view ────────────────────────────────────────────────── */
+/* ── The pad view: the whole screen is the pad ───────────────────── */
 
 .pad-view {
     position: fixed;
     inset: 0;
-    display: flex;
-    flex-direction: column;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     background:
         radial-gradient(90% 40% at 50% 0%, oklch(20% 0.05 242 / 0.7) 0%, transparent 70%),
         var(--ground-950);
@@ -164,93 +161,25 @@ button { border-radius: 10px; }
     -webkit-user-select: none;
 }
 
-.bar {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 8px 6px 16px;
-    min-width: 0;
-}
-.me-dot {
-    flex: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--ink-500);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 12px currentColor;
-}
-.bar-text { min-width: 0; flex: 1; }
-.bar-title {
-    font-size: 16px;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.bar-sub {
-    font-size: 13px;
-    color: var(--ink-300);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.bar-more {
-    flex: none;
-    width: 46px;
-    height: 46px;
-    --btn-pad-x: 0px;
-    --btn-pad-y: 0px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-.bar-more svg { fill: currentColor; }
-
-.turn-banner {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 0 12px 6px;
-    padding: 6px 6px 6px 14px;
-    min-height: 44px;
-    box-sizing: border-box;
-    border-radius: 12px;
-    background: oklch(20% 0.04 242 / 0.92);
-    border: 1px solid oklch(38% 0.06 242 / 0.7);
-    font-size: 15px;
-    font-weight: 600;
-}
-/* The brush is yours: the banner lights up, so a glance says "go". */
-.turn-banner.is-mine {
-    background: oklch(34% 0.11 242 / 0.95);
-    border-color: oklch(62% 0.13 242 / 0.9);
-}
-.turn-text { flex: 1; min-width: 0; }
-.turn-pass { flex: none; --btn-pad-y: 8px; min-height: 36px; }
-
-/* The pad and the tools, as one group in the middle of what is left.
-   The pad is sized FROM this box (phone.js layoutPad), so it must never size
-   the box: the flex item may not grow past its share, and overflow stays in. */
+/* The pad is centred in what is left of the screen. phone.js layoutPad
+   sizes it and, when the corner chrome would sit on it, moves this box's
+   top edge down below the chrome (padding-top) — the pad never shares its
+   space with anything. */
 .stage {
-    flex: 1 1 auto;
-    min-height: 0;
-    min-width: 0;
-    overflow: hidden;
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 8px)
+             calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 8px);
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 14px;
-    padding: 4px 12px 14px;
+    overflow: hidden;
 }
 .pad-wrap {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 0;
-    min-height: 0;
 }
 
 .pad {
@@ -291,16 +220,6 @@ button { border-radius: 10px; }
     transition: opacity 0.5s;
 }
 .pad-hint.is-gone { opacity: 0; }
-.size-ring {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    border: 2px solid rgba(255, 255, 255, 0.85);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
-    pointer-events: none;
-}
 .veil {
     position: absolute;
     inset: 0;
@@ -344,120 +263,87 @@ button { border-radius: 10px; }
     text-align: center;
 }
 
-/* ── Brush tools ─────────────────────────────────────────────────── */
+/* ── Corner chrome ───────────────────────────────────────────────── */
 
-.tools {
-    flex: none;
+.chrome {
+    position: fixed;
+    z-index: 15;
+    top: calc(env(safe-area-inset-top) + 8px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Top left: read-only status, so it never catches a touch. */
+.chrome-left {
+    left: calc(env(safe-area-inset-left) + 10px);
     box-sizing: border-box;
-    width: 100%;
-    max-width: 520px;
+    max-width: 46vw;
+    min-height: 40px;
+    padding: 5px 12px 5px 9px;
+    border-radius: 14px;
+    background: rgba(12, 14, 19, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+}
+/* While turns run the chip keeps one width, so the pad does not jump as the
+   brush moves around the room. */
+.chrome-left.is-turns { min-width: 158px; }
+/* The brush is yours: the chip lights up, so a glance says "go". */
+.chrome-left.is-mine {
+    background: oklch(34% 0.11 242 / 0.95);
+    border-color: oklch(62% 0.13 242 / 0.9);
+}
+.me-dot {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--ink-500);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 10px currentColor;
+}
+.chip-text {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 0 4px;
     min-width: 0;
+    line-height: 1.25;
 }
-/* What colour the next stroke takes. Read-only: the computer's brush decides
-   (see phone.js strokeColor), so nothing here looks pressable. */
-.colour-now {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 28px;
-    padding: 0 4px;
-    min-width: 0;
-}
-.colour-dots {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    max-width: 55%;
+.chip-main {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
-.colour-dot {
-    flex: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
-}
-.colour-dot.is-mix {
-    background: conic-gradient(#ff3b6b, #ffd23f, #3ddc84, #29c7ff, #b35cff, #ff3b6b);
-}
-/* Palette: the colour the NEXT stroke takes is the big one. */
-.colour-dot.is-next {
-    width: 20px;
-    height: 20px;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
-}
-.colour-text {
-    min-width: 0;
-    font-size: 13px;
+.chip-sub {
+    font-size: 12px;
     color: var(--ink-300);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.chip-sub:empty { display: none; }
 
-.size-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 44px;
-    padding: 0 4px;
-}
-.size-label {
-    flex: none;
-    font-size: 14px;
-    color: var(--ink-300);
-}
-.size-value {
-    flex: none;
-    min-width: 2.5em;
-    text-align: right;
-    font-size: 14px;
-    font-variant-numeric: tabular-nums;
-    color: var(--ink-100);
-}
-#sizeRange {
-    flex: 1;
-    min-width: 0;
+.chrome-right { right: calc(env(safe-area-inset-right) + 6px); }
+.chrome-more {
+    width: 44px;
     height: 44px;
-    margin: 0;
-    background: transparent;
-    -webkit-appearance: none;
-    appearance: none;
+    --btn-pad-x: 0px;
+    --btn-pad-y: 0px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
-#sizeRange::-webkit-slider-runnable-track {
-    height: 6px;
-    border-radius: 3px;
-    background: linear-gradient(90deg, var(--ground-500), oklch(62% 0.10 242));
+.chrome-more svg { fill: currentColor; }
+.chrome-pass {
+    --btn-pad-y: 8px;
+    min-height: 40px;
 }
-#sizeRange::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 28px;
-    height: 28px;
-    margin-top: -11px;
-    border-radius: 50%;
-    background: var(--chrome-0);
-    border: 1px solid var(--chrome-1);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+/* Turns running, brush elsewhere: the button keeps its room but not its face. */
+.chrome-pass.is-idle {
+    visibility: hidden;
+    pointer-events: none;
 }
-#sizeRange::-moz-range-track {
-    height: 6px;
-    border-radius: 3px;
-    background: linear-gradient(90deg, var(--ground-500), oklch(62% 0.10 242));
-}
-#sizeRange::-moz-range-thumb {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--chrome-0);
-    border: 1px solid var(--chrome-1);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-}
-#sizeRange:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
 
 /* ── Menu, confirm sheet, toast ──────────────────────────────────── */
 
@@ -467,6 +353,8 @@ button { border-radius: 10px; }
     top: calc(env(safe-area-inset-top) + 58px);
     right: calc(env(safe-area-inset-right) + 10px);
     min-width: 230px;
+    max-width: calc(100vw - 20px);
+    box-sizing: border-box;
     padding: 6px;
     display: flex;
     flex-direction: column;
@@ -476,6 +364,15 @@ button { border-radius: 10px; }
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
 }
+.menu-head {
+    padding: 8px 14px 10px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ink-300);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.menu-head b { color: var(--ink-100); font-weight: 600; }
 .menu button,
 .menu a {
     display: flex;
@@ -541,21 +438,8 @@ button { border-radius: 10px; }
     pointer-events: none;
 }
 
-/* ── Sideways: pad on the left, brush tools on the right ─────────── */
+/* ── Sideways: the pad already has the room it can use ───────────── */
 
 @media (orientation: landscape) and (max-height: 560px) {
-    .bar { padding-top: 4px; padding-bottom: 2px; }
-    .stage {
-        flex-direction: row;
-        gap: 16px;
-        padding: 2px 12px 10px;
-    }
-    .tools {
-        width: min(34vw, 280px);
-        max-height: 100%;
-        overflow-y: auto;
-    }
-    .colour-now { flex-wrap: wrap; }
-    .colour-text { white-space: normal; }
     .rotate-hint { display: none !important; }
 }

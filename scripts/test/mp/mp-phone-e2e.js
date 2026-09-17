@@ -164,6 +164,15 @@ async function touchStroke(b, from, to, steps = 18, ms = 360) {
     await b.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
+// Where the pad and the corner chrome are on the phone.
+const GEOM = "(function(){var r=function(id){var e=document.getElementById(id); if(!e||e.hidden) return null; var b=e.getBoundingClientRect();" +
+    " return (b.width&&b.height) ? {l:b.left,t:b.top,r:b.right,b:b.bottom,w:b.width,h:b.height} : null;};" +
+    " return {pad:r('pad'), chipL:r('chipLeft'), chipR:r('chipRight'), vw:innerWidth, vh:innerHeight," +
+    " hint:!document.getElementById('rotateHint').hidden, extra:!!(document.getElementById('sizeRange')||document.querySelector('.tools,.colour-now'))};})()";
+const padClear = (g) => !!g.pad && [g.chipL, g.chipR].every((c) => !c || c.b <= g.pad.t || c.r <= g.pad.l || c.l >= g.pad.r || c.t >= g.pad.b);
+const UPRIGHT = { width: 390, height: 844, deviceScaleFactor: 2, mobile: true, screenWidth: 390, screenHeight: 844, screenOrientation: { type: 'portraitPrimary', angle: 0 } };
+const SIDEWAYS = { width: 844, height: 390, deviceScaleFactor: 2, mobile: true, screenWidth: 844, screenHeight: 390, screenOrientation: { type: 'landscapePrimary', angle: 90 } };
+
 async function tap(b, sel) {
     const r = await b.eval("(function(){var e=document.querySelector(" + JSON.stringify(sel) + "); if(!e) return null; var r=e.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2};})()");
     if (!r) throw new Error('no element ' + sel);
@@ -216,7 +225,7 @@ async function tap(b, sel) {
         await shot(a, 'desktop-dialog-waiting.png');
 
         // ── B: an iPhone opens the room link ─────────────────────────
-        await b.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true, screenWidth: 390, screenHeight: 844 });
+        await b.send('Emulation.setDeviceMetricsOverride', UPRIGHT);
         await b.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
         await b.send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', platform: 'iPhone' });
         await b.send('Page.addScriptToEvaluateOnNewDocument', { source: PREP +
@@ -229,7 +238,7 @@ async function tap(b, sel) {
         check(!!open, 'the phone joins the room and hears from the computer', open && { phase: open.phase, count: open.count, host: open.host });
         const cvs = await a.eval("({w:document.getElementById('canvas').width,h:document.getElementById('canvas').height,r:config.SPLAT_RADIUS,gate:!!config.COLOR_GATE})");
         check(!!open && near(open.info.w, cvs.w, 3) && near(open.info.h, cvs.h, 3) && open.info.gate === cvs.gate, 'pad-info carries the canvas size and flow model', { info: open && { w: open.info.w, h: open.info.h, gate: open.info.gate }, canvas: cvs });
-        check(!!open && near(open.brush.value / 1000, cvs.r, 0.0005), 'the phone starts from the computer\'s brush size', { phone: open && open.brush.value, computer: cvs.r * 1000 });
+        check(!!open && near(open.brush.radius, cvs.r, 1e-6), 'the phone paints at the computer\'s brush size', { phone: open && open.brush.radius, computer: cvs.r });
         check(!!open && open.brush.colour === 'fixed' && open.info.color === '#ffffff', 'and paints in its colour', open && { brush: open.brush, color: open.info.color });
         check(!!open && open.info.spFrac > 0 && open.info.ref > 0 && open.info.budget > 0, 'and walks its dabs the computer\'s way', open && { spFrac: open.info.spFrac, spMin: open.info.spMin, ref: open.info.ref, tc: open.info.tc, floor: open.info.floor, budget: open.info.budget });
         check(!!open && near(open.pad.w / open.pad.h, cvs.w / cvs.h, 0.02) && open.pad.w > 300, 'the pad has the canvas\'s shape', open && open.pad);
@@ -241,19 +250,27 @@ async function tap(b, sel) {
         await shot(a, 'desktop-dialog-connected.png');
         await shot(b, 'phone-pad.png');
 
-        // Layout: upright, the tools sit right under the pad and everything
-        // fits; sideways, the pad takes the height and the tools move beside it.
-        const GEOM = "(function(){var r=function(id){var b=document.getElementById(id).getBoundingClientRect(); return {l:b.left,t:b.top,r:b.right,b:b.bottom,w:b.width,h:b.height};};" +
-            "return {pad:r('pad'), tools:r('tools'), vw:innerWidth, vh:innerHeight, hint:!document.getElementById('rotateHint').hidden};})()";
+        // Layout: the phone is the pad and nothing else. Upright the pad takes
+        // the width; sideways it takes the height, and the corner chrome (the
+        // status chip, the menu) sits in the margins, never on the pad.
         const up = await b.eval(GEOM);
-        check(up.tools.t - up.pad.b < 60 && up.tools.b <= up.vh && up.pad.r <= up.vw && up.hint, 'upright: pad and tools together, on screen, with the sideways hint', up);
-        await b.send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 2, mobile: true, screenWidth: 844, screenHeight: 390, screenOrientation: { type: 'landscapePrimary', angle: 90 } });
+        check(!up.extra, 'no brush controls on the phone', up.extra);
+        check(up.pad.w >= up.vw - 20 && up.pad.b <= up.vh && padClear(up) && up.hint, 'upright: the pad takes the width, clear of the chrome, with the sideways hint', up);
+        await b.send('Emulation.setDeviceMetricsOverride', SIDEWAYS);
         const side = await until(b, "(function(){var g=" + GEOM + "; return g.pad.h > " + up.pad.h + " ? g : null;})()", 4000);
-        check(!!side && side.pad.w * side.pad.h > up.pad.w * up.pad.h * 1.3 && side.tools.l >= side.pad.r && side.tools.r <= side.vw && side.pad.b <= side.vh && !side.hint,
-            'sideways: a bigger pad with the tools beside it', side);
+        check(!!side && side.pad.h >= side.vh - 20 && padClear(side) && !side.hint,
+            'sideways: the pad takes the full height, the chrome sits in the margins', side);
         await shot(b, 'phone-pad-landscape.png');
-        await b.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true, screenWidth: 390, screenHeight: 844, screenOrientation: { type: 'portraitPrimary', angle: 0 } });
+        await b.send('Emulation.setDeviceMetricsOverride', UPRIGHT);
         await until(b, "(function(){var g=" + GEOM + "; return g.pad.w <= " + (up.pad.w + 1) + ";})()", 4000);
+
+        // Size lives on the computer: the phone follows it.
+        const size0 = await a.eval("document.getElementById('brushSize').value");
+        await a.eval("(function(){var s=document.getElementById('brushSize'); s.value=24; s.dispatchEvent(new Event('input',{bubbles:true})); return 1;})()");
+        const followed = await until(b, "Math.abs(SwirlPad.state().brush.radius - 0.024) < 1e-6", 5000);
+        check(!!followed, 'the phone follows a size change made on the computer', await b.eval('SwirlPad.state().brush.radius'));
+        await a.eval("(function(){var s=document.getElementById('brushSize'); s.value=" + JSON.stringify(size0) + "; s.dispatchEvent(new Event('input',{bubbles:true})); return 1;})()");
+        await until(b, "Math.abs(SwirlPad.state().brush.radius - " + (Number(size0) / 1000) + ") < 1e-6", 5000);
         await a.eval("PhonePads.close(); 1");
 
         // ── Paint from the phone ─────────────────────────────────────
@@ -322,8 +339,15 @@ async function tap(b, sel) {
         const tOn = await until(b, "(function(){var s=SwirlPad.state(); return s.turns.on && s.turns.holder ? s.turns : null;})()", 5000);
         const aId = await a.eval('clientId');
         check(!!tOn && tOn.holder === aId, 'the phone sees turns start with the computer holding the brush', tOn);
-        const banner = await b.eval("document.getElementById('turnBanner').hidden ? null : document.getElementById('turnText').textContent");
-        check(!!banner && /is painting/.test(banner), 'the phone says whose turn it is', banner);
+        const banner = await b.eval("document.getElementById('chipMain').textContent + ' / ' + document.getElementById('chipSub').textContent");
+        check(/’s turn/.test(banner) && /next/.test(banner), 'the phone says whose turn it is, and that it is next', banner);
+        // Sideways with turns on: the wider chip pushes the pad down, never onto it.
+        await b.send('Emulation.setDeviceMetricsOverride', SIDEWAYS);
+        await sleep(600);
+        const sideTurns = await b.eval(GEOM);
+        check(padClear(sideTurns) && !!sideTurns.chipR && sideTurns.chipR.w > 60, 'sideways with turns: Pass keeps its place and the pad stays clear', sideTurns);
+        await b.send('Emulation.setDeviceMetricsOverride', UPRIGHT);
+        await sleep(600);
         const sentBefore = await b.eval("window.__sent.splat||0");
         await touchStroke(b, [0.3, 0.3], [0.6, 0.3], 8, 160);
         await sleep(400);
@@ -333,7 +357,7 @@ async function tap(b, sel) {
         await a.eval('passTurn(); 1');
         const mine = await until(b, "(function(){var s=SwirlPad.state(); return s.turns.holder===s.id;})()", 5000);
         check(!!mine, 'the brush reaches the phone');
-        check(await b.eval("!document.getElementById('passBtn').hidden && document.getElementById('turnBanner').classList.contains('is-mine')"), 'the phone lights up with a Pass button');
+        check(await b.eval("(function(){var p=document.getElementById('passBtn'); return !p.hidden && !p.classList.contains('is-idle') && getComputedStyle(p).visibility==='visible' && document.getElementById('chipLeft').classList.contains('is-mine');})()"), 'the phone lights up with a Pass button');
         const m0 = await a.eval('__e2e.fromPad.msgs');
         await touchStroke(b, [0.3, 0.6], [0.6, 0.6], 10, 200);
         await sleep(600);

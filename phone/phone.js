@@ -4,11 +4,12 @@
 // A phone does not run the painting. It joins the room a computer is in
 // (the QR or code from Swirl Together → Paint from your phone) and sends its
 // strokes as ordinary room paint, so every canvas in the room — the
-// computer's included — draws them the way it draws anyone's. What is on
-// this page is what a phone is good for: a pad the shape of the computer's
-// canvas and a size slider. Everything else about the brush is the
-// computer's. The full app stays one link away for someone with no
-// computer to watch.
+// computer's included — draws them the way it draws anyone's. The page is
+// the pad and nothing else: a surface the shape of the computer's canvas,
+// as big as the screen allows. Size, colour and the rest of the brush are
+// set on the computer, where the controls work better; a status chip and a
+// ⋯ menu sit in the corners the pad leaves free. The full app stays one link
+// away for someone with no computer to watch.
 //
 // Phones reach this page from swirltogether.com (index.html sends small
 // touch screens here, room code and all) and straight from the QR.
@@ -26,8 +27,9 @@
 //   in   'connected', 'client-count', 'host-changed', 'turn-state', 'pad-info'
 //   The relay (party/index.ts) never makes a pad (?kind=pad) the host.
 //
-// THE BRUSH — the computer's, walked the way js/05d0-brush-engine.js walks
-//   it, in the computer's canvas pixels as 'pad-info' reports them: a dab
+// THE BRUSH — the computer's (its size too, live), walked the way
+//   js/05d0-brush-engine.js walks it, in the computer's canvas pixels as
+//   'pad-info' reports them: a dab
 //   every Spacing px of travel (1 px by default), velocity 10 × spacing along
 //   the stroke, dye share k = spacing / (REF × brush diameter), the same
 //   per-sample dab budget and the same slow-movement floor. Same density as
@@ -328,8 +330,6 @@
         room.info = info;
         if (!brush.fromHost) adoptHostBrush();
         if (!prev || prev.w !== info.w || prev.h !== info.h) layoutPad();
-        renderColour();
-        renderSize();
     }
 
     // ── Take turns / Call and return (js/06c-mp-turns.js, the phone half) ──
@@ -350,6 +350,7 @@
     function applyTurnState(d) {
         var was = isMyTurn();
         var t = room.turns;
+        var wasOn = t.on;
         t.on = !!d.on;
         t.holder = (typeof d.holder === 'string' && d.holder) ? d.holder : null;
         t.order = Array.isArray(d.order) ? d.order.filter(function (x) { return typeof x === 'string'; }) : [];
@@ -373,6 +374,9 @@
         }
         syncTick();
         render();
+        // Turns widen the corner chrome (turn text, Pass): the pad may need
+        // to move out from under it.
+        if (wasOn !== t.on) queueLayout();
     }
 
     function passTurn() {
@@ -399,7 +403,7 @@
 
     function syncTick() {
         var want = room.turns && room.turns.on && room.turns.deadline > 0;
-        if (want && !room.timers.tick) room.timers.tick = setInterval(renderTurn, 500);
+        if (want && !room.timers.tick) room.timers.tick = setInterval(renderChrome, 500);
         if (!want && room.timers.tick) { clearInterval(room.timers.tick); room.timers.tick = 0; }
     }
 
@@ -421,30 +425,26 @@
 
     // ═══ The brush ═══════════════════════════════════════════════════
     var DEFAULT_W = 1600, DEFAULT_H = 900;
-    var SIZE_MIN = 1, SIZE_MAX = 60;            // the app's Brush Size units (radius × 1000)
+    var DEFAULT_RADIUS = 0.011;                 // 04a SPLAT_RADIUS, until the computer says
     var PHONE_SMOOTH_MS = 8;                    // a light hand on touch jitter (the desktop default is raw)
     var DAB_FLUSH_MS = 33;                      // js/06d DAB_FLUSH_MS
     var DAB_MAX_PER_MSG = 96;                   // js/06d DAB_MAX_PER_MSG
     var TRAIL_STEP_PX = 1.5;                    // the pad's own trail: one sprite per this much pad travel
 
     var brush = {
-        size: 0,             // slider position 0..1 (squared onto SIZE_MIN..SIZE_MAX)
         cycle: 0,            // the next palette colour, when the computer steps through one
-        fromHost: false      // this room's computer brush has been taken as the start
+        fromHost: false      // this room's palette position has been taken from the computer
     };
-    brush.size = valueToSize(11);
 
-    function sizeToValue(p) { p = clamp(p, 0, 1); return SIZE_MIN + (SIZE_MAX - SIZE_MIN) * p * p; }
-    function valueToSize(v) { return Math.sqrt(clamp((v - SIZE_MIN) / (SIZE_MAX - SIZE_MIN), 0, 1)); }
-    function radius() { return sizeToValue(brush.size) / 1000; }
+    // The computer's brush size, as it stands now (a stroke keeps the size
+    // it started with — metrics() is read at the press).
+    function radius() { return room.info ? room.info.radius : DEFAULT_RADIUS; }
 
-    // Start each room from the computer's brush size, and carry on its
-    // palette from where it stands. A size set here lasts until you leave.
+    // A palette carries on from where the computer's stands.
     function adoptHostBrush() {
         var i = room.info;
         if (!i) return;
         brush.fromHost = true;
-        brush.size = valueToSize(i.radius * 1000);
         brush.cycle = i.colors.length ? i.step % i.colors.length : 0;
     }
 
@@ -540,7 +540,6 @@
         if (mode === 'step') {
             var c = i.colors[brush.cycle % i.colors.length];
             brush.cycle = (brush.cycle + 1) % i.colors.length;
-            renderColour();
             return hexToRgb(c);
         }
         return vibrant();
@@ -838,44 +837,71 @@
         tctx.clearRect(0, 0, trail.width, trail.height);
     }
 
-    // ── The pad's shape: the computer's canvas, as big as fits ───────
+    // ── The pad's shape: the computer's canvas, as big as the screen allows ──
     var stage = $('stage');
-    var tools = $('tools');
-    // The stage holds the pad and the tools: stacked (upright phone), or
-    // side by side (sideways, where stage is a row). The pad gets what the
-    // tools leave.
-    function layoutPad() {
-        if ($('padView').hidden) return;
+    var chipL = $('chipLeft');
+    var chipR = $('chipRight');
+    var CHROME_GAP = 8;    // clear space between the corner chrome and the pad
+
+    function visibleRect(el) {
+        if (!el || el.hidden) return null;
+        var r = el.getBoundingClientRect();
+        return (r.width > 0 && r.height > 0) ? r : null;
+    }
+    function hits(a, b) {
+        return !!(a && b) && a.left < b.right + CHROME_GAP && a.right + CHROME_GAP > b.left &&
+            a.top < b.bottom + CHROME_GAP && a.bottom + CHROME_GAP > b.top;
+    }
+
+    // The pad at the canvas shape, as big as the stage's content box allows,
+    // and where the centred stage would put it.
+    function fitPad(hintH) {
         var box = stage.getBoundingClientRect();
         var cs = getComputedStyle(stage);
-        var row = cs.flexDirection === 'row';
-        var gap = parseFloat(row ? cs.columnGap : cs.rowGap) || 0;
-        var tb = tools.getBoundingClientRect();
-        var hint = $('rotateHint');
-        var hintH = (hint && !hint.hidden) ? hint.offsetHeight + 10 : 0;
-        var bw = box.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - (row ? tb.width + gap : 0);
-        var bh = box.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - hintH - (row ? 0 : tb.height + gap);
-        if (bw < 40 || bh < 40) return;
+        var pl = parseFloat(cs.paddingLeft), pr = parseFloat(cs.paddingRight);
+        var pt = parseFloat(cs.paddingTop), pb = parseFloat(cs.paddingBottom);
+        var bw = box.width - pl - pr, bh = box.height - pt - pb - hintH;
+        if (bw < 40 || bh < 40) return null;
         var ar = VW() / VH();
         var w = bw, h = w / ar;
         if (h > bh) { h = bh; w = h * ar; }
         w = Math.floor(w);
         h = Math.floor(h);
-        if (pad.offsetWidth !== w || pad.offsetHeight !== h) {
-            pad.style.width = w + 'px';
-            pad.style.height = h + 'px';
+        var left = box.left + pl + (bw - w) / 2;
+        var top = box.top + pt + (bh - h) / 2;
+        return { w: w, h: h, rect: { left: left, top: top, right: left + w, bottom: top + h } };
+    }
+
+    // First the whole screen. If that puts the pad under the corner chrome
+    // (sideways, where the pad takes the full height and the chrome only has
+    // the side margins), fit it again below the chrome: the pad never shares
+    // its space.
+    function layoutPad() {
+        if ($('padView').hidden) return;
+        var hint = $('rotateHint');
+        var vw = window.innerWidth, vh = window.innerHeight;
+        // A tall phone and a wide canvas make a letterbox of a pad: say so.
+        var wantHint = vh > vw * 1.2 && VW() / VH() > 1.25;
+        if (hint.hidden === wantHint) hint.hidden = !wantHint;
+        var hintH = hint.hidden ? 0 : hint.offsetHeight + 10;
+        stage.style.paddingTop = '';
+        var fit = fitPad(hintH);
+        if (!fit) return;
+        var cl = visibleRect(chipL), cr = visibleRect(chipR);
+        if (hits(fit.rect, cl) || hits(fit.rect, cr)) {
+            var below = Math.max(cl ? cl.bottom : 0, cr ? cr.bottom : 0) + CHROME_GAP;
+            stage.style.paddingTop = Math.ceil(below) + 'px';
+            fit = fitPad(hintH) || fit;
+        }
+        if (pad.offsetWidth !== fit.w || pad.offsetHeight !== fit.h) {
+            pad.style.width = fit.w + 'px';
+            pad.style.height = fit.h + 'px';
         }
         var dpr = Math.min(2, window.devicePixelRatio || 1);
-        var tw = Math.round(w * dpr), th = Math.round(h * dpr);
+        var tw = Math.round(fit.w * dpr), th = Math.round(fit.h * dpr);
         if (trail.width !== tw || trail.height !== th) {
             trail.width = tw;
             trail.height = th;
-        }
-        // A tall phone and a wide canvas make a letterbox of a pad.
-        var wantHint = box.height > box.width * 1.2 && ar > 1.25;
-        if (hint && hint.hidden === wantHint) {
-            hint.hidden = !wantHint;
-            queueLayout();
         }
     }
     // Laid out on the next frame, not inside the observer: resizing the pad
@@ -912,33 +938,10 @@
         $('fullLinkLanding').href = fullAppHref();
         $('fullLinkRoom').href = fullAppHref();
         if (!inRoom) return;
-        renderBar();
-        renderTurn();
+        renderChrome();
         renderVeil();
-        renderColour();
-        renderSize();
-    }
-
-    function renderBar() {
-        $('barTitle').textContent = 'Room ' + room.code;
-        var sub;
-        switch (room.phase) {
-            case 'open':
-                var others = Math.max(0, room.count - 1);
-                sub = (others ? others + (others === 1 ? ' other here' : ' others here') : 'Nobody else here yet') +
-                    (room.id ? ' · you’re ' + shortName(room.id) : '');
-                break;
-            case 'connecting': sub = 'Joining…'; break;
-            case 'retrying': sub = 'Reconnecting…'; break;
-            case 'lost': sub = 'Disconnected'; break;
-            case 'refused': sub = room.refusal === 'locked' ? 'Room locked' : 'Room full'; break;
-            default: sub = '';
-        }
-        $('barSub').textContent = sub;
-        var dot = $('meDot');
-        var col = (room.phase === 'open' && room.id) ? colorForClient(room.id) : '';
-        dot.style.background = col;
-        dot.style.color = col || 'transparent';
+        // The chrome may have changed size; the pad keeps clear of it.
+        queueLayout();
     }
 
     function fmtClock(ms) {
@@ -946,26 +949,55 @@
         return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
     }
 
-    function renderTurn() {
-        var banner = $('turnBanner');
+    // Short on purpose: in a sideways phone the chip lives in the margin
+    // beside the pad, and a longer line would push the pad down.
+    function peopleText() {
+        return room.count > 1 ? room.count + ' here' : 'Just you';
+    }
+
+    // The corner chrome: who is here or whose turn it is (left), Pass and
+    // the menu (right), and in the menu's head the room and which cursor on
+    // the big screen is yours.
+    function renderChrome() {
         var t = room.turns;
-        if (!room.code || room.phase !== 'open' || !t.on) { banner.hidden = true; return; }
-        var mine = isMyTurn();
-        var text;
-        if (mine && room.spent) text = 'Swirl sent — the brush is moving on';
-        else if (mine) text = isCallMode() ? 'Your call — make one swirl' : 'Your turn';
-        else {
+        var open = room.phase === 'open';
+        var turns = open && t.on;
+        var mine = turns && isMyTurn();
+        var main, sub = '';
+        if (!open) {
+            main = ({ connecting: 'Joining…', retrying: 'Reconnecting…', lost: 'Disconnected',
+                refused: room.refusal === 'locked' ? 'Room locked' : 'Room full' })[room.phase] || '';
+        } else if (turns) {
+            if (mine && room.spent) main = 'Swirl sent';
+            else if (mine) main = isCallMode() ? 'Your call' : 'Your turn';
+            else main = holderName() + (isCallMode() ? '’s call' : '’s turn');
+            if (t.deadline && !(mine && room.spent)) main += ' · ' + fmtClock(t.deadline - Date.now());
             var idx = t.order.indexOf(t.holder);
             var nextId = (idx >= 0 && t.order.length) ? t.order[(idx + 1) % t.order.length] : null;
-            text = holderName() + (isCallMode() ? '’s call' : ' is painting') +
-                (nextId && nextId === room.id ? ' · you’re next' : '');
+            sub = (!mine && nextId === room.id) ? 'You’re next' : peopleText();
+        } else {
+            main = peopleText();
         }
-        if (t.deadline && !(mine && room.spent)) text += ' · ' + fmtClock(t.deadline - Date.now());
-        $('turnText').textContent = text;
-        banner.classList.toggle('is-mine', mine && !room.spent);
-        $('passBtn').hidden = !(mine && !room.spent);
-        $('passBtn').textContent = isCallMode() ? 'Pass my call' : 'Pass';
-        banner.hidden = false;
+        $('chipMain').textContent = main;
+        $('chipSub').textContent = sub;
+        chipL.classList.toggle('is-turns', turns);
+        chipL.classList.toggle('is-mine', mine && !room.spent);
+        var dot = $('meDot');
+        var col = (open && room.id) ? colorForClient(room.id) : '';
+        dot.style.background = col;
+        dot.style.color = col || 'transparent';
+        // While turns run, Pass keeps its place (faded out when the brush is
+        // elsewhere), so the pad does not move as the brush goes round.
+        var pass = $('passBtn');
+        pass.hidden = !turns;
+        pass.classList.toggle('is-idle', !(mine && !room.spent));
+        pass.textContent = isCallMode() ? 'Pass my call' : 'Pass';
+        var head = $('menuHead');
+        head.textContent = '';
+        var b = document.createElement('b');
+        b.textContent = 'Room ' + room.code;
+        head.appendChild(b);
+        if (open && room.id) head.appendChild(document.createTextNode(' · you’re ' + shortName(room.id)));
     }
 
     function veilButton(label, fn, emphasis) {
@@ -1020,66 +1052,6 @@
         actions.forEach(function (b) { box.appendChild(b); });
         box.hidden = !actions.length;
     }
-
-    // The colour line: what the next stroke will look like, and why — the
-    // computer decides (see strokeColor), so this only reports it.
-    var PALETTE_DOTS = 8;
-    function renderColour() {
-        var dots = $('colourDots');
-        var i = room.info, mode = colourMode();
-        var key = mode + '|' + (i ? (i.color + '|' + i.colors.join(',')) : '') + '|' + brush.cycle;
-        if (dots.dataset.key === key) return;
-        dots.dataset.key = key;
-        dots.textContent = '';
-        var dot = function (bg, cls) {
-            var d = document.createElement('span');
-            d.className = 'colour-dot' + (cls ? ' ' + cls : '');
-            if (bg) d.style.background = bg;
-            dots.appendChild(d);
-        };
-        var text;
-        if (mode === 'fixed') {
-            dot(i.color);
-            text = 'The computer’s colour';
-        } else if (mode === 'step') {
-            // The next colour first, then the ones after it.
-            var n = i.colors.length;
-            for (var k = 0; k < Math.min(n, PALETTE_DOTS); k++) {
-                dot(i.colors[(brush.cycle + k) % n], k === 0 ? 'is-next' : '');
-            }
-            text = 'The computer’s palette, a colour a stroke';
-        } else {
-            dot('', 'is-mix');
-            text = i ? 'A new colour every stroke, like the computer' : 'A new colour every stroke';
-        }
-        $('colourText').textContent = text;
-    }
-
-    function fmtSize(v) { return v < 10 ? v.toFixed(1) : String(Math.round(v)); }
-
-    function renderSize() {
-        var range = $('sizeRange');
-        if (document.activeElement !== range) range.value = String(r3(brush.size));
-        $('sizeValue').textContent = fmtSize(sizeToValue(brush.size));
-    }
-
-    // While the slider moves, a ring on the pad shows the brush at its
-    // real size: the e^-1 footprint, √radius of the canvas height.
-    var ringTimer = 0;
-    function showSizeRing() {
-        var ring = $('sizeRing');
-        var d = Math.max(6, 2 * Math.sqrt(radius()) * pad.clientHeight);
-        ring.style.width = ring.style.height = d + 'px';
-        ring.hidden = false;
-        clearTimeout(ringTimer);
-        ringTimer = setTimeout(function () { ring.hidden = true; }, 900);
-    }
-    $('sizeRange').addEventListener('input', function (e) {
-        brush.size = clamp(parseFloat(e.target.value) || 0, 0, 1);
-        $('sizeValue').textContent = fmtSize(sizeToValue(brush.size));
-        showSizeRing();
-    });
-    $('sizeRange').addEventListener('change', function () { renderSize(); });
 
     // ── Menu, confirm, toast ─────────────────────────────────────────
     function openMenu() {
@@ -1254,7 +1226,7 @@
             return {
                 host: HOST, code: room.code, phase: room.phase, refusal: room.refusal, id: room.id,
                 count: room.count, turns: JSON.parse(JSON.stringify(room.turns)), spent: room.spent,
-                info: room.info, brush: { size: brush.size, value: sizeToValue(brush.size), colour: colourMode(), cycle: brush.cycle },
+                info: room.info, brush: { radius: radius(), colour: colourMode(), cycle: brush.cycle },
                 queued: queue.length, stroking: !!stroke,
                 pad: { w: pad.offsetWidth, h: pad.offsetHeight }
             };
