@@ -9,6 +9,8 @@
 //
 // Env: MP_HOST (default 127.0.0.1:8787), CHROME (path), SHOTS=<dir> saves
 // screenshots of the phone and the dialog. ~40 s.
+// APP_URL=https://swirltogether.com/ drives the DEPLOYED pages instead of
+// this tree (the relay then defaults to that site's own).
 'use strict';
 const { spawn } = require('child_process');
 const http = require('http');
@@ -19,7 +21,8 @@ const { connect, waitReady } = require('../cdp.js');
 
 const REPO = path.resolve(__dirname, '..', '..', '..');
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const RELAY = process.env.MP_HOST || '127.0.0.1:8787';
+const APP_URL = process.env.APP_URL || '';
+const RELAY = process.env.MP_HOST || (APP_URL ? new URL(APP_URL).host : '127.0.0.1:8787');
 const SHOTS = process.env.SHOTS || '';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const t0 = Date.now();
@@ -75,6 +78,12 @@ async function chrome(port, name, size) {
 
 const PREP = "try{localStorage.setItem('fluidui.photoWarn.ack.v1','1');localStorage.setItem('fluidui.uiFork.skip','1');" +
     "localStorage.setItem('fluidMultiplayerHost','" + RELAY + "');}catch(_){} window.__skipUIFork=true;";
+
+// ?delay06=1 holds the room client (06a) back for a few seconds, the way a
+// slow connection does, so the phone door can be clicked before it lands.
+const DELAY_06 = "(function(){ if (!/[?&]delay06=1/.test(location.search)) return; var ap = Node.prototype.appendChild;" +
+    " Node.prototype.appendChild = function (n) { if (n && n.tagName === 'SCRIPT' && /06a-mp-core/.test(n.src || '')) {" +
+    " var self = this; setTimeout(function () { ap.call(self, n); }, 2500); return n; } return ap.call(this, n); }; })();";
 
 // Desktop page kit: dye readback, and a count of peer paint by sender kind.
 const KIT_A = String.raw`(function(){
@@ -134,7 +143,10 @@ async function bootDesktop(A, url) {
     await a.send('Page.addScriptToEvaluateOnNewDocument', { source: PREP });
     await a.send('Page.navigate', { url });
     await waitReady(a, { timeoutMs: 90000 });
-    await until(a, "!!(window.PhonePads && typeof connectToRoom==='function' && document.getElementById('mixer-strip') && document.getElementById('phonePadBtn'))", 30000);
+    // The whole async chain, not just 06a: over a real network the room
+    // client's later files can still be loading when connectToRoom exists.
+    const ready = await until(a, "!!(window.__scriptsReady && window.PhonePads && typeof showConnectedUI==='function' && document.getElementById('mixer-strip') && document.getElementById('phonePadBtn'))", 30000);
+    if (!ready) throw new Error('desktop page never finished loading');
     await a.eval("(function(){var pw=document.getElementById('photoWarn'); if(pw) pw.hidden=true; if(isPaused) togglePause(); if(window.QualityGovernor&&QualityGovernor.setEnabled) QualityGovernor.setEnabled(false); return 1;})()");
     return a.eval(KIT_A);
 }
@@ -163,12 +175,25 @@ async function tap(b, sel) {
 
 (async () => {
     const srv = await serve();
-    const url = 'http://127.0.0.1:' + srv.address().port + '/';
+    const url = APP_URL || ('http://127.0.0.1:' + srv.address().port + '/');
     log('static server', url, 'relay', RELAY);
     let A = null, B = null;
     try {
         [A, B] = await Promise.all([chrome(9371, 'A', '1280,860'), chrome(9372, 'B', '500,900')]);
         const a = A.page, b = B.page;
+
+        // ── The door clicked before the room client has loaded ────────
+        await a.send('Page.addScriptToEvaluateOnNewDocument', { source: PREP + DELAY_06 });
+        await a.send('Page.navigate', { url: url + '?delay06=1' });
+        await until(a, "!!document.getElementById('phonePadBtn')", 30000);
+        const early = await a.eval("(function(){ var ready = !!window.__scriptsReady; document.getElementById('phonePadBtn').click();" +
+            " return { ready: ready, modal: !!document.getElementById('phonePadModal') }; })()");
+        check(!early.ready && !early.modal, 'a click before the room client loads waits for it', early);
+        const late = await until(a, "(function(){ var m = document.getElementById('phonePadModal');" +
+            " return window.__scriptsReady && m && m.classList.contains('show') && currentRoom ? currentRoom : null; })()", 60000);
+        check(!!late, 'and then opens the dialog with a room', late);
+        await a.eval('PhonePads.close(); disconnectMultiplayer(); 1').catch(() => {});
+
         log('A', await bootDesktop(A, url));
         // One solid colour on the computer, so the phone (which starts from
         // the computer's brush) and a local stroke paint the same dye.

@@ -351,7 +351,22 @@
         els.unlock.hidden = !(locked && amHost());
     }
 
+    var openWhenReady = false;
     function open() {
+        // The room client (06a–06e) arrives in the async chain after this
+        // file, and the button exists before it does: a click that beats it
+        // (a slow connection) opens the dialog once it lands instead of
+        // failing halfway into starting a room.
+        if (!window.__scriptsReady) {
+            if (!openWhenReady) {
+                openWhenReady = true;
+                document.addEventListener('fluidui:scripts-ready', function () {
+                    openWhenReady = false;
+                    open();
+                }, { once: true });
+            }
+            return false;
+        }
         if (inStrangerRoom()) {
             announce('Phones join rooms you start. Leave this swirl, then choose Paint from your phone.');
             return false;

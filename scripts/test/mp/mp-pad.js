@@ -4,8 +4,11 @@
 // messages (pad-hello / pad-info, its strokes and passes) like anyone's.
 //   MP_HOST=127.0.0.1:8787 node scripts/test/mp/mp-pad.js     (wrangler dev)
 //   node scripts/test/mp/mp-pad.js                            (partykit dev, :1999)
+//   MP_HOST=swirltogether.com node scripts/test/mp/mp-pad.js  (the live relay, wss)
 const WebSocket = require('ws');
 const HOST = process.env.MP_HOST || process.argv[2] || '127.0.0.1:1999';
+// ws:// for a local relay, wss:// for a deployed one (the client's rule).
+const PROTO = /^(localhost|127\.|10\.|192\.168\.)/.test(HOST) ? 'ws' : 'wss';
 const ROOM = process.env.MP_ROOM || ('PD' + Math.random().toString(36).slice(2, 6).toUpperCase());
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 const t0 = Date.now();
@@ -19,7 +22,7 @@ const stamp = Date.now().toString(36);
 
 function connect(name, uid, pad) {
   return new Promise((res, rej) => {
-    const url = `ws://${HOST}/parties/fluid/${ROOM}?uid=${encodeURIComponent(uid)}` + (pad ? '&kind=pad' : '');
+    const url = `${PROTO}://${HOST}/parties/fluid/${ROOM}?uid=${encodeURIComponent(uid)}` + (pad ? '&kind=pad' : '');
     const ws = new WebSocket(url);
     const c = { name, uid, ws, id: null, role: null, turn: null, msgs: [], hostChanged: [] };
     ws.on('message', (b) => {
@@ -128,7 +131,7 @@ const drop = async (c) => { c.ws.terminate(); await wait(700); };
   // 8. An ordinary client with no kind is unchanged: first in is host.
   const ROOM2 = ROOM + 'X';
   const plain = await new Promise((res, rej) => {
-    const ws = new WebSocket(`ws://${HOST}/parties/fluid/${ROOM2}?uid=plain-${stamp}`);
+    const ws = new WebSocket(`${PROTO}://${HOST}/parties/fluid/${ROOM2}?uid=plain-${stamp}`);
     ws.on('message', (b) => { const d = JSON.parse(b.toString()); if (d.type === 'connected') res({ ws, role: d.role }); });
     ws.on('error', rej);
   });
