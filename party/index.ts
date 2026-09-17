@@ -3,6 +3,7 @@ import {
   roomKind,
   capacityFor,
   uidFromRequestUrl,
+  isPadRequest,
   internalSecret,
   MAX_MESSAGE_BYTES,
 } from "./shared";
@@ -10,6 +11,9 @@ import {
 interface ConnState {
   uid: string;
   role: "host" | "guest";
+  // A phone brush (?kind=pad): paints, but never hosts. See the election in
+  // onConnect.
+  pad?: boolean;
   // Liveness: stamped on every message. `pinger` marks a client that has
   // sent at least one heartbeat — only those may be reaped for silence
   // (old deployed clients never ping and must never be reaped).
@@ -209,6 +213,7 @@ export default class FluidPartyServer implements Party.Server {
     await this.ensureLoaded();
 
     const uid = uidFromRequestUrl(ctx.request.url) || conn.id;
+    const pad = isPadRequest(ctx.request.url);
 
     // Reap zombies BEFORE the capacity check: a dead-but-unreaped peer must
     // not make a cap-2 stranger room refuse a live newcomer as "full".
@@ -236,7 +241,7 @@ export default class FluidPartyServer implements Party.Server {
     // closes (redeploy/eviction). The named members may never return — rebuild
     // around this member instead of pinning the room on ghosts.
     if (others === 0) {
-      if (this.hostId && this.hostId !== uid) this.hostId = uid;
+      if (this.hostId && this.hostId !== uid) this.hostId = pad ? null : uid;
       if (this.turnsOn) {
         this.turnQueue = [uid];
         this.turnHolder = uid;
@@ -248,9 +253,13 @@ export default class FluidPartyServer implements Party.Server {
 
     // Host election — synchronous compare-and-set on in-memory state (no await
     // between read and write, so two simultaneous first-joiners can't both win).
-    if (!this.hostId) this.hostId = uid;
-    const role: "host" | "guest" = uid === this.hostId ? "host" : "guest";
-    conn.setState({ uid, role } as ConnState);
+    // A phone brush never takes the seat: it has no canvas and no room
+    // controls, and a computer that reloads while its phone stays connected
+    // must get its room back, not find the phone holding it. So a pad leaves
+    // an empty seat empty, and the next canvas to arrive takes it.
+    if (!this.hostId && !pad) this.hostId = uid;
+    const role: "host" | "guest" = !pad && uid === this.hostId ? "host" : "guest";
+    conn.setState({ uid, role, pad } as ConnState);
 
     this.members.add(uid);
     // Joining while turns are running: append to the rotation (no holder change).
@@ -571,8 +580,14 @@ export default class FluidPartyServer implements Party.Server {
 
 
     // Host left but others remain → transfer host so lock/unlock stays usable.
+    // Never to a phone brush (see the election in onConnect): with only pads
+    // left the seat stays empty until a canvas joins.
     if (st && st.uid === this.hostId) {
-      const nextState = remaining[0].state as ConnState | null;
+      const next = remaining.find((c) => {
+        const cs = c.state as ConnState | null;
+        return !!cs && !cs.pad;
+      });
+      const nextState = next ? (next.state as ConnState | null) : null;
       this.hostId = nextState ? nextState.uid : null;
       await this.persist();
       if (this.hostId) {

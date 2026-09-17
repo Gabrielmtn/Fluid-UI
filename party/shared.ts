@@ -66,3 +66,14 @@ export function uidFromRequestUrl(url: string): string | null {
     return null;
   }
 }
+
+// A phone brush (phone/ in the web bundle) joins with ?kind=pad. It paints
+// into the room but has no canvas and no room controls, so the play room
+// never makes it the host (see the election in party/index.ts).
+export function isPadRequest(url: string): boolean {
+  try {
+    return new URL(url).searchParams.get("kind") === "pad";
+  } catch {
+    return false;
+  }
+}

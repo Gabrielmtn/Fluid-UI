@@ -78,7 +78,9 @@ function updateRemoteCursors() {
             cursorEl.style.boxShadow = '0 0 8px ' + col;
             const label = document.createElement('span');
             label.className = 'remote-cursor-label';
-            label.textContent = shortName(id);
+            // A phone brush paints here without a canvas of its own: mark
+            // it, so whoever holds the phone can find themselves.
+            label.textContent = (window.PhonePads && window.PhonePads.isPad(id) ? '📱 ' : '') + shortName(id);
             label.style.color = col;
             cursorEl.appendChild(label);
             canvasWrapper.appendChild(cursorEl);
@@ -202,6 +204,9 @@ function updateConnectedView() {
 
     updateTurnUI();
     updateUsersDisplay();
+    // Host changes, counts and room kind decide the phone door and who
+    // answers phones (js/54-phone-pads.js).
+    if (window.PhonePads) window.PhonePads.onRoom();
 }
 
 function showDisconnectedUI() {
@@ -214,6 +219,7 @@ function showDisconnectedUI() {
     // Reconnect button only appears after a give-up (giveUpConnection re-shows it)
     var rc = document.getElementById('reconnectBtn');
     if (rc) rc.style.display = 'none';
+    if (window.PhonePads) window.PhonePads.onRoom();
 }
 
 function updateUsersDisplay() {

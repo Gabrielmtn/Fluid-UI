@@ -17,7 +17,9 @@ const OUT = path.join(ROOT, "public");
 
 // Everything the browser loads (relative paths in index.html resolve from here).
 // If you add a runtime asset dir (fonts/, img/), add it to this list.
-const INCLUDE = ["index.html", "js", "css", "assets"];
+// phone/ is the phone brush (phone/index.html): what phones get instead of the
+// app, and where the "Paint from your phone" QR points.
+const INCLUDE = ["index.html", "js", "css", "assets", "phone"];
 
 // Empty public/ by clearing its CONTENTS (not removing the dir itself) — on
 // Windows a process serving public/ can hold a lock that makes removing the
@@ -94,6 +96,17 @@ fs.writeFileSync(htmlPath, html);
 const busted = (before.match(/(["'])(?:js|css)\/[^"'?]+\.(?:js|css)\1/g) || []).length;
 console.log(`  cache-busted ${busted} js/css URLs with ?v=${buildId}`);
 
+// The phone brush page gets the same stamp: its own phone.js/phone.css, and
+// the app's shared stylesheets it links as ../css/ — those are served
+// immutable (below), so an unstamped copy would never update on a phone.
+const phonePath = path.join(OUT, "phone", "index.html");
+if (fs.existsSync(phonePath)) {
+  const ph = fs.readFileSync(phonePath, "utf8");
+  const phRe = /(["'])((?:\.\.\/)?(?:js|css)\/[^"'?]+\.(?:js|css)|phone\.(?:js|css))\1/g;
+  fs.writeFileSync(phonePath, ph.replace(phRe, `$1$2?v=${buildId}$1`));
+  console.log(`  cache-busted ${(ph.match(phRe) || []).length} URLs in phone/index.html`);
+}
+
 // Cache policy for the Cloudflare Workers Static Assets deploy (wrangler.jsonc).
 // The platform honours this file per path, which hosted PartyKit's single
 // global TTL could not: the HTML is always revalidated so a deploy is seen at
@@ -105,6 +118,8 @@ fs.writeFileSync(
   [
     "/", "  Cache-Control: no-cache",
     "/index.html", "  Cache-Control: no-cache",
+    "/phone/", "  Cache-Control: no-cache",
+    "/phone/index.html", "  Cache-Control: no-cache",
     "/js/*", "  Cache-Control: public, max-age=31536000, immutable",
     "/css/*", "  Cache-Control: public, max-age=31536000, immutable",
     "/assets/*", "  Cache-Control: public, max-age=86400",

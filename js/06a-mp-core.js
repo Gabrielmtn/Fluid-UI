@@ -532,6 +532,9 @@ function onMultiplayerMessage(event) {
                 resetTurnState();
                 setSettingsLockedByHost(false, null);
                 updateConnectedView();
+                // Phones in the room say hello again when they see us
+                // arrive; until then the list of them starts over.
+                if (window.PhonePads) window.PhonePads.onRoom('connected');
                 break;
 
             case 'client-count':
@@ -645,7 +648,15 @@ function onMultiplayerMessage(event) {
                 if (data.clientId) break;
                 if (typeof data.id === 'string' && data.id && data.id !== clientId) {
                     dropPeerAssetsOf(data.id);
+                    if (window.PhonePads) window.PhonePads.onLeft(data.id);
                 }
+                break;
+
+            case 'pad-hello':
+                // A phone brush (phone/) says what it is: its cursor gets a
+                // phone mark, and the host tells it what this canvas paints
+                // with (js/54-phone-pads.js). Its strokes are plain 'splat's.
+                if (data.clientId !== clientId && window.PhonePads) window.PhonePads.onHello(data);
                 break;
 
             case 'stroke':

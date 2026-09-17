@@ -64,6 +64,7 @@
       "!.git/**",
       "!party/**",
       "!public/**",
+      "!phone/**",
       "!interaction-design-concept/**",
       "!scripts/**",
       "!steam/**",

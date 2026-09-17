@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0a0b0e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Swirl Together · phone brush</title>
+    <!-- Phones land here from swirltogether.com (index.html sends them) and
+         from the QR under Swirl Together → Paint from your phone. The page is
+         the phone's whole job: a pad that paints on the computer's canvas.
+         See phone.js. -->
+    <meta name="description" content="Your phone is the brush. Paint on the Swirl Together canvas on a computer, from your phone.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Swirl Together">
+    <meta property="og:title" content="Swirl Together · phone brush">
+    <meta property="og:description" content="Your phone is the brush. Paint on the Swirl Together canvas on a computer, from your phone.">
+    <meta property="og:image" content="https://swirltogether.com/assets/og/swirl-together-card.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../assets/favicon.ico" sizes="16x16 32x32 48x48 64x64">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+    <link rel="stylesheet" href="../css/00-tokens.css">
+    <link rel="stylesheet" href="../css/01-buttons.css">
+    <link rel="stylesheet" href="phone.css">
+</head>
+<body data-group="core">
+
+    <!-- ── Not in a room: what this is, and how to get in ── -->
+    <main id="landing" class="landing">
+        <div class="landing-inner">
+            <img class="brand-mark" src="../assets/apple-touch-icon.png" alt="" width="64" height="64">
+            <h1>Swirl Together</h1>
+            <p class="lead">On a phone, you are the brush. The painting happens on a computer.</p>
+
+            <ol class="steps">
+                <li><span class="step-n">1</span><span>Open Swirl Together on a computer: <b>swirltogether.com</b> or the desktop app.</span></li>
+                <li><span class="step-n">2</span><span>Under <b>Swirl Together</b>, choose <b>Paint from your phone</b>.</span></li>
+                <li><span class="step-n">3</span><span>Point this phone’s camera at the code on the screen.</span></li>
+            </ol>
+
+            <form id="joinForm" class="join" autocomplete="off" novalidate>
+                <label for="codeInput">Or type the room code</label>
+                <div class="join-row">
+                    <input id="codeInput" type="text" inputmode="text" autocapitalize="characters" autocomplete="off"
+                           autocorrect="off" spellcheck="false" maxlength="48" placeholder="K7P2QX" aria-describedby="joinError">
+                    <button type="submit" id="joinBtn" class="btn--emphasis">Join</button>
+                </div>
+                <p id="joinError" class="join-error" role="alert" hidden></p>
+            </form>
+
+            <p class="fineprint">No computer nearby? <a id="fullLinkLanding" href="../?full=1">Open the full canvas on this phone</a> instead.</p>
+        </div>
+    </main>
+
+    <!-- ── In a room: the pad ── -->
+    <main id="padView" class="pad-view" hidden>
+        <header class="bar">
+            <span id="meDot" class="me-dot" aria-hidden="true"></span>
+            <div class="bar-text">
+                <div id="barTitle" class="bar-title">Room</div>
+                <div id="barSub" class="bar-sub" aria-live="polite">Joining…</div>
+            </div>
+            <button type="button" id="moreBtn" class="btn--ghost bar-more" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" aria-label="More">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+            </button>
+        </header>
+
+        <div id="turnBanner" class="turn-banner" hidden>
+            <span id="turnText" class="turn-text"></span>
+            <button type="button" id="passBtn" class="turn-pass" hidden>Pass</button>
+        </div>
+
+        <!-- The pad and its tools sit together in the middle of the screen
+             (side by side when the phone is sideways). -->
+        <section id="stage" class="stage">
+            <div class="pad-wrap">
+                <div id="pad" class="pad" role="application" aria-label="Paint pad. Your strokes appear on the computer's screen.">
+                    <canvas id="trail" class="trail" aria-hidden="true"></canvas>
+                    <div id="sizeRing" class="size-ring" aria-hidden="true" hidden></div>
+                    <p id="padHint" class="pad-hint">Paint here — watch the big screen</p>
+                    <div id="veil" class="veil" hidden>
+                        <p id="veilText" class="veil-text"></p>
+                        <div id="veilActions" class="veil-actions"></div>
+                    </div>
+                </div>
+                <p id="rotateHint" class="rotate-hint" hidden>Turn your phone sideways for a bigger pad.</p>
+            </div>
+
+            <!-- The phone paints with the computer's brush: its colours, tip and
+                 arms. The one thing to set here is how big a stroke is. -->
+            <section id="tools" class="tools" aria-label="Brush">
+                <div class="colour-now">
+                    <span id="colourDots" class="colour-dots" aria-hidden="true"></span>
+                    <span id="colourText" class="colour-text">Colours come from the computer</span>
+                </div>
+                <div class="size-row">
+                    <span class="size-label" aria-hidden="true">Size</span>
+                    <input type="range" id="sizeRange" min="0" max="1" step="0.001" value="0.41" aria-label="Brush size">
+                    <span id="sizeValue" class="size-value" aria-hidden="true"></span>
+                </div>
+            </section>
+        </section>
+
+        <div id="moreMenu" class="menu" role="menu" hidden>
+            <button type="button" role="menuitem" id="fullscreenBtn" hidden>Full screen</button>
+            <button type="button" role="menuitem" id="clearBtn">Clear the canvas</button>
+            <a role="menuitem" id="fullLinkRoom" href="../?full=1">Open the full canvas here</a>
+            <button type="button" role="menuitem" id="leaveBtn">Leave the room</button>
+        </div>
+
+        <div id="confirmSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="confirmText" hidden>
+            <div class="sheet-card">
+                <p id="confirmText">Clear the canvas for everyone in the room?</p>
+                <div class="sheet-actions">
+                    <button type="button" id="confirmNo">Keep painting</button>
+                    <button type="button" id="confirmYes" class="btn--destructive">Clear</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    </main>
+
+    <script src="phone.js"></script>
+</body>
+</html>

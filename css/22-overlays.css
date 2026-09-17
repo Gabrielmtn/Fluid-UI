@@ -2039,3 +2039,80 @@ body.mobile-mode .playtest-label.floating {
 .demo-wishlist-modal .delete-modal-message { line-height: 1.5; }
 .demo-wishlist-modal .delete-modal-actions { flex-wrap: wrap; }
 .demo-wishlist-modal button:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+
+/* ── "Paint from your phone" (js/54-phone-pads.js) ──
+   .delete-modal chrome. Same tier as the other asks (10040): under the
+   How-do-I modal and the app-close confirm. The QR sits on white for the
+   same reason as the room panel's (a camera acquires it fastest). */
+.phone-pad-modal { z-index: 10040; }
+.phone-pad-modal .delete-modal-content { max-width: 470px; }
+.phone-pad-modal .delete-modal-message { line-height: 1.5; margin-bottom: 16px; }
+.phone-pad-body {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+.phone-pad-qr {
+    flex: none;
+    width: 196px;
+    height: 196px;
+    box-sizing: border-box;
+    padding: 6px;
+    border-radius: 10px;
+    background: #fff;
+}
+.phone-pad-qr svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.phone-pad-qr.is-hidden {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+}
+.phone-pad-side { flex: 1; min-width: 0; }
+.phone-pad-alt {
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ink-300, #b9bec7);
+}
+.phone-pad-code {
+    margin-top: 6px;
+    font: 700 28px/1.1 'Courier New', monospace;
+    letter-spacing: 3px;
+    color: var(--ink-100, #f2f3f5);
+    word-break: break-all;
+}
+.phone-pad-reveal { margin-top: 10px; }
+.phone-pad-status {
+    margin-top: 16px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ink-300, #b9bec7);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.phone-pad-status.is-live {
+    color: var(--ink-100, #f2f3f5);
+    background: rgba(63, 185, 80, 0.14);
+    border-color: rgba(63, 185, 80, 0.4);
+}
+.phone-pad-note {
+    margin-top: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--warn, #ffa500);
+}
+.phone-pad-modal .delete-modal-actions { margin-top: 18px; flex-wrap: wrap; }
+.phone-pad-modal [hidden] { display: none !important; }
+.phone-pad-modal button:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+@media (max-width: 520px) {
+    .phone-pad-body { flex-direction: column; align-items: stretch; }
+    .phone-pad-qr { margin: 0 auto; }
+}
+/* The phone door inside the room panel's invite block, under Copy link /
+   Copy code (the block's own rules live in 21-sidebar.css). */
+#multiArtistPanel .mp-btn-phone { width: 100%; margin-top: 8px; }
+#multiArtistPanel .mp-btn-phone[hidden] { display: none; }

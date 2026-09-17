@@ -465,6 +465,10 @@
             { say: 'Share it: Copy link for a chat, Copy code to read out, or switch to QR for phones. Hide keeps it off a stream.', target: { overlay: 'mp', sel: '#copyRoomBtn' }, until: { click: true } },
             { say: 'Friends paste the code into Join under Swirl Together, and their strokes land on your canvas live.', target: { overlay: 'mp', sel: '#roomName' } }
           ] },
+        { id: 'phone', pillar: 'together', title: 'Paint from my phone',
+          tags: ['phone', 'use', 'mobile', 'iphone', 'android', 'smartphone', 'remote', 'controller', 'control', 'touch', 'pad', 'scan', 'qr', 'couch', 'tv', 'tablet', 'connect'],
+          answer: 'Swirl Together → Paint from your phone. Scan the code with the phone’s camera: the phone becomes a brush, and its strokes land on this canvas.',
+          target: { section: 'Swirl Together', sel: '#phonePadBtn', fallback: { overlay: 'mp', sel: '#phonePadRoomBtn' } } },
         { id: 'turns', pillar: 'together', title: 'Take turns instead of painting at once',
           tags: ['turns', 'turn', 'rotation', 'timer', 'host', 'lock', 'whose'],
           answer: 'Swirl Together → Take turns (host only). The brush passes around on the turn length you set; the chip by the bottom bar shows whose turn it is.',

@@ -44,6 +44,38 @@
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <script>
+    // Phones get the phone brush (phone/), not this app (2026-09-16). On a
+    // phone Swirl Together is a controller: a pad that paints on a computer's
+    // canvas, in the room the computer is in — the room code (#CODE) and any
+    // query ride along. The whole app stays reachable with ?full=1, which the
+    // phone page links to. First script on the page on purpose: nothing
+    // heavy has started yet, and the async chain below checks the flag.
+    // Tablets and small desktop windows are not phones: a phone is a small
+    // screen (short side under 600 CSS px) that is touch-first or says it
+    // is mobile.
+    (function () {
+        try {
+            if (typeof process !== 'undefined' && process.versions && process.versions.electron) return;
+            if (!/^https?:$/.test(location.protocol)) return;
+            if (/(?:^|&)full=1(?:&|$)/.test(location.search.slice(1))) return;
+            var mq = function (q) { try { return window.matchMedia(q).matches; } catch (e) { return false; } };
+            var sw = (window.screen && screen.width) || 0, sh = (window.screen && screen.height) || 0;
+            var shortSide = Math.min(sw, sh) || Math.min(window.innerWidth, window.innerHeight);
+            var ua = navigator.userAgent || '';
+            var mobileUA = !!(navigator.userAgentData && navigator.userAgentData.mobile === true) ||
+                /iPhone|iPod|Android.+Mobile|Windows Phone|IEMobile|Mobile.+Firefox/i.test(ua);
+            var touchFirst = mq('(pointer: coarse)') && !mq('(any-pointer: fine)');
+            if (!(shortSide > 0 && shortSide < 600 && (mobileUA || touchFirst))) return;
+            window.__swirlToPhone = true;
+            document.documentElement.style.display = 'none';
+            location.replace(location.pathname.replace(/[^/]*$/, '') + 'phone/' + location.search + location.hash);
+        } catch (e) {
+            window.__swirlToPhone = false;
+            try { document.documentElement.style.display = ''; } catch (_) {}
+        }
+    })();
+    </script>
+    <script>
     // Boot-time globals + global error surface. Runs before every other script
     // so even an early load failure is visible instead of a silent half-boot.
     (function () {
@@ -1597,6 +1629,9 @@
     <!-- PERF: Adaptive loading with progress feedback -->
     <script>
     (function() {
+        // On the way to the phone brush (first script in <head>): the sim
+        // never starts on a page that is leaving.
+        if (window.__swirlToPhone) return;
         var scripts = [
             'js/04a-canvas-gl-config.js',
             'js/04b-presets.js',
@@ -1775,6 +1810,10 @@
          spot instead. Needs the built underbar and the startup prompts, so it
          loads last; the full game returns before touching anything. -->
     <script src="js/52-demo-clock.js"></script>
+    <!-- Paint from your phone: the door under Swirl Together, the QR dialog,
+         and the host's answer to a phone brush (phone/ in the web bundle).
+         Reads the room client (06a–06e) at event time, so it can load here. -->
+    <script src="js/54-phone-pads.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">
