@@ -466,8 +466,8 @@
             { say: 'Friends paste the code into Join under Swirl Together, and their strokes land on your canvas live.', target: { overlay: 'mp', sel: '#roomName' } }
           ] },
         { id: 'phone', pillar: 'together', title: 'Paint from my phone',
-          tags: ['phone', 'use', 'mobile', 'iphone', 'android', 'smartphone', 'remote', 'controller', 'control', 'touch', 'pad', 'scan', 'qr', 'couch', 'tv', 'tablet', 'connect'],
-          answer: 'Swirl Together → Paint from your phone. Scan the code with the phone’s camera: the phone becomes a brush, and its strokes land on this canvas.',
+          tags: ['phone', 'use', 'mobile', 'iphone', 'android', 'smartphone', 'remote', 'controller', 'control', 'touch', 'pad', 'scan', 'qr', 'couch', 'tv', 'tablet', 'connect', 'mouse', 'artist', 'friends'],
+          answer: 'Swirl Together → Paint from your phone, then pick how. As your mouse: the phone steers this canvas’s own brush, with all your settings. As an artist: each phone that scans joins your room as a painter of its own. Scan the code with the phone’s camera.',
           target: { section: 'Swirl Together', sel: '#phonePadBtn', fallback: { overlay: 'mp', sel: '#phonePadRoomBtn' } } },
         { id: 'turns', pillar: 'together', title: 'Take turns instead of painting at once',
           tags: ['turns', 'turn', 'rotation', 'timer', 'host', 'lock', 'whose'],

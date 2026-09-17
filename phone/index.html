@@ -40,23 +40,39 @@
             <img class="brand-mark" src="../assets/pwa/icon-192.png" alt="" width="64" height="64">
             <h1>Swirl Together</h1>
             <p class="lead">On a phone, you are the brush. The painting happens on a computer.</p>
+            <p id="landingNote" class="landing-note" role="status" hidden></p>
 
-            <!-- The room this phone was in lately (an app opened from the home
-                 screen starts here, without the link it was scanned from). -->
-            <button type="button" id="rejoinBtn" class="rejoin btn--emphasis" hidden>Rejoin room <span id="rejoinCode"></span></button>
+            <!-- What this phone was connected to lately (an app opened from the
+                 home screen starts here, without the link it was scanned from). -->
+            <button type="button" id="rejoinBtn" class="rejoin btn--emphasis" hidden><span id="rejoinText">Rejoin room</span> <span id="rejoinCode"></span></button>
+
+            <!-- The two ways a phone paints. A scanned code already knows
+                 which (a computer's has 8 characters, a room's 6); the pick
+                 here sets the steps and the code box below. -->
+            <h2 class="ways-title" id="waysTitle">Two ways to paint</h2>
+            <div class="ways" role="group" aria-labelledby="waysTitle">
+                <button type="button" id="wayMouse" class="way" aria-pressed="true">
+                    <span class="way-name">Be your computer’s mouse</span>
+                    <span class="way-text">Steer the brush on your own computer, with everything you set up there.</span>
+                </button>
+                <button type="button" id="wayRoom" class="way" aria-pressed="false">
+                    <span class="way-name">Join as an artist</span>
+                    <span class="way-text">Paint in a Swirl Together room as an artist of your own, beside everyone else.</span>
+                </button>
+            </div>
 
             <ol class="steps">
                 <li><span class="step-n">1</span><span>Open Swirl Together on a computer: <b>swirltogether.com</b> or the desktop app.</span></li>
-                <li><span class="step-n">2</span><span>Under <b>Swirl Together</b>, choose <b>Paint from your phone</b>.</span></li>
+                <li><span class="step-n">2</span><span id="step2">Choose <b>Paint from your phone</b>, then <b>As your mouse</b>.</span></li>
                 <li><span class="step-n">3</span><span id="step3">Point this phone’s camera at the code on the screen.</span></li>
             </ol>
 
             <form id="joinForm" class="join" autocomplete="off" novalidate>
-                <label for="codeInput" id="codeLabel">Or type the room code</label>
+                <label for="codeInput" id="codeLabel">Or type the code</label>
                 <div class="join-row">
                     <input id="codeInput" type="text" inputmode="text" autocapitalize="characters" autocomplete="off"
-                           autocorrect="off" spellcheck="false" maxlength="48" placeholder="K7P2QX" aria-describedby="joinError">
-                    <button type="submit" id="joinBtn" class="btn--emphasis">Join</button>
+                           autocorrect="off" spellcheck="false" maxlength="48" placeholder="KMP4 QX7R" aria-describedby="joinError">
+                    <button type="submit" id="joinBtn" class="btn--emphasis">Connect</button>
                 </div>
                 <p id="joinError" class="join-error" role="alert" hidden></p>
             </form>
@@ -72,7 +88,7 @@
         </div>
     </main>
 
-    <!-- ── In a room: the pad ── -->
+    <!-- ── Connected: the pad ── -->
     <main id="padView" class="pad-view" hidden>
         <!-- The whole screen is the pad: it takes the computer's canvas shape
              and as much of the screen as fits. The few other things sit in
@@ -94,7 +110,8 @@
         </section>
 
         <!-- Top left: who is here, or whose turn it is. The dot is this
-             phone's cursor colour on the big screen. -->
+             phone's cursor colour on the big screen (as the computer's
+             mouse: the colour the next stroke paints). -->
         <div id="chipLeft" class="chrome chrome-left" aria-live="polite">
             <span id="meDot" class="me-dot" aria-hidden="true"></span>
             <span class="chip-text">
@@ -130,8 +147,10 @@
             </div>
         </div>
 
-        <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     </main>
+
+    <!-- Outside the pad view: the landing says things too. -->
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
     <script src="phone.js"></script>
 </body>

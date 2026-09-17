@@ -201,9 +201,10 @@ async function tap(b, sel) {
             " return { ready: ready, modal: !!document.getElementById('phonePadModal') }; })()");
         check(!early.ready && !early.modal, 'a click before the room client loads waits for it', early);
         const late = await until(a, "(function(){ var m = document.getElementById('phonePadModal');" +
-            " return window.__scriptsReady && m && m.classList.contains('show') && currentRoom ? currentRoom : null; })()", 60000);
-        check(!!late, 'and then opens the dialog with a room', late);
-        await a.eval('PhonePads.close(); disconnectMultiplayer(); 1').catch(() => {});
+            " return window.__scriptsReady && m && m.classList.contains('show') && window.PhoneMouse && PhoneMouse.isOn() ? PhoneMouse.code() : null; })()", 60000);
+        check(!!late, 'and then opens the dialog, with a link for the phone', late);
+        // (stop() also clears the tab's resume flag: the next load starts clean)
+        await a.eval('PhonePads.close(); PhoneMouse.stop(); 1').catch(() => {});
 
         log('A', await bootDesktop(A, url));
         // One solid colour on the computer, so the phone (which starts from
@@ -212,15 +213,18 @@ async function tap(b, sel) {
         check(await a.eval('window.__swirlToPhone !== true'), 'a desktop browser is not sent to the phone page');
         check(await a.eval("!!document.querySelector('#mpDisconnected #phonePadBtn')"), 'Swirl Together shows "Paint from your phone"');
 
-        // ── The door: a room and a QR, no clipboard ──────────────────
+        // ── The door: As an artist is a room and a QR, no clipboard ──
+        // (The dialog opens on As your mouse; mp-phone-mouse.js covers that way.)
         await a.eval("window.__clip = 0; if (navigator.clipboard) navigator.clipboard.writeText = function(){ window.__clip++; return Promise.resolve(); }; 1");
         await a.eval("document.getElementById('phonePadBtn').click(); 1");
+        check(!!(await until(a, "!!document.getElementById('phonePadWayArtist') && !currentRoom", 5000)), 'the door opens the dialog without a room');
+        await a.eval("document.getElementById('phonePadWayArtist').click(); 1");
         const code = await until(a, 'isMultiplayerEnabled && currentRoom', 10000);
-        check(/^[A-Z0-9]{6}$/.test(code || ''), 'the door starts a room', code);
+        check(/^[A-Z0-9]{6}$/.test(code || ''), '"As an artist" starts a room', code);
         const dlg = await until(a, "(function(){var m=document.getElementById('phonePadModal'); if(!m||!m.classList.contains('show')) return null; return {qr:!!m.querySelector('#phonePadQr svg'), code:m.querySelector('#phonePadCode').textContent, status:m.querySelector('#phonePadStatus').textContent, alt:m.querySelector('#phonePadAlt').textContent};})()", 5000);
         check(!!dlg && dlg.qr && dlg.code === code, 'the dialog shows the QR and the code', dlg);
-        await until(a, "/Waiting for your phone/.test(document.getElementById('phonePadStatus').textContent)", 5000);
-        check(/Waiting for your phone/.test(await a.eval("document.getElementById('phonePadStatus').textContent")), 'the dialog waits for a phone');
+        await until(a, "/Waiting for a phone/.test(document.getElementById('phonePadStatus').textContent)", 5000);
+        check(/Waiting for a phone/.test(await a.eval("document.getElementById('phonePadStatus').textContent")), 'the dialog waits for a phone');
         check((await a.eval('window.__clip')) === 0, 'the phone door does not touch the clipboard');
         const qrUrl = await a.eval('PhonePads.padUrl(currentRoom)');
         check(qrUrl === 'https://swirltogether.com/phone/#' + code, 'from localhost the QR points at the public phone page', qrUrl);

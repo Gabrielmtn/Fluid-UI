@@ -2047,6 +2047,17 @@ body.mobile-mode .playtest-label.floating {
 .phone-pad-modal { z-index: 10040; }
 .phone-pad-modal .delete-modal-content { max-width: 470px; }
 .phone-pad-modal .delete-modal-message { line-height: 1.5; margin-bottom: 16px; }
+/* The two ways a phone paints (As your mouse | As an artist): one switch
+   across the dialog. Pressed state and tint come from 01-buttons.css. */
+.phone-pad-ways {
+    display: flex;
+    gap: 6px;
+    margin: 2px 0 12px;
+}
+.phone-pad-ways button {
+    flex: 1 1 0;
+    min-width: 0;
+}
 .phone-pad-body {
     display: flex;
     align-items: center;

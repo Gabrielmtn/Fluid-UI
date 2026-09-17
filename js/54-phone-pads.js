@@ -5,16 +5,23 @@
 //   roomLocked, shareMode, connectToRoom …) are script-global bindings that
 //   exist only once the async chain has loaded, so every read goes through a
 //   guarded accessor and runs at event time, never at load.
-// PROVIDES: window.PhonePads = { open, close, isPad, count, padUrl,
-//   onHello, onLeft, onRoom, sendInfo, __state }
+// PROVIDES: window.PhonePads = { open, close, isPad, count, padUrl, padBase,
+//   onHello, onLeft, onRoom, sendInfo, refresh, __state }
 //
 // A phone does not run the painting. It opens phone/ (swirltogether.com
-// sends small touch screens there), joins the room this canvas is in, and
-// sends its strokes as ordinary room paint — so this canvas, and every other
-// one in the room, draws them the way it draws anyone's (06d). This file is
-// the computer's side of that:
-//   • the door: "Paint from your phone" under Swirl Together, which starts a
-//     room when there is none, and the dialog with the QR a phone scans;
+// sends small touch screens there) and paints one of two ways, picked in
+// the dialog here (2026-09-17):
+//   • AS YOUR MOUSE (js/55-phone-mouse.js): the phone drives this canvas's
+//     own brush, over a private link. No room, and every setting is this
+//     computer's. The default: most people reaching for a phone want this.
+//   • AS AN ARTIST (this file): the phone joins the room this canvas is in
+//     and sends its strokes as ordinary room paint — so this canvas, and
+//     every other one in the room, draws them the way it draws anyone's
+//     (06d). A party's way in: every phone that scans is its own painter.
+// This file is the computer's side of the artist path, and the door to both:
+//   • the door: "Paint from your phone" under Swirl Together, and the dialog
+//     with the QR a phone scans (the artist tab starts a room when there is
+//     none);
 //   • who is a phone: pads say so ('pad-hello'), their cursors here read
 //     "📱 Artist-XX", and the dialog counts them;
 //   • what a phone paints with: THIS canvas's brush. The host answers each
@@ -72,6 +79,7 @@
     }
     function padUrl(code) { return padBase() + 'phone/#' + code; }
     function siteLabel() { return padBase().replace(/^https?:\/\//, '').replace(/\/$/, ''); }
+    function mouse() { return window.PhoneMouse || null; }
 
     // ── Which connections are phones ────────────────────────────────
     var pads = new Map();      // connection id → { tag, at }
@@ -227,12 +235,12 @@
             var btn = el('button', 'mp-btn-primary btn--emphasis', 'Paint from your phone');
             btn.id = 'phonePadBtn';
             btn.type = 'button';
-            btn.title = 'Show a code your phone can scan. It opens a brush for this canvas, nothing to install.';
+            btn.title = 'Show a code your phone can scan: it becomes this canvas’s mouse, or an artist in your room. Nothing to install.';
             btn.addEventListener('click', function () { open(); });
             var nodes = [
                 el('div', 'mp-or', 'or'),
                 btn,
-                el('div', 'mp-sub', 'Your phone becomes a brush for this canvas: scan a code, paint on the phone, watch it here. Nothing to install.')
+                el('div', 'mp-sub', 'Use your phone as this canvas’s mouse, or let phones join as artists. Scan a code, paint on the phone, watch it here. Nothing to install.')
             ];
             nodes.forEach(function (n) {
                 if (before && before.parentNode === disc) disc.insertBefore(n, before);
@@ -244,7 +252,7 @@
             var b2 = el('button', 'mp-btn-share mp-btn-phone', 'Paint from your phone');
             b2.id = 'phonePadRoomBtn';
             b2.type = 'button';
-            b2.title = 'Show a code your phone can scan. It joins this room as a brush.';
+            b2.title = 'Show a code your phone can scan: it becomes this canvas’s mouse, or an artist in this room.';
             b2.addEventListener('click', function () { open(); });
             invite.appendChild(b2);
         }
@@ -252,17 +260,29 @@
     }
 
     function syncButtons() {
+        var pm = mouse();
+        var mouseOn = !!(pm && pm.hasPhone());
+        var b1 = document.getElementById('phonePadBtn');
+        if (b1) b1.textContent = mouseOn ? 'Paint from your phone · connected' : 'Paint from your phone';
         var b = document.getElementById('phonePadRoomBtn');
         if (!b) return;
-        // A stranger pairing has two seats and both are taken.
-        b.hidden = !roomCode() || inStrangerRoom();
-        var n = pads.size;
-        b.textContent = n ? ('Paint from your phone · ' + n + ' connected') : 'Paint from your phone';
+        // Every room: a stranger pairing has no seat for a phone artist, but
+        // the phone can still be this canvas's mouse.
+        b.hidden = !roomCode();
+        var parts = [];
+        if (mouseOn) parts.push('your mouse');
+        if (pads.size) parts.push(pads.size + (pads.size === 1 ? ' artist' : ' artists'));
+        b.textContent = 'Paint from your phone' + (parts.length ? ' · ' + parts.join(', ') : '');
     }
 
     // ── The dialog ──────────────────────────────────────────────────
+    var WAY_KEY = 'fluidui.phoneWay';
     var modal = null, els = null, keyHandler = null, renderTimer = 0;
-    var revealed = false, qrKey = '';
+    var revealed = false, qrKey = '', way = 'mouse';
+
+    function savedWay() {
+        try { return localStorage.getItem(WAY_KEY) === 'artist' ? 'artist' : 'mouse'; } catch (_) { return 'mouse'; }
+    }
 
     function build() {
         if (modal) return;
@@ -275,8 +295,12 @@
         m.innerHTML =
             '<div class="delete-modal-content">' +
                 '<div class="delete-modal-title" id="phonePadTitle">Paint from your phone</div>' +
-                '<div class="delete-modal-message">Scan this with your phone’s camera. Your phone becomes a brush for this canvas: paint on the phone, watch it here. Nothing to install.</div>' +
-                '<div class="phone-pad-body">' +
+                '<div class="phone-pad-ways" role="group" aria-label="How the phone paints">' +
+                    '<button type="button" id="phonePadWayMouse" aria-pressed="true">As your mouse</button>' +
+                    '<button type="button" id="phonePadWayArtist" aria-pressed="false">As an artist</button>' +
+                '</div>' +
+                '<div class="delete-modal-message" id="phonePadMsg"></div>' +
+                '<div class="phone-pad-body" id="phonePadBody">' +
                     '<div class="phone-pad-qr" id="phonePadQr"></div>' +
                     '<div class="phone-pad-side">' +
                         '<div class="phone-pad-alt" id="phonePadAlt"></div>' +
@@ -287,6 +311,7 @@
                 '<div class="phone-pad-status" id="phonePadStatus" role="status" aria-live="polite"></div>' +
                 '<div class="phone-pad-note" id="phonePadNote" hidden></div>' +
                 '<div class="delete-modal-actions">' +
+                    '<button type="button" id="phonePadStop" hidden>Disconnect the phone</button>' +
                     '<button type="button" id="phonePadUnlock" hidden>Unlock the room</button>' +
                     '<button type="button" id="phonePadDone" class="btn--emphasis">Done</button>' +
                 '</div>' +
@@ -294,17 +319,33 @@
         document.body.appendChild(m);
         modal = m;
         els = {
+            wayMouse: m.querySelector('#phonePadWayMouse'),
+            wayArtist: m.querySelector('#phonePadWayArtist'),
+            msg: m.querySelector('#phonePadMsg'),
+            body: m.querySelector('#phonePadBody'),
             qr: m.querySelector('#phonePadQr'),
             alt: m.querySelector('#phonePadAlt'),
             code: m.querySelector('#phonePadCode'),
             reveal: m.querySelector('#phonePadReveal'),
             status: m.querySelector('#phonePadStatus'),
             note: m.querySelector('#phonePadNote'),
+            stop: m.querySelector('#phonePadStop'),
             unlock: m.querySelector('#phonePadUnlock'),
             done: m.querySelector('#phonePadDone')
         };
+        els.wayMouse.addEventListener('click', function () { setWay('mouse'); });
+        els.wayArtist.addEventListener('click', function () { setWay('artist'); });
         els.done.addEventListener('click', close);
         els.reveal.addEventListener('click', function () { revealed = true; renderModal(); });
+        els.stop.addEventListener('click', function () {
+            // The phone is sent away, and the link starts over on a new code
+            // (the dialog is still here to show it): the phone that was here
+            // cannot walk back in.
+            var pm = mouse();
+            if (pm) { pm.stop(true); pm.start(); }
+            qrKey = '';
+            renderModal();
+        });
         els.unlock.addEventListener('click', function () {
             if (amHost() && isLocked() && typeof window.toggleLock === 'function') window.toggleLock();
         });
@@ -314,45 +355,102 @@
 
     function isOpen() { return !!modal && modal.classList.contains('show'); }
 
+    // Switch the dialog between the two ways. Each starts what it needs:
+    // the mouse its link, the artist way a room (unless there is one).
+    function setWay(next) {
+        way = next === 'artist' ? 'artist' : 'mouse';
+        try { localStorage.setItem(WAY_KEY, way); } catch (_) {}
+        revealed = false;
+        qrKey = '';
+        if (way === 'mouse') {
+            var pm = mouse();
+            if (pm) pm.start();
+        } else if (!roomCode() && !inStrangerRoom()) {
+            // createRoom() minus its clipboard copy: the phone scans, nobody pastes.
+            try { connectToRoom(generateRoomCode()); }
+            catch (e) { console.warn('[phone] could not start a room', e); }
+        }
+        renderModal();
+    }
+
+    function groupCode(c) { return c && c.length === 8 ? c.slice(0, 4) + ' ' + c.slice(4) : c; }
+
     function renderModal() {
         if (!isOpen()) return;
-        var code = roomCode();
+        var asMouse = way === 'mouse';
+        els.wayMouse.setAttribute('aria-pressed', asMouse ? 'true' : 'false');
+        els.wayArtist.setAttribute('aria-pressed', asMouse ? 'false' : 'true');
+        els.msg.textContent = asMouse
+            ? 'Scan this with your phone’s camera. The phone becomes this computer’s mouse: it moves the brush here, with every setting you’ve made. Nothing to install.'
+            : 'Scan this with a phone’s camera to paint in this room as an artist of its own, beside you. Every phone that scans it joins. Nothing to install.';
+
+        var pm = mouse();
+        var ms = pm ? pm.status() : { on: false, phase: 'off', code: null, phone: false, open: false };
+        var stranger = !asMouse && inStrangerRoom();
+        var code = asMouse ? ms.code : (stranger ? null : roomCode());
+        var url = !code ? '' : (asMouse ? pm.url() : padUrl(code));
         // Hide (the room panel's share mode) keeps the code off a stream;
         // the dialog honours it until asked.
         var hidden = codeHidden() && !revealed;
-        var url = code ? padUrl(code) : '';
         var key = url + '|' + hidden;
         if (key !== qrKey) {
             qrKey = key;
             var svg = (url && !hidden && window.QRCode) ? window.QRCode.svg(url, { margin: 2 }) : '';
             els.qr.innerHTML = svg || '';
-            els.qr.setAttribute('aria-label', svg ? 'QR code: opens the phone brush for this room' : 'QR code hidden');
+            els.qr.setAttribute('aria-label', !svg ? 'QR code hidden'
+                : asMouse ? 'QR code: opens the phone as this computer’s mouse' : 'QR code: opens the phone brush for this room');
         }
+        els.body.hidden = stranger;
         els.qr.classList.toggle('is-hidden', hidden || !url);
         els.alt.textContent = 'No camera? Open ' + siteLabel() + ' on the phone and enter';
-        els.code.textContent = code ? (hidden ? '●●●●●●' : code) : '······';
-        els.reveal.hidden = !hidden;
+        els.code.textContent = code ? (hidden ? (asMouse ? '●●●● ●●●●' : '●●●●●●') : groupCode(code)) : (asMouse ? '···· ····' : '······');
+        els.reveal.hidden = !hidden || stranger;
 
-        var live = socketOpen() && !!selfId();
-        var n = pads.size;
-        els.status.textContent =
-            !code ? 'Starting a room…' :
-            !live ? 'Opening the room…' :
-            n === 1 ? '📱 A phone is connected. Paint on it and watch here.' :
-            n > 1 ? '📱 ' + n + ' phones are connected. Paint on them and watch here.' :
-            'Waiting for your phone…';
-        els.status.classList.toggle('is-live', live && n > 0);
+        var note = '';
+        var status = '';
+        var liveStatus = false;
+        if (asMouse) {
+            status =
+                !ms.on ? 'Opening a link for your phone…' :
+                ms.phone ? '📱 Your phone is your mouse. Paint on it and watch here.' :
+                ms.open ? 'Waiting for your phone…' :
+                ms.phase === 'retrying' ? 'Reconnecting…' :
+                'Opening a link for your phone…';
+            liveStatus = ms.phone;
+        } else if (stranger) {
+            note = 'A stranger swirl has two seats, and both are taken, so no phone can join it as an artist. Your phone can still be your mouse.';
+        } else {
+            var live = socketOpen() && !!selfId();
+            var n = pads.size;
+            status =
+                !code ? 'Starting a room…' :
+                !live ? 'Opening the room…' :
+                n === 1 ? '📱 A phone is connected. Paint on it and watch here.' :
+                n > 1 ? '📱 ' + n + ' phones are connected. Paint on them and watch here.' :
+                'Waiting for a phone…';
+            liveStatus = live && n > 0;
+            if (live && isLocked()) {
+                note = amHost()
+                    ? 'This room is locked, so a new phone can’t join. Unlock it first.'
+                    : 'This room is locked, so a new phone can’t join. Ask the host to unlock it.';
+            }
+        }
+        els.status.hidden = !status;
+        els.status.textContent = status;
+        els.status.classList.toggle('is-live', liveStatus);
+        els.note.hidden = !note;
+        els.note.textContent = note;
+        els.unlock.hidden = !(!asMouse && !stranger && socketOpen() && isLocked() && amHost());
+        els.stop.hidden = !(asMouse && ms.phone);
+    }
 
-        var locked = live && isLocked();
-        els.note.hidden = !locked;
-        els.note.textContent = !locked ? '' : amHost()
-            ? 'This room is locked, so a new phone can’t join. Unlock it first.'
-            : 'This room is locked, so a new phone can’t join. Ask the host to unlock it.';
-        els.unlock.hidden = !(locked && amHost());
+    function refresh() {
+        syncButtons();
+        renderModal();
     }
 
     var openWhenReady = false;
-    function open() {
+    function open(which) {
         // The room client (06a–06e) arrives in the async chain after this
         // file, and the button exists before it does: a click that beats it
         // (a slow connection) opens the dialog once it lands instead of
@@ -362,23 +460,12 @@
                 openWhenReady = true;
                 document.addEventListener('fluidui:scripts-ready', function () {
                     openWhenReady = false;
-                    open();
+                    open(which);
                 }, { once: true });
             }
             return false;
         }
-        if (inStrangerRoom()) {
-            announce('Phones join rooms you start. Leave this swirl, then choose Paint from your phone.');
-            return false;
-        }
-        if (!roomCode()) {
-            // createRoom() minus its clipboard copy: the phone scans, nobody pastes.
-            try { connectToRoom(generateRoomCode()); }
-            catch (e) { console.warn('[phone] could not start a room', e); return false; }
-        }
         build();
-        revealed = false;
-        qrKey = '';
         modal.classList.add('show');
         // The app's hotkeys listen on document; nothing typed here reaches
         // them (the same guard as 51's question).
@@ -389,7 +476,7 @@
             };
             document.addEventListener('keydown', keyHandler, true);
         }
-        renderModal();
+        setWay(which === 'artist' || which === 'mouse' ? which : savedWay());
         clearInterval(renderTimer);
         renderTimer = setInterval(renderModal, 500);
         try { els.done.focus({ preventScroll: true }); } catch (_) {}
@@ -402,10 +489,15 @@
         renderTimer = 0;
         if (keyHandler) { document.removeEventListener('keydown', keyHandler, true); keyHandler = null; }
         if (modal) modal.classList.remove('show');
+        // A link no phone ever used does not stay open for nothing.
+        var pm = mouse();
+        if (pm) pm.idleStop();
     }
 
     function init() {
         mountButtons();
+        var pm = mouse();
+        if (pm) pm.onChange(refresh);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
@@ -417,15 +509,18 @@
         isPad: isPad,
         count: function () { return pads.size; },
         padUrl: padUrl,
+        padBase: padBase,
+        way: function () { return way; },
         onHello: onHello,
         onLeft: onLeft,
         onRoom: onRoom,
         sendInfo: sendInfo,
+        refresh: refresh,
         __state: function () {
             return {
                 room: padRoom, pads: Array.from(pads.keys()), greeted: greeted.size,
                 watching: !!watchTimer, host: amHost(), lastInfo: lastInfo ? JSON.parse(lastInfo) : null,
-                url: roomCode() ? padUrl(roomCode()) : null
+                url: roomCode() ? padUrl(roomCode()) : null, way: way
             };
         }
     };
