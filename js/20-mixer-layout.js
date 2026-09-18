@@ -2030,7 +2030,10 @@
         // list, and a permanent micro-label above each resting pill so the
         // two aren't just two unlabeled numbers at the bottom of the screen.
         [['visualResolution', 'Image Sharpness', 'Resolution of the paint itself — sharper costs GPU'],
-         ['physicsResolution', 'Motion Detail', 'Resolution of the motion sim — finer swirls cost GPU']
+         ['physicsResolution', 'Motion Detail', 'Resolution of the motion sim — finer swirls cost GPU'],
+         // Beside Motion Detail per Gabriel (2026-09-18). Says it needs
+         // Surface Shading because on its own the pick changes nothing.
+         ['shadeFormResolution', 'Shading Detail', 'Grain of the Surface Shading relief — finer brings out the fine veins. Needs Surface Shading on (Effects)']
         ].forEach(function (pair) {
             const sel = document.getElementById(pair[0]);
             if (sel) bar.appendChild(makeQubDropdown(sel, pair[1], pair[2]));

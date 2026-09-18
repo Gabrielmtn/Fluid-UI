@@ -232,7 +232,8 @@
         else c.SIM_SUBSTEP = true;
         c.GLOW_RESOLUTION = t.glow || 256;
         c.SCATTER_RESOLUTION = t.scatter || 512;
-        if (t.shadeForm) c.SHADE_FORM_RESOLUTION = t.shadeForm;
+        // Shading Detail has a control now — drive it, so the pill tells the truth
+        if (t.shadeForm) { setCtl('shadeFormResolution', t.shadeForm, 'change'); c.SHADE_FORM_RESOLUTION = t.shadeForm; }
 
         setCtl('pressureIteration', t.iters, 'input');
         if (t.mg) {

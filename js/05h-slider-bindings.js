@@ -305,6 +305,34 @@
                 });
             }
         }
+        // Shading Detail: config.SHADE_FORM_RESOLUTION, the long side of the
+        // blurred form field Surface Shading lights (05c). A look knob, not
+        // free fidelity: 256 is the approved relief, and past ~1024 the fine
+        // stir veins come back into it. Only visible while Surface Shading is on.
+        // The form field is a fixed-base buffer like glow, so a pick rebuilds
+        // the framebuffers through the same artwork-preserving path as the two
+        // resolutions above — but only on a REAL change: presets and the room
+        // mirror re-apply every select they carry, and a same-value rebuild
+        // would stall each of them. No pinResolution: dye/sim are untouched.
+        const shadeFormSel = document.getElementById('shadeFormResolution');
+        if (shadeFormSel) {
+            window.setResolutionDropdown(shadeFormSel, config.SHADE_FORM_RESOLUTION || 256);
+            shadeFormSel.addEventListener('change', (e) => {
+                // A look param, so the host's settings lock holds it (13.5);
+                // put the pick back so the pill doesn't show a value we ignored.
+                if (window.__mpSettingsLocked && !window.__mpApplyingRemote) {
+                    window.setResolutionDropdown(shadeFormSel, config.SHADE_FORM_RESOLUTION || 256);
+                    e.stopImmediatePropagation();
+                    return;
+                }
+                const v = parseInt(e.target.value, 10);
+                if (!isFinite(v)) return;
+                const res = Math.max(64, Math.min(2048, v)); // 05c's clamp
+                if (res === config.SHADE_FORM_RESOLUTION) return;
+                config.SHADE_FORM_RESOLUTION = res;
+                window.needsFramebufferReinit = true;
+            });
+        }
         // Scrollwheel to adjust brush size, density (Shift), or motion isolation (Ctrl+Shift) on canvas area
         let lastDensitySnapTime = 0;
         canvasArea.addEventListener('wheel', (e) => {

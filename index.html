@@ -656,6 +656,19 @@
             </select>
         </div>
         <div class="control-group">
+            <label for="shadeFormResolution">Shading Detail</label>
+            <!-- config.SHADE_FORM_RESOLUTION: the long side of the blurred form
+                 field Surface Shading lights (05c). Values are load-bearing
+                 like the two above (registry-validated) — text only. -->
+            <select id="shadeFormResolution">
+                <option value="2048">2048 — Finest (marble veins)</option>
+                <option value="1024">1024 — Fine</option>
+                <option value="512">512 — Medium</option>
+                <option value="256" selected>256 — Smooth (default)</option>
+                <option value="128">128 — Softest</option>
+            </select>
+        </div>
+        <div class="control-group">
             <label for="fpsCap">FPS Limit</label>
             <select id="fpsCap">
                 <option value="30">30 fps — Battery Saver</option>

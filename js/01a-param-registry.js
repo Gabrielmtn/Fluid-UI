@@ -196,6 +196,12 @@
     var SELECTS = {
         visualResolution: {options: ["4096", "2048", "1536", "1024", "512", "256"], def: "2048", mut: null},
         physicsResolution: {options: ["2048", "1536", "1024", "512", "384", "256", "192", "128", "64", "32"], def: "512", mut: null},
+        // Shading Detail (SHADE_FORM_RESOLUTION). A LOOK param, not a machine
+        // one: unlike the two resolutions above it stays out of 12's
+        // BASELINE_SKIP and 50's link SKIP, so look links carry it and a
+        // preset click resets it to 256. No `mut`: a variation that quietly
+        // rebuilds every framebuffer reads as a hitch.
+        shadeFormResolution: {options: ["2048", "1024", "512", "256", "128"], def: "256", mut: null},
         // Mutate never deals mode "0": that is Off (05a doK), and a card that
         // switched the kaleidoscope off under an ON switch hid every other
         // kaleido change it listed. Turning it off is kaleidoToggle's job.
