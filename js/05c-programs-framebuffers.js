@@ -488,6 +488,272 @@
         }
         initFramebuffers();
         exposeSimStats(); // Expose to window for stats panel
+        // ── Idle hibernation (2026-09-15) ─────────────────────────────────
+        // A covered or minimized window used to hold every byte it had while
+        // painting: measured 225 MB dedicated VRAM on a 2134x1180 window at
+        // the stock 2048/512 (79 MB of it these FBOs), and 529 MB at 4096
+        // dye. Leaving Swirl open behind a game or a diffusion run cost that
+        // the whole time, for a picture nobody could see.
+        //
+        // Hibernating reads the CONTENT back to CPU at its EXACT size,
+        // shrinks every buffer to a token 64x32, and re-uploads on wake.
+        // Exact size is the whole point: a resolution change resamples
+        // raster layers and masks bilinearly (the open
+        // authored-content-resample bug), so anything that round-trips the
+        // ARTWORK through a different size would soften the user's painting
+        // a little more on every alt-tab. It goes to the CPU and comes back
+        // from there, never through the token buffers, so the bytes come
+        // back as they went in.
+        //
+        // NOT read back, because it is all regenerated on the first frame
+        // after wake: sharpen / micro-detail / glow chain / scatter / shade
+        // form / PhotoSafe / the multigrid pyramid / divergence / curl. The
+        // obstacle is rebuilt from collider geometry instead.
+        //
+        // WHEN to do this — and everything that must block it — lives in
+        // js/53-idle-vram.js. This half only knows how.
+        var _hib = null;   // snapshot while asleep, null while awake
+        // The size everything shrinks to while asleep. Not zero — see the
+        // note on hibernateFramebuffers for why a delete-only sleep gives
+        // the OS nothing back. Small enough that the whole buffer set is
+        // ~2 MB, big enough that every pass still has a valid target if
+        // something draws before the wake lands.
+        var HIB_DYE = 64, HIB_SIM = 32;
+
+        // readPixels format/type is per-FBO, not per-internalformat: an
+        // RGBA16F target and an R16F target disagree about what they hand
+        // back (see the debug playbook's readback gotcha). Ask the
+        // implementation first, and only then fall back.
+        function _readSpec(f, isByte) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
+            var fmt = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT);
+            var typ = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE);
+            var ok = (fmt === gl.RGBA) &&
+                (isByte ? typ === gl.UNSIGNED_BYTE
+                        : (typ === gl.FLOAT || typ === gl.HALF_FLOAT));
+            if (!ok) { fmt = gl.RGBA; typ = isByte ? gl.UNSIGNED_BYTE : gl.FLOAT; }
+            return { format: fmt, type: typ };
+        }
+        // Always read RGBA — the one channel count every target here agrees
+        // on — and narrow to the texture's real channels on the way back in.
+        function _readbackRGBA(f, isByte) {
+            if (!f || !f.fbo) return null;
+            var spec = _readSpec(f, isByte);
+            var n = f.width * f.height * 4;
+            var buf = spec.type === gl.UNSIGNED_BYTE ? new Uint8Array(n)
+                    : spec.type === gl.HALF_FLOAT ? new Uint16Array(n)
+                    : new Float32Array(n);
+            while (gl.getError() !== gl.NO_ERROR) { /* drain */ }
+            gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
+            gl.readPixels(0, 0, f.width, f.height, spec.format, spec.type, buf);
+            if (gl.getError() !== gl.NO_ERROR) {
+                // One retry on the universally-supported combo before giving
+                // up. A failed readback aborts the whole hibernation rather
+                // than silently dropping the artwork.
+                if (spec.type === gl.HALF_FLOAT) {
+                    buf = new Float32Array(n);
+                    spec = { format: gl.RGBA, type: gl.FLOAT };
+                    gl.readPixels(0, 0, f.width, f.height, spec.format, spec.type, buf);
+                    if (gl.getError() !== gl.NO_ERROR) return null;
+                } else return null;
+            }
+            return { data: buf, w: f.width, h: f.height, type: spec.type };
+        }
+        // RGBA snapshot → the texture's own channel count, then upload.
+        // Sizes always match: canvas.width is only ever assigned from the
+        // update loop, and the loop is stopped for the whole sleep, so the
+        // box cannot move underneath a snapshot. That makes this a straight
+        // texSubImage2D with no resample anywhere in the path. (A resize
+        // that happened while hidden lands after the wake, through the
+        // normal settle — same preserve-and-copy as any other resize.)
+        function _uploadRGBA(f, snap, channels, format) {
+            if (!f || !snap) return false;
+            if (f.width !== snap.w || f.height !== snap.h) return false;
+            var src = snap.data, out = src;
+            if (channels !== 4) {
+                var texels = snap.w * snap.h;
+                out = new src.constructor(texels * channels);
+                for (var i = 0, j = 0, k = 0; i < texels; i++, j += 4, k += channels) {
+                    for (var c = 0; c < channels; c++) out[k + c] = src[j + c];
+                }
+            }
+            gl.bindTexture(gl.TEXTURE_2D, f.texture);
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, snap.w, snap.h, format, snap.type, out);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            return true;
+        }
+        function _freeFBO(f) {
+            if (!f) return;
+            if (f.texture) gl.deleteTexture(f.texture);
+            if (f.fbo) gl.deleteFramebuffer(f.fbo);
+        }
+        function _freeDouble(d) { if (d) { _freeFBO(d.read); _freeFBO(d.write); } }
+        function _snapBytes(snap) {
+            var t = 0;
+            function add(s) { if (s && s.data) t += s.data.byteLength; }
+            add(snap.density); add(snap.velocity); add(snap.pressure); add(snap.wetness);
+            Object.keys(snap.raster).forEach(function (k) { add(snap.raster[k]); });
+            Object.keys(snap.mask).forEach(function (k) { add(snap.mask[k]); });
+            return t;
+        }
+
+        // Read everything worth keeping, then shrink every GPU buffer this
+        // file owns down to a token size. Returns a report, or null —
+        // changing nothing — if a readback failed, so a refusal is safe.
+        //
+        // SHRINK, NOT DELETE, and that is not a style choice. Measured on
+        // this machine, freeing every FBO and allocating nothing returned
+        // exactly nothing to the OS: 224.8 MB dedicated before, 224.9 MB
+        // after. Chromium's GPU process hands memory back when it
+        // REALLOCATES, not when it frees — its suballocator keeps the
+        // emptied heaps committed and reuses them. Re-initialising at
+        // 64x32 in the same breath took the same app to 103.5 MB. So the
+        // release we want is a side effect of the allocation, and a
+        // hibernate that only deletes is a no-op as far as the game or the
+        // diffusion run next door is concerned.
+        //
+        // The artwork never touches the token buffers — it goes to the CPU
+        // before the shrink and comes back from there — so nothing is
+        // resampled on the way through.
+        function hibernateFramebuffers() {
+            if (_hib) return _hib.report;
+            if (gl.isContextLost()) return null;
+            var before = _fboBytes;
+            var snap = {
+                dye: [dyeTexWidth, dyeTexHeight],
+                sim: [simTexWidth, simTexHeight],
+                raster: {}, mask: {}
+            };
+            snap.density = _readbackRGBA(density && density.read, false);
+            snap.velocity = _readbackRGBA(velocity && velocity.read, false);
+            snap.pressure = _readbackRGBA(pressure && pressure.read, false);
+            snap.wetness = _readbackRGBA(wetness && wetness.read, false);
+            if (!snap.density || !snap.velocity || !snap.pressure || !snap.wetness) return null;
+            var ok = true;
+            Object.keys(rasterStore).forEach(function (rid) {
+                if (!ok || !rasterStore[rid]) return;
+                snap.raster[rid] = _readbackRGBA(rasterStore[rid], true);
+                if (!snap.raster[rid]) ok = false;
+            });
+            Object.keys(maskStore).forEach(function (mid) {
+                if (!ok || !maskStore[mid]) return;
+                snap.mask[mid] = _readbackRGBA(maskStore[mid], true);
+                if (!snap.mask[mid]) ok = false;
+            });
+            if (!ok) return null;   // artwork unread — keep the live buffers
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+            // Paint layers and masks are dye-res and there can be many, so
+            // they are the biggest single win. Drop them outright rather
+            // than shrinking: the token re-init recreates only the store
+            // entries that still exist, and restore mints them back at full
+            // size from the snapshot.
+            Object.keys(rasterStore).forEach(function (k) { _freeFBO(rasterStore[k]); delete rasterStore[k]; });
+            Object.keys(maskStore).forEach(function (k) { _freeFBO(maskStore[k]); delete maskStore[k]; });
+            sketch = null; window.sketch = null;
+
+            // PhotoSafe's buffers are sized off the DRAWING BUFFER, not dye
+            // res, so the token resolution does not shrink them — roughly
+            // three canvas-sized RGBA8 targets that would otherwise survive
+            // the whole sleep. They hold only limiter state, which starts
+            // fresh (and conservative) on the next frame, so they come out
+            // by turning the flag off for the duration of the re-init.
+            var realDye = config.DYE_RESOLUTION, realSim = config.SIM_RESOLUTION;
+            var realSafe = config.PHOTOSAFE;
+            try {
+                config.DYE_RESOLUTION = HIB_DYE;
+                config.SIM_RESOLUTION = HIB_SIM;
+                config.PHOTOSAFE = false;
+                initFramebuffers();   // frees the big set AND allocates small
+            } finally {
+                config.DYE_RESOLUTION = realDye;
+                config.SIM_RESOLUTION = realSim;
+                config.PHOTOSAFE = realSafe;
+            }
+            // Everything on window now points at the token buffers, which
+            // are real and valid — so a reader that runs while we are asleep
+            // (the timers keep ticking; only rAF stops) gets a small live
+            // buffer rather than a null or a freed one. That is the whole
+            // reason this shrinks instead of nulling out.
+            exposeSimStats();
+
+            var report = { freedMB: +((before - _fboBytes) / 1048576).toFixed(1),
+                           tokenMB: +(_fboBytes / 1048576).toFixed(1),
+                           heldMB: +(_snapBytes(snap) / 1048576).toFixed(1),
+                           layers: Object.keys(snap.raster).length,
+                           masks: Object.keys(snap.mask).length };
+            _hib = { snap: snap, report: report };
+            window.__vramAsleep = true;
+            return report;
+        }
+
+        // Rebuild at the size the snapshot was taken at and pour the bytes
+        // back. The token buffers are freed first so initFramebuffers has
+        // nothing to preserve: upscaling 64x32 into the real grid would be
+        // both wasted work and exactly the resample this whole path exists
+        // to avoid — the snapshot is the source of truth, not the GPU.
+        function restoreFramebuffers() {
+            if (!_hib) return null;
+            if (gl.isContextLost()) { _hib = null; window.__vramAsleep = false; return null; }
+            var snap = _hib.snap;
+            _hib = null;            // clear FIRST: initFramebuffers must see us awake
+            window.__vramAsleep = false;
+
+            [sharpened, detailed, divergence, curl, obstacle, obstacleScratch,
+             glow, scatter, shadeForm, shadeFormTemp, safeFrame, mgRes0].forEach(_freeFBO);
+            [density, velocity, pressure, wetness,
+             safeOut, safeLuma, safeStats].forEach(_freeDouble);
+            glowFramebuffers.forEach(_freeFBO);
+            if (mgLevels) mgLevels.forEach(function (l) {
+                [l.rhs, l.res, l.obs].forEach(_freeFBO); _freeDouble(l.p);
+            });
+            density = velocity = pressure = wetness = null;
+            divergence = curl = sharpened = detailed = null;
+            obstacle = obstacleScratch = null;
+            glow = scatter = shadeForm = shadeFormTemp = null;
+            safeFrame = safeOut = safeLuma = safeStats = null;
+            mgRes0 = null; mgLevels = null; glowFramebuffers = [];
+
+            initFramebuffers();     // fresh and cleared, at the real resolution
+
+            var exact = (dyeTexWidth === snap.dye[0] && dyeTexHeight === snap.dye[1] &&
+                         simTexWidth === snap.sim[0] && simTexHeight === snap.sim[1]);
+            _uploadRGBA(density.read, snap.density, 4, gl.RGBA);
+            _uploadRGBA(velocity.read, snap.velocity, 2, gl.RG);
+            _uploadRGBA(pressure.read, snap.pressure, 1, gl.RED);
+            _uploadRGBA(wetness.read, snap.wetness, 1, gl.RED);
+            // Raster layers and masks are single FBOs that initFramebuffers
+            // only recreates for store entries that already exist, and
+            // hibernate emptied the stores. Mint them here at the CURRENT
+            // dye size and fill them. A size that no longer matched would
+            // leave the layer empty rather than resampled — loud rather than
+            // quietly lossy — but it cannot happen; see _uploadRGBA above.
+            Object.keys(snap.raster).forEach(function (rid) {
+                rasterStore[rid] = createFBO(dyeTexWidth, dyeTexHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR);
+                _uploadRGBA(rasterStore[rid], snap.raster[rid], 4, gl.RGBA);
+            });
+            Object.keys(snap.mask).forEach(function (mid) {
+                maskStore[mid] = createFBO(dyeTexWidth, dyeTexHeight, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR);
+                _uploadRGBA(maskStore[mid], snap.mask[mid], 4, gl.RGBA);
+            });
+            if (window.rasterLayers) {
+                sketch = rasterStore[window.rasterLayers.activeId()] || null;
+                window.sketch = sketch;
+            }
+            // The obstacle is derived, not authored — rebuild it from the
+            // collider layers rather than carrying its pixels through sleep.
+            if (window.collisionLayers && window.collisionLayers.updateObstacleFromLayers) {
+                try { window.collisionLayers.updateObstacleFromLayers(); }
+                catch (e) { console.warn('[vram] obstacle rebuild after wake failed:', e); }
+            }
+            exposeSimStats();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return { exact: exact, allocMB: +(_fboBytes / 1048576).toFixed(1) };
+        }
+        window.__vramHibernate = hibernateFramebuffers;
+        window.__vramRestore = restoreFramebuffers;
+        window.__vramAsleep = false;
+
         // ─── Multigrid pressure V-cycle (called from 05j instead of the
         // Jacobi loop when config.MULTIGRID and the governor budget allow).
         // Level 0 is the live pressure/divergence/obstacle; deeper levels

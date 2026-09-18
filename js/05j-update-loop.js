@@ -58,6 +58,14 @@
         function update() {
             const nowMs = performance.now();
             const cpuStart = nowMs;
+            // Asleep (js/53-idle-vram.js): every framebuffer this function
+            // touches has been freed and the artwork lives on the CPU until
+            // the window is looked at again. A hidden window has already
+            // stopped producing frames, so this only catches a tick already
+            // in flight when we let go — but one such tick would dereference
+            // a null density and take the context down with it. Re-arm so
+            // the loop is still alive when the compositor comes back.
+            if (window.__vramAsleep) { requestAnimationFrame(update); return; }
             // Display Hz: Electron API detects instantly; rAF fallback runs here if needed
             detectDisplayHz(nowMs);
             // FPS Cap: skip frame if interval hasn't elapsed (with epsilon tolerance)

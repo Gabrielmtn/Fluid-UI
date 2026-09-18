@@ -532,6 +532,8 @@
                             <div class="stat-row"><label class="stat-label" for="governorAllowRes">&nbsp;&nbsp;Resolution Tiers:</label> <input type="checkbox" id="governorAllowRes"></div>
                             <div class="stat-row"><label class="stat-label" for="governorAllowFx" title="Allow the governor's last rung to disable sharpen/micro-detail/glow/Crisp Advection under extreme load — changes the look, so it's opt-in">&nbsp;&nbsp;Effect Shedding:</label> <input type="checkbox" id="governorAllowFx"></div>
                             <div class="stat-row"><span class="stat-label">Adaptive State:</span> <span id="stat-governor">--</span></div>
+                            <div class="stat-row"><label class="stat-label" for="idleVramToggle" title="Extra VRAM saving while the window is minimized or fully covered: park the artwork in system memory and shrink the GPU buffers to nothing much. Windows already reclaims most of it on its own once the window stops drawing, so this is worth roughly 14 MB more — useful on a VRAM-starved machine or at the high fidelity tiers. Paused automatically while exporting, in a room, or with the pen window open.">Release VRAM When Hidden:</label> <input type="checkbox" id="idleVramToggle"></div>
+                            <div class="stat-row"><span class="stat-label">Hidden State:</span> <span id="stat-idlevram">--</span></div>
                         </div>
                         <div class="stats-section">
                             <div class="stats-title">Simulation</div>
@@ -1827,6 +1829,10 @@
          spot instead. Needs the built underbar and the startup prompts, so it
          loads last; the full game returns before touching anything. -->
     <script src="js/52-demo-clock.js"></script>
+    <!-- Hand the GPU buffers back while the window is hidden (minimized, or
+         fully covered by whatever else wants the VRAM). Loads late so its
+         guards can see the exporter, the pen window and the room. -->
+    <script src="js/53-idle-vram.js"></script>
     <!-- Paint from your phone: the door under Swirl Together, the QR dialog,
          and the host's answer to a phone brush (phone/ in the web bundle).
          Reads the room client (06a–06e) at event time, so it can load here. -->
