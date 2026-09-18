@@ -13,8 +13,11 @@
  * riding the Save button. A binding finds its control again by id — nearly
  * every slider and checkbox here has one — or, failing that, by where it
  * lives and what it says (section, tag, text, title, position), so a list
- * that re-renders its buttons still resolves. A control that cannot be
- * found when its key is pressed says so, instead of doing nothing.
+ * that re-renders its buttons still resolves. In a list whose rows carry the
+ * same buttons over and over — the layer rows — a binding belongs to its
+ * ROW, so the key follows that layer instead of the place it sat in (see
+ * ROW_IDS). A control that cannot be found when its key is pressed says so,
+ * instead of doing nothing.
  *
  * Bind mode TAKES the first click on a button rather than letting it act —
  * choosing Delete must not delete — but lets a slider, a dropdown or a
@@ -109,6 +112,37 @@
         return document.body;
     }
 
+    // Lists whose rows are the same buttons over and over, one row per thing:
+    // every layer row carries its own Fluidize, Transform and Delete. A
+    // binding made in one of those belongs to its ROW — that layer — and is
+    // stored as the row's own selector, then looked up inside it. By position
+    // it could not be: a new layer, a reorder, or a mask (which rewrites
+    // Fluidize's title the moment the layer has one) slid the key onto the
+    // next row's button and poured someone else's picture without a word.
+    // A row that is gone now resolves to nothing, which is the "isn't on
+    // screen right now" message rather than the nearest layer along.
+    var ROW_IDS = [{ sel: '.layer-item', attr: 'data-layer-index' }];
+
+    function rowSelOf(el) {
+        if (!el.closest) return '';
+        for (var i = 0; i < ROW_IDS.length; i++) {
+            var row = el.closest(ROW_IDS[i].sel + '[' + ROW_IDS[i].attr + ']');
+            if (!row) continue;
+            var v = row.getAttribute(ROW_IDS[i].attr);
+            if (!/^[\w-]+$/.test(v || '')) continue;   // only a plain id makes a safe selector
+            return ROW_IDS[i].sel + '[' + ROW_IDS[i].attr + '="' + v + '"]';
+        }
+        return '';
+    }
+
+    // Where to look for it: its own row when it lives in one, else the
+    // section (or nearest element with an id) it sits in.
+    function rootOf(loc) {
+        if (!loc || !loc.row) return scopeEl(loc && loc.scope);
+        var sec = scopeEl(loc.scope);
+        return (sec && sec.querySelector(loc.row)) || document.querySelector(loc.row);
+    }
+
     // A wordless control (a palette's colour chip) is told apart by its
     // colour, so the key still picks the same colour after the chips
     // re-render — and by its class, so a chip is never twinned with the
@@ -124,13 +158,15 @@
 
     // The same tag in the same place saying the same thing, by position
     // among its twins (a list's per-row buttons are identical but for where
-    // they sit).
+    // they sit). Inside ONE row the words are enough and the title is not:
+    // the row's own state writes that ("Turn what this mask is showing into
+    // fluid" the moment a layer has a mask), and a binding must survive it.
     function twins(root, loc) {
         if (!root) return [];
         return [].filter.call(root.querySelectorAll(loc.tag), function (c) {
             var s = signature(c);
-            return s.text === loc.text && s.title === loc.title && s.aria === loc.aria
-                && s.bg === (loc.bg || '') && s.cls === (loc.cls || '');
+            return s.text === loc.text && (loc.row ? true : s.title === loc.title)
+                && s.aria === loc.aria && s.bg === (loc.bg || '') && s.cls === (loc.cls || '');
         });
     }
 
@@ -139,7 +175,9 @@
         var s = signature(el);
         var loc = { scope: scopeOf(el), tag: el.tagName.toLowerCase(), text: s.text, title: s.title, aria: s.aria,
                     bg: s.bg, cls: s.cls, index: 0 };
-        loc.index = Math.max(0, twins(scopeEl(loc.scope), loc).indexOf(el));
+        var row = rowSelOf(el);
+        if (row) loc.row = row;
+        loc.index = Math.max(0, twins(rootOf(loc), loc).indexOf(el));
         return loc;
     }
 
@@ -150,7 +188,7 @@
     function resolve(loc) {
         if (!loc) return null;
         if (loc.id) return document.getElementById(loc.id);
-        var root = scopeEl(loc.scope);
+        var root = rootOf(loc);
         if (!root) return null;
         var exact = twins(root, loc);
         if (exact.length) return exact[loc.index] || null;
@@ -204,7 +242,12 @@
 
     function whereOf(el) {
         var t = sectionTitle(el);
-        if (t) return t;
+        // WHICH layer, not just "Layers": two rows' Fluidize keys read alike
+        // in Settings → Hotkeys otherwise, and in the bar that made them.
+        var row = el.closest ? el.closest('.layer-item') : null;
+        var ttl = row ? row.querySelector('.layer-title') : null;
+        var rowName = ttl ? norm(ttl.value || '') : '';
+        if (t) return rowName ? t + ' · ' + clip(rowName, 22) : t;
         if (el.closest('#mixer-strip, #mixer-more-panel')) return 'Top bar';
         if (el.closest('.mixer-presets-panel')) return 'Presets';
         if (el.closest('.brush-settings-panel')) return 'Brush';
