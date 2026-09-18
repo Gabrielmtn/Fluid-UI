@@ -296,7 +296,28 @@ app.commandLine.appendSwitch('enable-gpu-memory-buffer-compositor-resources'); /
 // ⚡ NUCLEAR: Force disable ALL frame limiting
 app.commandLine.appendSwitch('max-gum-fps', '1000'); // Remove media FPS cap
 app.commandLine.appendSwitch('disable-renderer-backgrounding'); // Keep rendering at full speed
-app.commandLine.appendSwitch('disable-backgrounding-occluded-windows'); // No throttling when covered
+// REMOVED 2026-09-15: disable-backgrounding-occluded-windows. It came in with
+// the "disable ALL frame limiting" sweep above, and what it actually bought
+// was a fully COVERED window still running the sim flat out behind whatever
+// the user had alt-tabbed to. Measured on a 2134x1180 window at stock
+// 2048/512, fully covered by another app:
+//
+//   with the switch      59.2 Hz of frames, 208.0 MB still RESIDENT in VRAM
+//   without it            0.1 Hz,           14-28 MB resident
+//
+// That second number is the point. Windows evicts a process's GPU
+// allocations once it stops presenting, so simply letting a covered window
+// go quiet hands ~180 MB back to whatever else wants it — no application
+// bookkeeping required. The switch was defeating that, because a window
+// that keeps drawing keeps everything resident. (js/53-idle-vram.js exists
+// to chase the remainder and ships OFF: measured, it lands inside the
+// run-to-run spread of doing nothing. This line is where the win was.)
+//
+// disable-renderer-backgrounding above STAYS: that one governs timer and
+// process priority, and a hidden window still stops rendering with it set.
+// Do NOT re-add this switch to "fix" a frozen background window — a window
+// that is genuinely visible (unfocused, on a second monitor) never reports
+// hidden, and keeps painting exactly as before.
 // NOTE: Do NOT use --use-angle=gl on Windows — OpenGL backend locks vsync to 60Hz.
 // Default D3D11 backend handles high-refresh monitors correctly.
 
