@@ -283,7 +283,7 @@
         var existing = container.querySelector('[data-overlay-id="' + ov.id + '"]');
         if (existing) existing.remove();
 
-        if (!ov.visible) return;
+        if (!onScreen(ov)) return;
 
         var el = document.createElement('div');
         el.dataset.overlayId = ov.id;
@@ -295,6 +295,8 @@
         el.style.transform = 'translate(-50%,-50%) rotate(' + (ov.rotation || 0) + 'deg)';
         el.style.zIndex = '51';
         styleTextEl(el, ov);
+        // Hidden, and only up while it is arranged (ARRANGE MODE): faded.
+        if (!ov.visible) el.style.opacity = GHOST_OPACITY;
 
         container.appendChild(el);
     }
@@ -378,6 +380,7 @@
     // after its text leaves the canvas.
     function setVisible(ov, v) {
         ov.visible = !!v;
+        delete revealed[ov.id];     // shown or hidden on purpose: no longer arrange's ghost
         renderOverlay(ov);
         save(); emitChange(); syncColliders();
         if (arranging) drawArrange();
@@ -495,6 +498,25 @@
     var ROTATE_OFFSET = 30;     // px above the top edge
     var CHROME = 'rgba(255, 130, 170, 0.95)';   // pink — matches the Text panel accent
 
+    // A hidden line being arranged — its ✥, or picked from the list while
+    // arranging — stays on screen until Done, faded, the way a hidden layer
+    // shows under Transform (26-layer-transform's .transform-ghost), so the
+    // move is never made blind. Screen only: `visible` stays false, so no
+    // save, wall, export, pour or room message sees it, and Done takes it
+    // back out of sight. Showing or hiding it on purpose ends that
+    // (setVisible) — from then on it is shown or hidden for real.
+    var revealed = {};          // id → true, this arrange only
+    var GHOST_OPACITY = 0.65;   // .transform-ghost's
+
+    function onScreen(ov) { return ov.visible || (arranging && revealed[ov.id] === true); }
+
+    function reveal(id) {
+        var ov = (typeof id === 'number') ? findOverlay(id) : null;
+        if (!arranging || !ov || ov.visible || revealed[id]) return;
+        revealed[id] = true;
+        renderOverlay(ov);
+    }
+
     // Geometry of an overlay in arrange-canvas pixel coords.
     function overlayGeom(ov) {
         if (ov && ov.room) return roomGeom(ov);
@@ -549,7 +571,7 @@
     // after this user's own, so they are searched first).
     function hitTest(px, py) {
         var sel = selectedId != null ? lineById(selectedId) : null;
-        if (sel && sel.visible) {
+        if (sel && onScreen(sel)) {
             var g = overlayGeom(sel);
             if (g) {
                 var l = toLocal(g, px, py);
@@ -576,7 +598,7 @@
         }
         for (var i = overlays.length - 1; i >= 0; i--) {
             var ov = overlays[i];
-            if (!ov.visible) continue;
+            if (!onScreen(ov)) continue;
             var gg = overlayGeom(ov);
             if (!gg) continue;
             var ll = toLocal(gg, px, py);
@@ -591,7 +613,7 @@
         if (!aCtx || !aCanvas) return;
         aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
         var sel = selectedId != null ? lineById(selectedId) : null;
-        if (!sel || !sel.visible) return;
+        if (!sel || !onScreen(sel)) return;
         var g = overlayGeom(sel);
         if (!g) return;
 
@@ -731,13 +753,14 @@
 
     function openArrange(focusId) {
         if (arranging) {
-            if (focusId != null) { selectedId = focusId; emitChange(); drawArrange(); }
+            if (focusId != null) { selectedId = focusId; reveal(focusId); emitChange(); drawArrange(); }
             return;
         }
         var area = document.getElementById('canvas-area');
         if (!area) return;
         arranging = true;
         selectedId = (focusId != null) ? focusId : selectedId;
+        reveal(selectedId);
         document.body.classList.add('text-arrange-active');
 
         aCanvas = document.createElement('canvas');
@@ -790,11 +813,18 @@
         if (aCanvas) { aCanvas.remove(); aCanvas = null; aCtx = null; }
         if (aBar) { aBar.remove(); aBar = null; }
         document.body.classList.remove('text-arrange-active');
+        // The hidden lines it showed go back out of sight.
+        var shown = revealed;
+        revealed = {};
+        for (var i = 0; i < overlays.length; i++) {
+            if (shown[overlays[i].id]) renderOverlay(overlays[i]);
+        }
         emitChange();
     }
 
     function select(id) {
         selectedId = id;
+        reveal(id);                 // arranging: a hidden line picked from the list shows
         emitChange();
         if (arranging) drawArrange();
     }
