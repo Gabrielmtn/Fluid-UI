@@ -3065,6 +3065,9 @@
         // of Effects per Gabriel 2026-07-23)
         moveControlGroup('wetInfluence', body);
         moveControlGroup('wetDrying', body);
+        // Grain Cleanup (HF_FLOOR_DYE) sits beside Crisp Advection: both
+        // decide how much fine detail survives transport (2026-09-18)
+        moveControlGroup('grainCleanup', body);
         moveCheckboxGroup('macCormackToggle', body);
         moveCheckboxGroup('multigridToggle', body);
         // Multigrid tuning panel — same toggle+panel pattern as

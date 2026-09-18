@@ -523,6 +523,9 @@
                                       // dye and frozen artwork are never touched.
                                       // Straight dye edges have zero Laplacian — moving
                                       // fronts keep their crispness. 0 = off.
+                                      // User-facing since 2026-09-18 as Grain Cleanup
+                                      // (Simulation, 0-0.85): lower keeps the stir's
+                                      // fine grain — measured ~2x fine detail at 0.
 
             COLLIDER_FLOW_KEEP: 1.0,  // Wall-drain flow gate (2026-08-11). The drain that stops
                                       // colliders burning their shape into the artwork used to

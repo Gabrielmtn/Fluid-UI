@@ -51,6 +51,12 @@
         velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 2.5, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
         curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 25, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
         velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 15, max: 60, step: 1, scope: "extended"}},
+        // Grain Cleanup (2026-09-18): the M2 dye spectral floor, HF_FLOOR_DYE
+        // (05b advection). Lower keeps the stir's fine grain, the veined look;
+        // 0.85 is the shader's own per-frame cap. No `mut`: the floor exists
+        // to stop no-fade presets ratcheting speckle, so a mutation must never
+        // be what turns it down under a Density Sustain of 1.
+        grainCleanup: {configKey: "HF_FLOOR_DYE", ui: {min: 0, max: 0.85, step: 0.05}, hard: {min: 0, max: 0.85}, def: 0.6, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
         sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "simulation", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
         // Detail work (mandala tracery, fine linework) needs far finer tips
         // than the old 0.1 floor allowed: the splat radius is variance-like,

@@ -701,6 +701,10 @@
             <label for="velocityCap" title="Speed ceiling in canvas-widths/sec (soft limit). Growth presets (velocity > 1) settle at this ceiling inside closed mask pockets — lower = calmer bounded swirls, higher = wilder motion. Also the fp16 overflow guard.">Max Speed <span id="velocityCapValue" class="value-display">30</span></label>
             <input type="range" id="velocityCap" min="5" max="60" value="30" step="1">
         </div>
+        <div class="control-group">
+            <label for="grainCleanup" title="Smooths the finest grain out of paint while it moves. Lower keeps more of it: crisper strands and fine veins (pairs with Shading Detail). Keep it up when paint never fades (Density Sustain 1.0 or higher) — there, speckle can build up without it, especially around colliders.">Grain Cleanup <span id="grainCleanupValue" class="value-display">0.60</span></label>
+            <input type="range" id="grainCleanup" min="0" max="0.85" value="0.6" step="0.05">
+        </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="macCormackToggle" checked>
             <label for="macCormackToggle" style="margin: 0" title="MacCormack error-corrected dye advection — sharper strokes, less smearing (2 extra GPU passes)">Crisp Advection</label>
