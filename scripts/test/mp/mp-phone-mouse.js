@@ -189,6 +189,13 @@ const DIALOG = "(function(){var m=document.getElementById('phonePadModal'); if(!
     " qr: !!m.querySelector('#phonePadQr svg'), code: m.querySelector('#phonePadCode').textContent," +
     " status: m.querySelector('#phonePadStatus').textContent, note: m.querySelector('#phonePadNote').hidden ? '' : m.querySelector('#phonePadNote').textContent," +
     " body: !m.querySelector('#phonePadBody').hidden, stop: !m.querySelector('#phonePadStop').hidden};})()";
+// The door in the room panel. "Shown" is judged only as far as the panel
+// itself, so a collapsed sidebar section never reads as the panel hiding its
+// own door.
+const DOOR = "(function(){ function shown(sel){ var e = document.querySelector(sel); if (!e) return 'missing'; var n = e;" +
+    " while (n && n.id !== 'multiArtistPanel') { if (n.hidden) return 'hidden'; if (getComputedStyle(n).display === 'none') return 'display:none'; n = n.parentElement; }" +
+    " return n ? 'shown' : 'detached'; } var b = document.getElementById('phonePadRoomBtn');" +
+    " return { room: shown('#phonePadRoomBtn'), invite: shown('#roomDisplay'), parent: b && b.parentElement ? b.parentElement.id : null, text: b ? b.textContent : null }; })()";
 
 (async () => {
     const srv = await serve();
@@ -218,6 +225,20 @@ const DIALOG = "(function(){var m=document.getElementById('phonePadModal'); if(!
         const linkUrl = await a.eval('PhoneMouse.url()');
         check(linkUrl === 'https://swirltogether.com/phone/#' + code, 'from localhost the QR points at the public phone page', linkUrl);
         await shot(a, 'mouse-dialog-waiting.png');
+
+        // Waiting for a stranger: the panel has swapped, so the door has to
+        // be in the room panel already — and the artist way, with no room to
+        // offer, must not answer the wait by starting a room of our own.
+        await a.eval('showMatchmaking(); 1');
+        const waitDoor = await a.eval(DOOR);
+        check(waitDoor.room === 'shown', 'while the lobby is finding a stranger the door is in the panel', waitDoor);
+        await a.eval("document.getElementById('phonePadWayArtist').click(); 1");
+        const waitDlg = await until(a, "(function(){var d=" + DIALOG + "; return d && !d.mouse ? d : null;})()", 5000);
+        const madeRoom = await a.eval('!!currentRoom');
+        check(!!waitDlg && !waitDlg.body && /waiting for a stranger/i.test(waitDlg.note) && !madeRoom,
+            'and "As an artist" says why instead of starting a room behind the search', { note: waitDlg && waitDlg.note, room: madeRoom });
+        await a.eval("document.getElementById('phonePadWayMouse').click(); showDisconnectedUI(); 1");
+        await until(a, "(function(){var d=" + DIALOG + "; return d && d.mouse;})()", 3000);
 
         // ── B: an iPhone opens the link ─────────────────────────────
         await bootPhone(B, 'PMOUSEB1');
@@ -316,6 +337,24 @@ const DIALOG = "(function(){var m=document.getElementById('phonePadModal'); if(!
         await until(a, 'connectedClients === 2', 5000);
         const people = await until(b, "(function(){var m=" + MOUSE + "; return m.info && m.info.people === 2 ? m.sub : null;})()", 5000);
         check(people === '2 in the room', 'the phone says how many are in the computer\'s room', people);
+
+        // ── The door from inside a room, in every kind of room ───────
+        const inRoom = await a.eval(DOOR);
+        check(inRoom.room === 'shown' && inRoom.parent === 'mpConnected', 'in a room the door is a row of the panel, not part of the invite block', inRoom);
+        check(/your mouse/.test(inRoom.text), 'and says the phone already has the mouse', inRoom.text);
+        // A stranger pairing hides the invite block outright (06e
+        // updateConnectedView), and the wait for a stranger has no room at
+        // all: the way in has to outlive both.
+        const strangerDoor = await a.eval("(function(){ window.__realStranger = isStrangerRoom; isStrangerRoom = function(){ return true; };" +
+            " updateConnectedView(); var d = " + DOOR + "; isStrangerRoom = window.__realStranger; updateConnectedView(); return d; })()");
+        check(strangerDoor.room === 'shown' && strangerDoor.invite !== 'shown', 'a stranger swirl hides the invite block and keeps the door', strangerDoor);
+        const waitingDoor = await a.eval("(function(){ showMatchmaking(); var d = " + DOOR + "; showConnectedUI(); return d; })()");
+        check(waitingDoor.room === 'shown', 'and it is there while the lobby is still finding a stranger', waitingDoor);
+        await a.eval("document.getElementById('phonePadRoomBtn').click(); 1");
+        const roomDlg = await until(a, "(function(){var d=" + DIALOG + "; return d ? d : null;})()", 5000);
+        check(!!roomDlg && roomDlg.mouse && /your mouse/.test(roomDlg.status), 'the door in a room opens the same dialog, on "As your mouse"', roomDlg);
+        await a.eval('PhonePads.close(); 1');
+        check(await a.eval('PhoneMouse.hasPhone()'), 'and closing it leaves the phone where it was');
         await c.eval("(function(){var s=document.getElementById('densityDissipation'); s.value=1; s.dispatchEvent(new Event('input',{bubbles:true})); clearCanvas(); return 1;})()");
         await sleep(500);
         const c0 = await c.eval('__e2e.dye()');
@@ -475,6 +514,20 @@ const DIALOG = "(function(){var m=document.getElementById('phonePadModal'); if(!
         await b.eval("(function(){var i=document.getElementById('codeInput'); i.value=" + JSON.stringify(code2.slice(0, 4).toLowerCase() + ' ' + code2.slice(4)) + "; i.dispatchEvent(new Event('input',{bubbles:true})); return 1;})()");
         const typed = await until(b, "(function(){var m=" + MOUSE + "; return m.active && m.code;})()", 10000);
         check(typed === code2, 'typing the computer\'s code (any case, with its space) connects as its mouse', typed);
+        // That pairing just happened with the computer already in a room —
+        // the whole point of the door living in the room panel.
+        check(await a.eval('!!currentRoom && isMultiplayerEnabled && PhoneMouse.hasPhone()'), 'a phone can take the mouse while the computer is in a room');
+        // A's id after its reload, not the one from before it: a reconnect
+        // gets a new connection id, and the other canvas counts by id.
+        const aId2 = await a.eval('clientId');
+        const pdRoom = await a.eval('__e2e.phonePresses.down');
+        const cRoom0 = await c.eval('__e2e.peer[' + JSON.stringify(aId2) + '] || 0');
+        await touchStroke(b, [0.35, 0.6], [0.65, 0.6], 8, 160);
+        await sleep(900);
+        const pdRoom1 = await a.eval('__e2e.phonePresses.down');
+        const cRoom1 = await c.eval('__e2e.peer[' + JSON.stringify(aId2) + '] || 0');
+        check(pdRoom1 === pdRoom + 1 && cRoom1 > cRoom0, 'and paints from there as the computer, into the room',
+            { presses: pdRoom1 - pdRoom, toTheRoom: cRoom1 - cRoom0 });
         // A room code typed on the mouse card still goes to the room.
         await tap(b, '#moreBtn');
         await tap(b, '#leaveBtn');

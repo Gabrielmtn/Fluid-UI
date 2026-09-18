@@ -19,9 +19,11 @@
 //     every other one in the room, draws them the way it draws anyone's
 //     (06d). A party's way in: every phone that scans is its own painter.
 // This file is the computer's side of the artist path, and the door to both:
-//   • the door: "Paint from your phone" under Swirl Together, and the dialog
-//     with the QR a phone scans (the artist tab starts a room when there is
-//     none);
+//   • the door: "Paint from your phone" under Swirl Together — once in the
+//     not-in-a-room panel, once as a row of the room panel, so a phone can
+//     be paired from inside a room too, a stranger swirl included — and the
+//     dialog with the QR a phone scans (the artist tab starts a room when
+//     there is none);
 //   • who is a phone: pads say so ('pad-hello'), their cursors here read
 //     "📱 Artist-XX", and the dialog counts them;
 //   • what a phone paints with: THIS canvas's brush. The host answers each
@@ -48,6 +50,14 @@
     function isLocked() { try { return !!roomLocked; } catch (_) { return false; } }
     function codeHidden() { try { return shareMode === 'hidden'; } catch (_) { return false; } }
     function inStrangerRoom() { try { return typeof isStrangerRoom === 'function' && isStrangerRoom(); } catch (_) { return false; } }
+    // The room panel showing with no room yet means one thing: the lobby is
+    // still finding a stranger (06e showMatchmaking). Worth knowing, because
+    // the artist way must not answer that by quietly starting a room of our
+    // own — the person is waiting for a person.
+    function findingStranger() {
+        var c = document.getElementById('mpConnected');
+        return !roomCode() && !!c && getComputedStyle(c).display !== 'none';
+    }
     function socketOpen() {
         try { return !!partySocket && partySocket.readyState === WebSocket.OPEN; } catch (_) { return false; }
     }
@@ -247,14 +257,22 @@
                 else disc.appendChild(n);
             });
         }
-        var invite = document.getElementById('roomDisplay');
-        if (invite && !document.getElementById('phonePadRoomBtn')) {
+        // In a room the door belongs to the panel, NOT to the invite block:
+        // the invite is about letting other people in, and a stranger
+        // pairing hides it outright (06e updateConnectedView), as does the
+        // wait for a stranger to turn up. Pairing your own phone has nothing
+        // to do with who else is here, so the door sits beside the invite
+        // and outlives it — reachable from inside any room, in any state.
+        var conn = document.getElementById('mpConnected');
+        if (conn && !document.getElementById('phonePadRoomBtn')) {
             var b2 = el('button', 'mp-btn-share mp-btn-phone', 'Paint from your phone');
             b2.id = 'phonePadRoomBtn';
             b2.type = 'button';
             b2.title = 'Show a code your phone can scan: it becomes this canvas’s mouse, or an artist in this room.';
             b2.addEventListener('click', function () { open(); });
-            invite.appendChild(b2);
+            var invite = document.getElementById('roomDisplay');
+            if (invite && invite.parentNode === conn) conn.insertBefore(b2, invite.nextSibling);
+            else conn.insertBefore(b2, conn.firstChild);
         }
         syncButtons();
     }
@@ -266,9 +284,11 @@
         if (b1) b1.textContent = mouseOn ? 'Paint from your phone · connected' : 'Paint from your phone';
         var b = document.getElementById('phonePadRoomBtn');
         if (!b) return;
-        // Every room: a stranger pairing has no seat for a phone artist, but
-        // the phone can still be this canvas's mouse.
-        b.hidden = !roomCode();
+        // Nothing hides this one: the panel it lives in is shown exactly
+        // when the not-in-a-room panel (with the other door) is not. A
+        // stranger pairing has no seat for a phone artist, and waiting for a
+        // stranger has no room at all — the phone can be this canvas's mouse
+        // through either, so the way in has to survive both.
         var parts = [];
         if (mouseOn) parts.push('your mouse');
         if (pads.size) parts.push(pads.size + (pads.size === 1 ? ' artist' : ' artists'));
@@ -365,7 +385,7 @@
         if (way === 'mouse') {
             var pm = mouse();
             if (pm) pm.start();
-        } else if (!roomCode() && !inStrangerRoom()) {
+        } else if (!roomCode() && !inStrangerRoom() && !findingStranger()) {
             // createRoom() minus its clipboard copy: the phone scans, nobody pastes.
             try { connectToRoom(generateRoomCode()); }
             catch (e) { console.warn('[phone] could not start a room', e); }
@@ -380,13 +400,22 @@
         var asMouse = way === 'mouse';
         els.wayMouse.setAttribute('aria-pressed', asMouse ? 'true' : 'false');
         els.wayArtist.setAttribute('aria-pressed', asMouse ? 'false' : 'true');
+        // In a room the two ways differ in a way worth saying out loud: as
+        // the mouse, what the phone paints is YOUR stroke — the same hand,
+        // moved from the couch — where an artist phone is another person in
+        // the room, with a cursor and a name of its own.
         els.msg.textContent = asMouse
-            ? 'Scan this with your phone’s camera. The phone becomes this computer’s mouse: it moves the brush here, with every setting you’ve made. Nothing to install.'
+            ? 'Scan this with your phone’s camera. The phone becomes this computer’s mouse: it moves the brush here, with every setting you’ve made. Nothing to install.' +
+              (roomCode() ? ' In this room it paints as you, not as another artist.' : '')
             : 'Scan this with a phone’s camera to paint in this room as an artist of its own, beside you. Every phone that scans it joins. Nothing to install.';
 
         var pm = mouse();
         var ms = pm ? pm.status() : { on: false, phase: 'off', code: null, phone: false, open: false };
-        var stranger = !asMouse && inStrangerRoom();
+        // No seat for a phone artist: a stranger swirl is two people, and
+        // while the lobby is still looking there is no room to join yet —
+        // and starting one here would be answering "a stranger" with "me".
+        var waiting = !asMouse && findingStranger();
+        var stranger = !asMouse && (inStrangerRoom() || waiting);
         var code = asMouse ? ms.code : (stranger ? null : roomCode());
         var url = !code ? '' : (asMouse ? pm.url() : padUrl(code));
         // Hide (the room panel's share mode) keeps the code off a stream;
@@ -418,7 +447,9 @@
                 'Opening a link for your phone…';
             liveStatus = ms.phone;
         } else if (stranger) {
-            note = 'A stranger swirl has two seats, and both are taken, so no phone can join it as an artist. Your phone can still be your mouse.';
+            note = waiting
+                ? 'You’re waiting for a stranger, so there is no room for a phone to join as an artist. Your phone can be your mouse while you wait, and after they arrive.'
+                : 'A stranger swirl has two seats, and both are taken, so no phone can join it as an artist. Your phone can still be your mouse.';
         } else {
             var live = socketOpen() && !!selfId();
             var n = pads.size;

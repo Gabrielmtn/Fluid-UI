@@ -2123,7 +2123,8 @@ body.mobile-mode .playtest-label.floating {
     .phone-pad-body { flex-direction: column; align-items: stretch; }
     .phone-pad-qr { margin: 0 auto; }
 }
-/* The phone door inside the room panel's invite block, under Copy link /
-   Copy code (the block's own rules live in 21-sidebar.css). */
-#multiArtistPanel .mp-btn-phone { width: 100%; margin-top: 8px; }
-#multiArtistPanel .mp-btn-phone[hidden] { display: none; }
+/* The phone door in the room panel: its own row under the invite block, not
+   part of it — the invite comes and goes with the kind of room, this does
+   not (js/54-phone-pads.js mountButtons). Same 12px rhythm as the rows it
+   sits between (21-sidebar.css); adjacent margins collapse. */
+#multiArtistPanel .mp-btn-phone { width: 100%; margin: 0 0 12px; }
