@@ -123,6 +123,38 @@
                 float s = clamp(obsTexStrength(t, sMax), 0.0, 1.0);
                 return smoothstep(0.0, 0.5, s);
             }
+            float obsTexDyeBlock(vec4 t, float sMax) {
+                // How much of a DIRECT DEPOSIT (brush dab, poured image) a
+                // texel refuses. Coverage only, no strength curve — that is
+                // the 2026-08-16 rule, "paint goes around a collider, not
+                // over it", and splatFrag and imageSplatFrag must agree on
+                // it or the brush and a pour disagree about where the wall
+                // is. Shared here so they cannot drift.
+                //
+                // The window is 0.30-0.55, NOT solidity()'s 0.35-0.85
+                // (2026-09-19). An obstacle edge is a ~4-texel coverage ramp
+                // — the shape's own antialiasing, the 2x box-filter
+                // downsample and the 1-texel finish blur — whose 0.5 contour
+                // IS the edge of the shape. Blocking on 0.35-0.85 therefore
+                // did not saturate until a texel and a third INSIDE it:
+                // measured on a full-strength text collider (frozen sim, so
+                // this is deposit alone), a dab still landed 80% of itself
+                // on the letterform's own edge, 43% a third of a texel in,
+                // 20% three quarters in. Nothing takes that band away —
+                // the velocity there is damped and the advection drain only
+                // bites above coverage 0.55 — so every stroke printed a
+                // little more rim onto the letters until they wore a
+                // permanent outline of paint. Saturating at 0.55 stops the
+                // deposit a fifth of a texel inside the edge instead — 4% of
+                // a dab on the edge, under half a percent at 0.55, nothing
+                // past it — and the ~1-texel taper outside the edge
+                // keeps the stroke feathering into the wall rather than
+                // clipping against it. solidity()'s window is deliberately
+                // untouched: the FLOW still treats the wall as exactly the
+                // shape it always did, and so does the velocity a dab
+                // injects (splatFrag's covBlock).
+                return smoothstep(0.30, 0.55, obsTexCoverage(t, sMax)) * obsTexPresence(t, sMax);
+            }
         `;
         const splatFrag = `#version 300 es
             precision ${PRECISION} float;
@@ -179,10 +211,12 @@
                 float obsBlock = 1.0;
                 float obsBlockDye = 1.0;
                 if (hasObstacle == 1) {
-                    // Must match obstacleSolidityGLSL's curve: dye injection
-                    // blocking and the projection's wall must agree on where
-                    // the wall IS, or paint deposits inside a wall the flow
-                    // respects (burned-in rims). See the solidity() comment.
+                    // covBlock is obstacleSolidityGLSL's curve, so the
+                    // VELOCITY a dab injects and the projection's wall agree
+                    // on where the wall is. Deposition uses the tighter
+                    // obsTexDyeBlock below — it has to saturate at the
+                    // shape's own edge, not a texel inside it, or the brush
+                    // prints a rim on the shape (2026-09-19).
                     // Per-texel strength (2026-08-31): coverage and response
                     // come from THIS texel's own strength, so painting on a
                     // weak collider is unchanged by a strong one elsewhere.
@@ -202,7 +236,9 @@
                     // be painted over. That is why colliding did not feel like
                     // colliding. Paint now goes AROUND the shape at every
                     // strength; advection through a leaky wall is untouched.
-                    obsBlockDye = 1.0 - covBlock;
+                    // The window itself lives in obsTexDyeBlock, which
+                    // imageSplatFrag shares so a pour lands where a dab does.
+                    obsBlockDye = 1.0 - obsTexDyeBlock(ot, uObsMax);
                     // VELOCITY now defaults to the same coverage-only block
                     // (2026-08-31): the old s³ curve injected (1-s³) of every
                     // dab's velocity INSIDE the wall — 66% at strength 0.7 —
@@ -2049,9 +2085,7 @@
                 // image cannot deposit inside a wall the flow respects.
                 float obsBlockDye = 1.0;
                 if (hasObstacle == 1) {
-                    vec4 ot = texture(uObstacle, vUv);
-                    float ocov = obsTexCoverage(ot, uObsMax);
-                    obsBlockDye = 1.0 - smoothstep(0.35, 0.85, ocov) * obsTexPresence(ot, uObsMax);
+                    obsBlockDye = 1.0 - obsTexDyeBlock(texture(uObstacle, vUv), uObsMax);
                 }
                 float cov = clamp(src.a, 0.0, 1.0) * clamp(amount, 0.0, 1.0);
                 vec3 color = src.rgb;
