@@ -918,18 +918,35 @@
                 //
                 // The fader sets the diffusion LENGTH rather than nu:
                 // VISCOSITY² × VISCOSITY_REACH is how far momentum spreads in
-                // one second, as a fraction of the sim's long side. Squared so
-                // the thin end, where a little thickness already shows, gets
-                // most of the travel. Canvas units, so the look holds when
-                // the governor or a tier changes the sim resolution; only the
-                // tap count in cells changes. Each step's variance is exact
-                // (viscosityKernel), so thickness does not depend on the frame
-                // rate, the Time fader or sub-stepping.
+                // one second, as a fraction of the canvas's short side.
+                // Squared so the thin end, where a little thickness already
+                // shows, gets most of the travel. Canvas units, so the look
+                // holds when the governor or a tier changes the sim
+                // resolution; only the tap count in cells changes. Each step's
+                // variance is exact (viscosityKernel), so thickness does not
+                // depend on the frame rate, the Time fader or sub-stepping.
+                //
+                // Viscosity acts on shear alone: a patch moving as one passes
+                // through this untouched. A stroke is a moving strip in still
+                // fluid, though, so its edges ARE shear, and a length much past
+                // the stroke's own width spends the stroke's motion on the
+                // fluid around it. That is where the top of the fader stops
+                // (VISCOSITY_REACH, 04a): the small swirls are gone and the
+                // stroke still travels. It is the SHORT side for the same
+                // reason: on a landscape canvas that is the height, the unit
+                // Brush Size is in (splatFrag), so the length keeps its ratio
+                // to the stroke however wide the window is. Against the long
+                // side it grew with the width: 1.8× a square canvas's on 16:9,
+                // 3.6× on 32:9. On a portrait canvas the brush, still a share
+                // of the height, is the fatter against it, and a fat stroke
+                // holds its speed longer (measured at 520×742, brush sizes 11
+                // and 4 at 1: 85-86% of Viscosity 0's speed 2.5 s on; the
+                // height gave 68-75%).
                 const _visc = (typeof config.VISCOSITY === 'number') ? Math.max(0, Math.min(1, config.VISCOSITY)) : 0;
                 if (_visc > 0) {
                     const _vReach = (typeof config.VISCOSITY_REACH === 'number' && config.VISCOSITY_REACH > 0)
-                        ? config.VISCOSITY_REACH : 0.12;
-                    const _vSigma = _vReach * _visc * _visc * Math.sqrt(dt) * Math.max(simTexWidth, simTexHeight); // cells
+                        ? config.VISCOSITY_REACH : 0.07;
+                    const _vSigma = _vReach * _visc * _visc * Math.sqrt(dt) * Math.min(simTexWidth, simTexHeight); // cells
                     // Below ~0.03 cells a step moves velocity by less than fp16
                     // can store; the pass would round to a no-op.
                     if (_vSigma > 0.03) {

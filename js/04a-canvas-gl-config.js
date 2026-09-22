@@ -361,10 +361,19 @@
 
             VISCOSITY: 0,             // How thick the fluid is (05j pass 2c, viscosityFrag): 0 = no
                                       // viscous term, the pass is skipped and the sim is bit-identical;
-                                      // 1 = honey. The fader is a diffusion LENGTH: VISCOSITY² ×
-                                      // VISCOSITY_REACH is how far momentum spreads in one second.
-            VISCOSITY_REACH: 0.12,    // That length at VISCOSITY 1, as a fraction of the sim's long side
-                                      // (console-tunable)
+                                      // 1 = the thickest fluid that still flows. The fader is a
+                                      // diffusion LENGTH: VISCOSITY² × VISCOSITY_REACH is how far
+                                      // momentum spreads in one second.
+            VISCOSITY_REACH: 0.07,    // That length at VISCOSITY 1, as a fraction of the canvas's SHORT
+                                      // side: the height on a landscape canvas, the unit Brush Size is
+                                      // in (console-tunable). It stops where the shear is gone. It was
+                                      // 0.12 of the long side on 2026-09-21 (0.21 of the height on
+                                      // 16:9), and the top half of that fader only slowed the strokes:
+                                      // the velocity's fine shear was already 96% gone at 0.5, and 2.5 s
+                                      // after a stroke the dye moved at 18-30% of Viscosity 0's speed
+                                      // at 1. At 0.07 (16:9, six strokes, brush sizes 11 and 4) it
+                                      // moves at 99-101%, and the dye's fine detail still drops from
+                                      // 0.62 to 0.22. 0.11 slows a small brush to 79%.
 
             VIBRANCE: 0,              // Selective saturation boost (0 = off, 1.0 = max)
 

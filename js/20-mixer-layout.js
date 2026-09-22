@@ -884,7 +884,7 @@
     var CHANNEL_TOOLTIPS = {
         'Brush Size': 'Brush size for painting fluid — the ⚙ opens brush settings & presets',
         'Fluid': 'Material mode (Swirl / Gloss Paint — Wetness or Thickness) + amount — the ⚙ opens the material picker',
-        'Viscosity': 'How thick the fluid is — 0 flows like water, higher turns slow and syrupy',
+        'Viscosity': 'How thick the fluid is — 0 flows like water, higher smooths the swirls into broad ribbons',
         'Isolation': 'Motion isolation - how much color follows velocity',
         'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — the ⚙ opens arm colors & symmetry',
         'Time': 'Simulation time scale',
