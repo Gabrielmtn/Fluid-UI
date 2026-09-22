@@ -57,7 +57,16 @@
         // to stop no-fade presets ratcheting speckle, so a mutation must never
         // be what turns it down under a Density Sustain of 1.
         grainCleanup: {configKey: "HF_FLOOR_DYE", ui: {min: 0, max: 0.85, step: 0.05}, hard: {min: 0, max: 0.85}, def: 0.6, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
-        sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "simulation", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
+        // Ridge Strength — the display sharpen amount, acting only while Ridges
+        // is above 0. The id stays 'sharpness' because saved presets carry it;
+        // it was labelled "Viscosity" until 2026-09-21 without touching the fluid.
+        sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "effects", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
+        // Viscosity (2026-09-21): the fluid's thickness, a real viscous term
+        // (05j pass 2c). Default 0 is the sim as it always was, and presets
+        // saved before it existed baseline to that. No `mut` yet: a variation
+        // that thickens the fluid changes how every later stroke behaves, not
+        // just how the frame looks — worth a feel-test before Mutate deals it.
+        viscosity: {configKey: "VISCOSITY", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
         // Detail work (mandala tracery, fine linework) needs far finer tips
         // than the old 0.1 floor allowed: the splat radius is variance-like,
         // so footprint scales with sqrt(size) — 0.1 still painted a ~31px dab

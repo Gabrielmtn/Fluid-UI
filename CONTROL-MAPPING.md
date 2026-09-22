@@ -37,7 +37,7 @@ All 60+ controls from the original sidebar have been mapped to the new professio
 ### Knob Channels (Radial Sliders)
 7. **Motion Isolation** - `velocityInfluence` (1-5)
 8. **Curl** - `curl` (0-60)
-9. **Viscosity** - `sharpness` (0-2)
+9. **Viscosity** - `viscosity` (0-1; real viscous diffusion since 2026-09-21 — it was `sharpness`, the display sharpen amount now labelled Ridge Strength under Surface Shading)
 10. **Multiplier** - `multiplier` (1x-8x)
 11. **K-Segments** - `kaleidoSegments` (1-24)
 12. **K-Angle** - `kAngle` (-180°-180°)

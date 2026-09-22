@@ -822,7 +822,10 @@
         fluidChannel.querySelector('.ch-header').appendChild(fluidGear);
         strip.appendChild(fluidChannel);
 
-        strip.appendChild(faderChannel('Viscosity', 'purple', 'sharpness', 'sharpnessValue'));
+        // Real viscosity since 2026-09-21. Until then this fader drove the
+        // display sharpen amount (#sharpness, now Ridge Strength in Surface
+        // Shading), which never touched the fluid.
+        strip.appendChild(faderChannel('Viscosity', 'purple', 'viscosity', 'viscosityValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
         var brushChannel = faderChannel('Multi-Brush', 'yellow', 'multiplier', 'multiplierValue');
         // The multiplier value ("1x") IS the brush-colors trigger — click it to
@@ -881,7 +884,7 @@
     var CHANNEL_TOOLTIPS = {
         'Brush Size': 'Brush size for painting fluid — the ⚙ opens brush settings & presets',
         'Fluid': 'Material mode (Swirl / Gloss Paint — Wetness or Thickness) + amount — the ⚙ opens the material picker',
-        'Viscosity': 'Sharpness/detail enhancement',
+        'Viscosity': 'How thick the fluid is — 0 flows like water, higher turns slow and syrupy',
         'Isolation': 'Motion isolation - how much color follows velocity',
         'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — the ⚙ opens arm colors & symmetry',
         'Time': 'Simulation time scale',
@@ -2353,11 +2356,11 @@
                       'kTwist', 'kZoom', 'kBlend', 'kaleidoMode',
                       'kaleido.mode', 'kaleido.segments', 'kaleido.angle', 'kaleido.twist', 'kaleido.zoom', 'kaleido.blend'],
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
-                         'pressureIteration', 'curl', 'sharpness', 'multiplier',
+                         'pressureIteration', 'curl', 'viscosity', 'multiplier',
                          'velocityInfluence', 'brushSize', 'velocityCap', 'wetInfluence', 'wetDrying',
                          'material.amount'],
             effects: ['enableLighting', 'enableLightShift',
-                      'lightIntensity', 'lightAmbient', 'lightSpeed', 'lightMode', 'vibrance', 'ridges',
+                      'lightIntensity', 'lightAmbient', 'lightSpeed', 'lightMode', 'vibrance', 'ridges', 'sharpness',
                       'glowToggle', 'glowIntensity', 'glowThreshold',
                       'scatterToggle', 'scatterAmount', 'scatterReach', 'scatterSource', 'scatterBlockToggle',
                       'shadingIntensity', 'displayShadingToggle', 'shadeRelief', 'shadeGloss',

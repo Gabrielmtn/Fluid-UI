@@ -9,7 +9,7 @@
 //   Swirl - Vorticity       → the classic curl control, untouched behavior
 //                             (internal key 'fluid')
 //   Gloss Paint - Wetness   → Flow: surface shading @0.8 + micro detail maxed; the
-//             slider drives paint body (sharpness) and velocity damping.
+//             slider drives Ridge Strength (sharpness) and velocity damping.
 //             (internal key 'acrylic')
 //   Gloss Paint - Thickness → Depth: inverse-chiaroscuro surface shading (shadeInvert)
 //             so strokes read as carved relief; the slider drives depth + dab
@@ -58,7 +58,11 @@
                 setUISlider('vibrance', 1);
                 window.displayShadingInvert = 0;
                 // Flow: low = stiff paint (crisp, heavy damping), high = runny
-                setUISlider('sharpness', (1.8 - 1.4 * t).toFixed(1)); // the "Viscosity" slider
+                // Ridge Strength. Until 2026-09-21 the UI labelled it
+                // "Viscosity"; it only sharpens the display, and only while
+                // Ridges > 0. Real viscosity is config.VISCOSITY, which no
+                // material sets yet.
+                setUISlider('sharpness', (1.8 - 1.4 * t).toFixed(1));
                 config.VELOCITY_DISSIPATION = 0.97 + t * 0.029;
                 config.CURL = 0; // any vorticity confinement chews the smooth paint edges
                 config.PRESSURE_ITERATIONS = 26;
@@ -77,14 +81,14 @@
                 // Carved relief look is FIXED for this material: surface shading
                 // with inverted normals (chiaroscuro — strokes read as dents).
                 // The slider is a body control like Thin's Flow, NOT a lighting
-                // knob: it drives viscosity (sharpness) + velocity damping in a
-                // much heavier register (~0.90, where motion dies in under a
-                // second — thick paint barely travels).
+                // knob: it drives Ridge Strength (sharpness, see acrylic) +
+                // velocity damping in a much heavier register (~0.90, where
+                // motion dies in under a second — thick paint barely travels).
                 setCheckbox('displayShadingToggle', true);
                 setUISlider('shadingIntensity', 1.2);
                 setUISlider('vibrance', 0);
                 window.displayShadingInvert = 1;
-                setUISlider('sharpness', (2.0 - 1.2 * t).toFixed(1)); // the "Viscosity" slider
+                setUISlider('sharpness', (2.0 - 1.2 * t).toFixed(1)); // Ridge Strength
                 config.VELOCITY_DISSIPATION = 0.90 + t * 0.03;        // 0.90 → 0.93
                 config.CURL = 0;
                 config.PRESSURE_ITERATIONS = 6;

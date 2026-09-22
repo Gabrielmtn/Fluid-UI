@@ -18,6 +18,7 @@
                 velocityInfluence: { key: 'VELOCITY_INFLUENCE', decimals: 3 },
                 curl: { key: 'CURL', decimals: 0 },
                 sharpness: { key: 'SHARPNESS', decimals: 1 },
+                viscosity: { key: 'VISCOSITY', decimals: 2 },
                 vibrance: { key: 'VIBRANCE', decimals: 2 }
             };
         const brushSizeSlider = document.getElementById('brushSize');

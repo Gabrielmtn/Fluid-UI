@@ -64,9 +64,11 @@
         lightShiftThreshold: ['enableLightShift'],
         lightShiftIntensity: ['enableLightShift'],
         lightShiftSaturation: ['enableLightShift'],
-        // Ridges and Vibrance sit under the Surface Shading switch (20): a
-        // mutation there with shading off would change a hidden control.
+        // Ridges, Ridge Strength and Vibrance sit under the Surface Shading
+        // switch (20): a mutation there with shading off would change a
+        // hidden control.
         ridges: ['displayShadingToggle'],
+        sharpness: ['displayShadingToggle'],
         vibrance: ['displayShadingToggle'],
         glowIntensity: ['glowToggle'],
         glowThreshold: ['glowToggle'],

@@ -354,7 +354,17 @@
                                       // false = old apply-on-arrival, which was unbudgeted: ~19k peer
                                       // dabs/sec measured at 8 painters (MP-AUDIT-2026-08-23 §1.1)
 
-            SHARPNESS: 0.8,           // Adaptive sharpness (0.0 = off, 1.0 = moderate, 2.0 = aggressive)
+            SHARPNESS: 0.8,           // Ridge Strength: the display sharpen amount (0.0 = off, 1.0 =
+                                      // moderate, 2.0 = aggressive). Acts only while RIDGES > 0. Its
+                                      // control id is still #sharpness, and it wore the "Viscosity"
+                                      // label until 2026-09-21 without ever touching the fluid.
+
+            VISCOSITY: 0,             // How thick the fluid is (05j pass 2c, viscosityFrag): 0 = no
+                                      // viscous term, the pass is skipped and the sim is bit-identical;
+                                      // 1 = honey. The fader is a diffusion LENGTH: VISCOSITY² ×
+                                      // VISCOSITY_REACH is how far momentum spreads in one second.
+            VISCOSITY_REACH: 0.12,    // That length at VISCOSITY 1, as a fraction of the sim's long side
+                                      // (console-tunable)
 
             VIBRANCE: 0,              // Selective saturation boost (0 = off, 1.0 = max)
 
@@ -1024,8 +1034,8 @@
                                       // 0 = sharpen OFF (default — the smooth look; the
                                       // pass is skipped entirely), 1 = classic unsharp
                                       // look, >1 = coarse emboss ridges. NOTE: the
-                                      // Viscosity/sharpness strength only acts when
-                                      // this is > 0.
+                                      // Ridge Strength slider (SHARPNESS) only acts
+                                      // when this is > 0.
 
 
 

@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05b-shader-sim.js — part 2/14 of former 05-fluid-sim.js (lines 654–966)
 // LOAD ORDER: after 05a-shader-core.js, before 05c-programs-framebuffers.js
-// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter frag sources
+// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/viscosity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter frag sources
 // REQUIRES: PRECISION (05a)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -1528,6 +1528,68 @@
                     k *= 1.0 - smoothstep(0.65, 0.98, cov);
                 }
                 fragColor = vec4(c - hfv * k, 0.0, 1.0);
+            }
+        `;
+        // Viscosity (2026-09-21): the fluid's thickness, as one axis of a
+        // separable Gaussian on velocity. That is the exact solution of the
+        // viscous term (du/dt = nu * laplacian(u)) over one step: diffusing for
+        // dt spreads momentum by a Gaussian with sigma^2 = 2 * nu * dt, so two
+        // passes (x then y) are one whole viscous step, stable at any
+        // thickness. The sim had no viscous term before; the old "Viscosity"
+        // fader was the display sharpen amount (now Ridge Strength).
+        // Walls: each side of the kernel marches outward texel by texel and
+        // stops trusting what it samples once it crosses solid (a tap past a
+        // wall contributes the texel's OWN velocity, as the pressure passes
+        // reflect pressure at solids), so momentum never diffuses through a
+        // collider and a wall adds no drag of its own; a collider's mode
+        // still decides that. The canvas border is treated the same way.
+        // Solid texels keep their velocity (the projection zeroes them).
+        // Cost: velocity is LINEAR-filtered, so one fetch placed between two
+        // neighbouring taps returns their weighted sum exactly (the usual
+        // separable-blur pairing) — half the velocity reads. The wall march
+        // still reads the obstacle at every tap, so a one-texel wall is never
+        // stepped over; a pair is judged by its outer tap.
+        const viscosityFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity;
+            uniform sampler2D uObstacle;
+            uniform int hasObstacle;
+            uniform vec2 uStep;      // one tap: the pass axis times the tap spacing, in UV
+            uniform float uFalloff;  // tap i weighs exp(-i*i*uFalloff), i counted in taps
+            uniform int uPairs;      // tap pairs per side, at most 32 (64 taps)
+            ${obstacleSolidityGLSL}
+            bool outside(vec2 uv) {
+                return uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0;
+            }
+            void main() {
+                vec2 c = texture(uVelocity, vUv).xy;
+                vec2 sum = c;
+                float wsum = 1.0;
+                for (int side = 0; side < 2; side++) {
+                    vec2 dir = (side == 0) ? uStep : -uStep;
+                    float open = 1.0;
+                    for (int k = 0; k < 32; k++) {
+                        if (k >= uPairs) break;
+                        float ia = float(2 * k + 1);
+                        float ib = ia + 1.0;
+                        float wa = exp(-ia * ia * uFalloff);
+                        float wb = exp(-ib * ib * uFalloff);
+                        if (outside(vUv + dir * ib)) {
+                            open = 0.0;
+                        } else if (hasObstacle == 1) {
+                            open *= (1.0 - solidity(vUv + dir * ia)) * (1.0 - solidity(vUv + dir * ib));
+                        }
+                        float w = wa + wb;
+                        vec2 pair = texture(uVelocity, vUv + dir * (ia + wb / w)).xy;
+                        sum += mix(c, pair, open) * w;
+                        wsum += w;
+                    }
+                }
+                vec2 v = sum / wsum;
+                if (hasObstacle == 1) v = mix(v, c, solidity(vUv));
+                fragColor = vec4(v, 0.0, 1.0);
             }
         `;
         const obstacleCompositeFrag = `#version 300 es

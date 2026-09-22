@@ -51,6 +51,47 @@
             if (1.0 - cand >= 0.002 || accum >= 1.0) return { dryMul: cand, accum: 0 };
             return { dryMul: 1.0, accum };
         }
+        // Viscosity kernel for 05b viscosityFrag, given one step's sigma in
+        // sim cells: tap pairs per side, tap spacing (cells), and the weight
+        // falloff whose kernel — exactly as the shader samples it, a pair
+        // being one filtered fetch at its weighted centre — has variance
+        // sigma². Bisected rather than read off the Gaussian, because a
+        // sampled Gaussian under-spreads at sub-texel sigma (0.3 cells gives
+        // an eighth of the variance) and the truncated tails lose ~2% more:
+        // exact variance is what keeps thickness independent of the frame
+        // rate, the Time fader and sub-stepping. Taps cover ±3 sigma one cell
+        // apart up to 64 a side (sigma 21 cells), then spread out.
+        // Memoized: at a steady frame rate sigma does not change.
+        let _viscKey = -1, _viscKernel = null;
+        function viscosityKernel(sigma) {
+            const key = Math.round(sigma * 1000);
+            if (key === _viscKey) return _viscKernel;
+            const need = Math.max(2, Math.ceil(3 * sigma));
+            const spacing = need > 64 ? 3 * sigma / 64 : 1;
+            const pairs = Math.min(32, Math.ceil(need / 2));
+            const variance = function (f) {
+                let wsum = 1, m2 = 0;
+                for (let k = 0; k < pairs; k++) {
+                    const ia = 2 * k + 1, ib = ia + 1;
+                    const wa = Math.exp(-ia * ia * f), wb = Math.exp(-ib * ib * f);
+                    const w = wa + wb;
+                    const p = (ia + wb / w) * spacing;
+                    const ph = p - Math.floor(p);
+                    wsum += 2 * w;
+                    m2 += 2 * w * (p * p + ph * (1 - ph)); // + the fetch's own bilinear spread
+                }
+                return m2 / wsum;
+            };
+            const target = sigma * sigma;
+            let lo = Math.log(1e-7), hi = Math.log(60); // variance falls as falloff rises
+            for (let it = 0; it < 48; it++) {
+                const mid = 0.5 * (lo + hi);
+                if (variance(Math.exp(mid)) > target) lo = mid; else hi = mid;
+            }
+            _viscKey = key;
+            _viscKernel = { pairs: pairs, spacing: spacing, falloff: Math.exp(0.5 * (lo + hi)) };
+            return _viscKernel;
+        }
         // The desktop build holds its window invisible until one frame has
         // actually been drawn — that is the only proof the context, the
         // programs and every framebuffer are real (js/00a-boot.js).
@@ -866,6 +907,59 @@
                     blit(velocity.write.fbo);
                     velocity.swap();
                     gl.activeTexture(gl.TEXTURE0);
+                }
+                // 2c. Viscosity: how thick the fluid is (2026-09-21). The
+                // viscous term this sim never had, as a Gaussian spread of
+                // momentum with sigma^2 = 2·nu·dt per step (viscosityFrag),
+                // after the forces and BEFORE the projection, so whatever
+                // divergence the wall-clipped kernel leaves is projected out
+                // like any force's. Skipped whole at 0 (the default), which
+                // leaves every pass bit-identical to before.
+                //
+                // The fader sets the diffusion LENGTH rather than nu:
+                // VISCOSITY² × VISCOSITY_REACH is how far momentum spreads in
+                // one second, as a fraction of the sim's long side. Squared so
+                // the thin end, where a little thickness already shows, gets
+                // most of the travel. Canvas units, so the look holds when
+                // the governor or a tier changes the sim resolution; only the
+                // tap count in cells changes. Each step's variance is exact
+                // (viscosityKernel), so thickness does not depend on the frame
+                // rate, the Time fader or sub-stepping.
+                const _visc = (typeof config.VISCOSITY === 'number') ? Math.max(0, Math.min(1, config.VISCOSITY)) : 0;
+                if (_visc > 0) {
+                    const _vReach = (typeof config.VISCOSITY_REACH === 'number' && config.VISCOSITY_REACH > 0)
+                        ? config.VISCOSITY_REACH : 0.12;
+                    const _vSigma = _vReach * _visc * _visc * Math.sqrt(dt) * Math.max(simTexWidth, simTexHeight); // cells
+                    // Below ~0.03 cells a step moves velocity by less than fp16
+                    // can store; the pass would round to a no-op.
+                    if (_vSigma > 0.03) {
+                        const _vK = viscosityKernel(_vSigma);
+                        const _vSpacing = _vK.spacing;
+                        viscosityProg.bind();
+                        gl.viewport(0, 0, simTexWidth, simTexHeight);
+                        gl.uniform1i(viscosityProg.uniforms.uVelocity, 0);
+                        gl.uniform1i(viscosityProg.uniforms.uPairs, _vK.pairs);
+                        gl.uniform1f(viscosityProg.uniforms.uFalloff, _vK.falloff);
+                        gl.uniform1i(viscosityProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                        gl.uniform1f(viscosityProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                        // With no obstacle the sampler shares unit 0 with the
+                        // velocity being read, so it can never alias the
+                        // texture this pass renders into.
+                        gl.uniform1i(viscosityProg.uniforms.uObstacle, obsActive ? 1 : 0);
+                        if (obsActive) {
+                            gl.activeTexture(gl.TEXTURE1);
+                            gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                        }
+                        for (let _vAxis = 0; _vAxis < 2; _vAxis++) {
+                            gl.uniform2f(viscosityProg.uniforms.uStep,
+                                _vAxis === 0 ? _vSpacing / simTexWidth : 0,
+                                _vAxis === 0 ? 0 : _vSpacing / simTexHeight);
+                            gl.activeTexture(gl.TEXTURE0);
+                            gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                            blit(velocity.write.fbo);
+                            velocity.swap();
+                        }
+                    }
                 }
                 // 3. Divergence
                 // Overflow (open canvas edges). The Effects checkbox owns it
