@@ -33,6 +33,11 @@
     /* Clicks land on the buttons only; the empty bar lets painting through. */
     pointer-events: none;
     user-select: none;
+    /* Its width is the drawing area's, so the pills can ask how much room
+       they have (the hotkey chips below). Nothing inside is position:fixed
+       while it sits here — the turn chip and the demo clock float from
+       <body> — so the containment this brings changes nothing else. */
+    container: underbar / inline-size;
 }
 #quality-underbar > * {
     pointer-events: auto;
@@ -50,6 +55,8 @@
 #quality-underbar .qub-dd {
     position: relative;
     display: inline-block;
+    /* Keeps its width: squeezed, a pill broke its value onto two lines. */
+    flex-shrink: 0;
 }
 /* Permanent micro-label above each resting pill (copy pass 2026-08-15):
    without it the bar was two unlabeled numbers. Ghost treatment matches the
@@ -137,6 +144,7 @@
        dark, since there is no plate behind it any more. */
     transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
     cursor: pointer;
+    white-space: nowrap;
 }
 #quality-underbar .qub-dd-btn:focus-visible {
     outline: none;
@@ -144,6 +152,25 @@
 #quality-underbar .qub-dd-chev {
     font-size: 9px;
     opacity: 0.55;
+}
+/* Shading Detail shows only while Surface Shading is on: 20-mixer-layout
+   mirrors the switch onto the bar as .qub-shading. */
+#quality-underbar:not(.qub-shading) .qub-dd-shade {
+    display: none;
+}
+/* The Alt+↑/↓ chips (17-hotkey-reminder) sit inside the pill, so the pill's
+   gap spaces them; the sidebar margin they carry doubled it. When the bar
+   runs short they go first, before a pill has to — the keys still work and
+   F1 still lists them. Cutoffs from the widest values plus the playtest
+   label: two pills measured 557px with the chips, three 682 (545 without). */
+#quality-underbar .qub-dd-btn .hk-cap {
+    margin-left: 0;
+}
+@container underbar (max-width: 560px) {
+    #quality-underbar .qub-dd-btn .hk-cap { display: none; }
+}
+@container underbar (max-width: 680px) {
+    #quality-underbar.qub-shading .qub-dd-btn .hk-cap { display: none; }
 }
 #quality-underbar .qub-dd-list {
     display: none;

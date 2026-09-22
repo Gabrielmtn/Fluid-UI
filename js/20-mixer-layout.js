@@ -1987,7 +1987,7 @@
         sidebar.appendChild(buildSettingsSection(controls));
 
         stampGroupRows(sidebar);
-        buildQualityUnderbar();
+        buildQualityUnderbar(sidebar);
 
         return sidebar;
     }
@@ -2016,7 +2016,7 @@
     // top-right corner surfacing the two knobs users reach for most (Visual
     // Quality + Physics Detail), without opening the Simulation panel. v1 per
     // Gabriel: these two controls, top-right; de-band etc. stay in the panel.
-    function buildQualityUnderbar() {
+    function buildQualityUnderbar(sidebar) {
         if (document.getElementById('quality-underbar')) return;
         const bar = document.createElement('div');
         bar.id = 'quality-underbar';
@@ -2031,13 +2031,35 @@
         // two aren't just two unlabeled numbers at the bottom of the screen.
         [['visualResolution', 'Image Sharpness', 'Resolution of the paint itself — sharper costs GPU'],
          ['physicsResolution', 'Motion Detail', 'Resolution of the motion sim — finer swirls cost GPU'],
-         // Beside Motion Detail per Gabriel (2026-09-18). Says it needs
-         // Surface Shading because on its own the pick changes nothing.
-         ['shadeFormResolution', 'Shading Detail', 'Grain of the Surface Shading relief — finer brings out the fine veins. Needs Surface Shading on (Effects)']
+         // Beside Motion Detail per Gabriel (2026-09-18). Shown only while
+         // Surface Shading is on (below), since on its own the pick changes nothing.
+         ['shadeFormResolution', 'Shading Detail', 'Grain of the Surface Shading relief — finer brings out the fine veins']
         ].forEach(function (pair) {
             const sel = document.getElementById(pair[0]);
             if (sel) bar.appendChild(makeQubDropdown(sel, pair[1], pair[2]));
         });
+        // The Surface Shading switch shows and hides the Shading Detail pill,
+        // as it does the sliders under it in Effects (05e). The pick still
+        // applies while hidden; the switch only decides what is shown. Every
+        // path that flips the switch (the box, its Effects thumb, presets, look
+        // links, the room mirror) fires 'change', so listening there is enough.
+        // It lands as .qub-shading on the bar, which hides the pill and tells
+        // the hotkey-chip cutoff how many pills share the bar (20-mixer-strip.css).
+        // Neither is in the document yet — the bar joins it below, the sidebar
+        // after this build returns — so look each up in its own tree.
+        const shadeSel = bar.querySelector('#shadeFormResolution');
+        const shadePill = shadeSel && shadeSel.closest('.qub-dd');
+        const shadeToggle = (sidebar && sidebar.querySelector('#displayShadingToggle'))
+            || document.getElementById('displayShadingToggle');
+        if (shadePill && shadeToggle) {
+            shadePill.classList.add('qub-dd-shade');
+            const syncShadePill = function () {
+                bar.classList.toggle('qub-shading', shadeToggle.checked);
+                if (!shadeToggle.checked) shadePill.classList.remove('open');
+            };
+            shadeToggle.addEventListener('change', syncShadePill);
+            syncShadePill();
+        }
         document.body.appendChild(bar);
         // Trim the right edge to #canvas-area's right — the drawing region's
         // edge, i.e. where the nav begins. canvas-area is left:0, so only its
@@ -2098,9 +2120,12 @@
             list.appendChild(sub);
         }
 
+        // The resting pill drops the option's trailing aside ("2048 — Sharp",
+        // not "2048 — Sharp (default)"): three full texts overran the bar
+        // at ~1000px windows. The open list still shows every option whole.
         const syncVal = function () {
             const o = sel.options[sel.selectedIndex];
-            val.textContent = o ? o.text : '';
+            val.textContent = o ? o.text.replace(/\s*\([^()]*\)$/, '') : '';
         };
         const rebuild = function () {
             Array.prototype.slice.call(list.querySelectorAll('.qub-dd-opt')).forEach(function (o) { o.remove(); });
