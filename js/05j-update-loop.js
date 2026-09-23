@@ -28,6 +28,27 @@
         // scene driving the attractor field and a user pushing in the same frame
         // cannot scribble on each other's upload.
         const brushPushScratch = new Float32Array(48);
+        // Gravity Direction's row/column weight means (ambientMeanFrag, pass
+        // 2b): an R16F target W x 2, W = the sim grid's longer side. Made here
+        // on first use rather than in initFramebuffers: it is a few KB, exists
+        // only once someone aims the pad, and a size change just remakes it.
+        let _ambMeans = null;
+        function ambientMeansTarget(w) {
+            if (_ambMeans && _ambMeans.width === w) return _ambMeans;
+            if (_ambMeans) { gl.deleteTexture(_ambMeans.texture); gl.deleteFramebuffer(_ambMeans.fbo); }
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, w, 2, 0, gl.RED, gl.HALF_FLOAT, null);
+            const fbo = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+            _ambMeans = { texture: texture, fbo: fbo, width: w };
+            return _ambMeans;
+        }
         // Resize settle deadline for the debounced FBO rebuild (0 = none pending)
         let _fboSettleAtMs = 0;
         // Last frame's wrapper size — the settle deadline re-arms only when
@@ -882,28 +903,50 @@
                 // the one force that never decays on its own.
                 const _ambX = (typeof config.AMBIENT_FORCE_X === 'number') ? config.AMBIENT_FORCE_X : 0;
                 const _ambY = (typeof config.AMBIENT_FORCE_Y === 'number') ? config.AMBIENT_FORCE_Y : 0;
-                if (!_frozen && config.AMBIENT_FORCE && (_ambX !== 0 || _ambY !== 0)) {
+                const _ambOn = !_frozen && !!config.AMBIENT_FORCE && (_ambX !== 0 || _ambY !== 0);
+                if (_ambOn) {
                     const _ambRef = (typeof config.AMBIENT_FORCE_REF === 'number')
                         ? config.AMBIENT_FORCE_REF : 0.5;
+                    const _ambLoad = (typeof config.AMBIENT_FORCE_LOAD === 'number' && config.AMBIENT_FORCE_LOAD > 0)
+                        ? config.AMBIENT_FORCE_LOAD : 2.4;
+                    const _ambFloor = (typeof config.AMBIENT_FORCE_FLOOR === 'number')
+                        ? Math.max(0, Math.min(1, config.AMBIENT_FORCE_FLOOR)) : 0;
+                    // First the weight's mean along every row and column of the
+                    // sim grid, so the force pass can pull each texel by how much
+                    // heavier it is than the fluid beside it (balanced pull, see
+                    // ambientForceFrag). Density on unit 0, target the means.
+                    const _ambMeansT = ambientMeansTarget(Math.max(simTexWidth, simTexHeight));
+                    ambientMeanProg.bind();
+                    gl.viewport(0, 0, _ambMeansT.width, 2);
+                    gl.uniform2i(ambientMeanProg.uniforms.uSim, simTexWidth, simTexHeight);
+                    gl.uniform1f(ambientMeanProg.uniforms.uLoad, _ambLoad);
+                    gl.uniform1f(ambientMeanProg.uniforms.uFloor, _ambFloor);
+                    gl.uniform1i(ambientMeanProg.uniforms.uDensity, 0);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    blit(_ambMeansT.fbo);
+                    gl.viewport(0, 0, simTexWidth, simTexHeight);
                     ambientForceProg.bind();
                     // The pad stores SCREEN space (y+ down); velocity's +y is up, so
                     // the flip happens here, once, rather than in the shader or the
                     // UI where it would be easy to apply twice.
                     gl.uniform2f(ambientForceProg.uniforms.uForce, _ambX * _ambRef, -_ambY * _ambRef);
                     gl.uniform1f(ambientForceProg.uniforms.dt, dt);
-                    gl.uniform1f(ambientForceProg.uniforms.uMaxDensity,
-                        (typeof config.AMBIENT_FORCE_MAXDYE === 'number') ? config.AMBIENT_FORCE_MAXDYE : 1.6);
-                    gl.uniform1f(ambientForceProg.uniforms.uFloor,
-                        (typeof config.AMBIENT_FORCE_FLOOR === 'number') ? Math.max(0, Math.min(1, config.AMBIENT_FORCE_FLOOR)) : 0);
+                    gl.uniform1f(ambientForceProg.uniforms.uLoad, _ambLoad);
+                    gl.uniform1f(ambientForceProg.uniforms.uFloor, _ambFloor);
+                    gl.uniform1f(ambientForceProg.uniforms.uBalance, config.AMBIENT_FORCE_BALANCE === false ? 0.0 : 1.0);
                     gl.uniform1f(ambientForceProg.uniforms.uCapSpd,
                         config.VEL_SOURCE_GATE === false ? 0.0 :
                         ((typeof config.VELOCITY_CAP === 'number' && config.VELOCITY_CAP > 0) ? config.VELOCITY_CAP : 30.0));
                     gl.uniform1i(ambientForceProg.uniforms.uVelocity, 0);
                     gl.uniform1i(ambientForceProg.uniforms.uDensity, 1);
+                    gl.uniform1i(ambientForceProg.uniforms.uMeans, 2);
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                     gl.activeTexture(gl.TEXTURE1);
                     gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    gl.activeTexture(gl.TEXTURE2);
+                    gl.bindTexture(gl.TEXTURE_2D, _ambMeansT.texture);
                     blit(velocity.write.fbo);
                     velocity.swap();
                     gl.activeTexture(gl.TEXTURE0);
@@ -1144,6 +1187,8 @@
                     (typeof config.EDGE_ABSORB_BAND === 'number' && config.EDGE_ABSORB_BAND > 0)
                         ? config.EDGE_ABSORB_BAND : 0.025);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 0);
+                // Gravity's floor drain is dye-only; the dye pass below sets it.
+                gl.uniform2f(advectionProg.uniforms.floorDrain, 0.0, 0.0);
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, 0);
                 gl.uniform1i(advectionProg.uniforms.macMode, 0);
                 gl.uniform1f(advectionProg.uniforms.uVelCap,
@@ -1373,6 +1418,28 @@
                 gl.uniform2f(advectionProg.uniforms.texelSize, 1.0, 1.0);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);
+                // Gravity's floor drain (advectionFrag): whichever edges the pad
+                // points at eat the paint that reaches them, each by its share
+                // of the direction, faster the harder the pad is pushed. Off
+                // whenever the pull is (frozen, switched off, centred).
+                {
+                    let _fdx = 0, _fdy = 0;
+                    const _fdRate = (typeof config.AMBIENT_FORCE_DRAIN === 'number')
+                        ? Math.max(0, config.AMBIENT_FORCE_DRAIN) : 0.05;
+                    const _fdMag = Math.hypot(_ambX, _ambY);
+                    if (_ambOn && _fdRate > 0 && _fdMag > 0) {
+                        const _fdK = _fdRate * Math.min(1, _fdMag) / _fdMag;
+                        _fdx = _ambX * _fdK;
+                        _fdy = -_ambY * _fdK;   // pad y is down, UV y is up
+                    }
+                    gl.uniform2f(advectionProg.uniforms.floorDrain, _fdx, _fdy);
+                    // Band as a share of the canvas HEIGHT on every edge, so the
+                    // side bands are as many pixels wide as the floor's.
+                    const _fdBand = (typeof config.AMBIENT_FORCE_DRAIN_BAND === 'number' && config.AMBIENT_FORCE_DRAIN_BAND > 0)
+                        ? config.AMBIENT_FORCE_DRAIN_BAND : 0.08;
+                    gl.uniform2f(advectionProg.uniforms.floorBand,
+                        _fdBand * canvas.height / Math.max(1, canvas.width), _fdBand);
+                }
                 gl.uniform1i(advectionProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1f(advectionProg.uniforms.uObsMax, _obsMax);
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);

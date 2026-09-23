@@ -929,13 +929,30 @@
                                       // seconds, with the low end of the pad still a slow
                                       // atmospheric drift. Above ~10 the field starts
                                       // outrunning the dye it is pushing.
-            AMBIENT_FORCE_FLOOR: 0.5, // Minimum share of the pull any visible paint gets
-                                      // (0 = legacy, purely density-proportional). With 0
-                                      // a sheet of dye spread thin over a collider hung
+            AMBIENT_FORCE_FLOOR: 0.5, // Base weight of any visible paint, in loaded-stroke
+                                      // units; the amount adds on top (0 = none). Without
+                                      // it a sheet of dye spread thin over a collider hung
                                       // there under gravity — the letter-top streaks and
                                       // "burn" Gabriel reported 2026-09-09 (see ambientForceFrag).
-            AMBIENT_FORCE_MAXDYE: 1.6,// Dye level treated as fully loaded, so a faint
-                                      // wash falls slower than a saturated one.
+            AMBIENT_FORCE_LOAD: 2.4,  // Paint amount (r+g+b) that weighs one loaded stroke.
+                                      // Replaces AMBIENT_FORCE_MAXDYE (1.6 on the brightest
+                                      // channel, a hard ceiling): a sum with no ceiling below
+                                      // 4x, so paint over paint, in any colour, is heavier
+                                      // and keeps falling (2026-09-22, see ambientForceFrag).
+            AMBIENT_FORCE_BALANCE: true, // Pull each texel by how much heavier it is than its
+                                      // own row (column, for a sideways pull), and push the
+                                      // lighter fluid beside it the other way: buoyancy, net
+                                      // force zero. false = the old absolute pull, whose
+                                      // uniform part this projection turns into a drift the
+                                      // wrong way (heavy paint rose). Console-tunable A/B.
+            AMBIENT_FORCE_DRAIN: 0.05,// Floor drain: the share of the paint in the band's
+                                      // outer edge eaten per 60Hz frame, on the edges the pad
+                                      // points at, x how far the pad is pushed (0 = off, and
+                                      // paint piles against that wall as before). At 0.05 a
+                                      // painted canvas under full gravity loses about a third
+                                      // of its paint in 10 s and never silts up.
+            AMBIENT_FORCE_DRAIN_BAND: 0.08, // Its width, as a share of the canvas height (the
+                                      // side bands are the same number of pixels).
             BRUSH_VELOCITY_ONLY: false, // Velocity-only brush ("Pressure"): the stroke runs the
                                       // splat's VELOCITY pass and skips the dye pass entirely,
                                       // so it moves paint that is already down without

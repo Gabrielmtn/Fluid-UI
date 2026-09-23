@@ -21,6 +21,7 @@
         const vorticityProg = new Program(baseVert, vorticityFrag);
         const attractorProg = new Program(baseVert, attractorFrag); // 6.2 attractor forcing field
         const ambientForceProg = new Program(baseVert, ambientForceFrag); // constant pressure field
+        const ambientMeanProg = new Program(baseVert, ambientMeanFrag);   // its row/column means (balanced pull)
         const pressureProg = new Program(baseVert, pressureFrag);
         const mgResidualProg = new Program(baseVert, mgResidualFrag);
         const mgRestrictProg = new Program(baseVert, mgRestrictFrag);

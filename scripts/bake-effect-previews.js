@@ -340,6 +340,9 @@
                 if (window.config) {
                     window.config.AMBIENT_FORCE = true; window.config.AMBIENT_FORCE_X = 1; window.config.AMBIENT_FORCE_Y = 0;
                     window.config.AMBIENT_FORCE_REF = 22;   // a puff reaches the edge in ~1.3 s
+                    // The wind's own floor drain would eat the first puff at
+                    // the rim too; this preview is the closed rim vs Border.
+                    window.config.AMBIENT_FORCE_DRAIN = 0;
                     window.config.DENSITY_DISSIPATION = 0.996;
                 }
             },
@@ -621,7 +624,7 @@
         const look = (typeof window.capturePresetSnapshot === 'function') ? window.capturePresetSnapshot({ lookOnly: true }) : null;
         const prevPath = window.lightShift ? JSON.parse(JSON.stringify(window.lightShift.colorPath || [])) : null;
         const prevLight = window.lightSource ? { x: window.lightSource.x, y: window.lightSource.y, mode: window.lightSource.mode } : null;
-        const prevForce = window.config ? [window.config.AMBIENT_FORCE_X, window.config.AMBIENT_FORCE_Y, window.config.AMBIENT_FORCE_REF] : null;
+        const prevForce = window.config ? [window.config.AMBIENT_FORCE_X, window.config.AMBIENT_FORCE_Y, window.config.AMBIENT_FORCE_REF, window.config.AMBIENT_FORCE_DRAIN] : null;
         const prevBrush = window.config ? { gate: window.config.COLOR_GATE, flow: window.config.BRUSH_FLOW, dens: window.config.DENSITY_DISSIPATION } : null;
 
         // A paused sim ignores paint (04f auto-pauses a hidden page, and a
@@ -709,7 +712,7 @@
             allOff();
             if (window.lightShift && window.lightShift.setPath && prevPath) window.lightShift.setPath(prevPath);
             if (window.lightSource && prevLight) { window.lightSource.x = prevLight.x; window.lightSource.y = prevLight.y; window.lightSource.mode = prevLight.mode; }
-            if (window.config && prevForce) { window.config.AMBIENT_FORCE_X = prevForce[0]; window.config.AMBIENT_FORCE_Y = prevForce[1]; window.config.AMBIENT_FORCE_REF = prevForce[2]; }
+            if (window.config && prevForce) { window.config.AMBIENT_FORCE_X = prevForce[0]; window.config.AMBIENT_FORCE_Y = prevForce[1]; window.config.AMBIENT_FORCE_REF = prevForce[2]; window.config.AMBIENT_FORCE_DRAIN = prevForce[3]; }
             if (window.config && prevBrush) { window.config.COLOR_GATE = prevBrush.gate; window.config.BRUSH_FLOW = prevBrush.flow; window.config.DENSITY_DISSIPATION = prevBrush.dens; }
             if (look && typeof window.applyPresetSnapshot === 'function') { try { window.applyPresetSnapshot(look); } catch (_) {} }
             if (typeof window.clearCanvas === 'function') window.clearCanvas();

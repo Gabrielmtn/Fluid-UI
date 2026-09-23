@@ -3261,7 +3261,7 @@
         'shading':      { title: 'Surface Shading',
             text: 'Lights the paint as a surface: ridges and pools pick up highlight and shadow. Relief sets the height and Gloss the shine; turn on Light Source to aim the light.' },
         'gravity':      { title: 'Gravity Direction',
-            text: 'A steady push across the whole canvas. Aim it with the pad: down is gravity, up is lift, sideways is wind. Every brush feels it.' },
+            text: 'A steady push across the whole canvas. Aim it with the pad: down is gravity, up is lift, sideways is wind. Paint drains off the edge it falls toward, so it never piles up. Every brush feels it.' },
         'border':       { title: 'Border',
             text: 'Open edges. Paint that reaches the rim drains off the canvas instead of bouncing back in. Width sets how far in the drain reaches.' },
         'breathing':    { title: 'Breathing',

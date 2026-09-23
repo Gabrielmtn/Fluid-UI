@@ -681,6 +681,8 @@
             uniform float uRestoreGain; // overshoot past it — the "and brighter"
             uniform float edgeAbsorb; // >0: absorbing borders — fluid vents off-canvas instead of bouncing
             uniform float edgeAbsorbBand; // drain band width, fraction of the canvas per axis
+            uniform vec2 floorDrain; // Gravity's floor drain: pull direction (UV, +y up) x rate; 0 = off
+            uniform vec2 floorBand;  // its band width per axis, UV (same pixel width on every edge)
             uniform int isDensity;
             uniform int hasObstacle;
             uniform int macMode; // 1 = uSource is the already-advected MacCormack
@@ -985,6 +987,29 @@
                     float bandK = (1.0 - smoothstep(0.0, max(edgeAbsorbBand, 1e-4), ed)) * edgeAbsorb;
                     color *= max(0.0, 1.0 - bandK * 0.55 * dt * 60.0);
                     if (isDensity == 0) color.a = 1.0;
+                }
+                // Gravity's floor drain (2026-09-22): the edge the pull points
+                // at eats the paint that reaches it, the way paint runs off the
+                // bottom of a canvas. Without it everything that falls piles
+                // into a still layer against that wall, and once the pile
+                // spans the canvas there is nothing left for the pull to move
+                // (Gabriel: gravity "has to be paired with a kind of eating
+                // force"). A diagonal pull drains both edges it points at, each
+                // by its share. Dye only (the walls stay walls for the flow),
+                // alpha included like the other drains, and never while
+                // frozen. Measured on a fully painted canvas with the pad
+                // straight down: without it the fall stops within ~3 s and the
+                // motion winds down (paint-weighted speed 0.51 at 2 s, 0.28 at
+                // 10 s); with it the canvas is still turning over at 10 s
+                // (~0.5), the floor never silts up (share of the paint in the
+                // bottom 15%: 0.10 vs 0.15), and about a third of the paint
+                // has poured off by then.
+                if (isDensity == 1 && frozen < 0.5 && (floorDrain.x != 0.0 || floorDrain.y != 0.0)) {
+                    float fk = max( floorDrain.x, 0.0) * (1.0 - smoothstep(0.0, floorBand.x, 1.0 - vUv.x))
+                             + max(-floorDrain.x, 0.0) * (1.0 - smoothstep(0.0, floorBand.x, vUv.x))
+                             + max( floorDrain.y, 0.0) * (1.0 - smoothstep(0.0, floorBand.y, 1.0 - vUv.y))
+                             + max(-floorDrain.y, 0.0) * (1.0 - smoothstep(0.0, floorBand.y, vUv.y));
+                    color *= max(0.0, 1.0 - fk * dt * 60.0);
                 }
                 fragColor = color;
             }
@@ -1366,32 +1391,127 @@
         // incompressible and has nowhere to go) but its EDGES roll. What you
         // see is paint falling, pooling and fingering rather than the whole
         // canvas sliding off one side.
+        //
+        // BALANCED PULL (2026-09-22). "At high densities it doesn't feel like
+        // gravity anymore", and it wasn't: measured, a blob dropped on paint
+        // loaded past 1.6 ROSE (-0.066 of the canvas in 2 s where a clear
+        // canvas let it fall 0.37), and in a painting session with the pad
+        // down, strokes laid on already-painted canvas moved UP on average
+        // (-0.03 canvas/s 1/6 s after the dab; the first ten, on clear
+        // canvas, fell at +0.05). Two causes, both fixed here:
+        //
+        //  1. The pull saturated. rho was clamp(max(r,g,b)/1.6, 0, 1), so
+        //     paint over paint weighed no more than the paint under it (and a
+        //     blue stroke over red weighed nothing extra at all: max, not
+        //     sum). Equal weight everywhere is a uniform force, which is
+        //     exactly what the projection deletes. The weight is now the
+        //     paint's AMOUNT, summed over the channels, so every layer adds
+        //     some (ambientWeightGLSL).
+        //
+        //  2. The part of the pull that is the same all along a row (for a
+        //     vertical pull; along a column for a sideways one) moves
+        //     nothing in a closed box. It only loads the pressure with the
+        //     column's weight. This projection subtracts twice the gradient
+        //     its solve converges to (divergenceFrag takes half-differences,
+        //     gradientFrag full ones), so that load is not cancelled but
+        //     REFLECTED: a uniform pull comes back as a steady drift of about
+        //     half a frame's pull the OTHER way (measured: heavy paint drifting
+        //     up at 0.03 canvas/s under full gravity). So each texel is now
+        //     pulled by how much heavier it is than its own row, and the
+        //     lighter fluid beside it is pushed the other way just as hard:
+        //     buoyancy, net force zero. With an exact projection the result is
+        //     identical (the subtracted part is a pure gradient); with this one
+        //     the drift is gone and the pressure stops carrying the column.
+        //     The row and column means come from ambientMeanFrag, one tiny
+        //     pass before this one.
+        //
+        // After both: a blob on paint at any load (0.25 to 4.0, same colour or
+        // not) falls 0.16-0.20 of the canvas in 2 s, and new strokes keep
+        // falling (about +0.1 canvas/s on average) for a whole 30 s session,
+        // the pad straight down. On clear canvas a
+        // typical stroke falls within ~30% of before (0.25 -> 0.29 in 2 s),
+        // and a single blob exactly as before (0.37 -> 0.38).
+        //
+        // The paint that falls has to go somewhere, or it piles into a still,
+        // muddy layer against the floor (the drain in advectionFrag, floorDrain).
+        const ambientWeightGLSL = `
+            // How heavy the paint in a texel is, in units of a loaded stroke.
+            // Thin-paint floor (2026-09-09): the density-proportional pull let
+            // a spread-out sheet hang (dye thrown sideways off the crown of a
+            // collider, a letter under gravity, thinned to ~0.1 and felt 6%
+            // of the gravity, so it sat there as a horizontal streak). Anything
+            // visibly painted carries floorShare as a BASE weight; the amount
+            // adds on top of it (2026-09-22: it used to be a max, which gave
+            // a thin wash and a loaded stroke over it the same weight). The
+            // amount is summed over the channels so that paint laid over
+            // paint, in any colour, is heavier; capped at 4 so a blown-out
+            // highlight does not fall like a stone.
+            float ambientWeight(vec3 d, float load, float floorShare) {
+                d = max(d, vec3(0.0));
+                float mx = max(d.r, max(d.g, d.b));
+                return floorShare * smoothstep(0.01, 0.06, mx)
+                     + min((d.r + d.g + d.b) / max(load, 1e-4), 4.0);
+            }
+        `;
+        // Row and column means of that weight, over exactly the texels the
+        // force pass samples (the sim grid's centres). Target is W x 2 with
+        // W = max(sim width, sim height): row 0 holds column means (index =
+        // x), row 1 holds row means (index = y). highp on purpose: this is a
+        // sum of up to 512 terms and a mediump accumulator would round it
+        // away. At most 512 samples per line; above that it strides.
+        const ambientMeanFrag = `#version 300 es
+            precision highp float;
+            precision highp int;
+            out vec4 fragColor;
+            uniform sampler2D uDensity;
+            uniform ivec2 uSim;          // sim grid size
+            uniform float uLoad, uFloor;
+            ${ambientWeightGLSL}
+            void main() {
+                int idx = int(gl_FragCoord.x);
+                bool colPass = gl_FragCoord.y < 1.0;
+                int len = colPass ? uSim.x : uSim.y;
+                int n = colPass ? uSim.y : uSim.x;
+                if (idx >= len) { fragColor = vec4(0.0); return; }
+                int stride = max(1, (n + 511) / 512);
+                float s = 0.0, c = 0.0;
+                vec2 inv = 1.0 / vec2(uSim);
+                for (int i = 0; i < 512; i++) {
+                    int k = i * stride;
+                    if (k >= n) break;
+                    vec2 uv = colPass ? vec2(float(idx) + 0.5, float(k) + 0.5) * inv
+                                      : vec2(float(k) + 0.5, float(idx) + 0.5) * inv;
+                    s += ambientWeight(texture(uDensity, uv).rgb, uLoad, uFloor);
+                    c += 1.0;
+                }
+                fragColor = vec4(s / max(c, 1.0), 0.0, 0.0, 1.0);
+            }
+        `;
         const ambientForceFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uVelocity;
             uniform sampler2D uDensity;
+            uniform sampler2D uMeans;  // ambientMeanFrag's output
             uniform vec2  uForce;      // direction * intensity, velocity units per second
             uniform float dt;
-            uniform float uMaxDensity; // dye level treated as fully loaded
+            uniform float uLoad;       // paint amount that weighs one loaded stroke
             uniform float uCapSpd;     // Max Speed headroom gate (0 = off)
-            uniform float uFloor;      // minimum share of the pull any VISIBLE dye
-                                       // gets (config.AMBIENT_FORCE_FLOOR, 0 = legacy)
+            uniform float uFloor;      // base weight of any VISIBLE paint
+                                       // (config.AMBIENT_FORCE_FLOOR, 0 = none)
+            uniform float uBalance;    // 1 = weigh against the row/column (default),
+                                       // 0 = the old absolute pull
+            ${ambientWeightGLSL}
             void main() {
                 vec2 vel = texture(uVelocity, vUv).xy;
-                vec3 d = texture(uDensity, vUv).rgb;
-                float maxc = max(d.r, max(d.g, d.b));
-                float rho = clamp(maxc / max(uMaxDensity, 1e-4), 0.0, 1.0);
-                // Thin-paint floor (2026-09-09): the density-proportional pull
-                // let a spread-out sheet hang — dye thrown sideways off the
-                // crown of a collider (a letter under gravity) thinned to
-                // ~0.1 and then felt 6% of the gravity, so it sat there as a
-                // horizontal streak instead of sliding down around the shape.
-                // Anything visibly painted now gets at least uFloor of the
-                // pull; the loaded-stroke response above the floor is unchanged.
-                rho = max(rho, uFloor * smoothstep(0.01, 0.06, maxc));
-                vec2 f = uForce * rho;
+                float w = ambientWeight(texture(uDensity, vUv).rgb, uLoad, uFloor);
+                // The force pass runs on the sim grid, so its fragment IS the
+                // texel index the means were taken at.
+                ivec2 p = ivec2(gl_FragCoord.xy);
+                vec2 around = vec2(texelFetch(uMeans, ivec2(p.x, 0), 0).r,
+                                   texelFetch(uMeans, ivec2(p.y, 1), 0).r);
+                vec2 f = uForce * (vec2(w) - uBalance * around);
                 // Same source gate vorticity uses: stop pushing texels already
                 // near the Max Speed ceiling. Pushing a capped texel adds no
                 // motion, only divergence for the projection to bounce back.

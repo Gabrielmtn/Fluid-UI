@@ -1,6 +1,6 @@
 {
   "generated": "node scripts/test/gen-shader-inventory.js",
-  "shaders": 38,
+  "shaders": 42,
   "collisionGroups": 2,
   "table": {
     "uTexture": {
@@ -23,7 +23,7 @@
         }
       ]
     },
-    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kMode|kTwist|kZoom|kaleidoEnabled|lampAmbient|lampOn|lampPos|lampPower|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|segments|shadeGloss|shadeInvert|shadeRelief|shadeTexelSize|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uTexture": {
+    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kMode|kTwist|kZoom|kaleidoEnabled|lampAmbient|lampOn|lampPos|lampPower|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|segments|shadeGloss|shadeInvert|shadeRelief|shadeTexelSize|shadeWallRim|shadeWalls|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uShadeWall|uTexture": {
       "name": "display",
       "uniforms": [
         "backgroundTransparency",
@@ -57,6 +57,8 @@
         "shadeInvert",
         "shadeRelief",
         "shadeTexelSize",
+        "shadeWallRim",
+        "shadeWalls",
         "texelSize",
         "uGlow",
         "uMaskOverlay",
@@ -78,6 +80,7 @@
         "uRasterP3",
         "uScatter",
         "uShadeForm",
+        "uShadeWall",
         "uTexture"
       ]
     },
@@ -145,7 +148,7 @@
         }
       ]
     },
-    "bloomCeiling|decayDt|dissipation|dt|edgeAbsorb|edgeAbsorbBand|frozen|hasObstacle|hfFloorDye|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelocity": {
+    "bloomCeiling|decayDt|dissipation|dt|edgeAbsorb|edgeAbsorbBand|floorBand|floorDrain|frozen|hasObstacle|hfFloorDye|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelocity": {
       "name": "advection",
       "uniforms": [
         "bloomCeiling",
@@ -154,6 +157,8 @@
         "dt",
         "edgeAbsorb",
         "edgeAbsorbBand",
+        "floorBand",
+        "floorDrain",
         "frozen",
         "hasObstacle",
         "hfFloorDye",
@@ -255,15 +260,26 @@
         "uVelocity"
       ]
     },
-    "dt|uCapSpd|uDensity|uFloor|uForce|uMaxDensity|uVelocity": {
+    "uDensity|uFloor|uLoad|uSim": {
+      "name": "ambientMean",
+      "uniforms": [
+        "uDensity",
+        "uFloor",
+        "uLoad",
+        "uSim"
+      ]
+    },
+    "dt|uBalance|uCapSpd|uDensity|uFloor|uForce|uLoad|uMeans|uVelocity": {
       "name": "ambientForce",
       "uniforms": [
         "dt",
+        "uBalance",
         "uCapSpd",
         "uDensity",
         "uFloor",
         "uForce",
-        "uMaxDensity",
+        "uLoad",
+        "uMeans",
         "uVelocity"
       ]
     },
@@ -291,6 +307,17 @@
         "texelSize",
         "uObsMax",
         "uObstacle",
+        "uVelocity"
+      ]
+    },
+    "hasObstacle|uFalloff|uObstacle|uPairs|uStep|uVelocity": {
+      "name": "viscosity",
+      "uniforms": [
+        "hasObstacle",
+        "uFalloff",
+        "uObstacle",
+        "uPairs",
+        "uStep",
         "uVelocity"
       ]
     },
@@ -460,6 +487,20 @@
         "uObstacle",
         "uTexture",
         "weight"
+      ]
+    },
+    "uObsMax|uObstacle": {
+      "name": "shadeWall",
+      "uniforms": [
+        "uObsMax",
+        "uObstacle"
+      ]
+    },
+    "uTexture|uWall": {
+      "name": "shadeForm",
+      "uniforms": [
+        "uTexture",
+        "uWall"
       ]
     },
     "areaFrac|darkFloor|dt|flashDelta|pairWindow|rateAllow|redDelta|releaseTau|slew|uLumaCur|uLumaPrev|uStatsPrev": {

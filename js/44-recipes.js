@@ -325,7 +325,7 @@
           ] },
         { id: 'gravity', pillar: 'effects', title: 'Make the paint fall, rise or drift',
           tags: ['gravity', 'lift', 'wind', 'drift', 'fall', 'sink', 'direction', 'pressure'],
-          answer: 'Effects → Gravity Direction. Aim the pad: down is gravity, up is lift, sideways is wind. Every brush feels it until you switch it off.',
+          answer: 'Effects → Gravity Direction. Aim the pad: down is gravity, up is lift, sideways is wind. Paint drains off the edge it falls toward. Every brush feels it until you switch it off.',
           target: { section: 'Effects', sel: '#pressureConstant' },
           steps: [
             { say: 'Effects → switch Gravity Direction on.', target: { section: 'Effects', sel: '#pressureConstant' }, until: { checked: '#pressureConstant' } },
