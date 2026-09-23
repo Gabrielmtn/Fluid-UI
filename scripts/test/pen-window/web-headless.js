@@ -141,30 +141,45 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         await pop.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy, pointerType: 'pen' });
         await sleep(120);
         const hover = await main.eval("({ mainRing: document.getElementById('brushCursor').style.display, hoverInside: window.PenWindow.__state().hoverInside })");
-        const popRing = await pop.eval("({ ring: document.getElementById('ring').style.display, tf: document.getElementById('ring').style.transform, w: document.getElementById('ring').style.width, svg: !!document.querySelector('#ring svg') })");
-        check('hover inside the box: main brush ring shows + popup ring follows', hover.mainRing === 'block' && hover.hoverInside && popRing.ring === 'block' && popRing.svg, { hover, popRing });
-        // The ring keeps the orientation line: turn the brush, the line turns.
+        // The popup's cursor: the hotspot dot (#ring) over the brush ghost
+        // (#ghost). `px` = the ghost's centre pixel — the tint at full coverage.
+        const GHOST = "(function(){ var g=document.getElementById('ghost'); var px=null; try { if (g.width && g.height) px=Array.from(g.getContext('2d').getImageData(g.width>>1, g.height>>1, 1, 1).data); } catch (e) {} return { ghost: g.style.display, tf: g.style.transform, w: parseFloat(g.style.width), opacity: parseFloat(g.style.opacity), px: px, ring: document.getElementById('ring').style.display, dot: !!document.querySelector('#ring svg') }; })()";
+        const popRing = await pop.eval(GHOST);
+        check('hover inside the box: main brush cursor shows + popup dot and ghost follow', hover.mainRing === 'block' && hover.hoverInside && popRing.ring === 'block' && popRing.dot && popRing.ghost === 'block', { hover, popRing });
+        // The ghost carries the brush angle and the paint colour: turn the brush, it turns.
         await main.eval("window.config.BRUSH_ANGLE = 45; var cp=document.getElementById('colorPicker'); if (cp) cp.value='#00ff88'; 1");
         await pop.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx + 5, y: cy + 3, pointerType: 'pen' });
         await sleep(60);
-        const ang = await pop.eval("(function(){ var g=document.querySelector('#ring .pr-line-group'); var l=document.querySelector('#ring .pr-line'); return { tf: g && g.getAttribute('transform'), shown: g && g.style.display !== 'none', stroke: l && l.getAttribute('stroke'), ring: document.getElementById('ring').style.display }; })()");
-        check('popup ring carries the brush angle line (rotate(45)) in the paint colour', ang.tf === 'rotate(45)' && ang.shown && ang.stroke === '#00ff88' && ang.ring === 'block', ang);
+        const ang = await pop.eval(GHOST);
+        check('popup ghost turns to the brush angle (rotate(45deg)) in the paint colour', /rotate\(45deg\)/.test(ang.tf) && ang.ghost === 'block' && ang.px && ang.px.join() === '0,255,136,255', ang);
         // The pen sits STILL; the angle, the next colour and the brush size
-        // change in the main window — the popout ring must follow on its own.
+        // change in the main window — the popout ghost must follow on its own.
         await main.eval("window.config.BRUSH_ANGLE = 77; var cp=document.getElementById('colorPicker'); if (cp) cp.value='#123456'; var b=document.getElementById('brushSize'); b.value='40'; b.dispatchEvent(new Event('input',{bubbles:true})); 1");
-        const sizeBefore = await pop.eval("parseFloat(document.getElementById('ring').style.width)");
+        const sizeBefore = await pop.eval("parseFloat(document.getElementById('ghost').style.width)");
         await sleep(150);
-        const still = await pop.eval("(function(){ var g=document.querySelector('#ring .pr-line-group'); var l=document.querySelector('#ring .pr-line'); return { tf: g && g.getAttribute('transform'), stroke: l && l.getAttribute('stroke'), w: parseFloat(document.getElementById('ring').style.width) }; })()");
-        check('pen still: angle, next colour and size changed in the main window reach the popout ring within a tick', still.tf === 'rotate(77)' && still.stroke === '#123456' && still.w > sizeBefore, { still, sizeBefore });
+        const still = await pop.eval(GHOST);
+        check('pen still: angle, next colour and size changed in the main window reach the popout ghost within a tick', /rotate\(77deg\)/.test(still.tf) && still.px && still.px.join() === '18,52,86,255' && still.w > sizeBefore, { still, sizeBefore });
         await main.eval("window.config.BRUSH_ANGLE = 0; var b=document.getElementById('brushSize'); b.value='11'; b.dispatchEvent(new Event('input',{bubbles:true})); 1");
+        // Brush Ghost Opacity reaches the popup too.
+        await main.eval("(function(){ var s=document.getElementById('brushGhostOpacity'); s.value='70'; s.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
+        await sleep(80);
+        const op = await pop.eval(GHOST);
+        check('Brush Ghost Opacity on the main window sets the popup ghost opacity', Math.abs(op.opacity - 0.7) < 1e-6, op);
+        await main.eval("(function(){ var s=document.getElementById('brushGhostOpacity'); s.value='30'; s.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
         // With the main window's Show Cursor OFF (Focus mode does this too), the
-        // pen window keeps its ring and hides the OS cursor over the stage.
+        // pen window keeps its cursor and hides the OS cursor over the stage.
         await main.eval("(function(){ var c=document.getElementById('cursorToggle'); if (c.checked) { c.checked=false; c.dispatchEvent(new Event('change',{bubbles:true})); } return 1; })()");
         await pop.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx - 4, y: cy + 2, pointerType: 'pen' });
         await sleep(60);
-        const offRing = await pop.eval("({ ring: document.getElementById('ring').style.display, cursor: getComputedStyle(document.getElementById('stage')).cursor, opacity: parseFloat(document.getElementById('ring').style.opacity), line: !!document.querySelector('#ring .pr-line') })");
+        const offRing = Object.assign(await pop.eval(GHOST), await pop.eval("({ cursor: getComputedStyle(document.getElementById('stage')).cursor })"));
         const mainOff = await main.eval("({ checked: document.getElementById('cursorToggle').checked, mainRing: document.getElementById('brushCursor').style.display })");
-        check('Show Cursor off on the main window: pen window still shows the ring (angle + colour) with no OS cursor', !mainOff.checked && offRing.ring === 'block' && offRing.cursor === 'none' && offRing.opacity >= 0.35 && offRing.line, { offRing, mainOff });
+        check('Show Cursor off on the main window: pen window still shows its cursor (ghost: angle + colour) with no OS cursor', !mainOff.checked && offRing.ring === 'block' && offRing.cursor === 'none' && offRing.ghost === 'block', { offRing, mainOff });
+        // Show Brush Ghost off: the popup keeps only the dot.
+        await main.eval("(function(){ var t=document.getElementById('brushGhostToggle'); t.checked=false; t.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
+        await sleep(80);
+        const noGhost = await pop.eval(GHOST);
+        check('Show Brush Ghost off: popup shows the dot, no ghost', noGhost.ring === 'block' && noGhost.ghost === 'none', noGhost);
+        await main.eval("(function(){ var t=document.getElementById('brushGhostToggle'); t.checked=true; t.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await main.eval("(function(){ var c=document.getElementById('cursorToggle'); c.checked=true; c.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await pop.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy, pointerType: 'pen' });
         await sleep(60);

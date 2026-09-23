@@ -456,12 +456,12 @@
                 }
             } else if (e.shiftKey) {
                 // Shift+Scroll: Rotate the brush tip (BRUSH_ANGLE, degrees, wraps
-                // 0↔360). The brush-ring cursor's line and the chisel/streak stamps
-                // follow it live. Eased: faster scroll = bigger turns.
+                // 0↔360). The brush ghost and the chisel/streak stamps follow it
+                // live. Eased: faster scroll = bigger turns.
                 const scrollMagnitude = Math.min(Math.abs(e.deltaY) / 100, 3); // cap 3×
                 const stepSize = 3 * scrollMagnitude; // ~3–9° per notch
                 let cur = (typeof config.BRUSH_ANGLE === 'number') ? config.BRUSH_ANGLE : 0;
-                // Scroll up = turn clockwise (matches the cursor line's rotation sense)
+                // Scroll up = turn clockwise (the ghost's and the stamp's rotation sense)
                 let newAngle = cur + (e.deltaY < 0 ? stepSize : -stepSize);
                 newAngle = ((newAngle % 360) + 360) % 360; // wrap into [0,360)
                 config.BRUSH_ANGLE = newAngle;

@@ -3494,6 +3494,8 @@
 
         // Toggles
         moveCheckboxGroup('cursorToggle', body);
+        moveCheckboxGroup('brushGhostToggle', body);
+        moveControlGroup('brushGhostOpacity', body);
         moveCheckboxGroup('showCanvasHandles', body);
         moveCheckboxGroup('lockCanvasBorders', body);
         moveCheckboxGroup('statsToggle', body);
@@ -4774,12 +4776,11 @@
             setBrushTip(typeof saved === 'number' ? saved : ((window.config && window.config.BRUSH_TIP) | 0));
         })();
 
-        // Angle: rotates the asymmetric stamp shapes (chisel/streak). The
-        // brush-ring cursor's bisecting line always shows this angle, so it
-        // stays enabled for every tip even though round tips don't visibly turn.
+        // Angle: rotates the asymmetric stamp shapes (chisel/streak) and custom
+        // shapes. Enabled for every tip — a custom shape can sit on any of them.
         var angleGroup = pSlider('brushAngle', 'Angle', 0, 360, 1, 'BRUSH_ANGLE',
             function (v) { return Math.round(v) + '°'; }, 'angle');
-        angleGroup.title = 'Rotate the brush tip (chisel/streak). The cursor line shows the angle.';
+        angleGroup.title = 'Rotate the brush tip (chisel/streak/custom shapes). The brush ghost shows the angle.';
         dyeOnlyEls.push(angleGroup);
 
         // ── Flow + stroke feel ──

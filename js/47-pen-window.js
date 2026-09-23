@@ -18,7 +18,7 @@
 //   sits on; a 60 Hz pen display would otherwise cap the whole sim).
 //
 //   Presenter-mode idea: the pen display shows a live MIRROR of the canvas
-//   plus the brush ring under the pen, so you can aim on the tablet and
+//   plus the brush cursor (the ghost of the next dab) under the pen, so you can aim on the tablet and
 //   watch the paint on the big screen. The mirror is deliberately the
 //   cheapest thing that is still a good reference: a 2D canvas in the pen
 //   window, at most ~1280 px wide, redrawn with ONE drawImage of #canvas —
@@ -208,7 +208,8 @@
             'color:rgba(207,214,224,0.55);font-size:15px;line-height:1.5;pointer-events:none;',
             'background-image:radial-gradient(rgba(255,255,255,0.10) 1px,transparent 1.2px);background-size:36px 36px}',
             '#blank b{display:block;font-size:17px;color:rgba(207,214,224,0.85);margin-bottom:4px}',
-            '#ring{position:fixed;left:0;top:0;pointer-events:none;display:none;transform:translate(-50%,-50%);will-change:transform,width,height}',
+            '#ghost{position:fixed;left:0;top:0;pointer-events:none;display:none;will-change:transform,width,height}',
+            '#ring{position:fixed;left:0;top:0;width:12px;height:12px;pointer-events:none;display:none;transform:translate(-50%,-50%);will-change:transform}',
             '#bar{position:fixed;left:0;right:0;top:0;height:40px;display:flex;gap:10px;align-items:center;padding:0 12px;',
             'background:rgba(10,14,20,0.94);border-bottom:1px solid rgba(255,255,255,0.10);z-index:5;cursor:default;',
             'transition:opacity .22s ease;box-sizing:border-box;white-space:nowrap}',
@@ -225,7 +226,7 @@
             '<div id="stage"><div id="box">',
             '<canvas id="mirror" width="16" height="9"></canvas>',
             '<div id="blank" hidden><div><b>Mirror off</b>Draw here and watch your main monitor.</div></div>',
-            '</div><div id="ring"></div></div>',
+            '</div><canvas id="ghost"></canvas><div id="ring"></div></div>',
             '<div id="bar"><b>Swirl Together · pen input</b>',
             '<span class="grow" id="status">Draw here — the paint lands on your main monitor.</span>',
             // Buttons only: in the desktop build this window never takes
@@ -1094,61 +1095,23 @@
         }
     }
 
-    // ── Ring: the brush cursor under the pen — 31's ring, drawn here ──
-    // Same markup and the same live inputs as js/31-brush-cursor.js (size
-    // from SPLAT_RADIUS, the ring colour, the orientation line at
-    // BRUSH_ANGLE in the colour about to be painted, the P badge in pressure
-    // mode, the size/opacity sliders), read directly rather than copied off
-    // the main ring — the main ring only renders while the main canvas is
-    // hovered, and a copy could be a frame stale while the angle turns
-    // (Shift+Scroll from the tablet). The angle line is the whole point of
-    // the ring for a chisel or streak tip: it stays.
+    // ── Cursor: the brush cursor under the pen — 31's, drawn here ──────
+    // The same cursor as js/31-brush-cursor.js: the ghost of the next dab
+    // (the tip's real shape, size and angle in the colour about to be
+    // painted — drawn by 31's own painter into this window's canvas, so the
+    // two can never disagree about a footprint) under a hotspot dot, or the
+    // P badge in pressure mode. Read live rather than copied off the main
+    // cursor — that one only renders while the main canvas is hovered, and a
+    // copy could be a frame stale while the angle turns (Shift+Scroll from
+    // the tablet). Like the main ghost it follows Show Brush Ghost and Brush
+    // Ghost Opacity, and steps aside while the pen is down.
     //
-    // ALWAYS on. The first cut followed the main window's Show Cursor
-    // toggle, so with it off (Focus mode switches it off too) the pen
+    // ALWAYS on otherwise. The first cut followed the main window's Show
+    // Cursor toggle, so with it off (Focus mode switches it off too) the pen
     // window showed a bare crosshair — "we were hoping to preserve the
     // cursor state in there, so we can still see the angle and next color".
-    // Here the ring IS the cursor; the OS arrow stays hidden over the stage
-    // whatever the main window does, and the opacity is floored so a ring
-    // dialled to invisible on the main screen still reads on the tablet.
-    function ringDiameter() {
-        var c = window.config || {};
-        var rect = canvas.getBoundingClientRect();
-        var splatR = (typeof c.SPLAT_RADIUS === 'number' ? c.SPLAT_RADIUS : 0.011) *
-                     (typeof c.STAMP_RADIUS_SCALE === 'number' ? c.STAMP_RADIUS_SCALE : 1);
-        var scaleIn = document.getElementById('brushCursorScale');
-        var frac = scaleIn ? Math.max(0.01, (parseFloat(scaleIn.value) || 25) / 100) : 0.25;
-        // 31: visible dab diameter ≈ 2·√SPLAT_RADIUS × CSS height, × ring fraction,
-        // floored at 6 px on the main screen — then scaled to the popup's box.
-        var dMain = Math.max(6, 2 * Math.sqrt(Math.max(0, splatR)) * rect.height * frac);
-        return dMain * (box.h / (rect.height || 1));
-    }
-    function ringColor() {
-        var inp = document.getElementById('brushCursorColor');
-        if (inp && /^#[0-9a-fA-F]{6}$/.test(inp.value)) return inp.value;
-        try { var s = localStorage.getItem('ui.brushCursorColor'); if (s) return s; } catch (_) {}
-        return '#ffffff';
-    }
-    function ringOpacity() {
-        var inp = document.getElementById('brushCursorOpacity');
-        if (inp) return Math.max(0, Math.min(1, (parseFloat(inp.value) || 0) / 100));
-        try { var o = parseFloat(localStorage.getItem('ui.brushCursorOpacity')); if (isFinite(o)) return o; } catch (_) {}
-        return 0.5;
-    }
-    function paintColorHex() {
-        var cp = document.getElementById('colorPicker');
-        if (cp && /^#[0-9a-fA-F]{6}$/.test(cp.value)) return cp.value;
-        var p = window.pointer;
-        if (p && p.color && p.color.length >= 3) {
-            var to = function (v) { var h = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16); return h.length === 1 ? '0' + h : h; };
-            return '#' + to(p.color[0]) + to(p.color[1]) + to(p.color[2]);
-        }
-        return '#ff0000';
-    }
-    function brushAngleDeg() {
-        var c = window.config || {};
-        return typeof c.BRUSH_ANGLE === 'number' ? c.BRUSH_ANGLE : 0;
-    }
+    // Here it IS the cursor; the OS arrow stays hidden over the stage
+    // whatever the main window does.
     function pressureActive() {
         var c = window.config || {};
         if (c.BRUSH_VELOCITY_ONLY) return true;
@@ -1157,70 +1120,51 @@
     }
     function buildRing() {
         ui.ring.innerHTML =
-            '<svg viewBox="-50 -50 100 100" width="100%" height="100%" style="overflow:visible;display:block;">' +
-            '<circle cx="0" cy="0" r="47" fill="none" stroke="rgba(0,0,0,0.55)" stroke-width="3.2" vector-effect="non-scaling-stroke"/>' +
-            '<circle class="pr-ring" cx="0" cy="0" r="47" fill="none" stroke="#ffffff" stroke-width="1.6" vector-effect="non-scaling-stroke"/>' +
-            '<g class="pr-line-group">' +
-            '<line x1="-47" y1="0" x2="47" y2="0" stroke="rgba(0,0,0,0.55)" stroke-width="3.4" vector-effect="non-scaling-stroke" stroke-linecap="round"/>' +
-            '<line class="pr-line" x1="-47" y1="0" x2="47" y2="0" stroke="#ff0000" stroke-width="1.8" vector-effect="non-scaling-stroke" stroke-linecap="round"/>' +
-            '</g>' +
-            '<circle class="pr-dot" cx="0" cy="0" r="1.4" fill="#ffffff" stroke="rgba(0,0,0,0.55)" stroke-width="0.8" vector-effect="non-scaling-stroke"/>' +
+            '<svg class="pr-dot" viewBox="-6 -6 12 12" width="12" height="12" style="display:block;">' +
+            '<circle cx="0" cy="0" r="1.6" fill="#ffffff" stroke="rgba(0,0,0,0.6)" stroke-width="1"/>' +
             '</svg>' +
             '<div class="pr-p" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;' +
             'font:700 11px system-ui,sans-serif;color:#fff;line-height:1;' +
             'text-shadow:0 0 3px rgba(0,0,0,0.9),0 1px 1px rgba(0,0,0,0.85);user-select:none;">P</div>';
         ui.ringParts = {
-            ring: ui.ring.querySelector('.pr-ring'),
-            lineGroup: ui.ring.querySelector('.pr-line-group'),
-            line: ui.ring.querySelector('.pr-line'),
             dot: ui.ring.querySelector('.pr-dot'),
             p: ui.ring.querySelector('.pr-p')
         };
     }
-    // The look of the ring — size, colours, angle line, P badge, opacity —
-    // re-read from the live inputs and written to the DOM only when
-    // something changed. Runs on every pen move AND on a 30 Hz timer while
-    // the ring is showing: the main ring re-renders every frame it is
-    // visible, and an angle turned with Shift+Scroll on the main window,
+    // Re-read from the live inputs on every pen move AND on a 30 Hz timer
+    // while the cursor is showing: the main cursor re-renders every frame it
+    // is visible, and an angle turned with Shift+Scroll on the main window,
     // a brush-size change, or the next colour advancing after a stroke all
     // have to show on the tablet while the pen sits still ("make sure the
-    // angle updates on change for the popout area").
+    // angle updates on change for the popout area"). The painter only
+    // re-rasterizes when the footprint itself changes.
     var ringState = null;
     var ringTimer = 0;
+    var ringX = 0, ringY = 0;
     function ringSync() {
         if (!ui || ui.ring.style.display !== 'block') return;
         if (!ui.ringParts) buildRing();
         var P = ui.ringParts;
         var pOn = pressureActive();
-        var next = {
-            d: Math.round(ringDiameter() * 100) / 100,
-            opacity: Math.max(0.35, ringOpacity()),
-            ring: ringColor(),
-            pOn: pOn,
-            line: pOn ? null : paintColorHex(),
-            angle: pOn ? null : brushAngleDeg()
-        };
-        var s = ringState;
-        if (!s || s.d !== next.d) { ui.ring.style.width = next.d + 'px'; ui.ring.style.height = next.d + 'px'; }
-        if (!s || s.opacity !== next.opacity) ui.ring.style.opacity = String(next.opacity);
-        if (!s || s.ring !== next.ring) P.ring.setAttribute('stroke', next.ring);
-        if (!s || s.pOn !== next.pOn) {
+        if (!ringState || ringState.pOn !== pOn) {
             P.p.style.display = pOn ? 'block' : 'none';
-            P.dot.style.display = pOn ? 'none' : '';
-            P.lineGroup.style.display = pOn ? 'none' : '';
+            // 'block', never '': an inline <svg> drifts off the hotspot.
+            P.dot.style.display = pOn ? 'none' : 'block';
         }
-        if (!pOn) {
-            if (!s || s.line !== next.line) P.line.setAttribute('stroke', next.line);
-            // SVG rotate() is clockwise in screen space, the same sense the
-            // shader turns the stamp — the line and the painted streak agree.
-            if (!s || s.angle !== next.angle) P.lineGroup.setAttribute('transform', 'rotate(' + next.angle + ')');
-        }
-        ringState = next;
+        ringState = { pOn: pOn };
+        var BC = window.__brushCursor;
+        if (!BC || typeof BC.ghostPainter !== 'function') return;
+        if (!ui.ghostPaint) ui.ghostPaint = BC.ghostPainter(ui.ghost);
+        ui.ghost.style.opacity = String(BC.ghostOpacity());
+        // box.h is the canvas's full height in this window's CSS px.
+        ui.ghostPaint.paint(heldCount > 0 ? null : BC.ghostSpec(), BC.radiusRoot() * box.h,
+            (pop && pop.devicePixelRatio) || 1, ringX, ringY);
     }
     function ringMove(e) {
         if (!ui) return;
         if (!ui.ringParts) buildRing();
-        ui.ring.style.transform = 'translate(' + e.clientX + 'px,' + e.clientY + 'px) translate(-50%,-50%)';
+        ringX = e.clientX; ringY = e.clientY;
+        ui.ring.style.transform = 'translate(' + ringX + 'px,' + ringY + 'px) translate(-50%,-50%)';
         if (ui.ring.style.display !== 'block') {
             ui.ring.style.display = 'block';
             ringState = null;              // full write on (re)appearance
@@ -1232,6 +1176,7 @@
     function ringHide() {
         if (!ui) return;
         ui.ring.style.display = 'none';
+        if (ui.ghostPaint) ui.ghostPaint.hide(); else ui.ghost.style.display = 'none';
         clearInterval(ringTimer); ringTimer = 0;
     }
 
@@ -1403,6 +1348,8 @@
             mirror: pdoc.getElementById('mirror'),
             blank: pdoc.getElementById('blank'),
             ring: pdoc.getElementById('ring'),
+            ghost: pdoc.getElementById('ghost'),
+            ghostPaint: null,
             bar: pdoc.getElementById('bar'),
             status: pdoc.getElementById('status'),
             mirrorBtn: pdoc.getElementById('mirrorBtn'),

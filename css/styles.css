@@ -972,6 +972,11 @@
         .hide-cursor {
             cursor: none !important;
         }
+
+        /* Brush Ghost Opacity greys out with Show Brush Ghost off (31 sets
+           :disabled). Keyed on the input so it survives the layout move,
+           which wipes the row's inline style. */
+        .control-group:has(#brushGhostOpacity:disabled) { opacity: 0.4; }
         
         /* Recorded Layers Drawer (full-width, slide-up) */
         .rec-drawer {
