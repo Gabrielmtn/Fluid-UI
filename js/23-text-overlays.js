@@ -1232,11 +1232,12 @@
     // channel means a 0.3 wall still reads as a crisp letter, not a sponge.
     var colliderInstalled = false;
 
-    // An overlay at ~zero opacity is not on screen, so it must not be a wall
-    // either — the same principle (and threshold) the bg box already gets in
-    // paintOverlay. Undefined opacity counts as visible.
+    // An overlay at zero opacity is not on screen, so it must not be a wall
+    // either — the same principle the bg box already gets in paintOverlay.
+    // Exactly zero, not ~zero: the Opacity fader steps by 1%, and 1% text is
+    // still on screen. Undefined opacity counts as visible.
     function isWallSource(ov) {
-        return ov.visible && ov.collider && !(ov.opacity <= 0.02);
+        return ov.visible && ov.collider && !(ov.opacity <= 0);
     }
 
     function anyCollider() {

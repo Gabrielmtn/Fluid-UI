@@ -5451,7 +5451,7 @@
             function (v) { commit({ lineHeight: v }); });
         editor.appendChild(leadSlider);
 
-        var opacitySlider = slider('textOverlayOpacity', 'Opacity', 0.05, 1, 0.05,
+        var opacitySlider = slider('textOverlayOpacity', 'Opacity', 0, 1, 0.01,
             function (v) { return Math.round(v * 100) + '%'; },
             function (v) { commit({ opacity: v }); });
         editor.appendChild(opacitySlider);
