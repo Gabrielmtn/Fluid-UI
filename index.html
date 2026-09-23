@@ -1420,11 +1420,11 @@
                             <input type="text" id="recMiniMaxDuration" class="time-input action-max" value="00:10:000" placeholder="mm:ss:ms">
                         </div>
                         <div class="row bottom2">
-                            <button id="recMiniPauseBtn" class="action-pause">Pause</button>
+                            <button id="recMiniPauseBtn" class="action-pause" title="Play / pause the active layer (F8)">Pause</button>
                             <button id="recMiniStopBtn" class="action-stop">Stop</button>
                         </div>
                         <div class="row bottom1">
-                            <button id="recMiniPlayAllBtn" class="full action-full">Play All</button>
+                            <button id="recMiniPlayAllBtn" class="full action-full" title="Play / pause every layer (Shift+F8)">Play All</button>
                         </div>
                     </div>
                 </div>
@@ -1485,8 +1485,8 @@
         <div class="rec-header" style="gap:6px;">
             <div class="rec-left" style="gap:6px;">
                 <button class="btn--record" id="recRecordBtn">Record</button>
-                <button id="recPlayBtn">Play Layer</button>
-                <button id="recPlayAllBtn">Play All</button>
+                <button id="recPlayBtn" title="Play / pause the active layer (F8)">Play Layer</button>
+                <button id="recPlayAllBtn" title="Play / pause every layer (Shift+F8)">Play All</button>
                 <button id="recStopBtn">Stop</button>
                 <button id="recAddLayerBtn">Add Layer</button>
                 <button id="recDuplicateLayerBtn">Duplicate</button>
@@ -1538,8 +1538,8 @@
                 <div>
                     <h3>Recording & Transport</h3>
                     <ul>
-                        <li>Space — Play / Pause Layer (Record mode)</li>
-                        <li>Shift+Space — Play All / Pause All (Record mode)</li>
+                        <li>F8 — Play / Pause Layer (Record mode)</li>
+                        <li>Shift+F8 — Play All / Pause All (Record mode)</li>
                         <li>F9 — Record (3-2-1 countdown)</li>
                         <li>Shift+F9 — Record Immediately</li>
                         <li>Esc — Stop All (recording + playback)</li>

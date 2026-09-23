@@ -222,6 +222,7 @@
         { says: 'already opens the hotkey list', test: function (k) { return k.key === 'F1' || (k.shift && (k.key === '?' || k.key === '/')); } },
         { says: 'already switches fullscreen', test: function (k) { return k.key === 'F11'; } },
         { says: 'already starts recording', test: function (k) { return k.key === 'F9'; } },
+        { says: 'already plays and pauses recordings', test: function (k) { return k.key === 'F8'; } },
         { says: 'already reloads the app', test: function (k) { return k.key === 'F5' || (k.ctrl && k.lower === 'r'); } },
         { says: 'already opens developer tools', test: function (k) { return k.key === 'F12' || (k.ctrl && k.shift && (k.lower === 'i' || k.lower === 'j')); } },
         { says: 'already resets all local data', test: function (k) { return k.ctrl && k.shift && k.lower === 'd'; } },

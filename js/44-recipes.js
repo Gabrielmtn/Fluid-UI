@@ -419,7 +419,7 @@
           ] },
         { id: 'record-performance', pillar: 'record', title: 'Record a performance and loop it',
           tags: ['record', 'loop', 'animation', 'performance', 'timeline', 'save', 'recorder', 'f9'],
-          answer: 'Animations → Create New Animation opens the recorder. F9 records after a countdown; Space plays; Save as New drops it into an animation slot you can loop any time.',
+          answer: 'Animations → Create New Animation opens the recorder. F9 records after a countdown; F8 plays; Save as New drops it into an animation slot you can loop any time.',
           hotkey: 'F9', target: { section: 'Animations', sel: '#animCreateNewBtn' },
           steps: [
             { say: 'Animations → Create New Animation opens the recorder.', target: { section: 'Animations', sel: '#animCreateNewBtn' }, until: { visible: '#recRecordBtn' } },

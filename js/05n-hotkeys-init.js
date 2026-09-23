@@ -371,26 +371,30 @@
                 if (typeof window.captureLayer === 'function') window.captureLayer();
                 return;
             }
+            // ── Recording playback: F8 ──
+            // Beside F9 Record. It used to ride Space whenever the recorder
+            // was open, which took Freeze away the moment the recorder showed.
+            if (key === 'F8') {
+                e.preventDefault();
+                if (e.repeat || !recEnabled) return;
+                if (e.shiftKey) {
+                    // Shift+F8: play all / pause all
+                    if (typeof recTogglePlaybackAll === 'function') recTogglePlaybackAll();
+                } else {
+                    // F8: play / pause active layer
+                    if (typeof recTogglePlayback === 'function') recTogglePlayback();
+                }
+                return;
+            }
             // ── Space transport ──
-            // Record mode keeps its playback transport; otherwise Space drives
-            // the sim: Space = stop/unstop fluid motion (freeze), Shift+Space =
-            // pause/unpause the simulation.
+            // Space drives the sim, recorder open or not: Space = stop/unstop
+            // fluid motion (freeze), Shift+Space = pause/unpause the simulation.
             if (key === ' ') {
                 e.preventDefault();
                 // OS key auto-repeat fires keydown ~25-30 Hz while held — a
-                // held Space must not strobe freeze/pause (or the playback
-                // transport) into a parity-random end state.
+                // held Space must not strobe freeze/pause into a
+                // parity-random end state.
                 if (e.repeat) return;
-                if (recEnabled) {
-                    if (e.shiftKey) {
-                        // Shift+Space: play all / pause all
-                        if (typeof recTogglePlaybackAll === 'function') recTogglePlaybackAll();
-                    } else {
-                        // Space: play / pause active layer
-                        if (typeof recTogglePlayback === 'function') recTogglePlayback();
-                    }
-                    return;
-                }
                 if (e.shiftKey) {
                     if (typeof window.togglePause === 'function') window.togglePause();
                 } else {

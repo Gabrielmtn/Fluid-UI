@@ -74,7 +74,7 @@
     {
       "keys": "Space",
       "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": false, "altKey": false },
-      "guard": "typing target; e.repeat ignored (js/05n-hotkeys-init.js:343); routed to rec transport instead when recEnabled===true (js/05n-hotkeys-init.js:344-353)",
+      "guard": "typing target; e.repeat ignored; acts the same with the recorder open (recEnabled) — rec playback moved to F8 on 2026-09-23",
       "effect": "window.toggleFreeze() (js/04b-presets.js:170-218): freeze saves DENSITY_DISSIPATION/VELOCITY_DISSIPATION then sets them to 1.0/0.9; unfreeze restores. 2026-09-12: while window.__fluidFrozen the 05j sub-step loop also skips the curl + vorticity-confinement passes and the ambient-force (Gravity Direction pad) pass, so once the 0.9/frame brake runs out no autonomous force moves the paint; the projection, the brake and the splat path stay live, so painting on a frozen canvas is unchanged",
       "assertion": "window.__fluidFrozen toggles (js/04b-presets.js:196); #freezeBtn.classList.contains('active') toggles; while frozen window.config.DENSITY_DISSIPATION===1.0 && window.config.VELOCITY_DISSIPATION===0.9; the picture holds still after the brake — scenarios.json invariants freeze-halts-the-sim / freeze-stops-gravity / freeze-stops-swirl (braked → held window, NEAR by design)",
       "source": "js/05n-hotkeys-init.js:338-360",
@@ -83,25 +83,25 @@
     {
       "keys": "Shift+Space",
       "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": true, "altKey": false },
-      "guard": "typing target; e.repeat ignored; routed to rec transport when recEnabled===true",
+      "guard": "typing target; e.repeat ignored; acts the same with the recorder open (recEnabled)",
       "effect": "window.togglePause() (js/04f-canvas-actions.js:73-84): flips the sim pause flag; the update loop skips stepping while paused (js/05j-update-loop.js:226)",
       "assertion": "bare-global isPaused toggles (declared js/01-config.js:32); #pauseBtn.textContent flips between '⏸' and '▶' and classList 'active' toggles",
       "source": "js/05n-hotkeys-init.js:354-359",
       "sheet": "index.html:1060"
     },
     {
-      "keys": "Space (record mode)",
-      "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": false, "altKey": false },
-      "guard": "recEnabled===true; active layer must have timeline.interactions.length>0 to start playing (js/03-recording.js:313)",
+      "keys": "F8",
+      "event": { "key": "F8", "code": "F8", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; e.repeat ignored; no-op unless recEnabled; active layer must have timeline.interactions.length>0 to start playing (js/03-recording.js:313)",
       "effect": "recTogglePlayback(): toggles active rec layer playback, stops other layers' playback",
       "assertion": "recLayers.find(l=>l.id===recActiveLayerId).timeline.isPlaying toggles (js/03-recording.js:307-322)",
       "source": "js/05n-hotkeys-init.js:344-351",
       "sheet": "index.html:1066"
     },
     {
-      "keys": "Shift+Space (record mode)",
-      "event": { "key": " ", "code": "Space", "ctrlKey": false, "shiftKey": true, "altKey": false },
-      "guard": "recEnabled===true; at least one layer with interactions (js/03-recording.js:329-330)",
+      "keys": "Shift+F8",
+      "event": { "key": "F8", "code": "F8", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "typing target; e.repeat ignored; no-op unless recEnabled; at least one layer with interactions (js/03-recording.js:329-330)",
       "effect": "recTogglePlaybackAll(): play/pause every layer that has interactions",
       "assertion": "bare-global recIsPlayingAll toggles (js/03-recording.js:324-342)",
       "source": "js/05n-hotkeys-init.js:345-348",
