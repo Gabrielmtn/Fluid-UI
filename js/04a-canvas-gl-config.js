@@ -530,15 +530,16 @@
                                       // p·this; gradient divides it back out. Console-
                                       // tunable for A/B (1 = legacy unscaled).
 
-            PROJECTION_HALF_GRADIENT: false, // true = the projection subtracts the gradient
+            PROJECTION_HALF_GRADIENT: true, // true = the projection subtracts the gradient
                                       // its own divergence and solve imply (half
                                       // differences, 05b gradientFrag); false = the
                                       // historic full difference, which reflects smooth
-                                      // divergence instead of removing it. OFF until
-                                      // Gabriel feel-tests it: it changes how every
-                                      // stroke moves. Console A/B, not persisted.
+                                      // divergence instead of removing it. ON since
+                                      // 2026-09-23 (Gabriel feel-tested it, together with
+                                      // VELOCITY_ISOTROPIC). Console kill switch, not
+                                      // persisted.
 
-            VELOCITY_ISOTROPIC: false, // true = velocity is stored in canvas LONG sides
+            VELOCITY_ISOTROPIC: true, // true = velocity is stored in canvas LONG sides
                                       // per second on BOTH axes, so a push, the
                                       // projection, curl, confinement, gravity and every
                                       // speed gate treat up/down like left/right (05b
@@ -556,8 +557,9 @@
                                       // landscape x is numerically unchanged and a square
                                       // canvas is bit-identical. Without the half gradient
                                       // it makes collider scenes jitter MORE, so pair them.
-                                      // OFF until Gabriel feel-tests it. Console A/B, not
-                                      // persisted; a live flip converts the motion in flight.
+                                      // ON since 2026-09-23 (feel-tested). Console kill
+                                      // switch, not persisted; a live flip converts the
+                                      // motion in flight.
 
             VELOCITY_REFERENCE_RESOLUTION: 512,
 

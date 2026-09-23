@@ -2044,8 +2044,8 @@
                 // divergence rises frame over frame), collider-scene jitter
                 // 0.20 → 0.17 at the default solve and 1.02 → 0.17 at 4
                 // cycles, and a pure radial push runs BACKWARDS (an outward
-                // ring push pulls the paint in). Behind a switch until it is
-                // feel-tested: strokes keep less lingering motion with it.
+                // ring push pulls the paint in). On by default since
+                // 2026-09-23; strokes keep less lingering motion with it.
                 vec2 gradP = vec2(pR - pL, pT - pB);
                 if (uHalfGrad > 0.5) gradP *= 0.5;
                 vec2 vel = texture(uVelocity, vUv).xy - gradP / pScale;
