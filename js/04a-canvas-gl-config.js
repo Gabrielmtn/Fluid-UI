@@ -451,6 +451,21 @@
                                       // (sharper relief, and past ~1024 the pixel-scale
                                       // striations the fixed base was chosen to exclude).
                                       // Left at 256 by default for that reason.
+            SHADE_WALLS: true,        // Surface Shading around colliders (2026-09-22): split
+                                      // the form field by the collider mask and put the
+                                      // paint's step back at each wall's own edge, so the
+                                      // relief follows the letterforms instead of blurring
+                                      // a word into one soft pit (05b shadeWallFrag). false
+                                      // = the old single blur, bit for bit. Console-tunable.
+            SHADE_WALL_RIM: 0.3,      // How deep that edge reads, x the paint's own step.
+                                      // 1 = the full step, which tilts far past anything
+                                      // the blurred paint does and reads as a heavy dark
+                                      // outline. 0.3 matches the darkest the old soft pit
+                                      // got (measured beside Impact text, 10th percentile
+                                      // of shaded/unshaded luma: 0.64 vs 0.71 in the key
+                                      // light, 0.73 vs 0.74 under the lamp), now within
+                                      // ~6 px of the letters instead of ~16. 0 = walls
+                                      // leave no mark on the relief at all.
 
             MACCORMACK: true,         // Crisp advection: MacCormack error-corrected dye transport
                                       // (2 extra dye-res passes; governor sheds it with post-FX)

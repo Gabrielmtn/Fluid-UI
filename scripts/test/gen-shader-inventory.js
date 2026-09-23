@@ -65,8 +65,12 @@ for (const [name, body] of Object.entries(sources)) {
     // `uniform sampler2D uPressure, uDivergence;` declares TWO names, and
     // a regex that captures one identifier per statement silently loses the
     // rest — which weakens exactly the multi-sampler passes worth naming.
+    // Line comments go first: prose like "in uniform control flow, ..." up
+    // to the next semicolon parses as a declaration of `flow`, and one
+    // phantom name keeps the whole set from ever being a subset of the
+    // program's real uniforms, so the profiler can't name that pass.
     const uniforms = [...new Set(
-        [...body.matchAll(/uniform\s+\w+\s+([^;]+);/g)]
+        [...body.replace(/\/\/.*$/gm, '').matchAll(/uniform\s+\w+\s+([^;]+);/g)]
             .flatMap(x => x[1].split(','))
             .map(x => x.replace(/\/\/.*$/, '').replace(/\[[^\]]*\]/, '').trim())
             .filter(x => /^\w+$/.test(x))

@@ -1660,14 +1660,42 @@
             // from this smoothed height field, not the raw dye, so pigment
             // texel noise can't render as relief texture.
             const _shadingOn = (window.displayShading || 0.0) > 0.0 && shadeForm;
+            // With colliders up, the form field is split round them (05b
+            // shadeWallFrag/shadeFormFrag) so the relief breaks at each wall's
+            // own edge instead of blurring a whole word into one soft pit.
+            // `obstacle` swaps with obstacleScratch on every GPU composite:
+            // read the live binding, never a cached texture.
+            const _shadeWallsOn = _shadingOn && !!shadeWall && !!obstacle
+                && config.SHADE_WALLS !== false
+                && !!(window.collisionLayers && window.collisionLayers.enabled);
             if (_shadingOn) {
-                blurProg.bind();
-                gl.uniform1i(blurProg.uniforms.uTexture, 0);
-                gl.uniform2f(blurProg.uniforms.texelSize, shadeForm.texelSizeX, 0.0);
-                gl.viewport(0, 0, shadeForm.width, shadeForm.height);
-                gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, displayTexture);
-                blit(shadeForm.fbo);
+                if (_shadeWallsOn) {
+                    shadeWallProg.bind();
+                    gl.uniform1i(shadeWallProg.uniforms.uObstacle, 0);
+                    gl.uniform1f(shadeWallProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                    gl.viewport(0, 0, shadeWall.width, shadeWall.height);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                    blit(shadeWall.fbo);
+                    shadeFormProg.bind();
+                    gl.uniform1i(shadeFormProg.uniforms.uTexture, 0);
+                    gl.uniform1i(shadeFormProg.uniforms.uWall, 1);
+                    gl.uniform2f(shadeFormProg.uniforms.texelSize, shadeForm.texelSizeX, 0.0);
+                    gl.viewport(0, 0, shadeForm.width, shadeForm.height);
+                    gl.activeTexture(gl.TEXTURE1);
+                    gl.bindTexture(gl.TEXTURE_2D, shadeWall.texture);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, displayTexture);
+                    blit(shadeForm.fbo);
+                } else {
+                    blurProg.bind();
+                    gl.uniform1i(blurProg.uniforms.uTexture, 0);
+                    gl.uniform2f(blurProg.uniforms.texelSize, shadeForm.texelSizeX, 0.0);
+                    gl.viewport(0, 0, shadeForm.width, shadeForm.height);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, displayTexture);
+                    blit(shadeForm.fbo);
+                }
                 blur(shadeForm, shadeFormTemp, 1);
             }
             gl.viewport(0, 0, canvas.width, canvas.height);
@@ -1757,6 +1785,10 @@
             if (_shadingOn) {
                 gl.uniform2f(displayProg.uniforms.shadeTexelSize, shadeForm.texelSizeX, shadeForm.texelSizeY);
             }
+            gl.uniform1f(displayProg.uniforms.shadeWalls, _shadeWallsOn ? 1.0 : 0.0);
+            gl.uniform1f(displayProg.uniforms.shadeWallRim,
+                (typeof config.SHADE_WALL_RIM === 'number' && isFinite(config.SHADE_WALL_RIM)) ? config.SHADE_WALL_RIM : 0.3);
+            gl.uniform1i(displayProg.uniforms.uShadeWall, 13);
             gl.uniform1i(displayProg.uniforms.uGlow, 1);
             gl.uniform1f(displayProg.uniforms.glowEnabled, _glowOn ? 1.0 : 0.0);
             gl.uniform1i(displayProg.uniforms.uScatter, 12);
@@ -1796,6 +1828,9 @@
             // to uGlow, so the shafts get a fresh one.
             gl.activeTexture(gl.TEXTURE12);
             gl.bindTexture(gl.TEXTURE_2D, (_scatterOn && scatter) ? scatter.texture : null);
+            // Unit 13: Surface Shading's collider mask (read only with walls up).
+            gl.activeTexture(gl.TEXTURE13);
+            gl.bindTexture(gl.TEXTURE_2D, _shadeWallsOn ? shadeWall.texture : null);
             // PhotoSafe (photosensitivity protection): when on, the display
             // pass renders into safeFrame instead of the canvas, and
             // applyPhotoSafe (05i) measures the frame, updates the limiter,

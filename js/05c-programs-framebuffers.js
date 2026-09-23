@@ -44,6 +44,8 @@
         const glowBlurProg = new Program(baseVert, glowBlurFrag);
         const glowFinalProg = new Program(baseVert, glowFinalFrag);
         const scatterProg = new Program(baseVert, scatterFrag);
+        const shadeWallProg = new Program(baseVert, shadeWallFrag);  // Surface Shading's collider mask
+        const shadeFormProg = new Program(blurVert, shadeFormFrag);  // form field split round the walls
         // PhotoSafe (photosensitivity protection) passes — see 05b sources
         const photoSafeLumaProg = new Program(baseVert, photoSafeLumaFrag);
         const photoSafeStatsProg = new Program(baseVert, photoSafeStatsFrag);
@@ -150,6 +152,7 @@
         // texel 1 detector: lastSign/pairTimer/transition-rate).
         let safeFrame, safeOut, safeLuma, safeStats;
         let shadeForm, shadeFormTemp;
+        let shadeWall; // Surface Shading: where a collider cuts the paint (sim res, R16F)
         // Multigrid pressure pyramid: mgRes0 = level-0 residual scratch;
         // mgLevels[i] = level i+1 {w, h, rhs, res, p(double), obs}. Level 0
         // aliases the live pressure/divergence/obstacle buffers.
@@ -195,7 +198,7 @@
                 if (f.fbo) gl.deleteFramebuffer(f.fbo);
             }
             [sharpened, detailed, divergence, curl, obstacle, obstacleScratch,
-             glow, scatter, shadeForm, shadeFormTemp, safeFrame].forEach(_deleteFBO);
+             glow, scatter, shadeForm, shadeFormTemp, shadeWall, safeFrame].forEach(_deleteFBO);
             [safeOut, safeLuma, safeStats].forEach(function (d) {
                 if (d) { _deleteFBO(d.read); _deleteFBO(d.write); }
             });
@@ -377,6 +380,11 @@
             }
             shadeForm = createFBO(sfW, sfH, rgba.internalFormat, rgba.format, texType, filter);
             shadeFormTemp = createFBO(sfW, sfH, rgba.internalFormat, rgba.format, texType, filter);
+            // The shading's collider mask (05b shadeWallFrag): the obstacle's
+            // shape at the contour the paint stops at, texel for texel. Sim
+            // res because that is all the shape there is; LINEAR so the
+            // display reads a smooth edge between texels.
+            shadeWall = createFBO(simTexWidth, simTexHeight, r.internalFormat, r.format, texType, filter);
             // Explicitly clear all FBOs to zero.
             // Electron's disable-gpu-driver-bug-workarounds can skip default zeroing,
             // leaving garbage in textures that corrupts simulation until first resize.
@@ -386,7 +394,7 @@
                 divergence, curl,
                 pressure.read, pressure.write,
                 sharpened, detailed, obstacle, obstacleScratch,
-                glow, scatter, shadeForm, shadeFormTemp,
+                glow, scatter, shadeForm, shadeFormTemp, shadeWall,
                 safeFrame,
                 safeOut && safeOut.read, safeOut && safeOut.write,
                 safeLuma && safeLuma.read, safeLuma && safeLuma.write,
@@ -701,7 +709,7 @@
             window.__vramAsleep = false;
 
             [sharpened, detailed, divergence, curl, obstacle, obstacleScratch,
-             glow, scatter, shadeForm, shadeFormTemp, safeFrame, mgRes0].forEach(_freeFBO);
+             glow, scatter, shadeForm, shadeFormTemp, shadeWall, safeFrame, mgRes0].forEach(_freeFBO);
             [density, velocity, pressure, wetness,
              safeOut, safeLuma, safeStats].forEach(_freeDouble);
             glowFramebuffers.forEach(_freeFBO);
@@ -711,7 +719,7 @@
             density = velocity = pressure = wetness = null;
             divergence = curl = sharpened = detailed = null;
             obstacle = obstacleScratch = null;
-            glow = scatter = shadeForm = shadeFormTemp = null;
+            glow = scatter = shadeForm = shadeFormTemp = shadeWall = null;
             safeFrame = safeOut = safeLuma = safeStats = null;
             mgRes0 = null; mgLevels = null; glowFramebuffers = [];
 

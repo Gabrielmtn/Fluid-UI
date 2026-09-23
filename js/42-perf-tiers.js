@@ -137,8 +137,8 @@
 
         // sim res, per texel: velocity(2xRG16F=8) + wetness(2xR16F=4) +
         // divergence(2) + curl(2) + pressure(2xR16F=4) + obstacle(RGBA16F=8) +
-        // obstacleScratch(RGBA16F=8) + mgRes0(2)
-        bytes += simTexels * 38;
+        // obstacleScratch(RGBA16F=8) + mgRes0(2) + shadeWall(R16F=2)
+        bytes += simTexels * 40;
         // multigrid pyramid: 4 R16F + 1 RGBA16F per level, each level a
         // quarter of the last — the geometric sum converges to a third
         // of one level

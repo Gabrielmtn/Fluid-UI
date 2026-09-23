@@ -127,6 +127,9 @@
             uniform vec4 uRasterC3;
             uniform sampler2D uShadeForm; // quarter-res blurred frame: the shading height field
             uniform vec2 shadeTexelSize;
+            uniform sampler2D uShadeWall; // collider mask, sim res (05b shadeWallFrag): 1 where a wall cuts the paint
+            uniform float shadeWalls;     // 1 = uShadeForm holds the wall-split luma sums (05b shadeFormFrag)
+            uniform float shadeWallRim;   // config.SHADE_WALL_RIM: how deep a wall's edge reads, x the paint's own step
             uniform float preserveOpacity;
             uniform float backgroundTransparency;
             uniform float kaleidoEnabled;
@@ -283,12 +286,57 @@
                 vec2 mapped = vec2(cos(a), sin(a)) * bandedR;
                 return mapped + center;
             }
+            // With collider walls up (shadeWalls) uShadeForm holds
+            // x = sum open*L, y = sum open, z = sum wall*L, w = sum wall,
+            // blurred: the paint around the walls and the paint inside them,
+            // averaged apart (05b shadeFormFrag). shadeSides reads the pair of
+            // levels at one UV. A side that is (nearly) absent from the kernel
+            // falls back to the plain blur, x + z, so an empty average can't
+            // invent a step.
+            vec2 shadeSides(vec2 uv) {
+                vec4 f = texture(uShadeForm, uv);
+                float plain = f.x + f.z;
+                return vec2((f.x + 0.05 * plain) / (f.y + 0.05),
+                            (f.z + 0.05 * plain) / (f.w + 0.05));
+            }
+            // The relief gradient with walls up, in shadeSobel's units. Each
+            // side gets its own Sobel, so no wall smears into the paint's form;
+            // they blend by how much of this pixel is wall; and the step
+            // between them goes back in at the wall's own edge -- the mask's
+            // gradient at THIS pixel, one sim texel either side, so the relief
+            // follows the collider's shape, not a 256 blur of it. Paint that
+            // runs on into a wall (a weak one) leaves the sides equal and no
+            // step; round an empty wall the paint's edge falls to nothing.
+            vec2 shadeWallSobel(vec2 uv, vec2 t2) {
+                vec2 lL  = shadeSides(uv + vec2(-t2.x,  0.0 ));
+                vec2 lR  = shadeSides(uv + vec2( t2.x,  0.0 ));
+                vec2 lT  = shadeSides(uv + vec2( 0.0 ,  t2.y));
+                vec2 lB  = shadeSides(uv + vec2( 0.0 , -t2.y));
+                vec2 lTL = shadeSides(uv + vec2(-t2.x,  t2.y));
+                vec2 lTR = shadeSides(uv + vec2( t2.x,  t2.y));
+                vec2 lBL = shadeSides(uv + vec2(-t2.x, -t2.y));
+                vec2 lBR = shadeSides(uv + vec2( t2.x, -t2.y));
+                vec2 gx = ((lTR + 2.0 * lR + lBR) - (lTL + 2.0 * lL + lBL)) * 0.0625;
+                vec2 gy = ((lTL + 2.0 * lT + lTR) - (lBL + 2.0 * lB + lBR)) * 0.0625;
+                vec2 wt = 1.0 / vec2(textureSize(uShadeWall, 0));
+                float w = texture(uShadeWall, uv).r;
+                // the mask's change per FORM texel, the unit the Sobel works in
+                vec2 dW = vec2(texture(uShadeWall, uv + vec2(wt.x, 0.0)).r - texture(uShadeWall, uv - vec2(wt.x, 0.0)).r,
+                               texture(uShadeWall, uv + vec2(0.0, wt.y)).r - texture(uShadeWall, uv - vec2(0.0, wt.y)).r)
+                          * t2 / (2.0 * wt);
+                vec2 s = shadeSides(uv);
+                // 0.5: the Sobel's response to a ramp, half its change per
+                // texel. shadeWallRim tempers the step: at full height a wall
+                // edge two sim texels wide tilts far past anything the blurred
+                // paint does, and reads as a heavy dark outline (config note).
+                return mix(vec2(gx.x, gy.x), vec2(gx.y, gy.y), w) + 0.5 * shadeWallRim * (s.y - s.x) * dW;
+            }
             // Sobel gradient of the shading height field at an arbitrary UV.
             // Factored out so surface shading can sample the FOLDED UV under
             // kaleido: uShadeForm is built from the pre-fold frame (the fold
             // exists only in this shader), so gradients must be looked up
             // where the fold reads the image or the relief ignores the faces.
-            vec2 shadeSobel(vec2 uv, vec2 t2) {
+            vec2 shadePlainSobel(vec2 uv, vec2 t2) {
                 const vec3 lumaW = vec3(0.299, 0.587, 0.114);
                 float lL  = dot(texture(uShadeForm, uv + vec2(-t2.x,  0.0 )).rgb, lumaW);
                 float lR  = dot(texture(uShadeForm, uv + vec2( t2.x,  0.0 )).rgb, lumaW);
@@ -301,6 +349,14 @@
                 float gx = ((lTR + 2.0 * lR + lBR) - (lTL + 2.0 * lL + lBL)) * 0.0625;
                 float gy = ((lTL + 2.0 * lT + lTR) - (lBL + 2.0 * lB + lBR)) * 0.0625;
                 return vec2(gx, gy);
+            }
+            // One return point: with an early return here, ANGLE's HLSL
+            // compiler warns the result is "potentially uninitialized".
+            vec2 shadeSobel(vec2 uv, vec2 t2) {
+                vec2 g;
+                if (shadeWalls > 0.5) g = shadeWallSobel(uv, t2);
+                else g = shadePlainSobel(uv, t2);
+                return g;
             }
             // Unit vector from one canvas UV toward the lamp. Its z is also
             // the lamp's light on flat paint (Lambert: 1 at the foot, 0.71 one

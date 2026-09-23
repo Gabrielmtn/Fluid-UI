@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05b-shader-sim.js — part 2/14 of former 05-fluid-sim.js (lines 654–966)
 // LOAD ORDER: after 05a-shader-core.js, before 05c-programs-framebuffers.js
-// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/viscosity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter frag sources
+// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/viscosity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter/shadeWall/shadeForm frag sources
 // REQUIRES: PRECISION (05a)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -2365,6 +2365,61 @@
                 // as a hard bright disc.
                 accum *= smoothstep(0.0, 0.08, length((vUv - origin) * aspect));
                 fragColor = vec4(max(accum, vec3(0.0)), 1.0);
+            }
+        `;
+        // ─── Surface Shading around colliders (2026-09-22) ──────────────
+        // Surface Shading lights a blurred 256 copy of the frame (05j's
+        // shadeForm), so pixel noise can't read as relief. A collider's dye
+        // void went through the same blur: every wall turned into a soft pit
+        // about three form texels wide, one smudge for a whole word, lit as
+        // a dark band that ignored the letterforms (Gabriel, 2026-09-22:
+        // "the relief shader is not nicely conforming to the shapes"). Beside
+        // 70 px Impact text it darkened the paint out to ~16 px.
+        //
+        // So with walls up the form field is split by the collider mask: the
+        // paint around a wall and the paint inside it (usually none) blur
+        // separately, and displayFrag puts the step between them back at the
+        // wall's own edge, reading shadeWallFrag's sim-res mask per pixel.
+        // The relief then breaks where the paint does, around each letter:
+        // measured, nothing changes past ~6 px from the letters.
+        //
+        // The mask: 1 where a wall cuts the paint. Same contour the brush
+        // stops at (obsTexDyeBlock's 0.30-0.55 coverage window), and the
+        // shape alone — whether the paint actually stops there is read from
+        // the paint itself, so a weak wall that holds paint gets no rim.
+        const shadeWallFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uObstacle;
+            uniform float uObsMax;
+            ${obsTexelGLSL}
+            void main() {
+                float cov = obsTexCoverage(texture(uObstacle, vUv), uObsMax);
+                fragColor = vec4(smoothstep(0.30, 0.55, cov), 0.0, 0.0, 1.0);
+            }
+        `;
+        // The form field's first pass (blurFrag's horizontal 3-tap
+        // downsample), split by that mask and reduced to luma, the only thing
+        // the shading reads: x = sum open*L, y = sum open, z = sum wall*L,
+        // w = sum wall. The blur that follows is linear, so the four channels
+        // stay a pair of weighted sums displayFrag can normalize.
+        const shadeFormFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR;
+            out vec4 fragColor;
+            uniform sampler2D uTexture; // the frame being shaded (HDR dye)
+            uniform sampler2D uWall;    // shadeWallFrag's mask, sim res
+            void main() {
+                const vec3 lumaW = vec3(0.299, 0.587, 0.114);
+                vec3 l = vec3(dot(texture(uTexture, vL).rgb, lumaW),
+                              dot(texture(uTexture, vUv).rgb, lumaW),
+                              dot(texture(uTexture, vR).rgb, lumaW));
+                vec3 k = vec3(0.35294117, 0.29411764, 0.35294117);
+                vec3 wall = k * vec3(texture(uWall, vL).r, texture(uWall, vUv).r, texture(uWall, vR).r);
+                vec3 open = k - wall;
+                fragColor = vec4(dot(open, l), open.x + open.y + open.z,
+                                 dot(wall, l), wall.x + wall.y + wall.z);
             }
         `;
         // ─── PhotoSafe (photosensitivity protection) shaders ──────────────
