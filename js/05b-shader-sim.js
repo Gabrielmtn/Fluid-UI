@@ -607,8 +607,15 @@
         `;
         const rk2Backtrace = `
                 vec2 vHalf = texture(uVelocity, vUv).xy;
+                // Isotropic velocity units (config.VELOCITY_ISOTROPIC): stored
+                // velocity is canvas LONG sides per second on both axes, and
+                // each axis turns into its own UV here (uVelToUv = long/axis,
+                // 1.78 for y on 16:9). (0, 0), which is also what a pass that
+                // never sets it reads, keeps the M3 per-axis UV/s.
+                if (uVelToUv.x > 0.0) vHalf *= uVelToUv;
                 vec2 midUv = clamp(vUv - 0.5 * dt * vHalf, 0.0, 1.0);
                 vec2 disp = dt * texture(uVelocity, midUv).xy;
+                if (uVelToUv.x > 0.0) disp *= uVelToUv;
                 float mTexels = length(disp / srcTexelSize);
                 // Frame-rate-honest ease-out: the thresholds were tuned as
                 // texels-per-frame AT 60FPS. At 144Hz dt halves, so the same
@@ -657,6 +664,7 @@
             uniform vec2 obstacleTexelSize;
             uniform vec2 srcTexelSize; // texel size of uSource (dye and sim grids differ)
             uniform float dt, dissipation;
+            uniform vec2 uVelToUv; // velocity units → UV per axis (rk2Backtrace)
             uniform float decayDt; // accumulated decay timestep; 0.0 = skip decay this frame
             uniform float uVelCap; // speed ceiling in canvas-widths/s (Max Speed slider)
             uniform float srcGate; // M1: 1 = taper growth amplification by speed headroom
@@ -1030,6 +1038,7 @@
             uniform vec2 texelSize;    // sim-grid texel (velocity lives there)
             uniform vec2 srcTexelSize; // dye-grid texel
             uniform float dt;
+            uniform vec2 uVelToUv;     // velocity units → UV per axis (rk2Backtrace)
             uniform int hasObstacle;
             ${obstacleSolidityGLSL}
             ${mobilityGLSL}
@@ -1058,6 +1067,7 @@
             uniform vec2 texelSize;      // sim-grid texel
             uniform vec2 srcTexelSize;   // dye-grid texel
             uniform float dt;
+            uniform vec2 uVelToUv;       // velocity units → UV per axis (rk2Backtrace)
             uniform int hasObstacle;
             uniform float deband;        // 0 = off (bit-exact); >0 softens fast-moving dye cliffs
             ${obstacleSolidityGLSL}
@@ -1151,6 +1161,7 @@
             uniform vec2 texelSize;        // sim-grid texel (velocity)
             uniform vec2 srcTexelSize;     // wetness-grid texel (== sim res)
             uniform float dt;
+            uniform vec2 uVelToUv;         // velocity units → UV per axis (rk2Backtrace)
             uniform float dryMul;          // batched half-life factor (1.0 = no-op)
             uniform int hasObstacle;
             ${obstacleSolidityGLSL}
@@ -1557,6 +1568,7 @@
             uniform float uMaxDensity;    // dye level treated as "full"
             uniform int   uCount;
             uniform float uKeep;          // 1 = gather may only ADD (see the note below)
+            uniform vec2  uVelToUv;       // isotropic units → UV per axis (config.VELOCITY_ISOTROPIC); 0,0 = UV
             uniform vec4  uAtt[${MAX_ATTRACTORS}]; // xy = UV pos, z = signed strength, w = radius (UV)
             void main() {
                 vec3 here = texture(uDensity, vUv).rgb;
@@ -1576,10 +1588,18 @@
                     f *= smoothstep(0.0, r * 0.06, dist);
                     if (f <= 0.0001) continue;
                     vec2 dir = delta / (length(delta) + 1e-5); // inward, in UV
+                    // Isotropic (config.VELOCITY_ISOTROPIC): the direction in
+                    // SQUARE units, so the pull is radial on screen and as fast
+                    // from above as from the side; transport is then canvas long
+                    // sides/s and turns into UV per axis below, like velocity.
+                    // Normalized in UV, a 16:9 gather drew paint in from above
+                    // and below at 0.56 of the speed it drew it from the sides.
+                    if (uVelToUv.x > 0.0) { vec2 dq = delta / uVelToUv; dir = dq / (length(dq) + 1e-5); }
                     vec2 tang = vec2(-dir.y, dir.x);           // swirl keeps the pool alive
                     transport += (dir + tang * uSwirl) * (A.z * f);
                 }
                 transport *= uForce * fillGate;
+                if (uVelToUv.x > 0.0) transport *= uVelToUv;
                 // Semi-Lagrangian gather: sample from the OUTWARD side so dye
                 // creeps toward the magnet. Pure resample — bounded, no energy.
                 vec2 src = clamp(vUv - transport * dt, 0.0, 1.0);

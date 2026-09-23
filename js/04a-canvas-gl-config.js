@@ -538,6 +538,27 @@
                                       // Gabriel feel-tests it: it changes how every
                                       // stroke moves. Console A/B, not persisted.
 
+            VELOCITY_ISOTROPIC: false, // true = velocity is stored in canvas LONG sides
+                                      // per second on BOTH axes, so a push, the
+                                      // projection, curl, confinement, gravity and every
+                                      // speed gate treat up/down like left/right (05b
+                                      // rk2Backtrace turns it into UV per axis). false =
+                                      // the M3 per-axis UV/s (a6f5668), where a canvas
+                                      // HEIGHT per second counts the same as a WIDTH per
+                                      // second. Measured 2026-09-23 on 16:9 (sim 512x288):
+                                      // a push down travels 0.78 as far as the same push
+                                      // right, a stroke's dye drifts 0.86 as far, a swirl
+                                      // is squashed (min/max speed round its ring 0.46),
+                                      // gravity pulls down ~0.6 as hard as sideways; with
+                                      // this AND PROJECTION_HALF_GRADIENT: 1.00 / 1.00 /
+                                      // 0.99 / 1.00. So down-gravity and vertical pushes
+                                      // get ~1.8x stronger on 16:9 (a retune point);
+                                      // landscape x is numerically unchanged and a square
+                                      // canvas is bit-identical. Without the half gradient
+                                      // it makes collider scenes jitter MORE, so pair them.
+                                      // OFF until Gabriel feel-tests it. Console A/B, not
+                                      // persisted; a live flip converts the motion in flight.
+
             VELOCITY_REFERENCE_RESOLUTION: 512,
 
             VELOCITY_CAP: 30,         // "Max Speed" ceiling in canvas-widths/s (soft knee from

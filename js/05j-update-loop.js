@@ -72,6 +72,17 @@
             if (1.0 - cand >= 0.002 || accum >= 1.0) return { dryMul: cand, accum: 0 };
             return { dryMul: 1.0, accum };
         }
+        // Isotropic velocity units (config.VELOCITY_ISOTROPIC, 05b
+        // rk2Backtrace): each axis's UV per stored unit, long/axis when on;
+        // (0, 0) tells the backtrace the field is the M3 per-axis UV/s.
+        // _velIsoLast is the setting the stored field is in (null = not yet
+        // seen), so a live flip can convert the motion already in flight.
+        let _velIsoLast = null;
+        function velToUv() {
+            if (config.VELOCITY_ISOTROPIC !== true) return [0.0, 0.0];
+            const L = Math.max(simTexWidth, simTexHeight);
+            return [L / simTexWidth, L / simTexHeight];
+        }
         // Viscosity kernel for 05b viscosityFrag, given one step's sigma in
         // sim cells: tap pairs per side, tap spacing (cells), and the weight
         // falloff whose kernel — exactly as the shader samples it, a pair
@@ -820,6 +831,31 @@
                 // Disable blend for physics passes (pure overwrite, no alpha needed)
                 gl.disable(gl.BLEND);
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
+                // A live flip of VELOCITY_ISOTROPIC converts the field in
+                // flight (per-axis UV/s × axis/long = long sides/s, and back),
+                // so motion already on the canvas keeps its speed. clearProg
+                // is a plain scale at softClamp 0; the colour masks give each
+                // axis its own factor.
+                const _velIso = config.VELOCITY_ISOTROPIC === true;
+                if (_velIso !== _velIsoLast) {
+                    if (_velIsoLast !== null) {
+                        const _vL = Math.max(simTexWidth, simTexHeight);
+                        clearProg.bind();
+                        gl.uniform1i(clearProg.uniforms.uTexture, 0);
+                        gl.uniform1f(clearProg.uniforms.softClamp, 0.0);
+                        gl.activeTexture(gl.TEXTURE0);
+                        gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                        gl.colorMask(true, false, false, false);
+                        gl.uniform1f(clearProg.uniforms.value, _velIso ? simTexWidth / _vL : _vL / simTexWidth);
+                        blit(velocity.write.fbo);
+                        gl.colorMask(false, true, false, false);
+                        gl.uniform1f(clearProg.uniforms.value, _velIso ? simTexHeight / _vL : _vL / simTexHeight);
+                        blit(velocity.write.fbo);
+                        gl.colorMask(true, true, true, true);
+                        velocity.swap();
+                    }
+                    _velIsoLast = _velIso;
+                }
                 // ── Standard Chorin projection order: forces → project → advect ──
                 // ── Freeze (Space) stands the fluid's OWN forces down ──────
                 // toggleFreeze (04b) pins dye dissipation at 1.0 and brakes
@@ -1180,6 +1216,9 @@
                 gl.uniform2f(advectionProg.uniforms.obstacleTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(advectionProg.uniforms.dt, dt);
+                // Stored velocity → UV per axis, for every backtrace below
+                const _vUv = velToUv();
+                gl.uniform2f(advectionProg.uniforms.uVelToUv, _vUv[0], _vUv[1]);
                 // Overflow borders: same value for the velocity and dye passes
                 // below. Band width is the Effects → Overflow → Border slider;
                 // floor it so a zeroed config can never hand the shader an
@@ -1261,6 +1300,7 @@
                     gl.uniform2f(wetnessAdvectProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform2f(wetnessAdvectProg.uniforms.srcTexelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform1f(wetnessAdvectProg.uniforms.dt, dt);
+                    gl.uniform2f(wetnessAdvectProg.uniforms.uVelToUv, _vUv[0], _vUv[1]);
                     gl.uniform1f(wetnessAdvectProg.uniforms.dryMul, _dry.dryMul);
                     // The field itself rides the raw flow: wetInfluence=0 so
                     // dyeMobility()==1 (no wetness self-read).
@@ -1351,6 +1391,7 @@
                     gl.uniform2f(macAdvectProg.uniforms.texelSize, 1.0, 1.0);
                     gl.uniform2f(macAdvectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                     gl.uniform1f(macAdvectProg.uniforms.dt, _dyeDt);
+                    gl.uniform2f(macAdvectProg.uniforms.uVelToUv, _vUv[0], _vUv[1]);
                     // Obstacle-aware backtrace probes (shared snippet) — the
                     // forward pass must see the same walls as correct/main
                     gl.uniform1i(macAdvectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
@@ -1383,6 +1424,7 @@
                     gl.uniform2f(macCorrectProg.uniforms.texelSize, 1.0, 1.0);
                     gl.uniform2f(macCorrectProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                     gl.uniform1f(macCorrectProg.uniforms.dt, _dyeDt);
+                    gl.uniform2f(macCorrectProg.uniforms.uVelToUv, _vUv[0], _vUv[1]);
                     gl.uniform1f(macCorrectProg.uniforms.uObsMax, _obsMax);
                     gl.uniform1i(macCorrectProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                     gl.uniform1i(macCorrectProg.uniforms.uVelocity, 0);
@@ -1417,6 +1459,7 @@
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
                 gl.uniform1i(advectionProg.uniforms.macMode, macActive ? 1 : 0);
+                gl.uniform2f(advectionProg.uniforms.uVelToUv, _vUv[0], _vUv[1]);
                 gl.uniform2f(advectionProg.uniforms.texelSize, 1.0, 1.0);
                 gl.uniform2f(advectionProg.uniforms.srcTexelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
                 gl.uniform1i(advectionProg.uniforms.isDensity, 1);
@@ -1541,6 +1584,7 @@
                     gl.uniform1f(attractorProg.uniforms.uMaxDensity, (typeof _af.maxDensity === 'number') ? _af.maxDensity : 1.6);
                     gl.uniform1i(attractorProg.uniforms.uCount, _n);
                     gl.uniform1f(attractorProg.uniforms.uKeep, 0); // scene field: plain gather
+                    gl.uniform2f(attractorProg.uniforms.uVelToUv, _vUv[0], _vUv[1]);
                     if (attractorProg.uniforms['uAtt[0]']) gl.uniform4fv(attractorProg.uniforms['uAtt[0]'], _flat);
                     gl.uniform1i(attractorProg.uniforms.uDensity, 0);
                     gl.activeTexture(gl.TEXTURE0);
@@ -1589,6 +1633,7 @@
                     // to sample and conserves dye on its own (measured 1.36x the
                     // control's retention while spreading 1.21x wider).
                     gl.uniform1f(attractorProg.uniforms.uKeep, _bp.sign > 0 ? 1 : 0);
+                    gl.uniform2f(attractorProg.uniforms.uVelToUv, _vUv[0], _vUv[1]);
                     if (attractorProg.uniforms['uAtt[0]']) gl.uniform4fv(attractorProg.uniforms['uAtt[0]'], _bf);
                     gl.uniform1i(attractorProg.uniforms.uDensity, 0);
                     gl.activeTexture(gl.TEXTURE0);
