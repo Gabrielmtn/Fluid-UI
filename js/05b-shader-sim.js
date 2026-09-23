@@ -1987,6 +1987,9 @@
             uniform float pScale; // undo the divergence pass's fp16 headroom
                                   // rescale (see divergenceFrag) — the stored
                                   // pressure is p·pScale, so gradients divide it out
+            uniform float uHalfGrad; // 1 = half-difference gradient
+                                     // (config.PROJECTION_HALF_GRADIENT);
+                                     // 0 / unset = the historic full difference
             uniform int hasObstacle;
             ${obstacleSolidityGLSL}
             void main() {
@@ -2009,7 +2012,23 @@
                     pB = mix(pB, pC, sB);
                     pT = mix(pT, pC, sT);
                 }
-                vec2 vel = texture(uVelocity, vUv).xy - vec2(pR - pL, pT - pB) / pScale;
+                // divergenceFrag takes HALF differences and the solve inverts
+                // the compact Laplacian, so the gradient consistent with them
+                // is 0.5·(pR − pL). The full difference (Pavel heritage)
+                // subtracts twice the solved gradient: once the solve
+                // converges (multigrid), smooth divergence is REFLECTED each
+                // frame instead of removed (Fourier symbol −cos k, not ~0).
+                // Measured 2026-09-23 (sim 512): a lone push rings at 30 Hz
+                // (centre speed 599, 42, 438, 161, 312…; half: 599, 309, 265,
+                // 254…), the ringing grows with the solve (4 V-cycles: the
+                // divergence rises frame over frame), collider-scene jitter
+                // 0.20 → 0.17 at the default solve and 1.02 → 0.17 at 4
+                // cycles, and a pure radial push runs BACKWARDS (an outward
+                // ring push pulls the paint in). Behind a switch until it is
+                // feel-tested: strokes keep less lingering motion with it.
+                vec2 gradP = vec2(pR - pL, pT - pB);
+                if (uHalfGrad > 0.5) gradP *= 0.5;
+                vec2 vel = texture(uVelocity, vUv).xy - gradP / pScale;
                 // No-penetration boundary: zero velocity normal to wall at edges.
                 // Skipped in overflow mode — outbound velocity keeps flowing out.
                 if (openBoundary < 0.5) {

@@ -530,6 +530,14 @@
                                       // p·this; gradient divides it back out. Console-
                                       // tunable for A/B (1 = legacy unscaled).
 
+            PROJECTION_HALF_GRADIENT: false, // true = the projection subtracts the gradient
+                                      // its own divergence and solve imply (half
+                                      // differences, 05b gradientFrag); false = the
+                                      // historic full difference, which reflects smooth
+                                      // divergence instead of removing it. OFF until
+                                      // Gabriel feel-tests it: it changes how every
+                                      // stroke moves. Console A/B, not persisted.
+
             VELOCITY_REFERENCE_RESOLUTION: 512,
 
             VELOCITY_CAP: 30,         // "Max Speed" ceiling in canvas-widths/s (soft knee from

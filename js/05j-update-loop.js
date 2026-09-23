@@ -1137,6 +1137,8 @@
                 gl.uniform2f(gradientProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                 gl.uniform1f(gradientProg.uniforms.uObsMax, _obsMax);
                 gl.uniform1f(gradientProg.uniforms.pScale, _pScale);
+                // Half-difference gradient (see gradientFrag): console A/B
+                gl.uniform1f(gradientProg.uniforms.uHalfGrad, config.PROJECTION_HALF_GRADIENT === true ? 1.0 : 0.0);
                 gl.uniform1f(gradientProg.uniforms.openBoundary, _openBoundary);
                 gl.uniform1i(gradientProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(gradientProg.uniforms.uPressure, 0);
