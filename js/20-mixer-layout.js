@@ -3875,7 +3875,7 @@
         timeInput.id = 'replayTimePeriod';
         timeInput.min = '1';
         timeInput.max = '60';
-        timeInput.value = '5';
+        timeInput.value = '2';   // the default look's period (2026-09-24; was 5) — keep in step with 12's baseline
         timeInput.step = '1';
 
         var timeSuffix = document.createElement('span');
@@ -4177,7 +4177,7 @@
 
         // Defaults
         if (!window.replayMode) window.replayMode = 'stroke';
-        if (!window.replayTimePeriod) window.replayTimePeriod = 5;
+        if (!window.replayTimePeriod) window.replayTimePeriod = 2;
         if (typeof window.preserveRandomness !== 'boolean') window.preserveRandomness = false;
         if (!window.splatInMode) window.splatInMode = 'instant';
         if (!window.splatOutMode) window.splatOutMode = 'instant';

@@ -137,7 +137,18 @@
                     if (preset[k] !== undefined) sliders[PRESET_KEY_TO_SLIDER[k]] = preset[k];
                 });
                 if (preset.SPLAT_RADIUS !== undefined) sliders.brushSize = preset.SPLAT_RADIUS * 1000;
-                const snap = { sliders: sliders };
+                // baseline 1: every built-in was designed (and its thumbnail baked)
+                // against the defaults that shipped before 2026-09-24, so the
+                // full apply fills what a preset leaves unsaid from THOSE — see
+                // LEGACY_LOOK_BASELINE in 12-save-load. Without it, the day the
+                // shipped defaults became the "Nice for default" look, Silky
+                // would have picked up its viscosity, ridges and vibrance.
+                const snap = { sliders: sliders, baseline: 1 };
+                // ...but on TODAY's palette and replay period: a built-in is a
+                // physics look, so a click must not switch a new user's palette
+                // back to the one that shipped before the defaults moved.
+                const base = (typeof window.baselineLookSnapshot === 'function') ? window.baselineLookSnapshot() : null;
+                if (base) { snap.paletteIndex = base.paletteIndex; snap.brushState = base.brushState; }
                 if (preset.ui) {
                     if (preset.ui.sliders) Object.assign(snap.sliders, preset.ui.sliders);
                     if (preset.ui.checkboxes) snap.checkboxes = Object.assign({}, preset.ui.checkboxes);

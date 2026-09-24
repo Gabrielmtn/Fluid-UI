@@ -332,7 +332,7 @@
         // the replay is triggered by hand after the stroke, and anchoring at "now"
         // would spend the budget on the seconds it took to reach the right button.
         function buildTimeReplayEvents() {
-            var period = (window.replayTimePeriod || 5) * 1000;
+            var period = (window.replayTimePeriod || 2) * 1000;
             // Flatten history + the in-progress stroke into one absolutely-timed
             // list. Each stroke's events are relative to that stroke's own start.
             var flat = [];
@@ -1414,7 +1414,7 @@
                 dist0 = m.dist; cy0 = m.cy;
                 const s = document.getElementById('brushSize');
                 size0 = s ? parseFloat(s.value) : config.SPLAT_RADIUS * 1000;
-                period0 = window.replayTimePeriod || 5;
+                period0 = window.replayTimePeriod || 2;
             }
             function move(e) {
                 if (!active || e.touches.length < 2) return;

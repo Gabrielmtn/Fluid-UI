@@ -61,7 +61,12 @@
             { name: "Ocean Waves", colors: { primary: "#4A90A4", secondary: "#5F9EA0", accent1: "#E8E8D0", accent2: "#2F4F4F", highlight: "#87CEEB" } }
         ];
         const curatedPalettes = [...defaultPalettes];
-        let currentPaletteIndex = 0;
+        // The palette a fresh install starts on: "Forest Serenity" (index 1), the
+        // swatch tray of the default look (2026-09-24). 12-save-load falls back to
+        // it when no palette index was ever saved, and baselines presets on it.
+        const DEFAULT_PALETTE_INDEX = 1;
+        window.DEFAULT_PALETTE_INDEX = DEFAULT_PALETTE_INDEX;
+        let currentPaletteIndex = DEFAULT_PALETTE_INDEX;
         let paletteStepIndex = 0;
         window.userPalettes = window.userPalettes || {};
         window.customPalettes = window.customPalettes || [];

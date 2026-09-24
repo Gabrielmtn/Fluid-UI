@@ -329,19 +329,19 @@
 
             TEXTURE_DOWNSAMPLE: 1,
 
-            DENSITY_DISSIPATION: 0.993,
+            DENSITY_DISSIPATION: 1.0,     // No fade: paint stays until it is moved (the "Nice for default" look, 2026-09-24; was 0.993)
 
-            VELOCITY_DISSIPATION: 0.999,
+            VELOCITY_DISSIPATION: 1.0009, // Motion keeps going; Viscosity and Max Speed bound it (2026-09-24; was 0.999)
 
             PRESSURE_DISSIPATION: 0.95, // was 0.944 — retuned with the multigrid solve
                                         // (low values were stabilizing unconverged Jacobi)
 
-            PRESSURE_ITERATIONS: 17,  // 17 is the first-touch feel Gabriel tuned to; 32 solved
+            PRESSURE_ITERATIONS: 47,  // 2026-09-24 default look (was 17, the first-touch feel; 32 solved
                                       // "cleaner" but read stiff before the user touches anything
 
-            CURL: 25,                 // Strong vortices for visually interesting fluid on first load
+            CURL: 0,                  // Vorticity confinement off in the default look (2026-09-24; was 25)
 
-            SPLAT_RADIUS: 0.011,
+            SPLAT_RADIUS: 0.0013,     // Brush Size 1.3: a fine line (2026-09-24; was 0.011)
 
             SPLAT_SCISSOR: true,      // Clip each splat pass to the dab's bounding box (bit-identical
                                       // to fullscreen — see 05i splatScissorRect); false = old fullscreen passes
@@ -354,12 +354,12 @@
                                       // false = old apply-on-arrival, which was unbudgeted: ~19k peer
                                       // dabs/sec measured at 8 painters (MP-AUDIT-2026-08-23 §1.1)
 
-            SHARPNESS: 0.8,           // Ridge Strength: the display sharpen amount (0.0 = off, 1.0 =
+            SHARPNESS: 2,             // Ridge Strength: the display sharpen amount (0.0 = off, 1.0 =
                                       // moderate, 2.0 = aggressive). Acts only while RIDGES > 0. Its
                                       // control id is still #sharpness, and it wore the "Viscosity"
                                       // label until 2026-09-21 without ever touching the fluid.
 
-            VISCOSITY: 0,             // How thick the fluid is (05j pass 2c, viscosityFrag): 0 = no
+            VISCOSITY: 0.3,           // How thick the fluid is (05j pass 2c, viscosityFrag): 0 = no
                                       // viscous term, the pass is skipped and the sim is bit-identical;
                                       // 1 = the thickest fluid that still flows. The fader is a
                                       // diffusion LENGTH: VISCOSITY² × VISCOSITY_REACH is how far
@@ -375,7 +375,7 @@
                                       // moves at 99-101%, and the dye's fine detail still drops from
                                       // 0.62 to 0.22. 0.11 slows a small brush to 79%.
 
-            VIBRANCE: 0,              // Selective saturation boost (0 = off, 1.0 = max)
+            VIBRANCE: 1,              // Selective saturation boost (0 = off, 1.0 = max). Default look 2026-09-24.
 
             DYE_RESOLUTION: 2048,     // Ultra (2K) by default on desktop — the highest real-time tier.
                                       // The governor's boot ascent starts light and ramps up to this;
@@ -384,7 +384,7 @@
 
             SIM_RESOLUTION: 512,      // Ultra physics by default on desktop (mobile overrides below)
 
-            VELOCITY_INFLUENCE: 2.5,  // Motion isolation (1.0 = full motion, 5.0 = maximum isolation)
+            VELOCITY_INFLUENCE: 5,    // Motion isolation (1.0 = full motion, 5.0 = maximum isolation). Default look 2026-09-24 (was 2.5).
 
             // ── Max-fidelity tiers (branch: perf-max-tiers) ───────────────
             // Three knobs that buy fidelity a resolution number cannot, each
@@ -579,7 +579,7 @@
                                       // flow, and on straight shear (zero Laplacian).
                                       // Skips a ~1-texel collider apron (wall slip stays).
                                       // 0 = off (console A/B).
-            HF_FLOOR_DYE: 0.6,        // M2 dye floor: same idea on the dye, gated by
+            HF_FLOOR_DYE: 0.75,       // M2 dye floor: same idea on the dye, gated by
                                       // MOTION — per-texel contrast in moving dye is
                                       // always numerical (bilinear transport cannot
                                       // sustain it), which is what lets preserve/growth
@@ -633,13 +633,13 @@
                                       // saturation 0.742 -> 0.958 (neon); 0.22 is the "turned
                                       // up, still your colour" setting. 0 = off.
 
-            SHADE_RELIEF: 1.0,        // Surface Shading relief strength (2026-07-21 rebalance).
+            SHADE_RELIEF: 0.1,        // Surface Shading relief strength (2026-07-21 rebalance; 0.1 since 2026-09-24).
                                       // Multiplies the luminance-preserving relief term (the signed
                                       // N.L-L.z form modulation) on top of the slider. 1 = shipped;
                                       // raise for deeper sculpting, 0 = flat (gloss only). The pass
                                       // no longer dims the dye — see displayFrag in 05a.
 
-            SHADE_GLOSS: 0.35,        // Surface Shading specular strength (2026-07-21). The plastic
+            SHADE_GLOSS: 0.05,        // Surface Shading specular strength (2026-07-21; 0.05 since 2026-09-24). The plastic
                                       // sheen: a tight Blinn-Phong highlight ADDED on top of the
                                       // preserved hue. 0.35 = shipped; raise for wetter/glossier
                                       // plastic, 0 = matte relief. Console-tunable, x the slider.
@@ -754,7 +754,7 @@
             BRUSH_STABILIZER: 0,      // D1 stroke stabilizer (weighted lag): 0 = raw input,
                                       // 1 = heavy Krita-style smoothing. Brush section slider.
 
-            BRUSH_SPACING: 0.001,     // D1 dab spacing as a fraction of brush diameter —
+            BRUSH_SPACING: 0.01,      // D1 dab spacing as a fraction of brush diameter (0.01 since 2026-09-24) —
                                       // distance-parameterized stroke density (speed-
                                       // independent; kills the 1-dab-per-frame gaps).
                                       // 0.05 → 0.001 (2026-08-18): Spacing is the ONLY thing
@@ -780,7 +780,7 @@
                                       // bit-for-bit. Never boosts above 1 (a dab can't deposit
                                       // more than full flow), so spacings above REF still
                                       // thin out the way they always did.
-            BRUSH_DAB_INTERVAL_MS: 8, // Constant-flow: SIMULATED milliseconds between dabs —
+            BRUSH_DAB_INTERVAL_MS: 4, // Constant-flow: SIMULATED milliseconds between dabs (4 since 2026-09-24) —
                                       // the time-axis twin of Spacing, and the only thing that
                                       // decides whether the hose reads as a line or as separate
                                       // pulses (BRUSH_HOSE_FLOOR below keeps the low end a solid
@@ -1051,7 +1051,7 @@
             BRUSH_TIP: 0,             // D1 brush tip on USER strokes (fluid dye only; velocity
                                       // stays gaussian, programmatic splats unaffected):
                                       // 0 = gaussian, 1 = blob, 2 = chisel, 3 = streak, 4 = ring
-            BRUSH_TIP_TEXTURE: 0.7,   // Stamp ROUGHNESS (rim jitter + surface grain + edge
+            BRUSH_TIP_TEXTURE: 1,     // Stamp ROUGHNESS (rim jitter + surface grain + edge
                                       // softness) for blob/chisel/streak tips and custom
                                       // shapes. The tip's footprint is absolute — 0 is a
                                       // hard-edged chisel, not a gaussian circle.
@@ -1096,13 +1096,13 @@
             TIME_FADER_HOLD_B: 0.76,      // 70% of the travel instead of the ~15% a linear
                                           // 0.01–3 scale gave it, with a detent on 1×.
 
-            WET_INFLUENCE: 0,         // P15-1 wetness→mobility coupling (0 = feature off,
+            WET_INFLUENCE: 0.14,      // P15-1 wetness→mobility coupling (0 = feature off,
                                       // bit-identical to no wetness). 1 = bone-dry paint
                                       // fully freezes in place; wet paint always flows.
-            WET_DRYING: 3.0,          // P15-1 wetness half-life in seconds: time for a wet
+            WET_DRYING: 4.5,          // P15-1 wetness half-life in seconds: time for a wet
                                       // region to dry halfway. Lower = paint sets faster.
 
-            RIDGES: 0,                // Sharpen kernel radius in 2048-reference texels.
+            RIDGES: 6,                // Sharpen kernel radius in 2048-reference texels (6 since 2026-09-24).
                                       // 0 = sharpen OFF (default — the smooth look; the
                                       // pass is skipped entirely), 1 = classic unsharp
                                       // look, >1 = coarse emboss ridges. NOTE: the

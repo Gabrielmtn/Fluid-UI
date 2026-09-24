@@ -36,7 +36,9 @@
 //   afterwards so a reload does not re-apply it.
 // Format: ?look=1.<base64url(deflate-raw(JSON))> ("0." = uncompressed, from
 //   a browser without CompressionStream). JSON = the trimmed snapshot, its
-//   schema version, and an optional name n (a saved preset's name).
+//   schema version, b = the defaults generation it was trimmed against
+//   (12's LOOK_BASELINE_GEN; absent = 1), and an optional name n (a saved
+//   preset's name).
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -107,13 +109,26 @@
     function trim(snap) {
         var reg = (window.ParamRegistry && typeof window.ParamRegistry.defaults === 'function') ? window.ParamRegistry.defaults() : null;
         var base = (typeof window.baselineLookSnapshot === 'function') ? window.baselineLookSnapshot() : null;
-        var out = { version: SNAPSHOT_VERSION };
+        // A value is left out only when it sits on the default in EVERY
+        // generation: a recipient still filling from the old defaults (the
+        // shipped demo, an unrefreshed web tab, an older desktop build) has
+        // no `b` to read, so anything whose default moved always rides.
+        var legacy = window.LEGACY_LOOK_BASELINE || null;
+        var legacySame = function (sec, k, v) {
+            if (!legacy || !legacy[sec] || !own.call(legacy[sec], k)) return true;
+            return round6(legacy[sec][k]) === v;
+        };
+        // b: the defaults generation the link was trimmed against (12's
+        // LOOK_BASELINE_GEN). The recipient fills what the link leaves out from
+        // that generation, so a link made before a defaults change still lands
+        // exactly; a link without it is from before the field existed (gen 1).
+        var out = { version: SNAPSHOT_VERSION, b: (typeof window.LOOK_BASELINE_GEN === 'number') ? window.LOOK_BASELINE_GEN : 2 };
         ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
             var src = snap[sec] || {}, o = {}, any = false;
             Object.keys(src).forEach(function (k) {
                 if (SKIP[sec][k]) return;
                 var v = round6(src[k]);
-                if (reg && reg[sec] && own.call(reg[sec], k) && round6(reg[sec][k]) === v) return;   // the default: the merge brings it back
+                if (reg && reg[sec] && own.call(reg[sec], k) && round6(reg[sec][k]) === v && legacySame(sec, k, v)) return;   // the default: the merge brings it back
                 o[k] = v; any = true;
             });
             if (any) out[sec] = o;
@@ -123,7 +138,8 @@
             var v = snap[k];
             if (v === undefined || v === null) return;
             if (k === 'brushTip') v = Object.assign({}, v, { shapeId: null });
-            if (base && base[k] !== undefined && JSON.stringify(base[k]) === JSON.stringify(v)) return;
+            if (base && base[k] !== undefined && JSON.stringify(base[k]) === JSON.stringify(v) &&
+                (!legacy || legacy[k] === undefined || JSON.stringify(legacy[k]) === JSON.stringify(v))) return;
             out[k] = v;
         });
         return out;
@@ -210,6 +226,7 @@
         }
         if (out.brushTip && typeof out.brushTip === 'object') out.brushTip.shapeId = null;
         out.version = (typeof obj.version === 'number' && isFinite(obj.version)) ? obj.version : SNAPSHOT_VERSION;
+        out.baseline = (typeof obj.b === 'number' && isFinite(obj.b)) ? Math.max(1, Math.min(999, obj.b | 0)) : 1;
         return { snapshot: out, name: (typeof obj.n === 'string') ? cleanName(obj.n) : '' };
     }
 

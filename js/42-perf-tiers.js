@@ -36,9 +36,9 @@
 // 05j gates the full-shape multigrid V-cycle behind PRESSURE_ITERATIONS
 // >= 24 (`_mgBudgetLow`). Below that, MG_CYCLES / MG_PRE / MG_POST /
 // MG_COARSE are read and DISCARDED — the solver runs a fixed light
-// 2x(1,1,4). At the shipped default of 17 iterations they do nothing at
-// all, so every tier from Cinematic up crosses 24 first and only then
-// shapes the cycle.
+// 2x(1,1,4). The shipped default has been 47 iterations since 2026-09-24
+// (the "Nice for default" look; it was 17, below the gate, until then), so
+// the shaped V-cycle is already live at stock.
 //
 // NOTHING here runs on its own. Tiers apply on an explicit call; the
 // default config is untouched and a stock boot is bit-identical to the
@@ -55,7 +55,7 @@
         stock: {
             label: 'Stock (shipped default)',
             about: 'What desktop boots with today. The baseline every measurement is relative to.',
-            dye: 2048, sim: 512, iters: 17, oversample: 1, renderScale: 1.0,
+            dye: 2048, sim: 512, iters: 47, oversample: 1, renderScale: 1.0,
             // Stated explicitly rather than left alone: a baseline row that
             // inherits whatever the last session saved is not a baseline.
             // (Measured: a run started from mg pre 0 / post 1 / coarse 27.)

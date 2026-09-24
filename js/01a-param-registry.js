@@ -25,10 +25,10 @@
     // Dynamically-created controls (no static markup; hydrated from DOM at runtime):
     // ["audioSensitivity","audioBeatThreshold","audioReactToggle","arMapAutoSplat","arMapSize","arMapKaleido","arMapColor","focusModeToggle","streamFormatLock","audioReactSource","audioAutoSplatMode","splatInMode","splatOutMode"]
     var SLIDERS = {
-        densityDissipation: {configKey: "DENSITY_DISSIPATION", ui: {min: 0.85, max: 1.005, step: 0.0001}, hard: {min: 0.85, max: 1.005}, def: 0.993, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.85, max: 1.005, step: 0.0001, scope: "basic"}},
-        velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.5, max: 1.0009}, def: 0.999, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
+        densityDissipation: {configKey: "DENSITY_DISSIPATION", ui: {min: 0.85, max: 1.005, step: 0.0001}, hard: {min: 0.85, max: 1.005}, def: 1, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.85, max: 1.005, step: 0.0001, scope: "basic"}},
+        velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.5, max: 1.0009}, def: 1.0009, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
         pressureDissipation: {configKey: "PRESSURE_DISSIPATION", ui: {min: 0.9, max: 1.0333, step: 0.001}, hard: {min: 0.75, max: 1.0333}, def: 0.95, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0333, step: 0.001, scope: "basic"}},
-        pressureIteration: {configKey: "PRESSURE_ITERATIONS", ui: {min: 1, max: 50, step: 1}, hard: {min: 1, max: 50}, def: 17, decimals: 0, category: "simulation", perfTier: 3, simSlider: true, mut: {min: 1, max: 50, step: 1, scope: "basic"}},
+        pressureIteration: {configKey: "PRESSURE_ITERATIONS", ui: {min: 1, max: 50, step: 1}, hard: {min: 1, max: 50}, def: 47, decimals: 0, category: "simulation", perfTier: 3, simSlider: true, mut: {min: 1, max: 50, step: 1, scope: "basic"}},
         // Multigrid V-cycle internals — deliberately no `mut`: the mutation
         // engine randomizing solver shape reads as a bug, not a style variant
         mgCycles: {configKey: "MG_CYCLES", ui: {min: 2, max: 4, step: 1}, hard: {min: 2, max: 4}, def: 2, decimals: 0, category: "simulation", perfTier: 3},
@@ -36,9 +36,9 @@
         mgPost: {configKey: "MG_POST", ui: {min: 0, max: 8, step: 1}, hard: {min: 0, max: 8}, def: 2, decimals: 0, category: "simulation", perfTier: 2},
         mgCoarse: {configKey: "MG_COARSE", ui: {min: 2, max: 32, step: 1}, hard: {min: 2, max: 32}, def: 8, decimals: 0, category: "simulation", perfTier: 1},
         mgRelax: {configKey: "MG_RELAX", ui: {min: 0.5, max: 1, step: 0.01}, hard: {min: 0.5, max: 1}, def: 1, decimals: 2, category: "simulation", perfTier: 0},
-        wetInfluence: {configKey: "WET_INFLUENCE", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "simulation", perfTier: 1, mut: {min: 0, max: 0.9, step: 0.01, scope: "extended"}},
-        wetDrying: {configKey: "WET_DRYING", ui: {min: 0.5, max: 20, step: 0.5}, hard: {min: 0.2, max: 60}, def: 3.0, decimals: 1, category: "simulation", perfTier: 0, mut: {min: 1, max: 12, step: 0.5, scope: "extended"}},
-        ridges: {configKey: "RIDGES", ui: {min: 0, max: 6, step: 0.1}, hard: {min: 0, max: 6}, def: 0, decimals: 1, category: "effects", perfTier: 1, mut: {min: 0, max: 4, step: 0.1, scope: "extended"}},
+        wetInfluence: {configKey: "WET_INFLUENCE", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.14, decimals: 2, category: "simulation", perfTier: 1, mut: {min: 0, max: 0.9, step: 0.01, scope: "extended"}},
+        wetDrying: {configKey: "WET_DRYING", ui: {min: 0.5, max: 20, step: 0.5}, hard: {min: 0.2, max: 60}, def: 4.5, decimals: 1, category: "simulation", perfTier: 0, mut: {min: 1, max: 12, step: 0.5, scope: "extended"}},
+        ridges: {configKey: "RIDGES", ui: {min: 0, max: 6, step: 0.1}, hard: {min: 0, max: 6}, def: 6, decimals: 1, category: "effects", perfTier: 1, mut: {min: 0, max: 4, step: 0.1, scope: "extended"}},
         // Overflow drain-band width. The slider is a PERCENTAGE of the canvas
         // and config.EDGE_ABSORB_BAND is a fraction (05e divides by 100), so
         // configKey stays null — naming the key here would put percentages
@@ -48,25 +48,25 @@
         overflowBand: {configKey: null, ui: {min: 0.5, max: 15, step: 0.5}, hard: {min: 0.5, max: 25}, def: 2.5, decimals: 1, category: "effects", perfTier: 0, simSlider: false},
         // Breathing effect (js/45-breathing.js) — read live by the module, not via config.
         breathStrength: {configKey: null, ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0.5, decimals: 2, category: "effects", perfTier: 0, simSlider: false},
-        velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 2.5, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
-        curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 25, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
+        velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 5, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
+        curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 0, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
         velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 15, max: 60, step: 1, scope: "extended"}},
         // Grain Cleanup (2026-09-18): the M2 dye spectral floor, HF_FLOOR_DYE
         // (05b advection). Lower keeps the stir's fine grain, the veined look;
         // 0.85 is the shader's own per-frame cap. No `mut`: the floor exists
         // to stop no-fade presets ratcheting speckle, so a mutation must never
         // be what turns it down under a Density Sustain of 1.
-        grainCleanup: {configKey: "HF_FLOOR_DYE", ui: {min: 0, max: 0.85, step: 0.05}, hard: {min: 0, max: 0.85}, def: 0.6, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
+        grainCleanup: {configKey: "HF_FLOOR_DYE", ui: {min: 0, max: 0.85, step: 0.05}, hard: {min: 0, max: 0.85}, def: 0.75, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
         // Ridge Strength — the display sharpen amount, acting only while Ridges
         // is above 0. The id stays 'sharpness' because saved presets carry it;
         // it was labelled "Viscosity" until 2026-09-21 without touching the fluid.
-        sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "effects", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
+        sharpness: {configKey: "SHARPNESS", ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 2, decimals: 1, category: "effects", perfTier: 1, simSlider: true, mut: {min: 0, max: 2, step: 0.1, scope: "basic"}},
         // Viscosity (2026-09-21): the fluid's thickness, a real viscous term
         // (05j pass 2c). Default 0 is the sim as it always was, and presets
         // saved before it existed baseline to that. No `mut` yet: a variation
         // that thickens the fluid changes how every later stroke behaves, not
         // just how the frame looks — worth a feel-test before Mutate deals it.
-        viscosity: {configKey: "VISCOSITY", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
+        viscosity: {configKey: "VISCOSITY", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.3, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
         // Detail work (mandala tracery, fine linework) needs far finer tips
         // than the old 0.1 floor allowed: the splat radius is variance-like,
         // so footprint scales with sqrt(size) — 0.1 still painted a ~31px dab
@@ -82,7 +82,7 @@
         // hard.max/1000, and wheel-zoom, row-drag, the printed scale and brush
         // presets all read the live attrs. Mutation keeps the old 30 ceiling — a
         // random jump to a canvas-swallowing brush is not a style.
-        brushSize: {configKey: null, ui: {min: 0.001, max: 100, step: 0.001}, hard: {min: 0.001, max: 100}, def: 11, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
+        brushSize: {configKey: null, ui: {min: 0.001, max: 100, step: 0.001}, hard: {min: 0.001, max: 100}, def: 1.3, decimals: 1, category: "brush", perfTier: 0, simSlider: false, mut: {min: 0.1, max: 30, step: 0.1, scope: "extended"}},
         multiplier: {configKey: null, ui: {min: 1, max: 8, step: 1}, hard: {min: 1, max: 8}, def: 1, decimals: 0, category: "brush", perfTier: 2, simSlider: false, mut: {min: 1, max: 8, step: 1, scope: "basic"}},
         // No mut (Gabriel 2026-08-06): a mutated timeScale can slow the whole
         // sim to near-frozen, which reads as "mutate broke it", not a style.
@@ -105,7 +105,7 @@
         lightShiftThreshold: {configKey: null, ui: {min: 0.5, max: 1, step: 0.01}, hard: {min: 0.5, max: 1}, def: 0.85, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0.5, max: 1, step: 0.01, scope: "extended"}},
         lightShiftIntensity: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.5, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
         lightShiftSaturation: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 1, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
-        vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "effects", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
+        vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 1, decimals: 2, category: "effects", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
         // step 0.05 -> 0.005 (2026-08-21): 0.05 was the smallest halo you could
         // ask for and it already read as a hard pop off zero. Range, def and
         // LINEAR meaning are deliberately untouched — this value is stored raw
@@ -141,9 +141,9 @@
         brushDabInterval: {configKey: "BRUSH_DAB_INTERVAL_MS", ui: null, hard: {min: 4, max: 250}, def: null, decimals: 0, category: "brush", perfTier: 0, simSlider: false},
         brushJitter: {configKey: "BRUSH_JITTER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushTipTexture: {configKey: "BRUSH_TIP_TEXTURE", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
-        shadingIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 0.8, decimals: 1, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.1, scope: "extended"}},
-        shadeRelief: {configKey: "SHADE_RELIEF", ui: {min: 0, max: 2, step: 0.05}, hard: {min: 0, max: 3}, def: 1.0, decimals: 2, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.05, scope: "extended"}},
-        shadeGloss: {configKey: "SHADE_GLOSS", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1.5}, def: 0.35, decimals: 2, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}}
+        shadingIntensity: {configKey: null, ui: {min: 0, max: 2, step: 0.1}, hard: {min: 0, max: 2}, def: 2, decimals: 1, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.1, scope: "extended"}},
+        shadeRelief: {configKey: "SHADE_RELIEF", ui: {min: 0, max: 2, step: 0.05}, hard: {min: 0, max: 3}, def: 0.1, decimals: 2, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 2, step: 0.05, scope: "extended"}},
+        shadeGloss: {configKey: "SHADE_GLOSS", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1.5}, def: 0.05, decimals: 2, category: "display", perfTier: 1, simSlider: false, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}}
     };
     var CHECKBOXES = {
         cursorToggle: {def: true, mutScope: null},

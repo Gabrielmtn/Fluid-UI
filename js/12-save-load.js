@@ -306,7 +306,8 @@
                 if (typeof paletteIdx === 'number' && paletteIdx >= 0) {
                     window.applyPalette(paletteIdx);
                 } else {
-                    window.applyPalette(0);
+                    // Nothing saved yet (a fresh install): the default look's palette.
+                    window.applyPalette((typeof window.DEFAULT_PALETTE_INDEX === 'number') ? window.DEFAULT_PALETTE_INDEX : 0);
                 }
             }
             console.log('Palettes loaded: custom=' + (cp ? cp.length : 0) + ', index=' + paletteIdx);
@@ -392,7 +393,18 @@
                 if (typeof window.rebuildArmColorRows === 'function') window.rebuildArmColorRows();
             } else {
                 if (!arm[0]) arm[0] = { mode: 'main', color: '#ffffff', stepIndex: 0 };
-                if (arm[0].mode === 'main') {
+                // Nothing about the colour mode was ever saved (a fresh install):
+                // the markup's defaults decide — randomColor is checked in
+                // index.html — not the live checkboxes. 05g's preseedPaletteOnLoad
+                // has already run applyPalette(), which auto-enables Step the way
+                // a hand pick does, and that made every first boot a Step boot
+                // (found 2026-09-24 while making "Nice for default" the default).
+                var savedStep = sm.get('checkbox.stepPalette'), savedRnd = sm.get('checkbox.randomColor');
+                if (typeof savedStep !== 'boolean' && typeof savedRnd !== 'boolean') {
+                    var stepEl0 = $('stepPalette'), rndEl0 = $('randomColor');
+                    arm[0].mode = (stepEl0 && stepEl0.defaultChecked) ? 'step'
+                        : ((rndEl0 && rndEl0.defaultChecked) ? 'random' : 'fixed');
+                } else if (arm[0].mode === 'main') {
                     if (boolEl('stepPalette')) arm[0].mode = 'step';
                     else if (boolEl('randomColor')) arm[0].mode = 'random';
                 }
@@ -730,7 +742,7 @@
         // retired. See applyPresetSnapshot for the matching read side.
         var brushState = {
             replayMode: window.replayMode || 'stroke',
-            replayTimePeriod: window.replayTimePeriod || 5,
+            replayTimePeriod: window.replayTimePeriod || 2,
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
             splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
@@ -946,6 +958,10 @@
 
         return {
             version: 2,
+            // Which generation of defaults this snapshot was taken against; a
+            // full apply fills anything it lacks from that generation (see
+            // LEGACY_LOOK_BASELINE below), so an older snapshot lands exactly.
+            baseline: LOOK_BASELINE_GEN,
             timestamp: Date.now(),
             sliders: sliders,
             checkboxes: checkboxes,
@@ -1781,15 +1797,51 @@
         recMode: 1, recPlaybackSpeed: 1, statsToggle: 1, autoloadSettings: 1,
         preserveFluidOpacity: 1, photoSafeToggle: 1 };
 
+    // ── Defaults generations ─────────────────────────────────────────
+    // 2026-09-24 the shipped defaults became the "Nice for default" look
+    // (registry defs, index.html values, 04a config). A full apply fills
+    // whatever a snapshot LACKS from the defaults, so anything captured
+    // before that day — a user preset saved before a slider existed, a
+    // built-in preset (04b, designed against the old baseline), or a
+    // shared-settings link trimmed against the old defaults — would have
+    // quietly changed. Snapshots now carry `baseline` (the generation they
+    // were taken against); one without it, or below the current
+    // generation, fills its gaps from LEGACY_LOOK_BASELINE instead, which
+    // is exactly the state it used to land on. Bump LOOK_BASELINE_GEN and
+    // extend the table whenever a look default changes again.
+    var LOOK_BASELINE_GEN = 2;
+    var LEGACY_LOOK_BASELINE = {
+        sliders: { densityDissipation: 0.993, velocityDissipation: 0.999, pressureIteration: 17,
+            wetInfluence: 0, wetDrying: 3, ridges: 0, velocityInfluence: 2.5, curl: 25,
+            grainCleanup: 0.6, sharpness: 0.8, viscosity: 0, brushSize: 11, vibrance: 0,
+            shadingIntensity: 0.8, shadeRelief: 1, shadeGloss: 0.35 },
+        // Not listed: Spacing, Interval and Texture (the strip's brush-engine
+        // sliders). The registry has no default for them, so a preset that
+        // does not carry them has always left them as they are — a built-in
+        // click keeps your dab spacing — and that stays so.
+        paletteIndex: 0,
+        brushState: { replayMode: 'stroke', replayTimePeriod: 5,
+            splatInMode: 'instant', splatOutMode: 'instant',
+            splatInDist: 0.15, splatOutDist: 0.15 }
+    };
+    window.LOOK_BASELINE_GEN = LOOK_BASELINE_GEN;
+    // 50-look-links trims against BOTH generations: a value whose default
+    // moved always rides a link, so a build that still fills from the old
+    // defaults (the shipped demo, an unrefreshed web tab) lands it exactly.
+    window.LEGACY_LOOK_BASELINE = LEGACY_LOOK_BASELINE;
+    function isLegacySnapshot(snapshot) {
+        return !(snapshot && typeof snapshot.baseline === 'number' && snapshot.baseline >= LOOK_BASELINE_GEN);
+    }
+
     function baselineLookSnapshot() {
         var base = {
             sliders: {}, checkboxes: {}, selects: {},
             colors: { background: '#000000', brush: '#ffffff' },
             kaleido: { mode: 1, segments: 12, angle: 0, twist: 0, zoom: 1, blend: 1 },
-            paletteIndex: 0,
+            paletteIndex: (typeof window.DEFAULT_PALETTE_INDEX === 'number') ? window.DEFAULT_PALETTE_INDEX : 1,
             armColors: [{ mode: 'main', color: '#ffffff', stepIndex: 0, push: false }],
             lightPos: { x: 0.5, y: 0.5 },
-            brushState: { replayMode: 'stroke', replayTimePeriod: 5,
+            brushState: { replayMode: 'stroke', replayTimePeriod: 2,
                 splatInMode: 'instant', splatOutMode: 'instant',
                 splatInDist: 0.15, splatOutDist: 0.15 },
             material: { mode: 'fluid', amount: null, shape: 0 },
@@ -1808,14 +1860,22 @@
     function applyPresetSnapshotFull(snapshot) {
         if (!snapshot) return;
         var base = baselineLookSnapshot();
+        // A snapshot from before the current defaults generation fills its
+        // gaps from the defaults it was taken against (see LEGACY_LOOK_BASELINE).
+        var legacy = isLegacySnapshot(snapshot);
         var merged = Object.assign({}, snapshot);
         ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
-            merged[sec] = Object.assign({}, base[sec], snapshot[sec] || {});
+            var fill = (legacy && LEGACY_LOOK_BASELINE[sec]) ? LEGACY_LOOK_BASELINE[sec] : {};
+            merged[sec] = Object.assign({}, base[sec], fill, snapshot[sec] || {});
         });
         ['colors', 'kaleido', 'brushState', 'material', 'brushTip', 'lightPos', 'armColors'].forEach(function (sec) {
-            if (snapshot[sec] === undefined || snapshot[sec] === null) merged[sec] = base[sec];
+            if (snapshot[sec] === undefined || snapshot[sec] === null) {
+                merged[sec] = (legacy && LEGACY_LOOK_BASELINE[sec]) ? LEGACY_LOOK_BASELINE[sec] : base[sec];
+            }
         });
-        if (merged.paletteIndex === undefined || merged.paletteIndex === null) merged.paletteIndex = base.paletteIndex;
+        if (merged.paletteIndex === undefined || merged.paletteIndex === null) {
+            merged.paletteIndex = legacy ? LEGACY_LOOK_BASELINE.paletteIndex : base.paletteIndex;
+        }
         applyPresetSnapshot(merged);
     }
     window.applyPresetSnapshotFull = applyPresetSnapshotFull;

@@ -571,7 +571,7 @@
         <button id="mobileMenuClose" class="mobile-menu-close" aria-label="Close Menu">✕</button>
         <div class="control-group">
             <label for="brushSize">Brush Size</label>
-            <input type="range" id="brushSize" min="0.001" max="100" value="11" step="0.001">
+            <input type="range" id="brushSize" min="0.001" max="100" value="1.3" step="0.001">
         </div>
         <div class="control-group">
             <label for="colorPicker">Fluid Color</label>
@@ -684,28 +684,28 @@
             </select>
         </div>
         <div class="control-group">
-            <label for="densityDissipation">Density Sustain <span id="densityValue" class="value-display">0.9930</span></label>
-            <input type="range" id="densityDissipation" min="0.85" max="1.005" value="0.993" step="0.0001">
+            <label for="densityDissipation">Density Sustain <span id="densityValue" class="value-display">1.0000</span></label>
+            <input type="range" id="densityDissipation" min="0.85" max="1.005" value="1" step="0.0001">
         </div>
         <div class="control-group">
-            <label for="velocityDissipation">Velocity Sustain <span id="velocityValue" class="value-display">0.9990</span></label>
-            <input type="range" id="velocityDissipation" min="0.9" max="1.0009" value="0.999" step="0.0001">
+            <label for="velocityDissipation">Velocity Sustain <span id="velocityValue" class="value-display">1.0009</span></label>
+            <input type="range" id="velocityDissipation" min="0.9" max="1.0009" value="1.0009" step="0.0001">
         </div>
         <div class="control-group">
-            <label for="pressureDissipation">Pressure Dissipation <span id="pressureValue" class="value-display">0.944</span></label>
-            <input type="range" id="pressureDissipation" min="0.9" max="1.0333" value="0.944" step="0.001">
+            <label for="pressureDissipation">Pressure Dissipation <span id="pressureValue" class="value-display">0.950</span></label>
+            <input type="range" id="pressureDissipation" min="0.9" max="1.0333" value="0.95" step="0.001">
         </div>
         <div class="control-group">
-            <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">17</span></label>
-            <input type="range" id="pressureIteration" min="1" max="50" value="17" step="1">
+            <label for="pressureIteration">Pressure Iteration <span id="iterationValue" class="value-display">47</span></label>
+            <input type="range" id="pressureIteration" min="1" max="50" value="47" step="1">
         </div>
         <div class="control-group">
             <label for="velocityCap" title="Speed ceiling in canvas-widths/sec (soft limit). Growth presets (velocity > 1) settle at this ceiling inside closed mask pockets — lower = calmer bounded swirls, higher = wilder motion. Also the fp16 overflow guard.">Max Speed <span id="velocityCapValue" class="value-display">30</span></label>
             <input type="range" id="velocityCap" min="5" max="60" value="30" step="1">
         </div>
         <div class="control-group">
-            <label for="grainCleanup" title="Smooths the finest grain out of paint while it moves. Lower keeps more of it: crisper strands and fine veins (pairs with Shading Detail). Keep it up when paint never fades (Density Sustain 1.0 or higher) — there, speckle can build up without it, especially around colliders.">Grain Cleanup <span id="grainCleanupValue" class="value-display">0.60</span></label>
-            <input type="range" id="grainCleanup" min="0" max="0.85" value="0.6" step="0.05">
+            <label for="grainCleanup" title="Smooths the finest grain out of paint while it moves. Lower keeps more of it: crisper strands and fine veins (pairs with Shading Detail). Keep it up when paint never fades (Density Sustain 1.0 or higher) — there, speckle can build up without it, especially around colliders.">Grain Cleanup <span id="grainCleanupValue" class="value-display">0.75</span></label>
+            <input type="range" id="grainCleanup" min="0" max="0.85" value="0.75" step="0.05">
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="macCormackToggle" checked>
@@ -738,8 +738,8 @@
             </div>
         </div>
         <div class="control-group">
-            <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">2.500</span></label>
-            <input type="range" id="velocityInfluence" min="1" max="5" value="2.5" step="0.001">
+            <label for="velocityInfluence">Motion Isolation <span id="velocityInfluenceValue" class="value-display">5.000</span></label>
+            <input type="range" id="velocityInfluence" min="1" max="5" value="5" step="0.001">
         </div>
         <div class="control-group">
             <label>
@@ -748,21 +748,21 @@
                     <option value="acrylic">Gloss Paint - Wetness</option>
                     <option value="clay">Gloss Paint - Thickness</option>
                 </select>
-                <span id="curlValue" class="value-display">25</span>
+                <span id="curlValue" class="value-display">0</span>
             </label>
-            <input type="range" id="curl" min="0" max="60" value="25" step="1">
+            <input type="range" id="curl" min="0" max="60" value="0" step="1">
         </div>
         <div class="control-group">
-            <label for="viscosity" title="How thick the fluid is. 0 flows like water; higher smooths the small swirls away, so strokes flow on in broad, smooth ribbons.">Viscosity <span id="viscosityValue" class="value-display">0.00</span></label>
-            <input type="range" id="viscosity" min="0" max="1" value="0" step="0.01">
+            <label for="viscosity" title="How thick the fluid is. 0 flows like water; higher smooths the small swirls away, so strokes flow on in broad, smooth ribbons.">Viscosity <span id="viscosityValue" class="value-display">0.30</span></label>
+            <input type="range" id="viscosity" min="0" max="1" value="0.3" step="0.01">
         </div>
         <div class="control-group">
-            <label for="wetInfluence" title="Drying — wet paint flows, dry paint holds in place. 0 = off (pure fluid). Higher = dry regions set harder, more paint-like.">Drying <span id="wetInfluenceValue" class="value-display">0.00</span></label>
-            <input type="range" id="wetInfluence" min="0" max="1" value="0" step="0.01">
+            <label for="wetInfluence" title="Drying — wet paint flows, dry paint holds in place. 0 = off (pure fluid). Higher = dry regions set harder, more paint-like.">Drying <span id="wetInfluenceValue" class="value-display">0.14</span></label>
+            <input type="range" id="wetInfluence" min="0" max="1" value="0.14" step="0.01">
         </div>
         <div class="control-group">
-            <label for="wetDrying" title="Drying speed — half-life in seconds for wet paint to set. Lower = paint dries and holds faster.">Dry Time <span id="wetDryingValue" class="value-display">3.0s</span></label>
-            <input type="range" id="wetDrying" min="0.5" max="20" value="3" step="0.5">
+            <label for="wetDrying" title="Drying speed — half-life in seconds for wet paint to set. Lower = paint dries and holds faster.">Dry Time <span id="wetDryingValue" class="value-display">4.5s</span></label>
+            <input type="range" id="wetDrying" min="0.5" max="20" value="4.5" step="0.5">
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="displayShadingToggle">
@@ -770,28 +770,28 @@
         </div>
         <div id="shadingIntensityGroup" class="collapsible" style="display:none;">
             <div class="control-group">
-                <label for="shadingIntensity">Intensity <span id="shadingIntensityValue" class="value-display">0.8</span></label>
-                <input type="range" id="shadingIntensity" min="0" max="2" value="0.8" step="0.1">
+                <label for="shadingIntensity">Intensity <span id="shadingIntensityValue" class="value-display">2.0</span></label>
+                <input type="range" id="shadingIntensity" min="0" max="2" value="2" step="0.1">
             </div>
             <div class="control-group">
-                <label for="shadeRelief">Relief <span id="shadeReliefValue" class="value-display">1.00</span></label>
-                <input type="range" id="shadeRelief" min="0" max="2" value="1" step="0.05">
+                <label for="shadeRelief">Relief <span id="shadeReliefValue" class="value-display">0.10</span></label>
+                <input type="range" id="shadeRelief" min="0" max="2" value="0.1" step="0.05">
             </div>
             <div class="control-group">
-                <label for="shadeGloss">Gloss <span id="shadeGlossValue" class="value-display">0.35</span></label>
-                <input type="range" id="shadeGloss" min="0" max="1" value="0.35" step="0.05">
+                <label for="shadeGloss">Gloss <span id="shadeGlossValue" class="value-display">0.05</span></label>
+                <input type="range" id="shadeGloss" min="0" max="1" value="0.05" step="0.05">
             </div>
             <div class="control-group">
-                <label for="ridges" title="Sharpening on moving paint. Up to 1 turns it up at a fine radius; past 1 the kernel widens into coarse embossed ridges. Needs Ridge Strength above 0.">Ridges <span id="ridgesValue" class="value-display">0.0</span></label>
-                <input type="range" id="ridges" min="0" max="6" value="0" step="0.1">
+                <label for="ridges" title="Sharpening on moving paint. Up to 1 turns it up at a fine radius; past 1 the kernel widens into coarse embossed ridges. Needs Ridge Strength above 0.">Ridges <span id="ridgesValue" class="value-display">6.0</span></label>
+                <input type="range" id="ridges" min="0" max="6" value="6" step="0.1">
             </div>
             <div class="control-group">
-                <label for="sharpness" title="How hard Ridges sharpens. Does nothing while Ridges is at 0.">Ridge Strength <span id="sharpnessValue" class="value-display">0.8</span></label>
-                <input type="range" id="sharpness" min="0" max="2" value="0.8" step="0.1">
+                <label for="sharpness" title="How hard Ridges sharpens. Does nothing while Ridges is at 0.">Ridge Strength <span id="sharpnessValue" class="value-display">2.0</span></label>
+                <input type="range" id="sharpness" min="0" max="2" value="2" step="0.1">
             </div>
             <div class="control-group">
-                <label for="vibrance" title="Selective saturation: muted colours get richer, already-vivid ones are left alone. 0 = off.">Vibrance <span id="vibranceValue" class="value-display">0.0</span></label>
-                <input type="range" id="vibrance" min="0" max="1" value="0" step="0.05">
+                <label for="vibrance" title="Selective saturation: muted colours get richer, already-vivid ones are left alone. 0 = off.">Vibrance <span id="vibranceValue" class="value-display">1.00</span></label>
+                <input type="range" id="vibrance" min="0" max="1" value="1" step="0.05">
             </div>
         </div>
         <div class="control-group checkbox-group">
