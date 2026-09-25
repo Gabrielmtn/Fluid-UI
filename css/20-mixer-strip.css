@@ -994,7 +994,7 @@ body > .controls {
    Brush — renders a .control-group the same way. The drawer carries both
    classes, so its own look is unchanged. */
 .arm-colors-panel .control-group {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 .arm-colors-panel .control-group label {
     display: block;
@@ -1010,6 +1010,17 @@ body > .controls {
 .arm-colors-panel .control-group input[type="range"] {
     width: 100%;
     margin: 0;
+    /* Same 32px hit box as the sidebar rows (21-sidebar.css): the 44px
+       rack-row default was the single tallest thing in every panel row, and
+       these drawers stack six of them. Coarse pointers get the full box
+       back below, like the sidebar. (2026-09-24, Gabriel: "a bit more
+       vertically compact".) */
+    --input-py: 5px;
+}
+@media (pointer: coarse) {
+    .arm-colors-panel .control-group input[type="range"] {
+        --input-py: 11px;
+    }
 }
 .arm-colors-panel .control-group.checkbox-group {
     display: flex;

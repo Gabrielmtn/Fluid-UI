@@ -3495,7 +3495,9 @@
         // Toggles
         moveCheckboxGroup('cursorToggle', body);
         moveCheckboxGroup('brushGhostToggle', body);
-        moveControlGroup('brushGhostOpacity', body);
+        // Ghost Opacity moved to the Brush panel (buildBrushPanel) 2026-09-24
+        // — it tunes the brush's own preview, so it lives with the brush.
+        // The Show toggle stays here with the other Show rows.
         moveCheckboxGroup('showCanvasHandles', body);
         moveCheckboxGroup('lockCanvasBorders', body);
         moveCheckboxGroup('statsToggle', body);
@@ -4782,6 +4784,14 @@
             function (v) { return Math.round(v) + '°'; }, 'angle');
         angleGroup.title = 'Rotate the brush tip (chisel/streak/custom shapes). The brush ghost shows the angle.';
         dyeOnlyEls.push(angleGroup);
+        // Ghost Opacity: the brush-ghost slider from index.html, re-parented
+        // here (2026-09-24, Gabriel: "move ghost opacity into the brush
+        // settings menu, instead of display"). It sits under Angle because the
+        // ghost IS the tip at that angle. Not a pSlider: js/31-brush-cursor.js
+        // owns it and persists it viewer-local (localStorage), never as a
+        // brush preset key. Not in dyeOnlyEls either — Pressure mode still
+        // draws the ghost (a white print), so the slider stays useful there.
+        moveControlGroup('brushGhostOpacity', panel);
 
         // ── Flow + stroke feel ──
         // Flow scales DYE, so a Pressure stroke has nothing for it to scale.
