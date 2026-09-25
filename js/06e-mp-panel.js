@@ -72,7 +72,9 @@ function updateRemoteCursors() {
             cursorEl.id = `remote-cursor-${id}`;
             cursorEl.className = 'remote-cursor';
             cursorEl.style.cssText = 'position:absolute;width:12px;height:12px;border-radius:50%;' +
-                'border:2px solid rgba(255,255,255,0.85);pointer-events:none;z-index:1000;' +
+                // 1002: over the text layer (1001, 23-text-overlays), so words
+                // on the canvas never hide where a painter is.
+                'border:2px solid rgba(255,255,255,0.85);pointer-events:none;z-index:1002;' +
                 'transform:translate(-50%,-50%);transition:left 0.05s, top 0.05s;';
             cursorEl.style.backgroundColor = col;
             cursorEl.style.boxShadow = '0 0 8px ' + col;

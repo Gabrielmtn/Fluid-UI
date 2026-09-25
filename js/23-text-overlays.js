@@ -190,7 +190,14 @@
     function init() {
         container = document.createElement('div');
         container.id = 'text-overlay-container';
-        container.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;overflow:hidden;';
+        // 1001: over the whole layer stack. 05k's updateLayerZIndices gives
+        // the sim canvas and image layers 1000 counting down, and
+        // #canvas-wrapper has no stacking context, so they compete with this
+        // layer directly. At 50 the text sat UNDER the fluid, showing only
+        // through its transparent black and vanishing under a Kaleido fill,
+        // while compositeOntoCanvas exports it on top. Handles, the arrange
+        // surface and the brush ghost all sit above 10000.
+        container.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1001;overflow:hidden;';
         var canvasArea = document.getElementById('canvas-area');
         if (canvasArea) {
             canvasArea.style.position = 'relative';
