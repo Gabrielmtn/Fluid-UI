@@ -1084,8 +1084,20 @@
                 </select>
             </div>
             <div class="control-group">
-                <label for="breathStrength" title="How firmly the paint moves: the push out on the inhale and the pull back on the exhale.">Strength <span id="breathStrengthValue" class="value-display">50%</span></label>
+                <label for="breathStrength" title="How much the paint between the rings swirls. The rings, and the paint's travel in and out with them, always keep the pattern's time.">Swirl strength <span id="breathStrengthValue" class="value-display">50%</span></label>
                 <input type="range" id="breathStrength" min="0" max="1" value="0.5" step="0.05">
+            </div>
+            <div class="control-group">
+                <label for="breathColorMode" title="When the paint takes a new color. Each cycle: one new color per full in · hold · out · hold. Each breath: a new color on every breath in and every breath out. New colors step around the color wheel from the brush color.">Color</label>
+                <select id="breathColorMode" title="Stays the same: the brush color, every breath. Each cycle: a new color per full cycle. Each breath: a new color on every breath in and every breath out.">
+                    <option value="same" selected>Stays the same</option>
+                    <option value="cycle">Changes each cycle</option>
+                    <option value="breath">Changes each breath</option>
+                </select>
+            </div>
+            <div class="control-group checkbox-group">
+                <input type="checkbox" id="breathFadeToggle" checked>
+                <label for="breathFadeToggle" style="margin: 0" title="Checked: each breath's paint fades away, paced to the pattern (a quarter of it is left by the next cycle), whatever Density Sustain says. Unchecked: paint never fades while Breathing runs. Your slider is left alone either way.">Fades</label>
             </div>
             <div class="control-group checkbox-group">
                 <input type="checkbox" id="breathCueToggle" checked>

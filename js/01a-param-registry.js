@@ -180,6 +180,7 @@
         // mode you choose, not a variation to be dealt.
         breathingToggle: {def: false, mutScope: null},
         breathCueToggle: {def: true, mutScope: null},
+        breathFadeToggle: {def: true, mutScope: null},
         scatterToggle: {def: false, mutScope: "extended"},
         // Colliders block light. mutScope null: with no collision layer it is a
         // no-op, so mutating it would spend a variation slot on nothing.
@@ -235,6 +236,7 @@
         // shaft at once, which reads as a glitch rather than a variation.
         scatterSource: {options: ["light", "brush"], def: "light", mut: null},
         breathPattern: {options: ["relaxed", "box", "478"], def: "relaxed", mut: null},
+        breathColorMode: {options: ["same", "cycle", "breath"], def: "same", mut: null},
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
         recMode: {options: ["off", "min", "full"], def: "off", mut: null},
         recPlaybackSpeed: {options: ["0.25", "0.5", "1", "2", "4"], def: "0.25", mut: null},

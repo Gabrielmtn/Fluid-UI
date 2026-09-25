@@ -1495,9 +1495,16 @@
                 // Ignite rides on top of the user's rate and ceiling
                 // without ever writing them (see window.DyeNudge in 05h).
                 // Idle returns the base values unchanged — exact no-op.
-                const _dyeDiss = window.DyeNudge
-                    ? window.DyeNudge.dissipation(config.DENSITY_DISSIPATION)
+                // Breathing (45) runs the dye at a rate of its own while it is
+                // on: its Fades box on is a fade paced to the breath, off is a
+                // floor of 1.0 (never fades). The slider and config are
+                // untouched; Ignite still rides on top.
+                const _dyeBase = (typeof window.__dyeSustainOverride === 'number')
+                    ? window.__dyeSustainOverride
                     : config.DENSITY_DISSIPATION;
+                const _dyeDiss = window.DyeNudge
+                    ? window.DyeNudge.dissipation(_dyeBase)
+                    : _dyeBase;
                 // The Gate cap is the cap, Ignite included — it enriches via
                 // display-stage vibrance instead of buying headroom here.
                 const _dyeCeil = config.BLOOM_CEILING || 0.0;
@@ -1526,8 +1533,8 @@
                 // nudge ramps the effective rate every frame, and resetting on
                 // that would zero the debt before it ever clears the fp16
                 // threshold, so slow presets would stop decaying mid-nudge.
-                if (config.DENSITY_DISSIPATION !== lastDyeDiss) {
-                    lastDyeDiss = config.DENSITY_DISSIPATION;
+                if (_dyeBase !== lastDyeDiss) {
+                    lastDyeDiss = _dyeBase;
                     dyeDecayAccum = 0;
                 }
                 const _dyeDecay = computeDecayDt(_dyeDiss, dyeDecayAccum, _dyeDt);
