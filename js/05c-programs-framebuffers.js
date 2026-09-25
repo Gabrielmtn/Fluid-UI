@@ -41,6 +41,7 @@
         const imageSplatProg = new Program(baseVert, imageSplatFrag); // image → dye (Splat to Fluid)
         const captureProg = new Program(baseVert, captureFrag); // D2 bridge: dye → sketch
         const blurProg = new Program(blurVert, blurFrag);
+        const obstacleBlurProg = new Program(blurVert, obstacleBlurFrag); // obstacle finish blur that keeps thin walls
         const glowPrefilterProg = new Program(baseVert, glowPrefilterFrag);
         const glowBlurProg = new Program(baseVert, glowBlurFrag);
         const glowFinalProg = new Program(baseVert, glowFinalFrag);
@@ -911,16 +912,20 @@
         }
         // The 1-sim-texel blur that bounds every edge ramp (D0.5 rev 3):
         // H into scratch, V back into obstacle. Shared by both upload paths.
+        // Walls under three texels across keep their coverage (05b
+        // obstacleBlurFrag) unless config.COLLIDER_KEEP_THIN is false.
         function _blurObstacle() {
             gl.disable(gl.BLEND);
-            blurProg.bind();
-            gl.uniform1i(blurProg.uniforms.uTexture, 0);
+            obstacleBlurProg.bind();
+            gl.uniform1i(obstacleBlurProg.uniforms.uTexture, 0);
+            gl.uniform1f(obstacleBlurProg.uniforms.uKeepThin,
+                (typeof config !== 'undefined' && config.COLLIDER_KEEP_THIN === false) ? 0 : 1);
             gl.viewport(0, 0, obstacle.width, obstacle.height);
-            gl.uniform2f(blurProg.uniforms.texelSize, obstacle.texelSizeX, 0.0);
+            gl.uniform2f(obstacleBlurProg.uniforms.texelSize, obstacle.texelSizeX, 0.0);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
             blit(obstacleScratch.fbo);
-            gl.uniform2f(blurProg.uniforms.texelSize, 0.0, obstacle.texelSizeY);
+            gl.uniform2f(obstacleBlurProg.uniforms.texelSize, 0.0, obstacle.texelSizeY);
             gl.bindTexture(gl.TEXTURE_2D, obstacleScratch.texture);
             blit(obstacle.fbo);
         }

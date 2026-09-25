@@ -1868,6 +1868,53 @@
                 fragColor = (isErode == 1) ? mn : mx;
             }
         `;
+        // The obstacle's finish blur, one axis per pass (2026-09-25). This is
+        // blurFrag's 5-texel kernel (the D0.5 rev-3 blur that bounds every
+        // edge ramp), except where a wall is THINNER than three texels along
+        // this axis. There the blur spread the wall over five texels: a
+        // 1-texel stroke peaked at 0.29 coverage, a 2-texel one at 0.53, and
+        // the end of a stroke, blurred along both axes, lower still. All of
+        // that sits under or at the bottom of solidity()'s 0.35-0.85 window,
+        // so thin walls let the fluid through. At the default 512 physics
+        // that is most small text and the tips of bigger letters (measured:
+        // inside 16 px bold letters the fluid kept 49% of the surrounding
+        // speed, 24 px 42%, 48 px 6%). A thin ridge now keeps its own
+        // coverage and still gets the blur's apron outside it. A texel of a
+        // wall three or more texels across always has a pair of neighbours
+        // at least as covered as itself on one side, so the test comes out
+        // zero there and the pass is the old blur, bit for bit. The blend
+        // weight comes from presence (wall + Slow) and mixes whole texels,
+        // so the premultiplied strength and stick ratios are kept.
+        const obstacleBlurFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv, vL, vR;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            uniform float uKeepThin;  // config.COLLIDER_KEEP_THIN; 0 = the plain blur
+            void main() {
+                vec4 c = texture(uTexture, vUv);
+                vec4 sum = c * 0.29411764;
+                sum += texture(uTexture, vL) * 0.35294117;
+                sum += texture(uTexture, vR) * 0.35294117;
+                fragColor = sum;
+                float pc = c.x + c.w;
+                if (uKeepThin < 0.5 || pc < 1e-4) return;
+                // One texel along this pass's axis (blurVert puts vL and vR
+                // 1.333 texels out), so these four taps land on texel centres.
+                vec2 stp = (vR - vUv) * 0.75;
+                vec4 l2 = texture(uTexture, vUv - 2.0 * stp);
+                vec4 l1 = texture(uTexture, vUv - stp);
+                vec4 r1 = texture(uTexture, vUv + stp);
+                vec4 r2 = texture(uTexture, vUv + 2.0 * stp);
+                // How far the wall carries on past this texel, on its
+                // better side: at least as covered for two texels = wide.
+                float wide = max(min(l2.x + l2.w, l1.x + l1.w), min(r1.x + r1.w, r2.x + r2.w));
+                float keep = clamp(1.0 - wide / pc, 0.0, 1.0);
+                float ps = sum.x + sum.w;
+                if (keep * pc <= ps) return;
+                fragColor = mix(sum, c, (keep * pc - ps) / max(pc - ps, 1e-6));
+            }
+        `;
         // Doubles as the multigrid smoother: hSq = (2^level)² converts the
         // level's RHS — stored in level-0 "continuous" units all the way down
         // the pyramid so fp16 storage never sees compounding 4^L factors —

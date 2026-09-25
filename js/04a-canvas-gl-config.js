@@ -516,6 +516,15 @@
                                       // Ramp starts at 0.25× this (near-transparent stays
                                       // open; AA edges stay smooth). Console-tunable.
 
+            COLLIDER_KEEP_THIN: true, // Walls thinner than three sim texels keep their
+                                      // coverage through the obstacle's edge blur (05b
+                                      // obstacleBlurFrag). The blur used to thin them
+                                      // below solidity()'s window, so small text and the
+                                      // tips of letters let the fluid through (2026-09-25).
+                                      // Anything wider blurs exactly as before. Console-
+                                      // tunable; re-apply via
+                                      // collisionLayers.updateObstacleFromLayers().
+
             PRESSURE_SCALE: 1 / 256,  // fp16 headroom rescale of the pressure system.
                                       // 1/64 → 1/256 (2026-07-15): a vortex confined in a
                                       // SEALED strength-1.0 mask pocket generates real

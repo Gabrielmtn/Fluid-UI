@@ -1,6 +1,6 @@
 {
   "generated": "node scripts/test/gen-shader-inventory.js",
-  "shaders": 43,
+  "shaders": 44,
   "collisionGroups": 2,
   "table": {
     "uTexture": {
@@ -355,6 +355,13 @@
       "name": "morphObstacle",
       "uniforms": [
         "isErode",
+        "uTexture"
+      ]
+    },
+    "uKeepThin|uTexture": {
+      "name": "obstacleBlur",
+      "uniforms": [
+        "uKeepThin",
         "uTexture"
       ]
     },
