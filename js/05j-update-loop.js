@@ -1914,6 +1914,7 @@
             gl.uniform1f(displayProg.uniforms.glowEnabled, _glowOn ? 1.0 : 0.0);
             gl.uniform1i(displayProg.uniforms.uScatter, 12);
             gl.uniform1f(displayProg.uniforms.scatterEnabled, _scatterOn ? 1.0 : 0.0);
+            gl.uniform1f(displayProg.uniforms.scatterSmooth, config.SCATTER_SMOOTH !== false ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.preserveOpacity, window.preserveFluidOpacity ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.backgroundTransparency, window.backgroundTransparency || 0.0);
             gl.uniform1f(displayProg.uniforms.kaleidoEnabled, window.kaleidoEnabled ? 1.0 : 0.0);

@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05b-shader-sim.js — part 2/14 of former 05-fluid-sim.js (lines 654–966)
 // LOAD ORDER: after 05a-shader-core.js, before 05c-programs-framebuffers.js
-// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/viscosity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter/shadeWall/shadeForm frag sources
+// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/viscosity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter/scatterSmooth/shadeWall/shadeForm frag sources
 // REQUIRES: PRECISION (05a)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -2411,6 +2411,10 @@
         // why a NaN weight could black out the entire canvas (bd7e62f). This
         // one is origin-driven, emissive, per-channel and purely additive:
         // that failure mode is structurally impossible here.
+        //
+        // Steps per march. scatterSmoothFrag below averages over exactly one
+        // of them, so the two must share this number.
+        const SCATTER_STEPS = 48;
         const scatterFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
@@ -2427,7 +2431,7 @@
             uniform int hasObstacle;     // 0 = no colliders / occlusion off
             uniform float blockStrength; // 1 = opaque wall, <1 = translucent
             ${obsTexelGLSL}
-            #define ITERATIONS 48
+            #define ITERATIONS ${SCATTER_STEPS}
             #define OCC_TAPS 5
             void main() {
                 // NB: stepUV, not step — 'step' is a GLSL builtin.
@@ -2471,12 +2475,29 @@
                 // crosses. One attenuation per step, as before, so a
                 // translucent wall (blockStrength < 1) dims light exactly as
                 // much as it did; it just can no longer be missed.
+                //
+                // Both tests stop light at the wall's OUTLINE, coverage
+                // 0.30-0.55: the contour obsTexDyeBlock stops the brush at
+                // and shadeWallFrag draws the relief rim on. They used
+                // solidity()'s 0.35-0.85, which is how porous a wall is to
+                // FLUID (2026-09-25, Gabriel: "our light passing through
+                // collisions is awfully grainy"). That window saturates only
+                // at 0.85, and a thin stroke never gets there: under 30 px
+                // text at sim 512, 133 of 192 columns through the letters
+                // peak between 0.55 and 0.85. The march crosses a letter in
+                // one step, so up to two thirds of the light went through,
+                // and how much depended on where the dither put the taps.
+                // The letters printed as grainy streaks of leaked light.
+                // A 1536-step march blocks it under either window, because
+                // its many small steps compound. Against that march, the
+                // error behind the text fell 26.2 -> 10.4 and the light
+                // inside the letters 52.9 -> 6.2.
                 vec2 obsTexels = vec2(1.0);
                 vec2 prev = vUv;
                 if (hasObstacle == 1) {
                     obsTexels = vec2(textureSize(uObstacle, 0));
                     float own = obsTexCoverage(texture(uObstacle, vUv), uObsMax);
-                    illum *= 1.0 - blockStrength * smoothstep(0.35, 0.85, own);
+                    illum *= 1.0 - blockStrength * smoothstep(0.30, 0.55, own);
                 }
                 for (int i = 0; i < ITERATIONS; i++) {
                     coord -= stepUV;
@@ -2513,7 +2534,7 @@
                             vec2 at = mix(prev, coord, float(k) / taps);
                             cov = max(cov, obsTexCoverage(texture(uObstacle, at), uObsMax));
                         }
-                        illum *= 1.0 - blockStrength * smoothstep(0.35, 0.85, cov);
+                        illum *= 1.0 - blockStrength * smoothstep(0.30, 0.55, cov);
                     }
                     prev = coord;
                     accum += texture(uTexture, coord).rgb * illum;
@@ -2524,6 +2545,59 @@
                 // as a hard bright disc.
                 accum *= smoothstep(0.0, 0.08, length((vUv - origin) * aspect));
                 fragColor = vec4(max(accum, vec3(0.0)), 1.0);
+            }
+        `;
+        // ─── Scatter smoothing (2026-09-25) ─────────────────────────────
+        // The march leaves texel-sized junk on its 512 grid, and the ~3x
+        // upscale to the canvas makes it visible (Gabriel, 2026-09-25: "the
+        // beams still have a certain roughness to them"). Each pixel decides
+        // on its own whether its ray clears a letter's edge, so every shadow
+        // edge comes out as a wobbling stair-step, one texel per ray. The
+        // dither also leaves grain along each shaft.
+        //
+        // Both lie ALONG the ray. A shadow edge runs through the origin, so
+        // averaging a pixel with its neighbours on its own ray blends the
+        // staircase into the edge's true position and the dither into a
+        // denser march, and a shaft gets no wider. The window is one march
+        // step, the march's own resolution along the ray, so no detail the
+        // march resolved is lost. It stops at a wall, so light never
+        // smears across a collider into its own shadow.
+        //
+        // Measured on a 30 px text wall (a beam edge's RMS distance from a
+        // straight line, in canvas px): 0.30 -> 0.17, and 0.10 with
+        // displayFrag's B-spline upsample. A native-resolution march
+        // scores 0.04. config.SCATTER_SMOOTH = false skips both.
+        const scatterSmoothFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;  // scatterFrag's output
+            uniform vec2 origin;         // same origin and reach the march used
+            uniform float density;
+            uniform sampler2D uObstacle;
+            uniform float uObsMax;
+            uniform int hasObstacle;
+            ${obsTexelGLSL}
+            #define ITERATIONS ${SCATTER_STEPS}
+            #define TAPS 4
+            void main() {
+                // One march step along this pixel's ray, centred on it.
+                vec2 stepUV = (vUv - origin) * (density / float(ITERATIONS));
+                vec4 sum = texture(uTexture, vUv);
+                float n = 1.0;
+                for (int side = 0; side < 2; side++) {
+                    float dir = (side == 0) ? -1.0 : 1.0;
+                    for (int k = 1; k <= TAPS; k++) {
+                        vec2 at = vUv + stepUV * (dir * float(k) / float(2 * TAPS + 1));
+                        // Stop at the wall's outline: the middle of the
+                        // march's 0.30-0.55 occlusion window.
+                        if (hasObstacle == 1
+                            && obsTexCoverage(texture(uObstacle, at), uObsMax) > 0.425) break;
+                        sum += texture(uTexture, at);
+                        n += 1.0;
+                    }
+                }
+                fragColor = sum / n;
             }
         `;
         // ─── Surface Shading around colliders (2026-09-22) ──────────────

@@ -1,6 +1,6 @@
 {
   "generated": "node scripts/test/gen-shader-inventory.js",
-  "shaders": 42,
+  "shaders": 43,
   "collisionGroups": 2,
   "table": {
     "uTexture": {
@@ -23,7 +23,7 @@
         }
       ]
     },
-    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kMode|kTwist|kZoom|kaleidoEnabled|lampAmbient|lampOn|lampPos|lampPower|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|segments|shadeGloss|shadeInvert|shadeRelief|shadeTexelSize|shadeWallRim|shadeWalls|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uShadeWall|uTexture": {
+    "backgroundTransparency|displayShading|gateVibrance|gateWhite|glowEnabled|igniteVibrance|kAngle|kBlend|kMode|kTwist|kZoom|kaleidoEnabled|lampAmbient|lampOn|lampPos|lampPower|lightShiftCeiling|lightShiftColor|lightShiftDensity|lightShiftEnabled|lightShiftIntensity|lightShiftMode|lightShiftThreshold|maskOverlayOn|preserveOpacity|scatterEnabled|scatterSmooth|segments|shadeGloss|shadeInvert|shadeRelief|shadeTexelSize|shadeWallRim|shadeWalls|texelSize|uGlow|uMaskOverlay|uRaster0|uRaster1|uRaster2|uRaster3|uRasterC0|uRasterC1|uRasterC2|uRasterC3|uRasterM0|uRasterM1|uRasterM2|uRasterM3|uRasterP0|uRasterP1|uRasterP2|uRasterP3|uScatter|uShadeForm|uShadeWall|uTexture": {
       "name": "display",
       "uniforms": [
         "backgroundTransparency",
@@ -52,6 +52,7 @@
         "maskOverlayOn",
         "preserveOpacity",
         "scatterEnabled",
+        "scatterSmooth",
         "segments",
         "shadeGloss",
         "shadeInvert",
@@ -148,7 +149,7 @@
         }
       ]
     },
-    "bloomCeiling|decayDt|dissipation|dt|edgeAbsorb|edgeAbsorbBand|floorBand|floorDrain|frozen|hasObstacle|hfFloorDye|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelocity": {
+    "bloomCeiling|decayDt|dissipation|dt|edgeAbsorb|edgeAbsorbBand|floorBand|floorDrain|frozen|hasObstacle|hfFloorDye|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelToUv|uVelocity": {
       "name": "advection",
       "uniforms": [
         "bloomCeiling",
@@ -177,10 +178,11 @@
         "uRestoreGain",
         "uSource",
         "uVelCap",
+        "uVelToUv",
         "uVelocity"
       ]
     },
-    "dt|hasObstacle|srcTexelSize|texelSize|uObstacle|uSource|uVelocity": {
+    "dt|hasObstacle|srcTexelSize|texelSize|uObstacle|uSource|uVelToUv|uVelocity": {
       "name": "macAdvect",
       "uniforms": [
         "dt",
@@ -189,10 +191,11 @@
         "texelSize",
         "uObstacle",
         "uSource",
+        "uVelToUv",
         "uVelocity"
       ]
     },
-    "deband|dt|hasObstacle|srcTexelSize|texelSize|uForward|uObstacle|uSource|uVelocity": {
+    "deband|dt|hasObstacle|srcTexelSize|texelSize|uForward|uObstacle|uSource|uVelToUv|uVelocity": {
       "name": "macCorrect",
       "uniforms": [
         "deband",
@@ -203,10 +206,11 @@
         "uForward",
         "uObstacle",
         "uSource",
+        "uVelToUv",
         "uVelocity"
       ]
     },
-    "dryMul|dt|hasObstacle|srcTexelSize|texelSize|uObstacle|uSource|uVelocity": {
+    "dryMul|dt|hasObstacle|srcTexelSize|texelSize|uObstacle|uSource|uVelToUv|uVelocity": {
       "name": "wetnessAdvect",
       "uniforms": [
         "dryMul",
@@ -216,6 +220,7 @@
         "texelSize",
         "uObstacle",
         "uSource",
+        "uVelToUv",
         "uVelocity"
       ]
     },
@@ -283,7 +288,7 @@
         "uVelocity"
       ]
     },
-    "aspectRatio|dt|uAtt|uCount|uDensity|uDensityGate|uForce|uKeep|uMaxDensity|uSwirl": {
+    "aspectRatio|dt|uAtt|uCount|uDensity|uDensityGate|uForce|uKeep|uMaxDensity|uSwirl|uVelToUv": {
       "name": "attractor",
       "uniforms": [
         "aspectRatio",
@@ -295,7 +300,8 @@
         "uForce",
         "uKeep",
         "uMaxDensity",
-        "uSwirl"
+        "uSwirl",
+        "uVelToUv"
       ]
     },
     "dt|hasObstacle|strength|texelSize|uObsMax|uObstacle|uVelocity": {
@@ -388,13 +394,14 @@
         "uPressure"
       ]
     },
-    "hasObstacle|openBoundary|pScale|texelSize|uObstacle|uPressure|uVelocity": {
+    "hasObstacle|openBoundary|pScale|texelSize|uHalfGrad|uObstacle|uPressure|uVelocity": {
       "name": "gradient",
       "uniforms": [
         "hasObstacle",
         "openBoundary",
         "pScale",
         "texelSize",
+        "uHalfGrad",
         "uObstacle",
         "uPressure",
         "uVelocity"
@@ -487,6 +494,17 @@
         "uObstacle",
         "uTexture",
         "weight"
+      ]
+    },
+    "density|hasObstacle|origin|uObsMax|uObstacle|uTexture": {
+      "name": "scatterSmooth",
+      "uniforms": [
+        "density",
+        "hasObstacle",
+        "origin",
+        "uObsMax",
+        "uObstacle",
+        "uTexture"
       ]
     },
     "uObsMax|uObstacle": {

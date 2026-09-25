@@ -1060,8 +1060,8 @@
                 gl.uniform2f(scatterProg.uniforms.origin, _so.x, _so.y);
                 gl.uniform2f(scatterProg.uniforms.aspect,
                     canvas.width / Math.max(1, canvas.height), 1.0);
-                gl.uniform1f(scatterProg.uniforms.density,
-                    (config.SCATTER_DENSITY != null) ? config.SCATTER_DENSITY : 0.6);
+                const _density = (config.SCATTER_DENSITY != null) ? config.SCATTER_DENSITY : 0.6;
+                gl.uniform1f(scatterProg.uniforms.density, _density);
                 gl.uniform1f(scatterProg.uniforms.decay,
                     (config.SCATTER_DECAY != null) ? config.SCATTER_DECAY : 0.94);
                 gl.uniform1f(scatterProg.uniforms.weight,
@@ -1085,6 +1085,22 @@
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, glow.texture);
                 blit(scatter.fbo);
+                // Smooth along each ray (05b scatterSmoothFrag), then swap so
+                // `scatter` holds what the display samples. Same viewport, and
+                // unit 1 still holds the obstacle (or nothing) from the march.
+                if (config.SCATTER_SMOOTH !== false && scatterTemp) {
+                    scatterSmoothProg.bind();
+                    gl.uniform1i(scatterSmoothProg.uniforms.uTexture, 0);
+                    gl.uniform2f(scatterSmoothProg.uniforms.origin, _so.x, _so.y);
+                    gl.uniform1f(scatterSmoothProg.uniforms.density, _density);
+                    gl.uniform1i(scatterSmoothProg.uniforms.uObstacle, 1);
+                    gl.uniform1f(scatterSmoothProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                    gl.uniform1i(scatterSmoothProg.uniforms.hasObstacle, _occlude ? 1 : 0);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, scatter.texture);
+                    blit(scatterTemp.fbo);
+                    const _s = scatter; scatter = scatterTemp; scatterTemp = _s;
+                }
             }
             // Downsample chain
             glowBlurProg.bind();

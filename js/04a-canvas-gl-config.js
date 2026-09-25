@@ -1188,6 +1188,13 @@
                                       // read as jagged stair-steps (2026-08-21).
                                       // Console-tunable; cost is O(res^2).
 
+            SCATTER_SMOOTH: true,     // Smooth the shafts along each ray and upsample
+                                      // them through a B-spline (05b scatterSmoothFrag,
+                                      // 05a scatterSample). Takes out the stair-stepped,
+                                      // wobbling shadow edges and the dither grain the
+                                      // 512 grid leaves (2026-09-25). Console-tunable;
+                                      // false renders exactly as before.
+
             SCATTER_BLOCK: true,      // Colliders cast shadows in the light shafts.
                                       // No-op unless BOTH Scatter and a collision layer
                                       // exist, so ON by default is free where it does

@@ -144,13 +144,13 @@
         // of one level
         bytes += simTexels * 16 / 3;
 
-        // fixed-base buffers: glow + its mip chain (+1/3), scatter,
+        // fixed-base buffers: glow + its mip chain (+1/3), scatter x2,
         // shadeForm x2 — all RGBA16F
         var glow = grid(Math.min(t.glow || 256, Math.max(b.w, b.h)));
         var scat = grid(Math.min(t.scatter || 512, Math.max(b.w, b.h)));
         var shade = grid((cfg().SHADE_FORM_RESOLUTION | 0) || 256);
         bytes += glow.w * glow.h * 8 * 4 / 3;
-        bytes += scat.w * scat.h * 8;
+        bytes += scat.w * scat.h * 8 * 2;   // scatter + scatterTemp (its smoothing pass)
         bytes += shade.w * shade.h * 8 * 2;
 
         // the drawing buffer itself, at the supersample factor. RGBA8,

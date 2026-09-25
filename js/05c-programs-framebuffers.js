@@ -45,6 +45,7 @@
         const glowBlurProg = new Program(baseVert, glowBlurFrag);
         const glowFinalProg = new Program(baseVert, glowFinalFrag);
         const scatterProg = new Program(baseVert, scatterFrag);
+        const scatterSmoothProg = new Program(baseVert, scatterSmoothFrag); // along-ray smoothing of the shafts
         const shadeWallProg = new Program(baseVert, shadeWallFrag);  // Surface Shading's collider mask
         const shadeFormProg = new Program(blurVert, shadeFormFrag);  // form field split round the walls
         // PhotoSafe (photosensitivity protection) passes — see 05b sources
@@ -146,6 +147,7 @@
         let sketch; // alias: the ACTIVE raster layer's FBO (assigned by rasterLayers.setActive)
         let glow, glowFramebuffers = []; // HDR bloom: 256-base target + halving mip chain
         let scatter; // Volumetric light shafts: same 256-base grid as `glow`
+        let scatterTemp; // scatterSmoothFrag's target; swaps with `scatter` each frame
         // PhotoSafe buffers: safeFrame = the display pass's render target while
         // protection is on; safeOut = double-buffered PRESENTED frame (write =
         // this frame, read = history); safeLuma = 16x16 block luminance pair;
@@ -199,7 +201,7 @@
                 if (f.fbo) gl.deleteFramebuffer(f.fbo);
             }
             [sharpened, detailed, divergence, curl, obstacle, obstacleScratch,
-             glow, scatter, shadeForm, shadeFormTemp, shadeWall, safeFrame].forEach(_deleteFBO);
+             glow, scatter, scatterTemp, shadeForm, shadeFormTemp, shadeWall, safeFrame].forEach(_deleteFBO);
             [safeOut, safeLuma, safeStats].forEach(function (d) {
                 if (d) { _deleteFBO(d.read); _deleteFBO(d.write); }
             });
@@ -340,6 +342,7 @@
                 scatW = Math.max(1, Math.round(scatRes * glowAspect));
             }
             scatter = createFBO(scatW, scatH, rgba.internalFormat, rgba.format, texType, filter);
+            scatterTemp = createFBO(scatW, scatH, rgba.internalFormat, rgba.format, texType, filter);
             // PhotoSafe buffers. safeFrame/safeOut are RGBA8 at the DRAWING
             // BUFFER size — same quantization as the canvas, so the protected
             // pass-through stays bit-identical to a direct present. The luma
@@ -395,7 +398,7 @@
                 divergence, curl,
                 pressure.read, pressure.write,
                 sharpened, detailed, obstacle, obstacleScratch,
-                glow, scatter, shadeForm, shadeFormTemp, shadeWall,
+                glow, scatter, scatterTemp, shadeForm, shadeFormTemp, shadeWall,
                 safeFrame,
                 safeOut && safeOut.read, safeOut && safeOut.write,
                 safeLuma && safeLuma.read, safeLuma && safeLuma.write,
@@ -710,7 +713,7 @@
             window.__vramAsleep = false;
 
             [sharpened, detailed, divergence, curl, obstacle, obstacleScratch,
-             glow, scatter, shadeForm, shadeFormTemp, shadeWall, safeFrame, mgRes0].forEach(_freeFBO);
+             glow, scatter, scatterTemp, shadeForm, shadeFormTemp, shadeWall, safeFrame, mgRes0].forEach(_freeFBO);
             [density, velocity, pressure, wetness,
              safeOut, safeLuma, safeStats].forEach(_freeDouble);
             glowFramebuffers.forEach(_freeFBO);
@@ -720,7 +723,7 @@
             density = velocity = pressure = wetness = null;
             divergence = curl = sharpened = detailed = null;
             obstacle = obstacleScratch = null;
-            glow = scatter = shadeForm = shadeFormTemp = shadeWall = null;
+            glow = scatter = scatterTemp = shadeForm = shadeFormTemp = shadeWall = null;
             safeFrame = safeOut = safeLuma = safeStats = null;
             mgRes0 = null; mgLevels = null; glowFramebuffers = [];
 

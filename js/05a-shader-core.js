@@ -96,6 +96,7 @@
             uniform float glowEnabled;
             uniform sampler2D uScatter;   // Scatter: volumetric light shafts marched from an origin
             uniform float scatterEnabled;
+            uniform float scatterSmooth;  // config.SCATTER_SMOOTH: B-spline upsample of uScatter
             // D2 raster layer stack: up to 4 visible raster paint layers
             // (premultiplied RGBA8), composited around the fluid. Per-slot
             // params: x=enabled, y=opacity, z=blend mode (0 normal /
@@ -370,6 +371,32 @@
                 float asp = texelSize.y / texelSize.x;
                 vec2 d = (lampPos - uv) * ((asp >= 1.0) ? vec2(asp, 1.0) : vec2(1.0, 1.0 / asp));
                 return normalize(vec3(d, LAMP_H));
+            }
+            // Scatter's buffer is ~3x coarser than the canvas at stock (512
+            // base). Bilinear magnification kinks a slanted shaft edge at
+            // every texel boundary, which reads as a fine sawtooth along it.
+            // With scatterSmooth on it is read through a cubic B-spline
+            // instead: four bilinear taps (Sigg & Hadwiger's weights folded
+            // into the tap offsets), C2-smooth, so the edge stays straight.
+            // See 05b scatterSmoothFrag, the other half of the same fix.
+            vec3 scatterSample(vec2 uv) {
+                if (scatterSmooth < 0.5) return texture(uScatter, uv).rgb;
+                vec2 ts = vec2(textureSize(uScatter, 0));
+                vec2 p = uv * ts - 0.5;
+                vec2 f = fract(p);
+                vec2 i = p - f;
+                vec2 f2 = f * f, f3 = f2 * f;
+                vec2 w0 = (-f3 + 3.0 * f2 - 3.0 * f + 1.0) / 6.0;
+                vec2 w1 = (3.0 * f3 - 6.0 * f2 + 4.0) / 6.0;
+                vec2 w2 = (-3.0 * f3 + 3.0 * f2 + 3.0 * f + 1.0) / 6.0;
+                vec2 w3 = f3 / 6.0;
+                vec2 g0 = w0 + w1, g1 = w2 + w3;
+                vec2 h0 = (i - 0.5 + w1 / g0) / ts;   // between texels i-1 and i
+                vec2 h1 = (i + 1.5 + w3 / g1) / ts;   // between texels i+1 and i+2
+                return g0.y * (g0.x * texture(uScatter, h0).rgb
+                             + g1.x * texture(uScatter, vec2(h1.x, h0.y)).rgb)
+                     + g1.y * (g0.x * texture(uScatter, vec2(h0.x, h1.y)).rgb
+                             + g1.x * texture(uScatter, h1).rgb);
             }
             void main() {
                 vec4 base = texture(uTexture, vUv);
@@ -686,8 +713,10 @@
                     // is what puts it under the Gate shoulder below — two
                     // additive light terms, one hue-preserving soft-limit.
                     if (scatterEnabled > 0.5) {
-                        vec3 sc = mix(texture(uScatter, vUv).rgb, texture(uScatter, kUv).rgb,
-                                      doK ? clamp(kBlend, 0.0, 1.0) : 0.0);
+                        // The kaleido sample only when it is blended in: with
+                        // the B-spline it costs four taps, not one.
+                        vec3 sc = scatterSample(vUv);
+                        if (doK) sc = mix(sc, scatterSample(kUv), clamp(kBlend, 0.0, 1.0));
                         sc = pow(max(sc, vec3(0.0)), vec3(1.0 / 2.2));
                         if (lightShiftEnabled > 0.5) {
                             // Same rule as the halo above: shafts are light OF
