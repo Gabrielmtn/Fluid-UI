@@ -120,7 +120,13 @@
             case 'num':
                 if (typeof v !== 'number' || !isFinite(v)) return undefined;
                 if (key === 'SPLAT_RADIUS') return Math.max(0.000001, Math.min(0.1, v));
-                if (key === 'BRUSH_ANGLE') return Math.max(-180, Math.min(180, v));
+                // Degrees, and the rest of the app keeps it in [0, 360): the
+                // Brush panel slider is 0..360, 12-save-load clamps a brush
+                // preset to [0, 360] and Shift+Scroll (05h) wraps. Wrap here
+                // too, so "Use current brush" stores 270 as 270 (a clamp to
+                // +/-180 used to fold it to 180) and a hand-edited -90 still
+                // means the rotation it names (270) rather than being cut off.
+                if (key === 'BRUSH_ANGLE') return ((v % 360) + 360) % 360;
                 if (key === 'BRUSH_VEL_STRENGTH') return Math.max(0, Math.min(5, v));
                 return Math.max(0, Math.min(10, v));
             case 'bool': return !!v;
