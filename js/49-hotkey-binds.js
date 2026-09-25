@@ -338,7 +338,7 @@
 
     // Never bindable: this module's own bar and list, any hotkey picker,
     // dialogs, and the canvas itself.
-    var NOT_BINDABLE = '#hkBindBar, .hk-block, .hk-picker, #hotkeyOverlay, .delete-modal, #recipePill, #canvas';
+    var NOT_BINDABLE = '#hkBindBar, .hk-block, .hk-picker, #hotkeyOverlay, .delete-modal, #recipePill, #canvas, .preset-fork';
 
     // Controls that open or fold other UI — More ▾, Presets ▾, a ⚙ that opens
     // its channel's settings, a ⋯ menu, a list that folds open. They keep

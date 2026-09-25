@@ -1479,6 +1479,45 @@
         Object.keys(all).forEach(function (p) { if (all[p] && all[p].group === name) presetSetGroup(p, ''); });
     }
 
+    // ── First open of the popup: forge your own path, or build on ours ──
+    // (Gabriel, 2026-09-24.) A profile that has never answered sees the
+    // question in place of the list; the answer decides whether the built-in
+    // looks are listed at all. The key lives OUTSIDE the settingsManager
+    // namespace on purpose (same reasoning as 43's fork ack): Settings → Clear
+    // and the nuclear reset wipe every 'fluidUI:' key, and a question answered
+    // once must not come back because the sliders were reset. Either answer
+    // can be flipped later — the Built in group's ⋯ hides them, the own-path
+    // list ends with "Show the built-in presets". Hiding is the popup only:
+    // applyPreset by key (hotkeys, the multiplayer broadcast, look links)
+    // keeps working underneath.
+    var LS_PRESET_PATH = 'fluidui.presetPath.v1';   // 'ours' | 'own'
+    function presetPathGet() {
+        try {
+            var v = localStorage.getItem(LS_PRESET_PATH);
+            return (v === 'ours' || v === 'own') ? v : null;
+        } catch (_) { return null; }
+    }
+    function presetPathSet(v) {
+        try {
+            if (v === 'ours' || v === 'own') localStorage.setItem(LS_PRESET_PATH, v);
+            else localStorage.removeItem(LS_PRESET_PATH);
+        } catch (_) {}
+    }
+    // Harness, bake and shot lanes never get the question (the same flags 43
+    // honours for the startup fork): they see the built-ins, nothing persists.
+    function presetForkWaived() {
+        if (window.__skipUIFork || window.__shot || window.__test) return true;
+        try { return localStorage.getItem('fluidui.uiFork.skip') === '1'; } catch (_) { return false; }
+    }
+    window.PresetPath = {
+        get: presetPathGet,
+        set: function (v) {
+            presetPathSet(v);
+            if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
+        },
+        pending: function () { return presetPathGet() === null && !presetForkWaived(); }
+    };
+
     function buildPresetsChannel(controls) {
         const wrap = document.createElement('div');
         wrap.className = 'mixer-presets-channel';
@@ -1565,15 +1604,15 @@
                 presetGroupsSave(st);
                 block.classList.toggle('collapsed', !!st.collapsed[id]);
             });
-            if (opts.menu) {
+            if (opts.menu || opts.items) {
                 const more = document.createElement('button');
                 more.type = 'button';
                 more.className = 'preset-more btn--icon';
                 more.textContent = '⋯';
-                more.title = 'Rename or delete this group';
+                more.title = opts.items ? 'Show or hide' : 'Rename or delete this group';
                 more.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    openPresetMenu(more, [
+                    openPresetMenu(more, opts.items || [
                         { label: 'Rename group…', run: function () { inlineRename(head, id); } },
                         { label: 'Delete group (keep presets)', danger: true, run: function () { presetGroupDelete(id); renderMixerUserPresets(); } }
                     ]);
@@ -1646,10 +1685,45 @@
             setTimeout(function () { document.addEventListener('click', closePresetMenu, { once: true }); }, 0);
         }
 
+        // The question, in the list's place. Two answers, both persisted by
+        // presetPathSet; the list re-renders under the same open panel.
+        function buildFork() {
+            const f = document.createElement('div');
+            f.className = 'preset-fork';
+            const say = document.createElement('div');
+            say.className = 'preset-fork-say';
+            say.textContent = 'In life, you can forge your own path, or build upon what others have tried. Both are valid.';
+            f.appendChild(say);
+            [['ours', 'I know what I want, give me your presets'],
+             ['own', 'I don\'t want your presets, I\'m forging my own path']].forEach(function (o) {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'preset-fork-btn';
+                b.dataset.path = o[0];
+                b.textContent = o[1];
+                b.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    presetPathSet(o[0]);
+                    renderMixerUserPresets();
+                    positionPanel();   // the list just changed height
+                });
+                f.appendChild(b);
+            });
+            return f;
+        }
+
         function renderMixerUserPresets() {
             if (!window.Settings) return;
             closePresetMenu();
             list.innerHTML = '';
+            // First open: the question stands in for the whole list, and the
+            // save footer + Copy-link foot wait with it (.is-forking rules in
+            // 20-mixer-strip.css) — there is nothing to save INTO yet.
+            const path = presetPathGet();
+            const forking = path === null && !presetForkWaived();
+            panel.classList.toggle('is-forking', forking);
+            if (forking) { list.appendChild(buildFork()); return; }
+            const showBuiltin = path !== 'own';
             const presets = window.Settings.getAllPresets();
             const names = Object.keys(presets).sort(function (a, b) {
                 return ((presets[b] && presets[b].timestamp) || 0) - ((presets[a] && presets[a].timestamp) || 0);
@@ -1660,10 +1734,16 @@
             // Groups that exist but are empty still show (you just made one).
             gs.order.forEach(function (g) { if (!byGroup[g]) byGroup[g] = []; });
 
-            // Built in
-            const bi = groupBlock('__builtin', 'Built in', builtinBtns.length, {});
-            builtinBtns.forEach(function (b) { bi.body.appendChild(b); });
-            list.appendChild(bi.block);
+            // Built in — unless this profile chose its own path. The buttons
+            // stay in builtinBtns either way, detached; 04b's highlighter
+            // only sees what is in the document.
+            if (showBuiltin) {
+                const bi = groupBlock('__builtin', 'Built in', builtinBtns.length, { items: [
+                    { label: 'Hide the built-in presets', run: function () { presetPathSet('own'); renderMixerUserPresets(); } }
+                ] });
+                builtinBtns.forEach(function (b) { bi.body.appendChild(b); });
+                list.appendChild(bi.block);
+            }
 
             const groupNames = gs.order.slice();
             Object.keys(byGroup).forEach(function (g) { if (g && groupNames.indexOf(g) < 0) groupNames.push(g); });
@@ -1741,6 +1821,24 @@
                 const blk = groupBlock('__loose', groupNames.length ? 'Saved' : 'Saved', loose.length, {});
                 loose.forEach(function (n) { blk.body.appendChild(row(n)); });
                 list.appendChild(blk.block);
+            }
+            // Own path: an empty list says where the first preset comes from,
+            // and the built-ins are one click away for anyone who changes
+            // their mind.
+            if (!showBuiltin) {
+                if (!list.children.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'preset-empty';
+                    empty.textContent = 'Nothing saved yet. + New Preset keeps everything on screen under a name of your own.';
+                    list.appendChild(empty);
+                }
+                const back = document.createElement('button');
+                back.type = 'button';
+                back.className = 'preset-path-back btn--ghost btn--sm';
+                back.textContent = 'Show the built-in presets';
+                back.title = 'List the looks that come with the app again';
+                back.addEventListener('click', function () { presetPathSet('ours'); renderMixerUserPresets(); });
+                list.appendChild(back);
             }
         }
 

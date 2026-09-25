@@ -1368,6 +1368,43 @@ body > .controls {
    does not grow — the preset action stays the wide one. */
 .mixer-presets-footer .mixer-preset-new-group { flex: 0 0 auto; }
 
+/* ── First open of the popup (2026-09-24): forge your own path, or build on
+   ours. js/20 renderMixerUserPresets puts the question in the list's place
+   and marks the panel .is-forking, which hides the save footer and the
+   Copy-link foot (js/50) until it is answered. Buttons take the panel's
+   tint (data-group="core", 01-buttons) — layout only here. */
+.preset-fork { display: flex; flex-direction: column; gap: 8px; padding: 4px 2px 6px; }
+.preset-fork-say {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-100, #f2f3f5);
+    padding: 2px 2px 4px;
+}
+.mixer-presets-panel .preset-fork-btn {
+    box-sizing: border-box;
+    width: 100%;
+    text-align: left;
+    white-space: normal;
+    line-height: 1.35;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+.mixer-presets-panel.is-forking .mixer-presets-footer,
+.mixer-presets-panel.is-forking .look-link-foot { display: none; }
+/* Own path: the empty list's one line, and the way back to the built-ins. */
+.preset-empty {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--ink-500, #7b828e);
+    padding: 6px 4px 4px;
+}
+.mixer-presets-panel .preset-path-back {
+    align-self: flex-start;
+    margin-top: 2px;
+    opacity: 0.7;
+}
+.mixer-presets-panel .preset-path-back:hover { opacity: 1; }
+
 /* ── "More" overflow cell + panel (js/46-strip-more.js) ───────────────────
    On a monitor too narrow for the whole bar the fader cells park, from the
    right, into this cell — it takes the place of the last fader that had to
