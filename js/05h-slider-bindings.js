@@ -457,12 +457,15 @@
             } else if (e.shiftKey) {
                 // Shift+Scroll: Rotate the brush tip (BRUSH_ANGLE, degrees, wraps
                 // 0↔360). The brush ghost and the chisel/streak stamps follow it
-                // live. Eased: faster scroll = bigger turns.
-                const scrollMagnitude = Math.min(Math.abs(e.deltaY) / 100, 3); // cap 3×
-                const stepSize = 3 * scrollMagnitude; // ~3–9° per notch
-                let cur = (typeof config.BRUSH_ANGLE === 'number') ? config.BRUSH_ANGLE : 0;
+                // live. One notch = one whole degree, and the first notch lands on the
+                // next whole degree in that direction, so a preset sitting at 47.3°
+                // can still reach exactly 0° (2026-09-24, Gabriel: the old 3°×speed
+                // step could never hit 0 from an off-grid start).
+                if (e.deltaY === 0) return; // sideways scroll: nothing to turn
+                let cur = (typeof config.BRUSH_ANGLE === 'number' && isFinite(config.BRUSH_ANGLE)) ? config.BRUSH_ANGLE : 0;
+                cur = Math.round(cur * 1e6) / 1e6; // shed float noise so 47.0000001 counts as 47
                 // Scroll up = turn clockwise (the ghost's and the stamp's rotation sense)
-                let newAngle = cur + (e.deltaY < 0 ? stepSize : -stepSize);
+                let newAngle = (e.deltaY < 0) ? Math.floor(cur) + 1 : Math.ceil(cur) - 1;
                 newAngle = ((newAngle % 360) + 360) % 360; // wrap into [0,360)
                 config.BRUSH_ANGLE = newAngle;
                 // Keep the Brush-panel slider + its readout in sync if built.
