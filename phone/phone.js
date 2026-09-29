@@ -422,6 +422,7 @@
             spMin: num(p.spMin, 0.25, 64, 1),
             ref: num(p.ref, 0.001, 4, 0.35),
             tc: num(p.tc, 1, 16, 1),
+            tshare: p.tshare === 1 ? 1 : 0,
             floor: num(p.floor, 0, 1000, 125),
             stab: num(p.stab, 0, 1, 0),
             budget: num(p.budget, 200, 20000, 4000),
@@ -642,10 +643,11 @@
         var r = radius();
         var D = Math.max(4, 2 * Math.sqrt(r) * VH());               // 05d0 brushDiameterPx
         var tc = i ? i.tc : 1;                                        // 05d0 timeCompensation
-        var S = Math.max(i ? i.spMin : 1, (i ? i.spFrac : 0.001) * D) * tc;   // 05d0 spacingPx
+        var tshare = !!(i && i.tshare);                               // 05d0 timeShare
+        var S = Math.max(i ? i.spMin : 1, (i ? i.spFrac : 0.001) * D) * (tshare ? 1 : tc);   // 05d0 spacingPx
         var stab = i ? i.stab : 0;
         return {
-            r: r, D: D, S: S, tc: tc,
+            r: r, D: D, S: S, tc: tc, tshare: tshare,
             ref: (i ? i.ref : 0.35) * D,
             gate: !!(i && i.gate),
             flow: i ? i.flow : 1,
@@ -660,7 +662,9 @@
     // normalizePaintFlow — linear when additive, in the exponent under
     // Cap Colour, where a dab converges rather than adds).
     function shareOf(m, used) {
-        var k = (m.ref > 0 && m.tc > 0) ? Math.min(1, used / (m.tc * m.ref)) : 1;
+        var k = !(m.ref > 0 && m.tc > 0) ? 1
+            : m.tshare ? Math.min(1, used / m.ref) / m.tc
+            : Math.min(1, used / (m.tc * m.ref));
         var f = clamp(m.flow, 0, 1);
         var share = (k >= 1) ? f : (m.gate ? 1 - Math.pow(1 - f, k) : f * k);
         return { k: k, share: share };

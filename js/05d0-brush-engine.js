@@ -87,6 +87,15 @@
     // cap (a spacing multiplier); 1 or below disables the compensation.
     // Deliberately inert at Time ≥ 1: fast time already spreads deposits out
     // on its own, and densifying there would multiply the per-frame dab cost.
+    //
+    // 2026-09-28: the spread is now a DYE SHARE instead (timeShare below).
+    // Spreading spacing did lower dabs-per-simulated-second, but it did it by
+    // laying a quarter of the dabs per wall second — at Time 0.2 a stamp
+    // stroke broke into separate copies 4px apart, and a hand that had not
+    // changed speed saw the brush slow down. Dividing each dab's share by the
+    // same factor removes exactly the same dye per simulated second and keeps
+    // the Time-1 sampling. The cap stays: it is what holds the dye the same
+    // as before at Time < 0.25.
     function timeCompensation() {
         var c = window.config;
         var cap = (c && typeof c.BRUSH_TIME_COMP === 'number') ? c.BRUSH_TIME_COMP : 4;
@@ -94,6 +103,13 @@
         var s = window.timeScale;
         if (typeof s !== 'number' || !(s > 0) || s >= 1) return 1;
         return Math.min(cap, 1 / s);
+    }
+
+    // Low Time carried in the dab's share rather than in fewer dabs
+    // (config.BRUSH_TIME_SHARE, default on). false = the spread, bit for bit.
+    function timeShare() {
+        var c = window.config;
+        return !(c && c.BRUSH_TIME_SHARE === false);
     }
 
     // Spacing as the slider asks for it, in px, BEFORE the low-Time spread.
@@ -115,7 +131,7 @@
     }
 
     function spacingPx() {
-        return baseSpacingPx() * timeCompensation();
+        return timeShare() ? baseSpacingPx() : baseSpacingPx() * timeCompensation();
     }
 
     // Dye normalization on the DISTANCE axis (2026-08-17). Dabs are impulses, so
@@ -129,10 +145,11 @@
     // 0.25px floor and the coalescing bump below — both are sampling artefacts
     // and both must be compensated, or a fast segment would silently lighten.
     //
-    // timeCompensation is deliberately NOT compensated: spreading spacing at low
-    // Time exists precisely to deposit LESS dye per simulated second (the flat
-    // over-saturated middle), so cancelling it here would undo that fix. Hence
-    // the ratio is taken against baseSpacingPx, not spacingPx.
+    // timeCompensation is deliberately NOT compensated: lowering the dye per
+    // simulated second at low Time is the whole point of it (the flat
+    // over-saturated middle), so cancelling it here would undo that fix. With
+    // the spread (BRUSH_TIME_SHARE off) the ratio is taken against
+    // baseSpacingPx, not spacingPx; with the time share it is applied here.
     //
     // Clamped to 1: a dab can't deposit more than full flow, so spacings above
     // REF thin the stroke exactly as they always did.
@@ -140,13 +157,24 @@
         var ref = cfg('BRUSH_SPACING_REF', 0.35) * brushDiameterPx();
         var tc = timeCompensation();
         if (!(ref > 0) || !(tc > 0)) return 1;
+        // Time share: `used` is unspread, so the clamp sees the spacing alone
+        // and the time factor comes off AFTER it. A spacing past REF at Time
+        // 0.25 lands a quarter dab every spacing — the same dye per pixel as
+        // the spread's one full dab every four.
+        if (timeShare()) return Math.min(1, used / ref) / tc;
         // used already carries floor x timeComp x coalescing bump; dividing the
         // timeComp back out leaves exactly the artefacts we DO want to cancel.
         return Math.min(1, used / (tc * ref));
     }
 
+    // The slow-speed floor's clock. With the time share it is 05j's pace clock
+    // (simulated time, but never slower than Time 1): the floor dab's share
+    // already carries the low-Time reduction, so metering its RATE on the
+    // simulated clock as well took it off twice — 25 floor dabs per wall
+    // second at Time 0.2 against 125 at Time 1.
     function simNowMs() {
-        var t = window.__simTimeMs;
+        var t = (timeShare() && typeof window.__paceTimeMs === 'number')
+            ? window.__paceTimeMs : window.__simTimeMs;
         return (typeof t === 'number') ? t : 0;
     }
 
@@ -166,8 +194,8 @@
     // finer. Consuming `residual` is what keeps it honest: that travel is now
     // deposited, so the walker cannot bill for it again.
     //
-    // Gated on the SIM clock, so the Time slider still meters it, and on
-    // residual > 0, so a genuinely stationary pointer still deposits nothing —
+    // Gated on the pace clock (simulated time, never slower than Time 1 —
+    // see simNowMs), and on residual > 0, so a genuinely stationary pointer still deposits nothing —
     // On Move keeps its contract. The sim clock only ticks once per frame, so
     // this lands at most one extra dab per frame: at slow speeds that is the
     // same "one sample per frame at the true pointer" that makes Constant look
@@ -187,9 +215,10 @@
         if (!(rate > 0) || !(residual > 0)) return;
         var now = simNowMs();
         if (now - lastEmitSimMs < 1000 / rate) return;
-        var ref = cfg('BRUSH_SPACING_REF', 0.35) * brushDiameterPx();
-        var tc = timeCompensation();
-        var k = (ref > 0 && tc > 0) ? Math.min(1, residual / (tc * ref)) : 1;
+        // Share of the travel this dab stands for — the walker's own rule, low
+        // Time included (same number as the old inline min(1, r/(tc·ref))
+        // with the time share off).
+        var k = dabFlowShare(residual);
         if (queue.length < MAX_QUEUE) {
             queue.push({
                 x: x, y: y,
@@ -224,8 +253,9 @@
         // preserved, density (not coverage) is what yields at speed. The
         // momentum rule self-adjusts (vx scales with the effective spacing).
         // The drain budget is published per frame by 05j and scales with the
-        // frame's simulated step (BRUSH_DAB_BUDGET per simulated second), so a
-        // 33ms frame retires twice what a 16ms one does. It used to be a flat 64
+        // frame's simulated step (BRUSH_DAB_BUDGET per simulated second, at the
+        // Time-1 pace below Time 1), so a 33ms frame retires twice what a 16ms
+        // one does. It used to be a flat 64
         // per frame, which made this bump — and therefore stroke density —
         // frame-rate dependent at dense spacing.
         var drainBudget = (typeof window.__dabDrainBudget === 'number' && window.__dabDrainBudget > 0)

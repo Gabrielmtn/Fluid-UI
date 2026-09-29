@@ -5082,21 +5082,31 @@
         // at 0.70, which is what a "says 250/s but I see dots" report was
         // comparing against. Tagged with the scale so a number that changes
         // under an untouched slider explains itself on the spot.
+        // Below Time 1 the hose keeps its Time-1 pace and lightens each dab
+        // instead (2026-09-28, BRUSH_TIME_SHARE in 05j), so only a faster Time
+        // changes the count now.
         var fmtInterval = function (v) {
             var ts = (typeof window.timeScale === 'number' && window.timeScale > 0) ? window.timeScale : 1;
+            if (ts < 1 && !(window.config && window.config.BRUSH_TIME_SHARE === false)) ts = 1;
             var s = Math.round(v) + ' ms · ' + Math.round(1000 / Math.max(1, v) * ts) + '/s';
             if (Math.abs(ts - 1) > 0.005) s += ' @' + ts.toFixed(2) + 'x';
             return s;
         };
         intervalGroup = pSlider('brushDabInterval', 'Interval', 4, 250, 1, 'BRUSH_DAB_INTERVAL_MS',
             fmtInterval, 'dabInterval');
-        intervalGroup.title = 'Constant flow: simulated time between dabs, shown as the rate the ' +
-            'screen actually gets (the Time slider scales it). The low end is always a solid line; ' +
-            'higher lays visibly separate pulses. Spacing is the same idea along travel.';
+        intervalGroup.title = 'Constant flow: time between dabs, shown as the rate the screen gets. ' +
+            'The low end is always a solid line; higher lays visibly separate pulses. Slowing Time ' +
+            'makes each dab lighter, not further apart. Spacing is the same idea along travel.';
         (function () {
             var ts = document.getElementById('timeScale');
+            // A tick late: this listener is registered before the one in 05e
+            // that sets window.timeScale, so refreshing inline read the
+            // PREVIOUS Time — a click on the track left the readout one step
+            // stale (measured 2026-09-28).
             if (ts) ts.addEventListener('input', function () {
-                if (intervalGroup && intervalGroup.__refreshValue) intervalGroup.__refreshValue();
+                setTimeout(function () {
+                    if (intervalGroup && intervalGroup.__refreshValue) intervalGroup.__refreshValue();
+                }, 0);
             });
         })();
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');

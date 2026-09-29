@@ -747,8 +747,25 @@
             gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
-            blit(density.write.fbo);
-            density.swap();
+            // A placed bitmap deposits nothing outside its rect, so it runs as
+            // a scissored pass the way a dab does (splatPass above): a pour
+            // costs its own box, not the whole dye. A held text key lays a
+            // pour every texel or so of travel since 2026-09-28 (23, the
+            // hose's spatial floor), and each used to be a whole-dye pass.
+            // No rect, a rect past half the dye, or SPLAT_SCISSOR=false: the
+            // whole pass, as before.
+            let _pass = 'full';
+            if (rect && config.SPLAT_SCISSOR !== false) {
+                const _x0 = Math.max(0, Math.floor(rect.x) - 1);
+                const _x1 = Math.min(dyeTexWidth, Math.ceil(rect.x + rect.w) + 1);
+                const _y0 = Math.max(0, Math.floor(dyeTexHeight - (rect.y + rect.h)) - 1);
+                const _y1 = Math.min(dyeTexHeight, Math.ceil(dyeTexHeight - rect.y) + 1);
+                if (_x1 <= _x0 || _y1 <= _y0) _pass = null;              // wholly off the dye
+                else if ((_x1 - _x0) * (_y1 - _y0) < 0.5 * dyeTexWidth * dyeTexHeight) {
+                    _pass = [_x0, _y0, _x1 - _x0, _y1 - _y0];
+                }
+            }
+            splatPass(density, dyeTexWidth, dyeTexHeight, _pass);
             if (!stamp) { try { gl.deleteTexture(tex); } catch (_) {} }
             gl.activeTexture(gl.TEXTURE0);
             return true;

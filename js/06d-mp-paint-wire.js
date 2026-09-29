@@ -953,11 +953,15 @@ function queueDab(xNorm, yNorm, dxAbs, dyAbs, radius, share, k) {
     if (!_dabQueue.length) _dabQueueT0 = now;
     var s = (typeof share === 'number' && isFinite(share)) ? Math.max(0, Math.min(4, share)) : 1;
     var kk = (typeof k === 'number' && isFinite(k) && k > 0) ? Math.min(1, k) : 1;
+    // Shares go in significant digits, not decimals: a fine stroke at low Time
+    // carries k around 0.002 per dab and less (05d0 / 05j time share), which
+    // three decimals rounded to 0 — and a receiver reads 0 as "no k", i.e. a
+    // FULL push per dab.
     _dabQueue.push([
         +xNorm.toFixed(4), +yNorm.toFixed(4),
         +dxAbs.toFixed(3), +dyAbs.toFixed(3),
         +(radius || 0).toFixed(5),
-        +s.toFixed(4), +kk.toFixed(3),
+        +s.toPrecision(4), +kk.toPrecision(3),
         Math.max(0, now - _dabQueueT0)
     ]);
     // Arm count is stamped per message, so a forced flush must carry the real
@@ -1179,9 +1183,15 @@ window.__mpDrainInbound = function (budget) {
     while (_inboundSplats.length && spent < bud) {
         var e = _inboundSplats[0];
         if (e.kind === 'text') {
-            // A pour is one dye-sized image pass, so beside the shared budget
-            // it keeps the local hold's own ceiling per frame.
-            var room = Math.min(bud - spent, TEXT_POURS_PER_FRAME - poured);
+            // Beside the shared budget a pour keeps the local hold's own
+            // ceiling per frame (23 pourRoom: the dab budget, held to eight
+            // whole-dye passes' worth for a line that covers half the dye).
+            var textCap = TEXT_POURS_PER_FRAME;
+            var T = window.textOverlays;
+            if (T && typeof T.pourRoom === 'function') {
+                try { textCap = T.pourRoom(e.owner, e.look, e.cw, e.ch); } catch (_) {}
+            }
+            var room = Math.min(bud - spent, textCap - poured);
             var jt = e.idx;
             while (jt < e.n && (jt - e.idx) < room && e.base + e.pours[jt][3] <= now) jt++;
             if (jt === e.idx) break; // not due yet, or this frame's pours are spent
@@ -1677,8 +1687,8 @@ function handleStrokeChunk(data) {
 // like a stroke out of turn (23 asks __mpTurnBlocked before it pours).
 var TEXT_LINE_THROTTLE_MS = 120;  // typing sends at most ~8 line updates a second
 var TEXT_POUR_FLUSH_MS = 33;      // the dab train's cadence
-var TEXT_POUR_MAX_PER_MSG = 48;   // a held key pours up to ~125/s; ~30 bytes a pour
-var TEXT_POURS_PER_FRAME = 8;     // receive ceiling per frame = 23's HOLD_POURS_PER_FRAME
+var TEXT_POUR_MAX_PER_MSG = 48;   // ~30 bytes a pour; a held key at speed fills one a frame
+var TEXT_POURS_PER_FRAME = 8;     // receive ceiling when 23 can't size the line (23 pourRoom)
 var TEXT_LINE_MAX_BYTES = 15500;  // under the relay's 16KB cap (shared.ts MAX_MESSAGE_BYTES)
 var _textLineSent = new Map();    // our overlay id → rev the room holds
 var _textLineTimer = null;
@@ -1787,7 +1797,9 @@ function queueTextPour(look, cw, ch, nx, ny, amount) {
     var now = Date.now();
     if (!_textPourQ) _textPourQ = { key: key, look: look, cw: cw, ch: ch, pours: [], t0: now, last: now };
     var a = (typeof amount === 'number' && isFinite(amount)) ? Math.max(0, Math.min(1, amount)) : 1;
-    _textPourQ.pours.push([+nx.toFixed(4), +ny.toFixed(4), +a.toFixed(4), now - _textPourQ.t0]);
+    // Amount in significant digits: a held key's pour at low Time, split
+    // along a fast stroke, carries well under 0.001 (23 sampleAmount).
+    _textPourQ.pours.push([+nx.toFixed(4), +ny.toFixed(4), +a.toPrecision(4), now - _textPourQ.t0]);
     _textPourQ.last = now;
     if (_textPourQ.pours.length >= TEXT_POUR_MAX_PER_MSG || now - _textPourQ.t0 >= TEXT_POUR_FLUSH_MS) {
         flushTextPours();

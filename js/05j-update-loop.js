@@ -235,6 +235,22 @@
             // floor (05d0) needs "how much sim time has passed", and it runs on
             // the input-sample callback where no frame timing is available.
             window.__simTimeMs = (window.__simTimeMs || 0) + frameDt * 1000;
+            // The brush's PACE clock (2026-09-28, config.BRUSH_TIME_SHARE):
+            // simulated time, but never slower than Time 1. Below Time 1 the
+            // brush keeps laying as many dabs per wall second as it does at
+            // Time 1 and each one carries timeScale of the dye instead (05d0
+            // dabFlowShare, the hose below) — paint per simulated second is
+            // exactly what the sim-clock pacing gave, but the sampling no
+            // longer thins out: at Time 0.2 the hose used to lay a fifth of
+            // its dabs and a fast stamp stroke printed separate copies. At
+            // Time ≥ 1 paceDt IS frameDt, so nothing there changes.
+            const _paceShare = (config.BRUSH_TIME_SHARE !== false &&
+                window.timeScale > 0 && window.timeScale < 1) ? window.timeScale : 1;
+            const paceDt = frameDt / _paceShare;
+            window.__paceTimeMs = (window.__paceTimeMs || 0) + paceDt * 1000;
+            // ...and the share each dab takes, for the hose's twins outside this
+            // loop (23's held text key).
+            window.__paceShare = _paceShare;
             // Wall-clock deposition credit, for the sources that deposit once
             // per FRAME instead of once per unit of travel (constant-flow
             // splat mode, the splat-out tail). Those are frame-rate deposition
@@ -352,8 +368,12 @@
             // Hoisted above the isPaused branch (2026-08-26) so peer paint can
             // share it: pausing freezes YOUR sim, it does not mute the room,
             // and the apply-on-arrival path this replaced never checked it.
+            //
+            // On the pace clock (2026-09-28): the budget guards the frame's GPU
+            // cost, which slow motion does not shrink, and counted in simulated
+            // time it left 8 dabs a frame at Time 0.2 on a 144Hz panel.
             const _dabBudget = Math.max(8, Math.ceil(
-                ((typeof config.BRUSH_DAB_BUDGET === 'number' ? config.BRUSH_DAB_BUDGET : 4000)) * frameDt));
+                ((typeof config.BRUSH_DAB_BUDGET === 'number' ? config.BRUSH_DAB_BUDGET : 4000)) * paceDt));
             window.__dabDrainBudget = _dabBudget;
             // Peer dabs land HERE, on the frame, instead of inside the
             // WebSocket message handler — the whole room's inbound paint now
@@ -423,10 +443,16 @@
                         // — a 60Hz display is unchanged, 144Hz stops over-painting,
                         // and a sub-stepped 30Hz panel now matches both.
                         //
-                        // frameDt (not the wall delta) keeps the Time slider's
-                        // metering intact: a dab is an impulse, so pacing it on
-                        // anything but the sim clock deposits 1/timeScale times too
-                        // much dye into a field that advected 1/timeScale as far.
+                        // The Time slider's metering stays intact: a dab is an
+                        // impulse, so a clock on the wall delta alone would deposit
+                        // 1/timeScale times too much dye into a field that advected
+                        // 1/timeScale as far. It used to run on frameDt for that —
+                        // which also laid 1/timeScale times FEWER dabs, a fifth at
+                        // Time 0.2, so a fast stroke broke up exactly when you slow
+                        // time down to paint it. It runs on paceDt now (never
+                        // slower than Time 1) and each dab carries _paceShare of
+                        // the dye: the same paint per simulated second, the Time-1
+                        // number of dabs.
                         if (pointer.down && window.BrushEngine.isActive()) {
                             _dabs = [];
                             // Interval -> rate. The control is an interval so its slider reads
@@ -439,10 +465,11 @@
                             // Share of the reference dye each dab carries. Clamped
                             // to 1 so a rate BELOW the reference can never boost a
                             // dab past full flow — it just deposits less, as it
-                            // should.
-                            const _k = Math.min(1, _rateRef / _rate);
+                            // should. The low-Time share comes off after the clamp,
+                            // the way the dabs it replaces would have.
+                            const _k = Math.min(1, _rateRef / _rate) * _paceShare;
                             const _c0 = window.__contFlowCredit || 0;
-                            const _credit = _c0 + _rate * frameDt;
+                            const _credit = _c0 + _rate * paceDt;
                             let _n = Math.floor(_credit);
                             if (_n > _dabBudget) _n = _dabBudget;   // spike guard
                             if (_n > 0) {
@@ -481,21 +508,28 @@
                                 // at no coarser than floorPx, each carrying k/m — so
                                 // paint per simulated second is untouched (the
                                 // clock still decides WHEN and HOW MUCH), only the
-                                // sampling gets finer. The floor grows with the
-                                // SQUARE of the Interval past its reference, so the
-                                // slider's "higher = visible pulses" contract
-                                // survives: a quarter diameter (solid) at or below
-                                // 8ms, one diameter (touching beads) at 16ms, four
-                                // at 32ms, and 244 at 250ms — the top of the slider
-                                // never fires, so anyone laying rare blobs with a
-                                // pen tip keeps one blob per interval (measured:
-                                // the linear version split a 250ms pulse into six
-                                // fainter ones at 1000px/s). Stationary hose:
+                                // sampling gets finer. At or below the reference
+                                // Interval the floor is BRUSH_HOSE_FLOOR diameters,
+                                // 1% since 2026-09-28 (was a quarter): a quarter is
+                                // solid for a Gaussian tip, but a STAMP's detail is a
+                                // few px wide, and a text stamp at 2500px/s printed
+                                // separate copies 10px apart — "staggers when the
+                                // brush moves fast". 1% is On Move's default Spacing,
+                                // so a moving hose lays On Move's sweep. Past the
+                                // reference a pulse floor of (ratio² − 1)/3
+                                // diameters takes over, so the slider's "higher =
+                                // visible pulses" contract survives without a jump
+                                // at the reference: one diameter (touching beads) at
+                                // 16ms, five at 32ms, and 325 at 250ms — the top of
+                                // the slider never fires, so anyone laying rare
+                                // blobs with a pen tip keeps one blob per interval
+                                // (measured: a linear floor split a 250ms pulse into
+                                // six fainter ones at 1000px/s). Stationary hose:
                                 // zero-length gap, m = 1, bit-identical to before.
                                 let _m = 1;
                                 const _seglen = Math.hypot(segx, segy);
                                 if (_interp && _seglen > 0) {
-                                    const _fl = (typeof config.BRUSH_HOSE_FLOOR === 'number') ? config.BRUSH_HOSE_FLOOR : 0.25;
+                                    const _fl = (typeof config.BRUSH_HOSE_FLOOR === 'number') ? config.BRUSH_HOSE_FLOOR : 0.01;
                                     const _flRef = (typeof config.BRUSH_HOSE_FLOOR_REF_MS === 'number' && config.BRUSH_HOSE_FLOOR_REF_MS > 0)
                                         ? config.BRUSH_HOSE_FLOOR_REF_MS : 8;
                                     if (_fl > 0) {
@@ -504,8 +538,12 @@
                                         // scales SPLAT_RADIUS, whose px radius goes as
                                         // its square root). Same formula, same 4px floor.
                                         const _dia = Math.max(4, 2 * Math.sqrt(Math.max(0, config.SPLAT_RADIUS) * getSplatInMult()) * canvas.height);
+                                        // Never finer than On Move's own spacing floor
+                                        // (BRUSH_SPACING_MIN_PX), which is what keeps a
+                                        // pen tip's count inside the dab budget.
                                         const _fg = Math.max(1, _ivl / _flRef);
-                                        const _floorPx = _fl * _dia * _fg * _fg;
+                                        const _minPx = (typeof config.BRUSH_SPACING_MIN_PX === 'number') ? config.BRUSH_SPACING_MIN_PX : 1;
+                                        const _floorPx = Math.max(_minPx, _fl * _dia, _dia * (_fg * _fg - 1) / 3);
                                         _m = Math.ceil((_seglen / _n) / _floorPx);
                                         // Budget covers the TOTAL samples this frame, so
                                         // a pen tip under a fast flick thins the fill

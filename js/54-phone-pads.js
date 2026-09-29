@@ -187,6 +187,9 @@
         info.spMin = (typeof cfg.BRUSH_SPACING_MIN_PX === 'number') ? cfg.BRUSH_SPACING_MIN_PX : 1;
         info.ref = (typeof cfg.BRUSH_SPACING_REF === 'number') ? cfg.BRUSH_SPACING_REF : 0.35;
         info.tc = (tcCap > 1 && typeof ts === 'number' && ts > 0 && ts < 1) ? +Math.min(tcCap, 1 / ts).toFixed(3) : 1;
+        // Low Time lightens each dab instead of spreading them (05d0 timeShare);
+        // a phone that predates the flag keeps spreading, which lays the same dye.
+        if (info.tc > 1 && cfg.BRUSH_TIME_SHARE !== false) info.tshare = 1;
         info.floor = (cfg.BRUSH_DAB_FLOOR !== false &&
             spFrac <= ((typeof cfg.BRUSH_DAB_FLOOR_MAX_SPACING === 'number') ? cfg.BRUSH_DAB_FLOOR_MAX_SPACING : 0.001))
             ? ((typeof cfg.BRUSH_DAB_FLOOR_RATE === 'number') ? cfg.BRUSH_DAB_FLOOR_RATE : 125) : 0;

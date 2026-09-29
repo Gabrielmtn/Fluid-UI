@@ -1821,15 +1821,21 @@
     // The press prints the line (the strike), and from that moment the line
     // keeps pouring until the key comes up, on the Constant-flow brush's own
     // rhythm, not the OS key repeat's: its Interval
-    // (config.BRUSH_DAB_INTERVAL_MS) on the SIMULATED clock, each pour
+    // (config.BRUSH_DAB_INTERVAL_MS) on the brush's PACE clock (05j
+    // __paceTimeMs: simulated time, never slower than Time 1), each pour
     // carrying the brush's per-dab share of the reference dye
-    // (BRUSH_DAB_RATE_REF / rate, never above full, 05j). So a held line lays
-    // paint at the rate a held brush does at any Interval, the Time slider
-    // meters it, and a paused sim takes none. At the brush it follows the
-    // hand, the pours spread along the path moved since the last one — the
-    // strike's spot, to begin with — the way the hose spreads its dabs, so a
-    // held key paints with the text; arranged, the line is a fountain at its
-    // own spot. One upload per hold: every pour reuses the stamp.
+    // (BRUSH_DAB_RATE_REF / rate, never above full, 05j) times the low-Time
+    // share (__paceShare). So a held line lays paint at the rate a held brush
+    // does at any Interval, the Time slider meters it, and a paused sim takes
+    // none. At the brush it follows the hand the way the hose does: each pour
+    // at its true sub-frame spot along the path from the last pour, and when
+    // the hand has moved further than the hose's spatial floor since then,
+    // that pour's paint laid as samples along the gap (holdFloorPx) — so a
+    // held key paints a continuous sweep with the text instead of printing
+    // separate copies of it at speed ("text hotkeys still have the stagger",
+    // 2026-09-28: 4ms at 2500px/s left copies 10px apart, 50px at Time 0.2).
+    // Arranged, the line is a fountain at its own spot. One upload per hold:
+    // every pour reuses the stamp.
     //
     // The flow starts with the strike, not after a wait. It used to wait
     // 200ms so that a tap stayed one strike, and in moving fluid the wait
@@ -1838,9 +1844,63 @@
     // holds", Gabriel 2026-09-15; by dye readback in a steady current, all
     // of the strike's letters had left the brush by 200ms). The brush has no
     // wait either. A tap is now what a click on the hose is: a short pour.
-    var HOLD_POURS_PER_FRAME = 8;     // spike guard, the text twin of BRUSH_DAB_BUDGET
-    var holds = {};                   // overlay id → { sim, credit, ps, last, flowing }
+    var HOLD_FULL_PASSES = 8;         // per-frame ceiling on a hold's pours, in whole-dye passes
+    var holds = {};                   // overlay id → { pace, credit, ps, last, flowing }
     var holdRaf = 0;
+
+    // How many pours a frame may lay: the brush's dab budget (05j
+    // __dabDrainBudget, per frame), and never more work than the old cap of
+    // eight pours cost when each was a whole-dye pass. 05i scissors a pour
+    // to its box now, so an ordinary line gets the brush's full budget and
+    // only a line covering half the dye (a whole pass again) is held to 8.
+    // 06d asks the same of a peer's pours (pourRoom).
+    function poursPerFrame(W, H, dye) {
+        var bud = (typeof window.__dabDrainBudget === 'number' && window.__dabDrainBudget > 0)
+            ? window.__dabDrainBudget : HOLD_FULL_PASSES;
+        var full = dye.w * dye.h, area = W * H;
+        var pass = (area >= 0.5 * full || (window.config && window.config.SPLAT_SCISSOR === false)) ? full : area;
+        return Math.max(1, Math.min(bud, Math.floor(HOLD_FULL_PASSES * full / Math.max(1, pass))));
+    }
+
+    // The hose's spatial floor (05j), in this line's terms and in CSS px of
+    // #canvas: BRUSH_HOSE_FLOOR of the font size at fine Intervals, the font
+    // size standing in for the brush's diameter; past BRUSH_HOSE_FLOOR_REF_MS
+    // the pulse floor of (ratio² − 1)/3 font sizes, so a long Interval still
+    // lays separate copies; never under one dye texel, since a pour snaps to
+    // whole texels and anything finer only repeats one. 0 = no floor.
+    function holdFloorPx(ov, g, dye, ivl) {
+        var cfg = window.config || {};
+        var fl = (typeof cfg.BRUSH_HOSE_FLOOR === 'number') ? cfg.BRUSH_HOSE_FLOOR : 0.01;
+        if (!(fl > 0)) return 0;
+        var ref = (typeof cfg.BRUSH_HOSE_FLOOR_REF_MS === 'number' && cfg.BRUSH_HOSE_FLOOR_REF_MS > 0)
+            ? cfg.BRUSH_HOSE_FLOOR_REF_MS : 8;
+        var size = ov.fontSize || 48;
+        var fg = Math.max(1, ivl / ref);
+        return Math.max(g.cssW / dye.w, g.cssH / dye.h, fl * size, size * (fg * fg - 1) / 3);
+    }
+
+    // One clock pour's paint `a` laid as samples that each carry the share
+    // `q` of it (the low-Time share over the samples it is split into), exact
+    // in both of the image splat's models (05i imageSplatFrag). Additive adds
+    // coverage × amount × colour — linear, so the share multiplies. Gate
+    // CONVERGES by coverage × amount × Flow, so the share goes in the
+    // exponent of what is left (05d normalizePaintFlow's rule), with Flow
+    // folded in and taken back out: the samples land, at full coverage,
+    // exactly where the one pour would have. q = 1 is the pour itself.
+    function sampleAmount(a, q) {
+        if (!(q < 1)) return a;
+        var cfg = window.config || {};
+        if (!cfg.COLOR_GATE) return a * q;
+        var F = Math.max(0, Math.min(1, (typeof cfg.BRUSH_FLOW === 'number') ? cfg.BRUSH_FLOW : 1));
+        if (!(F > 0)) return a * q;
+        var w = Math.min(1, a * F);
+        return Math.min(1, (1 - Math.pow(1 - w, q)) / F);
+    }
+
+    function paceNowMs() {
+        var t = window.__paceTimeMs;
+        return (typeof t === 'number') ? t : window.__simTimeMs;
+    }
 
     function pressHotkey(id) {
         var ov = findOverlay(id);
@@ -1848,7 +1908,7 @@
         endHold(id);
         if (ov.hotkeyAction === 'toggle') { triggerHotkey(id); return; }   // nothing to keep doing
         if (mpPaintBlocked()) return;                        // someone else's turn: no strike, no flow
-        var h = holds[id] = { sim: null, credit: 0, ps: null, last: null, flowing: false };
+        var h = holds[id] = { pace: null, credit: 0, ps: null, last: null, flowing: false };
         // The flow picks up where and when the strike lands; a strike that
         // fails takes its flow with it.
         function landed(ok) {
@@ -1856,7 +1916,7 @@
             var live = findOverlay(id), g = colliderGeom();
             if (!ok || !live || !g) { endHold(id); return; }
             h.last = pourSpot(live, g);
-            h.sim = window.__simTimeMs;
+            h.pace = paceNowMs();
             h.flowing = true;
         }
         if (!triggerHotkey(id, landed)) { endHold(id); return; }
@@ -1874,15 +1934,16 @@
         holdRaf = 0;
         var ids = Object.keys(holds);
         if (!ids.length) return;
-        var simNow = window.__simTimeMs;
-        // 01-config's flag, shared by every classic script. __simTimeMs keeps
-        // counting through a pause (05j), so the pause has to be asked.
+        var paceNow = paceNowMs();
+        // 01-config's flag, shared by every classic script. The pace clock
+        // keeps counting through a pause (05j), so the pause has to be asked.
         var paused = (typeof isPaused !== 'undefined') && !!isPaused;
         var cfg = window.config || {};
         var ivl = (typeof cfg.BRUSH_DAB_INTERVAL_MS === 'number' && cfg.BRUSH_DAB_INTERVAL_MS > 0) ? cfg.BRUSH_DAB_INTERVAL_MS : 8;
         var rate = 1000 / ivl;
         var rateRef = (typeof cfg.BRUSH_DAB_RATE_REF === 'number' && cfg.BRUSH_DAB_RATE_REF > 0) ? cfg.BRUSH_DAB_RATE_REF : 62.5;
-        var amount = pourAmount() * Math.min(1, rateRef / rate);
+        var amount = pourAmount() * Math.min(1, rateRef / rate);   // one clock pour
+        var share = (typeof window.__paceShare === 'number' && window.__paceShare > 0) ? window.__paceShare : 1;
         var g = colliderGeom();
         var dye = window.__dyeTexSize ? window.__dyeTexSize() : null;
         // The brush left us mid-hold (the clock ran out, the call was spent,
@@ -1892,15 +1953,16 @@
             var h = holds[key];
             var ov = findOverlay(+key);
             if (!ov || ov.hotkeyAction === 'toggle' || blocked) { endHold(key); return; }
-            var dt = (typeof simNow === 'number' && typeof h.sim === 'number') ? Math.max(0, simNow - h.sim) : 0;
-            h.sim = simNow;
+            var dt = (typeof paceNow === 'number' && typeof h.pace === 'number') ? Math.max(0, paceNow - h.pace) : 0;
+            h.pace = paceNow;
             // The strike not down yet, or nothing to pour into: no flow, and
             // no credit piling up to arrive all at once later.
             if (!h.flowing || paused || !g || !dye || !canStamp()) return;
             h.credit += rate * dt / 1000;
-            var n = Math.floor(h.credit);
-            h.credit -= n;
-            if (n > HOLD_POURS_PER_FRAME) n = HOLD_POURS_PER_FRAME;
+            var credit = h.credit;
+            var n = Math.floor(credit);
+            // No pour this frame: h.last stays put, so the next pour's segment
+            // spans the frames skipped (the hose's rule).
             if (n <= 0) return;
             // Rebuilt when the dye resolution moves under the hold, or a pour
             // would land at the old texel size.
@@ -1909,20 +1971,38 @@
                 h.ps = makeStamp(ov, g);
                 if (!h.ps) return;
             }
+            var cap = poursPerFrame(h.ps.w, h.ps.h, dye);
             var spot = pourSpot(ov, g);
             var from = h.last || spot;
+            // Pour i belongs at i/credit along the last pour → the brush: the
+            // n pours cover the first n/credit of it and the rest is the next
+            // frame's (05j's placement — the old i/n of the frame's own travel
+            // put a lone pour at the frame end and a pair at mid + end).
+            // Behind by more than a frame's worth (a stall): catch up to the
+            // brush and drop the backlog, as the old spike guard did.
+            var cover;
+            if (n > cap) { n = cap; cover = 1; h.credit = credit - Math.floor(credit); }
+            else { cover = n / credit; h.credit = credit - n; }
+            var segx = (spot.x - from.x) * cover, segy = (spot.y - from.y) * cover;
+            var seglen = Math.hypot(segx, segy);
+            var m = 1;
+            var floorPx = seglen > 0 ? holdFloorPx(ov, g, dye, ivl) : 0;
+            if (floorPx > 0) m = Math.max(1, Math.min(Math.max(1, Math.floor(cap / n)),
+                Math.ceil((seglen / n) / floorPx)));
+            var total = n * m;
+            var a = sampleAmount(amount, share / m);
             try {
-                for (var i = 1; i <= n; i++) {
-                    var t = i / n;
-                    var px = from.x + (spot.x - from.x) * t, py = from.y + (spot.y - from.y) * t;
-                    if (pourStamp(h.ps, px, py, g, amount)) mpPoured(ov, px, py, g, amount);
+                for (var i = 1; i <= total; i++) {
+                    var t = i / total;
+                    var px = from.x + segx * t, py = from.y + segy * t;
+                    if (pourStamp(h.ps, px, py, g, a)) mpPoured(ov, px, py, g, a);
                 }
             } catch (e) {
                 console.warn('⚠️ Text held pour failed for overlay', ov.id, e);
                 endHold(key);
                 return;
             }
-            h.last = spot;
+            h.last = { x: from.x + segx, y: from.y + segy };
         });
         if (Object.keys(holds).length) holdRaf = requestAnimationFrame(holdTick);
     }
@@ -2420,6 +2500,28 @@
         return ok;
     }
 
+    // How many of a peer's pours of one line this frame may lay (06d's
+    // inbound drain): the local hold's own ceiling (poursPerFrame), from the
+    // size of the bitmap peerPour builds for them. A held key sends as many
+    // pours as the painter's budget allows now, and the old flat 8 a frame
+    // here would fall behind them until the queue dropped paint.
+    var peerRoomSizes = new Map();    // look|canvas|dye → { W, H }, a few kept
+    function pourRoom(owner, look, cw, ch) {
+        var dye = window.__dyeTexSize ? window.__dyeTexSize() : null;
+        cw = num(cw, 20, 20000, 0);
+        ch = num(ch, 20, 20000, 0);
+        if (!dye || !(dye.w > 0) || !(dye.h > 0) || !cw || !ch || !canStamp()) return HOLD_FULL_PASSES;
+        var line = cleanLook(look);
+        var key = cw + 'x' + ch + '|' + dye.w + 'x' + dye.h + '|' + JSON.stringify(line);
+        var sz = peerRoomSizes.get(key);
+        if (!sz) {
+            sz = stampSize(line, { cssW: cw, cssH: ch }, dye);
+            peerRoomSizes.set(key, sz);
+            while (peerRoomSizes.size > PEER_STAMPS_MAX) peerRoomSizes.delete(peerRoomSizes.keys().next().value);
+        }
+        return poursPerFrame(sz.W, sz.H, dye);
+    }
+
     function disposePeerStamp(e) {
         if (e && e.ps && e.ps.stamp) { try { e.ps.stamp.dispose(); } catch (_) {} }
     }
@@ -2476,6 +2578,7 @@
         removePeerLine: removePeerLine,
         dropPeerLines: dropPeerLines,
         peerPour: peerPour,
+        pourRoom: pourRoom,                 // 06d: a peer's pours per frame
         dropPeerStamps: dropPeerStamps,
         getRoomLines: getRoomLines,         // the Text panel's "In the room" rows
         applyRoomEdit: applyRoomEdit,       // a partner edited one of our lines

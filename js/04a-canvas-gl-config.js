@@ -818,14 +818,15 @@
                                       // bit-for-bit. Never boosts above 1 (a dab can't deposit
                                       // more than full flow), so spacings above REF still
                                       // thin out the way they always did.
-            BRUSH_DAB_INTERVAL_MS: 4, // Constant-flow: SIMULATED milliseconds between dabs (4 since 2026-09-24) —
+            BRUSH_DAB_INTERVAL_MS: 4, // Constant-flow: milliseconds between dabs (4 since 2026-09-24) —
                                       // the time-axis twin of Spacing, and the only thing that
                                       // decides whether the hose reads as a line or as separate
                                       // pulses (BRUSH_HOSE_FLOOR below keeps the low end a solid
-                                      // line whatever the hand speed or the Time slider — the
-                                      // clock alone meters SIMULATED seconds, so 250/s at Time
-                                      // 0.7 is 175 deposits per wall second, a dotted line under
-                                      // a pen-width tip). Minimum is the fine smooth hose (8ms = 125
+                                      // line whatever the hand speed). Below Time 1 the clock
+                                      // runs at the Time-1 pace and each dab is lighter instead
+                                      // (BRUSH_TIME_SHARE), so 250/s stays 250/s on screen at
+                                      // Time 0.2; at Time 1 and above it is simulated ms, as it
+                                      // always was. Minimum is the fine smooth hose (8ms = 125
                                       // dabs/sim-sec, ~2 per frame at 60fps, which is finer
                                       // than a display can resolve); every step UP is fewer,
                                       // further-apart deposits you can actually see.
@@ -859,6 +860,11 @@
                                       // 30fps a fast dense stroke measured 54 of those 64 used,
                                       // so it was ~10 dabs from silently thinning. 4000/s is
                                       // the same 64 at a 16ms step and scales with the step.
+                                      // Below Time 1 it is counted at the Time-1 pace
+                                      // (BRUSH_TIME_SHARE): the budget guards the frame's GPU
+                                      // cost, which slow motion does not shrink, and the
+                                      // simulated count left 8 dabs a frame at Time 0.2 on a
+                                      // 144Hz panel — a fast stroke thinned to fit it.
             BRUSH_DAB_FLOOR: true,    // On Move keeps depositing at very slow hand speeds.
                                       // The walker's rate is speed/spacing, so it falls to
                                       // zero as the hand slows: measured 41 dabs/s at
@@ -891,28 +897,33 @@
                                       // the frame end and a pair at midpoint+end whenever the
                                       // carried fraction tipped over — a doubled spot every
                                       // fifth frame at 1.2 dabs/frame, read as beads.
-            BRUSH_HOSE_FLOOR: 0.25,   // Constant flow's spatial floor (05j, 2026-09-10): the
+            BRUSH_HOSE_FLOOR: 0.01,   // Constant flow's spatial floor (05j, 2026-09-10): the
                                       // coarsest sampling the hose may lay along the path, in
-                                      // painted DIAMETERS, at or below the reference interval.
-                                      // The clock still decides when and how much dye each dab
-                                      // deposits; when the hand has moved further than this
-                                      // since the previous dab, that dye is laid as m samples
-                                      // spread over the gap, k/m each — paint per simulated
-                                      // second untouched, sampling finer. Same idea as On
-                                      // Move's slow-speed floor (BRUSH_DAB_FLOOR). Without it
-                                      // the hose is metered purely in time: a 1000px/s hand at
-                                      // Time 0.7 leaves 6px between deposits, 12px on a 30fps
-                                      // frame — hidden under the 226px default tip, a dotted
-                                      // line under a pen-width one. A quarter diameter is
-                                      // solid for hard-edged tips too (Gaussian tips are
-                                      // ripple-free from half a diameter). 0 disables.
+                                      // painted DIAMETERS (never under BRUSH_SPACING_MIN_PX),
+                                      // at or below the reference interval. The clock still
+                                      // decides when and how much dye each dab deposits; when
+                                      // the hand has moved further than this since the
+                                      // previous dab, that dye is laid as m samples spread
+                                      // over the gap, k/m each — paint per simulated second
+                                      // untouched, sampling finer. Same idea as On Move's
+                                      // slow-speed floor (BRUSH_DAB_FLOOR).
+                                      // 0.25 → 0.01 (2026-09-28): a quarter diameter is solid
+                                      // for a Gaussian tip but not for a STAMP, whose detail
+                                      // is a few px wide — a text stamp at 2500px/s printed
+                                      // separate copies ~10px apart at Time 1 and ~30px at
+                                      // Time 0.2 (Gabriel: "staggers when the brush moves
+                                      // fast"). 1% is On Move's default Spacing, so a moving
+                                      // hose now lays the same continuous sweep On Move does,
+                                      // at the same cost (BRUSH_DAB_BUDGET caps both). 0
+                                      // disables.
             BRUSH_HOSE_FLOOR_REF_MS: 8, // Interval the floor is quoted at. At or below it the
-                                      // floor is BRUSH_HOSE_FLOOR flat; above it the floor
-                                      // grows with the SQUARE of the ratio (16ms = one
-                                      // diameter = touching beads, 32ms = four, 250ms = 244,
-                                      // i.e. never fires), so the Interval slider's "higher
-                                      // lays visibly separate pulses" contract survives the
-                                      // floor and the top of the slider is untouched.
+                                      // floor is BRUSH_HOSE_FLOOR flat; above it a pulse floor
+                                      // of (ratio² − 1)/3 diameters takes over (12ms = 0.42,
+                                      // 16ms = one diameter = touching beads, 32ms = five,
+                                      // 250ms = 325, i.e. never fires), so the Interval
+                                      // slider's "higher lays visibly separate pulses"
+                                      // contract survives the floor, the top of the slider is
+                                      // untouched, and nothing jumps as the slider crosses 8.
             REPLAY_INTERP: true,      // Stroke replay spreads a recorded dab along the path it
                                       // covers instead of dropping it whole at its own
                                       // timestamp. At 1x that is the same one dab per frame;
@@ -925,11 +936,26 @@
             BRUSH_TIME_COMP: 4,       // Sim-clock deposition compensation cap (05d0). A dab is
                                       // an impulse, so a distance-spaced walker deposits
                                       // 1/timeScale times as much dye per SIMULATED second at
-                                      // low Time — the flat over-saturated middle. Spacing is
-                                      // spread by 1/timeScale, up to this multiplier, which
-                                      // restores dabs-per-sim-second (momentum per distance is
-                                      // unchanged — the momentum rule rescales with spacing).
-                                      // Inert at Time ≥ 1; 1 disables. Console-tunable.
+                                      // low Time — the flat over-saturated middle. Each dab's
+                                      // dye share is divided by 1/timeScale, up to this
+                                      // multiplier (with BRUSH_TIME_SHARE off, spacing is
+                                      // spread by it instead). Momentum per distance is
+                                      // unchanged either way. Inert at Time ≥ 1; 1 disables.
+                                      // Console-tunable.
+            BRUSH_TIME_SHARE: true,   // Below Time 1, slow motion lightens each dab instead
+                                      // of laying fewer (2026-09-28). The walker used to spread
+                                      // Spacing by 1/timeScale and the hose ran its clock on
+                                      // simulated time, so at Time 0.2 the brush laid a
+                                      // quarter to a fifth of the dabs per wall second — a
+                                      // stamp stroke broke into separate copies ("at 0.2x we're
+                                      // also slowing the paint speed"). Now both keep their
+                                      // Time-1 pace and carry the reduction in the dye share
+                                      // (05d0 dabFlowShare, 05j hose k), so paint per
+                                      // simulated second is exactly what it was — only the
+                                      // sampling stays fine. The dab budget and the slow-speed
+                                      // floor's clock ride the same Time-1 pace (05j
+                                      // __paceTimeMs). Inert at Time ≥ 1. false = the old
+                                      // spread/sim-clock pacing, bit for bit.
             REC_SIM_CLOCK: true,      // Recording playhead rides the sim clock (03-recording).
                                       // false = the old wall-clock playhead, which fed splats
                                       // 1/timeScale times too fast for the physics consuming
