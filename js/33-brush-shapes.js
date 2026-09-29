@@ -19,6 +19,7 @@
     'use strict';
 
     var shapes = null;      // in-memory copy of the persisted list
+    var MAX_SHAPES = 24;    // library cap; add() drops the oldest past it
     var TEX = {};           // id → {texture, aspect} (lazy GL upload)
     var BROKEN = {};        // id → 1 for stamps whose bitmap will not decode
 
@@ -327,10 +328,16 @@
                 'That shape came out empty — mask an area (or use an image with transparency) and Apply again.');
             return null;
         }
+        // The same art twice is one shape: pick the one already there rather
+        // than spend a slot on a copy. A one-click source (the Text panel's
+        // Convert to brush) makes a second press easy, and on a full library every
+        // copy would push one of the user's own shapes out.
+        var same = load().find(function (s) { return s.dataURL === stamp; });
+        if (same) { setActive(same.id); return same.id; }
         var id = 'bs' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         var entry = { id: id, name: name || 'Shape', dataURL: stamp };
         load().unshift(entry);
-        if (shapes.length > 24) shapes.length = 24;
+        if (shapes.length > MAX_SHAPES) shapes.length = MAX_SHAPES;
         if (!store()) {
             // Quota: the shape works this session but won't survive a reload.
             say('Saved only for this session',
@@ -439,7 +446,7 @@
         arr.forEach(function (s) {
             if (!s || typeof s.id !== 'string' || typeof s.dataURL !== 'string') return;
             if (seenId[s.id] || seenData[s.dataURL]) return; // already have it
-            if (shapes.length >= 24) return;                 // existing entries win the cap
+            if (shapes.length >= MAX_SHAPES) return;         // existing entries win the cap
             shapes.push({ id: s.id, name: s.name || 'Shape', dataURL: s.dataURL });
             seenId[s.id] = 1; seenData[s.dataURL] = 1;
         });
@@ -474,6 +481,7 @@
 
     window.BrushShapes = {
         list: function () { return load().slice(); },
+        MAX: MAX_SHAPES,
         activeId: activeId,
         setActive: setActive,
         getActiveStamp: getActiveStamp,

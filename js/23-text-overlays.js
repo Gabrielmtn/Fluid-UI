@@ -30,6 +30,9 @@
  * overlay into the dye through the same image-splat path a layer takes,
  * then hides it. See fluidize() after the composite section.
  *
+ * Convert to brush turns a line's letterforms into a custom brush shape
+ * (33-brush-shapes), no screenshot involved. See makeBrush() after it.
+ *
  * Any overlay can carry a HOTKEY (js/48-hotkeys.js): a key that fires the
  * line from anywhere — pours the whole block into the fluid, centred on the
  * brush or where the line is arranged, a typewriter whose keys type
@@ -38,7 +41,7 @@
  *
  * window.textOverlays = {
  *   add, remove, update, toggle, clearAll, getAll, renderAll,
- *   compositeOntoCanvas, fluidize, hasCollider, refreshColliders,
+ *   compositeOntoCanvas, fluidize, makeBrush, hasCollider, refreshColliders,
  *   setHotkey, triggerHotkey,
  *   FONTS, DEFAULTS, POSITIONS,
  *   openArrange, closeArrange, isArranging, select, getSelectedId, onChange
@@ -1136,24 +1139,40 @@
     // the wrong phase moved a pour a full texel (measured). A held key reuses
     // one bitmap at every spot and is within half a texel instead.
     var measureCtx = null;
-    function makeStamp(ov, g, cx, cy) {
-        var dye = window.__dyeTexSize();
-        if (!g || !dye || !(dye.w > 0) || !(dye.h > 0)) return null;
-        var kx = dye.w / g.cssW, ky = dye.h / g.cssH;
+
+    // The unrotated box a line lays out, in its own px, from a throwaway 1px
+    // canvas: paintOverlay measures as it paints, so this is the same maths.
+    function measureBox(ov, fill) {
         if (!measureCtx) {
             var one = document.createElement('canvas');
             one.width = one.height = 1;
             measureCtx = one.getContext('2d');
         }
         measureCtx.save();
-        var box;
-        try { box = paintOverlay(measureCtx, ov, false); } finally { measureCtx.restore(); }
+        try { return paintOverlay(measureCtx, ov, fill); } finally { measureCtx.restore(); }
+    }
+
+    // The bitmap's size in dye texels: the line's rotated box plus margin.
+    function stampSize(ov, g, dye) {
+        var kx = dye.w / g.cssW, ky = dye.h / g.cssH;
+        var box = measureBox(ov, false);
         var m = (ov.fontSize || 48) + 12;
         var bw = box.w + 2 * m, bh = box.h + 2 * m;
         var rot = (ov.rotation || 0) * Math.PI / 180;
         var c = Math.abs(Math.cos(rot)), s = Math.abs(Math.sin(rot));
-        var W = Math.max(1, Math.min(dye.w * 2, Math.ceil((bw * c + bh * s) * kx) + 2));
-        var H = Math.max(1, Math.min(dye.h * 2, Math.ceil((bw * s + bh * c) * ky) + 2));
+        return {
+            W: Math.max(1, Math.min(dye.w * 2, Math.ceil((bw * c + bh * s) * kx) + 2)),
+            H: Math.max(1, Math.min(dye.h * 2, Math.ceil((bw * s + bh * c) * ky) + 2))
+        };
+    }
+
+    function makeStamp(ov, g, cx, cy) {
+        var dye = window.__dyeTexSize();
+        if (!g || !dye || !(dye.w > 0) || !(dye.h > 0)) return null;
+        var kx = dye.w / g.cssW, ky = dye.h / g.cssH;
+        var sz = stampSize(ov, g, dye);
+        var W = sz.W, H = sz.H;
+        var rot = (ov.rotation || 0) * Math.PI / 180;
         // Where the text's centre sits in the bitmap: the middle, nudged by
         // the target spot's fractional texel so placement (below) is exact.
         var ox = W / 2, oy = H / 2;
@@ -1216,6 +1235,95 @@
     function tell(title, msg) {
         if (typeof window.appAlert === 'function') window.appAlert(title, msg);
         else alert(title + '\n\n' + msg);
+    }
+
+    // ===========================================================
+    //  CONVERT TO BRUSH - the text becomes a brush shape
+    // ===========================================================
+    // A line of type is already a clean stamp: exact letterforms, antialiased
+    // alpha. The only other way to paint with words was a screenshot through
+    // the Brush panel's Clipboard tile, which keys the letters back out of a
+    // flat picture and comes back ragged at the edges. This paints the line
+    // straight into the stamp format 33-brush-shapes stores (white, alpha =
+    // coverage; the splat reads only alpha) and hands it to BrushShapes.add,
+    // which crops, sizes, saves and selects it.
+    //
+    // Letterforms only, through paintOverlay's wall pass (one flat fill, no
+    // shadow) with the box switched off: the background box would make the
+    // stamp a plain rectangle and the shadow a halo. The line's opacity and
+    // rotation stay behind too — how hard and at what angle a stamp prints is
+    // the brush's business. The line itself is left as it is.
+    //
+    // Painted with its long side at BRUSH_STAMP_LONG px: canvas text scales as
+    // outlines, so this is sharp at any font size, and it sits under 33's
+    // 1024 cap once that adds its 4% crop ring, so the stamp is stored as
+    // painted rather than resampled.
+    var BRUSH_STAMP_LONG = 940;
+
+    function brushNameOf(ov) {
+        var first = displayText(ov).split('\n').map(function (s) { return s.trim(); })
+            .filter(Boolean)[0] || 'Text';
+        first = first.replace(/\s+/g, ' ');
+        return first.length > 32 ? first.slice(0, 31) + '…' : first;
+    }
+
+    function paintBrushStamp(ov) {
+        var look = {};
+        for (var k in ov) if (ov.hasOwnProperty(k) && k !== 'el') look[k] = ov[k];
+        look.bgEnabled = false;
+        var box = measureBox(look, '#fff');
+        var s = BRUSH_STAMP_LONG / Math.max(1, box.w, box.h);
+        // Room for what overhangs the advance box: italics, swashes, accents.
+        // The crop in 33 takes the empty margin back off.
+        var m = (look.fontSize || 48) * 0.5 + 4;
+        var cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.ceil((box.w + 2 * m) * s));
+        cv.height = Math.max(1, Math.ceil((box.h + 2 * m) * s));
+        var ctx = cv.getContext('2d');
+        ctx.translate(cv.width / 2, cv.height / 2);
+        ctx.scale(s, s);
+        paintOverlay(ctx, look, '#fff');
+        return cv;
+    }
+
+    // `done(shapeId)` hears the new shape's id, or null if nothing was made
+    // (no text, the user kept a full library, the stamp came out empty).
+    function makeBrush(id, done) {
+        function finish(v) { if (done) done(v || null); }
+        var ov = lineById(id);
+        if (!ov) { finish(null); return; }
+        var B = window.BrushShapes;
+        if (!B || typeof B.add !== 'function') {
+            tell('One moment', 'Brush shapes are still loading. Try again in a moment.');
+            finish(null); return;
+        }
+        if (!displayText(ov).trim()) {
+            tell('Nothing to make a brush from', 'Type something into this line first.');
+            finish(null); return;
+        }
+        function build() {
+            var shapeId = null;
+            try { shapeId = B.add(brushNameOf(ov), paintBrushStamp(ov)); }
+            catch (e) { console.warn('⚠️ Text to brush failed for line', id, e); }
+            finish(shapeId);
+        }
+        // add() makes room on a full library by dropping the oldest shape,
+        // silently. A button that makes a shape in one click must not spend
+        // one of the user's own without asking.
+        var lib = (typeof B.list === 'function') ? B.list() : [];
+        var max = B.MAX || 24;
+        if (lib.length >= max && typeof window.appConfirm === 'function') {
+            var oldest = lib[lib.length - 1];
+            window.appConfirm({
+                title: 'Brush shapes are full',
+                message: 'You have ' + max + ' brush shapes, the most there is room for. ' +
+                    'Making this one removes the oldest, "' + ((oldest && oldest.name) || 'Shape') + '".',
+                confirmLabel: 'Make it',
+                cancelLabel: 'Keep mine'
+            }).then(function (ok) { if (ok) build(); else finish(null); });
+            return;
+        }
+        build();
     }
 
     // ===========================================================
@@ -2339,6 +2447,7 @@
         renderAll: renderAll,
         compositeOntoCanvas: compositeOntoCanvas,
         fluidize: fluidize,                 // pour one line into the dye and hide it
+        makeBrush: makeBrush,               // one line's letterforms as a brush shape
         setHotkey: setHotkey,               // { hotkey, hotkeyAction } without a re-render
         triggerHotkey: triggerHotkey,       // what pressing a line's key does
         hasCollider: anyCollider,

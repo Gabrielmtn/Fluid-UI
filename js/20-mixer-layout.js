@@ -5866,6 +5866,32 @@
         itemActions.appendChild(delBtn);
         editor.appendChild(itemActions);
 
+        // Convert to brush: the line's letterforms become a custom brush shape
+        // and the brush tip at once (textOverlays.makeBrush). Its own row: at
+        // 280px a fourth button in the row above would crush all four labels.
+        // The label says it worked for a moment, since the only other sign is
+        // the tip swatch at the end of the Size fader changing.
+        var brushBtn = document.createElement('button');
+        brushBtn.type = 'button';
+        brushBtn.id = 'textOverlayMakeBrush';
+        brushBtn.textContent = 'Convert to brush';
+        brushBtn.title = 'Paint with these letters: the text becomes a brush shape and your brush tip right away, with clean edges. ' +
+            'It keeps the font, weight, case and spacing; the background box, shadow and rotation are left out. ' +
+            'The text itself stays where it is. Find the shape again in the brush tip menu.';
+        brushBtn.style.cssText = 'width:100%;cursor:pointer;margin-bottom:10px;';
+        var brushBtnTimer = null;
+        brushBtn.addEventListener('click', function () {
+            var a = api(); var id = selId();
+            if (!a || id == null || typeof a.makeBrush !== 'function') return;
+            a.makeBrush(id, function (shapeId) {
+                if (!shapeId) return;
+                brushBtn.textContent = 'Brush ready';
+                if (brushBtnTimer) clearTimeout(brushBtnTimer);
+                brushBtnTimer = setTimeout(function () { brushBtn.textContent = 'Convert to brush'; }, 1600);
+            });
+        });
+        editor.appendChild(brushBtn);
+
         // ─── Clear all ───────────────────────────────────────────
         var clearBtn = document.createElement('button');
         clearBtn.type = 'button';
