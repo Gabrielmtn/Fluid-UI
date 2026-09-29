@@ -495,6 +495,15 @@
       "assertion": "window.ZoomView.scale multiplied by ~1.12 (deltaY<0) or divided (deltaY>0); #brushSize.value UNCHANGED",
       "source": "js/35-zoom-view.js:168-180",
       "sheet": "NOT LISTED in the F1 modal"
+    },
+    {
+      "keys": "Scroll (after a slider's hotkey)",
+      "event": { "type": "wheel", "deltaY": -100, "ctrlKey": false, "shiftKey": false, "altKey": false, "bubbles": true, "cancelable": true, "targetSelector": "#canvas-area" },
+      "guard": "a Ctrl+Shift+H value binding on a range slider fired: while its key is held, a wheel ANYWHERE; after release, a wheel over #canvas-area within 2500 ms of the release or the last notch. Ended by any other non-modifier keydown, a wheel whose modifiers differ from the key's own (grace only), or bind mode. Window capture, so it beats Zoom Mode and the brush-size wheel",
+      "effect": "Nudges that slider 1% of its travel per notch (at least one step), along the perceptual fader for Density/Time; 'input' per notch, 'change' 250 ms after the last; #hkWheel pill shows key, name and value while the wheel is the slider's",
+      "assertion": "the bound slider's value moves in the deltaY direction; #brushSize.value UNCHANGED; #hkWheel visible",
+      "source": "js/49-hotkey-binds.js (SCROLL AFTER A SLIDER'S KEY)",
+      "sheet": "index.html F1 Help: Slider's Key, then Scroll"
     }
   ],
   "pointer_stroke": [

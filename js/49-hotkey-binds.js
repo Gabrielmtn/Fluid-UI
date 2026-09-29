@@ -23,6 +23,10 @@
  * choosing Delete must not delete — but lets a slider, a dropdown or a
  * colour well work as usual, because the value it ends on is the binding.
  *
+ * A slider's key also hands it the mouse wheel: hold the key and scroll, or
+ * scroll over the canvas just after, and the wheel fine-tunes that slider
+ * from where the key put it (see SCROLL AFTER A SLIDER'S KEY).
+ *
  * window.HotkeyBinds = { start, stop, isActive, list, remove, fire }
  */
 (function () {
@@ -303,7 +307,10 @@
                 combo: b.combo,
                 label: '“' + describe(b) + '”',
                 does: b.role === 'toggle' ? 'toggles' : b.kind === 'value' ? 'sets' : 'clicks',
-                run: function () { fire(b); },
+                run: function (e) { if (fire(b) && b.kind === 'value') wheelTake(b, e); },
+                // A value key is HELD (js/48): while it is down the wheel is
+                // its slider's everywhere; letting go starts the grace below.
+                release: b.kind === 'value' ? function () { wheelLetGo(b); } : undefined,
                 set: function (combo) { setCombo(b.id, combo); },
                 // Moved to another binding: this one keeps its place in the
                 // list, keyless, rather than vanishing with its choice.
@@ -311,6 +318,188 @@
             };
         });
     });
+
+    // ─── SCROLL AFTER A SLIDER'S KEY ────────────────────────────
+    // A slider's key puts it where it was bound AND hands it the mouse wheel,
+    // so a notch or two either way fine-tunes it from there. While the key is
+    // held the wheel is the slider's anywhere; once it is let go, a wheel over
+    // the canvas (where the wheel already sets a value: brush size) is still
+    // the slider's for WHEEL_MS, and every notch buys WHEEL_MS more. The pill
+    // under the canvas names the slider and its value for exactly as long as
+    // the wheel is its, so what a scroll will do is never a guess. Ended early
+    // by any other key, by a wheel with other modifiers than the key's own
+    // (Ctrl/Shift/Alt+Scroll keep their meanings), and by bind mode.
+    //
+    // A notch is 1% of the fader (never less than one step of it). Density
+    // and Time move along the PERCEPTUAL fader people see (js/20), not the
+    // raw number behind it, so a notch is the same size anywhere on them.
+    // Each notch sends 'input' like a drag; 'change' follows once the wheel
+    // rests, the way letting go of a fader sends it.
+    var WHEEL_MS = 2500;
+    var WHEEL_NOTCHES = 100;     // notches from one end of a fader to the other
+    var WHEEL_SETTLE_MS = 250;
+    var wheel = null;            // { b, el, code, held, acc, timer, settleTimer, face }
+
+    function faceOf(el) {
+        var p = el.id ? document.getElementById(el.id + 'Perceptual') : null;
+        return (p && p.tagName === 'INPUT' && p.type === 'range') ? p : el;
+    }
+
+    function wheelTake(b, e) {
+        var el = resolve(b.target);
+        wheelEnd();
+        if (!el || el.tagName !== 'INPUT' || el.type !== 'range') return;
+        // Only a real press is held; its release() will come. Anything else
+        // (a replayed key with no keyup) starts on the grace clock.
+        var held = !!(e && e.type === 'keydown');
+        wheel = { b: b, el: el, code: (e && e.code) || '', held: held, acc: 0, timer: 0, settleTimer: 0, face: null };
+        if (!held) wheelRenew();
+        hudShow();
+    }
+
+    function wheelLetGo(b) {
+        if (!wheel || wheel.b !== b || !wheel.held) return;
+        wheel.held = false;
+        wheelRenew();
+    }
+
+    function wheelRenew() {
+        clearTimeout(wheel.timer);
+        wheel.timer = wheel.held ? 0 : setTimeout(wheelEnd, WHEEL_MS);
+    }
+
+    function wheelEnd() {
+        if (!wheel) return;
+        var w = wheel;
+        wheel = null;
+        clearTimeout(w.timer);
+        if (w.settleTimer) settle(w);
+        hudHide();
+    }
+
+    function settle(w) {
+        clearTimeout(w.settleTimer);
+        w.settleTimer = 0;
+        if (w.face && w.face.isConnected) w.face.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // The key's own modifiers (Shift+K, still holding Shift) count as a plain
+    // wheel; any others mean the wheel's own meaning was asked for.
+    function modsMatch(e, combo) {
+        var c = String(combo || '');
+        return !!(e.ctrlKey || e.metaKey) === /(^|\+)Ctrl\+/.test(c) &&
+               !!e.altKey === /(^|\+)Alt\+/.test(c) &&
+               !!e.shiftKey === /(^|\+)Shift\+/.test(c);
+    }
+
+    function decimalsOf(step) {
+        var s = String(step);
+        var dot = s.indexOf('.');
+        return dot === -1 ? 0 : s.length - dot - 1;
+    }
+
+    function nudge(w, e) {
+        var d = e.deltaY;
+        if (!d && e.shiftKey) d = e.deltaX;      // Shift turns some wheels sideways
+        if (!d) return;
+        var px = e.deltaMode === 1 ? d * 100 / 3 : e.deltaMode === 2 ? d * 100 : d;
+        // A mouse notch counts as one whatever the OS makes of it; the sim keeps
+        // the main thread busy enough that Chromium folds a fast spin into one
+        // bigger delta, so those count up to three. A touchpad's small deltas
+        // add up to notches.
+        var mag = Math.abs(px);
+        var notches = mag >= 50 ? Math.min(3, Math.max(1, Math.floor(mag / 100 + 0.4))) : mag / 100;
+        var dir = px < 0 ? 1 : -1;               // wheel up = more, as everywhere on the canvas
+        var f = faceOf(w.el);
+        if (f !== w.face) { w.face = f; w.acc = 0; }
+        var min = parseFloat(f.min), max = parseFloat(f.max);
+        if (!isFinite(min)) min = 0;
+        if (!isFinite(max)) max = 100;
+        if (!(max > min)) return;
+        var step = parseFloat(f.step);
+        if (!(step > 0)) step = 0;               // step="any"
+        var per = Math.max(step, (max - min) / WHEEL_NOTCHES);
+        if (w.acc && (w.acc > 0) !== (dir > 0)) w.acc = 0;   // turning back starts clean
+        w.acc += dir * notches * per;
+        var cur = parseFloat(f.value);
+        var next;
+        if (step) {
+            var n = Math.trunc(w.acc / step + (w.acc > 0 ? 1e-6 : -1e-6));
+            if (!n) return;
+            w.acc -= n * step;
+            next = cur + n * step;
+            next = parseFloat((min + Math.round((next - min) / step) * step).toFixed(decimalsOf(f.step)));
+        } else {
+            next = cur + w.acc;
+            w.acc = 0;
+        }
+        next = Math.min(max, Math.max(min, next));
+        if (next === cur) { w.acc = 0; return; }   // at the end of its travel
+        f.value = String(next);
+        try { f.style.setProperty('--val', f.value); } catch (_) {}
+        f.dispatchEvent(new Event('input', { bubbles: true }));
+        clearTimeout(w.settleTimer);
+        w.settleTimer = setTimeout(function () { settle(w); }, WHEEL_SETTLE_MS);
+        hudShow();
+        // Some readouts are written a frame late; catch them up.
+        requestAnimationFrame(hudShow);
+    }
+
+    // Window capture, passive:false: ahead of Zoom Mode's wheel (35) and the
+    // canvas's brush-size wheel (05h), and allowed to stop them. The Pen
+    // Input Window's wheel arrives here too, re-dispatched on the canvas (47).
+    window.addEventListener('wheel', function (e) {
+        if (!wheel) return;
+        if (mode) { wheelEnd(); return; }
+        if (!wheel.held) {
+            var area = document.getElementById('canvas-area');
+            if (!area || !area.contains(e.target)) return;   // the sidebar still scrolls
+            var mods = e.ctrlKey || e.metaKey || e.altKey || e.shiftKey;
+            if (mods && !modsMatch(e, wheel.b.combo)) { wheelEnd(); return; }
+        }
+        if (!wheel.el.isConnected) {
+            // The panel re-rendered since the press: find the slider again.
+            var el = resolve(wheel.b.target);
+            if (!el || el.type !== 'range') { wheelEnd(); return; }
+            wheel.el = el;
+        }
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        nudge(wheel, e);
+        wheelRenew();
+    }, { capture: true, passive: false });
+
+    // Any other key ends it: a scroll after pressing Space or a text key
+    // means the wheel's own job again. Lone modifiers and the key's own
+    // repeats don't count.
+    var MODIFIER_KEYS = { Shift: 1, Control: 1, Alt: 1, Meta: 1, AltGraph: 1, CapsLock: 1 };
+    window.addEventListener('keydown', function (e) {
+        if (!wheel || MODIFIER_KEYS[e.key]) return;
+        if (wheel.code && e.code === wheel.code) return;
+        wheelEnd();
+    }, true);
+
+    // The pill: key cap, the slider's name, its value as its readout shows it.
+    var hudEl = null, hudCap = null, hudName = null, hudVal = null;
+    function hudShow() {
+        if (!wheel) return;
+        if (!hudEl) {
+            hudEl = document.createElement('div');
+            hudEl.id = 'hkWheel';
+            hudEl.setAttribute('role', 'status');
+            hudCap = make('span', 'hk-cap', hudEl);
+            hudName = make('span', 'hk-wheel-name', hudEl);
+            hudVal = make('b', 'hk-wheel-val', hudEl);
+            make('span', 'hk-wheel-hint', hudEl).textContent = 'scroll to fine-tune';
+            document.body.appendChild(hudEl);
+        }
+        hudCap.textContent = H.format(wheel.b.combo);
+        hudName.textContent = wheel.b.name;
+        hudVal.textContent = valueTextOf(wheel.el);
+        hudEl.hidden = false;
+        if (toastEl) toastEl.hidden = true;
+    }
+    function hudHide() { if (hudEl) hudEl.hidden = true; }
 
     // ─── BIND MODE ──────────────────────────────────────────────
     // Three steps, and the bar always says which one this is and what to do:
@@ -786,6 +975,7 @@
 
     function start() {
         if (mode) return;
+        wheelEnd();
         buildBar();
         hoverBox = make('div', 'hk-outline', document.body);
         hoverTag = make('div', 'hk-tag', document.body);

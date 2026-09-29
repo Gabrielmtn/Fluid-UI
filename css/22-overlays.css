@@ -1241,6 +1241,31 @@ input[type="color"].text-swatch::-moz-color-swatch {
 }
 #hkToast[hidden] { display: none; }
 
+/* A slider's key has the wheel (js/49): key, slider, value. Same spot and
+   ground as the toast, which it replaces while it shows. */
+#hkWheel {
+    position: fixed;
+    left: 50%;
+    bottom: 96px;
+    transform: translateX(-50%);
+    z-index: 10030;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 8px;
+    border-radius: 8px;
+    background: rgba(13, 17, 23, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #e6edf3;
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+#hkWheel[hidden] { display: none; }
+#hkWheel .hk-cap { margin-left: 0; color: #e6edf3; border-color: rgba(255, 255, 255, 0.45); }
+#hkWheel .hk-wheel-val { font-variant-numeric: tabular-nums; }
+#hkWheel .hk-wheel-hint { color: rgba(230, 237, 243, 0.55); }
+
 /* Settings → Hotkeys: the same fold-open list Interface uses above it. */
 .hk-block {
     margin-bottom: 12px;
