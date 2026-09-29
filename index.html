@@ -851,6 +851,19 @@
                 <option value="rake">Rake</option>
             </select>
         </div>
+        <!-- Off (default): each arm's tip turns with its arm around the centre.
+             On: every arm prints at the brush's own angle. Moved into the
+             Multi-Brush dropdown under Symmetry, like the group above. -->
+        <div class="control-group checkbox-group" id="symmetrySameAngleGroup"
+             title="Off: each arm's tip turns with its arm around the centre of the canvas, so the arms form one symmetric shape. On: every arm uses the brush's own angle.">
+            <input type="checkbox" id="symmetrySameAngle">
+            <label for="symmetrySameAngle" style="margin: 0">Same angle on every arm</label>
+        </div>
+        <div class="control-group checkbox-group" id="symmetryFaceCenterGroup"
+             title="The brush turns as you move around the center of the canvas, so it always points the same way relative to the center. Right at the center it holds its angle.">
+            <input type="checkbox" id="symmetryFaceCenter">
+            <label for="symmetryFaceCenter" style="margin: 0">Stay oriented to the center</label>
+        </div>
         <div class="control-group">
             <label for="timeScale">⏱️ Time <span id="timeScaleValue" class="value-display">1.00x</span></label>
             <input type="range" id="timeScale" min="0.01" max="3" value="1" step="0.01">

@@ -181,9 +181,39 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         check('Show Brush Ghost off: popup shows the dot, no ghost', noGhost.ring === 'block' && noGhost.ghost === 'none', noGhost);
         await main.eval("(function(){ var t=document.getElementById('brushGhostToggle'); t.checked=true; t.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await main.eval("(function(){ var c=document.getElementById('cursorToggle'); c.checked=true; c.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
+        // Multi-Brush: the popup shows every arm's ghost (31 ghostSet), laid
+        // over the box, each turned with its arm about the canvas centre —
+        // and all at the brush angle once Same angle on every arm is ticked.
+        await main.eval("setMultiplierHotkey(4); window.config.SYMMETRY_MODE='radial'; window.config.BRUSH_TIP=2; window.config.BRUSH_ANGLE=30; 1");
+        const ax = bx + bw * 0.7, ay = by + bh * 0.3;
+        await pop.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: ax, y: ay, pointerType: 'pen' });
+        await sleep(80);
+        const ARMS = "(function(){ var h=document.getElementById('ghostArms'); var g=document.getElementById('ghost'); var arms=[].slice.call(h.children).filter(function(c){ return c.style.display==='block'; }).map(function(c){ var t=/translate\\(([-\\d.e]+)px, ([-\\d.e]+)px\\)/.exec(c.style.transform); var r=/rotate\\(([-\\d.e]+)deg\\)/.exec(c.style.transform); return { x:+t[1], y:+t[2], rot: Math.round(((+r[1] % 360) + 360) % 360) }; }); var mr=/rotate\\(([-\\d.e]+)deg\\)/.exec(g.style.transform); return { host: h.style.display, hostTf: h.style.transform, opacity: parseFloat(h.style.opacity), main: g.style.display, mainRot: mr ? Math.round(+mr[1]) : null, arms: arms }; })()";
+        const multi = await pop.eval(ARMS);
+        // Expected, in box coordinates: the pen's offset from the box centre
+        // turned 90°, 180° and 270° clockwise (y down: (x, y) → (−y, x)).
+        const ox = ax - (bx + bw / 2), oy = ay - (by + bh / 2);
+        const want = [[-oy, ox, 120], [-ox, -oy, 210], [oy, -ox, 300]].map(function (w) { return { x: w[0] + bw / 2, y: w[1] + bh / 2, rot: w[2] }; });
+        const armsOk = multi.arms.length === 3 && want.every(function (w, i) { const a = multi.arms[i]; return a && Math.abs(a.x - w.x) < 1.5 && Math.abs(a.y - w.y) < 1.5 && a.rot === w.rot; });
+        check('Multi-Brush 4x: popup shows the 3 other arms’ ghosts at their landing spots, turned with their arms (120/210/300)', multi.host === 'block' && multi.main === 'block' && multi.mainRot === 30 && armsOk && Math.abs(multi.opacity - 0.3) < 1e-6, { multi, want });
+        await main.eval("(function(){ var c=document.getElementById('symmetrySameAngle'); c.checked=true; c.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
+        await sleep(80);
+        const same = await pop.eval(ARMS);
+        check('Same angle on every arm: every popup arm ghost keeps the brush angle', same.arms.length === 3 && same.arms.every(function (a) { return a.rot === 30; }), same);
+        await main.eval("(function(){ var c=document.getElementById('symmetrySameAngle'); c.checked=false; c.dispatchEvent(new Event('change',{bubbles:true})); setMultiplierHotkey(1); window.config.BRUSH_TIP=0; window.config.BRUSH_ANGLE=0; return 1; })()");
         await pop.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy, pointerType: 'pen' });
-        await sleep(60);
-        // Screenshot the popup while hovering (mirror + ring).
+        await sleep(80);
+        const single = await pop.eval(ARMS);
+        check('back to 1x: popup arm ghosts gone', single.host === 'none' && single.arms.length === 0, single);
+        // Stay oriented to the center: the popup ghost's angle is the brush's
+        // plus the pen's bearing from the canvas centre (clockwise from up) —
+        // straight right of the centre, far out, that is 90°.
+        await main.eval("(function(){ var c=document.getElementById('symmetryFaceCenter'); c.checked=true; c.dispatchEvent(new Event('change',{bubbles:true})); window.config.BRUSH_TIP=2; window.config.BRUSH_ANGLE=15; return 1; })()");
+        await pop.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: bx + bw * 0.9, y: by + bh / 2, pointerType: 'pen' });
+        await sleep(80);
+        const faced = await pop.eval(ARMS);
+        check('Stay oriented to the center: pen right of the centre turns the popup ghost to brush angle + 90 (105)', faced.main === 'block' && faced.mainRot === 105, faced);
+        await main.eval("(function(){ var c=document.getElementById('symmetryFaceCenter'); c.checked=false; c.dispatchEvent(new Event('change',{bubbles:true})); window.config.BRUSH_TIP=0; window.config.BRUSH_ANGLE=0; return 1; })()");        // Screenshot the popup while hovering (mirror + ring).
         const shot = await pop.send('Page.captureScreenshot', { format: 'png' });
         fs.writeFileSync(path.join(OUT, 'penwin-popup.png'), Buffer.from(shot.data, 'base64'));
         if (bx > 4 || by > 4) {

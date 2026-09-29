@@ -1807,30 +1807,58 @@
     // quietly changed. Snapshots now carry `baseline` (the generation they
     // were taken against); one without it, or below the current
     // generation, fills its gaps from LEGACY_LOOK_BASELINE instead, which
-    // is exactly the state it used to land on. Bump LOOK_BASELINE_GEN and
-    // extend the table whenever a look default changes again.
-    var LOOK_BASELINE_GEN = 2;
-    var LEGACY_LOOK_BASELINE = {
-        sliders: { densityDissipation: 0.993, velocityDissipation: 0.999, pressureIteration: 17,
-            wetInfluence: 0, wetDrying: 3, ridges: 0, velocityInfluence: 2.5, curl: 25,
-            grainCleanup: 0.6, sharpness: 0.8, viscosity: 0, brushSize: 11, vibrance: 0,
-            shadingIntensity: 0.8, shadeRelief: 1, shadeGloss: 0.35 },
-        // Not listed: Spacing, Interval and Texture (the strip's brush-engine
-        // sliders). The registry has no default for them, so a preset that
-        // does not carry them has always left them as they are — a built-in
-        // click keeps your dab spacing — and that stays so.
-        paletteIndex: 0,
-        brushState: { replayMode: 'stroke', replayTimePeriod: 5,
-            splatInMode: 'instant', splatOutMode: 'instant',
-            splatInDist: 0.15, splatOutDist: 0.15 }
+    // is exactly the state it used to land on. When a look default changes
+    // again: bump LOOK_BASELINE_GEN and add that generation's entry to
+    // LOOK_BASELINE_MOVES.
+    var LOOK_BASELINE_GEN = 3;
+    // Per generation, the keys whose default it MOVED, at the value they had
+    // before the move. A snapshot taken against generation g fills its gaps
+    // from every entry newer than g, the oldest value winning when a key
+    // moved more than once.
+    var LOOK_BASELINE_MOVES = {
+        // 2026-09-24: the "Nice for default" look.
+        2: {
+            sliders: { densityDissipation: 0.993, velocityDissipation: 0.999, pressureIteration: 17,
+                wetInfluence: 0, wetDrying: 3, ridges: 0, velocityInfluence: 2.5, curl: 25,
+                grainCleanup: 0.6, sharpness: 0.8, viscosity: 0, brushSize: 11, vibrance: 0,
+                shadingIntensity: 0.8, shadeRelief: 1, shadeGloss: 0.35 },
+            // Not listed: Spacing, Interval and Texture (the strip's brush-engine
+            // sliders). The registry has no default for them, so a preset that
+            // does not carry them has always left them as they are — a built-in
+            // click keeps your dab spacing — and that stays so.
+            paletteIndex: 0,
+            brushState: { replayMode: 'stroke', replayTimePeriod: 5,
+                splatInMode: 'instant', splatOutMode: 'instant',
+                splatInDist: 0.15, splatOutDist: 0.15 }
+        },
+        // 2026-09-25: Multi-Brush arms turn the tip with them (05g
+        // armStampTurn); before, every arm printed at the brush's angle.
+        3: { checkboxes: { symmetrySameAngle: true } }
     };
+    var FILL_SECTIONS = { sliders: 1, checkboxes: 1, selects: 1 };
+    // What a snapshot of generation `gen` fills its gaps from, or null when
+    // it is current.
+    function legacyFill(gen) {
+        if (!(gen >= 1)) gen = 1;
+        if (gen >= LOOK_BASELINE_GEN) return null;
+        var out = {};
+        for (var g = LOOK_BASELINE_GEN; g > gen; g--) {
+            var mv = LOOK_BASELINE_MOVES[g];
+            if (!mv) continue;
+            Object.keys(mv).forEach(function (sec) {
+                out[sec] = FILL_SECTIONS[sec] ? Object.assign({}, out[sec], mv[sec]) : mv[sec];
+            });
+        }
+        return out;
+    }
     window.LOOK_BASELINE_GEN = LOOK_BASELINE_GEN;
-    // 50-look-links trims against BOTH generations: a value whose default
+    // 50-look-links trims against EVERY generation: a value whose default
     // moved always rides a link, so a build that still fills from the old
     // defaults (the shipped demo, an unrefreshed web tab) lands it exactly.
+    var LEGACY_LOOK_BASELINE = legacyFill(1);
     window.LEGACY_LOOK_BASELINE = LEGACY_LOOK_BASELINE;
-    function isLegacySnapshot(snapshot) {
-        return !(snapshot && typeof snapshot.baseline === 'number' && snapshot.baseline >= LOOK_BASELINE_GEN);
+    function snapshotLegacyFill(snapshot) {
+        return legacyFill((snapshot && typeof snapshot.baseline === 'number') ? snapshot.baseline : 1);
     }
 
     function baselineLookSnapshot() {
@@ -1861,20 +1889,19 @@
         if (!snapshot) return;
         var base = baselineLookSnapshot();
         // A snapshot from before the current defaults generation fills its
-        // gaps from the defaults it was taken against (see LEGACY_LOOK_BASELINE).
-        var legacy = isLegacySnapshot(snapshot);
+        // gaps from the defaults it was taken against (see LOOK_BASELINE_MOVES).
+        var legacy = snapshotLegacyFill(snapshot) || {};
         var merged = Object.assign({}, snapshot);
         ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
-            var fill = (legacy && LEGACY_LOOK_BASELINE[sec]) ? LEGACY_LOOK_BASELINE[sec] : {};
-            merged[sec] = Object.assign({}, base[sec], fill, snapshot[sec] || {});
+            merged[sec] = Object.assign({}, base[sec], legacy[sec] || {}, snapshot[sec] || {});
         });
         ['colors', 'kaleido', 'brushState', 'material', 'brushTip', 'lightPos', 'armColors'].forEach(function (sec) {
             if (snapshot[sec] === undefined || snapshot[sec] === null) {
-                merged[sec] = (legacy && LEGACY_LOOK_BASELINE[sec]) ? LEGACY_LOOK_BASELINE[sec] : base[sec];
+                merged[sec] = legacy[sec] ? legacy[sec] : base[sec];
             }
         });
         if (merged.paletteIndex === undefined || merged.paletteIndex === null) {
-            merged.paletteIndex = legacy ? LEGACY_LOOK_BASELINE.paletteIndex : base.paletteIndex;
+            merged.paletteIndex = (typeof legacy.paletteIndex === 'number') ? legacy.paletteIndex : base.paletteIndex;
         }
         applyPresetSnapshot(merged);
     }

@@ -7352,6 +7352,13 @@
             symGroup.style.padding = '';
             panel.appendChild(symGroup);
         }
+        // ...and whether the arms turn the tip with them (05g armStampTurn).
+        var sameAngGroup = document.getElementById('symmetrySameAngleGroup');
+        if (sameAngGroup) panel.appendChild(sameAngGroup);
+        // ...and whether the tip keeps its pose relative to the centre (05g
+        // faceCenterTurn).
+        var faceGroup = document.getElementById('symmetryFaceCenterGroup');
+        if (faceGroup) panel.appendChild(faceGroup);
         var symNote = document.createElement('div');
         symNote.className = 'arm-sym-note';
         symNote.style.cssText = 'padding:2px 0 6px;font-size:9px;color:rgba(255,255,255,0.45);';

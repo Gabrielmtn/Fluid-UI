@@ -8,7 +8,9 @@
 //   by default; #brushGhostOpacity) — and #brushCursor on top of it: a small
 //   hotspot dot, or the P badge while the brush pushes paint instead of
 //   laying it. The ghost replaced the old ring + angle line (2026-09-23): it
-//   shows the size, the angle and the next colour by itself.
+//   shows the size, the angle and the next colour by itself. With Multi-Brush
+//   on, #brushCursorArms holds a ghost for every other arm's dab too, each
+//   turned the way that arm prints (ghostSet, shared with js/47's popup).
 //
 // Why a DOM overlay (not a canvas draw): it must sit above the fluid canvas
 // AND every layer/UI element and follow the OS pointer with zero sim
@@ -54,35 +56,57 @@
         var t = document.getElementById('cursorToggle');
         return !t || t.checked; // default on if the toggle isn't in the DOM
     }
+    var HEX_RE = /^#[0-9a-fA-F]{6}$/;
+    function rgbHex(c) {
+        var to = function (v) {
+            var h = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16);
+            return h.length === 1 ? '0' + h : h;
+        };
+        return '#' + to(c[0]) + to(c[1]) + to(c[2]);
+    }
     function paintColorHex() {
         // The colour "about to be painted" — the main picker is the app's live
         // next-colour preview (step/random advance it on mouseup). Fall back to
         // pointer.color (what the in-progress stroke is depositing).
         var cp = document.getElementById('colorPicker');
-        if (cp && /^#[0-9a-fA-F]{6}$/.test(cp.value)) return cp.value;
+        if (cp && HEX_RE.test(cp.value)) return cp.value;
         var p = window.pointer;
-        if (p && p.color && p.color.length >= 3) {
-            var to = function (v) {
-                var h = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16);
-                return h.length === 1 ? '0' + h : h;
-            };
-            return '#' + to(p.color[0]) + to(p.color[1]) + to(p.color[2]);
-        }
+        if (p && p.color && p.color.length >= 3) return rgbHex(p.color);
         return '#ff0000';
+    }
+    // The colour Multi-Brush arm i's next dab takes: 05g resolveArmColor, read
+    // without its side effect — it draws a Random arm's colour on first use,
+    // and that draw belongs to the stroke, not to a hover. Arm 0 and 'main'
+    // arms paint the picker's colour.
+    function armColorHex(i) {
+        var arr = window.multiArmColors, cfg = arr && arr[i];
+        if (!i || !cfg || cfg.mode === 'main') return paintColorHex();
+        if (cfg.mode === 'fixed') return HEX_RE.test(cfg.color || '') ? cfg.color : '#ffffff';
+        if (cfg.cachedColor && cfg.cachedColor.length >= 3) return rgbHex(cfg.cachedColor);
+        if (cfg.mode === 'step' && typeof getStepColorList === 'function') {
+            var list = getStepColorList() || [];
+            var h = list.length ? list[(cfg.stepIndex || 0) % list.length] : null;
+            if (HEX_RE.test(h || '')) return h;
+        }
+        // A Random arm before its first stroke has no colour yet: neutral.
+        return cfg.mode === 'random' ? '#ffffff' : paintColorHex();
     }
     function brushAngleDeg() {
         var c = window.config || {};
         return typeof c.BRUSH_ANGLE === 'number' ? c.BRUSH_ANGLE : 0;
     }
-    function pressureActive() {
-        // "Pressure" = the velocity-only brush (whole-brush toggle) or the
-        // active arm (arm 0, the one under the pointer) marked as a push arm.
-        // Not pen pressure — the app deliberately has none.
+    // Arm i pushes paint instead of laying it: the velocity-only brush
+    // (whole-brush toggle) or that arm marked as a push arm in the Multi-Brush
+    // panel. Not pen pressure — the app deliberately has none.
+    function armPushes(i) {
         var c = window.config || {};
         if (c.BRUSH_VELOCITY_ONLY) return true;
         var a = window.multiArmColors;
-        return !!(a && a[0] && a[0].push);
+        return !!(a && a[i] && a[i].push);
     }
+    // "Pressure" for the cursor = the active arm (arm 0, the one under the
+    // pointer) pushes.
+    function pressureActive() { return armPushes(0); }
 
     // ── Ghost: a faint print of the next dab (2026-09-22) ─────────────
     // What the brush will leave: the selected tip's own footprint at its real
@@ -114,6 +138,14 @@
     ghostEl.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;' +
         'z-index:10049;display:none;will-change:transform,width,height;';
     document.body.appendChild(ghostEl);
+    // The other Multi-Brush arms' ghosts (see renderGhost). Clipped to the
+    // canvas — an arm that lands off the edge paints nothing — and before
+    // ghostEl in the DOM, so the ghost under the pointer stays on top.
+    var armWrap = document.createElement('div');
+    armWrap.id = 'brushCursorArms';
+    armWrap.style.cssText = 'position:fixed;left:0;top:0;overflow:hidden;pointer-events:none;' +
+        'z-index:10049;display:none;';
+    document.body.insertBefore(armWrap, ghostEl);
     var pressed = false;
 
     var ghostToggle = document.getElementById('brushGhostToggle');
@@ -121,6 +153,8 @@
     var ghostOpacityValueEl = document.getElementById('brushGhostOpacityValue');
     function applyGhostOpacity() {
         ghostEl.style.opacity = String(ghostOpacity);
+        // On the wrapper, not per arm: overlapping arms read as one print.
+        armWrap.style.opacity = String(ghostOpacity);
         if (ghostOpacityValueEl) ghostOpacityValueEl.textContent = Math.round(ghostOpacity * 100) + '%';
         // Greyed while the ghost is off (styles.css dims the row off :disabled).
         if (ghostOpacityInput) ghostOpacityInput.disabled = !ghostOn;
@@ -130,7 +164,7 @@
         ghostToggle.addEventListener('change', function () {
             ghostOn = !!ghostToggle.checked;
             try { localStorage.setItem(GHOST_KEY, ghostOn ? '1' : '0'); } catch (_) {}
-            if (!ghostOn) ghostEl.style.display = 'none';
+            if (!ghostOn) { ghostEl.style.display = 'none'; armWrap.style.display = 'none'; }
             applyGhostOpacity();
             requestRender();
         });
@@ -192,8 +226,12 @@
     // What the next dab prints: hx/hy = the footprint's half-extents in q,
     // a(x, y) = its coverage there (unrotated: the angle turns the element).
     // `neutral` footprints carry no colour of their own — a push, a collider
-    // wall, an eraser — and draw white. null = nothing to show.
-    function ghostSpec() {
+    // wall, an eraser — and draw white. null = nothing to show. `arm` is the
+    // Multi-Brush arm whose dab this is (default 0, the one under the pointer):
+    // only whether it pushes differs between arms.
+    var PUSH_SPEC = { key: 'push', hx: 2.1, hy: 2.1, neutral: true,
+                      a: function (x, y) { return Math.exp(-(x * x + y * y)); } };
+    function ghostSpec(arm) {
         var c = window.config;
         if (!c) return null;
         var target = c.BRUSH_TARGET || 'fluid';
@@ -201,10 +239,7 @@
         var neutralRaster = target === 'mask' || !!c.BRUSH_ERASER;
         // Pressure lays no dye, and the tips are dye-only: its push is the
         // velocity pass's plain gaussian whatever tip is selected.
-        if (!raster && pressureActive()) {
-            return { key: 'push', hx: 2.1, hy: 2.1, neutral: true,
-                     a: function (x, y) { return Math.exp(-(x * x + y * y)); } };
-        }
+        if (!raster && armPushes(arm | 0)) return PUSH_SPEC;
         // A custom shape overrides the tips on every route (splat() and
         // bindRasterStamp share its mapping, at the full radius).
         var url = activeShapeUrl();
@@ -293,18 +328,45 @@
         return Math.sqrt(Math.max(0, num(c.SPLAT_RADIUS, 0.011) * num(c.STAMP_RADIUS_SCALE, 1)));
     }
 
-    // A painter owns one <canvas> — here the main cursor's; the Pen Input
-    // Window (js/47) makes one for its popup — and its own cached mask, so
-    // two surfaces at different sizes never make each other re-rasterize.
+    // Rasterized footprints (white, alpha = coverage), keyed by footprint and
+    // density and holding the newest `cap`. One store serves every painter on
+    // a surface, so eight arms cost one rasterize, not eight; a surface shows
+    // at most two footprints at once (the paint and a push arm's).
+    function maskStore(cap) {
+        var masks = Object.create(null), order = [];
+        return function (spec, D) {
+            var key = spec.key + '|' + D;
+            var m = masks[key];
+            if (!m) {
+                m = document.createElement('canvas');
+                buildGhostMask(m, spec, D);
+                m.ghostKey = key;
+                masks[key] = m;
+                order.push(key);
+                while (order.length > cap) delete masks[order.shift()];
+            }
+            return m;
+        };
+    }
+
+    // A painter owns one <canvas> — the main cursor's, one per Multi-Brush
+    // arm, or the Pen Input Window's (js/47) — and tints it from a mask store:
+    // `masks` when given (painters on one surface share one), else its own,
+    // so two surfaces at different sizes never make each other re-rasterize.
     // The target may live in another same-origin document.
-    //   paint(spec, k, dpr, x, y): draw `spec` for a surface showing k CSS px
-    //   per q unit at device ratio dpr, centred on (x, y) in its viewport.
+    //   paint(spec, k, dpr, x, y, opt): draw `spec` for a surface showing k
+    //   CSS px per q unit at device ratio dpr, centred on (x, y) in the
+    //   target's containing block. opt (all optional): color (default: the
+    //   next paint colour; neutral specs are always white), angle in degrees
+    //   (default: the brush's), flip (mirror the tip in its own frame first,
+    //   as a mirrored Multi-Brush arm prints it).
     //   hide(): take it off screen.
-    function ghostPainter(target) {
-        var mask = document.createElement('canvas'); // white footprint, alpha = coverage
+    function ghostPainter(target, masks) {
+        if (!masks) masks = maskStore(1);
         var shapeKey = '', tint = '';
         function hide() { if (target.style.display !== 'none') target.style.display = 'none'; }
-        function paint(spec, k, dpr, x, y) {
+        function paint(spec, k, dpr, x, y, opt) {
+            opt = opt || {};
             if (!spec || !(k > 0)) { hide(); return; }
             // Mask resolution: the next power of two over the on-screen density
             // (so it only re-rasterizes when the size crosses an octave),
@@ -312,13 +374,12 @@
             var want = k * (dpr || 1), D = 16;
             while (D < want && D < 256) D *= 2;
             while (D > 16 && 4 * spec.hx * spec.hy * D * D > 600000) D /= 2;
-            var key = spec.key + '|' + D;
-            if (key !== shapeKey) {
-                buildGhostMask(mask, spec, D);
-                shapeKey = key;
+            var mask = masks(spec, D);
+            if (mask.ghostKey !== shapeKey) {
+                shapeKey = mask.ghostKey;
                 tint = '';
             }
-            var col = spec.neutral ? '#ffffff' : paintColorHex();
+            var col = spec.neutral ? '#ffffff' : (opt.color || paintColorHex());
             if (col !== tint) {
                 var W = mask.width, H = mask.height;
                 if (target.width !== W) target.width = W;
@@ -336,18 +397,160 @@
             target.style.height = (2 * spec.hy * k) + 'px';
             // CSS rotate() is clockwise on screen — the same sense the shader's
             // stampAngle turns the stamp, so ghost and painted streak agree.
+            // Transforms apply right to left: scaleX(-1) mirrors the tip in
+            // its own frame before the turn, as splatFrag's stampFlip does.
+            var ang = (typeof opt.angle === 'number') ? opt.angle : brushAngleDeg();
             target.style.transform = 'translate(' + x + 'px,' + y + 'px) translate(-50%,-50%) ' +
-                'rotate(' + brushAngleDeg() + 'deg)';
+                'rotate(' + ang + 'deg)' + (opt.flip ? ' scaleX(-1)' : '');
             if (target.style.display !== 'block') target.style.display = 'block';
         }
         return { paint: paint, hide: hide, tint: function () { return tint; } };
     }
 
-    var mainGhost = ghostPainter(ghostEl);
-    function renderGhost() {
-        mainGhost.paint((ghostOn && !pressed) ? ghostSpec() : null,
-            radiusRoot() * canvas.getBoundingClientRect().height,
-            window.devicePixelRatio || 1, lastX, lastY);
+    // ── Multi-Brush arms (2026-09-25) ─────────────────────────────────
+    // A Multi-Brush stroke lays one dab per symmetry transform (05g
+    // multiSplat), so the ghost shows every one: the footprint at each arm's
+    // landing spot, turned (and on a mirrored arm, mirrored) the way that arm
+    // prints it (05g armStampTurn), in that arm's colour — or the push
+    // footprint on an arm marked Pressure. The transforms are 05g's own list,
+    // so ghost and paint can't disagree about a layout; a rake's bristle line
+    // is the heading the last stroke left, which is what the next press
+    // inherits.
+
+    // A left button bound to "mirror brushstroke" folds its mirror into the
+    // stroke it starts (41 pins it at the press), so the preview folds it in.
+    function hoverMirror() {
+        var BM = window.ButtonModes;
+        var s = (BM && typeof BM.side === 'function') ? BM.side('left') : null;
+        if (!s || s.mode !== 'mirror' || typeof BM.mirrorCode !== 'function') return 0;
+        return BM.mirrorCode(s.mirror) || 1;
+    }
+    // The transforms a stroke from here would paint through, or null when it
+    // is one plain dab (mask and sketch strokes never fan out over the arms).
+    function armTransforms() {
+        var c = window.config;
+        var st = window.symmetryTransforms;
+        if (!c || typeof st !== 'function') return null;
+        var target = c.BRUSH_TARGET || 'fluid';
+        if (target === 'mask' || target === 'sketch') return null;
+        var n = (typeof animationMultiplier === 'number') ? animationMultiplier : 1;
+        // No travel (dx = dy = 0), like a press: rake reads its carried
+        // heading and nothing in 05g is advanced by the call.
+        var list = st(c.SYMMETRY_MODE, n, 0, 0, hoverMirror());
+        return (list && list.length) ? list : null;
+    }
+    function isIdentity(m) {
+        return Math.abs(m[0] - 1) < 1e-9 && Math.abs(m[1]) < 1e-9 && Math.abs(m[2]) < 1e-6 &&
+               Math.abs(m[3]) < 1e-9 && Math.abs(m[4] - 1) < 1e-9 && Math.abs(m[5]) < 1e-6;
+    }
+    // How arm `m` prints the tip: its angle in degrees and whether mirrored.
+    // 05g armStampTurn gives the arm's rotation φ (null = every arm keeps the
+    // brush's angle); the dab prints at φ + angle, or mirrored at φ − angle.
+    // Same arithmetic as splat() (05i), so ghost and paint agree.
+    function armPose(m, angleDeg) {
+        var turn = (typeof window.armStampTurn === 'function') ? window.armStampTurn(m) : null;
+        if (typeof turn !== 'number') return { angle: angleDeg, flip: false };
+        var t = turn * 180 / Math.PI;
+        var flip = (m[0] * m[4] - m[1] * m[3]) < 0;
+        return { angle: flip ? t - angleDeg : t + angleDeg, flip: flip };
+    }
+
+    // Everything one surface needs to show the whole brush: the dab under the
+    // pointer on `mainTarget`, every other arm's on canvases pooled in
+    // `armHost` — a position:fixed box this lays over the canvas and that
+    // clips to it (an arm landing off the edge paints nothing). The main
+    // window and the Pen Input Window (js/47) each own one; the host may live
+    // in another same-origin document.
+    //   paint(on, k, dpr, x, y, box): the pointer at (x, y) in the surface's
+    //   viewport, box = {left, top, width, height} where the canvas sits
+    //   there, k = CSS px per q unit (radiusRoot() × box.height). on = false
+    //   hides it all.
+    //   hide()
+    function ghostSet(mainTarget, armHost) {
+        var masks = maskStore(2);
+        var main = ghostPainter(mainTarget, masks);
+        var arms = [];
+        var hostBox = '';
+        function armPainter(i) {
+            if (!arms[i]) {
+                var cv = armHost.ownerDocument.createElement('canvas');
+                cv.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;' +
+                    'display:none;will-change:transform,width,height;';
+                armHost.appendChild(cv);
+                arms[i] = ghostPainter(cv, masks);
+            }
+            return arms[i];
+        }
+        function hideArms(from) {
+            for (var i = from; i < arms.length; i++) arms[i].hide();
+            if (!from && armHost.style.display !== 'none') armHost.style.display = 'none';
+        }
+        function hide() { main.hide(); hideArms(0); }
+        function paint(on, k, dpr, x, y, box) {
+            if (!on) { main.paint(null, k, dpr, x, y); hideArms(0); return; }
+            // The pointer in multiSplat's frame: MAIN-canvas px relative to its
+            // centre, through the box (as 02 getCanvasCoordinates maps a press;
+            // the pen window's box is the same canvas, letterboxed).
+            var W = canvas.width, H = canvas.height;
+            var sx = box.width ? W / box.width : 1, sy = box.height ? H / box.height : 1;
+            var rx = (x - box.left) * sx - W * 0.5;
+            var ry = (y - box.top) * sy - H * 0.5;
+            var list = armTransforms();
+            // Stay oriented to the center: the pose the next dab would take
+            // here, asked without moving the carried pose (05g
+            // faceCenterTurn). Fluid strokes only, like the arms.
+            var A = brushAngleDeg();
+            if (list && typeof window.faceCenterTurn === 'function') {
+                A += window.faceCenterTurn(rx + W * 0.5, ry + H * 0.5, false) * 180 / Math.PI;
+            }
+            if (!list || (list.length === 1 && isIdentity(list[0].m))) {
+                main.paint(ghostSpec(0), k, dpr, x, y, { angle: A });
+                hideArms(0);
+                return;
+            }
+            var bk = box.left + ',' + box.top + ',' + box.width + ',' + box.height;
+            if (bk !== hostBox) {
+                hostBox = bk;
+                armHost.style.transform = 'translate(' + box.left + 'px,' + box.top + 'px)';
+                armHost.style.width = box.width + 'px';
+                armHost.style.height = box.height + 'px';
+            }
+            var underPointer = false, used = 0;
+            for (var i = 0; i < list.length; i++) {
+                var m = list[i].m, arm = list[i].arm;
+                var pose = armPose(m, A);
+                var opt = { color: armColorHex(arm), angle: pose.angle, flip: pose.flip };
+                // The unmoved dab is the one under the pointer: the main ghost.
+                // (An even rake has none — its bristles straddle the pointer.)
+                if (!underPointer && isIdentity(m)) {
+                    underPointer = true;
+                    main.paint(ghostSpec(arm), k, dpr, x, y, opt);
+                    continue;
+                }
+                var fx = m[0] * rx + m[1] * ry + m[2] + W * 0.5;
+                var fy = m[3] * rx + m[4] * ry + m[5] + H * 0.5;
+                armPainter(used++).paint(ghostSpec(arm), k, dpr, fx / sx, fy / sy, opt);
+            }
+            if (!underPointer) main.hide();
+            hideArms(used);
+            if (used && armHost.style.display !== 'block') armHost.style.display = 'block';
+        }
+        return { paint: paint, hide: hide };
+    }
+
+    var mainGhost = ghostSet(ghostEl, armWrap);
+    function renderGhost(x, y) {
+        var r = canvas.getBoundingClientRect();
+        mainGhost.paint(ghostOn && !pressed, radiusRoot() * r.height,
+            window.devicePixelRatio || 1, x, y, r);
+    }
+
+    // A held stroke lock (js/56) keeps the brush on a circle or a spoke round
+    // the canvas centre while the hand wanders: the cursor shows where the
+    // paint goes, not where the hand is.
+    function brushAt(x, y) {
+        var L = window.StrokeLock;
+        return (L && L.shaping()) ? L.clientPoint(x, y) : { x: x, y: y };
     }
 
     // ── Render loop (runs only while hovering) ────────────────────────
@@ -365,7 +568,8 @@
         if (!visible) return;
         if (!cursorEnabled()) { hide(); return; }
 
-        el.style.transform = 'translate(' + lastX + 'px,' + lastY + 'px) translate(-50%,-50%)';
+        var at = brushAt(lastX, lastY);
+        el.style.transform = 'translate(' + at.x + 'px,' + at.y + 'px) translate(-50%,-50%)';
 
         // Pressure mode swaps the dot for the P badge — the brush moves paint
         // rather than depositing a colour.
@@ -375,7 +579,7 @@
         // would drift off the hotspot by the font's descent.
         if (dotEl) dotEl.style.display = pOn ? 'none' : 'block';
 
-        renderGhost();
+        renderGhost(at.x, at.y);
 
         rafId = requestAnimationFrame(render);
     }
@@ -401,6 +605,7 @@
         visible = false;
         el.style.display = 'none';
         ghostEl.style.display = 'none';
+        armWrap.style.display = 'none';
         if (canvas.style.cursor === 'none') canvas.style.cursor = '';
         if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
     }
@@ -448,12 +653,15 @@
     // Expose for other modules / debugging. setOwner(pointerId|null): the
     // Pen Input Window hands the cursor to its pen while the pen is over the
     // surface and gives it back (null) when it leaves. The ghost* members let
-    // it draw the same ghost in its popup: ghostSpec() is null while Show
-    // Brush Ghost is off.
+    // it draw the same ghost in its popup: ghostSet(main, armHost) is the
+    // whole Multi-Brush ghost, ghostEnabled() is Show Brush Ghost, and
+    // ghostSpec() is null while that is off.
     window.__brushCursor = {
         show: show, hide: hide, el: el, ghost: ghostEl,
         ghostSpec: function () { return ghostOn ? ghostSpec() : null; },
+        ghostEnabled: function () { return ghostOn; },
         ghostPainter: ghostPainter,
+        ghostSet: ghostSet,
         ghostOpacity: function () { return ghostOpacity; },
         radiusRoot: radiusRoot,
         setOwner: function (id) {

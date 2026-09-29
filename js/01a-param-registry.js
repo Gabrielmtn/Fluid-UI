@@ -207,6 +207,15 @@
         focusModeToggle: {def: null, mutScope: null},
         streamFormatLock: {def: null, mutScope: null},
         autoloadSettings: {def: true, mutScope: null},
+        // Multi-Brush: every arm prints at the brush's own angle instead of
+        // turning with its arm (05g armStampTurn). No mutScope, for the same
+        // reason symmetryMode has no `mut`: it only shapes future strokes.
+        // Older snapshots fill it as true (12 LEGACY_LOOK_BASELINE, gen 3).
+        symmetrySameAngle: {def: false, mutScope: null},
+        // Multi-Brush: the tip keeps one pose relative to the canvas centre
+        // (05g faceCenterTurn). Off matches every older snapshot, so no
+        // baseline generation is needed.
+        symmetryFaceCenter: {def: false, mutScope: null},
         displayShadingToggle: {def: false, mutScope: "extended"}
     };
     var SELECTS = {

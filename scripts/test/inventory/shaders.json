@@ -104,7 +104,7 @@
         "vibrance"
       ]
     },
-    "aspectRatio|barHalfW|barPoint|color|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|uVelCovBlock|velocityInfluence|velocityScale": {
+    "aspectRatio|barHalfW|barPoint|color|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampFlip|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|uVelCovBlock|velocityInfluence|velocityScale": {
       "name": "splat",
       "uniforms": [
         "aspectRatio",
@@ -121,6 +121,7 @@
         "ringSquash",
         "stampAngle",
         "stampAspect",
+        "stampFlip",
         "stampNoise",
         "stampSeed",
         "stampShape",

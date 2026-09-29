@@ -171,6 +171,7 @@
             uniform vec2 stampSeed;    // per-splat offset so consecutive stamps differ
             uniform int stampShape;    // 0 = blob, 1 = chisel (square press), 2 = streak (elongated smear)
             uniform float stampAngle;  // brush rotation (radians, screen space) for chisel/streak; 0 = upright
+            uniform float stampFlip;   // 1 = print the custom stamp mirrored across its own vertical axis (a mirrored Multi-Brush arm)
             uniform float ringRadius;  // >0: thin ring-band stamp at this radius (aspect-corrected UV); 0 = classic blob
             uniform float ringSquash;  // ring ellipse squash (1 = circle, <1 = flattened vertically)
             uniform float barHalfW;    // >0: crisp bar stamp this half-width wide (aspect-corrected UV); EQ lane slabs
@@ -385,6 +386,11 @@
                             float ca = cos(stampAngle), sa = sin(stampAngle);
                             qr = vec2(q.x * ca - q.y * sa, q.x * sa + q.y * ca);
                         }
+                        // Mirrored arm: flip in the stamp's own frame, i.e.
+                        // mirror first, then turn by stampAngle. Only here:
+                        // the built-in tips above are all symmetric about
+                        // their own vertical axis, so a flip is a no-op there.
+                        if (stampFlip > 0.5) qr.x = -qr.x;
                         // Long side spans the same visual extent as the gaussian
                         // dab (its alpha-0.1 edge sits at |p| ~ 1.5*sqrt(radius));
                         // support stays far inside the scissor rect (K = 6).

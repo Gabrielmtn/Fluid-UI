@@ -1106,6 +1106,20 @@
                                       // bristles offset perpendicular to travel. Multi-Brush
                                       // dropdown select. (A 'spiral' mode was retired 2026-08-16
                                       // — it never read right; stale values coerce to radial.)
+            SYM_SAME_ANGLE: false,    // Multi-Brush tip angle. false (default since
+                                      // 2026-09-25): each arm's tip turns with its arm about
+                                      // the canvas centre, and a mirrored arm prints it
+                                      // mirrored, so the arms form one symmetric figure
+                                      // (4 arms of a corner shape make a square). true: every
+                                      // arm prints at BRUSH_ANGLE as-is (the old behaviour).
+                                      // #symmetrySameAngle in the Multi-Brush panel.
+            SYM_FACE_CENTER: false,   // Stay oriented to the center: BRUSH_ANGLE is measured
+                                      // from the pointer's direction out of the canvas centre
+                                      // rather than from screen-up, so the tip keeps one pose
+                                      // RELATIVE to the centre wherever you paint (05g
+                                      // faceCenterTurn; turn-rate capped by travel near the
+                                      // centre, so a pass through it turns over smoothly).
+                                      // #symmetryFaceCenter in the Multi-Brush panel.
             SYM_RAKE_SMOOTH: 2.5,     // 'rake' heading smoothing: brush diameters of TRAVEL
                                       // the bristle line takes to turn. Per-dab direction is
                                       // one 1-2px pointer segment (±45° of quantization

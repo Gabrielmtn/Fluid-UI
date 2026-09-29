@@ -205,6 +205,9 @@
         }
         var ap = (typeof window.armPushMask === 'function') ? window.armPushMask() : 0;
         if (ap) info.ap = ap;
+        // Arms turn the tip with them unless Same angle is on (06d `at`).
+        if (!cfg.SYM_SAME_ANGLE) info.at = 1;
+        if (cfg.SYM_FACE_CENTER) info.fc = 1;
         return info;
     }
 

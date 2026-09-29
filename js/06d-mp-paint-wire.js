@@ -102,6 +102,14 @@ function brushWireFields() {
     // just ignores the field.
     var _mir = window.__strokeMirrorPin | 0;
     if (_mir) f.mir = _mir;
+    // Multi-Brush arms turn the tip with them (05g armStampTurn). Sent as
+    // `at: 1` when they do, because ABSENCE has to mean "every arm kept the
+    // brush's angle": that is how every build before 2026-09-25 painted.
+    if (!cfg.SYM_SAME_ANGLE) f.at = 1;
+    // Stay oriented to the center (05g faceCenterTurn): the tip's pose is
+    // measured from the centre. Omitted when off, which is what older builds
+    // painted.
+    if (cfg.SYM_FACE_CENTER) f.fc = 1;
     const rev = publishActiveShape();
     if (rev) { f.shape = cfg.BRUSH_SHAPE_ID; f.rev = rev; }
     return f;
@@ -1399,6 +1407,23 @@ function handleRemoteSplat(data, from, to) {
                 window.config.SYMMETRY_MODE = _sym;
             }
         }
+        // ...and whether its arms turned the tip with them (brushWireFields
+        // `at`). Pinned unconditionally, like `mir`: absence is a sender that
+        // kept one angle on every arm, never "use mine".
+        var _sameAngPrev = null, _faceCPrev = null;
+        if (window.config) {
+            var _sameAng = _rd.at !== 1;
+            if (_sameAng !== !!window.config.SYM_SAME_ANGLE) {
+                _sameAngPrev = !!window.config.SYM_SAME_ANGLE;
+                window.config.SYM_SAME_ANGLE = _sameAng;
+            }
+            // Same rule for Stay oriented to the center (`fc`).
+            var _faceC = _rd.fc === 1;
+            if (_faceC !== !!window.config.SYM_FACE_CENTER) {
+                _faceCPrev = !!window.config.SYM_FACE_CENTER;
+                window.config.SYM_FACE_CENTER = _faceC;
+            }
+        }
         try {
             // 1.3 parity path: the sender's real dab train. Each dab is applied
             // with ITS OWN full velocity, verbatim — no gap-fill invention and
@@ -1518,6 +1543,8 @@ function handleRemoteSplat(data, from, to) {
             isProcessingRemoteEvent = false;
             window.__remoteStroke = false;
             if (_symPrev !== null) window.config.SYMMETRY_MODE = _symPrev;
+            if (_sameAngPrev !== null) window.config.SYM_SAME_ANGLE = _sameAngPrev;
+            if (_faceCPrev !== null) window.config.SYM_FACE_CENTER = _faceCPrev;
             // Restore on explicit flags, not on "was it null": BRUSH_SHAPE_ID
             // is legitimately null whenever the viewer has no shape selected,
             // and a null-sentinel check would leave the PEER's id active on

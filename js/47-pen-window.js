@@ -209,6 +209,8 @@
             'background-image:radial-gradient(rgba(255,255,255,0.10) 1px,transparent 1.2px);background-size:36px 36px}',
             '#blank b{display:block;font-size:17px;color:rgba(207,214,224,0.85);margin-bottom:4px}',
             '#ghost{position:fixed;left:0;top:0;pointer-events:none;display:none;will-change:transform,width,height}',
+            // The other Multi-Brush arms' ghosts; 31's ghostSet lays it over the box and clips to it.
+            '#ghostArms{position:fixed;left:0;top:0;overflow:hidden;pointer-events:none;display:none}',
             '#ring{position:fixed;left:0;top:0;width:12px;height:12px;pointer-events:none;display:none;transform:translate(-50%,-50%);will-change:transform}',
             '#bar{position:fixed;left:0;right:0;top:0;height:40px;display:flex;gap:10px;align-items:center;padding:0 12px;',
             'background:rgba(10,14,20,0.94);border-bottom:1px solid rgba(255,255,255,0.10);z-index:5;cursor:default;',
@@ -226,7 +228,7 @@
             '<div id="stage"><div id="box">',
             '<canvas id="mirror" width="16" height="9"></canvas>',
             '<div id="blank" hidden><div><b>Mirror off</b>Draw here and watch your main monitor.</div></div>',
-            '</div><canvas id="ghost"></canvas><div id="ring"></div></div>',
+            '</div><div id="ghostArms"></div><canvas id="ghost"></canvas><div id="ring"></div></div>',
             '<div id="bar"><b>Swirl Together · pen input</b>',
             '<span class="grow" id="status">Draw here — the paint lands on your main monitor.</span>',
             // Buttons only: in the desktop build this window never takes
@@ -1100,7 +1102,7 @@
     // (the tip's real shape, size and angle in the colour about to be
     // painted — drawn by 31's own painter into this window's canvas, so the
     // two can never disagree about a footprint) under a hotspot dot, or the
-    // P badge in pressure mode. Read live rather than copied off the main
+    // P badge in pressure mode — with Multi-Brush on, every arm's ghost too. Read live rather than copied off the main
     // cursor — that one only renders while the main canvas is hovered, and a
     // copy could be a frame stale while the angle turns (Shift+Scroll from
     // the tablet). Like the main ghost it follows Show Brush Ghost and Brush
@@ -1153,17 +1155,37 @@
         }
         ringState = { pOn: pOn };
         var BC = window.__brushCursor;
-        if (!BC || typeof BC.ghostPainter !== 'function') return;
-        if (!ui.ghostPaint) ui.ghostPaint = BC.ghostPainter(ui.ghost);
-        ui.ghost.style.opacity = String(BC.ghostOpacity());
+        if (!BC || typeof BC.ghostSet !== 'function') return;
+        // 31's whole ghost: the dab under the pen, plus every other
+        // Multi-Brush arm's, laid over the box and clipped to it.
+        if (!ui.ghostPaint) ui.ghostPaint = BC.ghostSet(ui.ghost, ui.ghostArms);
+        var op = String(BC.ghostOpacity());
+        ui.ghost.style.opacity = op;
+        ui.ghostArms.style.opacity = op;
         // box.h is the canvas's full height in this window's CSS px.
-        ui.ghostPaint.paint(heldCount > 0 ? null : BC.ghostSpec(), BC.radiusRoot() * box.h,
-            (pop && pop.devicePixelRatio) || 1, ringX, ringY);
+        ui.ghostPaint.paint(heldCount === 0 && BC.ghostEnabled(), BC.radiusRoot() * box.h,
+            (pop && pop.devicePixelRatio) || 1, ringX, ringY,
+            { left: box.x, top: box.y, width: box.w, height: box.h });
+    }
+    // A held stroke lock (js/56) keeps the brush on a circle or a spoke round
+    // the canvas centre: the cursor goes where the paint does, as the main
+    // one does (31) — through the main canvas and back into the box.
+    function lockedRingPoint(x, y) {
+        var L = window.StrokeLock;
+        if (!L || !L.shaping() || !box || !box.w || !box.h) return { x: x, y: y };
+        var rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return { x: x, y: y };
+        var m = mapPoint(x, y), q = L.clientPoint(m.cx, m.cy);
+        return {
+            x: box.x + (q.x - rect.left) / rect.width * box.w,
+            y: box.y + (q.y - rect.top) / rect.height * box.h
+        };
     }
     function ringMove(e) {
         if (!ui) return;
         if (!ui.ringParts) buildRing();
-        ringX = e.clientX; ringY = e.clientY;
+        var at = lockedRingPoint(e.clientX, e.clientY);
+        ringX = at.x; ringY = at.y;
         ui.ring.style.transform = 'translate(' + ringX + 'px,' + ringY + 'px) translate(-50%,-50%)';
         if (ui.ring.style.display !== 'block') {
             ui.ring.style.display = 'block';
@@ -1349,6 +1371,7 @@
             blank: pdoc.getElementById('blank'),
             ring: pdoc.getElementById('ring'),
             ghost: pdoc.getElementById('ghost'),
+            ghostArms: pdoc.getElementById('ghostArms'),
             ghostPaint: null,
             bar: pdoc.getElementById('bar'),
             status: pdoc.getElementById('status'),

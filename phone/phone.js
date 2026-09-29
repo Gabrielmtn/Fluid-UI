@@ -409,6 +409,8 @@
             push: (typeof p.push === 'string' && /^(smudge|spread|gather|swirl)$/.test(p.push)) ? p.push : null,
             pushS: num(p.pushS, 0, 5, 1),
             ap: (typeof p.ap === 'number' && isFinite(p.ap)) ? (Math.abs(p.ap) | 0) & 0xff : 0,
+            at: p.at === 1 ? 1 : 0,
+            fc: p.fc === 1 ? 1 : 0,
             colors: (Array.isArray(p.colors) ? p.colors : [])
                 .filter(function (c) { return typeof c === 'string' && HEX.test(c); })
                 .slice(0, 16)
@@ -676,6 +678,10 @@
         if (i && i.angle) f.angle = i.angle;
         if (i && i.push) { f.push = i.push; f.pushS = i.pushS; }
         if (i && i.ap) f.ap = i.ap;
+        // Multi-Brush arms turn the tip with them (06d brushWireFields `at`).
+        if (i && i.at) f.at = 1;
+        // ...and keeps its pose relative to the center (`fc`).
+        if (i && i.fc) f.fc = 1;
         return f;
     }
 

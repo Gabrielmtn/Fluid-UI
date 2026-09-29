@@ -294,6 +294,96 @@
             el.addEventListener('change', applySymmetryMode);
             applySymmetryMode();
         })();
+        (function initSymmetrySameAngle() {
+            var el = document.getElementById('symmetrySameAngle');
+            if (!el) return;
+            function apply() { config.SYM_SAME_ANGLE = !!el.checked; }
+            el.addEventListener('change', apply);
+            apply();
+        })();
+        (function initSymmetryFaceCenter() {
+            var el = document.getElementById('symmetryFaceCenter');
+            if (!el) return;
+            function apply() { config.SYM_FACE_CENTER = !!el.checked; }
+            el.addEventListener('change', apply);
+            apply();
+        })();
+
+        // ── Stay oriented to the center (2026-09-25) ──────────────────────
+        // With config.SYM_FACE_CENTER the brush angle is measured from the
+        // dab's direction out of the canvas centre instead of from screen-up:
+        // the tip's pose RELATIVE to the centre stays fixed wherever you paint,
+        // so a chisel at 0° always points its long side along the radius. The
+        // offset is the pointer's bearing from the centre, clockwise from up
+        // (the sense stampAngle turns in), so straight above the centre the
+        // brush prints at exactly its own angle. It rides the SOURCE dab; the
+        // arms then turn it with them (armStampTurn), which puts every arm in
+        // the same pose relative to the centre — unless Same angle on every arm
+        // is on, in which case they all print the source's pose.
+        //
+        // The bearing is undefined AT the centre, and a stroke straight
+        // through it flips it 180° in one dab. So the pose is a carried state
+        // that follows the bearing at a capped TURN RATE per pixel of travel:
+        // at most 2/r radians per px, r = distance from the centre floored at
+        // one brush width. Going round the centre at radius r needs exactly
+        // 1/r, so anywhere a brush width or more out the pose tracks the
+        // bearing exactly (twice the rate any path there can ask for); only a
+        // pass right through the centre is eased, turning over at no more than
+        // 2/width rad/px (2.9°/px at a 40px brush) and exact again about two
+        // widths out. Per px of TRAVEL, not per dab, so dab spacing and stroke
+        // speed never change it. Inside half a brush width the cap also fades
+        // to zero, so a trembling hand parked on the centre holds its pose
+        // instead of random-walking it round (measured: 360° of wander over
+        // 300 ±1.5px dabs without the fade, 1.3° with it).
+        // `faceHeld` / `faceX, faceY` are that carried pose and where it was
+        // last laid (upright at the centre until a first dab), shared like the
+        // rake heading. `commit` = a real dab; the brush ghost (31) asks with
+        // commit false, which is exactly what the next dab there would print.
+        // A gap of more than a brush width since the last dab is a jump (a new
+        // stroke elsewhere), not travel, and lands on the exact bearing.
+        var faceHeld = 0, faceX = null, faceY = null;
+        function faceCenterTurn(x, y, commit) {
+            if (!config.SYM_FACE_CENTER) return 0;
+            var cx = canvas.width * 0.5, cy = canvas.height * 0.5;
+            var rx = x - cx, ry = y - cy;
+            var r = Math.hypot(rx, ry);
+            var D = symBrushDiameterPx();
+            var target = Math.atan2(rx, -ry);
+            var lx = (faceX === null) ? cx : faceX, ly = (faceY === null) ? cy : faceY;
+            var travel = Math.hypot(x - lx, y - ly);
+            var ht = Math.min(1, r / (0.5 * D)), hold = ht * ht * (3 - 2 * ht);
+            var cap = hold * 2 * travel / Math.max(r, D);
+            var d = target - faceHeld;
+            d -= 2 * Math.PI * Math.round(d / (2 * Math.PI));   // shortest way round
+            var a = (travel > D || Math.abs(d) <= cap) ? target : faceHeld + (d > 0 ? cap : -cap);
+            a -= 2 * Math.PI * Math.round(a / (2 * Math.PI));
+            if (commit) { faceHeld = a; faceX = x; faceY = y; }
+            return a;
+        }
+        window.faceCenterTurn = faceCenterTurn;
+
+        // ── Arm tip angle (2026-09-25) ────────────────────────────────────
+        // By default an arm's tip turns WITH the arm: the dab a 90° arm lays is
+        // the source dab carried round the centre, footprint and all, so four
+        // arms of a corner-shaped stamp close into a square instead of printing
+        // four copies at one angle. A mirrored arm (negative determinant) prints
+        // the tip mirrored as well, which is what makes a mirror mode read as
+        // one brush folded over. A rake bristle is a pure translation and keeps
+        // the brush's angle. config.SYM_SAME_ANGLE switches this off.
+        //
+        // Returns the arm's rotation φ in radians (clockwise on screen, the
+        // sense stampAngle turns in), or null when every arm keeps the brush's
+        // angle. The linear part is R(φ) for a rotation and R(φ)·F for a
+        // reflection (F = mirror across the tip's own vertical axis). The dab
+        // then prints at φ + angle, or mirrored at φ − angle: R(φ)·F·R(a) =
+        // R(φ − a)·F. splat() (05i) and the brush ghost (31) both apply that.
+        function armStampTurn(m) {
+            if (config.SYM_SAME_ANGLE) return null;
+            return (m[0] * m[4] - m[1] * m[3]) < 0
+                ? Math.atan2(-m[3], -m[0])
+                : Math.atan2(m[3], m[0]);
+        }
+        window.armStampTurn = armStampTurn;
         // ── Per-arm Pressure (2026-08-26) ────────────────────────────────
         // An arm can be marked as a PUSH arm in the Multi-Brush panel: it runs
         // the velocity pass and lays no dye, while its siblings paint normally.
@@ -371,6 +461,11 @@
             // told even while the painter holds a mirror-bound button.
             const strokeMir = window.__brushTipOn ? (window.__strokeMirrorPin | 0) : 0;
             const transforms = symmetryTransforms(config.SYMMETRY_MODE, animationMultiplier, dx, dy, strokeMir);
+            // Stay oriented to the center: the SOURCE dab's pose offset, for
+            // splat() to add to BRUSH_ANGLE on every arm. User strokes only —
+            // a programmatic source prints gaussian and must not move the
+            // carried pose.
+            window.__faceTurn = window.__brushTipOn ? faceCenterTurn(x, y, true) : 0;
             const relX = x - centerX;
             const relY = y - centerY;
             for (let i = 0; i < transforms.length; i++) {
@@ -397,12 +492,17 @@
                 //    its source and the pair read as two brushes, not one
                 //    folded over. A point reflection (mirrorXY = 180° rotation)
                 //    has determinant +1 and correctly does NOT flip.
+                //  · __armTurn — the arm's rotation for the tip (see
+                //    armStampTurn); null keeps the brush's own angle.
                 window.__armVelOnly = (armPushMask & (1 << transforms[i].arm)) ? true : null;
                 window.__armFlip = (m[0] * m[4] - m[1] * m[3]) < 0;
+                window.__armTurn = armStampTurn(m);
                 splat(finalX, finalY, armDx, armDy, armColor);
             }
             window.__armVelOnly = null;
             window.__armFlip = false;
+            window.__armTurn = null;
+            window.__faceTurn = 0;
             if (shouldBroadcast && typeof broadcastSplat === 'function') {
                 broadcastSplat(
                     x / canvas.width,
@@ -418,6 +518,8 @@
                 window.__brushTipOn = false;
                 window.__armVelOnly = null;
                 window.__armFlip = false;
+                window.__armTurn = null;
+                window.__faceTurn = 0;
             }
         }
         // Helper to apply a multiSplat with specific multiplier and radius, restoring after

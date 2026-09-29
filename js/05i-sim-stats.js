@@ -239,7 +239,19 @@
             // Brush rotation: degrees → radians for chisel/streak stamps (inert on
             // round shapes, and on the material clay stamp when stampNoise is 0,
             // so it never fights other splats).
-            gl.uniform1f(splatProg.uniforms.stampAngle, (config.BRUSH_ANGLE || 0) * Math.PI / 180);
+            // A Multi-Brush arm turns the tip with it (05g armStampTurn,
+            // published per dab as __armTurn): φ + angle, or on a mirrored arm
+            // the tip mirrored at φ − angle. Null = the brush's own angle.
+            // __faceTurn (Stay oriented to the center, 05g faceCenterTurn) is
+            // the source dab's bearing from the centre, part of "angle".
+            let _stampAng = (config.BRUSH_ANGLE || 0) * Math.PI / 180, _stampFlip = 0;
+            if (typeof window.__faceTurn === 'number') _stampAng += window.__faceTurn;
+            if (typeof window.__armTurn === 'number') {
+                if (window.__armFlip) { _stampAng = window.__armTurn - _stampAng; _stampFlip = 1; }
+                else _stampAng = window.__armTurn + _stampAng;
+            }
+            gl.uniform1f(splatProg.uniforms.stampAngle, _stampAng);
+            gl.uniform1f(splatProg.uniforms.stampFlip, _stampFlip);
             gl.uniform1f(splatProg.uniforms.ringRadius, 0); // classic blob — never inherit a stale ring stamp
             gl.uniform1f(splatProg.uniforms.barHalfW, 0);   // ...or a stale bar stamp
             // Custom brush shape (user-authored alpha stamp): user strokes only,
