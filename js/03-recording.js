@@ -675,7 +675,13 @@
             }
             return _recBtnCache;
         }
-        
+
+        // Record button label: countdown digit, then "Recording" while it runs
+        function _recRecordLabel(isRec) {
+            if (recCountdownActive) return String(recCountdownVal || 3);
+            return isRec ? 'Recording' : 'Record';
+        }
+
         // PERF: Lightweight state update - only updates button states, no DOM rebuild
         function recUpdateButtonStates() {
             const a = recGetActiveLayer();
@@ -685,7 +691,7 @@
             
             // Full panel buttons
             if (btns.rec) {
-                btns.rec.textContent = recCountdownActive ? String(recCountdownVal || 3) : 'Record';
+                btns.rec.textContent = _recRecordLabel(isRec);
                 btns.rec.classList.toggle('active', isRec);
             }
             if (btns.play) {
@@ -696,7 +702,7 @@
             
             // Mini panel buttons
             if (btns.miniRec) {
-                btns.miniRec.textContent = recCountdownActive ? String(recCountdownVal || 3) : 'Record';
+                btns.miniRec.textContent = _recRecordLabel(isRec);
                 btns.miniRec.classList.toggle('active', isRec);
             }
             if (btns.miniPause) {
@@ -774,7 +780,7 @@
             const playBtn = document.getElementById('recPlayBtn');
             const playAllBtn = document.getElementById('recPlayAllBtn');
             const a = recGetActiveLayer();
-            if (recordBtn) recordBtn.textContent = recCountdownActive ? String(recCountdownVal || 3) : 'Record';
+            if (recordBtn) recordBtn.textContent = _recRecordLabel(!!(a && a.timeline.isRecording));
             if (playBtn) playBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play Layer';
             if (playAllBtn) playAllBtn.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
             if (recordBtn) recordBtn.classList.toggle('active', !!(a && a.timeline.isRecording));
@@ -788,7 +794,7 @@
             const miniRecBtn = document.getElementById('recMiniRecordBtn');
             const miniPauseBtn = document.getElementById('recMiniPauseBtn');
             const miniPlayAllBtn = document.getElementById('recMiniPlayAllBtn');
-            if (miniRecBtn) miniRecBtn.textContent = recCountdownActive ? String(recCountdownVal || 3) : 'Record';
+            if (miniRecBtn) miniRecBtn.textContent = _recRecordLabel(!!(a && a.timeline.isRecording));
             if (miniPauseBtn) miniPauseBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play';
             if (miniPlayAllBtn) miniPlayAllBtn.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
             if (miniRecBtn) miniRecBtn.classList.toggle('active', !!(a && a.timeline.isRecording));
