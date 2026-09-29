@@ -140,6 +140,7 @@
             uniform float kTwist; // radians per unit radius
             uniform float kZoom;  // scale
             uniform float kBlend; // 0..1
+            uniform float kIsotropic; // 1 = Wedge folds in screen proportions (config.KALEIDO_ISOTROPIC)
             uniform float displayShading; // 0=off, >0 = shading intensity
             uniform float shadeInvert;    // 1 = flip relief normals (clay chiaroscuro: strokes read as carved dents)
             uniform float shadeRelief;    // SHADE_RELIEF x slider: relief strength (redistributes light across the form)
@@ -186,9 +187,20 @@
                 return 1.0 - abs(mod(uv, 2.0) - 1.0);
             }
             // Mode 1: Wedge - Facets create angular reflections
+            // With kIsotropic the fold works in SCREEN proportions (short
+            // side = 1; texelSize is the dye grid, the canvas's aspect), so a
+            // rotation or a mirror is one on screen and every facet is the
+            // same shape. UV is normalised per axis, and on a non-square
+            // canvas a rotation there is a rotation plus a stretch: each copy
+            // of the source facet came out squashed by a different amount and
+            // the mandala drew as an ellipse. Square canvas: ks = 1, unchanged.
             vec2 kaleidoWedge(vec2 uv) {
                 vec2 center = vec2(0.5);
-                vec2 p = uv - center;
+                float kAsp = texelSize.y / texelSize.x;
+                vec2 ks = (kIsotropic > 0.5)
+                    ? ((kAsp >= 1.0) ? vec2(kAsp, 1.0) : vec2(1.0, 1.0 / kAsp))
+                    : vec2(1.0);
+                vec2 p = (uv - center) * ks;
                 float ca = cos(kAngle), sa = sin(kAngle);
                 p = mat2(ca, -sa, sa, ca) * p;
                 float r = length(p) * max(0.0001, kZoom);
@@ -201,7 +213,7 @@
                 a = abs(a - segAngle * 0.5);
                 vec2 dir = vec2(cos(a), sin(a));
                 vec2 mapped = dir * r;
-                return mapped + center;
+                return mapped / ks + center;
             }
             // Mode 2/3: Mirror - Layers create stacked reflections with depth
             vec2 mirrorLayers(vec2 uv, bool horizontal) {

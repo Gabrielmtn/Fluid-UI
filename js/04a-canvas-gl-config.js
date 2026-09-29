@@ -1217,7 +1217,18 @@
                                       // 512 grid leaves (2026-09-25). Console-tunable;
                                       // false renders exactly as before.
 
-            SCATTER_BLOCK: true,      // Colliders cast shadows in the light shafts.
+            KALEIDO_ISOTROPIC: true,  // Kaleido Wedge (and Mandala Studio) folds in
+                                      // SCREEN proportions, so every facet is the same
+                                      // shape (05a kaleidoWedge). false = the historic
+                                      // fold in per-axis UV, where on a non-square
+                                      // canvas each copy came out stretched by a
+                                      // different amount: measured 2026-09-26 at
+                                      // 952x561, a round dot's copy straight up was a
+                                      // flat oval ~3x wider than tall, and the mandala
+                                      // drew as an ellipse. Square canvas: identical.
+                                      // Console kill switch, not persisted.
+
+            SCATTER_BLOCK: true,     // Colliders cast shadows in the light shafts.
                                       // No-op unless BOTH Scatter and a collision layer
                                       // exist, so ON by default is free where it does
                                       // not apply and correct where it does.

@@ -1937,6 +1937,7 @@
             gl.uniform1f(displayProg.uniforms.kAngle, window.kAngle || 0.0);
             gl.uniform1f(displayProg.uniforms.kTwist, window.kTwist || 0.0);
             gl.uniform1f(displayProg.uniforms.kZoom, window.kZoom || 1.0);
+            gl.uniform1f(displayProg.uniforms.kIsotropic, config.KALEIDO_ISOTROPIC !== false ? 1.0 : 0.0);
             gl.uniform1f(
                 displayProg.uniforms.kBlend,
                 (typeof window.kBlend === 'number' && isFinite(window.kBlend)) ? window.kBlend : 1.0

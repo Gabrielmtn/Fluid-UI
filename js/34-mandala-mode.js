@@ -25,10 +25,16 @@
 //      180/n degrees). Measured: dot painted at θ=10°, n=6 — at kAngle
 //      30° it renders at 10° (identity); at kAngle 0° that spot goes
 //      dark and the dot shows up at 20° and 40° instead.
-//   Texture space is the y-flip of screen space (splat() maps y →
-//   1 - y/H) and is normalised per-axis, so a texture-space angle θ
-//   points along screen vector (W·cos θ, −H·sin θ). Guides use that
-//   mapping, which is why spokes stay registered on a non-square canvas.
+//   The angle is measured y-UP (texture space is the y-flip of screen
+//   space: splat() maps y → 1 - y/H). Since 2026-09-26 the fold works in
+//   SCREEN proportions (config.KALEIDO_ISOTROPIC), so a fold angle θ
+//   points along screen vector (cos θ, −sin θ) and every wedge is the
+//   same shape. Before, it folded per-axis UV, where θ pointed along
+//   (W·cos θ, −H·sin θ): the wedges were unequal and each copy of the
+//   source came out stretched by a different amount (a round dot's copy
+//   straight up was a flat oval ~3x wider than tall at 16:9). foldDir()
+//   follows the switch, so guides and the wedge gate stay registered
+//   either way.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -114,6 +120,14 @@
     }
     function segAngleOf(n) { return 2 * Math.PI / n; }
 
+    // Screen direction (y-down, unnormalised) of the fold angle θ, for a
+    // W×H canvas. The fold is isotropic unless its kill switch is off.
+    function isoFold() { return !(window.config && window.config.KALEIDO_ISOTROPIC === false); }
+    function foldDir(theta, W, H) {
+        const iso = isoFold();
+        return [(iso ? 1 : W) * Math.cos(theta), -(iso ? 1 : H) * Math.sin(theta)];
+    }
+
     // Pin kAngle to segAngle/2 so the source wedge renders as itself.
     // The slider is step=1 and 180/n is often fractional, so the slider
     // carries the rounded value for display while window.kAngle takes the
@@ -156,12 +170,14 @@
     // inside the paintable source wedge?
     function insideWedge(x, y) {
         const segAngle = segAngleOf(wedgeCount());
-        const u = x / canvas.width - 0.5;
-        const v = (1 - y / canvas.height) - 0.5;       // screen y-down → texture y-up
+        const W = canvas.width, H = canvas.height;
+        let u = x / W - 0.5;
+        let v = (1 - y / H) - 0.5;                     // screen y-down → texture y-up
         // Every wedge meets at the hub; below a few px the wedge is thinner
         // than the brush, so let the centre through rather than making the
         // middle of the mandala unreachable.
         if (Math.hypot(u, v) < 0.02) return true;
+        if (isoFold()) { u *= W; v *= H; }             // the angle the shader folds
         let a = Math.atan2(v, u) % (2 * Math.PI);
         if (a < 0) a += 2 * Math.PI;
         const tol = 0.02;                              // don't stutter on the seam
@@ -222,9 +238,9 @@
         return svg;
     }
 
-    // Screen-space ray for a texture-space angle, aspect corrected.
+    // Screen-space ray along a fold angle.
     function rayTo(theta, W, H, len) {
-        const dx = W * Math.cos(theta), dy = -H * Math.sin(theta);
+        const d = foldDir(theta, W, H), dx = d[0], dy = d[1];
         const m = Math.hypot(dx, dy) || 1;
         return [W / 2 + dx / m * len, H / 2 + dy / m * len];
     }
@@ -301,12 +317,12 @@
         const picked = document.querySelector('input[name="mandalaFill"]:checked');
         const mode = (active() && picked) ? picked.value : 'off';
         if (mode === 'off') { window.ZoomView.reset(); return; }
-        // Aim at the middle of the wedge: texture angle segAngle/4, mapped to
-        // screen through the same aspect-correct vector the guides use.
+        // Aim at the middle of the wedge: fold angle segAngle/4, mapped to
+        // screen through the same vector the guides use.
         const segAngle = segAngleOf(wedgeCount());
         const th = segAngle / 4;
         const W = canvas.offsetWidth, H = canvas.offsetHeight;
-        const dx = W * Math.cos(th), dy = -H * Math.sin(th);
+        const d = foldDir(th, W, H), dx = d[0], dy = d[1];
         const m = Math.hypot(dx, dy) || 1;
         window.ZoomView.focus(dx / m, dy / m, 0.5, FILL_ZOOM[mode] || 1);
     }
