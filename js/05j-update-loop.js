@@ -1175,6 +1175,10 @@
                 gl.uniform1f(gradientProg.uniforms.pScale, _pScale);
                 // Half-difference gradient (see gradientFrag): console A/B
                 gl.uniform1f(gradientProg.uniforms.uHalfGrad, config.PROJECTION_HALF_GRADIENT === true ? 1.0 : 0.0);
+                // Walls brake per simulated second, not per step (see
+                // obstacleDampFrag): one 60 Hz step at Time 1 is dt 0.016.
+                const _brakeK = config.COLLIDER_BRAKE_DT === false ? 0.0 : dt / 0.016;
+                gl.uniform1f(gradientProg.uniforms.uBrakeK, _brakeK);
                 gl.uniform1f(gradientProg.uniforms.openBoundary, _openBoundary);
                 gl.uniform1i(gradientProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(gradientProg.uniforms.uPressure, 0);
@@ -1199,6 +1203,7 @@
                     gl.uniform1f(obstacleDampProg.uniforms.dt, dt);
                     gl.uniform1f(obstacleDampProg.uniforms.uHalo,
                         (typeof config.OBS_BLOCK_HALO === 'number') ? Math.max(0, Math.min(1, config.OBS_BLOCK_HALO)) : 0.35);
+                    gl.uniform1f(obstacleDampProg.uniforms.uBrakeK, _brakeK);
                     gl.uniform2f(obstacleDampProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform1i(obstacleDampProg.uniforms.uVelocity, 0);
                     gl.uniform1i(obstacleDampProg.uniforms.uObstacle, 1);

@@ -774,6 +774,15 @@
                                       // wall, scaled by the wall's strength response
                                       // (05b obstacleDampFrag). 0 = off (Block then
                                       // differs from Deflect only in the apron window).
+            COLLIDER_BRAKE_DT: true,  // Walls brake the flow per SIMULATED second, not per
+                                      // step (2026-09-25). The wall damp and the in-wall
+                                      // velocity kill were per-step multipliers, so a
+                                      // 144 Hz screen braked 2.4x as hard per second and
+                                      // Time 0.13x about 7.7x. Now each is raised to
+                                      // dt/0.016 (the 60 Hz step), so a steady 60 Hz at
+                                      // Time 1 is unchanged. Measured effect at 0.13x is
+                                      // modest (+15% paint fall speed inside letters).
+                                      // false = the per-step braking.
             OBS_DIV_MASK: true,       // Cut-cell divergence RHS: a mostly-solid cell's
                                       // mass source scales by its fluid fraction, so
                                       // pressure cannot integrate inside sealed walls

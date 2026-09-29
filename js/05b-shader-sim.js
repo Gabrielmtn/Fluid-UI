@@ -2057,6 +2057,8 @@
             uniform float uHalfGrad; // 1 = half-difference gradient
                                      // (config.PROJECTION_HALF_GRADIENT);
                                      // 0 / unset = the historic full difference
+            uniform float uBrakeK;   // dt / 0.016 for the in-wall kill below
+                                     // (config.COLLIDER_BRAKE_DT); 0 / unset = per step
             uniform int hasObstacle;
             ${obstacleSolidityGLSL}
             void main() {
@@ -2115,8 +2117,13 @@
                     // Inside the solid itself velocity dies outright — the
                     // damp pass used to be the only thing doing this; keeping
                     // it here makes the projected field consistent even if
-                    // that pass is ever retired.
-                    vel *= 1.0 - solidity(vUv);
+                    // that pass is ever retired. Per simulated second like the
+                    // damp pass (see obstacleDampFrag): in a leaky wall this is
+                    // a brake, and per step it braked harder at 144 Hz or a
+                    // low Time setting.
+                    float keepV = 1.0 - solidity(vUv);
+                    if (uBrakeK > 0.0 && abs(uBrakeK - 1.0) > 1e-6) keepV = pow(max(keepV, 0.0), uBrakeK);
+                    vel *= keepV;
                 }
                 fragColor = vec4(vel, 0.0, 1.0);
             }
@@ -2161,6 +2168,7 @@
             uniform float uObsMax;  // max collisionStrength (coverage normalizer)
             uniform float dt;       // sim step (s) — the Slow drag is a half-life
             uniform float uHalo;    // Block boundary-layer halo strength (config.OBS_BLOCK_HALO, 0 = off)
+            uniform float uBrakeK;  // dt / 0.016 (config.COLLIDER_BRAKE_DT); 0 = per-step braking
             ${obsTexelGLSL}
             void main() {
                 vec2 vel = texture(uVelocity, vUv).xy;
@@ -2204,6 +2212,14 @@
                 // does, and the flow slides around.
                 float haloWin = stick * uHalo * smoothstep(0.05, 0.5, obsTexCoverage(halo, uObsMax));
                 float damp = 1.0 - max(osr * wallWin, obsTexResponse(halo, uObsMax) * haloWin);
+                // Per simulated second, not per step (2026-09-25). The factor
+                // above is what one 60 Hz step at Time 1 keeps (dt 0.016, the
+                // clamp), so other steps raise it to dt/0.016: a 144 Hz step
+                // keeps damp^0.42, a Time 0.13x step damp^0.13. As a flat
+                // per-step multiply, 144 Hz braked 2.4x as hard per second and
+                // Time 0.13x about 7.7x. k == 1 skips pow, so a 16 ms step (60
+                // Hz at Time 1) stays bit-identical.
+                if (uBrakeK > 0.0 && abs(uBrakeK - 1.0) > 1e-6) damp = pow(max(damp, 0.0), uBrakeK);
                 // SLOW: a drag field, not a wall. Velocity decays with a
                 // half-life set by the strength on a log scale — 1.5 frames
                 // at 1.0 (tar: whatever enters stops), ~12 at 0.5 (honey),
