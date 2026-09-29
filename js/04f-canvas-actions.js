@@ -82,6 +82,25 @@
 
             btn.classList.toggle('active', isPaused);
 
+            // Resuming with Freeze on picks up STILL: the motion the pause
+            // caught is dropped instead of braking out as a slide, so you
+            // paint on the canvas exactly as it looked paused. Pressure goes
+            // too — it warm-starts the next solve, and a stale gradient
+            // would push the fluid again on its own.
+            if (!isPaused && window.__fluidFrozen && config.FREEZE_RESUME_STILL !== false) {
+
+                [velocity.read, velocity.write, pressure.read, pressure.write].forEach((t) => {
+
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+
+                    gl.clearColor(0, 0, 0, 0);
+
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+
+                });
+
+            }
+
         };
 
         

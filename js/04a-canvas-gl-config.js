@@ -539,6 +539,19 @@
                                       // p·this; gradient divides it back out. Console-
                                       // tunable for A/B (1 = legacy unscaled).
 
+            FREEZE_WALL_BRAKE: true,  // true = Freeze (Space) brakes the fluid to rest in
+                                      // the same wall time at every Time setting (05j,
+                                      // the velocity advection's decay); false = the
+                                      // brake runs on the sim clock and takes 1/Time as
+                                      // long (~5 s at 0.2x). Inert at Time >= 1.
+                                      // Console kill switch, not persisted.
+
+            FREEZE_RESUME_STILL: true, // true = resuming a pause (Shift+Space) with Freeze
+                                      // on drops the motion the pause caught, so
+                                      // nothing slides (04f togglePause); false =
+                                      // the caught motion brakes out as usual.
+                                      // Console kill switch, not persisted.
+
             PROJECTION_HALF_GRADIENT: true, // true = the projection subtracts the gradient
                                       // its own divergence and solve imply (half
                                       // differences, 05b gradientFrag); false = the

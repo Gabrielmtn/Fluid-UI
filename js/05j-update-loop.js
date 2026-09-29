@@ -1253,7 +1253,18 @@
                     lastVelDiss = config.VELOCITY_DISSIPATION;
                     velDecayAccum = 0;
                 }
-                const _velDecay = computeDecayDt(config.VELOCITY_DISSIPATION, velDecayAccum, dt);
+                // Freeze's brake (0.9 per 1/60 s, set by toggleFreeze) runs
+                // on the wall clock whenever Time is below 1: on the sim clock
+                // it took 1/timeScale as long to bring the canvas to rest —
+                // ~5 s at Time 0.2, ~100 s at the slider's 0.01 floor — so
+                // the moment you meant to capture kept drifting. rawDt is the
+                // step before the Time scale, so the pause lands in the same
+                // wall time at every Time, and the dye, advecting on the slow
+                // clock, drifts timeScale as far before it does. At Time >= 1
+                // dt already covers rawDt: unchanged, bit for bit.
+                const _velDecayIn = (_frozen && config.FREEZE_WALL_BRAKE !== false)
+                    ? Math.max(dt, rawDt) : dt;
+                const _velDecay = computeDecayDt(config.VELOCITY_DISSIPATION, velDecayAccum, _velDecayIn);
                 velDecayAccum = _velDecay.accum;
                 gl.uniform1f(advectionProg.uniforms.decayDt, _velDecay.decayDt);
                 gl.activeTexture(gl.TEXTURE0);
