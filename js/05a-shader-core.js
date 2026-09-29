@@ -128,6 +128,7 @@
             uniform vec4 uRasterC3;
             uniform sampler2D uShadeForm; // quarter-res blurred frame: the shading height field
             uniform vec2 shadeTexelSize;
+            uniform float shadeDetailGain; // form long side / 256: the Sobel's per-texel slope back to 256-texel units (config.SHADE_DETAIL_EVEN)
             uniform sampler2D uShadeWall; // collider mask, sim res (05b shadeWallFrag): 1 where a wall cuts the paint
             uniform float shadeWalls;     // 1 = uShadeForm holds the wall-split luma sums (05b shadeFormFrag)
             uniform float shadeWallRim;   // config.SHADE_WALL_RIM: how deep a wall's edge reads, x the paint's own step
@@ -543,6 +544,13 @@
                             g = mix(g, gk, kw);
                         }
                     }
+                    // The Sobel measures change per FORM texel, so a finer
+                    // Shading Detail flattened every slope with it: 2048 lit
+                    // at 1/8 of 256's relief, 128 at double -- the pick read
+                    // inverted. Back in 256-texel units the same paint tilts
+                    // the same at every setting and the finer ones add their
+                    // veins on top. 1.0 at 256, so the stock look is exact.
+                    g *= shadeDetailGain;
                     float dx = g.x;
                     float dy = g.y;
                     float nStr = displayShading * 6.0 * shadeFade * (shadeInvert > 0.5 ? -1.0 : 1.0);

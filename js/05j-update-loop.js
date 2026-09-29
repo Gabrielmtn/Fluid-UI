@@ -1916,6 +1916,10 @@
             gl.uniform1f(displayProg.uniforms.maskOverlayOn, _mOverlay ? 1 : 0);
             if (_shadingOn) {
                 gl.uniform2f(displayProg.uniforms.shadeTexelSize, shadeForm.texelSizeX, shadeForm.texelSizeY);
+                // Relief slopes in 256-texel units whatever Shading Detail is
+                // (05a); false = the old per-texel slopes, bit for bit.
+                gl.uniform1f(displayProg.uniforms.shadeDetailGain, config.SHADE_DETAIL_EVEN === false ? 1.0
+                    : Math.max(shadeForm.width, shadeForm.height) / 256);
             }
             gl.uniform1f(displayProg.uniforms.shadeWalls, _shadeWallsOn ? 1.0 : 0.0);
             gl.uniform1f(displayProg.uniforms.shadeWallRim,

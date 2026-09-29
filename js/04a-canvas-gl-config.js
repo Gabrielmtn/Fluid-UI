@@ -451,6 +451,13 @@
                                       // (sharper relief, and past ~1024 the pixel-scale
                                       // striations the fixed base was chosen to exclude).
                                       // Left at 256 by default for that reason.
+            SHADE_DETAIL_EVEN: true,  // Keep the relief's strength the same at every
+                                      // SHADE_FORM_RESOLUTION (2026-09-27). The Sobel
+                                      // measured slope per form texel, so 2048 lit at 1/8
+                                      // of 256's relief and 128 at double: "Finest" was
+                                      // nearly invisible. true = slopes in 256-texel
+                                      // units (05a shadeDetailGain; 256 unchanged).
+                                      // false = the old per-texel slopes. Console-tunable.
             SHADE_WALLS: true,        // Surface Shading around colliders (2026-09-22): split
                                       // the form field by the collider mask and put the
                                       // paint's step back at each wall's own edge, so the
