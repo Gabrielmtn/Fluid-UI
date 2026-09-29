@@ -3670,6 +3670,95 @@
         return wrap;
     }
 
+    // Stroke locks (js/56): a key held while painting keeps the brush at its
+    // distance from the centre (a circle) or on its angle (a spoke in and out
+    // of the centre). One js/48 picker per lock; the key is written through
+    // the moment it is chosen, like every hotkey, and Settings → Hotkeys
+    // lists it too — so the pickers follow outside changes.
+    function buildStrokeLockBlock() {
+        var wrap = document.createElement('div');
+        var SL = window.StrokeLock, HK = window.Hotkeys;
+        if (!SL || !HK || typeof HK.picker !== 'function') return wrap;
+        wrap.className = 'stroke-lock-block';
+
+        var head = document.createElement('label');
+        head.className = 'brush-section-label';
+        head.textContent = 'Stroke Locks';
+        head.title = 'Keys you hold while you paint. The brush stays on a circle round the centre of the canvas, '
+            + 'or on a straight line through it, even when your hand drifts off it.';
+        wrap.appendChild(head);
+
+        var note = document.createElement('div');
+        var pickers = {};
+        [
+            { kind: 'distance', name: 'Keep distance', sub: 'Circles round the centre',
+              hint: 'Hold it while you paint: the brush stays as far from the centre as it was when you pressed it, '
+                  + 'so you can swirl a clean circle. Let go to paint freely again.' },
+            { kind: 'angle', name: 'Keep angle', sub: 'To and from the centre',
+              hint: 'Hold it while you paint: the brush stays on the line through the centre it was on when you pressed it, '
+                  + 'so it only moves toward or away from the centre. Good for pushing colours together.' }
+        ].forEach(function (d) {
+            var row = document.createElement('div');
+            row.className = 'hk-row stroke-lock-row';
+            var p = HK.picker({
+                value: SL.key(d.kind),
+                selfId: 'lock:' + d.kind,
+                noteEl: note,
+                hint: d.hint,
+                onChange: function (combo) { SL.setKey(d.kind, combo); }
+            });
+            pickers[d.kind] = p;
+            row.appendChild(p.el);
+            var txt = document.createElement('div');
+            txt.className = 'hk-row-text';
+            txt.title = d.hint;
+            var nm = document.createElement('div');
+            nm.className = 'hk-row-name';
+            nm.textContent = d.name;
+            var sub = document.createElement('div');
+            sub.className = 'hk-row-sub';
+            sub.textContent = d.sub;
+            txt.appendChild(nm);
+            txt.appendChild(sub);
+            row.appendChild(txt);
+            wrap.appendChild(row);
+        });
+        wrap.appendChild(note);
+
+        // The circle or line (and the centre) drawn on the canvas while a
+        // lock key is held. Off by default; the brush cursor rides the lock
+        // either way.
+        var guideRow = document.createElement('div');
+        guideRow.className = 'control-group checkbox-group';
+        var guideCb = document.createElement('input');
+        guideCb.type = 'checkbox';
+        guideCb.id = 'strokeLockGuides';
+        guideCb.checked = SL.showGuides();
+        var guideLbl = document.createElement('label');
+        guideLbl.setAttribute('for', 'strokeLockGuides');
+        guideLbl.style.margin = '0';
+        guideLbl.textContent = 'Show guides';
+        guideLbl.title = 'While a lock key is held, draw the circle or line the brush is kept on, and mark the centre.';
+        guideRow.appendChild(guideCb);
+        guideRow.appendChild(guideLbl);
+        wrap.appendChild(guideRow);
+        guideCb.addEventListener('change', function () { SL.setShowGuides(guideCb.checked); });
+
+        // A key moved here from another binding, re-keyed or removed in
+        // Settings → Hotkeys: show it. Only when it differs, so a picker's
+        // own message ("Moved from …") outlives the notice its edit set off.
+        function sync() {
+            Object.keys(pickers).forEach(function (k) {
+                var p = pickers[k];
+                if (!p.isListening() && p.getValue() !== SL.key(k)) p.setValue(SL.key(k));
+            });
+            if (guideCb.checked !== SL.showGuides()) guideCb.checked = SL.showGuides();
+        }
+        if (typeof HK.onChange === 'function') HK.onChange(sync);
+        SL.onChange(sync);
+        return wrap;
+    }
+
     function buildButtonRole(side, BM, syncLock) {
         var box = document.createElement('div');
         box.style.cssText = 'margin-bottom:10px;';
@@ -3932,6 +4021,7 @@
         // What each button DOES leads the section: everything below it is a
         // parameter of an action one of these two chose.
         body.appendChild(buildButtonRolesBlock());
+        body.appendChild(buildStrokeLockBlock());
 
         // --- Replay Mode ---
         var modeLabel = document.createElement('label');

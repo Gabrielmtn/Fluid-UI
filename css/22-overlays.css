@@ -1298,6 +1298,15 @@ input[type="color"].text-swatch::-moz-color-swatch {
 .hk-empty { font-size: 10px; line-height: 1.4; color: rgba(255, 255, 255, 0.45); padding: 2px 0; }
 .hk-block > .hk-picker-note { margin: 6px 0 0; }
 
+/* ── Stroke locks (js/56-stroke-lock.js) ──
+   Stroke and replay's two hold-to-lock keys: Settings → Hotkeys' row shape
+   with a wider key, since a lock key keeps its own ×. */
+.stroke-lock-block { margin-bottom: 10px; }
+.stroke-lock-row .hk-picker { flex: 0 0 104px; }
+.stroke-lock-row .hk-picker-key { height: 26px; padding: 0 6px; font-size: 11px; }
+.stroke-lock-row .hk-picker-clear { height: 26px; width: 22px; }
+.stroke-lock-block > .hk-picker-note { margin: 4px 0 0; }
+
 /* ── Text overlay arrange mode ── */
 #text-arrange-canvas {
     /* sized/positioned inline; swallows pointer events so painting is paused */

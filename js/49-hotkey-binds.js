@@ -1144,17 +1144,25 @@
         return H.list().filter(function (b) { return b.source === 'text'; });
     }
 
+    // Keys another module keeps for itself (Stroke and replay's stroke
+    // locks, js/56): listed under the binding's own `group`, re-keyed with
+    // its set(), taken off with its clear().
+    function otherBindings() {
+        return H.list().filter(function (b) { return b.source !== 'text' && b.source !== 'controls'; });
+    }
+
     function render() {
         if (!block || !block.isConnected) { if (!mountBlock()) return; }
         var texts = textBindings();
-        var keyed = binds.filter(function (b) { return !!b.combo; }).length + texts.length;
+        var others = otherBindings();
+        var keyed = binds.filter(function (b) { return !!b.combo; }).length + texts.length + others.length;
         countEl.textContent = keyed ? String(keyed) : '';
         if (listEl.hidden) return;
         // Never pull a picker out from under a key being chosen.
         if (H.isListening() && listEl.contains(document.activeElement)) { renderDirty = true; return; }
         renderDirty = false;
         listEl.innerHTML = '';
-        if (!binds.length && !texts.length) {
+        if (!binds.length && !texts.length && !others.length) {
             var empty = document.createElement('div');
             empty.className = 'hk-empty';
             empty.textContent = 'No hotkeys yet. Press ' + H.format('Ctrl+Shift+KeyH') +
@@ -1189,6 +1197,18 @@
                 }));
             });
         }
+        var lastGroup = null;
+        others.forEach(function (o) {
+            var g = o.group || 'Other';
+            if (g !== lastGroup) { group(g); lastGroup = g; }
+            listEl.appendChild(row({
+                combo: o.combo, selfId: o.id,
+                name: o.label, sub: [o.where, o.does].filter(Boolean).join(' · '),
+                onKey: function (combo) { if (o.set) o.set(combo); },
+                delTitle: 'Take the key off',
+                onDelete: function () { if (o.clear) o.clear(); }
+            }));
+        });
     }
 
     function group(title) {

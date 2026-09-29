@@ -828,6 +828,15 @@
         function buttonBit(btn) { return btn === 0 ? 1 : (btn === 2 ? 2 : 0); }
         let replayButton = null;   // which button latched the replay hold
         let paintButton = null;    // ...and which one owns the live stroke
+        // Where a pointer or touch PAINTS, in canvas px. A held stroke lock
+        // (js/56 — Keep distance / Keep angle, Stroke and replay) holds the
+        // brush on a circle or a spoke round the canvas centre however the
+        // hand wanders, so it is applied here, before the engine, the
+        // recorder, the replay store and the room see the position.
+        function paintCoords(e) {
+            const c = getCanvasCoordinates(e);
+            return window.StrokeLock ? window.StrokeLock.apply(c.x, c.y) : c;
+        }
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'touch') return; // touchstart owns touch
             const btnMode = buttonMode(e.button);
@@ -913,7 +922,7 @@
             // stabilizer's catch-up dabs are part of this stroke and must
             // land in this stroke's brush.
             if (window.ButtonModes) window.ButtonModes.beginStroke(e.button);
-            const coords = getCanvasCoordinates(e);
+            const coords = paintCoords(e);
             pointer.down = true;
             pointer.moved = false;
             pointer.x = coords.x;
@@ -1001,6 +1010,15 @@
             // idle device can still release itself.
             if (pointer.down && window.__paintPointerId != null
                 && e.pointerId !== window.__paintPointerId) return;
+            // Every position this move carries — the coalesced sub-frame
+            // samples, oldest first; the last is the event's own — through
+            // paintCoords exactly ONCE and in order. Keep distance (js/56)
+            // turns the brush by how the hand moves from one sample to the
+            // next, so it must see them as they happened, not the event's
+            // position and then the samples leading up to it again.
+            const _evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
+            const _pts = ((_evs && _evs.length) ? _evs : [e]).map(paintCoords);
+            const _at = _pts[_pts.length - 1];
             // The live cursor, in canvas px, whatever else is going on. The
             // gate right below freezes `pointer` for a replay or a pause — the
             // stroke state must not move while a replay paints — but the brush
@@ -1008,9 +1026,8 @@
             // from here (05j): "the paint in the right spot, the light
             // connected to the current brush location, not the replay one".
             {
-                const _cc = getCanvasCoordinates(e);
                 const _cp = window.__cursorPos || (window.__cursorPos = { x: 0, y: 0, at: 0 });
-                _cp.x = _cc.x; _cp.y = _cc.y; _cp.at = Date.now();
+                _cp.x = _at.x; _cp.y = _at.y; _cp.at = Date.now();
             }
             // The paint button let go while another button stays down — tip
             // lifted with the barrel still pressed, left released under a held
@@ -1030,20 +1047,11 @@
             // Engine feed: replay every coalesced sub-frame sample (position)
             // while a stroke is live. Density is governed by BRUSH_SPACING.
             if (window.BrushEngine && window.BrushEngine.isActive()) {
-                const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
-                if (evs && evs.length) {
-                    for (let i = 0; i < evs.length; i++) {
-                        const c = getCanvasCoordinates(evs[i]);
-                        window.BrushEngine.move(c.x, c.y);
-                    }
-                } else {
-                    const c = getCanvasCoordinates(e);
-                    window.BrushEngine.move(c.x, c.y);
-                }
+                for (let i = 0; i < _pts.length; i++) window.BrushEngine.move(_pts[i].x, _pts[i].y);
             }
             // Pointer state (was the old mousemove path): drives the release
             // velocity/point, the multiplayer cursor, recording and broadcast.
-            const coords = getCanvasCoordinates(e);
+            const coords = _at;
             pointer.dx = (coords.x - pointer.x) * 10.0;
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
@@ -1494,7 +1502,7 @@
             // full idle in 05j — same contract as the pointerdown path.
             if (window.ButtonModes) window.ButtonModes.beginStroke(0);
             const touch = e.touches[0];
-            const coords = getCanvasCoordinates(touch);
+            const coords = paintCoords(touch);
             pointer.down = true;
             pointer.moved = false;
             pointer.x = coords.x;
@@ -1544,7 +1552,7 @@
             if (TouchGestures.isActive()) { TouchGestures.move(e); return; }
             if (TouchGestures.isSuppressed()) return;
             const touch = e.touches[0];
-            const coords = getCanvasCoordinates(touch);
+            const coords = paintCoords(touch);
             pointer.dx = (coords.x - pointer.x) * 10.0;
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
