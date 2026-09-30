@@ -252,12 +252,17 @@
             });
             if (window.Boot.titleCard && splash) {
                 // Title card rides in with the window, then dissolves off the
-                // already-running app underneath it.
+                // already-running app underneath it. The boot cursor stays up
+                // with the card and goes halfway through its dissolve (0.6s in
+                // css/init-responsive.css) — where the picture turns from card
+                // to app — so the two leave together.
+                var releaseCursor = window.Boot.holdCursor ? window.Boot.holdCursor() : function () {};
                 window.Boot.onReveal(function (info) {
                     setTimeout(function () {
                         splash.classList.add('ready');
                         setTimeout(function () {
                             splash.classList.add('fade-out');
+                            setTimeout(releaseCursor, 300);
                             setTimeout(function () {
                                 if (splash.parentNode) splash.parentNode.removeChild(splash);
                             }, 700);

@@ -71,6 +71,7 @@
     var TITLE_HOLD_MS = 420;   // title-card dwell after the window has landed
     var QUIET_FRAMES = 5;      // identical layout samples that mean "settled"
     var QUIET_MAX_MS = 1500;   // ...but never wait longer than this for quiet
+    var CURSOR_HOLD_MAX_MS = 2500; // past the card's hold, a held orb goes regardless
     var WATCHDOG_MS = 9000;    // a boot that never signals still has to appear
     var REPLY_MS = 2000;       // main answers 'boot-ready' far inside this
     var fadeMs = 420;          // real value arrives from main on 'boot-reveal'
@@ -221,7 +222,11 @@
     function enter() {
         if (entered) return;
         entered = true;
-        stopCursor();
+        // A title card that is about to dissolve holds the orb until it goes
+        // (holdCursor, below) — cursor and card leave the screen together.
+        // With nothing holding it, the orb goes as the window comes up.
+        if (cursorHolds > 0) setTimeout(stopCursor, fadeMs + TITLE_HOLD_MS + CURSOR_HOLD_MAX_MS);
+        else stopCursor();
         dropSplashIfNoCard();
         // A launch with no ramp to ride (fade disabled, main gone) still
         // has to show the card rather than leave it sitting at zero.
@@ -349,18 +354,45 @@
         // So nothing goes over the app at all. The rule has to name `*`
         // because cursor INHERITANCE loses to any element that sets its own
         // (measured — a rule on <html> alone is not enough during boot), and
-        // it hangs off `.booting`, which enter() drops at the reveal. That is
-        // belt AND braces: even if this node were somehow left behind, the
-        // class going away already stops it applying, and either way there is
-        // no hit-test target to block anything.
+        // it hangs off its own `.boot-cursor` class, which stopCursor() drops.
+        // That is belt AND braces: even if this node were somehow left behind,
+        // the class going away already stops it applying, and either way there
+        // is no hit-test target to block anything.
+        //
+        // Its own class, not `.booting`: `.booting` has to go at the reveal
+        // (it freezes transitions), but the orb stays up through the title
+        // card's dwell and leaves WITH the card — see holdCursor().
+        root.classList.add('boot-cursor');
         curStyle = document.createElement('style');
         curStyle.id = 'boot-cursor-style';
-        curStyle.textContent = 'html.booting, html.booting * { cursor: url("' +
+        curStyle.textContent = 'html.boot-cursor, html.boot-cursor * { cursor: url("' +
             CUR_SRC + '") ' + CUR_HOT + ' ' + CUR_HOT + ', progress !important; }';
         (document.head || root).appendChild(curStyle);
     }
 
+    // The orb is the loading screen's cursor, and the title card is part of
+    // the loading screen — so while the card is up, the orb stays. Dropping it
+    // at the reveal left the app's own cursor sitting over a card that then
+    // held for another second and a half, and the two read as separate exits.
+    // The card's owner (20-mixer-layout.js) takes a hold before the reveal and
+    // releases it in the middle of the card's dissolve. A cursor cannot fade
+    // (every change flashes the arrow, see above), so this is still ONE cut —
+    // it just lands where the picture turns from card to app.
+    var cursorHolds = 0;
+    function holdCursor() {
+        if (!curStyle || entered) return function () {};
+        cursorHolds++;
+        var released = false;
+        return function release() {
+            if (released) return;
+            released = true;
+            if (--cursorHolds <= 0 && entered) stopCursor();
+        };
+    }
+
     function stopCursor() {
+        cursorHolds = 0;
+        root.classList.remove('boot-cursor');
         if (curStyle && curStyle.parentNode) curStyle.parentNode.removeChild(curStyle);
         curStyle = null;
         // By id as well as by reference, and including the veil this used to
@@ -383,6 +415,9 @@
         // caller (20-mixer-layout.js) runs well after the reveal.
         get titleCard() { return titleCard(); },
         done: done,
+        // Keep the boot cursor past the reveal; returns release(). Take it
+        // BEFORE the reveal — once the window is up, it is a no-op.
+        holdCursor: holdCursor,
         // Run fn when the window starts fading in. Late registrations run
         // immediately, so a chunk that loads after the reveal still works.
         onReveal: function (fn) {
