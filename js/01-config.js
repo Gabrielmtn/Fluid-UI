@@ -40,8 +40,6 @@
         
         let showCursor = true;
         
-        let savedDensity = null;
-        let savedVelocity = null;
         let activePreset = null;
         
         const canvas = document.getElementById('canvas');

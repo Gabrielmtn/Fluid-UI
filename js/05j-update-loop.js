@@ -124,6 +124,9 @@
             _viscKernel = { pairs: pairs, spacing: spacing, falloff: Math.exp(0.5 * (lo + hi)) };
             return _viscKernel;
         }
+        // Freeze (Space): the velocity rate while frozen, per 1/60 s. Motion
+        // eases out over ~0.85 s instead of stopping dead.
+        const FREEZE_VELOCITY_BRAKE = 0.9;
         // The desktop build holds its window invisible until one frame has
         // actually been drawn — that is the only proof the context, the
         // programs and every framebuffer are real (js/00a-boot.js).
@@ -896,8 +899,8 @@
                 }
                 // ── Standard Chorin projection order: forces → project → advect ──
                 // ── Freeze (Space) stands the fluid's OWN forces down ──────
-                // toggleFreeze (04b) pins dye dissipation at 1.0 and brakes
-                // velocity at 0.9/frame, but two passes below add velocity
+                // Freeze holds dye dissipation at 1.0 and brakes velocity at
+                // 0.9/frame (the advection passes below), but two passes add velocity
                 // back every step with no hand on the canvas: vorticity
                 // confinement feeds on whatever curl is still braking out,
                 // and the Gravity Direction pad re-injects a push from the
@@ -1289,14 +1292,18 @@
                 gl.uniform1f(advectionProg.uniforms.wetInfluence, 0.0);
                 gl.uniform1i(advectionProg.uniforms.uVelocity, 0);
                 gl.uniform1i(advectionProg.uniforms.uSource, 0);
-                gl.uniform1f(advectionProg.uniforms.dissipation, config.VELOCITY_DISSIPATION);
+                // Freeze brakes here and only here: config keeps the user's
+                // Velocity Sustain, so Save, presets and the room mirror never
+                // capture the brake as their setting (see toggleFreeze, 04b).
+                const _velRate = _frozen ? FREEZE_VELOCITY_BRAKE : config.VELOCITY_DISSIPATION;
+                gl.uniform1f(advectionProg.uniforms.dissipation, _velRate);
                 // Batched decay (see header): a slider change resets the debt
                 // so an accumulated exponent is never applied to a new rate.
-                if (config.VELOCITY_DISSIPATION !== lastVelDiss) {
-                    lastVelDiss = config.VELOCITY_DISSIPATION;
+                if (_velRate !== lastVelDiss) {
+                    lastVelDiss = _velRate;
                     velDecayAccum = 0;
                 }
-                // Freeze's brake (0.9 per 1/60 s, set by toggleFreeze) runs
+                // Freeze's brake (0.9 per 1/60 s) runs
                 // on the wall clock whenever Time is below 1: on the sim clock
                 // it took 1/timeScale as long to bring the canvas to rest —
                 // ~5 s at Time 0.2, ~100 s at the slider's 0.01 floor — so
@@ -1307,7 +1314,7 @@
                 // dt already covers rawDt: unchanged, bit for bit.
                 const _velDecayIn = (_frozen && config.FREEZE_WALL_BRAKE !== false)
                     ? Math.max(dt, rawDt) : dt;
-                const _velDecay = computeDecayDt(config.VELOCITY_DISSIPATION, velDecayAccum, _velDecayIn);
+                const _velDecay = computeDecayDt(_velRate, velDecayAccum, _velDecayIn);
                 velDecayAccum = _velDecay.accum;
                 gl.uniform1f(advectionProg.uniforms.decayDt, _velDecay.decayDt);
                 gl.activeTexture(gl.TEXTURE0);
@@ -1552,8 +1559,10 @@
                 // Breathing (45) runs the dye at a rate of its own while it is
                 // on: its Fades box on is a fade paced to the breath, off is a
                 // floor of 1.0 (never fades). The slider and config are
-                // untouched; Ignite still rides on top.
-                const _dyeBase = (typeof window.__dyeSustainOverride === 'number')
+                // untouched; Ignite still rides on top. Freeze holds the dye
+                // at 1.0 the same way, ahead of both.
+                const _dyeBase = window.__fluidFrozen ? 1.0
+                    : (typeof window.__dyeSustainOverride === 'number')
                     ? window.__dyeSustainOverride
                     : config.DENSITY_DISSIPATION;
                 const _dyeDiss = window.DyeNudge

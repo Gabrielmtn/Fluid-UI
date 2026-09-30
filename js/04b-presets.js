@@ -284,33 +284,15 @@
 
             window.__fluidFrozen = !isUnfreezing;
 
-            if (!isUnfreezing) {
-
-                // Freeze: save current values and set to freeze state
-
-                savedDensity = config.DENSITY_DISSIPATION;
-
-                savedVelocity = config.VELOCITY_DISSIPATION;
-
-                config.DENSITY_DISSIPATION = 1.0;
-
-                config.VELOCITY_DISSIPATION = 0.9;
-
-            } else {
-
-                // Unfreeze: restore saved values
-
-                config.DENSITY_DISSIPATION = savedDensity;
-
-                config.VELOCITY_DISSIPATION = savedVelocity;
-
-            }
-
-            
-
-            // Single DOM update
-
-            updateSliderValues();
+            // That flag is the whole freeze: 05j holds the dye (rate 1.0) and
+            // brakes the velocity (FREEZE_VELOCITY_BRAKE) inside the step and
+            // never touches the Sustain settings. Freeze used to write 1.0 /
+            // 0.9 into config and put saved copies back on unfreeze, so
+            // everything that read config meanwhile took the brake for the
+            // user's own value: Save stored Velocity 0.9 and every launch
+            // came up at the bottom of the slider (2026-09-29), presets and
+            // the room mirror captured it too, and a slider moved while
+            // frozen was thrown away on unfreeze.
 
         };
 

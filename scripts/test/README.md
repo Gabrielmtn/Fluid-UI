@@ -124,10 +124,11 @@ comments that nothing had ever checked:
   standing bug #2 (display→sim coupling) with no measurable magnitude.
 - **`freeze-halts-the-sim`** — answered 2026-09-12: Freeze IS meant to
   hold the picture still, brake included. Space runs `toggleFreeze`
-  (04b), which pins `DENSITY_DISSIPATION = 1.0` and brakes velocity at
-  `VELOCITY_DISSIPATION = 0.9` — dye stops fading and the stroke's own
-  momentum runs out over about a second — and the sim step (05j) now
-  skips the two forces the fluid applies to itself while
+  (04b), which raises `window.__fluidFrozen`; while it is up the sim
+  step (05j) holds the dye at rate 1.0 and brakes velocity at 0.9 per
+  1/60 s (since 2026-09-29 without writing either into config) — dye
+  stops fading and the stroke's own momentum runs out over about a
+  second — and it skips the two forces the fluid applies to itself while
   `window.__fluidFrozen` is up: vorticity confinement (with its curl
   pass) and the Gravity Direction pad's ambient force. The invariant
   compares `braked` → `held`, a 30-frame window that opens 92 frames
