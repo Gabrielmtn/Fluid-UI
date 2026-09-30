@@ -331,22 +331,102 @@ body.focus-mode #canvas {
     box-shadow: 0 0 8px rgba(180, 100, 255, 0.3);
 }
 
+/* Fallback when js/57 is missing: the old background / brush diagonal. */
 .mutation-swatch {
     width: 100%;
     height: 32px;
     border-radius: 4px;
     margin-bottom: 6px;
 }
-.mutation-card-label {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.7);
-    text-align: center;
-    margin-bottom: 4px;
+/* The card's picture (js/57-mutation-thumbs): the variant's brush as
+   circles, its kaleidoscope as lines. Its height comes from the
+   aspect-ratio 20-mixer-layout sets inline (MutationThumbs.aspect). */
+.mutation-thumb-wrap {
+    position: relative;
+    margin-bottom: 6px;
 }
-.mutation-card-preview {
+.mutation-thumb {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    background: #000;
+}
+/* Top left "Rnd" / "Palette": the circles show only the next stroke's
+   colour. Bottom right: the kaleido mode and its count. */
+.mutation-thumb-tag {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    padding: 1px 4px;
+    border-radius: 3px;
     font-size: 9px;
-    color: rgba(255, 255, 255, 0.5);
-    line-height: 1.4;
+    line-height: 1.3;
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(0, 0, 0, 0.72);
+    pointer-events: none;
+}
+.mutation-thumb-tag-k {
+    left: auto;
+    top: auto;
+    right: 3px;
+    bottom: 3px;
+}
+/* "N changes": the breadcrumbs' chip; hovering it lists the changes. */
+.mutation-card-foot {
+    text-align: center;
+}
+.mutation-changes {
+    display: inline-block;
+    font-size: 10px;
+    line-height: 1.3;
+    padding: 2px 8px;
+    background: rgba(180, 100, 255, 0.1);
+    border: 1px solid rgba(180, 100, 255, 0.2);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.7);
+}
+.mutation-changes:hover,
+.mutation-changes:focus-visible {
+    background: rgba(180, 100, 255, 0.22);
+    border-color: rgba(180, 100, 255, 0.4);
+    color: rgba(255, 255, 255, 0.95);
+    outline: none;
+}
+/* The hover card's list, inside the .fx-tip shell (20 tipShow). */
+.fx-tip.mutation-tip {
+    width: 260px;
+    padding: 9px 10px 8px;
+}
+.mutation-tip-title {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.mutation-tip-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 11px;
+    line-height: 1.55;
+}
+.mutation-tip-name {
+    opacity: 0.72;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mutation-tip-val {
+    flex: none;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.mutation-tip-val .mutation-color-dot,
+.mutation-diff-val .mutation-color-dot {
+    width: 10px;
+    height: 10px;
+    vertical-align: -1px;
 }
 
 .mutation-diff {

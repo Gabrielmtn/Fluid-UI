@@ -2520,6 +2520,8 @@
             var grid = document.getElementById('mutationGrid');
             if (!grid) return;
             grid.innerHTML = '';
+            // The card a hover card belonged to may have just gone.
+            tipHide();
 
             if (_variants.length === 0) {
                 grid.style.display = 'none';
@@ -2528,36 +2530,53 @@
             }
             grid.style.display = '';
 
+            var thumbs = window.MutationThumbs;
             _variants.forEach(function (variant, idx) {
                 var card = document.createElement('div');
                 card.className = 'mutation-card';
                 card.dataset.index = idx;
 
-                // Color swatch preview
-                var swatch = document.createElement('div');
-                swatch.className = 'mutation-swatch';
-                var bg = (variant.colors && variant.colors.background) || '#000';
-                var br = (variant.colors && variant.colors.brush) || '#fff';
-                swatch.style.background = 'linear-gradient(135deg, ' + bg + ' 50%, ' + br + ' 50%)';
-                card.appendChild(swatch);
+                // Thumbnail: the variant's brush as circles (its Multi-Brush
+                // count and symmetry, each arm's next colour), its
+                // kaleidoscope as lines behind them (57). Painted below, once
+                // the grid is laid out and the canvas has its on-screen size.
+                if (thumbs) {
+                    var thumbWrap = document.createElement('div');
+                    thumbWrap.className = 'mutation-thumb-wrap';
+                    var thumb = document.createElement('canvas');
+                    thumb.className = 'mutation-thumb';
+                    thumb.style.aspectRatio = String(thumbs.aspect());
+                    thumbWrap.appendChild(thumb);
+                    card.appendChild(thumbWrap);
+                } else {
+                    var swatch = document.createElement('div');
+                    swatch.className = 'mutation-swatch';
+                    var bg = (variant.colors && variant.colors.background) || '#000';
+                    var br = (variant.colors && variant.colors.brush) || '#fff';
+                    swatch.style.background = 'linear-gradient(135deg, ' + bg + ' 50%, ' + br + ' 50%)';
+                    card.appendChild(swatch);
+                }
 
-                // Summary label
-                var label = document.createElement('div');
-                label.className = 'mutation-card-label';
-                var diff = engine.diffSummary(_baseSnapshot, variant);
-                label.textContent = diff.length + ' change' + (diff.length !== 1 ? 's' : '');
-                card.appendChild(label);
-
-                // Key changes preview
-                var preview = document.createElement('div');
-                preview.className = 'mutation-card-preview';
-                var topChanges = diff.slice(0, 3).map(function (d) {
-                    if (d.type === 'color') return d.param.split('.')[1];
-                    if (d.type === 'checkbox') return d.param;
-                    return d.param + ' ' + (d.pct > 0 ? d.pct + '%' : '');
+                // "N changes": hovering (or focusing) it lists them.
+                var foot = document.createElement('div');
+                foot.className = 'mutation-card-foot';
+                var token = document.createElement('span');
+                token.className = 'mutation-changes';
+                var count = engine.diffSummary(_baseSnapshot, variant).length;
+                token.textContent = count + ' change' + (count !== 1 ? 's' : '');
+                token.tabIndex = 0;
+                token.addEventListener('mouseenter', function () {
+                    clearTimeout(tipTimer);
+                    tipTimer = setTimeout(function () { tipShow(card, variant); }, 160);
                 });
-                preview.textContent = topChanges.join(', ');
-                card.appendChild(preview);
+                token.addEventListener('mouseleave', tipHide);
+                token.addEventListener('focus', function () { tipShow(card, variant); });
+                token.addEventListener('blur', tipHide);
+                token.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); applyVariant(idx); }
+                });
+                foot.appendChild(token);
+                card.appendChild(foot);
 
                 // Click to apply
                 card.addEventListener('click', function () {
@@ -2566,6 +2585,216 @@
 
                 grid.appendChild(card);
             });
+            if (thumbs) paintThumbs(grid, thumbs);
+        }
+
+        // Paint every card's thumbnail at its real on-screen size (the
+        // sidebar can be zoomed by --ui-scale, so the CSS width alone is not
+        // the pixel count). All sizes are read before any canvas is resized.
+        function paintThumbs(grid, thumbs) {
+            var dpr = window.devicePixelRatio || 1;
+            var jobs = Array.prototype.map.call(grid.querySelectorAll('.mutation-card'), function (card) {
+                var cnv = card.querySelector('canvas.mutation-thumb');
+                var r = cnv ? cnv.getBoundingClientRect() : null;
+                return { card: card, cnv: cnv, w: r ? r.width : 0, h: r ? r.height : 0 };
+            });
+            jobs.forEach(function (j) {
+                var variant = _variants[parseInt(j.card.dataset.index, 10)];
+                if (!j.cnv || !variant) return;
+                // A grid laid out while hidden has no size yet: paint at the
+                // default two-column card width.
+                var w = j.w || 104, h = j.h || w / thumbs.aspect();
+                j.cnv.width = Math.max(2, Math.round(w * dpr));
+                j.cnv.height = Math.max(2, Math.round(h * dpr));
+                var info = null;
+                try { info = thumbs.paint(j.cnv, variant); } catch (e) { console.warn('[Mutation] thumbnail failed:', e); }
+                if (!info) return;
+                // What the picture can't say. Rnd and Palette: the colour
+                // shown is only the next stroke's. Kaleido: the fold's name
+                // and count.
+                var tagText = info.colorMode === 'random' ? 'Rnd' : info.colorMode === 'step' ? 'Palette' : '';
+                if (tagText) thumbTag(j.cnv.parentNode, tagText, '');
+                if (info.kaleido) {
+                    thumbTag(j.cnv.parentNode, optionText('kaleidoMode', info.kaleido.mode) + ' ' + info.kaleido.segments,
+                        'mutation-thumb-tag-k');
+                }
+            });
+        }
+
+        function thumbTag(wrap, text, extra) {
+            var tag = document.createElement('span');
+            tag.className = 'mutation-thumb-tag' + (extra ? ' ' + extra : '');
+            tag.textContent = text;
+            wrap.appendChild(tag);
+        }
+
+        function optionText(id, value) {
+            var sel = document.getElementById(id);
+            var opt = sel && Array.prototype.find.call(sel.options || [], function (o) { return o.value === String(value); });
+            return opt ? opt.textContent.trim() : String(value);
+        }
+
+        // ── What a variant changes, in the words on screen ──
+        // For the "N changes" card and the diff panel. The names say which
+        // effect a slider belongs to ("Intensity" is in four panels) and
+        // follow the UI's own; an id missing here falls back to its control's
+        // label. Kaleido's count is named as its slider is in that mode (05f).
+        var CHANGE_NAMES = {
+            'color.brush': 'Brush colour', 'color.background': 'Background', 'color.arms': 'Arm colours',
+            randomColor: 'Rnd', stepPalette: 'Palette mode', palette: 'Palette',
+            multiplier: 'Multi-Brush', brushSize: 'Brush Size',
+            kaleidoToggle: 'Kaleido', kaleidoMode: 'Kaleido Mode', kAngle: 'Kaleido Angle',
+            kTwist: 'Kaleido Twist', kZoom: 'Kaleido Zoom', kBlend: 'Kaleido Blend',
+            kAnimateRot: 'Kaleido Spin', kSpinSpeed: 'Kaleido Spin Speed',
+            densityDissipation: 'Density Sustain', velocityDissipation: 'Velocity Sustain',
+            pressureDissipation: 'Pressure Dissipation', pressureIteration: 'Pressure Iterations',
+            velocityInfluence: 'Motion Isolation', curl: 'Swirl', viscosity: 'Viscosity',
+            velocityCap: 'Max Speed', wetInfluence: 'Drying', wetDrying: 'Dry Time',
+            ridges: 'Ridges', sharpness: 'Ridge Strength', vibrance: 'Vibrance',
+            displayShadingToggle: 'Surface Shading', shadingIntensity: 'Shading Intensity',
+            shadeRelief: 'Shading Relief', shadeGloss: 'Shading Gloss',
+            enableLighting: 'Light Source', lightMode: 'Light Source Mode', lightPos: 'Light Source Position',
+            lightSpeed: 'Light Source Speed', lightIntensity: 'Light Source Intensity', lightAmbient: 'Light Source Ambient',
+            enableLightShift: 'Light Shift', lightShiftMode: 'Light Shift Blend', lightShiftPath: 'Light Shift Path',
+            lightShiftSpeed: 'Light Shift Speed', lightShiftThreshold: 'Light Shift Threshold',
+            lightShiftIntensity: 'Light Shift Intensity', lightShiftSaturation: 'Light Shift Saturation',
+            glowToggle: 'Glow', glowIntensity: 'Glow Intensity', glowThreshold: 'Glow Threshold',
+            scatterToggle: 'Scatter', scatterAmount: 'Scatter Amount', scatterReach: 'Scatter Reach',
+            audioSensitivity: 'Audio Sensitivity', audioBeatThreshold: 'Beat Threshold',
+            ssOrigin: 'Shooting Star Origin'
+        };
+        var SEGMENT_WORDS = { 1: 'Facets', 2: 'Layers', 3: 'Layers', 4: 'Reflections', 5: 'Rings' };
+
+        function changeName(d, variant) {
+            if (d.param === 'kaleidoSegments') {
+                var k = variant && variant.kaleido;
+                var km = (k && typeof k.mode === 'number') ? k.mode
+                    : parseInt((variant && variant.selects && variant.selects.kaleidoMode) || '1', 10);
+                return 'Kaleido ' + (SEGMENT_WORDS[km] || 'Segments');
+            }
+            // A Gloss Paint's Curl slider is its body control (29).
+            if (d.param === 'material.amount') {
+                return (variant && variant.material && variant.material.mode === 'clay') ? 'Paint Thickness' : 'Paint Flow';
+            }
+            if (CHANGE_NAMES[d.param]) return CHANGE_NAMES[d.param];
+            var el = document.getElementById(d.param);
+            var lab = el && ((el.labels && el.labels[0]) || document.querySelector('label[for="' + d.param + '"]'));
+            if (lab) {
+                var c = lab.cloneNode(true);
+                Array.prototype.forEach.call(c.querySelectorAll('.value-display'), function (x) { x.remove(); });
+                var t = c.textContent.replace(/\s+/g, ' ').trim();
+                if (t) return t;
+            }
+            return d.param;
+        }
+
+        // Units as the controls print them.
+        var CHANGE_UNITS = { multiplier: 'x', kAngle: '°', kSpinSpeed: '°/s' };
+
+        function changeValue(d, v) {
+            if (d.type === 'checkbox') return v ? 'On' : 'Off';
+            if (typeof v === 'number') {
+                var reg = window.ParamRegistry && window.ParamRegistry.SLIDERS && window.ParamRegistry.SLIDERS[d.param];
+                var dec = (reg && typeof reg.decimals === 'number') ? reg.decimals : (Math.abs(v) >= 10 ? 0 : 2);
+                return v.toFixed(dec) + (CHANGE_UNITS[d.param] || '');
+            }
+            if (d.type === 'select' && document.getElementById(d.param)) return optionText(d.param, v);
+            return v === undefined || v === null ? '' : String(v);
+        }
+
+        // What the card shows first (colour, arms, kaleido), then the rest
+        // in the engine's order.
+        function changeRank(p) {
+            if (/^color\.|^(randomColor|stepPalette|palette)$/.test(p)) return 0;
+            if (p === 'multiplier') return 1;
+            if (/^kaleido|^k[A-Z]/.test(p)) return 2;
+            return 3;
+        }
+
+        function changesOf(variant) {
+            return engine.diffSummary(_baseSnapshot, variant)
+                .map(function (d, i) { return { d: d, i: i }; })
+                .sort(function (a, b) { return changeRank(a.d.param) - changeRank(b.d.param) || a.i - b.i; })
+                .map(function (x) { return x.d; });
+        }
+
+        // One change as a row: its name, then "from → to" (colours as dots).
+        function changeRow(d, variant, cls) {
+            var row = document.createElement('div');
+            row.className = cls.row;
+            var name = document.createElement('span');
+            name.className = cls.name;
+            name.textContent = changeName(d, variant);
+            row.appendChild(name);
+            row.appendChild(document.createTextNode(' '));
+            var val = document.createElement('span');
+            val.className = cls.val;
+            function part(v) {
+                if (d.type === 'color') {
+                    var dot = document.createElement('span');
+                    dot.className = 'mutation-color-dot';
+                    dot.style.background = String(v);
+                    val.appendChild(dot);
+                } else {
+                    val.appendChild(document.createTextNode(changeValue(d, v)));
+                }
+            }
+            part(d.from);
+            val.appendChild(document.createTextNode(' → '));
+            part(d.to);
+            row.appendChild(val);
+            return row;
+        }
+
+        // The hover card: the .fx-tip shell the Effects rows use (body-
+        // mounted, zoomed with --ui-scale, left of the sidebar over the
+        // canvas), holding the change list.
+        var tipEl = null, tipTimer = 0;
+        function tipBuild() {
+            if (tipEl) return tipEl;
+            tipEl = document.createElement('div');
+            tipEl.className = 'fx-tip mutation-tip';
+            document.body.appendChild(tipEl);
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') tipHide(); }, true);
+            var sb = document.getElementById('sidebar-right');
+            if (sb) sb.addEventListener('scroll', tipHide, { passive: true });
+            return tipEl;
+        }
+
+        function tipShow(card, variant) {
+            if (!card.isConnected) return;
+            var el = tipBuild();
+            var diff = changesOf(variant);
+            el.innerHTML = '';
+            var title = document.createElement('div');
+            title.className = 'mutation-tip-title';
+            title.textContent = diff.length + ' change' + (diff.length !== 1 ? 's' : '');
+            el.appendChild(title);
+            diff.forEach(function (d) {
+                el.appendChild(changeRow(d, variant, { row: 'mutation-tip-row', name: 'mutation-tip-name', val: 'mutation-tip-val' }));
+            });
+            el.classList.add('show');
+            // Left of the sidebar, level with the card: left of the card
+            // itself, a right-hand card's list covered the cards beside it.
+            // Screen px in, zoomed CSS px out (fxTipShow's rule).
+            var z = window.UIScale ? window.UIScale.get() : 1;
+            var r = card.getBoundingClientRect();
+            var side = card.closest('#sidebar-right') || card.parentNode;
+            var sr = side.getBoundingClientRect();
+            var w = el.offsetWidth * z, h = el.offsetHeight * z;
+            var left = sr.left - w - 10;
+            if (left < 4) left = Math.min(sr.right + 10, window.innerWidth - w - 4);
+            var top = r.top;
+            if (top + h > window.innerHeight - 4) top = window.innerHeight - h - 4;
+            if (top < 4) top = 4;
+            el.style.left = (left / z) + 'px';
+            el.style.top = (top / z) + 'px';
+        }
+
+        function tipHide() {
+            clearTimeout(tipTimer);
+            tipTimer = 0;
+            if (tipEl) tipEl.classList.remove('show');
         }
 
         // Apply a specific variant
@@ -2599,23 +2828,20 @@
         function showDiff(variant) {
             var panel = document.getElementById('mutationDiff');
             if (!panel || !_baseSnapshot) return;
-            var diff = engine.diffSummary(_baseSnapshot, variant);
+            var diff = changesOf(variant);
             if (diff.length === 0) {
                 panel.style.display = 'none';
                 return;
             }
             panel.style.display = 'block';
-            var html = '<div class="mutation-diff-title">' + diff.length + ' parameter' + (diff.length !== 1 ? 's' : '') + ' changed:</div>';
+            panel.innerHTML = '';
+            var title = document.createElement('div');
+            title.className = 'mutation-diff-title';
+            title.textContent = diff.length + ' parameter' + (diff.length !== 1 ? 's' : '') + ' changed:';
+            panel.appendChild(title);
             diff.forEach(function (d) {
-                var from = d.type === 'color' ? '<span class="mutation-color-dot" style="background:' + d.from + '"></span>' :
-                           d.type === 'checkbox' ? (d.from ? 'ON' : 'OFF') :
-                           (typeof d.from === 'number' ? d.from.toFixed(3) : d.from);
-                var to = d.type === 'color' ? '<span class="mutation-color-dot" style="background:' + d.to + '"></span>' :
-                         d.type === 'checkbox' ? (d.to ? 'ON' : 'OFF') :
-                         (typeof d.to === 'number' ? d.to.toFixed(3) : d.to);
-                html += '<div class="mutation-diff-row"><span class="mutation-diff-param">' + d.param + '</span> ' + from + ' → ' + to + '</div>';
+                panel.appendChild(changeRow(d, variant, { row: 'mutation-diff-row', name: 'mutation-diff-param', val: 'mutation-diff-val' }));
             });
-            panel.innerHTML = html;
         }
 
         // Render chain breadcrumbs
