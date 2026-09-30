@@ -3281,6 +3281,14 @@
                 }
             } catch (_) {}
         }
+        // The room mirror's way in (06b applyRemoteLookSnapshot): a watcher
+        // takes the painter's gravity exactly, pad and readout included.
+        window.setGravityField = function (on, x, y) { setVec(x, y); setOn(on); };
+        // Out of turn (or under a host's settings lock) the painter owns this,
+        // the same as the sim sliders (05h). It matters more here than on most
+        // controls: gravity moves the paint itself, so a watcher aiming their
+        // own pulls their canvas away from everyone else's for good.
+        function locked() { return !!window.__mpSettingsLocked && !window.__mpApplyingRemote; }
         var dragging = false;
         function aim(ev) {
             var r = pad.getBoundingClientRect();
@@ -3290,6 +3298,7 @@
         }
         pad.addEventListener('pointerdown', function (ev) {
             ev.preventDefault(); ev.stopPropagation();
+            if (locked()) return;
             dragging = true;
             try { pad.setPointerCapture(ev.pointerId); } catch (_) {}
             // Aiming switches it on: a pad that does nothing until you also find
@@ -3311,9 +3320,12 @@
         // Double-click recentres — the quick way back to no push without hunting
         // for the exact middle.
         pad.addEventListener('dblclick', function (ev) {
-            ev.preventDefault(); setVec(0, 0);
+            ev.preventDefault();
+            if (locked()) return;
+            setVec(0, 0);
         });
         check.addEventListener('change', function () {
+            if (locked()) { check.checked = !!(window.config && window.config.AMBIENT_FORCE); return; }
             setOn(check.checked);
             // Switching on with the pad centred would do nothing at all, which
             // reads as a dead checkbox. Seed it downward: gravity is the thing
@@ -4234,6 +4246,11 @@
             ramp.slider.style.setProperty('--max', ramp.slider.max);
             ramp.slider.style.setProperty('--val', ramp.slider.value);
         }
+        // Redraw both rows from the globals, for 12's snapshot apply.
+        window.__syncSplatRamps = function () {
+            syncRamp(inRamp, splatInSelect, 'in');
+            syncRamp(outRamp, splatOutSelect, 'out');
+        };
         splatInSelect.addEventListener('change', function() {
             window.splatInMode = splatInSelect.value;
             syncRamp(inRamp, splatInSelect, 'in');

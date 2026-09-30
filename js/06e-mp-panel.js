@@ -384,6 +384,7 @@ function copyRoomCode(fromCreate, what) {
 
 // Initialize multiplayer UI + auto-join from hash
 function initMultiplayerUI() {
+    installWatcherGate(); // 06b: out-of-turn look edits are put back
     // Wire up buttons
     var createBtn = document.getElementById('createRoomBtn');
     if (createBtn) createBtn.addEventListener('click', createRoom);

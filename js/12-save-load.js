@@ -746,7 +746,12 @@
             splatInMode: window.splatInMode || 'instant',
             splatOutMode: window.splatOutMode || 'instant',
             splatInDist: typeof window.splatInDist === 'number' ? window.splatInDist : 0.15,
-            splatOutDist: typeof window.splatOutDist === 'number' ? window.splatOutDist : 0.15
+            splatOutDist: typeof window.splatOutDist === 'number' ? window.splatOutDist : 0.15,
+            // "Over time" ramps in milliseconds (the same row reads as seconds
+            // in that mode). Without these a preset or a room only ever
+            // carried the distance.
+            splatInMs: typeof window.splatInMs === 'number' ? window.splatInMs : 350,
+            splatOutMs: typeof window.splatOutMs === 'number' ? window.splatOutMs : 350
         };
 
         // ── Shooting star origin ──
@@ -1298,16 +1303,22 @@
                     var soEl = document.getElementById('splatOutMode');
                     if (soEl) soEl.value = bs.splatOutMode;
                 }
-                if (typeof bs.splatInDist === 'number') {
-                    window.splatInDist = bs.splatInDist;
-                    var siD = document.getElementById('splatInDist');
-                    if (siD) { siD.value = bs.splatInDist; siD.dispatchEvent(new Event('input', { bubbles: true })); }
-                }
-                if (typeof bs.splatOutDist === 'number') {
-                    window.splatOutDist = bs.splatOutDist;
-                    var soD = document.getElementById('splatOutDist');
-                    if (soD) { soD.value = bs.splatOutDist; soD.dispatchEvent(new Event('input', { bubbles: true })); }
-                }
+                // Set directly, not through the ramp row's 'input' handler: that
+                // row means distance OR seconds depending on the mode, and a
+                // distance pushed through it in "Over time" mode was stored
+                // (and saved) as the TIME, x1000 — a room watcher's own Splat
+                // In time became 150 ms (2026-09-29). The row is then redrawn
+                // from these values. Saved as the handler would have, except
+                // from a look link, which never touches the saved session.
+                var rampSave = function (key, v) {
+                    try { if (window.settingsManager && !window.__lookLinkApplying) window.settingsManager.set(key, v); } catch (_) {}
+                };
+                var ms = function (v) { return Math.max(50, Math.min(3000, v)); };
+                if (typeof bs.splatInDist === 'number') { window.splatInDist = bs.splatInDist; rampSave('brush.splatInDist', bs.splatInDist); }
+                if (typeof bs.splatOutDist === 'number') { window.splatOutDist = bs.splatOutDist; rampSave('brush.splatOutDist', bs.splatOutDist); }
+                if (typeof bs.splatInMs === 'number' && isFinite(bs.splatInMs)) { window.splatInMs = ms(bs.splatInMs); rampSave('brush.splatInMs', window.splatInMs); }
+                if (typeof bs.splatOutMs === 'number' && isFinite(bs.splatOutMs)) { window.splatOutMs = ms(bs.splatOutMs); rampSave('brush.splatOutMs', window.splatOutMs); }
+                if (typeof window.__syncSplatRamps === 'function') window.__syncSplatRamps();
                 // bs.gateMaxDensity (older snapshots): the Gate ceiling is a
                 // fixed constant now, so the stored level is intentionally
                 // ignored rather than migrated.

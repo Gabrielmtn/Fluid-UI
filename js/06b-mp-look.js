@@ -49,9 +49,20 @@ window.__mpApplyingRemote = false; // lets the host's snapshot through the gate
 // resolution goes in its own `resolution` section so a Custom value carries
 // too). A watcher that cannot keep up still has its governor as the safety
 // valve — it steps down by measured fps, never up past the painter's pick.
+//
+// The second row joined 2026-09-29 (measured: a painter pressing F put the
+// watcher's whole window into Focus mode). They are how YOUR screen is laid
+// out and what YOUR machine listens to, not what the canvas looks like:
+// Focus mode and the stream-format lock rebuild the layout, the cursor and
+// canvas-handle switches are chrome, and the capture and audio switches
+// reach for devices (a synthetic audio-source change on a running engine
+// asks for the microphone). Dropped on receive too, for older senders.
 var MP_PERF_LOCAL_KEYS = [
     'recMode', 'recPlaybackSpeed', 'statsToggle', 'autoloadSettings',
-    'brushEraser', 'sketchVisible'
+    'brushEraser', 'sketchVisible',
+    'focusModeToggle', 'streamFormatLock', 'cursorToggle', 'showCanvasHandles',
+    'lockCanvasBorders', 'hoverCaptureToggle', 'detachCaptureToggle',
+    'audioReactToggle', 'audioReactSource'
 ];
 // Per-arm Pressure (armColors[].push) falls under the SAME rule, and arrived
 // after that list was written. The colours an arm paints are look; whether an
@@ -181,6 +192,16 @@ function captureLookSnapshot() {
         resolution: (window.config && typeof window.config.DYE_RESOLUTION === 'number' &&
                      typeof window.config.SIM_RESOLUTION === 'number')
             ? { dye: window.config.DYE_RESOLUTION, sim: window.config.SIM_RESOLUTION }
+            : null,
+        // Gravity Direction is not a registry control (a checkbox plus an aim
+        // pad that live only in config), so the preset capture above never
+        // saw it. Until 2026-09-29 a watcher kept running their OWN gravity
+        // under the painter's strokes: switched on, it pulled every stroke on
+        // their canvas and nobody else's. Mirror-only, like transport.
+        gravity: window.config
+            ? { on: !!window.config.AMBIENT_FORCE,
+                x: (typeof window.config.AMBIENT_FORCE_X === 'number') ? window.config.AMBIENT_FORCE_X : 0,
+                y: (typeof window.config.AMBIENT_FORCE_Y === 'number') ? window.config.AMBIENT_FORCE_Y : 0 }
             : null
     };
     Object.keys(full.sliders || {}).forEach(function (k) {
@@ -223,7 +244,7 @@ function fitLookSnapshot(snap) {
         out = { sliders: out.sliders, checkboxes: out.checkboxes, selects: out.selects,
                 colors: out.colors, kaleido: out.kaleido, paletteIndex: out.paletteIndex,
                 material: out.material, cosOscillator: out.cosOscillator,
-                transport: out.transport, armColors: out.armColors };
+                transport: out.transport, armColors: out.armColors, gravity: out.gravity };
     }
     return out;
 }
@@ -320,7 +341,7 @@ function toggleSettingsLock() {
 var LOCK_SNAPSHOT_ALLOW = ['sliders', 'checkboxes', 'selects', 'colors', 'savedColors',
     'paletteIndex', 'paletteName', 'armColors', 'brushState', 'lightPos',
     'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin', 'material',
-    'brushTip', 'cosOscillator', 'transport', 'resolution'];
+    'brushTip', 'cosOscillator', 'transport', 'resolution', 'gravity'];
 // Bounded recursive clean: primitives-only leaves (no data: URLs, strings
 // capped), depth ≤ 3 so armColors [{mode,color}], lightShiftPath waypoints
 // and userPalettes [{name, colors: [...]}] survive — the old one-level rule
@@ -347,6 +368,11 @@ function sanitizeLockSnapshot(snapshot) {
         if (v !== undefined) out[k] = v;
     });
     if (out.armColors) keepLocalArmPush(out.armColors);
+    ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
+        if (out[sec] && typeof out[sec] === 'object') {
+            MP_PERF_LOCAL_KEYS.forEach(function (k) { delete out[sec][k]; });
+        }
+    });
     // Relay caps messages at 16KB — shed the bulkiest optional sections
     // rather than letting the whole snapshot fail to arrive.
     try {
@@ -382,6 +408,29 @@ function setSettingsLockedByHost(locked, snapshot) {
 function applyRemoteLookSnapshot(snapshot) {
     var safeSnap = sanitizeLockSnapshot(snapshot);
     if (safeSnap && typeof window.applyPresetSnapshot === 'function') {
+        // Transport parity (mirror-only; applyPresetSnapshot ignores it): the
+        // painter pausing or freezing the fluid is part of the performance.
+        // It goes FIRST. Freeze no longer touches the Sustain sliders (04b),
+        // but a peer on an older build still parks them at 1.0/0.9 and
+        // puts back what it saved on unfreeze; its frozen snapshot carries
+        // those 1.0/0.9, so the watcher saved them too. Applied after
+        // the sliders, the watcher's unfreeze then wrote 1.0/0.9 back over the
+        // real values that had just arrived, and a still painter never sent
+        // them again: paint that never faded, motion that died in a second
+        // (measured 2026-09-29). This way the sliders land last and win.
+        try {
+            var t = safeSnap.transport;
+            if (t) {
+                if (typeof t.paused === 'boolean' && typeof isPaused !== 'undefined' &&
+                    !!isPaused !== t.paused && typeof window.togglePause === 'function') {
+                    window.togglePause();
+                }
+                if (typeof t.frozen === 'boolean' && !!window.__fluidFrozen !== t.frozen &&
+                    typeof window.toggleFreeze === 'function') {
+                    window.toggleFreeze();
+                }
+            }
+        } catch (e) { /* best-effort */ }
         isProcessingRemoteEvent = true;
         window.__mpApplyingRemote = true;
         try { window.applyPresetSnapshot(safeSnap); }
@@ -412,22 +461,74 @@ function applyRemoteLookSnapshot(snapshot) {
                 }
             }
         } catch (e) { /* best-effort */ }
-        // Transport parity (mirror-only; applyPresetSnapshot ignores it): the
-        // painter pausing or freezing the fluid is part of the performance.
+        // Gravity parity (mirror-only; see captureLookSnapshot). The painter's
+        // switch AND aim replace ours outright. A snapshot from an older
+        // build has no section: leave ours alone rather than guess.
         try {
-            var t = safeSnap.transport;
-            if (t) {
-                if (typeof t.paused === 'boolean' && typeof isPaused !== 'undefined' &&
-                    !!isPaused !== t.paused && typeof window.togglePause === 'function') {
-                    window.togglePause();
-                }
-                if (typeof t.frozen === 'boolean' && !!window.__fluidFrozen !== t.frozen &&
-                    typeof window.toggleFreeze === 'function') {
-                    window.toggleFreeze();
+            var g = safeSnap.gravity;
+            if (g && typeof g.on === 'boolean' && window.config) {
+                var unit = function (v) { return (typeof v === 'number' && isFinite(v)) ? Math.max(-1, Math.min(1, v)) : 0; };
+                var gx = unit(g.x), gy = unit(g.y);
+                var c = window.config;
+                if (!!c.AMBIENT_FORCE !== g.on || c.AMBIENT_FORCE_X !== gx || c.AMBIENT_FORCE_Y !== gy) {
+                    if (typeof window.setGravityField === 'function') {
+                        window.setGravityField(g.on, gx, gy);
+                    } else {
+                        // Effects not wired yet: write what its restore() reads.
+                        c.AMBIENT_FORCE = g.on; c.AMBIENT_FORCE_X = gx; c.AMBIENT_FORCE_Y = gy;
+                        if (window.settingsManager) {
+                            window.settingsManager.set('pressure.constantOn', g.on);
+                            window.settingsManager.set('pressure.fx', gx);
+                            window.settingsManager.set('pressure.fy', gy);
+                        }
+                    }
                 }
             }
         } catch (e) { /* best-effort */ }
+        mpLastLook = safeSnap;
     }
+}
+
+// ── Watcher gate ────────────────────────────────────────────────────
+// While the look is someone else's (their turn, or a host's settings lock),
+// a local edit to a look control is put back. Only the sim sliders ever had
+// this (05h), and even they left the thumb where it was dragged, trusting the
+// painter's next snapshot to move it back; a painter whose look is still
+// sends none. Every other switch, select and slider changed the watcher's
+// own canvas and stayed changed (measured 2026-09-29: Border, Color Gate,
+// physics resolution). Per-person controls (MP_PERF_LOCAL_KEYS, PhotoSafe,
+// the brush sliders) are left alone. Values come back from the last look
+// that arrived, which is exactly what the room is running.
+var mpLastLook = null;
+var MP_GATE_SKIP = { photoSafeToggle: 1, preserveFluidOpacity: 1 };
+function mpGatedSection(el) {
+    var R = window.ParamRegistry;
+    if (!R || !el || !el.id || MP_GATE_SKIP[el.id] || MP_PERF_LOCAL_KEYS.indexOf(el.id) !== -1) return null;
+    if (R.CHECKBOXES[el.id] && el.type === 'checkbox') return 'checkboxes';
+    if (R.SELECTS[el.id] && el.tagName === 'SELECT') return 'selects';
+    if (R.SLIDERS[el.id] && el.type === 'range' && R.SLIDERS[el.id].category !== 'brush') return 'sliders';
+    return null;
+}
+function mpWatcherGate(e) {
+    if (!window.__mpSettingsLocked || window.__mpApplyingRemote) return;
+    var el = e.target, sec = mpGatedSection(el);
+    if (!sec) return;
+    e.stopImmediatePropagation();
+    var look = mpLastLook && mpLastLook[sec];
+    if (sec === 'checkboxes') {
+        // A cancelled click never flips the box and fires no change at all.
+        if (e.type === 'click') { e.preventDefault(); return; }
+        el.checked = (look && typeof look[el.id] === 'boolean') ? look[el.id] : !el.checked;
+    } else if (look && look[el.id] != null) {
+        el.value = look[el.id];
+        if (sec === 'sliders') el.style.setProperty('--val', el.value);
+    }
+}
+function installWatcherGate() {
+    if (installWatcherGate.done) return;
+    installWatcherGate.done = true;
+    // Window capture runs before every listener on the control itself.
+    ['click', 'input', 'change'].forEach(function (t) { window.addEventListener(t, mpWatcherGate, true); });
 }
 
 function resetSettingsLock() {

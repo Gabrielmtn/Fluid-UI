@@ -74,10 +74,30 @@
         }
     }
 
+    // A key a registry slider owns goes back to what that slider says NOW, not
+    // to what config held when the scene began. The slider still writes config
+    // while a scene runs, so the value can have moved since; restoring the old
+    // one left the sim on a number the slider no longer showed. In a room it
+    // also split the canvases (2026-09-29): the look mirror carries sliders,
+    // and each person had snapped their own value at their own moment.
+    function sliderValueFor(key) {
+        var R = window.ParamRegistry;
+        if (!R || !R.SLIDERS) return undefined;
+        for (var id in R.SLIDERS) {
+            if (R.SLIDERS[id].configKey !== key) continue;
+            var el = document.getElementById(id);
+            var v = el ? parseFloat(el.value) : NaN;
+            return isFinite(v) ? v : undefined;
+        }
+        return undefined;
+    }
+
     function restoreConfig() {
         if (!cfgSnap || !window.config) { cfgSnap = null; return; }
         for (var k in cfgSnap) {
-            if (cfgSnap[k] !== undefined) window.config[k] = cfgSnap[k];
+            var live = sliderValueFor(k);
+            if (live !== undefined) window.config[k] = live;
+            else if (cfgSnap[k] !== undefined) window.config[k] = cfgSnap[k];
         }
         cfgSnap = null;
     }

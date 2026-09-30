@@ -338,6 +338,12 @@
         let lastDensitySnapTime = 0;
         canvasArea.addEventListener('wheel', (e) => {
             e.preventDefault();
+            // The four sim shortcuts (Ctrl, Ctrl+Shift, Ctrl+Alt, Alt+Shift)
+            // write config directly, past the sliders' own 13.5 gate, so out
+            // of turn they split the watcher's canvas from the room's. Brush
+            // size and angle (plain / Shift) stay free.
+            if ((e.ctrlKey || (e.altKey && e.shiftKey)) &&
+                window.__mpSettingsLocked && !window.__mpApplyingRemote) return;
             if (e.ctrlKey && e.shiftKey) {
                 // Ctrl+Shift+Scroll: Adjust Motion Isolation (Velocity Influence)
                 // Uses eased acceleration: faster scroll = bigger jumps
