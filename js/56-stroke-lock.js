@@ -16,14 +16,18 @@
 // So a Keep-distance circle is one ring every arm traces together, and a
 // Keep-angle spoke brings the arms' colours straight into each other.
 //
-// A hand never holds a circle exactly. The lock takes what the hand does
-// and keeps only the part that is allowed: the radius (or the angle) is
-// the one the brush had when the key went down, and the hand's drift off
-// it is simply not painted. Keep angle projects the hand onto its line.
-// Keep distance moves the brush round its circle by how far the hand TURNS
-// round the centre (orbitTurn), so a hand that wanders near the middle
-// slows the brush instead of flinging it across the circle. The position
-// is corrected where 05d reads it,
+// A hand never holds a circle exactly. The lock keeps its own copy of the
+// hand (the HAND below): it moves by what the real hand DOES, sample to
+// sample, and it cannot leave the guide's area — a band either side of
+// the circle or the line (AREA_PX on screen), never nearer the centre than
+// half the radius, never off the canvas along the spoke. However far the
+// real hand strays, the one the lock steers by is still beside the guide,
+// so coming back works at once and a lap that drifts across the desk turns
+// the brush as evenly as one that doesn't (2026-09-29: "we're keeping the
+// mouse in the right area the whole time"). The brush is the hand put on
+// the guide: its bearing on the circle, its foot on the line. The guide
+// marks the hand with a small ring. The position is corrected where 05d
+// reads it,
 // before the stroke engine, the recorder, the replay store and the room
 // see it, so a locked stroke replays, records and reaches peers exactly as
 // it was painted.
@@ -51,22 +55,27 @@
     // Closer to the centre than this (canvas px), a spoke has no direction
     // yet: Keep angle waits for the brush to leave the middle.
     var MIN_SPOKE_PX = 3;
-    // Keep distance follows the hand's TURNING round the centre. Beyond
-    // this share of the lock's radius the brush turns exactly as the hand
-    // does; closer in, the turn fades out toward nothing at the centre.
-    var ORBIT_INNER = 0.5;
+    // The guide's area, where the hand may be: this far either side of the
+    // circle or the line, in CSS px on screen, and for Keep distance never
+    // nearer the centre than this share of the radius (bearings near the
+    // middle swing wildly: a few px there are half a turn).
+    var AREA_PX = 24;
+    var AREA_INNER = 0.5;
     // The ease back to the hand, as travel: 1.5x how far the hand had
     // strayed, kept between these shares of the canvas's short side.
     var GLIDE_PER_OFFSET = 1.5, GLIDE_MIN = 0.02, GLIDE_MAX = 0.3;
 
     var keys = { distance: '', angle: '' };
-    var locks = {};         // kind → { pending } | { r, phi } | { ux, uy }
+    var locks = {};         // kind → { pending } | { r, hx, hy } | { ux, uy, hx, hy }  (hx, hy: the HAND, canvas px)
     var pin = null;         // both anchored: the spot the brush stays on
     var glide = null;       // { ox, oy, x0, y0, far, span } easing off after a change mid-stroke
-    var lastRaw = null;     // the hand, canvas px
+    var lastRaw = null;     // the real hand, canvas px
+    var lastWho = null;     // ...and the pointer it came from
+    var handJump = false;   // that pointer left or came back: its next sample moves nothing
     var lastOut = null;     // where the brush went for it
     var overCanvas = false;
     var listeners = [];
+    var handListeners = [];
 
     function cv() { return document.getElementById('canvas'); }
     function H() { return window.Hotkeys || null; }
@@ -83,67 +92,89 @@
         if (!c) return false;
         var rx = x - c.width * 0.5, ry = y - c.height * 0.5, d = Math.hypot(rx, ry);
         if (kind === 'distance') {
-            // phi: where on the circle the brush is. A brush exactly on the
-            // centre has no direction; it starts at 0 (its radius is 0, so
-            // it stays on the centre whichever way phi turns).
-            locks.distance = { r: d, phi: d > 1e-6 ? Math.atan2(ry, rx) : 0 };
+            // The hand starts where the brush is. A brush exactly on the
+            // centre has radius 0 and stays there whatever the hand does.
+            locks.distance = { r: d, hx: x, hy: y };
             return true;
         }
         if (d < MIN_SPOKE_PX) return false;
-        locks.angle = { ux: rx / d, uy: ry / d };
+        locks.angle = { ux: rx / d, uy: ry / d, hx: x, hy: y };
         return true;
     }
 
-    // How far the brush turns round the circle as the hand moves from the
-    // previous sample to (x, y). Taking the hand's own angle instead made
-    // the brush whip round whenever the hand came near the centre — there a
-    // few pixels are half a turn, and passing the middle flipped the brush
-    // to the far side of the circle. So the brush turns by the hand's TURN:
-    // exactly, while the hand is further out than ORBIT_INNER of the radius
-    // (both samples); nearer in, by the area the hand sweeps round the
-    // centre over that inner radius squared, which shrinks to nothing at
-    // the centre and is zero for a hand crossing straight through it. The
-    // two agree where they meet, so the brush speeds up and slows down
-    // smoothly as the hand comes in and goes out.
-    function orbitTurn(x, y) {
-        var c = cv(), dl = locks.distance;
-        if (!c || !lastRaw || !dl) return 0;
-        var ox = c.width * 0.5, oy = c.height * 0.5;
-        var ax = lastRaw.x - ox, ay = lastRaw.y - oy, bx = x - ox, by = y - oy;
-        var cross = ax * by - ay * bx;
-        if (!cross) return 0;
-        var turn = Math.atan2(cross, ax * bx + ay * by);
-        var inner = ORBIT_INNER * dl.r;
-        if (!(inner > 1e-6)) return turn;
-        var swept = Math.abs(cross) / (inner * inner);
-        return Math.abs(turn) <= swept ? turn : (turn < 0 ? -swept : swept);
+    // The area's half-width in canvas px: AREA_PX on screen, whatever the
+    // canvas resolution or Zoom View.
+    function areaPx() {
+        var c = cv();
+        var w = c ? c.getBoundingClientRect().width : 0;
+        return AREA_PX * ((c && w > 0) ? c.width / w : 1);
     }
 
-    // Where the anchored locks put a hand at (x, y), or null when none is.
-    // `commit` keeps Keep distance's turn (apply); without it nothing moves
-    // (peek). The spoke is a whole line through the centre: pulling past the
-    // middle carries on out the other side instead of stalling on it.
-    function constrain(x, y, commit) {
+    // The HAND of lock `kind` moved by (dx, dy), then kept inside the
+    // guide's area. Taking the real hand's own position instead (the first
+    // cut) or its turn round the centre (the second) steered by wherever
+    // the hand had wandered to: near the middle a few px were half a turn,
+    // and a lap drifting off-centre sped the brush up on the near side and
+    // slowed it on the far one. Kept beside the guide, the hand's bearing
+    // (or its place along the spoke) is always a steady thing to steer by,
+    // and a hand pushing out past the edge slides along it like a cursor
+    // along the edge of the screen.
+    function keepHand(kind, dx, dy) {
+        var c = cv(), L = locks[kind];
+        var ox = c.width * 0.5, oy = c.height * 0.5, w = areaPx();
+        var x = L.hx + dx - ox, y = L.hy + dy - oy;
+        if (kind === 'distance') {
+            if (!(L.r > 1e-6)) return { x: ox, y: oy };
+            var d = Math.hypot(x, y);
+            // Straight onto the centre: stay where it was (it has no bearing there).
+            if (!(d > 1e-9)) { x = L.hx - ox; y = L.hy - oy; d = Math.hypot(x, y) || 1; }
+            var k = Math.min(L.r + w, Math.max(L.r - w, AREA_INNER * L.r, d)) / d;
+            return { x: ox + x * k, y: oy + y * k };
+        }
+        // Along the spoke (t) no further than the canvas edge; across it (s)
+        // no further than the area. The spoke is a whole line through the
+        // centre: pulling past the middle carries on out the other side.
+        var ux = L.ux, uy = L.uy;
+        var reach = Math.min(Math.abs(ux) > 1e-9 ? ox / Math.abs(ux) : Infinity,
+                             Math.abs(uy) > 1e-9 ? oy / Math.abs(uy) : Infinity);
+        var t = Math.max(-reach, Math.min(reach, x * ux + y * uy));
+        var s = Math.max(-w, Math.min(w, y * ux - x * uy));
+        return { x: ox + ux * t - uy * s, y: oy + uy * t + ux * s };
+    }
+
+    // Where lock `kind` puts the brush for a hand at (x, y): its bearing on
+    // the circle, its foot on the spoke.
+    function onGuide(kind, x, y) {
+        var c = cv(), L = locks[kind];
+        var ox = c.width * 0.5, oy = c.height * 0.5;
+        if (kind === 'distance') {
+            var rx = x - ox, ry = y - oy, d = Math.hypot(rx, ry);
+            if (!(d > 1e-9) || !(L.r > 1e-6)) return { x: ox, y: oy };
+            return { x: ox + rx / d * L.r, y: oy + ry / d * L.r };
+        }
+        var t = (x - ox) * L.ux + (y - oy) * L.uy;
+        return { x: ox + L.ux * t, y: oy + L.uy * t };
+    }
+
+    // Where the anchored locks put the brush when the real hand has moved
+    // by (dx, dy), or null when none is anchored. `commit` moves the HAND
+    // (apply); without it nothing moves (peek).
+    function constrain(dx, dy, commit) {
         var dOn = anchored('distance'), aOn = anchored('angle');
         if (!dOn && !aOn) return null;
         if (dOn && aOn) return pin ? { x: pin.x, y: pin.y } : (lastOut ? { x: lastOut.x, y: lastOut.y } : null);
-        var c = cv();
-        if (!c) return null;
-        var ox = c.width * 0.5, oy = c.height * 0.5;
-        if (dOn) {
-            var dl = locks.distance, phi = dl.phi + orbitTurn(x, y);
-            if (commit) dl.phi = phi;
-            return { x: ox + dl.r * Math.cos(phi), y: oy + dl.r * Math.sin(phi) };
-        }
-        var a = locks.angle, t = (x - ox) * a.ux + (y - oy) * a.uy;
-        return { x: ox + a.ux * t, y: oy + a.uy * t };
+        if (!cv()) return null;
+        var kind = dOn ? 'distance' : 'angle', L = locks[kind];
+        var h = keepHand(kind, dx, dy);
+        if (commit) { L.hx = h.x; L.hy = h.y; }
+        return onGuide(kind, h.x, h.y);
     }
 
-    // The locks' answer plus whatever is still easing off. `commit` moves
-    // the ease and the turn along (apply); without it the call changes
-    // nothing (peek).
-    function resolve(x, y, commit) {
-        var out = constrain(x, y, commit) || { x: x, y: y };
+    // The locks' answer plus whatever is still easing off, for the real hand
+    // at (x, y) having moved by (dx, dy). `commit` moves the ease and the
+    // HAND along (apply); without it the call changes nothing (peek).
+    function resolve(x, y, dx, dy, commit) {
+        var out = constrain(dx, dy, commit) || { x: x, y: y };
         var g = glide;
         if (g) {
             var far = Math.max(g.far, Math.hypot(x - g.x0, y - g.y0));
@@ -163,7 +194,7 @@
     function rebase() {
         glide = null;
         if (!strokeLive() || !lastOut || !lastRaw) return;
-        var now = constrain(lastRaw.x, lastRaw.y) || lastRaw;
+        var now = constrain(0, 0) || lastRaw;
         var ox = lastOut.x - now.x, oy = lastOut.y - now.y, off = Math.hypot(ox, oy);
         if (off < 0.5) return;
         var c = cv(), side = c ? Math.min(c.width, c.height) : 1080;
@@ -207,12 +238,10 @@
         if (!locks[kind]) return;
         delete locks[kind];
         pin = null;
-        // Keep distance left on its own (both were held): it turns on from
-        // where the brush is, not from where it stood before the pin.
-        var c = cv();
-        if (anchored('distance') && lastOut && c) {
-            locks.distance.phi = Math.atan2(lastOut.y - c.height * 0.5, lastOut.x - c.width * 0.5);
-        }
+        // The other lock left on its own (both were held): its hand goes on
+        // from where the brush is, not from where it stood before the pin.
+        var rest = anchored('distance') ? 'distance' : (anchored('angle') ? 'angle' : null);
+        if (rest && lastOut) { locks[rest].hx = lastOut.x; locks[rest].hy = lastOut.y; }
         rebase();
         paintGuide();
         emit();
@@ -222,20 +251,39 @@
 
     // ─── THE STROKE'S POSITIONS ─────────────────────────────────
     // 05d hands every painted position through here: press, move (each
-    // coalesced sample), the live-cursor spot, touch.
-    function apply(x, y) {
+    // coalesced sample), the live-cursor spot, touch. `who` is the pointer
+    // (or touch) it came from: the HAND moves by one pointer's own motion,
+    // so a sample from another device, or from a pointer just back over
+    // the canvas, moves it nothing instead of dragging it across.
+    function apply(x, y, who) {
         if (glide && !strokeLive()) glide = null;   // the stroke it was easing has ended
-        // Turned from the previous sample, then this one becomes it.
-        var out = resolve(x, y, true);
+        var jump = !lastRaw || handJump || who !== lastWho;
+        handJump = false;
+        lastWho = who;
+        // Moved by the step from the previous sample, then this one becomes it.
+        var out = resolve(x, y, jump ? 0 : x - lastRaw.x, jump ? 0 : y - lastRaw.y, true);
         lastRaw = { x: x, y: y };
         // Recorded first: a lock that anchors now anchors on this sample,
         // and the brush is already here.
         lastOut = out;
         if (anyPending()) settlePending(out);
+        if (anyOn()) handMoved();
         return out;
     }
 
-    function peek(x, y) { return resolve(x, y, false); }
+    function peek(x, y) {
+        return resolve(x, y, lastRaw ? x - lastRaw.x : 0, lastRaw ? y - lastRaw.y : 0, false);
+    }
+
+    // The HAND and the spot on the guide the brush takes from it (canvas
+    // px), while exactly one lock steers; null otherwise (none, pending,
+    // or both held: pinned).
+    function hand() {
+        var dOn = anchored('distance'), aOn = anchored('angle');
+        if (dOn === aOn || !cv()) return null;
+        var kind = dOn ? 'distance' : 'angle', L = locks[kind];
+        return { hand: { x: L.hx, y: L.hy }, brush: onGuide(kind, L.hx, L.hy) };
+    }
 
     // True while the brush may not be where the hand is.
     function shaping() { return anyOn() || !!glide; }
@@ -254,24 +302,36 @@
     (function trackHover() {
         var c = cv();
         if (!c) return;
-        c.addEventListener('pointerenter', function () { overCanvas = true; });
+        // The hand's pointer leaving or coming back: where it re-enters says
+        // nothing about how far it moved, so its next sample moves the HAND
+        // nothing (see apply).
+        function away(e) { if (e.pointerId === lastWho) handJump = true; }
+        c.addEventListener('pointerenter', function (e) { overCanvas = true; away(e); });
         // A pointer already over the canvas when the page loaded never
         // entered it; its first move says it is here.
         c.addEventListener('pointermove', function () { overCanvas = true; });
-        c.addEventListener('pointerleave', function () { overCanvas = false; });
+        c.addEventListener('pointerleave', function (e) { overCanvas = false; away(e); });
+        // A finger coming down lands anywhere (and touch ids repeat): ahead
+        // of 05d's touchstart, which paints its first sample.
+        c.addEventListener('touchstart', function () { handJump = true; }, { capture: true, passive: true });
     })();
 
     // ─── THE GUIDE ──────────────────────────────────────────────
-    // While a lock is held: the centre, and the circle or spoke the brush
-    // is held to. Inside #canvas-wrapper one step above the canvas, like
+    // While a lock is held: the centre, the circle or spoke the brush is
+    // held to, and a small ring on the HAND tied to the spot it puts the
+    // brush on. Inside #canvas-wrapper one step above the canvas, like
     // Mandala Studio's guides (34), so Zoom View carries it and the side
-    // panels stay on top. Drawn on a change only; nothing animates.
+    // panels stay on top. The marks are redrawn on a change; the hand's
+    // ring just moves (once a frame at most).
     // Off unless Show guides is ticked (Stroke Locks): the brush cursor
     // already rides the lock, and lines over the painting are a choice.
+    // The Pen Input Window (47) draws the same marks over its own box with
+    // guideMarkup() + paintHand(), under its own Guides menu.
     var GUIDES_KEY = 'strokeLock.showGuides';
     var SVG_NS = 'http://www.w3.org/2000/svg';
-    var svg = null;
+    var svg = null, svgMarks = null, svgHand = null;
     var showGuides = false;
+    var handRaf = 0;
 
     function setShowGuides(on) {
         on = !!on;
@@ -291,31 +351,29 @@
         svg.id = 'strokeLockGuide';
         svg.setAttribute('aria-hidden', 'true');
         svg.style.cssText = 'position:absolute;pointer-events:none;display:none;';
+        svgMarks = document.createElementNS(SVG_NS, 'g');
+        svgHand = document.createElementNS(SVG_NS, 'g');
+        svg.appendChild(svgMarks);
+        svg.appendChild(svgHand);
         wrap.appendChild(svg);
         return svg;
     }
 
     // Each mark twice: a dark halo under a light line, so it reads on pale
     // paint and on black alike.
+    var HALO = 'rgba(0,0,0,0.45)', LINE = 'rgba(255,255,255,0.8)';
     function stroked(el) {
         var ns = ' fill="none" vector-effect="non-scaling-stroke"';
-        return el.replace('/>', ' stroke="rgba(0,0,0,0.45)" stroke-width="3"' + ns + '/>') +
-               el.replace('/>', ' stroke="rgba(255,255,255,0.8)" stroke-width="1.25"' + ns + '/>');
+        return el.replace('/>', ' stroke="' + HALO + '" stroke-width="3"' + ns + '/>') +
+               el.replace('/>', ' stroke="' + LINE + '" stroke-width="1.25"' + ns + '/>');
     }
 
-    function paintGuide() {
-        if (!anyOn() || !showGuides) { if (svg) svg.style.display = 'none'; return; }
+    // The marks for a W×H box laid over the whole canvas (CSS px of that
+    // box), '' while no lock is held: the circle or the spoke, the pin when
+    // both are held, and the centre.
+    function guideMarkup(W, Hh) {
         var c = cv();
-        if (!c || !c.width || !c.height || !ensureGuide()) return;
-        var W = c.offsetWidth, Hh = c.offsetHeight;
-        svg.style.left = c.offsetLeft + 'px';
-        svg.style.top = c.offsetTop + 'px';
-        svg.style.width = W + 'px';
-        svg.style.height = Hh + 'px';
-        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + Hh);
-        var cz = parseInt(getComputedStyle(c).zIndex, 10);
-        svg.style.zIndex = (isFinite(cz) ? cz : 2) + 1;
-
+        if (!anyOn() || !c || !c.width || !c.height || !(W > 0) || !(Hh > 0)) return '';
         var kx = W / c.width, ky = Hh / c.height;
         var cx = W / 2, cy = Hh / 2;
         var parts = '';
@@ -333,8 +391,79 @@
         }
         // The origin: a small cross, drawn last so it sits on the lines.
         parts += stroked('<path d="M' + (cx - 6) + ' ' + cy + ' H' + (cx + 6) + ' M' + cx + ' ' + (cy - 6) + ' V' + (cy + 6) + '"/>');
-        svg.innerHTML = parts;
+        return parts;
+    }
+
+    // The HAND into SVG group `g` (any same-origin document) over a W×H box:
+    // a small ring where it is, and a thin tie to the spot on the guide the
+    // brush takes from it (as long as the hand is off the line). Built once
+    // per group, moved by attribute writes after that; hidden while no
+    // single lock steers.
+    function paintHand(g, W, Hh) {
+        if (!g) return;
+        var c = cv(), h = hand();
+        if (!h || !c || !c.width || !c.height || !(W > 0) || !(Hh > 0)) {
+            if (g.style.display !== 'none') g.style.display = 'none';
+            return;
+        }
+        var el = g.__strokeLockHand;
+        if (!el) {
+            var doc = g.ownerDocument;
+            var mk = function (tag, stroke, width) {
+                var e = doc.createElementNS(SVG_NS, tag);
+                e.setAttribute('fill', 'none');
+                e.setAttribute('stroke', stroke);
+                e.setAttribute('stroke-width', width);
+                e.setAttribute('vector-effect', 'non-scaling-stroke');
+                g.appendChild(e);
+                return e;
+            };
+            el = g.__strokeLockHand = {
+                tieHalo: mk('line', HALO, 2.5), tie: mk('line', 'rgba(255,255,255,0.5)', 1),
+                ringHalo: mk('circle', HALO, 3), ring: mk('circle', LINE, 1.5)
+            };
+            el.ringHalo.setAttribute('r', '4');
+            el.ring.setAttribute('r', '4');
+        }
+        var kx = W / c.width, ky = Hh / c.height;
+        var hx = h.hand.x * kx, hy = h.hand.y * ky, bx = h.brush.x * kx, by = h.brush.y * ky;
+        [el.tieHalo, el.tie].forEach(function (l) {
+            l.setAttribute('x1', hx); l.setAttribute('y1', hy);
+            l.setAttribute('x2', bx); l.setAttribute('y2', by);
+        });
+        [el.ringHalo, el.ring].forEach(function (r) { r.setAttribute('cx', hx); r.setAttribute('cy', hy); });
+        if (g.style.display === 'none') g.style.display = '';
+    }
+
+    function paintGuide() {
+        if (!anyOn() || !showGuides) { if (svg) svg.style.display = 'none'; return; }
+        var c = cv();
+        if (!c || !c.width || !c.height || !ensureGuide()) return;
+        var W = c.offsetWidth, Hh = c.offsetHeight;
+        svg.style.left = c.offsetLeft + 'px';
+        svg.style.top = c.offsetTop + 'px';
+        svg.style.width = W + 'px';
+        svg.style.height = Hh + 'px';
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + Hh);
+        var cz = parseInt(getComputedStyle(c).zIndex, 10);
+        svg.style.zIndex = (isFinite(cz) ? cz : 2) + 1;
+        svgMarks.innerHTML = guideMarkup(W, Hh);
+        paintHand(svgHand, W, Hh);
         svg.style.display = 'block';
+    }
+
+    // The hand moved: its ring here, and whoever else draws it (47), once a
+    // frame however many samples arrived.
+    function handMoved() {
+        if (handRaf) return;
+        handRaf = requestAnimationFrame(function () {
+            handRaf = 0;
+            var c = cv();
+            if (svg && svg.style.display === 'block' && c) paintHand(svgHand, c.offsetWidth, c.offsetHeight);
+            for (var i = 0; i < handListeners.length; i++) {
+                try { handListeners[i](); } catch (e) { console.warn('[StrokeLock] hand listener failed', e); }
+            }
+        });
     }
 
     (function followCanvas() {
@@ -422,13 +551,22 @@
         isHeld: function (kind) { return !!locks[kind]; },
         showGuides: function () { return showGuides; },
         setShowGuides: setShowGuides,
+        // Other surfaces' guides (47): the marks for a W×H box over the
+        // canvas ('' while no lock is held), and the hand's ring into a group.
+        guideMarkup: guideMarkup,
+        paintHand: paintHand,
+        hand: hand,
         onChange: function (fn) { if (typeof fn === 'function') listeners.push(fn); },
+        // Once a frame while the hand moves under a held lock.
+        onHand: function (fn) { if (typeof fn === 'function') handListeners.push(fn); },
         // Tests and console poking: what is held and how.
         state: function () {
             return {
                 distance: locks.distance ? JSON.parse(JSON.stringify(locks.distance)) : null,
                 angle: locks.angle ? JSON.parse(JSON.stringify(locks.angle)) : null,
                 pin: pin ? { x: pin.x, y: pin.y } : null,
+                hand: hand(),
+                area: areaPx(),
                 glide: glide ? { ox: glide.ox, oy: glide.oy, far: glide.far, span: glide.span } : null
             };
         }

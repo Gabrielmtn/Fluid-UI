@@ -3750,7 +3750,7 @@
         guideLbl.setAttribute('for', 'strokeLockGuides');
         guideLbl.style.margin = '0';
         guideLbl.textContent = 'Show guides';
-        guideLbl.title = 'While a lock key is held, draw the circle or line the brush is kept on, and mark the centre.';
+        guideLbl.title = 'While a lock key is held, draw the circle or line the brush is kept on, mark the centre, and ring where your hand is (it stays beside the line however far the mouse goes).';
         guideRow.appendChild(guideCb);
         guideRow.appendChild(guideLbl);
         wrap.appendChild(guideRow);

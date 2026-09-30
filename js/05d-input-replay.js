@@ -835,7 +835,11 @@
         // recorder, the replay store and the room see the position.
         function paintCoords(e) {
             const c = getCanvasCoordinates(e);
-            return window.StrokeLock ? window.StrokeLock.apply(c.x, c.y) : c;
+            // Which pointer (or touch) this is: the lock moves its hand by one
+            // device's own motion, never across from another's position.
+            return window.StrokeLock
+                ? window.StrokeLock.apply(c.x, c.y, e.pointerId != null ? e.pointerId : 't' + e.identifier)
+                : c;
         }
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'touch') return; // touchstart owns touch
