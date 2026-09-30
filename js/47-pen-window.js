@@ -29,6 +29,16 @@
 //   off the GPU at full canvas resolution and re-uploads it: measured as
 //   the one real cost of the feature, so it is gone. Off = blank surface.
 //
+//   Guides (2026-09-29): the main window's guides are DOM over #canvas, so
+//   the blit never carried them. The pen window draws its own over the
+//   mirror, from each guide's own markup at this box's size — Stroke locks
+//   (the circle or spoke a held lock keeps the brush on, plus the ring on
+//   the lock's hand) and Mandala Studio (the paintable wedge, seams and
+//   rings) — each ticked on or off in the toolbar's Guides menu, whatever
+//   the main window shows. "Always show cursor" (on by default) keeps the
+//   brush cursor here when the main window hides its own (C, Focus mode,
+//   Show Brush Ghost off); untick it and this window follows the main one.
+//
 //   Hotkeys and the scroll wheel work from the pen window too: keys are
 //   re-dispatched on document.body here, wheel on the canvas, so [ ] size,
 //   Space freeze, Ctrl+Z, right-click replay all behave as at home.
@@ -80,6 +90,8 @@
     var SCREEN_KEY = 'display.penWindowScreen';   // Electron display id the window last lived on
     var SCREEN_KEY_WEB = 'display.penWindowScreenWeb';   // browser: label or "left,top" of the chosen screen
     var RETURN_KEY = 'display.penWindowMouseReturn';     // "Mouse Picks Up Where It Left Off"
+    var GUIDES_KEY = 'display.penWindowGuides';          // { guide id: shown here }
+    var CURSOR_KEY = 'display.penWindowCursor';          // "Always show cursor" in this window
     var ID_OFFSET = 5000;          // synthetic pointerIds never collide with real ones
     var BAR_ZONE = 56;             // px from the top edge that reveals the toolbar
     var BAR_LINGER = 1400;         // ms the toolbar stays after the pointer leaves it
@@ -127,6 +139,30 @@
     var mirrorTimer = 0, mirrorCtx = null, mirrorSpec = null;
     var mirrorStats = { draws: 0, drawMs: 0, lastRate: 0 };   // drawMs = EMA of one blit's main-thread cost
     var screenDetails = null;   // Window Management API details, when granted
+    var guideTimer = 0;
+    var guideHooks = false;     // StrokeLock listeners registered (once; they check isOpen)
+
+    // The guides this window can draw over its mirror, bottom to top. Each
+    // `markup(W, H)` is the owning module's own marks for a W×H box over the
+    // whole canvas ('' while that guide has nothing to show), so the two
+    // windows cannot disagree about where a line is.
+    var GUIDES = [
+        { id: 'mandala', name: 'Mandala Studio',
+          about: 'The wedge you paint in, its seams and rings, while Mandala Studio is on.',
+          markup: function (W, H) {
+              var M = window.MandalaStudio;
+              return (M && typeof M.guideMarkup === 'function') ? M.guideMarkup(W, H) : '';
+          } },
+        { id: 'strokeLock', name: 'Stroke locks',
+          about: 'The circle or line a held lock keeps the brush on, with a ring where your hand is.',
+          markup: function (W, H) {
+              var L = window.StrokeLock;
+              return (L && typeof L.guideMarkup === 'function') ? L.guideMarkup(W, H) : '';
+          } }
+    ];
+    var MENU_ORDER = ['strokeLock', 'mandala'];
+    var guidesOn = { strokeLock: true, mandala: true };
+    var cursorForced = true;
 
     // ── Self-test: does a constructed event carry its coalesced samples? ──
     var COALESCED_OK = (function () {
@@ -189,6 +225,33 @@
         try { if (window.settingsManager) { window.settingsManager.set(SCREEN_KEY_WEB, key); return; } } catch (_) {}
         try { localStorage.setItem('fluidUI:' + SCREEN_KEY_WEB, String(key)); } catch (_) {}
     }
+    // Guides menu + Always show cursor: this viewer's choices for this
+    // window (never in presets). Both default on.
+    function loadGuideSettings() {
+        var g = null, c = null;
+        try { if (window.settingsManager) { g = window.settingsManager.get(GUIDES_KEY, null); c = window.settingsManager.get(CURSOR_KEY, null); } } catch (_) {}
+        if (g == null) { try { g = JSON.parse(localStorage.getItem('fluidUI:' + GUIDES_KEY) || 'null'); } catch (_) {} }
+        if (c == null) { try { c = localStorage.getItem('fluidUI:' + CURSOR_KEY); } catch (_) {} }
+        if (g && typeof g === 'object') {
+            GUIDES.forEach(function (d) { if (typeof g[d.id] === 'boolean') guidesOn[d.id] = g[d.id]; });
+        }
+        if (c != null) cursorForced = !(c === false || c === 'false' || c === '0' || c === 0);
+    }
+    function saveGuideSettings() {
+        var g = {};
+        GUIDES.forEach(function (d) { g[d.id] = !!guidesOn[d.id]; });
+        try {
+            if (window.settingsManager) {
+                window.settingsManager.set(GUIDES_KEY, g);
+                window.settingsManager.set(CURSOR_KEY, cursorForced);
+                return;
+            }
+        } catch (_) {}
+        try {
+            localStorage.setItem('fluidUI:' + GUIDES_KEY, JSON.stringify(g));
+            localStorage.setItem('fluidUI:' + CURSOR_KEY, cursorForced ? '1' : '0');
+        } catch (_) {}
+    }
 
     // ── Popup markup (a fresh document: none of the app's CSS applies) ──
 
@@ -224,21 +287,43 @@
             '#bar select{padding:4px 6px}',
             '#bar button:hover,#bar select:hover{background:rgba(255,255,255,0.13)}',
             '#bar button:focus,#bar select:focus{outline:1px solid rgba(120,180,255,0.7)}',
+            '#bar input[type=checkbox]{margin:0;accent-color:#78b4ff;cursor:pointer}',
+            '#bar label{cursor:pointer}',
+            // Guides over the mirror (and over the blank surface with the
+            // mirror off), under the cursor; clipped to the box.
+            '.guide{position:absolute;left:0;top:0;width:100%;height:100%;display:none;pointer-events:none}',
+            '#guidesMenu{position:fixed;top:44px;left:12px;z-index:6;width:300px;max-width:calc(100vw - 24px);padding:6px;',
+            'box-sizing:border-box;background:rgba(10,14,20,0.97);border:1px solid rgba(255,255,255,0.16);border-radius:8px;',
+            'box-shadow:0 8px 24px rgba(0,0,0,0.5);cursor:default}',
+            '#guidesMenu label{display:flex;gap:10px;align-items:flex-start;padding:7px 8px;border-radius:6px;cursor:pointer}',
+            '#guidesMenu label:hover{background:rgba(255,255,255,0.07)}',
+            '#guidesMenu input{margin:2px 0 0;accent-color:#78b4ff;cursor:pointer}',
+            '#guidesMenu b{display:block;color:#e8ecf2;font-weight:600}',
+            '#guidesMenu small{display:block;color:#9aa6b8;font-size:12px;line-height:1.35;margin-top:2px}',
             '</style></head><body>',
             '<div id="stage"><div id="box">',
             '<canvas id="mirror" width="16" height="9"></canvas>',
             '<div id="blank" hidden><div><b>Mirror off</b>Draw here and watch your main monitor.</div></div>',
+            '<svg class="guide" id="guide-mandala" aria-hidden="true"><g></g></svg>',
+            '<svg class="guide" id="guide-strokeLock" aria-hidden="true"><g></g><g></g></svg>',
             '</div><div id="ghostArms"></div><canvas id="ghost"></canvas><div id="ring"></div></div>',
             '<div id="bar"><b>Swirl Together · pen input</b>',
             '<span class="grow" id="status">Draw here — the paint lands on your main monitor.</span>',
             // Buttons only: in the desktop build this window never takes
             // focus (so the mouse keeps working in the app while the pen is
-            // down), and a <select> needs focus to open.
+            // down), and a <select> needs focus to open. The Guides menu is
+            // our own list of checkboxes for the same reason; a checkbox
+            // toggles on its click, focus or not.
+            '<button id="guidesBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Guides drawn over this window, whatever the main window shows">Guides: all &#9662;</button>',
+            '<label title="Keep the brush cursor in this window even when the main window hides it (C, Focus mode, Show Brush Ghost off). Untick to follow the main window.">',
+            '<input type="checkbox" id="cursorBox" checked>Always show cursor</label>',
             '<button id="mirrorBtn" type="button" title="Mirror: what this window shows under the pen. Click to cycle Light / Smooth / Off.">Mirror: Light</button>',
             '<button id="screenBtn" type="button" title="Move this window to the next screen">Screen &#9656;</button>',
             '<button id="fsBtn" type="button" title="F11">Fullscreen</button>',
             '<button id="closeBtn" type="button">Close</button>',
-            '</div></body></html>'
+            '</div>',
+            '<div id="guidesMenu" role="group" aria-label="Guides" hidden></div>',
+            '</body></html>'
         ].join('');
     }
 
@@ -701,6 +786,7 @@
         ui.box.style.width = w + 'px';
         ui.box.style.height = h + 'px';
         sizeMirror();
+        guidesSync();
     }
 
     // Popup client point → main-window client point on the canvas.
@@ -929,6 +1015,9 @@
         retireStalePens(e);
         if (isStrayMouse(e)) return;
         notePen(e);
+        // A press on the surface with the Guides menu open closes it and
+        // paints nothing: a tap to dismiss must not leave a dab.
+        if (guidesMenuOpen()) { toggleGuidesMenu(false); e.preventDefault(); return; }
         lastInputTs = performance.now();
         mirrorWake();
         fit();
@@ -1078,6 +1167,7 @@
         var tag = t && t.tagName ? t.tagName.toLowerCase() : '';
         if (tag === 'select' || tag === 'input' || tag === 'button' || tag === 'textarea') return;
         if (e.key === 'F11') { if (e.type === 'keydown') toggleFullscreen(); e.preventDefault(); return; }
+        if (e.key === 'Escape' && guidesMenuOpen()) { if (e.type === 'keydown') toggleGuidesMenu(false); e.preventDefault(); return; }
         if (e.key === 'Escape' && !childWin && pdoc && pdoc.fullscreenElement) return;
         var ok = true;
         try {
@@ -1105,15 +1195,17 @@
     // P badge in pressure mode — with Multi-Brush on, every arm's ghost too. Read live rather than copied off the main
     // cursor — that one only renders while the main canvas is hovered, and a
     // copy could be a frame stale while the angle turns (Shift+Scroll from
-    // the tablet). Like the main ghost it follows Show Brush Ghost and Brush
-    // Ghost Opacity, and steps aside while the pen is down.
+    // the tablet). It takes Brush Ghost Opacity, and steps aside while the
+    // pen is down.
     //
-    // ALWAYS on otherwise. The first cut followed the main window's Show
+    // Shown whatever the main window does while "Always show cursor" is
+    // ticked (the default). The first cut followed the main window's Show
     // Cursor toggle, so with it off (Focus mode switches it off too) the pen
     // window showed a bare crosshair — "we were hoping to preserve the
     // cursor state in there, so we can still see the angle and next color".
-    // Here it IS the cursor; the OS arrow stays hidden over the stage
-    // whatever the main window does.
+    // Unticked (2026-09-29), it follows the main window again: C hides it
+    // here too, and Show Brush Ghost off leaves the dot. The OS arrow stays
+    // hidden over the stage either way.
     function pressureActive() {
         var c = window.config || {};
         if (c.BRUSH_VELOCITY_ONLY) return true;
@@ -1143,9 +1235,15 @@
     var ringState = null;
     var ringTimer = 0;
     var ringX = 0, ringY = 0;
+    // The main window's Show Cursor (C; Focus mode unticks it too).
+    function mainCursorOn() {
+        var t = document.getElementById('cursorToggle');
+        return !t || t.checked;
+    }
     function ringSync() {
         if (!ui || ui.ring.style.display !== 'block') return;
         if (!ui.ringParts) buildRing();
+        lockHandSync();
         var P = ui.ringParts;
         var pOn = pressureActive();
         if (!ringState || ringState.pOn !== pOn) {
@@ -1154,6 +1252,13 @@
             P.dot.style.display = pOn ? 'none' : 'block';
         }
         ringState = { pOn: pOn };
+        // Always show cursor (this window's own box, on by default): the dot
+        // and the ghost stay whatever the main window hides. Off: this
+        // window follows it, C hiding both cursors and Show Brush Ghost the
+        // ghost. The OS arrow stays hidden over the stage either way.
+        var shown = cursorForced || mainCursorOn();
+        var vis = shown ? '' : 'hidden';
+        if (ui.ring.style.visibility !== vis) ui.ring.style.visibility = vis;
         var BC = window.__brushCursor;
         if (!BC || typeof BC.ghostSet !== 'function') return;
         // 31's whole ghost: the dab under the pen, plus every other
@@ -1162,8 +1267,9 @@
         var op = String(BC.ghostOpacity());
         ui.ghost.style.opacity = op;
         ui.ghostArms.style.opacity = op;
+        var ghostOn = cursorForced || (shown && BC.ghostEnabled());
         // box.h is the canvas's full height in this window's CSS px.
-        ui.ghostPaint.paint(heldCount === 0 && BC.ghostEnabled(), BC.radiusRoot() * box.h,
+        ui.ghostPaint.paint(heldCount === 0 && ghostOn, BC.radiusRoot() * box.h,
             (pop && pop.devicePixelRatio) || 1, ringX, ringY,
             { left: box.x, top: box.y, width: box.w, height: box.h });
     }
@@ -1208,7 +1314,113 @@
         if (!ui) return;
         ui.bar.classList.remove('idle');
         clearTimeout(barTimer);
-        barTimer = setTimeout(function () { if (ui) ui.bar.classList.add('idle'); }, BAR_LINGER);
+        // Not while the Guides menu hangs off it; closing the menu calls back here.
+        barTimer = setTimeout(function () { if (ui && !guidesMenuOpen()) ui.bar.classList.add('idle'); }, BAR_LINGER);
+    }
+
+    // ── Guides over the mirror ───────────────────────────────────────
+
+    function guideDef(id) {
+        for (var i = 0; i < GUIDES.length; i++) if (GUIDES[i].id === id) return GUIDES[i];
+        return null;
+    }
+    function guideOn(id) { return guidesOn[id] !== false; }
+    // Every ticked guide's marks at this box's size, rewritten only when
+    // they change; an unticked guide, or one with nothing to show right now
+    // (no lock held, Mandala Studio off), is hidden.
+    function guidesSync() {
+        if (!ui || !ui.guides) return;
+        var vb = '0 0 ' + box.w + ' ' + box.h;
+        for (var i = 0; i < GUIDES.length; i++) {
+            var d = GUIDES[i], g = ui.guides[d.id];
+            if (!g || !g.svg || !g.marks) continue;
+            var mk = '';
+            if (guideOn(d.id)) {
+                try { mk = d.markup(box.w, box.h) || ''; } catch (e) { console.warn('Pen window: ' + d.id + ' guide failed', e); }
+            }
+            if (g.vb !== vb) { g.svg.setAttribute('viewBox', vb); g.vb = vb; }
+            if (g.last !== mk) { g.marks.innerHTML = mk; g.last = mk; }
+            var disp = mk ? 'block' : 'none';
+            if (g.svg.style.display !== disp) g.svg.style.display = disp;
+        }
+        lockHandSync();
+    }
+    // The stroke lock's hand ring moves with every sample, not on a change:
+    // 56 draws it into our group by attribute writes. Run from each pen move
+    // here (ringSync) and, for a hand the main window's mouse is moving,
+    // from 56's once-a-frame hand listener.
+    function lockHandSync() {
+        var g = ui && ui.guides && ui.guides.strokeLock;
+        var L = window.StrokeLock;
+        if (!g || !g.hand || !L || typeof L.paintHand !== 'function') return;
+        if (!guideOn('strokeLock') || g.svg.style.display === 'none') {
+            if (g.hand.style.display !== 'none') g.hand.style.display = 'none';
+            return;
+        }
+        L.paintHand(g.hand, box.w, box.h);
+    }
+    function hookGuides() {
+        var L = window.StrokeLock;
+        if (guideHooks || !L || typeof L.onChange !== 'function') return;
+        guideHooks = true;
+        L.onChange(function () { if (isOpen()) guidesSync(); });
+        if (typeof L.onHand === 'function') L.onHand(function () { if (isOpen()) lockHandSync(); });
+    }
+
+    // The Guides button reads like a select showing its choice.
+    function syncGuidesBtn() {
+        if (!ui) return;
+        var on = MENU_ORDER.filter(guideOn);
+        var said = on.length === MENU_ORDER.length ? 'all'
+            : (!on.length ? 'off' : on.map(function (id) { return guideDef(id).name; }).join(', '));
+        ui.guidesBtn.textContent = 'Guides: ' + said + ' ▾';
+    }
+    function buildGuidesMenu() {
+        if (!ui || !ui.guidesMenu) return;
+        var m = ui.guidesMenu;
+        m.textContent = '';
+        MENU_ORDER.forEach(function (id) {
+            var d = guideDef(id);
+            if (!d) return;
+            var row = pdoc.createElement('label');
+            var cb = pdoc.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = guideOn(id);
+            cb.setAttribute('data-guide', id);
+            var txt = pdoc.createElement('span');
+            var name = pdoc.createElement('b');
+            name.textContent = d.name;
+            var about = pdoc.createElement('small');
+            about.textContent = d.about;
+            txt.appendChild(name);
+            txt.appendChild(about);
+            row.appendChild(cb);
+            row.appendChild(txt);
+            cb.addEventListener('change', function () {
+                guidesOn[id] = !!cb.checked;
+                saveGuideSettings();
+                syncGuidesBtn();
+                guidesSync();
+                cb.blur();
+            });
+            m.appendChild(row);
+        });
+        syncGuidesBtn();
+    }
+    function guidesMenuOpen() { return !!(ui && ui.guidesMenu && !ui.guidesMenu.hidden); }
+    function toggleGuidesMenu(open) {
+        if (!ui || !ui.guidesMenu) return;
+        if (typeof open !== 'boolean') open = !guidesMenuOpen();
+        if (open) {
+            // Under the button, kept on screen.
+            var r = ui.guidesBtn.getBoundingClientRect();
+            var W = (pop && pop.innerWidth) || 800;
+            ui.guidesMenu.style.left = Math.max(8, Math.min(r.left, W - 308)) + 'px';
+            ui.guidesMenu.style.top = Math.round(r.bottom + 6) + 'px';
+        }
+        ui.guidesMenu.hidden = !open;
+        ui.guidesBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        showBar();
     }
     function onBarTrack(e) {
         if (!ui) return;
@@ -1379,8 +1591,17 @@
             fsBtn: pdoc.getElementById('fsBtn'),
             screenBtn: pdoc.getElementById('screenBtn'),
             closeBtn: pdoc.getElementById('closeBtn'),
+            guidesBtn: pdoc.getElementById('guidesBtn'),
+            guidesMenu: pdoc.getElementById('guidesMenu'),
+            cursorBox: pdoc.getElementById('cursorBox'),
+            guides: {},
             ringParts: null
         };
+        GUIDES.forEach(function (d) {
+            var s = pdoc.getElementById('guide-' + d.id);
+            var gs = s ? s.getElementsByTagName('g') : [];
+            ui.guides[d.id] = { svg: s, marks: gs[0] || null, hand: gs[1] || null, last: null, vb: '' };
+        });
         held = {}; heldCount = 0; hoverInside = false;
 
         // Our functions, its elements: one process, one thread, no bridge.
@@ -1416,6 +1637,15 @@
                 startMirror();
             }
         });
+        ui.guidesBtn.addEventListener('click', function () { toggleGuidesMenu(); ui.guidesBtn.blur(); });
+        ui.cursorBox.checked = cursorForced;
+        ui.cursorBox.addEventListener('change', function () {
+            cursorForced = !!ui.cursorBox.checked;
+            saveGuideSettings();
+            ringSync();
+            ui.cursorBox.blur();   // focused, it would keep the hotkeys (onKey skips inputs)
+        });
+        buildGuidesMenu();
 
         if (isElectron) {
             // The BrowserWindow exists by the time window.open returns.
@@ -1428,6 +1658,14 @@
         syncScreenRadios();
         cursorReturnSync();
         showBar();
+        hookGuides();
+        guidesSync();
+        clearInterval(guideTimer);
+        // Mandala Studio has no change events to follow (a wedge count, the
+        // angle, Paint Only In Wedge...): its marks are re-read four times a
+        // second and rewritten only when they differ. Stroke locks also say
+        // when they change (hookGuides).
+        guideTimer = setInterval(function () { if (pdoc && pdoc.visibilityState === 'visible') guidesSync(); }, 250);
         clearInterval(fitTimer);
         fitTimer = setInterval(fit, 1000);          // canvas aspect can change under us (resize, zoom view)
         clearInterval(pollTimer);
@@ -1452,6 +1690,7 @@
     // never a hard abort), drop the mirror, close the window, reset.
     function cleanup(reason) {
         clearInterval(fitTimer); fitTimer = 0;
+        clearInterval(guideTimer); guideTimer = 0;
         clearInterval(pollTimer); pollTimer = 0;
         clearTimeout(barTimer); barTimer = 0;
         Object.keys(held).forEach(function (id) { releaseHeld(id); });
@@ -1512,6 +1751,7 @@
 
     function init() {
         loadMirrorSetting();
+        loadGuideSettings();
         var b = button();
         if (b) b.addEventListener('click', function () { toggle(); });
         var sel = mirrorSelect();
@@ -1544,6 +1784,15 @@
                 open: isOpen(), box: box, heldCount: heldCount, hoverInside: hoverInside,
                 ringOwner: ownerId, pendingCancels: Object.keys(pendingCancel).length,
                 coalescedOK: COALESCED_OK, childWin: !!childWin, electron: isElectron,
+                cursorForced: cursorForced,
+                guides: {
+                    on: JSON.parse(JSON.stringify(guidesOn)),
+                    shown: GUIDES.filter(function (d) {
+                        var g = ui && ui.guides && ui.guides[d.id];
+                        return !!(g && g.svg && g.svg.style.display === 'block');
+                    }).map(function (d) { return d.id; }),
+                    menuOpen: guidesMenuOpen()
+                },
                 cursorReturn: {
                     on: cursorReturn.on, available: cursorReturn.available, reason: cursorReturn.reason,
                     penOwnsCursor: penOwnsCursor, penGone: penGone,

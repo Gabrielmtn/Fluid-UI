@@ -259,8 +259,13 @@
         // canvas or punch through the UI.
         const cz = parseInt(getComputedStyle(canvas).zIndex, 10);
         svg.style.zIndex = (isFinite(cz) ? cz : 2) + 1;
+        svg.innerHTML = guideMarkup(canvas.offsetWidth, canvas.offsetHeight);
+    }
 
-        const W = canvas.offsetWidth, H = canvas.offsetHeight;
+    // The guide marks for a W×H box laid over the whole canvas, in that
+    // box's px: here the canvas's own CSS box; the Pen Input Window (47)
+    // draws them over its box at its own size.
+    function guideMarkup(W, H) {
         const cx = W / 2, cy = H / 2;
         const L = Math.hypot(W, H);            // past every corner
         const rMax = Math.min(cx, cy);
@@ -304,7 +309,7 @@
         parts += '<path d="M' + w0[0] + ' ' + w0[1] + ' L' + cx + ' ' + cy + ' L' + w1[0] + ' ' + w1[1] +
             '" fill="none" stroke="rgba(130,205,255,0.85)" stroke-width="1.5"/>';
         parts += '<circle cx="' + cx + '" cy="' + cy + '" r="2.5" fill="rgba(255,255,255,0.55)"/>';
-        svg.innerHTML = parts;
+        return parts;
     }
 
     // ── Fill: scale the view so the working wedge reads as the whole
@@ -358,6 +363,14 @@
         if (guidesVisible()) drawGuides();
     }
     function refresh() { if (guidesVisible()) drawGuides(); }
+
+    // For other surfaces (the Pen Input Window, 47): whether the mode is on,
+    // and its guide marks for a W×H box over the canvas ('' while off).
+    // Hide Guides is this window's choice; the other surface has its own.
+    window.MandalaStudio = {
+        active: active,
+        guideMarkup: function (W, H) { return (active() && W > 0 && H > 0) ? guideMarkup(W, H) : ''; }
+    };
 
     if (typeof ResizeObserver !== 'undefined') new ResizeObserver(refresh).observe(canvas);
     // Reordering layers rewrites the canvas's inline z-index, which would

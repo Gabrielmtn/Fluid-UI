@@ -16,6 +16,14 @@ Neither ships (electron-builder drops `scripts/`).
   window), plus the mirror: wiped paint leaves the tablet too, the
   Background Color shows under it, the first input after idle redraws at
   once. 14 of its 15 checks fail on the code before 2026-09-14.
+- `node scripts/test/pen-window/guides.js` — the popup toolbar's Guides menu
+  (Stroke locks + Mandala Studio drawn over the box, each on or off here
+  whatever the main window shows, persisted) and Always show cursor (C and
+  Show Brush Ghost off hide the popup cursor only when it is unticked), plus
+  the stroke locks' confined hand: pushed far off the circle or the spoke
+  (hovering, and a pen stroke dragged off the box) it stops at the band's
+  edge with the paint still on the guide, the first move back pulls it in,
+  and drifting laps turn the brush one way with no jumps.
 - `node scripts/test/pen-window/electron-probe.js` — the desktop build via the
   throwaway `throwaway-main.js` beside it (hidden main window, own userData,
   no single-instance lock, the REAL window-open handler lifted verbatim from

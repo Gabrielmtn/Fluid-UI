@@ -174,11 +174,17 @@ const COVERAGE = "(function(){ var gl=window.gl, d=window.density, w=window.dyeT
         const offRing = Object.assign(await pop.eval(GHOST), await pop.eval("({ cursor: getComputedStyle(document.getElementById('stage')).cursor })"));
         const mainOff = await main.eval("({ checked: document.getElementById('cursorToggle').checked, mainRing: document.getElementById('brushCursor').style.display })");
         check('Show Cursor off on the main window: pen window still shows its cursor (ghost: angle + colour) with no OS cursor', !mainOff.checked && offRing.ring === 'block' && offRing.cursor === 'none' && offRing.ghost === 'block', { offRing, mainOff });
-        // Show Brush Ghost off: the popup keeps only the dot.
+        // Show Brush Ghost off: "Always show cursor" (the popup's own box, on by
+        // default) keeps the ghost here; unticked, the popup keeps only the dot.
         await main.eval("(function(){ var t=document.getElementById('brushGhostToggle'); t.checked=false; t.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await sleep(80);
+        const forced = await pop.eval(GHOST);
+        check('Show Brush Ghost off, Always show cursor on (default): popup still shows the ghost', forced.ring === 'block' && forced.ghost === 'block', forced);
+        await pop.eval("(function(){ var b=document.getElementById('cursorBox'); b.checked=false; b.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
+        await sleep(80);
         const noGhost = await pop.eval(GHOST);
-        check('Show Brush Ghost off: popup shows the dot, no ghost', noGhost.ring === 'block' && noGhost.ghost === 'none', noGhost);
+        check('...Always show cursor off: popup shows the dot, no ghost', noGhost.ring === 'block' && noGhost.ghost === 'none', noGhost);
+        await pop.eval("(function(){ var b=document.getElementById('cursorBox'); b.checked=true; b.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await main.eval("(function(){ var t=document.getElementById('brushGhostToggle'); t.checked=true; t.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await main.eval("(function(){ var c=document.getElementById('cursorToggle'); c.checked=true; c.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         // Multi-Brush: the popup shows every arm's ghost (31 ghostSet), laid
