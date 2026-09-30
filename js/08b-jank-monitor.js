@@ -421,6 +421,7 @@
         pressureIters: function () { return window.config && window.config.PRESSURE_ITERATIONS; },
         curl: function () { return window.config && window.config.CURL; },
         viscosity: function () { return window.config && window.config.VISCOSITY; },
+        colorBlend: function () { return window.config && window.config.COLOR_BLEND; },
         splatRadius: function () { return window.config && window.config.SPLAT_RADIUS; },
         sharpness: function () { return window.config && window.config.SHARPNESS; },
         vibrance: function () { return window.config && window.config.VIBRANCE; },

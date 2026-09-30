@@ -1,6 +1,6 @@
 {
   "generated": "node scripts/test/gen-shader-inventory.js",
-  "shaders": 44,
+  "shaders": 46,
   "collisionGroups": 2,
   "table": {
     "uTexture": {
@@ -328,6 +328,40 @@
         "uPairs",
         "uStep",
         "uVelocity"
+      ]
+    },
+    "uCellShort|uDye|uPress|uSpeedScale|uSqueeze|uTexel|uVelocity": {
+      "name": "colorBlendStir",
+      "uniforms": [
+        "uCellShort",
+        "uDye",
+        "uPress",
+        "uSpeedScale",
+        "uSqueeze",
+        "uTexel",
+        "uVelocity"
+      ]
+    },
+    "hasObstacle|uDryStir|uDye|uDyeTexel|uObstacle|uPaintShare|uPass|uSeed|uSource|uSrcMax|uSrcScale|uStepUv|uStir|uStirRest|uVarPerStir|uWetFull|uWetness": {
+      "name": "colorBlend",
+      "uniforms": [
+        "hasObstacle",
+        "uDryStir",
+        "uDye",
+        "uDyeTexel",
+        "uObstacle",
+        "uPaintShare",
+        "uPass",
+        "uSeed",
+        "uSource",
+        "uSrcMax",
+        "uSrcScale",
+        "uStepUv",
+        "uStir",
+        "uStirRest",
+        "uVarPerStir",
+        "uWetFull",
+        "uWetness"
       ]
     },
     "covKnee|solid|sourceRotation|sourceSkew|sourceTransform|stick|strength|texelSize|uAspect|uObstacle|uSource": {

@@ -78,6 +78,12 @@
         // _velIsoLast is the setting the stored field is in (null = not yet
         // seen), so a live flip can convert the motion already in flight.
         let _velIsoLast = null;
+        // Color Blend (8d): a new dither seed every step, so its rounding
+        // noise never repeats in place.
+        let colorBlendSeed = 0;
+        // Color Blend (8d): how far it has come back since Freeze let go,
+        // 0 (frozen) to 1 (full), over COLOR_BLEND_THAW seconds.
+        let colorBlendThaw = 1;
         function velToUv() {
             if (config.VELOCITY_ISOTROPIC !== true) return [0.0, 0.0];
             const L = Math.max(simTexWidth, simTexHeight);
@@ -920,6 +926,9 @@
                 // and the brake, so painting-while-frozen is unchanged;
                 // only the autonomous forces go quiet. The curl texture has
                 // no reader but confinement, so its pass is skipped too.
+                // The paint's own clock stops with them: Color Blend (8d) is
+                // skipped and the Drying map (7c) stops drying, so wet paint
+                // neither runs together nor sets while frozen.
                 const _frozen = !!window.__fluidFrozen;
                 // 1. Curl computation
                 if (!_frozen) {
@@ -1351,10 +1360,19 @@
                 // then set wetInfluence=0 so dyeMobility() is a bit-exact 1.0.
                 const _wetInfluence = (typeof config.WET_INFLUENCE === 'number' && config.WET_INFLUENCE > 0)
                     ? Math.min(config.WET_INFLUENCE, 1.0) : 0.0;
-                if (_wetInfluence > 0) {
+                // Color Blend (8d) reads the map too: wet paint blends where
+                // colours meet, dry paint has set. So it is kept whenever
+                // either is on; with Drying at 0 the dye passes still get
+                // wetInfluence 0, so it never touches the motion.
+                if (_wetInfluence > 0 || (config.COLOR_BLEND || 0) > 0) {
                     const _halfLife = (typeof config.WET_DRYING === 'number' && config.WET_DRYING > 0) ? config.WET_DRYING : 3.0;
                     if (_halfLife !== lastWetDrying) { lastWetDrying = _halfLife; wetDryAccum = 0; }
-                    const _dry = computeDryMul(_halfLife, wetDryAccum, dt);
+                    // Frozen, the map still rides the braking flow (so it
+                    // stays on the paint) but does not dry, the way the dye
+                    // does not fade: paint left or laid wet on a frozen canvas
+                    // is as wet when it thaws, and blends from there.
+                    const _dry = _frozen ? { dryMul: 1.0, accum: wetDryAccum }
+                        : computeDryMul(_halfLife, wetDryAccum, dt);
                     wetDryAccum = _dry.accum;
                     wetnessAdvectProg.bind();
                     gl.viewport(0, 0, simTexWidth, simTexHeight);
@@ -1710,6 +1728,164 @@
                     gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
                     blit(density.write.fbo);
                     density.swap();
+                }
+                // 8d. Color Blend (2026-09-29): colours travel through the
+                // paint and mix (colorBlendFrag), while the velocity, the
+                // pressure and each texel's amount of paint stay exactly what
+                // the flow made them. Skipped whole at 0 (the default), which
+                // leaves the dye bit-identical.
+                //
+                // How far colour travels is a diffusion, like wet paint's: D =
+                // l² × (wet × (stir + COLOR_BLEND_CONTACT) + dry ×
+                // COLOR_BLEND_DRY_STIR × stir), where l = COLOR_BLEND ×
+                // COLOR_BLEND_LENGTH of the canvas's short side and wet is the
+                // Drying map (7c). Wet colours that touch run into each other,
+                // moving or not, and settle as the paint dries at Dry Time, so
+                // a blend zone forms and each colour keeps its own away from
+                // it; the stir
+                // (the local velocity gradient, worked out once per sim texel
+                // and smoothed, colorBlendStirFrag) adds the eddy part, so
+                // shear, roll-up and Vorticity's churn mix harder, and where
+                // the flow converges into itself (few Pressure iterations) the
+                // squeeze counts COLOR_BLEND_SQUEEZE times over and mixes the
+                // paint too (see the shader). A step spreads colour by a
+                // variance of 2·D·dt, handed to the shader per unit of stir in
+                // half-res texels² (uVarPerStir). The fader scales the length
+                // itself, so 0.5 reaches half as far as 1: drying bounds the
+                // blend, so the top needs no curve of its own to keep it in
+                // check. Short side for the reason Viscosity uses it:
+                // Brush Size is a share of it, so the blend keeps its ratio to
+                // a stroke however wide the window is.
+                //
+                // Scratch: the stir (two channels) goes into velocity.write,
+                // dead between the swap at 7 and the next step's first
+                // velocity pass, which overwrites it unread. The half-res
+                // spreads go into the lower-left corner of `sharpened` (x)
+                // and `detailed` (y), the dye-res buffers the MacCormack
+                // passes above already borrow (see the note at 8); nothing
+                // reads them again until post-FX overwrites them this frame.
+                const _cb = (typeof config.COLOR_BLEND === 'number') ? Math.max(0, Math.min(1, config.COLOR_BLEND)) : 0;
+                // Freeze means still, so it stands down while frozen: wet
+                // paint would keep running together on a frozen canvas (Blend
+                // 1, still fills: the border widened 25 -> 35 px in 3 s).
+                //
+                // And it eases back in when Freeze lets go. The paint is held
+                // wet (7c), so at full rate every edge would start blending on
+                // the first thawed step, and a sharp edge softens fastest at
+                // first (its width grows with the square root of time): the
+                // whole picture went soft in a blink while the flow was still
+                // waking up from still. So the blend comes back on a
+                // smoothstep over COLOR_BLEND_THAW seconds of sim time.
+                const _cbThawSec = (typeof config.COLOR_BLEND_THAW === 'number') ? Math.max(0, config.COLOR_BLEND_THAW) : 1.5;
+                if (_frozen) colorBlendThaw = 0;
+                else if (colorBlendThaw < 1) colorBlendThaw = (_cbThawSec > 0) ? Math.min(1, colorBlendThaw + _dyeDt / _cbThawSec) : 1;
+                const _cbEase = colorBlendThaw * colorBlendThaw * (3 - 2 * colorBlendThaw);
+                if (_cb > 0 && !_frozen && _cbEase > 0) {
+                    const _cbLen = ((typeof config.COLOR_BLEND_LENGTH === 'number' && config.COLOR_BLEND_LENGTH > 0)
+                        ? config.COLOR_BLEND_LENGTH : 0.02) * _cb; // short sides
+                    const _cbRest = (typeof config.COLOR_BLEND_CONTACT === 'number') ? Math.max(0, config.COLOR_BLEND_CONTACT) : 2;
+                    const _cbDry = (typeof config.COLOR_BLEND_DRY_STIR === 'number') ? Math.max(0, Math.min(1, config.COLOR_BLEND_DRY_STIR)) : 0.25;
+                    const _cbHalfW = Math.max(1, Math.ceil(dyeTexWidth / 2));
+                    const _cbHalfH = Math.max(1, Math.ceil(dyeTexHeight / 2));
+                    const _cbHalfShort = Math.min(_cbHalfW, _cbHalfH);
+                    const _cbVar = 2 * _cbLen * _cbLen * _dyeDt * _cbHalfShort * _cbHalfShort * _cbEase; // half-res texels² per 1/s
+                    // Skip when even a hard stir (100/s) would stay under the
+                    // shader's own floor (1e-4 texels²): nothing would move.
+                    if (_cbVar * (100 + _cbRest) > 1e-4) {
+                        const _cbShort = Math.min(simTexWidth, simTexHeight);
+                        // Stored velocity → short sides per second, per axis:
+                        // isotropic units are long-side UV/s (velToUv), the
+                        // legacy M3 field is each axis's own UV/s.
+                        const _cbSx = (_vUv[0] > 0 ? _vUv[0] : 1) * simTexWidth / _cbShort;
+                        const _cbSy = (_vUv[1] > 0 ? _vUv[1] : 1) * simTexHeight / _cbShort;
+                        // The stir, once per sim texel, smoothed (see the shader).
+                        colorBlendStirProg.bind();
+                        gl.viewport(0, 0, simTexWidth, simTexHeight);
+                        gl.uniform1i(colorBlendStirProg.uniforms.uVelocity, 0);
+                        gl.uniform2f(colorBlendStirProg.uniforms.uTexel, 1 / simTexWidth, 1 / simTexHeight);
+                        gl.uniform2f(colorBlendStirProg.uniforms.uSpeedScale, _cbSx, _cbSy);
+                        gl.uniform1f(colorBlendStirProg.uniforms.uCellShort, 1 / _cbShort);
+                        gl.uniform1f(colorBlendStirProg.uniforms.uSqueeze,
+                            (typeof config.COLOR_BLEND_SQUEEZE === 'number') ? Math.max(0, config.COLOR_BLEND_SQUEEZE) : 24);
+                        gl.uniform1f(colorBlendStirProg.uniforms.uPress,
+                            (typeof config.COLOR_BLEND_PRESS === 'number') ? Math.max(0, config.COLOR_BLEND_PRESS) : 12);
+                        gl.uniform1i(colorBlendStirProg.uniforms.uDye, 1);
+                        gl.activeTexture(gl.TEXTURE1);
+                        gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                        gl.activeTexture(gl.TEXTURE0);
+                        gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                        blit(velocity.write.fbo);
+                        colorBlendProg.bind();
+                        gl.uniform1i(colorBlendProg.uniforms.uSource, 0);
+                        gl.uniform1i(colorBlendProg.uniforms.uDye, 1);
+                        gl.uniform1i(colorBlendProg.uniforms.uObstacle, 2);
+                        gl.uniform1i(colorBlendProg.uniforms.uStir, 3);
+                        gl.uniform1i(colorBlendProg.uniforms.uWetness, 4);
+                        gl.uniform1i(colorBlendProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+                        gl.uniform1f(colorBlendProg.uniforms.uObsMax, _obsMax);
+                        gl.uniform1f(colorBlendProg.uniforms.uVarPerStir, _cbVar);
+                        gl.uniform1f(colorBlendProg.uniforms.uStirRest, _cbRest);
+                        gl.uniform1f(colorBlendProg.uniforms.uDryStir, _cbDry);
+                        gl.uniform1f(colorBlendProg.uniforms.uWetFull,
+                            (typeof config.COLOR_BLEND_WET_FULL === 'number' && config.COLOR_BLEND_WET_FULL > 0) ? config.COLOR_BLEND_WET_FULL : 0.5);
+                        gl.uniform1f(colorBlendProg.uniforms.uPaintShare,
+                            (typeof config.COLOR_BLEND_PAINT === 'number') ? Math.max(0, Math.min(1, config.COLOR_BLEND_PAINT)) : 1);
+                        gl.uniform2f(colorBlendProg.uniforms.uDyeTexel, 1 / dyeTexWidth, 1 / dyeTexHeight);
+                        colorBlendSeed = (colorBlendSeed + 1) % 16777216;
+                        gl.uniform1f(colorBlendProg.uniforms.uSeed, colorBlendSeed);
+                        // Every sampler bound on every pass, none of them the
+                        // target: WebGL checks all four for a feedback loop
+                        // whether or not the pass reads them. Unit 2 holds the
+                        // obstacle even with no collider (it always exists and
+                        // nothing in the step renders into it): a velocity
+                        // texture parked there as the stand-in stayed bound
+                        // into the next sub-step, where gradientProg samples
+                        // unit 2 while rendering into velocity.write, and after
+                        // the step's swaps that was the same texture. WebGL
+                        // dropped the draw (INVALID_OPERATION), so a sub-step's
+                        // projection was lost whenever a slow frame sub-stepped
+                        // with Color Blend on (caught 2026-09-29, 2-4 sub-steps).
+                        gl.activeTexture(gl.TEXTURE1);
+                        gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                        gl.activeTexture(gl.TEXTURE2);
+                        gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                        gl.activeTexture(gl.TEXTURE3);
+                        gl.bindTexture(gl.TEXTURE_2D, velocity.write.texture);
+                        gl.activeTexture(gl.TEXTURE4);
+                        gl.bindTexture(gl.TEXTURE_2D, wetness.read.texture);
+                        // The half-res image sits in the corner of a dye-res
+                        // buffer: this maps canvas UV into it, and the clamp
+                        // keeps a bilinear read from reaching past its edge.
+                        const _cbSx2 = _cbHalfW / dyeTexWidth, _cbSy2 = _cbHalfH / dyeTexHeight;
+                        const _cbMx = (_cbHalfW - 0.5) / dyeTexWidth, _cbMy = (_cbHalfH - 0.5) / dyeTexHeight;
+                        // Pass 0: spread along x at half res, dye → sharpened's corner.
+                        gl.viewport(0, 0, _cbHalfW, _cbHalfH);
+                        gl.uniform1i(colorBlendProg.uniforms.uPass, 0);
+                        gl.uniform2f(colorBlendProg.uniforms.uStepUv, 1 / _cbHalfW, 0);
+                        gl.uniform2f(colorBlendProg.uniforms.uSrcScale, 1, 1);
+                        gl.uniform2f(colorBlendProg.uniforms.uSrcMax, 1, 1);
+                        gl.activeTexture(gl.TEXTURE0);
+                        gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                        blit(sharpened.fbo);
+                        // Pass 1: spread along y at half res → detailed's corner.
+                        gl.uniform1i(colorBlendProg.uniforms.uPass, 1);
+                        gl.uniform2f(colorBlendProg.uniforms.uStepUv, 0, 1 / _cbHalfH);
+                        gl.uniform2f(colorBlendProg.uniforms.uSrcScale, _cbSx2, _cbSy2);
+                        gl.uniform2f(colorBlendProg.uniforms.uSrcMax, _cbMx, _cbMy);
+                        gl.bindTexture(gl.TEXTURE_2D, sharpened.texture);
+                        blit(detailed.fbo);
+                        // Pass 2: blend the spread colour into the dye, full res.
+                        gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                        gl.uniform1i(colorBlendProg.uniforms.uPass, 2);
+                        gl.bindTexture(gl.TEXTURE_2D, detailed.texture);
+                        blit(density.write.fbo);
+                        density.swap();
+                        // Take the stir off unit 3 for the same reason: it is
+                        // velocity.write, which the next sub-step renders into.
+                        gl.activeTexture(gl.TEXTURE3);
+                        gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+                        gl.activeTexture(gl.TEXTURE0);
+                    }
                 }
                 } // ── end dye-transport gate (DYE_FOLLOWS_SUBSTEP) ──
                 } // ── end physics sub-step loop ──

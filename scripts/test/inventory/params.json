@@ -315,6 +315,23 @@
       "registered": true
     },
     {
+      "id": "colorBlend",
+      "kind": "slider",
+      "configKey": "COLOR_BLEND",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "def": 0,
+      "mapping": "config.COLOR_BLEND = parseFloat(value); colour diffusion D = l^2 * (wet * (stir + COLOR_BLEND_CONTACT 2/s) + dry * COLOR_BLEND_DRY_STIR 0.25 * stir), l = COLOR_BLEND * COLOR_BLEND_LENGTH (0.02) of the short side, wet = Drying map / COLOR_BLEND_WET_FULL (0.5); stir = |grad u| + COLOR_BLEND_SQUEEZE (24) * squeeze + COLOR_BLEND_PRESS (12) * compression along a colour front; paint evens out locally (conservative flux)",
+      "section": "simulation",
+      "consumer": "sim-shader",
+      "gatedBy": "COLOR_BLEND > 0 (the pass is skipped at 0, the default); empty canvas skips; skipped while frozen (Space), then eases back over COLOR_BLEND_THAW (1.5 s)",
+      "sweepRelevant": true,
+      "expectedEffect": "Strip fader Color Blend: colours blend where they meet like wet paint, settling as the paint dries (Dry Time); churned and colliding paint blends more; velocity and pressure untouched; nothing bleeds into empty canvas. Measured 2026-09-30 (two still fills, 88-px border): ~158 px at 0.5 and ~270 px at 1 after 12 s, levelling off as the paint dries (the stir-only version left it unchanged, the contact-forever version merged everything by 4 s). Head-on collision at Blend 1: ~200 px band at 47 Pressure iterations. Paint conserved (dithered fp16 rounding). GPU (4090, dye 2048): 0.10 ms still, 0.73 ms Vorticity 30 at 1.",
+      "binding": "consumed js/05j-update-loop.js pass 8d: colorBlendStirFrag (stir, sim res, into velocity.write), colorBlendFrag passes 0/1 (half-res colour spread into the corners of sharpened/detailed) and 2 (full-res blend + paint flux into the dye) (js/05b-shader-sim.js)",
+      "registered": true
+    },
+    {
       "id": "brushSize",
       "kind": "slider",
       "configKey": "SPLAT_RADIUS",

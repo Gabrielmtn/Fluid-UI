@@ -832,6 +832,7 @@
         // Shading), which never touched the fluid.
         strip.appendChild(faderChannel('Viscosity', 'purple', 'viscosity', 'viscosityValue'));
         strip.appendChild(faderChannel('Isolation', 'green', 'velocityInfluence', 'velocityInfluenceValue'));
+        strip.appendChild(faderChannel('Color Blend', 'orange', 'colorBlend', 'colorBlendValue'));
         var brushChannel = faderChannel('Multi-Brush', 'yellow', 'multiplier', 'multiplierValue');
         // The multiplier value ("1x") IS the brush-colors trigger — click it to
         // open the per-arm brush color controls; the gear is the discoverable
@@ -891,6 +892,7 @@
         'Fluid': 'Material mode (Swirl / Gloss Paint — Wetness or Thickness) + amount — the ⚙ opens the material picker',
         'Viscosity': 'How thick the fluid is — 0 flows like water, higher smooths the swirls into broad ribbons',
         'Isolation': 'Motion isolation - how much color follows velocity',
+        'Color Blend': 'How much colours blend where they meet, like wet paint: they run together while wet and settle as they dry (Dry Time). The flow itself is unchanged',
         'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — the ⚙ opens arm colors & symmetry',
         'Time': 'Simulation time scale',
         'Density': 'How fast color fades',
@@ -2459,7 +2461,7 @@
                       'kTwist', 'kZoom', 'kBlend', 'kaleidoMode',
                       'kaleido.mode', 'kaleido.segments', 'kaleido.angle', 'kaleido.twist', 'kaleido.zoom', 'kaleido.blend'],
             simulation: ['densityDissipation', 'velocityDissipation', 'pressureDissipation',
-                         'pressureIteration', 'curl', 'viscosity', 'multiplier',
+                         'pressureIteration', 'curl', 'viscosity', 'colorBlend', 'multiplier',
                          'velocityInfluence', 'brushSize', 'velocityCap', 'wetInfluence', 'wetDrying',
                          'material.amount'],
             effects: ['enableLighting', 'enableLightShift',

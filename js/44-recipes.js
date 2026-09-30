@@ -212,6 +212,11 @@
           tags: ['cap', 'gate', 'white', 'overexposed', 'blown', 'bright', 'saturate'],
           answer: 'Cap in the Color cell keeps piled-up strokes from saturating to white. Light Shift in Effects can also recolour the brightest paint.',
           target: { strip: 'Color', sel: '.ch-gate-toggle' } },
+        { id: 'color-blend', pillar: 'colour', title: 'Make colours mix together',
+          tags: ['blend', 'mix', 'mixing', 'merge', 'melt', 'colour', 'color', 'gradient', 'soft'],
+          answer: 'Drag the Color Blend fader in the top bar. Where colours meet they run into each other while the paint is wet, then settle as it dries; Dry Time sets how long that lasts, and swirling or colliding paint blends more.',
+          target: { strip: 'Color Blend', sel: '#colorBlend' },
+          demo: { label: 'Try Color Blend 0.5', run() { const el = $('colorBlend'); const was = el ? el.value : null; setCtl('colorBlend', 0.5, 'input'); return () => { if (was != null) setCtl('colorBlend', was, 'input'); }; } } },
 
         // ── Layers ──
         { id: 'paste-image', pillar: 'layers', title: 'Paste an image as a layer',

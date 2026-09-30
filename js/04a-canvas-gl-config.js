@@ -375,6 +375,35 @@
                                       // moves at 99-101%, and the dye's fine detail still drops from
                                       // 0.62 to 0.22. 0.11 slows a small brush to 79%.
 
+            COLOR_BLEND: 0,           // How far colours run into each other (05j pass 8d, colorBlendFrag),
+                                      // like wet paint: 0 = the pass is skipped and the dye is
+                                      // bit-identical. Only the COLOUR moves (plus a little paint where
+                                      // two fills meet); velocity and pressure are untouched. A diffusion
+                                      // D = l² × (wet × (stir + COLOR_BLEND_CONTACT) + dry ×
+                                      // COLOR_BLEND_DRY_STIR × stir), wet = the Drying map: wet colours
+                                      // that touch blend, and stop as the paint dries at Dry Time.
+            COLOR_BLEND_LENGTH: 0.02, // The mixing length l at COLOR_BLEND 1 (it scales with the fader),
+                                      // as a fraction of the canvas's SHORT side
+            COLOR_BLEND_CONTACT: 2,   // The stir wet paint counts as having, moving or not (1/s): wet
+                                      // colours in contact mix at l² × this until they dry. Measured at 1
+                                      // (Dry Time 4.5 s): two still fills' 88-px border settles near 270 px
+            COLOR_BLEND_WET_FULL: 0.5, // Wetness (the Drying map) from which paint counts as fully wet: a
+                                      // stroke's soft edge and freshly stirred paint read well under 1
+            COLOR_BLEND_DRY_STIR: 0.25, // Share of the stir's mixing that dry paint keeps (0 = dry paint
+                                      // never mixes, 1 = dryness does not matter to stirring)
+            COLOR_BLEND_PAINT: 1,     // How far the AMOUNT of paint evens out between touching paint, as a
+                                      // share of the stable 4-neighbour flux (0 = colour only). Fills the
+                                      // thin line where two fills meet; follows the fader (console-tunable)
+            COLOR_BLEND_PRESS: 12,    // How many times the flow's compression ALONG a colour front counts
+                                      // (two colours pushed into each other: a head-on collision). Fades
+                                      // as the front softens, so it widens pressed fronts only
+            COLOR_BLEND_SQUEEZE: 24,  // How many times the flow's convergence (past a quarter of its
+                                      // gradient) counts in the stir; 0 = shear and swirl only. Silent at
+                                      // a solved pressure (console-tunable)
+            COLOR_BLEND_THAW: 1.5,    // Seconds the blend takes to come back (smoothstep) after Freeze lets
+                                      // go. Freeze holds the paint wet, so without it every edge snapped
+                                      // soft on the first step. 0 = back at once
+
             VIBRANCE: 1,              // Selective saturation boost (0 = off, 1.0 = max). Default look 2026-09-24.
 
             DYE_RESOLUTION: 2048,     // Ultra (2K) by default on desktop — the highest real-time tier.

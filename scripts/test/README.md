@@ -138,6 +138,12 @@ comments that nothing had ever checked:
   `freeze-stops-gravity` (pad aimed straight down) and
   `freeze-stops-swirl` (Swirl at 60) guard each gate on its own; the
   pre-fix and post-fix measurements live in each invariant's note.
+  Since 2026-09-30 Color Blend (8d) stands down too and the Drying map
+  stops drying (7c), so wet paint neither runs together nor sets while
+  frozen; the blend eases back in over `COLOR_BLEND_THAW` (1.5 s) after
+  Space lets go. No invariant guards that one: the blend moves colour, not
+  paint, so coverage and dyeMean hold either way and it would read NEAR
+  before and after. Check it with a dye diff across the freeze instead.
   `isPaused` (05j), on **Shift+Space**, remains the hard halt.
 
 ## GL errors

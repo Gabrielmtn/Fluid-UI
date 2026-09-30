@@ -371,7 +371,10 @@
             // wetness at the dye dab's footprint (sim res), feature-gated so it
             // is exactly free when off. baseRadius (not the possibly-narrowed
             // ring/tip radius) keeps the wet footprint aligned with the paint.
-            if ((config.WET_INFLUENCE || 0) > 0 && typeof wetness !== 'undefined' && wetness) {
+            // Color Blend reads the wetness too (wet paint blends), so either
+            // feature keeps it.
+            if (((config.WET_INFLUENCE || 0) > 0 || (config.COLOR_BLEND || 0) > 0)
+                && typeof wetness !== 'undefined' && wetness) {
                 wetSplatProg.bind();
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
                 gl.uniform1f(wetSplatProg.uniforms.aspectRatio, aspectRatio);

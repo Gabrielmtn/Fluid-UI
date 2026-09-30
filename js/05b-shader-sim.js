@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/05b-shader-sim.js — part 2/14 of former 05-fluid-sim.js (lines 654–966)
 // LOAD ORDER: after 05a-shader-core.js, before 05c-programs-framebuffers.js
-// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/viscosity/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter/scatterSmooth/shadeWall/shadeForm frag sources
+// PROVIDES: splat/advection/macAdvect/macCorrect/divergence/curl/turbulence/vorticity/viscosity/colorBlendStir/colorBlend/pressure/mgResidual/mgRestrict/mgProlong/gradient/clear/obstacleDamp/glow/scatter/scatterSmooth/shadeWall/shadeForm frag sources
 // REQUIRES: PRECISION (05a)
 // NOTE: verbatim split of unwrapped top-level classic-script code.
 //   Correctness comes from preserved source order — do not reorder.
@@ -1736,6 +1736,326 @@
                 vec2 v = sum / wsum;
                 if (hasObstacle == 1) v = mix(v, c, solidity(vUv));
                 fragColor = vec4(v, 0.0, 1.0);
+            }
+        `;
+        // Color Blend (2026-09-29): colours travel through the paint and mix,
+        // while the fluid (velocity, pressure) is untouched. Colour travels
+        // far: each texel takes on the paint-weighted average colour of its
+        // neighbourhood at its own amount of paint (r+g+b). That average is a
+        // Gaussian of the dye divided by its own r+g+b, so one separable blur
+        // carries both, and more paint pulls harder on the colour. The amount
+        // of paint evens out too, but only locally (paintFlux): where two
+        // fills meet, the thinner paint along the line between them fills in,
+        // so they overlap instead of standing either side of a seam, while
+        // the swirls' larger brightness structure stays. Empty canvas carries
+        // no colour and takes no paint, so nothing bleeds off the paint.
+        //
+        // How far colour travels is set like wet paint's: this step's
+        // variance is v = uVarPerStir x (wet x (stir + uStirRest) + dry x
+        // uDryStir x stir), with wet the paint's wetness (the Drying map: a
+        // stroke wets it, it dries at the Dry Time half-life). uStirRest is
+        // CONTACT mixing: wet colours that touch run into each other, moving
+        // or not, and stop as the paint sets, so a blend zone forms where
+        // they meet and each colour keeps its own away from it. Stir-only
+        // mixing (no contact) left two still fills' 76-px border unchanged
+        // at Color Blend 1, "oil paints that won't mix"; contact mixing that
+        // never stopped carried the colour through the whole paint, "coloured
+        // water", one colour swallowing the other. The stir is an eddy
+        // diffusivity (colorBlendStirFrag): shear, roll-up and Vorticity's
+        // churn mix harder, as does the squeeze below, and still mix a little
+        // (uDryStir) once the paint has dried.
+        //
+        // Paint moves between each texel and its four neighbours as flux
+        // (paintFlux): what one texel gives its neighbour takes, so the paint
+        // is conserved to rounding (pulling each texel toward its
+        // neighbourhood mean lost 1.4% in 100 steps). No flux crosses into
+        // empty canvas or a wall. Two things drive it. uPaintShare x the
+        // blend's own reach: after a head-on collision at Color Blend 1 the
+        // colours had fully merged yet a line stayed, a 25% dip in paint 10-14
+        // texels wide where the fills' thin edges met, outlined by Ridges.
+        // And the squeeze: with few Pressure iterations the flow keeps
+        // running into a collision line (0.2 short sides/s, 4 s after at 1
+        // iteration), which pulls the colour ramp back as fast as blending
+        // widens it and piles the paint into a ridge of both colours. So the
+        // squeeze counts COLOR_BLEND_SQUEEZE times over in the stir, and
+        // where it is the stir the ridge spreads back out.
+        //
+        // Three passes. 0 and 1 spread the colour along x then y at HALF the
+        // dye resolution, into the lower-left corner of two dye-res scratch
+        // buffers: colour is smooth wherever it has blended, so half the
+        // resolution loses nothing visible and a quarter of the texels
+        // carries the whole spread. Pass 0 reads the dye at half-res texel
+        // centres, which fall between four dye texels, so each read is their
+        // average. Pass 2 runs at full resolution: colour from
+        // the spread (bilinear), paint from the texel itself, so the fine
+        // detail is all still there. Each texel sizes its own kernel from its
+        // own v: below one texel² a one-texel Gaussian is mixed in by v,
+        // above it the kernel is sqrt(v) wide and applies whole, so the step's
+        // variance is v either way and the rate does not depend on the frame
+        // rate. The passes size their kernels at their own texels, so where v
+        // changes sharply the kernel is not exactly separable; the blend only
+        // reads it for a neighbourhood colour, so that costs nothing visible.
+        // A tap past a wall or the canvas edge counts as the centre texel
+        // (viscosityFrag's march), so colours never mix through a collider.
+        // Pigment memory (alpha) is untouched.
+        //
+        // The stir, once per sim texel: |grad u| (strain and rotation,
+        // central differences) plus uSqueeze x the squeeze (-div u past
+        // SQUEEZE_FLOOR x |grad u|), over the 5x5 texels around this one,
+        // averaged with 1-4-6-4-1 weights; G carries the squeeze part alone.
+        // A derivative sharpens the flow's grid-scale noise, Vorticity's
+        // above all: read raw, the stir jumped 22-28% from one sim cell to
+        // the next, so the blend took a different bite out of each cell and
+        // the paint came out speckled, with stair-stepped, furry edges.
+        // Averaging the MAGNITUDE keeps the churn's strength and leaves 5-7%
+        // cell to cell. PRESS: where the flow compresses the fluid along the
+        // direction the colour changes (n·E·n < 0, n the colour gradient's
+        // axis, E the strain), two colours are being pushed into each other,
+        // as at a head-on collision, whose stagnation line re-sharpens the
+        // front as fast as any blend widens it. uPress x that rate joins the
+        // stir there, and it fades as the front softens (the colour change
+        // across two sim texels under PRESS_EDGE), so it widens pressed
+        // fronts without spreading through the paint. Shear along colour
+        // bands does not press them. Only convergence past SQUEEZE_FLOOR of
+        // the gradient counts: the velocity read here is already advected,
+        // and advection and fresh dabs leave a little everywhere. At 47
+        // iterations it stays under 0.2 of the gradient on all but 13 of
+        // 149k texels, so the squeeze is silent at the defaults; at 1
+        // iteration most churned paint is past 0.5. 49 velocity reads a sim
+        // texel. Written into velocity.write (05j 8d).
+        const colorBlendStirFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity;
+            uniform vec2 uTexel;         // one sim texel, in UV
+            uniform vec2 uSpeedScale;    // stored velocity -> canvas short sides per second, per axis
+            uniform float uCellShort;    // one sim texel, in canvas short sides
+            uniform float uSqueeze;      // how many times the convergence counts on top of |grad u|
+            uniform sampler2D uDye;      // for the direction the colour changes in
+            uniform float uPress;        // how many times a pressed colour front's compression counts
+            const float BINOM[5] = float[5](1.0, 4.0, 6.0, 4.0, 1.0);
+            const float SQUEEZE_FLOOR = 0.25; // convergence below this share of |grad u| is residue, not a squeeze
+            const float PRESS_EDGE = 0.02;    // colour change across two sim texels that counts as a front
+            vec3 hue(vec2 uv) {
+                vec3 c = max(texture(uDye, uv).rgb, vec3(0.0));
+                float s = c.r + c.g + c.b;
+                return (s > 1e-4) ? c / s : vec3(0.0);
+            }
+            void main() {
+                vec2 v[49];
+                for (int j = 0; j < 7; j++) {
+                    for (int i = 0; i < 7; i++) {
+                        v[j * 7 + i] = texture(uVelocity, vUv + vec2(float(i - 3), float(j - 3)) * uTexel).xy * uSpeedScale;
+                    }
+                }
+                float stir = 0.0, squeeze = 0.0;
+                vec2 dx = vec2(0.0), dy = vec2(0.0); // the strain's pieces, averaged the same way
+                for (int j = 1; j < 6; j++) {
+                    for (int i = 1; i < 6; i++) {
+                        vec2 gx = v[j * 7 + i + 1] - v[j * 7 + i - 1];
+                        vec2 gy = v[(j + 1) * 7 + i] - v[(j - 1) * 7 + i];
+                        float w = BINOM[i - 1] * BINOM[j - 1];
+                        float g = sqrt(dot(gx, gx) + dot(gy, gy));
+                        stir += w * g;
+                        squeeze += w * max(0.0, -(gx.x + gy.y) - SQUEEZE_FLOOR * g);
+                        dx += w * gx;
+                        dy += w * gy;
+                    }
+                }
+                float toRate = 1.0 / (256.0 * 2.0 * uCellShort);
+                squeeze *= uSqueeze * toRate;
+                // The colour's axis: the principal direction of its change.
+                vec3 cx = hue(vUv + vec2(uTexel.x, 0.0)) - hue(vUv - vec2(uTexel.x, 0.0));
+                vec3 cy = hue(vUv + vec2(0.0, uTexel.y)) - hue(vUv - vec2(0.0, uTexel.y));
+                float txx = dot(cx, cx), tyy = dot(cy, cy), txy = dot(cx, cy);
+                float ang = 0.5 * atan(2.0 * txy, txx - tyy);
+                vec2 n = vec2(cos(ang), sin(ang));
+                // Strain along n: du/dx n.x² + (du/dy + dv/dx) n.x n.y + dv/dy n.y²
+                float along = (dx.x * n.x * n.x + (dy.x + dx.y) * n.x * n.y + dy.y * n.y * n.y) * toRate;
+                float press = uPress * max(0.0, -along) * smoothstep(0.0, PRESS_EDGE, sqrt(txx + tyy));
+                fragColor = vec4(stir * toRate + squeeze + press, squeeze + press, 0.0, 1.0);
+            }
+        `;
+        const colorBlendFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uSource;   // pass 0: the dye; 1: pass 0's spread; 2: pass 1's spread
+            uniform sampler2D uDye;      // pass 2: the dye as it stands
+            uniform sampler2D uStir;     // colorBlendStirFrag's output (sim res, LINEAR): R stir, G its squeeze part
+            uniform sampler2D uObstacle;
+            uniform sampler2D uWetness;  // the Drying map (sim res): 1 = just painted, 0 = dry
+            uniform int hasObstacle;
+            uniform int uPass;           // 0 = spread along x, 1 = along y (half res), 2 = blend into the dye (full res)
+            uniform vec2 uStepUv;        // one half-res texel along this pass's axis, in canvas UV
+            uniform vec2 uSrcScale;      // canvas UV -> uSource UV (1 for the dye; the corner's share for the scratch)
+            uniform vec2 uSrcMax;        // the largest uSource UV a read may use, so half-res reads stay in their corner
+            uniform vec2 uDyeTexel;      // one dye texel, in UV (the squeeze's flux)
+            uniform float uVarPerStir;   // this step's variance, in half-res texels², per 1/s of stir
+            uniform float uStirRest;     // contact mixing: the stir wet paint has, moving or not (1/s)
+            uniform float uDryStir;      // share of the stir's mixing dry paint keeps (0-1)
+            uniform float uWetFull;      // wetness from which paint counts as fully wet
+            uniform float uPaintShare;   // how far paint evens out, as a share of the stable flux (0-1)
+            uniform float uSeed;         // new every step: the dither for pass 2's rounding
+            const float SIGMA_MAX = 16.0;         // half-res texels per step for the stir: 24 tap pairs a side
+            const float SIGMA_MAX_SQUEEZED = 24.0; // ...and where the squeeze is the stir: 36 pairs. A pressed
+                                                   // front re-sharpens as fast as a step spreads it, so its
+                                                   // width is set by this cap.
+            ${obstacleSolidityGLSL}
+            bool outside(vec2 uv) {
+                return uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0;
+            }
+            // Rounding to fp16 before the store, so the store has nothing left
+            // to round. Some GPUs TRUNCATE fp32 -> fp16 on a render-target
+            // write (the 4090 under ANGLE/D3D11 stores 0.9999999 as 0.99951):
+            // a blend landing an epsilon under the old value then lost a whole
+            // step, 0.035% of the paint per step. Below 2^-14 steps are 2^-24.
+            vec3 halfStep(vec3 x) {
+                vec3 a = max(abs(x), vec3(6.103515625e-5));
+                vec3 e = floor(log2(a));
+                e += step(exp2(e + 1.0), a) - (1.0 - step(exp2(e), a)); // log2 can miss by one at a power of two
+                return exp2(e - 10.0);
+            }
+            // Nearest: for the half-res spreads, recomputed every step.
+            vec3 toHalf(vec3 x) {
+                vec3 ulp = halfStep(x);
+                return round(x / ulp) * ulp;
+            }
+            // Dithered, for the dye: up with the probability of the remainder,
+            // so every change counts on average. Nearest rounding stalled the
+            // large channels: a shift that moved red at 1.0 by less than half
+            // its (coarse) step rounded back, while the blue that paid for it,
+            // on a finer step, moved; the paint drained 0.17% per 100 steps,
+            // mostly out of blue. A value that is already exact stays exact.
+            vec3 random3(vec2 p) {
+                // pcg3d (Jarzynski & Olano 2020); 24 bits, so never quite 1
+                uvec3 v = uvec3(uvec2(p), uint(uSeed)) * 1664525u + 1013904223u;
+                v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+                v ^= v >> 16u;
+                v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+                return vec3(v >> 8u) * (1.0 / 16777216.0);
+            }
+            vec3 toHalfDithered(vec3 x) {
+                vec3 ulp = halfStep(x);
+                return floor(x / ulp + random3(gl_FragCoord.xy)) * ulp;
+            }
+            vec3 src(vec2 uv) {
+                return max(texture(uSource, min(uv * uSrcScale, uSrcMax)).rgb, vec3(0.0));
+            }
+            float inkAt(vec2 uv) {
+                vec3 c = max(texture(uDye, uv).rgb, vec3(0.0));
+                return c.r + c.g + c.b;
+            }
+            // This step's variance at uv, in half-res texels² (see above).
+            // Paint counts as fully wet from uWetFull up: a stroke's soft
+            // edge, where colours meet, is only half as wet as its middle, and
+            // moving paint shares its wetness with the fluid it is stirred
+            // into (1.0 fell to ~0.3 within a second of a collision), so read
+            // raw the blend starved exactly where it was needed.
+            float blendVar(vec2 uv, vec2 st) {
+                float wet = clamp(texture(uWetness, uv).r / max(uWetFull, 1e-3), 0.0, 1.0);
+                float v = uVarPerStir * (wet * (st.r + uStirRest) + (1.0 - wet) * uDryStir * st.r);
+                if (hasObstacle == 1) v *= 1.0 - solidity(uv);
+                return v;
+            }
+            // The paint exchange at uv, at most 0.2 a neighbour (the explicit
+            // step's stable limit with four of them): the larger of the
+            // squeeze's (its share of the stir, full by a variance of 4
+            // half-res texels²) and the blend's own (uPaintShare, full by 64,
+            // so it follows the fader and the wetness). Nothing flows out of
+            // empty canvas or a wall.
+            float paintRate(vec2 uv, float ink) {
+                if (ink <= 0.0) return 0.0;
+                vec2 st = texture(uStir, uv).rg;
+                float v = blendVar(uv, st);
+                float squeeze = clamp(st.g / max(st.r, 1e-6), 0.0, 1.0) * clamp(v / 4.0, 0.0, 1.0);
+                float blend = uPaintShare * clamp(v / 64.0, 0.0, 1.0);
+                return 0.2 * max(squeeze, blend);
+            }
+            // Net paint this texel takes from its four neighbours. Each pair
+            // exchanges at the smaller of the two rates, the same number seen
+            // from both sides, so every give is a take.
+            float paintFlux(float ink, float rate) {
+                float flux = 0.0;
+                for (int n = 0; n < 4; n++) {
+                    vec2 o = (n == 0) ? vec2(uDyeTexel.x, 0.0) : (n == 1) ? vec2(-uDyeTexel.x, 0.0)
+                           : (n == 2) ? vec2(0.0, uDyeTexel.y) : vec2(0.0, -uDyeTexel.y);
+                    vec2 uv = vUv + o;
+                    if (outside(uv)) continue;
+                    float inkN = inkAt(uv);
+                    flux += min(rate, paintRate(uv, inkN)) * (inkN - ink);
+                }
+                return flux;
+            }
+            void main() {
+                vec2 st = texture(uStir, vUv).rg;
+                float v = blendVar(vUv, st);
+                if (uPass == 2) {
+                    vec4 d = texture(uDye, vUv);
+                    vec3 dc = max(d.rgb, vec3(0.0));
+                    float ink = dc.r + dc.g + dc.b;
+                    if (v < 1e-4 || ink <= 0.0) {
+                        fragColor = d;
+                        return;
+                    }
+                    // Colour: toward the spread's, at this texel's own amount
+                    // of paint. Then the paint flux changes the amount.
+                    vec3 near = src(vUv);
+                    float nearInk = near.r + near.g + near.b;
+                    vec3 blended = (nearInk > 1e-6) ? near * (ink / nearInk) : d.rgb;
+                    vec3 outc = mix(d.rgb, blended, min(v, 1.0));
+                    float rate = paintRate(vUv, ink);
+                    if (rate > 0.0) {
+                        // Scale the non-negative colour, so a sliver of
+                        // ringing below zero is never multiplied up when a
+                        // faint texel takes in paint; one with next to no
+                        // colour of its own takes the neighbourhood's.
+                        outc = max(outc, vec3(0.0));
+                        float outInk = outc.r + outc.g + outc.b;
+                        float newInk = max(0.0, ink + paintFlux(ink, rate));
+                        if (outInk > 1e-6) outc *= newInk / outInk;
+                        else if (nearInk > 1e-6) outc = near * (newInk / nearInk);
+                    }
+                    fragColor = vec4(toHalfDithered(outc), d.a);
+                    return;
+                }
+                // Passes 0 and 1: spread along one axis, at half resolution.
+                // Empty canvas hands on nothing (its spread would only carry
+                // paint from beside it to the corners of the kernels above and
+                // below, which those texels' own rows cover), and unstirred
+                // fluid hands on its own colour.
+                vec3 c = src(vUv);
+                if (v < 1e-4 || c.r + c.g + c.b <= 0.0) {
+                    fragColor = vec4(c, 1.0);
+                    return;
+                }
+                float sigma = min(sqrt(max(v, 1.0)),
+                    mix(SIGMA_MAX, SIGMA_MAX_SQUEEZED, clamp(st.g / max(st.r, 1e-6), 0.0, 1.0)));
+                int pairs = int(ceil(1.5 * sigma));     // taps reach 3 sigma
+                float falloff = 0.5 / (sigma * sigma);  // tap i weighs exp(-i*i*falloff)
+                vec3 sum = c;
+                float wsum = 1.0;
+                for (int side = 0; side < 2; side++) {
+                    vec2 dir = (side == 0) ? uStepUv : -uStepUv;
+                    float open = 1.0;
+                    for (int k = 0; k < 36; k++) {
+                        if (k >= pairs) break;
+                        float ia = float(2 * k + 1);
+                        float ib = ia + 1.0;
+                        float wa = exp(-ia * ia * falloff);
+                        float wb = exp(-ib * ib * falloff);
+                        if (outside(vUv + dir * ib)) {
+                            open = 0.0;
+                        } else if (hasObstacle == 1) {
+                            open *= (1.0 - solidity(vUv + dir * ia)) * (1.0 - solidity(vUv + dir * ib));
+                        }
+                        float w = wa + wb;
+                        sum += mix(c, src(vUv + dir * (ia + wb / w)), open) * w;
+                        wsum += w;
+                    }
+                }
+                fragColor = vec4(toHalf(sum / wsum), 1.0);
             }
         `;
         const obstacleCompositeFrag = `#version 300 es
