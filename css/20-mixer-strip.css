@@ -1398,12 +1398,37 @@ body > .controls {
     color: var(--ink-500, #7b828e);
     padding: 6px 4px 4px;
 }
-.mixer-presets-panel .preset-path-back {
-    align-self: flex-start;
-    margin-top: 2px;
-    opacity: 0.7;
-}
+.preset-path-back-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.mixer-presets-panel .preset-path-back { opacity: 0.7; }
 .mixer-presets-panel .preset-path-back:hover { opacity: 1; }
+/* The × that sends the offer away for good (2026-09-30): pushed to the row's
+   right edge, red from .btn--destructive in 01-buttons, size only here.
+   I D K F A brings the offer back, and #presetPathToast says so. */
+.mixer-presets-panel .preset-path-forget {
+    flex: none;
+    margin-left: auto;
+    width: 18px;
+    height: 18px;
+    font-size: 13px;
+    line-height: 1;
+    opacity: 0.8;
+}
+.mixer-presets-panel .preset-path-forget:hover { opacity: 1; }
+#presetPathToast {
+    position: fixed;
+    left: 50%;
+    bottom: 96px;
+    transform: translateX(-50%);
+    z-index: 10030;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: rgba(13, 17, 23, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #e6edf3;
+    font-size: 12px;
+    pointer-events: none;
+}
+#presetPathToast[hidden] { display: none; }
 
 /* ── "More" overflow cell + panel (js/46-strip-more.js) ───────────────────
    On a monitor too narrow for the whole bar the fader cells park, from the

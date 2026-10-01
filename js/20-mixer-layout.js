@@ -1516,13 +1516,72 @@
         if (window.__skipUIFork || window.__shot || window.__test) return true;
         try { return localStorage.getItem('fluidui.uiFork.skip') === '1'; } catch (_) { return false; }
     }
+    // The own-path list's "Show the built-in presets" carries a small red ×
+    // (Gabriel, 2026-09-30): the button is the way back from a wrong answer,
+    // the × is for the person who meant it and wants the offer gone. Gone is
+    // gone, with one door left: typing I D K F A, in order, anywhere outside a
+    // text field, puts the button back. Same out-of-namespace reasoning as the
+    // path key above.
+    var LS_PRESET_BACK_HIDDEN = 'fluidui.presetPath.backHidden.v1';   // '1' | missing
+    function presetBackHidden() {
+        try { return localStorage.getItem(LS_PRESET_BACK_HIDDEN) === '1'; } catch (_) { return false; }
+    }
+    function presetBackHide(on) {
+        try {
+            if (on) localStorage.setItem(LS_PRESET_BACK_HIDDEN, '1');
+            else localStorage.removeItem(LS_PRESET_BACK_HIDDEN);
+        } catch (_) {}
+    }
+    var presetPathToastEl = null, presetPathToastTimer = 0;
+    function presetPathToast(msg) {
+        if (!presetPathToastEl) {
+            presetPathToastEl = document.createElement('div');
+            presetPathToastEl.id = 'presetPathToast';
+            presetPathToastEl.setAttribute('role', 'status');
+            document.body.appendChild(presetPathToastEl);
+        }
+        presetPathToastEl.textContent = msg;
+        presetPathToastEl.hidden = false;
+        clearTimeout(presetPathToastTimer);
+        presetPathToastTimer = setTimeout(function () { presetPathToastEl.hidden = true; }, 3200);
+    }
+    // The cheat listens from window capture, ahead of every other key
+    // handler, and the word only counts when nothing else came between its
+    // letters. F is Focus mode and A is Step Palette, so a finished word
+    // would leave the UI hidden under its own toast: once I D K is down AND
+    // the offer is actually hidden, the F and the A are the cheat's and go no
+    // further. Everyone else's keys are untouched (so no RESERVED rule in 48).
+    var PRESET_CHEAT = 'idkfa', presetCheatAt = 0;
+    window.addEventListener('keydown', function (e) {
+        var k = e.key || '';
+        if (e.repeat || k === 'Shift' || k === 'CapsLock') return;
+        var t = e.target;
+        var typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''));
+        if (typing || e.ctrlKey || e.altKey || e.metaKey || k.length !== 1) { presetCheatAt = 0; return; }
+        k = k.toLowerCase();
+        if (k === PRESET_CHEAT.charAt(presetCheatAt)) {
+            if (presetCheatAt >= 3 && presetBackHidden()) { e.preventDefault(); e.stopImmediatePropagation(); }
+            presetCheatAt++;
+        } else presetCheatAt = (k === PRESET_CHEAT.charAt(0)) ? 1 : 0;
+        if (presetCheatAt < PRESET_CHEAT.length) return;
+        presetCheatAt = 0;
+        if (!presetBackHidden()) return;
+        presetBackHide(false);
+        if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
+        presetPathToast('Cheat accepted. "Show the built-in presets" is back in Presets.');
+    }, true);
     window.PresetPath = {
         get: presetPathGet,
         set: function (v) {
             presetPathSet(v);
             if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
         },
-        pending: function () { return presetPathGet() === null && !presetForkWaived(); }
+        pending: function () { return presetPathGet() === null && !presetForkWaived(); },
+        backHidden: presetBackHidden,
+        hideBack: function (on) {
+            presetBackHide(on);
+            if (typeof window.refreshAllPresetLists === 'function') window.refreshAllPresetLists();
+        }
     };
 
     function buildPresetsChannel(controls) {
@@ -1831,7 +1890,8 @@
             }
             // Own path: an empty list says where the first preset comes from,
             // and the built-ins are one click away for anyone who changes
-            // their mind.
+            // their mind — until the × beside the offer sends it away for
+            // good (I D K F A brings it back, see presetBackHidden).
             if (!showBuiltin) {
                 if (!list.children.length) {
                     const empty = document.createElement('div');
@@ -1839,13 +1899,31 @@
                     empty.textContent = 'Nothing saved yet. + New Preset keeps everything on screen under a name of your own.';
                     list.appendChild(empty);
                 }
-                const back = document.createElement('button');
-                back.type = 'button';
-                back.className = 'preset-path-back btn--ghost btn--sm';
-                back.textContent = 'Show the built-in presets';
-                back.title = 'List the looks that come with the app again';
-                back.addEventListener('click', function () { presetPathSet('ours'); renderMixerUserPresets(); });
-                list.appendChild(back);
+                if (!presetBackHidden()) {
+                    const backRow = document.createElement('div');
+                    backRow.className = 'preset-path-back-row';
+                    const back = document.createElement('button');
+                    back.type = 'button';
+                    back.className = 'preset-path-back btn--ghost btn--sm';
+                    back.textContent = 'Show the built-in presets';
+                    back.title = 'List the looks that come with the app again';
+                    back.addEventListener('click', function () { presetPathSet('ours'); renderMixerUserPresets(); });
+                    backRow.appendChild(back);
+                    const forget = document.createElement('button');
+                    forget.type = 'button';
+                    forget.className = 'preset-path-forget btn--icon btn--destructive';
+                    forget.textContent = '×';
+                    forget.title = 'Hide this button for good';
+                    forget.setAttribute('aria-label', 'Hide "Show the built-in presets" for good');
+                    forget.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        presetBackHide(true);
+                        renderMixerUserPresets();
+                        positionPanel();   // the list just changed height
+                    });
+                    backRow.appendChild(forget);
+                    list.appendChild(backRow);
+                }
             }
         }
 
