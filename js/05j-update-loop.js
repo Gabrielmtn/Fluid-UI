@@ -1831,6 +1831,13 @@
                         gl.uniform1f(colorBlendProg.uniforms.uPaintShare,
                             (typeof config.COLOR_BLEND_PAINT === 'number') ? Math.max(0, Math.min(1, config.COLOR_BLEND_PAINT)) : 1);
                         gl.uniform2f(colorBlendProg.uniforms.uDyeTexel, 1 / dyeTexWidth, 1 / dyeTexHeight);
+                        // The stir's box taps (colorBlendFrag stirAt): a
+                        // half-res texel apart, or two sim texels where those
+                        // are larger, so each bilinear tap reads fresh texels.
+                        const _cbStirOn = config.COLOR_BLEND_STIR_SMOOTH !== false;
+                        gl.uniform2f(colorBlendProg.uniforms.uStirStep,
+                            _cbStirOn ? Math.max(2 / simTexWidth, 1 / _cbHalfW) : 0,
+                            _cbStirOn ? Math.max(2 / simTexHeight, 1 / _cbHalfH) : 0);
                         colorBlendSeed = (colorBlendSeed + 1) % 16777216;
                         gl.uniform1f(colorBlendProg.uniforms.uSeed, colorBlendSeed);
                         // Every sampler bound on every pass, none of them the

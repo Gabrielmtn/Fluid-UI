@@ -386,6 +386,20 @@
                 if (_win && stampHeldHere(stampTex.texture, x, y, baseRadius, _stampAng, _stampFlip)) _hold = _win;
             }
             gl.uniform2f(splatProg.uniforms.stampHold, _hold ? _hold[0] : 0, _hold ? _hold[1] : 0);
+            // Wet pickup (splatFrag): the dab takes on the fresh paint it lands
+            // in, by Color Blend x COLOR_BLEND_PICKUP. The Drying map rides
+            // unit 3 whether or not it is read, so the sampler never points at
+            // a stale texture (the sub-step feedback trap, 05j 8d).
+            const _pickK = (typeof config.COLOR_BLEND_PICKUP === 'number') ? Math.max(0, config.COLOR_BLEND_PICKUP) : 0.8;
+            const _pick = ((config.COLOR_BLEND || 0) > 0 && typeof wetness !== 'undefined' && wetness)
+                ? Math.max(0, Math.min(1, config.COLOR_BLEND)) * _pickK : 0;
+            gl.uniform1f(splatProg.uniforms.wetPickup, _pick);
+            gl.uniform1f(splatProg.uniforms.wetPickupAmount, config.COLOR_BLEND_PICKUP_AMOUNT === false ? 0 : 1);
+            gl.uniform2f(splatProg.uniforms.dyeTexel, 1 / dyeTexWidth, 1 / dyeTexHeight);
+            gl.uniform1i(splatProg.uniforms.uWetness, 3);
+            gl.activeTexture(gl.TEXTURE3);
+            gl.bindTexture(gl.TEXTURE_2D, (typeof wetness !== 'undefined' && wetness) ? wetness.read.texture : density.read.texture);
+            gl.activeTexture(gl.TEXTURE0);
             if (brushTip === 4 && !stampTex) {
                 // Ring tip: thin dye band at ~the gaussian's visible radius
                 // (≈√radius in p-space) — dye pass ONLY, so the ring uniform
@@ -422,7 +436,16 @@
                 gl.viewport(0, 0, simTexWidth, simTexHeight);
                 gl.uniform1f(wetSplatProg.uniforms.aspectRatio, aspectRatio);
                 gl.uniform2f(wetSplatProg.uniforms.point, x / canvas.width, 1.0 - y / canvas.height);
-                gl.uniform1f(wetSplatProg.uniforms.radius, baseRadius);
+                // The wet footprint is a gaussian of the dab radius, which is
+                // the SOFT tip's footprint. A custom stamp prints out to
+                // 1.6 sqrt(r) (splatFrag he) and a clay tip's rim sits at
+                // 1.18 sqrt(r), where that gaussian is 0.08 and 0.25: the
+                // outer letters of a text stamp were laid on "dry" paper, so
+                // Color Blend and the wet pickup skipped them (the fuzzy
+                // two-arm overlap, 2026-10-01). Widen it to read ~0.5 at
+                // the footprint's edge instead.
+                const _wetK = stampTex ? 4 : (brushTip >= 1 && brushTip <= 3) ? 2 : 1;
+                gl.uniform1f(wetSplatProg.uniforms.radius, baseRadius * _wetK);
                 gl.uniform1f(wetSplatProg.uniforms.amount, 1.0);
                 gl.uniform1i(wetSplatProg.uniforms.uTarget, 0);
                 gl.activeTexture(gl.TEXTURE0);

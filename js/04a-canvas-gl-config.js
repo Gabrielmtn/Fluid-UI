@@ -403,6 +403,21 @@
             COLOR_BLEND_THAW: 1.5,    // Seconds the blend takes to come back (smoothstep) after Freeze lets
                                       // go. Freeze holds the paint wet, so without it every edge snapped
                                       // soft on the first step. 0 = back at once
+            COLOR_BLEND_PICKUP: 0.8,  // Wet pickup (2026-10-01, splatFrag): how much of the FRESH paint under
+                                      // a dab the dab's hue takes on, times the fader. A brush dabbed into
+                                      // wet paint picks it up; two Multi-Brush arms laying two colours on
+                                      // one spot then lay the running mix instead of a fuzzy patchwork.
+                                      // Fresh = painted within about one Dry Time. 0 = dabs land pure
+            COLOR_BLEND_PICKUP_AMOUNT: true, // Under Gate the pickup takes on the fresh paint's AMOUNT as well
+                                      // as its hue (2026-10-01). Hue alone left the two arms' overlap a
+                                      // letter-shaped patchwork of paint thickness (12% steps between a
+                                      // pink and a cyan), which Ridges and Surface Shading drew as
+                                      // stair-stepped echoes. false = hue only, each dab its own amount
+            COLOR_BLEND_STIR_SMOOTH: true, // The blend sizes each texel's kernel from the stir averaged over
+                                      // a 4x4 box of taps (2026-10-01, colorBlendFrag stirAt). Read at
+                                      // one tap, the squeeze's cell-scale mottle gave neighbouring texels
+                                      // kernels 3 to 24 texels wide and speckled the hue 1-3% wherever a
+                                      // brush was laying two colours into each other. false = one tap
 
             VIBRANCE: 1,              // Selective saturation boost (0 = off, 1.0 = max). Default look 2026-09-24.
 

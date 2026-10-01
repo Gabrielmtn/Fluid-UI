@@ -180,6 +180,10 @@
             uniform float stampTexOn;    // 1 = the dye footprint comes from the stamp texture
             uniform float stampAspect;   // stamp width/height, so non-square stamps keep their aspect
             uniform vec2 stampHold;      // (lo, hi): this same stamp already landed on this spot, so refill only coverage above the window; hi 0 = off
+            uniform sampler2D uWetness;  // the Drying map (sim res): 1 at a dab, halves every Dry Time; unit 3
+            uniform float wetPickup;     // how much of the fresh paint under a dab the dab takes on; 0 = off
+            uniform float wetPickupAmount; // 1 = under Gate the dab takes on the paint's amount as well as its hue
+            uniform vec2 dyeTexel;       // one dye texel in UV, for the pickup's neighbourhood
             uniform int gateColor;     // 1 = clamp dye at the splat's own color (no HDR overflow into white)
             uniform float gateFlow;    // Gate: 0-1 flow — scales the CONVERGENCE, not the colour, so low flow builds toward the TRUE colour instead of a darkened one
             uniform int isVelocity; // 1 for velocity, 0 for density
@@ -423,6 +427,62 @@
                         }
                         shape = cov;
                     }
+                    // Wet pickup (2026-10-01). Two Multi-Brush arms laying two
+                    // colours into one spot, 250 dabs a second, left a fuzzy
+                    // patchwork at Color Blend 1: every dab snapped its texels
+                    // back to its own colour, and the blend's per-frame reach
+                    // (a texel or two) could only half-smooth that. A real
+                    // brush picks up the wet paint it dabs into. So where the
+                    // paint under a dab is fresh (the Drying map: ~0.5 and up
+                    // across a dab's footprint, halving every Dry Time, so
+                    // "fresh" fades out over a few seconds), the dab's hue
+                    // moves toward the paint in a 7-texel neighbourhood by
+                    // wetPickup (Color Blend x COLOR_BLEND_PICKUP). Both arms
+                    // then lay the running mix, and the overlap reads as one
+                    // colour. Thin paint under the dab hands on little.
+                    // Blend 0: nothing.
+                    vec3 dabColor = color;
+                    if (wetPickup > 0.0) {
+                        float fresh = smoothstep(0.25, 0.6, texture(uWetness, vUv).r);
+                        if (fresh > 0.0) {
+                            vec2 o = dyeTexel * 3.0;
+                            vec3 t0 = max(base, vec3(0.0));
+                            vec3 t1 = max(texture(uTarget, vUv + vec2(o.x, 0.0)).rgb, vec3(0.0));
+                            vec3 t2 = max(texture(uTarget, vUv - vec2(o.x, 0.0)).rgb, vec3(0.0));
+                            vec3 t3 = max(texture(uTarget, vUv + vec2(0.0, o.y)).rgb, vec3(0.0));
+                            vec3 t4 = max(texture(uTarget, vUv - vec2(0.0, o.y)).rgb, vec3(0.0));
+                            vec3 near = t0 + t1 + t2 + t3 + t4;
+                            float nearInk = near.r + near.g + near.b;
+                            float ownInk = color.r + color.g + color.b;
+                            if (nearInk > 1e-4 && ownInk > 1e-6) {
+                                float k = wetPickup * fresh * smoothstep(0.0, 1.0, 0.2 * nearInk / ownInk);
+                                // The AMOUNT of paint too, under Gate (2026-10-01).
+                                // Two colours rarely carry the same amount (a
+                                // pink 1.65, a cyan 1.88 of r+g+b), and with
+                                // only the hue picked up each arm's dab left
+                                // its own amount: the overlap's hue came out
+                                // smooth while its paint thickness stayed a
+                                // hard, letter-shaped patchwork of 12% steps,
+                                // which Ridges and Surface Shading drew as
+                                // stair-stepped echoes of every dab. So the
+                                // amount moves toward the neighbourhood's by
+                                // the same share. That is the ink-weighted
+                                // mean of the taps, so empty canvas beside the
+                                // paint does not thin the dab. Repeats still
+                                // converge on the dab's own colour and amount
+                                // (20 dabs, as before). Not the additive
+                                // branch: adding the neighbourhood's amount to
+                                // itself would grow without bound.
+                                float amt = ownInk;
+                                if (gateColor == 1 && wetPickupAmount > 0.5) {
+                                    vec3 one = vec3(1.0);
+                                    float i0 = dot(t0, one), i1 = dot(t1, one), i2 = dot(t2, one), i3 = dot(t3, one), i4 = dot(t4, one);
+                                    amt = mix(ownInk, (i0 * i0 + i1 * i1 + i2 * i2 + i3 * i3 + i4 * i4) / nearInk, k);
+                                }
+                                dabColor = mix(color * (amt / ownInk), near * (amt / nearInk), k);
+                            }
+                        }
+                    }
                     vec3 result;
                     // Pigment memory: what strength was this dye laid down at?
                     // Tracked the same way the colour itself is, so the two
@@ -449,10 +509,10 @@
                         // colour value — fine for the additive branch below, but
                         // under Gate that made every low-flow stroke a dark hue.)
                         float w = clamp(shape, 0.0, 1.0) * obsBlockDye * gateFlow;
-                        result = mix(base, color, w);
-                        newMem = mix(baseMem, max(color.r, max(color.g, color.b)), w);
+                        result = mix(base, dabColor, w);
+                        newMem = mix(baseMem, max(dabColor.r, max(dabColor.g, dabColor.b)), w);
                     } else {
-                        result = base + shape * color * obsBlockDye;
+                        result = base + shape * dabColor * obsBlockDye;
                         newMem = max(baseMem, max(result.r, max(result.g, result.b)));
                     }
                     fragColor = vec4(result, newMem);
@@ -1909,6 +1969,7 @@
             uniform float uWetFull;      // wetness from which paint counts as fully wet
             uniform float uPaintShare;   // how far paint evens out, as a share of the stable flux (0-1)
             uniform float uSeed;         // new every step: the dither for pass 2's rounding
+            uniform vec2 uStirStep;      // spacing of stirAt's 4x4 taps, in UV; 0 = one tap
             const float SIGMA_MAX = 16.0;         // half-res texels per step for the stir: 24 tap pairs a side
             const float SIGMA_MAX_SQUEEZED = 24.0; // ...and where the squeeze is the stir: 36 pairs. A pressed
                                                    // front re-sharpens as fast as a step spreads it, so its
@@ -1958,6 +2019,28 @@
                 vec3 c = max(texture(uDye, uv).rgb, vec3(0.0));
                 return c.r + c.g + c.b;
             }
+            // The stir that sizes this texel's kernel: a 4x4 box of bilinear
+            // taps (2026-10-01). While a brush is painting, the squeeze is
+            // most of the stir (98 of 120/s, 15 Pressure iterations, sim
+            // 4096), and it is mottled: full over most cells with holes a few
+            // sim texels wide, 26% from one cell to the next after the stir's
+            // own 5x5. Read at one tap, neighbouring half-res texels spread
+            // with kernels anywhere from 3 to 24 texels wide, and wherever
+            // the colour was not flat (two arms' dabs landing in each other)
+            // each kept a different hue: a 1-3% speckle, one or two texels
+            // across, that the display finish made plain. The box spans four
+            // half-res texels a side, or eight sim texels when those are
+            // larger, so neighbours size their kernels alike.
+            vec2 stirAt(vec2 uv) {
+                if (uStirStep.x <= 0.0) return texture(uStir, uv).rg;
+                vec2 s = vec2(0.0);
+                for (int j = 0; j < 4; j++) {
+                    for (int i = 0; i < 4; i++) {
+                        s += texture(uStir, uv + (vec2(float(i), float(j)) - 1.5) * uStirStep).rg;
+                    }
+                }
+                return s * 0.0625;
+            }
             // This step's variance at uv, in half-res texels² (see above).
             // Paint counts as fully wet from uWetFull up: a stroke's soft
             // edge, where colours meet, is only half as wet as its middle, and
@@ -2000,7 +2083,7 @@
                 return flux;
             }
             void main() {
-                vec2 st = texture(uStir, vUv).rg;
+                vec2 st = stirAt(vUv);
                 float v = blendVar(vUv, st);
                 if (uPass == 2) {
                     vec4 d = texture(uDye, vUv);

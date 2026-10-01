@@ -104,13 +104,14 @@
         "vibrance"
       ]
     },
-    "aspectRatio|barHalfW|barPoint|color|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampFlip|stampHold|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|uVelCovBlock|velocityInfluence|velocityScale": {
+    "aspectRatio|barHalfW|barPoint|color|dyeTexel|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampFlip|stampHold|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|uVelCovBlock|uWetness|velocityInfluence|velocityScale|wetPickup|wetPickupAmount": {
       "name": "splat",
       "uniforms": [
         "aspectRatio",
         "barHalfW",
         "barPoint",
         "color",
+        "dyeTexel",
         "gateColor",
         "gateFlow",
         "hasObstacle",
@@ -133,8 +134,11 @@
         "uStampTex",
         "uTarget",
         "uVelCovBlock",
+        "uWetness",
         "velocityInfluence",
-        "velocityScale"
+        "velocityScale",
+        "wetPickup",
+        "wetPickupAmount"
       ]
     },
     "uDye": {
@@ -343,7 +347,7 @@
         "uVelocity"
       ]
     },
-    "hasObstacle|uDryStir|uDye|uDyeTexel|uObstacle|uPaintShare|uPass|uSeed|uSource|uSrcMax|uSrcScale|uStepUv|uStir|uStirRest|uVarPerStir|uWetFull|uWetness": {
+    "hasObstacle|uDryStir|uDye|uDyeTexel|uObstacle|uPaintShare|uPass|uSeed|uSource|uSrcMax|uSrcScale|uStepUv|uStir|uStirRest|uStirStep|uVarPerStir|uWetFull|uWetness": {
       "name": "colorBlend",
       "uniforms": [
         "hasObstacle",
@@ -360,6 +364,7 @@
         "uStepUv",
         "uStir",
         "uStirRest",
+        "uStirStep",
         "uVarPerStir",
         "uWetFull",
         "uWetness"
