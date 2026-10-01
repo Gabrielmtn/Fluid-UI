@@ -1412,6 +1412,188 @@ input[type="color"].text-swatch::-moz-color-swatch {
 .stroke-lock-row .hk-picker-clear { height: 26px; width: 22px; }
 .stroke-lock-block > .hk-picker-note { margin: 4px 0 0; }
 
+/* ── Radial menu (js/58-radial-menu.js) ──
+   The wheel that opens at the pointer (E, or a mouse button set to it), and
+   Settings → Radial Menu, where its items are added and taken off. Only
+   the wheel's own disc takes the pointer: everything round it stays live,
+   so a press off the wheel lands on what is under it. JS sizes and places
+   the wheel (it grows with --ui-scale). A slider item fills from the hub
+   outward a shade lighter than its wedge, with a quiet line on the fill's
+   edge — no colour of its own; a control or key item lights in the system
+   panel's hue, from the layer's data-group. Nothing animates (Electron
+   compositor rule). */
+#radialMenu {
+    position: fixed;
+    inset: 0;
+    z-index: 10040;            /* over the bind bar (10030), under dialogs (10060) */
+    pointer-events: none;
+    user-select: none;
+}
+.radial-hit {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: auto;
+    cursor: default;
+    touch-action: none;
+}
+#radialMenu[hidden] { display: none; }
+.radial-wheel {
+    position: absolute;        /* a point: the wheel's centre */
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+.radial-svg { position: absolute; overflow: visible; }
+.radial-wedge {
+    fill: rgba(15, 20, 27, 0.95);
+    stroke: rgba(255, 255, 255, 0.18);
+    stroke-width: 1;
+}
+.radial-wedge.is-hot {
+    fill: oklch(50% 0.13 var(--sec-h, 250));
+    stroke: rgba(255, 255, 255, 0.6);
+}
+/* A slider under the pointer keeps its ground (the fill is its value) and
+   says it is live with its outline. */
+.radial-wedge.is-slider.is-hot {
+    fill: rgba(15, 20, 27, 0.95);
+    stroke: rgba(255, 255, 255, 0.6);
+}
+.radial-wedge.is-slider.is-dragging { stroke: rgba(255, 255, 255, 0.85); }
+.radial-wedge.is-off { fill: rgba(15, 20, 27, 0.8); }
+/* How far the slider is: the wedge's own ground, a shade lighter. */
+.radial-fill { fill: rgba(255, 255, 255, 0.09); }
+.radial-wedge.is-hot + .radial-fill { fill: rgba(255, 255, 255, 0.14); }
+.radial-wedge.is-off + .radial-fill { fill: rgba(255, 255, 255, 0.04); }
+.radial-thumb {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.3);
+    stroke-width: 1.5;
+    stroke-linecap: butt;
+}
+.radial-wedge.is-hot + .radial-fill + .radial-thumb { stroke: rgba(255, 255, 255, 0.6); }
+.radial-wedge.is-off + .radial-fill + .radial-thumb { stroke: rgba(255, 255, 255, 0.12); }
+.radial-hub {
+    fill: rgba(15, 20, 27, 0.95);
+    stroke: rgba(255, 255, 255, 0.28);
+    stroke-width: 1;
+}
+.radial-hub-x {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translate(-50%, -50%);
+    font-size: calc(16px * var(--ui-scale, 1));
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.5);
+}
+.radial-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: max-content;        /* up to the max-width JS gives it for its wedge */
+    box-sizing: border-box;
+    text-align: center;
+    color: #e6edf3;
+    font-size: calc(12px * var(--ui-scale, 1));
+    line-height: 1.2;
+}
+.radial-label.is-hot { color: #fff; }
+.radial-label.is-off { opacity: 0.45; }
+.radial-label-val {
+    display: block;
+    margin-top: 2px;
+    font-size: calc(11px * var(--ui-scale, 1));
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: #fff;
+}
+.radial-label-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: break-word;
+    font-weight: 600;
+}
+.radial-label-key {
+    display: inline-block;
+    margin-top: 3px;
+    padding: 1px 5px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font-size: calc(10px * var(--ui-scale, 1));
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.6);
+}
+.radial-label.is-hot .radial-label-key { color: #fff; border-color: rgba(255, 255, 255, 0.6); }
+.radial-empty {
+    position: absolute;
+    left: 0;
+    transform: translateX(-50%);
+    width: 220px;
+    padding: 6px 10px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    background: rgba(13, 17, 23, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #e6edf3;
+    font-size: 12px;
+    line-height: 1.4;
+    text-align: center;
+}
+/* A word when an item's key has nothing on it: the hotkey toast's spot. */
+#radialNote {
+    position: fixed;
+    left: 50%;
+    bottom: 96px;
+    transform: translateX(-50%);
+    z-index: 10030;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: rgba(13, 17, 23, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #e6edf3;
+    font-size: 12px;
+    pointer-events: none;
+}
+#radialNote[hidden] { display: none; }
+
+/* Settings → Radial Menu: Settings → Hotkeys' rows, with a key cap where
+   those have a key field (a key item's key is what it presses, not a
+   binding to re-record; sliders and controls have none), the door into
+   bind mode, and one line to add a key item: label, key, Add. */
+.radial-block [hidden] { display: none !important; }
+.radial-how { margin-bottom: 6px; }
+.radial-list { margin-bottom: 6px; }
+.radial-row .hk-cap { flex: 0 0 auto; min-width: 46px; margin-left: 0; }
+#sidebar-right .radial-pick-btn { width: 100%; margin-bottom: 6px; }
+.radial-add { display: flex; align-items: flex-start; gap: 4px; }
+#sidebar-right .radial-add-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 28px;
+    box-sizing: border-box;
+    padding: 0 6px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, #0f141b, #0b0f14);
+    color: #e6edf3;
+    font-size: 11px;
+}
+#sidebar-right .radial-add-label:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.25);
+}
+.radial-add .hk-picker { flex: 0 0 92px; }
+.radial-add .hk-picker-key { padding: 0 6px; font-size: 11px; }
+.radial-add-btn { flex: none; height: 28px; padding: 0 10px; font-size: 11px; }
+#sidebar-right .radial-reset { width: 100%; margin-top: 6px; font-size: 10px; }
+
 /* ── Text overlay arrange mode ── */
 #text-arrange-canvas {
     /* sized/positioned inline; swallows pointer events so painting is paused */

@@ -447,12 +447,9 @@
                     if (lower === 'r') { toggleCheckbox('randomColor'); return; }
                     if (lower === 'a') { toggleCheckbox('stepPalette'); return; }
                 }
-                // E: Quick export (video)
-                if (lower === 'e' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (window.fluidExport) window.fluidExport.video();
-                    return;
-                }
+                // E opens the radial menu (js/58-radial-menu.js, which owns the
+                // key). It started a video export from here until 2026-09-30;
+                // Export → Video can be put on the menu like any button.
                 // M: Trigger mutation
                 if (lower === 'm' && !e.shiftKey) {
                     e.preventDefault();

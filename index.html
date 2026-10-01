@@ -1598,7 +1598,7 @@
                 <div>
                     <h3>Export & Mutation</h3>
                     <ul>
-                        <li>E — Quick Export (Video)</li>
+                        <li>E — Radial Menu at the pointer: drag a slider, or hover it and scroll</li>
                         <li>M — Mutate Settings</li>
                         <li>Right Shift+Enter — Capture Layer</li>
                     </ul>
@@ -1610,6 +1610,7 @@
                         <li>Shift+[ / Shift+] — Coarse − / +</li>
                         <li>Scroll — Brush Size − / +</li>
                         <li>Hold right-click (Replay) — the left button still works the menus</li>
+                        <li>Middle-click — Radial Menu (each button's job: Stroke and replay)</li>
                         <li>Shift+Scroll — Rotate Brush (angle)</li>
                     </ul>
                 </div>
@@ -1855,6 +1856,11 @@
          48-hotkeys and mounts into Settings under 43's Interface block, so it
          loads after both. -->
     <script src="js/49-hotkey-binds.js"></script>
+    <!-- Radial menu: E, or a mouse button set to it (41), opens the top
+         bar's sliders as a wheel at the pointer; controls and keys can go
+         on it too (49's bind mode, 48's press). Its list lives in Settings
+         under 49's Hotkeys block, so it loads after both. -->
+    <script src="js/58-radial-menu.js"></script>
     <!-- "Try this look" links: ?look=opal opens the app with a curated look
          applied, on top of the saved session and never written into it;
          Copy link to this look lives in the Presets popup. -->

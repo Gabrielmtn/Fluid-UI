@@ -3940,8 +3940,8 @@
     // exercise needs no menu trip mid-session.
     //
     // 41-button-modes owns the state, the persistence and the pins; this builds
-    // the doors onto it. The two sides are literally the same builder, so left
-    // and right can never drift apart.
+    // the doors onto it. The sides are literally the same builder, so left,
+    // right and middle can never drift apart.
     var altPickerRefreshers = [];   // re-render on a brush-shape library change
     function refreshAltPickers() {
         for (var i = 0; i < altPickerRefreshers.length; i++) {
@@ -3959,25 +3959,28 @@
         var head = document.createElement('label');
         head.className = 'brush-section-label';
         head.textContent = 'Mouse Buttons';
-        head.title = 'What each mouse button does. A touchscreen follows the LEFT setting.';
+        head.title = 'What each mouse button does. A touchscreen follows the LEFT setting. Mouse 3 is the wheel, pressed.';
         wrap.appendChild(head);
 
-        // Both buttons on Replay is a deliberate, useful state (the motion is
-        // locked in and the patient cannot paint over it) and an easy accident.
-        // Say which one it is instead of leaving a canvas that ignores clicks.
+        // No button left painting is a deliberate, useful state (every button
+        // on Replay: the motion is locked in and the patient cannot paint
+        // over it) and an easy accident. Say which one it is instead of
+        // leaving a canvas that ignores clicks.
         var lock = document.createElement('div');
         lock.className = 'button-roles-lock';
         lock.style.cssText = 'font-size:10px;line-height:1.35;margin:-2px 0 8px;padding:5px 7px;'
             + 'border-radius:4px;background:rgba(255,200,100,0.10);'
             + 'border:1px solid rgba(255,200,100,0.35);color:rgba(255,225,180,0.95);';
-        lock.textContent = 'Both buttons replay — nothing new can be painted. That is the '
-            + 'painting lock: the last stroke can be re-triggered, but not added to.';
         wrap.appendChild(lock);
 
-        function syncLock() { lock.style.display = BM.isPaintLocked() ? '' : 'none'; }
+        function syncLock() {
+            lock.style.display = BM.isPaintLocked() ? '' : 'none';
+            lock.textContent = 'No button paints, so nothing new can be painted.'
+                + (BM.anyReplay() ? ' That is the painting lock: the last stroke can be re-triggered, but not added to.' : '');
+        }
 
         var syncAll = [];
-        ['left', 'right'].forEach(function (side) {
+        BM.SIDES.forEach(function (side) {
             var built = buildButtonRole(side, BM, syncLock);
             wrap.appendChild(built.el);
             syncAll.push(built.sync);
@@ -4089,7 +4092,7 @@
         var lbl = document.createElement('label');
         lbl.className = 'brush-section-label';
         lbl.setAttribute('for', 'buttonMode_' + side);
-        lbl.textContent = (side === 'left' ? 'Left Click' : 'Right Click');
+        lbl.textContent = BM.SIDE_LABELS[side];
         box.appendChild(lbl);
 
         var sel = document.createElement('select');
@@ -4232,6 +4235,22 @@
         altBox.appendChild(altSummary);
         box.appendChild(altBox);
 
+        // ── Radial menu (shown for 'radial') ──────────────────────────
+        // What is ON the menu is one list for every button and for E, kept
+        // in Settings (js/58): this is the door to it.
+        var radialRow = document.createElement('div');
+        radialRow.className = 'brush-mode-row';
+        var radialBtn = document.createElement('button');
+        radialBtn.type = 'button';
+        radialBtn.className = 'brush-mode-btn';
+        radialBtn.textContent = 'Edit the menu';
+        radialBtn.title = 'Settings → Radial Menu: put other sliders, buttons and keys on it, or take items off.';
+        radialBtn.addEventListener('click', function () {
+            if (window.RadialMenu) window.RadialMenu.openEditor();
+        });
+        radialRow.appendChild(radialBtn);
+        box.appendChild(radialRow);
+
         // ── Wiring ────────────────────────────────────────────────────
         sel.addEventListener('change', function () {
             BM.setMode(side, sel.value);
@@ -4298,6 +4317,7 @@
             hint.textContent = BM.MODE_HINTS[st.mode] || '';
             mirRow.style.display = (st.mode === 'mirror') ? '' : 'none';
             altBox.style.display = (st.mode === 'alt') ? '' : 'none';
+            radialRow.style.display = (st.mode === 'radial') ? '' : 'none';
             Object.keys(mirBtns).forEach(function (k) {
                 mirBtns[k].classList.toggle('active', k === st.mirror);
             });
@@ -7271,7 +7291,7 @@
 
         var videoBtn = document.createElement('button');
         videoBtn.textContent = 'Video';
-        videoBtn.title = 'Record a clip of the canvas as it moves (E). MP4 where the browser can, WebM otherwise; the background goes under the paint.';
+        videoBtn.title = 'Record a clip of the canvas as it moves. MP4 where the browser can, WebM otherwise; the background goes under the paint.';
         videoBtn.style.cssText = 'cursor:pointer;';
         videoBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.video();

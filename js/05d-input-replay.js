@@ -812,20 +812,23 @@
         // rehearsed motion can be re-triggered and nothing new can be painted,
         // or two different brushes bound to the two buttons.
         //
-        // Every mode that is not 'replay' is a PAINT press — so a mode added
-        // later paints (with whatever pin it installs) rather than doing
-        // nothing at all — and a null answer means the button has no role,
-        // which is still the case for middle, back/forward and the pen eraser.
-        // The fallback keeps the historical binding if 41 failed to load.
+        // 'replay' holds the replay and 'radial' opens the radial menu (js/58);
+        // every other mode is a PAINT press — so a mode added later paints
+        // (with whatever pin it installs) rather than doing nothing at all —
+        // and a null answer means the button has no role, which is still the
+        // case for back/forward and the pen eraser. The middle button (Mouse
+        // 3) has had one since 2026-09-30: the radial menu, unless it is given
+        // another. The fallback keeps the historical binding if 41 failed to
+        // load.
         function buttonMode(btn) {
             var BM = window.ButtonModes;
             if (BM && typeof BM.modeFor === 'function') return BM.modeFor(btn);
             return btn === 0 ? 'paint' : (btn === 2 ? 'replay' : null);
         }
         // A button's bit in PointerEvent.buttons — 1 for the primary, 2 for the
-        // secondary. The replay self-heal below tests the bit of whichever
-        // button actually latched the hold, not a hardcoded 2.
-        function buttonBit(btn) { return btn === 0 ? 1 : (btn === 2 ? 2 : 0); }
+        // secondary, 4 for the middle. The replay self-heal below tests the bit
+        // of whichever button actually latched the hold, not a hardcoded 2.
+        function buttonBit(btn) { return btn === 0 ? 1 : (btn === 2 ? 2 : (btn === 1 ? 4 : 0)); }
         let replayButton = null;   // which button latched the replay hold
         let paintButton = null;    // ...and which one owns the live stroke
         // Where a pointer or touch PAINTS, in canvas px. A held stroke lock
@@ -844,10 +847,22 @@
         canvas.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'touch') return; // touchstart owns touch
             const btnMode = buttonMode(e.button);
-            if (!btnMode) return;   // middle / back / forward / pen eraser
+            if (!btnMode) return;   // back / forward / pen eraser
             // The secondary button never opens the OS menu, whatever it is
-            // bound to (contextmenu is suppressed below as well).
-            if (e.button === 2) e.preventDefault();
+            // bound to (contextmenu is suppressed below as well), and the
+            // middle one never starts the browser's autoscroll.
+            if (e.button === 2 || e.button === 1) e.preventDefault();
+            // The radial menu opens at the pointer and takes the rest of
+            // this press: it watches the pointer itself until the button
+            // comes up, so no stroke state is touched and nothing is
+            // captured here. It is not painting, so it opens on a paused
+            // canvas and out of turn alike.
+            if (btnMode === 'radial') {
+                if (window.RadialMenu) {
+                    window.RadialMenu.open({ x: e.clientX, y: e.clientY, pointerId: e.pointerId, button: e.button });
+                }
+                return;
+            }
             // Take-turns multiplayer: while it's someone else's turn, both
             // painting AND replay (which rebroadcasts a stroke) are gated —
             // the relay would drop them and the local-only paint would
@@ -890,10 +905,10 @@
                 }
                 return;
             }
-            // Paint press. Only buttons 0 and 2 ever reach here (buttonMode
-            // returns null for everything else) — and both are finalized by the
-            // pointerup handler below, which is what the old "primary button
-            // only" guard was really protecting: a button that could start a
+            // Paint press. Only buttons 0, 1 and 2 ever reach here (buttonMode
+            // returns null for everything else) — and all three are finalized
+            // by the pointerup handler below, which is what the old "primary
+            // button only" guard was really protecting: a button that could start a
             // stroke but never end it left pointer.down stuck true, painting a
             // permanent line under the cursor until the app was restarted.
             // Only process presses that actually target the canvas (not click-throughs from UI)
@@ -1274,6 +1289,7 @@
             if (typeof e.button !== 'number' || e.button < 0) return;   // a plain move
             const bit = buttonBit(e.button);
             if (!bit || e.button === replayButton) return;               // the hold's own button
+            if (e.button === 1) return;                                  // a middle click never worked the menus
             const t = e.target;
             if (!t || t === canvas || t === document || t === document.documentElement) return;
             const type = (e.buttons & bit) ? 'pointerdown' : 'pointerup';
@@ -1486,6 +1502,14 @@
                 isReplayActive = true;
                 window._pausedPointerState = null;
                 replayStroke(true);
+                return;
+            }
+            // ...and so does the radial menu: a left button set to it opens
+            // the menu under the finger, which watches the touch from there.
+            if (e.touches.length === 1 && !TouchGestures.isSuppressed() && buttonMode(0) === 'radial') {
+                if (window.RadialMenu) {
+                    window.RadialMenu.open({ x: e.touches[0].clientX, y: e.touches[0].clientY, button: 0 });
+                }
                 return;
             }
             if (isPaused) return;

@@ -27,7 +27,14 @@
  * scroll over the canvas just after, and the wheel fine-tunes that slider
  * from where the key put it (see SCROLL AFTER A SLIDER'S KEY).
  *
- * window.HotkeyBinds = { start, stop, isActive, list, remove, fire }
+ * The same choosing, without the key, fills the radial menu (js/58): bind
+ * mode started with a DESTINATION hands the chosen control to it instead of
+ * asking for a key. One way of choosing, so one set of rules about what a
+ * click in bind mode means — a control that only opens something is never
+ * taken, there or here.
+ *
+ * window.HotkeyBinds = { start, stop, isActive, list, remove, fire, open,
+ *                        run, resolve, describe, nameOf, valueTextOf, faceOf }
  */
 (function () {
     'use strict';
@@ -216,6 +223,12 @@
             var g = el.closest('.control-group');
             if (g) l = g.querySelector(':scope > label');
         }
+        // A heading label set right above its control with no `for` (Stroke
+        // and replay's Splat In / Splat Out dropdowns).
+        if (!l) {
+            var p = el.previousElementSibling;
+            if (p && p.tagName === 'LABEL' && !p.control) l = p;
+        }
         if (!l) return '';
         var c = l.cloneNode(true);
         [].forEach.call(c.querySelectorAll('.value-display, .hk-cap, input, select, button'), function (x) { x.remove(); });
@@ -234,7 +247,10 @@
         var raw = el.tagName === 'SELECT' ? '' : norm(norm(el.textContent).replace(/[×✕✖▾▴▸◂▼▲►◄]/g, ''));
         // Glyph-only buttons (✥ 👁 × 📂) say what they do in their title.
         var words = /[A-Za-z0-9]/.test(raw) ? raw : '';
-        var bg = (!raw && el.style && el.style.backgroundColor) ? 'Colour ' + hexOf(el.style.backgroundColor) : '';
+        // A wordless colour chip is its colour — a dropdown or a field with a
+        // painted ground is not.
+        var chipLike = el.tagName !== 'SELECT' && el.tagName !== 'INPUT';
+        var bg = (chipLike && !raw && el.style && el.style.backgroundColor) ? 'Colour ' + hexOf(el.style.backgroundColor) : '';
         return clip(words || norm(el.getAttribute('aria-label')) || norm(el.getAttribute('title')) || bg || raw || el.id || el.tagName.toLowerCase(), 40);
     }
 
@@ -514,6 +530,12 @@
     //     bar stays until Done, Esc, a click elsewhere, or a few seconds;
     //     Bind another goes back to step 1
     var mode = null;        // null | 'pick' | 'key' | 'done'
+    // Where a chosen control goes when it is not onto a key (start({ to })):
+    //   { title, what, pickLines, doneSay, doneLines,
+    //     add(draft, el) → a reason it cannot be taken (string), or
+    //                      { shown } — the words for what was added }
+    // With one set, step 2 is skipped: choose, done.
+    var dest = null;
     var offer = null;       // step 1's "Hotkey to …" control, while one is being set
     var pending = null;     // the binding being made
     var picker = null;
@@ -637,12 +659,12 @@
         make('span', 'hk-tag-name', tag).textContent = name;
     }
 
-    function chip(b) {
+    function chip(b, words) {
         var c = make('div', 'hk-chip');
         if (b.where) make('div', 'hk-chip-where', c).textContent = b.where;
         var n = make('div', 'hk-chip-name', c);
-        n.textContent = describe(b);
-        n.title = describe(b);
+        n.textContent = words || describe(b);
+        n.title = n.textContent;
         return c;
     }
 
@@ -652,15 +674,16 @@
     }
 
     var STEPS = ['Choose a control', 'Press a key', 'Done'];
+    var DEST_STEPS = ['Choose a control', 'Done'];
 
     function buildBar() {
         var bar = make('div', '');
         bar.id = 'hkBindBar';
         bar.dataset.group = 'system';
         bar.setAttribute('role', 'dialog');
-        bar.setAttribute('aria-label', 'Bind a hotkey');
+        bar.setAttribute('aria-label', dest ? dest.title : 'Bind a hotkey');
         var head = make('div', 'hk-steps', bar);
-        var steps = STEPS.map(function (label, i) {
+        var steps = (dest ? DEST_STEPS : STEPS).map(function (label, i) {
             if (i) make('span', 'hk-step-sep', head).textContent = '›';
             var s = make('span', 'hk-step', head);
             var n = make('span', 'hk-step-n', s);
@@ -807,15 +830,16 @@
             ui.pair.appendChild(offerButton(offer));
             lines(ui.sub, col
                 ? ['The button follows your colour. Press it when it’s right.',
-                   'Or click any other control to bind that instead. Esc cancels.']
-                : ['Press it to put ' + describe(offerDraft(offer)) + ' on a key.',
-                   'Or keep going: click another control to bind that instead. Esc cancels.']);
+                   'Or click any other control to ' + (dest ? 'take' : 'bind') + ' that instead. Esc cancels.']
+                : ['Press it to put ' + describe(offerDraft(offer)) + ' on ' + (dest ? dest.what : 'a key') + '.',
+                   'Or keep going: click another control to ' + (dest ? 'take' : 'bind') + ' that instead. Esc cancels.']);
             setAction(ui.more, '');
             setAction(ui.main, 'Cancel', stop);
         } else if (n === 1) {
-            ui.say.textContent = 'Choose the control you want on a key';
-            lines(ui.sub, ['Click a button or a checkbox, or set a slider and let go.',
-                           'Menus and lists still open, so you can reach what’s inside. Esc cancels.']);
+            ui.say.textContent = 'Choose the control you want on ' + (dest ? dest.what : 'a key');
+            lines(ui.sub, dest ? dest.pickLines
+                : ['Click a button or a checkbox, or set a slider and let go.',
+                   'Menus and lists still open, so you can reach what’s inside. Esc cancels.']);
             setAction(ui.more, '');
             setAction(ui.main, 'Cancel', stop);
         } else if (n === 2) {
@@ -827,6 +851,13 @@
                            'Wrong control? Click or set another one to switch. Esc cancels.']);
             setAction(ui.more, '');
             setAction(ui.main, 'Cancel', stop);
+        } else if (dest) {
+            ui.say.textContent = dest.doneSay;
+            ui.pair.appendChild(chip(made, made.shown));
+            lines(ui.sub, dest.doneLines);
+            setAction(ui.more, 'Add another', toStep1);
+            setAction(ui.main, 'Done', stop, true);
+            try { ui.main.focus({ preventScroll: true }); } catch (_) {}
         } else {
             var key = H.format(made.combo);
             ui.say.textContent = '✓ Hotkey saved';
@@ -861,7 +892,7 @@
         btn.type = 'button';
         var colour = isColour(b) ? String(b.el.value) : '';
         if (colour) make('span', 'hk-offer-swatch', btn).style.background = colour;
-        make('span', 'hk-offer-lead', btn).textContent = 'Hotkey to';
+        make('span', 'hk-offer-lead', btn).textContent = dest ? 'Add' : 'Hotkey to';
         var val = make('span', 'hk-offer-val', btn);
         val.textContent = valueTextOf(b.el);
         // The hex in its own colour — a dark one gets a light halo, or it
@@ -973,8 +1004,10 @@
         choose(b, { keepPlace: true });     // the bar stays by the swatch it was just used at
     }
 
-    function start() {
+    // o.to: a destination other than a key (see `dest`).
+    function start(o) {
         if (mode) return;
+        dest = (o && o.to) || null;
         wheelEnd();
         buildBar();
         hoverBox = make('div', 'hk-outline', document.body);
@@ -1030,6 +1063,7 @@
             if (d && d.parentNode) d.parentNode.removeChild(d);
         });
         ui = hoverBox = hoverTag = chosenBox = chosenTag = null;
+        dest = null;
         document.body.classList.remove('hk-binding');
         H.suspend(false);
         // A press still under way when the bar closed keeps its tail swallowed
@@ -1061,6 +1095,7 @@
         fillTag(chosenTag, '…', '', describe(pending));
         place(chosenBox, chosenTag, chosenEl);
         ui.note.hidden = true;
+        if (dest) { handOver(el); return; }
         picker = H.picker({
             noteEl: ui.note,
             selfId: 'ctl:' + pending.id,
@@ -1075,6 +1110,26 @@
         setStep(2);
         picker.listen();
         if (!(opts && opts.keepPlace)) { anchorColour = null; moveBar(barHome(), true); }
+    }
+
+    // The chosen control goes to the destination instead of onto a key.
+    function handOver(el) {
+        var made = pending, res = null;
+        pending = null;
+        try { res = dest.add(made, el); }
+        catch (err) { console.warn('[HotkeyBinds] destination failed', err); res = 'That could not be added.'; }
+        if (typeof res === 'string' && res) { toast(res); toStep1(); return; }
+        made.shown = (res && res.shown) || describe(made);
+        mode = 'done';
+        H.suspend(false);
+        fillTag(chosenTag, '✓', '', made.shown);
+        chosenTag.classList.add('is-done');
+        chosenBox.classList.add('is-done');
+        place(chosenBox, chosenTag, chosenEl);
+        setStep(3, made);
+        anchorColour = null;
+        moveBar(barHome(), true);
+        doneTimer = setTimeout(stop, DONE_MS);
     }
 
     function commit(combo) {
@@ -1282,7 +1337,7 @@
         bindBtn.appendChild(bl);
         bindBtn.appendChild(bk);
         bindBtn.title = 'Then click a button, or set a slider and let go. The key you press next does exactly that, from anywhere.';
-        bindBtn.addEventListener('click', function () { start(); });
+        bindBtn.addEventListener('click', function () { start(); });   // onto a key
         block.appendChild(bindBtn);
 
         // Folds open in place, like Interface's Visible sections above it.
@@ -1477,6 +1532,16 @@
         remove: remove,
         fire: function (id) { var b = byId(id); return b ? fire(b) : false; },
         // Settings → Hotkeys, opened (tours, tests)
-        open: function () { mountBlock(); setOpen(true); }
+        open: function () { mountBlock(); setOpen(true); },
+        // For the radial menu (js/58), whose items are controls chosen the
+        // same way: find one again, act on it as its key would, say what it
+        // is — and what a control is called, what it reads, and the fader
+        // people see in front of a slider.
+        run: function (b) { return fire(b); },
+        resolve: resolve,
+        describe: describe,
+        nameOf: nameOf,
+        valueTextOf: valueTextOf,
+        faceOf: faceOf
     };
 })();

@@ -174,12 +174,13 @@
             { say: 'The wall lives in Layers as a collision layer; uncheck Collision to switch it off. Click Fluid to paint dye again.', target: { layer: 'collision', fallback: inDrawer('.brush-mode-btn', 'Fluid') } }
           ] },
         { id: 'mouse-buttons', pillar: 'brush', title: 'Set what each mouse button does',
-          tags: ['mouse', 'button', 'right', 'click', 'replay', 'mirror', 'alternate', 'pen', 'stylus'],
-          answer: 'Stroke and replay → Mouse Buttons. Each button can paint, replay the last stroke, mirror your stroke, or paint with an alternate brush.',
+          tags: ['mouse', 'button', 'right', 'middle', 'click', 'replay', 'mirror', 'alternate', 'radial', 'menu', 'pen', 'stylus'],
+          answer: 'Stroke and replay → Mouse Buttons. Each of the three buttons can paint, replay the last stroke, mirror your stroke, paint with an alternate brush, or open the radial menu.',
           target: { section: 'Stroke and replay', sel: '#buttonMode_left' },
           steps: [
             { say: 'Stroke and replay → Mouse Buttons. Pick a job for the left button.', target: { section: 'Stroke and replay', sel: '#buttonMode_left' }, until: { change: '#buttonMode_left' } },
-            { say: 'And for the right: replay the last stroke, mirror your stroke, or paint with an alternate brush.', note: 'Both on replay locks painting out; the panel says so.', target: { sel: '#buttonMode_right' }, until: { change: '#buttonMode_right' } }
+            { say: 'And for the right: replay the last stroke, mirror your stroke, or paint with an alternate brush.', note: 'With no button left painting, painting is locked out; the panel says so.', target: { sel: '#buttonMode_right' }, until: { change: '#buttonMode_right' } },
+            { say: 'The middle button opens the radial menu unless you give it another job.', target: { sel: '#buttonMode_middle' } }
           ] },
 
         // ── Colour ──
@@ -494,10 +495,10 @@
         // ── Export ──
         { id: 'export-video', pillar: 'export', title: 'Save a video or GIF',
           tags: ['export', 'video', 'gif', 'mp4', 'webm', 'record', 'share', 'clip'],
-          answer: 'Export → Quick Export: Video, GIF, Save picture or Sequence. E starts a video export straight away. Painting keeps working while it records.',
-          hotkey: 'E', target: { section: 'Export', sel: 'button', text: 'Video' },
+          answer: 'Export → Quick Export: Video, GIF, Save picture or Sequence. Painting keeps working while it records.',
+          target: { section: 'Export', sel: 'button', text: 'Video' },
           steps: [
-            { say: 'Export → Quick Export → Video, or press E. GIF, Save picture and Sequence sit beside it.', key: 'E', target: { section: 'Export', sel: 'button', text: ['Video', 'GIF'] }, until: { click: true } },
+            { say: 'Export → Quick Export → Video. GIF, Save picture and Sequence sit beside it.', note: 'Settings → Radial Menu → Add from the interface puts Video on the radial menu (E).', target: { section: 'Export', sel: 'button', text: ['Video', 'GIF'] }, until: { click: true } },
             { say: 'It records while you keep painting; Cancel Export stops it early. The file downloads when it finishes.', target: { sel: '#exportStopBtn', fallback: { section: 'Export', sel: '#exportStatus' } } }
           ] },
         { id: 'export-still', pillar: 'export', title: 'Save a picture of the canvas',
@@ -535,6 +536,11 @@
           answer: 'F1 (or Shift+?) opens the shortcut list. Hold Ctrl or Alt for a moment and the key caps light up beside the controls they reach.',
           hotkey: 'F1',
           demo: { label: 'Open the list', closes: true, run() { if (typeof window.showHotkeys === 'function') window.showHotkeys(); } } },
+        { id: 'radial-menu', pillar: 'interface', title: 'Open the radial menu',
+          tags: ['radial', 'menu', 'pie', 'wheel', 'middle', 'mouse', 'slider', 'fader', 'shortcut', 'hotkey', 'quick', 'e'],
+          answer: 'Press E, or click the middle mouse button: the top bar’s sliders open as a wheel round the pointer. Drag one away from the middle for more, or hover it and scroll for small steps. Settings → Radial Menu adds other sliders, buttons and keys.',
+          hotkey: 'E', target: { section: 'Settings', sel: '.radial-block' },
+          demo: { label: 'Open the menu', closes: true, run() { if (window.RadialMenu) window.RadialMenu.open(); } } },
         { id: 'canvas-size', pillar: 'interface', title: 'Resize or lock the canvas',
           tags: ['canvas', 'size', 'resize', 'handles', 'lock', 'aspect', 'format', 'ratio', '9:16'],
           answer: 'Display → Show Canvas Border & Handles (H) reveals the corner handles; drag them. L locks the borders. Focus → Format snaps to 9:16, 1:1, 16:9 or 21:9.',

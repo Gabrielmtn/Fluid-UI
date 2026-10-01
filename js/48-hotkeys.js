@@ -36,8 +36,14 @@
  * up, so holding a key can mean something (a line of text keeps pouring
  * until the key comes up, like the Constant-flow brush).
  *
+ * A key can also be PRESSED for someone: press(combo) sends the key events
+ * that press would make, so the app's own handlers and the bindings above
+ * both answer it. The radial menu (js/58-radial-menu.js) is a ring of keys
+ * pressed that way. A few keys belong to the system (copy, paste, reload)
+ * and only a real press works them: isNative says which.
+ *
  * window.Hotkeys = {
- *   fromEvent, normalize, format, reservedBy,
+ *   fromEvent, normalize, format, reservedBy, isNative, press,
  *   addSource, list, find, releaseAll, onChange, changed, suspend,
  *   picker, isListening
  * }
@@ -210,34 +216,36 @@
     // One rule per built-in, written the way its handler tests the press —
     // e.key for most, e.code for the multiplier digits — so a rule matches
     // exactly the presses that handler acts on, Shift and all. First match
-    // wins; `says` finishes the sentence "<key> …".
+    // wins; `says` finishes the sentence "<key> …". `native` marks the keys
+    // the browser or the system answers, not a handler here: press() cannot
+    // work those.
     function k0(k) { return !k.ctrl && !k.alt && !k.shift; }
     function noCA(k) { return !k.ctrl && !k.alt; }
     var RESERVED = [
         // Everywhere — the picker's own keys, a focused button's, the browser's
         { says: 'already cancels and stops recordings', test: function (k) { return k.key === 'Escape'; } },
-        { says: 'already moves between controls', test: function (k) { return k.key === 'Tab'; } },
-        { says: 'already presses the focused button', test: function (k) { return k.key === 'Enter' && k0(k); } },
+        { says: 'already moves between controls', native: true, test: function (k) { return k.key === 'Tab'; } },
+        { says: 'already presses the focused button', native: true, test: function (k) { return k.key === 'Enter' && k0(k); } },
         { says: 'already freezes and pauses the fluid', test: function (k) { return k.key === ' '; } },
         { says: 'already opens the hotkey list', test: function (k) { return k.key === 'F1' || (k.shift && (k.key === '?' || k.key === '/')); } },
         { says: 'already switches fullscreen', test: function (k) { return k.key === 'F11'; } },
         { says: 'already starts recording', test: function (k) { return k.key === 'F9'; } },
         { says: 'already plays and pauses recordings', test: function (k) { return k.key === 'F8'; } },
-        { says: 'already reloads the app', test: function (k) { return k.key === 'F5' || (k.ctrl && k.lower === 'r'); } },
-        { says: 'already opens developer tools', test: function (k) { return k.key === 'F12' || (k.ctrl && k.shift && (k.lower === 'i' || k.lower === 'j')); } },
-        { says: 'already resets all local data', test: function (k) { return k.ctrl && k.shift && k.lower === 'd'; } },
+        { says: 'already reloads the app', native: true, test: function (k) { return k.key === 'F5' || (k.ctrl && k.lower === 'r'); } },
+        { says: 'already opens developer tools', native: true, test: function (k) { return k.key === 'F12' || (k.ctrl && k.shift && (k.lower === 'i' || k.lower === 'j')); } },
+        { says: 'already resets all local data', native: true, test: function (k) { return k.ctrl && k.shift && k.lower === 'd'; } },
         { says: 'already binds a hotkey to a control', test: function (k) { return k.ctrl && k.shift && k.lower === 'h'; } },
         { says: 'already adds a recording layer', test: function (k) { return k.ctrl && k.shift && k.lower === 'n'; } },
         { says: 'already frees memory (developer)', test: function (k) { return k.ctrl && k.shift && k.lower === 'g'; } },
         { says: 'already undoes', test: function (k) { return k.ctrl && k.lower === 'z' && !k.shift; } },
         { says: 'already redoes', test: function (k) { return k.ctrl && (k.lower === 'y' || k.lower === 'z'); } },
-        { says: 'already selects all', test: function (k) { return k.ctrl && !k.alt && k.lower === 'a'; } },
-        { says: 'already copies', test: function (k) { return k.ctrl && !k.alt && k.lower === 'c'; } },
-        { says: 'already cuts', test: function (k) { return k.ctrl && !k.alt && k.lower === 'x'; } },
-        { says: 'already pastes an image as a hidden collider', test: function (k) { return k.ctrl && !k.alt && k.shift && k.lower === 'v'; } },
-        { says: 'already pastes an image as a layer', test: function (k) { return k.ctrl && !k.alt && k.lower === 'v'; } },
-        { says: 'already belongs to the browser', test: function (k) { return k.ctrl && !k.alt && (k.lower === 'w' || k.lower === 't' || k.lower === 'n' || k.lower === 'q'); } },
-        { says: 'already closes the window', test: function (k) { return k.alt && k.key === 'F4'; } },
+        { says: 'already selects all', native: true, test: function (k) { return k.ctrl && !k.alt && k.lower === 'a'; } },
+        { says: 'already copies', native: true, test: function (k) { return k.ctrl && !k.alt && k.lower === 'c'; } },
+        { says: 'already cuts', native: true, test: function (k) { return k.ctrl && !k.alt && k.lower === 'x'; } },
+        { says: 'already pastes an image as a hidden collider', native: true, test: function (k) { return k.ctrl && !k.alt && k.shift && k.lower === 'v'; } },
+        { says: 'already pastes an image as a layer', native: true, test: function (k) { return k.ctrl && !k.alt && k.lower === 'v'; } },
+        { says: 'already belongs to the browser', native: true, test: function (k) { return k.ctrl && !k.alt && (k.lower === 'w' || k.lower === 't' || k.lower === 'n' || k.lower === 'q'); } },
+        { says: 'already closes the window', native: true, test: function (k) { return k.alt && k.key === 'F4'; } },
         // 05n — canvas, recording, colour
         { says: 'already captures a layer', test: function (k) { return k.key === 'Enter' && k.shift && noCA(k); } },
         { says: 'already sends the canvas to ComfyUI', test: function (k) { return k.key === 'Enter' && k.ctrl && !k.shift && !k.alt; } },
@@ -247,7 +255,7 @@
         { says: 'already locks the borders', test: function (k) { return k0(k) && k.lower === 'l'; } },
         { says: 'already toggles random colors', test: function (k) { return k0(k) && k.lower === 'r'; } },
         { says: 'already toggles palette mode', test: function (k) { return k0(k) && k.lower === 'a'; } },
-        { says: 'already starts a quick export', test: function (k) { return k0(k) && k.lower === 'e'; } },
+        { says: 'already opens the radial menu', test: function (k) { return k0(k) && k.lower === 'e'; } },
         { says: 'already mutates the settings', test: function (k) { return k0(k) && k.lower === 'm'; } },
         { says: 'already changes the brush size', test: function (k) { return noCA(k) && (k.key === '[' || k.key === ']'); } },
         { says: 'already steps through the palette', test: function (k) { return noCA(k) && k.lower === 'n'; } },
@@ -300,15 +308,26 @@
         };
     }
 
-    // What the app already does with this press (a KeyboardEvent) or this
-    // combo (a string) — the phrase from RESERVED — or null if it is free.
-    function reservedBy(x) {
+    function reservedRule(x) {
         var k = (typeof x === 'string') ? factsFromCombo(x) : (x ? facts(x) : null);
         if (!k) return null;
         for (var i = 0; i < RESERVED.length; i++) {
-            try { if (RESERVED[i].test(k)) return RESERVED[i].says; } catch (_) {}
+            try { if (RESERVED[i].test(k)) return RESERVED[i]; } catch (_) {}
         }
         return null;
+    }
+
+    // What the app already does with this press (a KeyboardEvent) or this
+    // combo (a string) — the phrase from RESERVED — or null if it is free.
+    function reservedBy(x) {
+        var r = reservedRule(x);
+        return r ? r.says : null;
+    }
+
+    // A key only a real press works: the browser or the system answers it.
+    function isNative(x) {
+        var r = reservedRule(x);
+        return !!(r && r.native);
     }
 
     // ─── BINDINGS ───────────────────────────────────────────────
@@ -465,6 +484,32 @@
     window.addEventListener('blur', releaseAll);
     document.addEventListener('visibilitychange', function () { if (document.hidden) releaseAll(); });
 
+    // ─── PRESSING A KEY FOR SOMEONE ─────────────────────────────
+    // The key events a press of `combo` would make, down then up, sent to
+    // the document: every handler in the app reads only the key, the code
+    // and the modifiers, so they answer these like a real press, and so does
+    // the dispatcher above (a held binding gets its release with the keyup).
+    // A Shift combo goes out under the RIGHT Shift, which is the one Capture
+    // Layer asks for (05n); nothing else tells the two apart.
+    function keyEvent(type, key, code, c, shift, location) {
+        return new KeyboardEvent(type, {
+            key: key, code: code, location: location || 0,
+            ctrlKey: c.ctrl, altKey: c.alt, shiftKey: shift, metaKey: false,
+            bubbles: true, cancelable: true, composed: true, view: window
+        });
+    }
+
+    function press(combo) {
+        var c = parse(combo);
+        if (!c) return false;
+        var key = keyChar(c.code, c.shift);
+        if (c.shift) document.dispatchEvent(keyEvent('keydown', 'Shift', 'ShiftRight', c, true, 2));
+        document.dispatchEvent(keyEvent('keydown', key, c.code, c, c.shift));
+        document.dispatchEvent(keyEvent('keyup', key, c.code, c, c.shift));
+        if (c.shift) document.dispatchEvent(keyEvent('keyup', 'Shift', 'ShiftRight', c, false, 2));
+        return true;
+    }
+
     // ─── THE PICKER ─────────────────────────────────────────────
     // Click, press the keys, done. While it listens it owns the keyboard —
     // window capture, ahead of every document handler — so Z or F pressed
@@ -491,6 +536,12 @@
     //                something — 49's bind bar),
     //         listenHint: the line shown when it starts listening (false for
     //                none — a host that already says what to do),
+    //         press: true picks a key to PRESS (the radial menu's items),
+    //                not one to bind: a key the app or another binding
+    //                already answers is exactly what is wanted, so neither
+    //                is refused, nothing is moved, and Delete is a key like
+    //                any other (Backspace still removes),
+    //         refuse(combo): with press, a reason this key will not do, or '',
     //         emptyLabel, hint: one line on what the key will do }
     var listening = null;   // the picker session that has the keyboard
     var swallowUps = {};    // keyups owed to presses a picker took
@@ -552,6 +603,7 @@
         // A saved key the app has since claimed (a preset from an older
         // build, a new shortcut) is shown, with the reason it is dead.
         function idleWarning() {
+            if (opts.press) return '';
             var says = value ? reservedBy(value) : null;
             return says ? format(value) + ' ' + says + ', so this hotkey will not fire. Pick another.' : '';
         }
@@ -635,9 +687,15 @@
             if (e.repeat) return;
             var bare = !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
             if (e.key === 'Escape') { session.cancel(); return; }
-            if (bare && (e.key === 'Backspace' || e.key === 'Delete')) { commit('', []); return; }
+            if (bare && (e.key === 'Backspace' || (e.key === 'Delete' && !opts.press))) { commit('', []); return; }
             var combo = fromEvent(e);
             if (!combo) return;
+            if (opts.press) {
+                var why = (typeof opts.refuse === 'function') ? opts.refuse(combo) : '';
+                if (why) { paint(); say(why, 'warn'); return; }
+                commit(combo, []);
+                return;
+            }
             var says = reservedBy(e);
             if (says) {
                 pending = '';
@@ -712,6 +770,8 @@
         normalize: normalize,
         format: format,
         reservedBy: reservedBy,
+        isNative: isNative,
+        press: press,
         addSource: addSource,
         list: list,
         find: find,

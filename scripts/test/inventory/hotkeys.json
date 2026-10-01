@@ -200,11 +200,11 @@
     {
       "keys": "E",
       "event": { "key": "e", "code": "KeyE", "ctrlKey": false, "shiftKey": false, "altKey": false },
-      "guard": "typing target; !ctrl/meta && !alt && !shift (js/05n-hotkeys-init.js:400)",
-      "effect": "window.fluidExport.video() — STARTS A REAL VIDEO EXPORT (js/24-video-export.js:1256-1268)",
-      "assertion": "window.fluidExport.isExporting()===true; harness must call window.fluidExport.stop() to clean up",
-      "source": "js/05n-hotkeys-init.js:400-404",
-      "sheet": "index.html:1097"
+      "guard": "typing target; !ctrl/meta && !alt && !shift; ignored while a dialog (.delete-modal.show) is up or Ctrl+Shift+H bind mode is active (js/58-radial-menu.js, document keydown, bubble)",
+      "effect": "Opens the radial menu at the pointer (window.RadialMenu.open): the top bar's sliders as wedges. A press on a slider wedge dragged along its spoke sets the slider (input events, change on release); a wheel over one steps it 1% a notch. Control and key items run on a click, or on letting go after a hold past 200 ms. Tapped: the menu stays open. E again or Esc closes it. Until 2026-09-30 this key started a video export. A mouse button set to Radial menu (middle by default, js/41-button-modes.js) opens the same menu from #canvas pointerdown (js/05d-input-replay.js).",
+      "assertion": "window.RadialMenu.isOpen()===true and #radialMenu is not hidden; dispatch keyup KeyE, then Escape, to clean up",
+      "source": "js/58-radial-menu.js",
+      "sheet": "index.html (Export & Mutation)"
     },
     {
       "keys": "M",

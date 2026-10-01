@@ -6,7 +6,8 @@
 //   every one of them degrades to the historical left=paint / right=replay
 //   behaviour if this file is missing.
 // PROVIDES: window.ButtonModes, window.__strokeMirrorPin, window.__btnPinActive
-// REQUIRES: config (04a), settingsManager (09); BrushShapes (33) runtime only
+// REQUIRES: config (04a), settingsManager (09); BrushShapes (33) and
+//   RadialMenu (58) at runtime only
 //
 // WHY: art-therapy teachers set the exercise, not the patient. A session
 // might want both buttons locked to Replay so a patient can re-trigger one
@@ -15,7 +16,11 @@
 // mid-session. So the button→action binding is data, and each binding
 // carries its own configuration.
 //
-// FOUR MODES, and the shape of each:
+// THREE BUTTONS: left, right and (2026-09-30) the middle one, Mouse 3,
+// which had no role at all before and now opens the radial menu unless it
+// is given another job.
+//
+// FIVE MODES, and the shape of each:
 //   paint   — the ordinary brush. No pin at all.
 //   replay  — hold to replay the last stroke (the historical right-click).
 //   mirror  — paint, with every dab also stamped across an axis. Rides as
@@ -28,6 +33,9 @@
 //             (05j) — the same pin-then-restore idiom emitReplayDab and the
 //             multiplayer receiver already use for a footprint that belongs
 //             to the stroke rather than to the panel.
+//   radial  — paints nothing: the press opens the radial menu (js/58) at
+//             the pointer, the main sliders in a ring to drag and scroll.
+//             05d hands the press over before any stroke state is touched.
 //
 // The pin is deliberately NOT a "switch the live brush" — that would leave
 // the Brush panel showing values that are not what the next left-click will
@@ -36,22 +44,24 @@
 (function () {
     'use strict';
 
-    var MODES = ['paint', 'replay', 'mirror', 'alt'];
+    var MODES = ['paint', 'replay', 'mirror', 'alt', 'radial'];
     var MODE_LABELS = {
         paint:  'Brushstroke',
         replay: 'Replay',
         mirror: 'Mirror brushstroke',
-        alt:    'Alternate brush'
+        alt:    'Alternate brush',
+        radial: 'Radial menu'
     };
     var MODE_HINTS = {
         paint:  'Paints normally with the brush in the Brush panel.',
-        replay: 'Hold to replay the last stroke (or the last few seconds, in Time mode). Paints nothing new — set BOTH buttons to this to lock a rehearsed motion in.',
+        replay: 'Hold to replay the last stroke (or the last few seconds, in Time mode). Paints nothing new: leave no button on a brush and a rehearsed motion is locked in.',
         // The caveat is in the hint rather than left to be discovered: the
         // mirror rides the fluid dab loop (05g multiSplat), and collider /
         // raster-layer strokes stamp through their own routes, so a mirror-
         // bound button paints an ordinary single stroke on those targets.
         mirror: 'Paints normally AND stamps a mirrored twin across the canvas — a bilateral stroke from one hand. Fluid strokes only; Collider painting is not mirrored.',
-        alt:    'Paints with the separate brush configured below, leaving the main brush untouched.'
+        alt:    'Paints with the separate brush configured below, leaving the main brush untouched.',
+        radial: 'Opens the radial menu at the pointer: the main sliders in a ring. Drag one away from the middle for more, or hover it and scroll. Paints nothing.'
     };
     // Axis codes ride the wire and the recorded dab, so they are small ints,
     // not strings: 1 = across the vertical axis (a left/right mirror),
@@ -90,14 +100,21 @@
     var VEL_LEGACY = { blow: 'spread', suck: 'gather', vortex: 'swirl' };
 
     var SETTINGS_KEY = 'input.buttonModes';
-    var BUTTONS = { 0: 'left', 2: 'right' };
+    // PointerEvent.button → the binding it reads. 1 is the middle button
+    // (Mouse 3); back, forward and the pen eraser still have no role.
+    var BUTTONS = { 0: 'left', 1: 'middle', 2: 'right' };
+    // In the order the panel lists them.
+    var SIDES = ['left', 'right', 'middle'];
+    var SIDE_LABELS = { left: 'Left Click', right: 'Right Click', middle: 'Middle Click (Mouse 3)' };
 
     function defaults() {
         return {
             // The historical binding, so a first boot after this ships feels
-            // like every boot before it.
-            left:  { mode: 'paint',  mirror: 'x', alt: {} },
-            right: { mode: 'replay', mirror: 'x', alt: {} }
+            // like every boot before it...
+            left:   { mode: 'paint',  mirror: 'x', alt: {} },
+            right:  { mode: 'replay', mirror: 'x', alt: {} },
+            // ...and the button that did nothing until now gets the menu.
+            middle: { mode: 'radial', mirror: 'x', alt: {} }
         };
     }
 
@@ -168,7 +185,10 @@
         try { raw = sm() && sm().get(SETTINGS_KEY); } catch (_) {}
         var d = defaults();
         if (!raw || typeof raw !== 'object') { state = d; return; }
-        state = { left: coerceSide(raw.left, d.left), right: coerceSide(raw.right, d.right) };
+        // A blob saved before the middle button had a role has no `middle`:
+        // coerceSide hands it the default.
+        state = {};
+        SIDES.forEach(function (k) { state[k] = coerceSide(raw[k], d[k]); });
     }
 
     function save() {
@@ -182,7 +202,7 @@
     }
 
     function sideKey(btn) {
-        if (btn === 'left' || btn === 'right') return btn;
+        if (SIDES.indexOf(btn) >= 0) return btn;
         return BUTTONS[btn] || null;
     }
     function sideFor(btn) {
@@ -271,6 +291,8 @@
         MODES: MODES,
         MODE_LABELS: MODE_LABELS,
         MODE_HINTS: MODE_HINTS,
+        SIDES: SIDES,
+        SIDE_LABELS: SIDE_LABELS,
         MIRROR_AXES: MIRROR_AXES,
         ALT_KEYS: ALT_KEYS,
 
@@ -278,17 +300,23 @@
         side: function (btn) { return sideFor(btn); },
 
         // The action a button press should take, or null if the button has no
-        // role at all. 05d's paint path treats every non-'replay' answer as a
-        // paint press, so a mode added later paints rather than doing nothing.
+        // role at all. 05d takes 'replay' and 'radial' for itself and treats
+        // every other answer as a paint press, so a mode added later paints
+        // rather than doing nothing.
         modeFor: function (btn) {
             var side = sideFor(btn);
             return side ? side.mode : null;
         },
-        isPaintMode: function (mode) { return !!mode && mode !== 'replay'; },
-        // True when NO button can paint — every one of them is bound to
-        // Replay. Used for the UI's warning line.
+        isPaintMode: function (mode) { return !!mode && mode !== 'replay' && mode !== 'radial'; },
+        // True when NO button can paint — every one of them replays or opens
+        // the menu. Used for the UI's warning line.
         isPaintLocked: function () {
-            return state.left.mode === 'replay' && state.right.mode === 'replay';
+            return SIDES.every(function (k) { return !API.isPaintMode(state[k].mode); });
+        },
+        // ...and whether one of them at least replays: that is the painting
+        // lock proper (a rehearsed motion, re-triggerable, not added to).
+        anyReplay: function () {
+            return SIDES.some(function (k) { return state[k].mode === 'replay'; });
         },
 
         setMode: function (btn, mode) {
