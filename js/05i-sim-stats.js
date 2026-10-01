@@ -50,6 +50,41 @@
             gl.disable(gl.SCISSOR_TEST);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
+        // ── A stamp held still ────────────────────────────────────────────
+        // Has this exact stamp (bitmap, spot, size, angle) landed here in the
+        // last STAMP_HOLD_MS? Then this dab is a repeat, and splatFrag lays
+        // only the stamp's solid inside (stampHold; config note in 04a).
+        // Asked here, at the one place every dab goes through, so the live
+        // brush, each Multi-Brush arm, a replay and a peer's stroke all get
+        // the same answer with nothing extra recorded or sent.
+        const _stampSeen = new Map();        // landing → ms of the last one
+        const _stampTexIds = new WeakMap();  // WebGLTexture → small id for the key
+        let _stampTexSeq = 0;
+        function stampHoldMs() {
+            return (typeof config.STAMP_HOLD_MS === 'number' && config.STAMP_HOLD_MS > 0) ? config.STAMP_HOLD_MS : 600;
+        }
+        function stampHeldHere(tex, x, y, radius, ang, flip) {
+            let id = _stampTexIds.get(tex);
+            if (!id) { id = ++_stampTexSeq; _stampTexIds.set(tex, id); }
+            // Quarter canvas px: a resting mouse repeats its position exactly.
+            const key = id + '|' + Math.round(x * 4) + '|' + Math.round(y * 4) + '|'
+                + radius.toFixed(6) + '|' + ang.toFixed(4) + '|' + flip;
+            const now = performance.now();
+            const last = _stampSeen.get(key);
+            _stampSeen.delete(key);          // re-insert: the Map stays in age order
+            _stampSeen.set(key, now);
+            if (_stampSeen.size > 256) _stampSeen.delete(_stampSeen.keys().next().value);
+            return last !== undefined && (now - last) < stampHoldMs();
+        }
+        // The refill window as (lo, hi), or null when a repeat lays its full
+        // coverage: Gate off (additive piles up everywhere by design) or the
+        // switch off.
+        function stampHoldWindow() {
+            if (!config.COLOR_GATE || config.STAMP_HOLD_EDGE === false) return null;
+            const lo = (typeof config.STAMP_HOLD_LO === 'number') ? config.STAMP_HOLD_LO : 0.5;
+            const hi = (typeof config.STAMP_HOLD_HI === 'number') ? config.STAMP_HOLD_HI : 0.9;
+            return [lo, Math.max(hi, lo + 0.001)];
+        }
         function splat(x, y, dx, dy, color) {
             // Hold this dab while a selected brush shape's stamp is still
             // uploading (2026-08-18). The custom-shape block below only fires
@@ -343,6 +378,14 @@
             gl.uniform1i(splatProg.uniforms.isVelocity, 0); // Density pass
             gl.uniform1i(splatProg.uniforms.uTarget, 0);
             gl.uniform3fv(splatProg.uniforms.color, color);
+            // Down here, past the Push return: only a dab that lays dye counts
+            // as a landing.
+            let _hold = null;
+            if (stampTex) {
+                const _win = stampHoldWindow();
+                if (_win && stampHeldHere(stampTex.texture, x, y, baseRadius, _stampAng, _stampFlip)) _hold = _win;
+            }
+            gl.uniform2f(splatProg.uniforms.stampHold, _hold ? _hold[0] : 0, _hold ? _hold[1] : 0);
             if (brushTip === 4 && !stampTex) {
                 // Ring tip: thin dye band at ~the gaussian's visible radius
                 // (≈√radius in p-space) — dye pass ONLY, so the ring uniform
@@ -724,6 +767,17 @@
             gl.uniform1i(imageSplatProg.uniforms.uImage, 2);
             gl.uniform1f(imageSplatProg.uniforms.amount,
                 (typeof amount === 'number') ? Math.max(0, Math.min(1, amount)) : 1);
+            // A kept bitmap poured on the rect it was last poured on is a
+            // held text key standing still: the repeat tops up the solid
+            // inside (imageSplatFrag edgeHold, the stamp's rule above).
+            let _eHold = null;
+            if (stamp && rect) {
+                const _win = stampHoldWindow();
+                const _now = performance.now(), _l = stamp.landed;
+                if (_win && _l && _l.x === rect.x && _l.y === rect.y && (_now - _l.t) < stampHoldMs()) _eHold = _win;
+                stamp.landed = { x: rect.x, y: rect.y, t: _now };
+            }
+            gl.uniform2f(imageSplatProg.uniforms.edgeHold, _eHold ? _eHold[0] : 0, _eHold ? _eHold[1] : 0);
             // The same two knobs a dab reads, so a poured image lands with the
             // brush settings that are live right now (05i splat()).
             gl.uniform1i(imageSplatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);

@@ -104,7 +104,7 @@
         "vibrance"
       ]
     },
-    "aspectRatio|barHalfW|barPoint|color|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampFlip|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|uVelCovBlock|velocityInfluence|velocityScale": {
+    "aspectRatio|barHalfW|barPoint|color|gateColor|gateFlow|hasObstacle|isVelocity|point|radius|ringRadius|ringSquash|stampAngle|stampAspect|stampFlip|stampHold|stampNoise|stampSeed|stampShape|stampTexOn|stampTipOn|uObsMax|uObstacle|uStampTex|uTarget|uVelCovBlock|velocityInfluence|velocityScale": {
       "name": "splat",
       "uniforms": [
         "aspectRatio",
@@ -122,6 +122,7 @@
         "stampAngle",
         "stampAspect",
         "stampFlip",
+        "stampHold",
         "stampNoise",
         "stampSeed",
         "stampShape",
@@ -495,10 +496,11 @@
         "uSketch"
       ]
     },
-    "amount|gateColor|gateFlow|hasObstacle|toneCeil|toneWhite|uImage|uImageRect|uObsMax|uObstacle|uTarget": {
+    "amount|edgeHold|gateColor|gateFlow|hasObstacle|toneCeil|toneWhite|uImage|uImageRect|uObsMax|uObstacle|uTarget": {
       "name": "imageSplat",
       "uniforms": [
         "amount",
+        "edgeHold",
         "gateColor",
         "gateFlow",
         "hasObstacle",

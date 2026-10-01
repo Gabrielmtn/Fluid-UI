@@ -179,6 +179,7 @@
             uniform sampler2D uStampTex; // custom brush-shape stamp (alpha = coverage), bound on unit 2
             uniform float stampTexOn;    // 1 = the dye footprint comes from the stamp texture
             uniform float stampAspect;   // stamp width/height, so non-square stamps keep their aspect
+            uniform vec2 stampHold;      // (lo, hi): this same stamp already landed on this spot, so refill only coverage above the window; hi 0 = off
             uniform int gateColor;     // 1 = clamp dye at the splat's own color (no HDR overflow into white)
             uniform float gateFlow;    // Gate: 0-1 flow — scales the CONVERGENCE, not the colour, so low flow builds toward the TRUE colour instead of a darkened one
             uniform int isVelocity; // 1 for velocity, 0 for density
@@ -406,6 +407,16 @@
                         // nothing and makes the mip level well defined.
                         float inStamp = float(all(greaterThanEqual(suv, vec2(0.0))) && all(lessThanEqual(suv, vec2(1.0))));
                         float cov = texture(uStampTex, clamp(suv, 0.0, 1.0)).a * inStamp;
+                        // A stamp held still (2026-09-30). Gate converges by
+                        // coverage, so the soft edge of a stamp is a RATE, not
+                        // a level: the hose lays 250 dabs a second on one spot
+                        // and every texel the edge touches climbs to the full
+                        // colour. Letters came out a texel or two fatter on
+                        // every side with a 1-bit outline. The first dab on a
+                        // spot lays the edge as drawn; the ones that follow
+                        // (05i stampHeldHere) only top up what is solidly
+                        // inside, so the outline stays where that dab put it.
+                        if (stampHold.y > 0.0) cov *= smoothstep(stampHold.x, stampHold.y, cov);
                         if (stampNoise > 0.0) {
                             float n2 = sn_noise(q * 3.0 + stampSeed);
                             cov *= mix(1.0, 0.75 + 0.5 * n2, stampNoise);
@@ -2659,6 +2670,7 @@
             uniform sampler2D uImage;     // canvas-aligned cut-out, straight alpha
             uniform vec4 uImageRect;      // where it lands in dye UV: xy = lower-left, zw = size
             uniform float amount;         // deposit strength (0-1)
+            uniform vec2 edgeHold;        // (lo, hi): the same bitmap on the same spot again, mirrors splatFrag's stampHold; hi 0 = off
             uniform int gateColor;        // mirrors splatFrag's COLOR_GATE branch
             uniform float gateFlow;
             uniform int hasObstacle;
@@ -2697,7 +2709,13 @@
                 if (hasObstacle == 1) {
                     obsBlockDye = 1.0 - obsTexDyeBlock(texture(uObstacle, vUv), uObsMax);
                 }
-                float cov = clamp(src.a, 0.0, 1.0) * clamp(amount, 0.0, 1.0);
+                // A held text key pours one bitmap on one spot many times a
+                // second. Same rule as a held stamp (splatFrag stampHold): the
+                // repeats top up the solid inside and leave the soft edge as
+                // the first pour laid it.
+                float srcA = clamp(src.a, 0.0, 1.0);
+                if (edgeHold.y > 0.0) srcA *= smoothstep(edgeHold.x, edgeHold.y, srcA);
+                float cov = srcA * clamp(amount, 0.0, 1.0);
                 vec3 color = src.rgb;
                 if (toneCeil > 0.0) color = min(unToneMap(color, toneWhite), vec3(toneCeil));
                 vec3 result;

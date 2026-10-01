@@ -985,6 +985,21 @@
                                       // floor's clock ride the same Time-1 pace (05j
                                       // __paceTimeMs). Inert at Time ≥ 1. false = the old
                                       // spread/sim-clock pacing, bit for bit.
+            STAMP_HOLD_EDGE: true,    // A brush shape or a text key held still keeps its outline
+                                      // (2026-09-30). Gate converges by coverage, so a stamp's
+                                      // soft edge filled in under repeated dabs: a text stamp
+                                      // held 400 ms came out twice as heavy, letters fused, the
+                                      // edge 1-bit. The first landing on a spot lays the edge;
+                                      // the same stamp on the same spot again (05i
+                                      // stampHeldHere, inside STAMP_HOLD_MS) only tops up
+                                      // coverage above the window below. Gate only; a stamp
+                                      // that moves is untouched. false = every dab lays its
+                                      // full coverage, as before.
+            STAMP_HOLD_LO: 0.5,       // The refill window: a repeat lays nothing under LO
+            STAMP_HOLD_HI: 0.9,       // coverage and everything above HI. Console-tunable.
+            STAMP_HOLD_MS: 600,       // How long a spot remembers its last stamp. Longer than
+                                      // the longest Interval, short enough that a second
+                                      // click lays a second coat.
             REC_SIM_CLOCK: true,      // Recording playhead rides the sim clock (03-recording).
                                       // false = the old wall-clock playhead, which fed splats
                                       // 1/timeScale times too fast for the physics consuming
