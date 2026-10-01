@@ -6153,13 +6153,99 @@
         editor.appendChild(brushBtn);
 
         // ─── Clear all ───────────────────────────────────────────
+        // Every line goes at once, its hotkey with it, and nothing brings
+        // them back. So the button only asks: the question opens under it,
+        // and the red button in there is the one that clears. Cancel, Esc, a
+        // click anywhere else, or the button again withdraws the question.
         var clearBtn = document.createElement('button');
         clearBtn.type = 'button';
+        clearBtn.id = 'textOverlayClearAll';
         clearBtn.className = 'btn--destructive';
         clearBtn.textContent = 'Clear All';
         clearBtn.style.cssText = 'width:100%;cursor:pointer;';
-        clearBtn.addEventListener('click', function () { var a = api(); if (a) a.clearAll(); });
+        clearBtn.setAttribute('aria-expanded', 'false');
+        clearBtn.setAttribute('aria-controls', 'textOverlayClearAsk');
         body.appendChild(clearBtn);
+
+        var clearAsk = document.createElement('div');
+        clearAsk.id = 'textOverlayClearAsk';
+        clearAsk.setAttribute('role', 'group');
+        clearAsk.setAttribute('aria-label', 'Clear all text?');
+        clearAsk.style.cssText = 'display:none;margin-top:6px;padding:8px;border-radius:4px;' +
+            'border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);';
+        var clearAskMsg = document.createElement('div');
+        clearAskMsg.style.cssText = 'font-size:11px;line-height:1.4;color:rgba(255,255,255,0.8);margin-bottom:8px;';
+        clearAsk.appendChild(clearAskMsg);
+        var clearAskRow = rowEl(0);
+        var clearNoBtn = document.createElement('button');
+        clearNoBtn.type = 'button';
+        clearNoBtn.textContent = 'Cancel';
+        clearNoBtn.style.cssText = 'flex:1;cursor:pointer;';
+        var clearYesBtn = document.createElement('button');
+        clearYesBtn.type = 'button';
+        clearYesBtn.id = 'textOverlayClearConfirm';
+        clearYesBtn.className = 'btn--destructive';
+        clearYesBtn.textContent = 'Yes, clear all';
+        clearYesBtn.style.cssText = 'flex:1;cursor:pointer;';
+        clearAskRow.appendChild(clearNoBtn);
+        clearAskRow.appendChild(clearYesBtn);
+        clearAsk.appendChild(clearAskRow);
+        body.appendChild(clearAsk);
+
+        var clearAskOpen = false;
+        // The question names what is about to go. False when there is nothing
+        // of this user's to clear (the room's lines are never Clear All's).
+        function fillClearAsk() {
+            var a = api();
+            var all = a ? a.getAll() : [];
+            if (!all.length) return false;
+            var keyed = all.filter(function (ov) { return !!ov.hotkey; }).length;
+            var room = (a && typeof a.getRoomLines === 'function') ? a.getRoomLines().length : 0;
+            clearAskMsg.textContent =
+                (all.length === 1 ? 'Delete your one line of text?' : 'Delete all ' + all.length + ' lines of text?') +
+                (keyed ? (all.length === 1 ? ' Its hotkey goes with it.' : ' Hotkeys set on them go too.') : '') +
+                ' This can’t be undone.' +
+                (room ? ' Other painters’ text stays.' : '');
+            return true;
+        }
+        function onClearAskOutside(e) {
+            if (!clearAsk.contains(e.target) && !clearBtn.contains(e.target)) closeClearAsk();
+        }
+        function onClearAskKey(e) {
+            if (e.key !== 'Escape') return;
+            e.preventDefault(); e.stopPropagation();
+            closeClearAsk();
+            clearBtn.focus();
+        }
+        function openClearAsk() {
+            if (clearAskOpen || !fillClearAsk()) return;
+            clearAskOpen = true;
+            clearAsk.style.display = '';
+            clearBtn.setAttribute('aria-expanded', 'true');
+            document.addEventListener('pointerdown', onClearAskOutside, true);
+            document.addEventListener('keydown', onClearAskKey, true);
+            // Cancel takes the focus: Enter and Space land on the safe answer.
+            clearNoBtn.focus();
+            // The button sits at the foot of the panel; bring the question into view.
+            if (typeof clearAsk.scrollIntoView === 'function') clearAsk.scrollIntoView({ block: 'nearest' });
+        }
+        function closeClearAsk() {
+            if (!clearAskOpen) return;
+            clearAskOpen = false;
+            clearAsk.style.display = 'none';
+            clearBtn.setAttribute('aria-expanded', 'false');
+            document.removeEventListener('pointerdown', onClearAskOutside, true);
+            document.removeEventListener('keydown', onClearAskKey, true);
+        }
+        clearBtn.addEventListener('click', function () {
+            if (clearAskOpen) closeClearAsk(); else openClearAsk();
+        });
+        clearNoBtn.addEventListener('click', function () { closeClearAsk(); clearBtn.focus(); });
+        clearYesBtn.addEventListener('click', function () {
+            var a = api();
+            closeClearAsk();
+            if (a) a.clearAll();
+        });
 
         // ─── Sync controls from the selected overlay ─────────────
         function syncEditor() {
@@ -6216,6 +6302,9 @@
                 syncArrangeBtn();
                 refreshList();
                 if (!suppressSync) syncEditor();
+                // An open question keeps its count honest, and leaves when
+                // the last line does.
+                if (clearAskOpen && !fillClearAsk()) closeClearAsk();
             });
             syncArrangeBtn();
             refreshList();
