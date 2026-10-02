@@ -1606,6 +1606,7 @@
                 <div>
                     <h3>Brush</h3>
                     <ul>
+                        <li>Tab — Fluid → Pressure → Collider (Shift+Tab goes back)</li>
                         <li>[ / ] — Brush Size − / +</li>
                         <li>Shift+[ / Shift+] — Coarse − / +</li>
                         <li>Scroll — Brush Size − / +</li>
@@ -1861,6 +1862,10 @@
          on it too (49's bind mode, 48's press). Its list lives in Settings
          under 49's Hotkeys block, so it loads after both. -->
     <script src="js/58-radial-menu.js"></script>
+    <!-- Tab steps the brush through Fluid, Pressure and Collider (Shift+Tab
+         back): the brush drawer's Paint Into row, with the drawer shut.
+         Calls window.BrushType, which 20 builds with the drawer. -->
+    <script src="js/59-brush-type-key.js"></script>
     <!-- "Try this look" links: ?look=opal opens the app with a curated look
          applied, on top of the saved session and never written into it;
          Copy link to this look lives in the Presets popup. -->

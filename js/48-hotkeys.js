@@ -224,7 +224,8 @@
     var RESERVED = [
         // Everywhere — the picker's own keys, a focused button's, the browser's
         { says: 'already cancels and stops recordings', test: function (k) { return k.key === 'Escape'; } },
-        { says: 'already moves between controls', native: true, test: function (k) { return k.key === 'Tab'; } },
+        { says: 'already switches the brush: Fluid, Pressure, Collider', test: function (k) { return k.key === 'Tab' && noCA(k); } },
+        { says: 'already belongs to the browser', native: true, test: function (k) { return k.key === 'Tab'; } },
         { says: 'already presses the focused button', native: true, test: function (k) { return k.key === 'Enter' && k0(k); } },
         { says: 'already freezes and pauses the fluid', test: function (k) { return k.key === ' '; } },
         { says: 'already opens the hotkey list', test: function (k) { return k.key === 'F1' || (k.shift && (k.key === '?' || k.key === '/')); } },
@@ -680,7 +681,9 @@
             // through to whatever it was meant for.
             if (!el.isConnected) { session.cancel(); return; }
             if (isModifier(e)) { session.onMods(e); return; }
-            if (e.key === 'Tab') { session.cancel(); return; }
+            // Focus still moves on, but the app's own Tab (the brush switch,
+            // js/59) must not also hear the press that cancelled.
+            if (e.key === 'Tab') { session.cancel(); e.stopPropagation(); return; }
             e.preventDefault();
             e.stopImmediatePropagation();
             if (e.code) swallowUps[e.code] = true;

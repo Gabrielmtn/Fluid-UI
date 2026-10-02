@@ -155,8 +155,8 @@
             { say: 'Hold the button still on the canvas: the brush keeps depositing. Flow sets how much lands per dab.', note: 'On Move is the way back.', target: inDrawer('#brushFlow') }
           ] },
         { id: 'pressure-brush', pillar: 'brush', title: 'Move paint around without adding any',
-          tags: ['smudge', 'spread', 'gather', 'swirl', 'push', 'pressure', 'stir'],
-          answer: 'In the brush drawer choose Pressure and a mode: Smudge drags, Spread pushes out, Gather pulls in, Swirl spins. Nothing new is deposited.',
+          tags: ['smudge', 'spread', 'gather', 'swirl', 'push', 'pressure', 'stir', 'tab'],
+          answer: 'In the brush drawer choose Pressure and a mode: Smudge drags, Spread pushes out, Gather pulls in, Swirl spins. Nothing new is deposited. Tab switches Fluid, Pressure and Collider without opening the drawer.',
           target: inDrawer('.brush-mode-btn', 'Pressure'),
           steps: [
             { say: 'In the brush drawer choose Pressure.', target: inDrawer('.brush-mode-btn', 'Pressure'), until: { active: true } },
@@ -165,8 +165,8 @@
             { say: 'Drag on the canvas. Nothing new is deposited. Click Fluid when you want colour again.', target: inDrawer('.brush-mode-btn', 'Fluid') }
           ] },
         { id: 'paint-collider', pillar: 'brush', title: 'Paint walls the fluid flows around',
-          tags: ['collider', 'wall', 'collision', 'block', 'obstacle', 'mask'],
-          answer: 'In the brush drawer, under Paint Into, click Collider. Strokes become walls; click Fluid to paint dye again. The wall shows in Layers as a collision layer.',
+          tags: ['collider', 'wall', 'collision', 'block', 'obstacle', 'mask', 'tab'],
+          answer: 'In the brush drawer, under Paint Into, click Collider. Strokes become walls; click Fluid to paint dye again. The wall shows in Layers as a collision layer. Tab switches Fluid, Pressure and Collider without opening the drawer.',
           target: inDrawer('.brush-mode-btn', 'Collider'),
           steps: [
             { say: 'In the brush drawer, under Paint Into, click Collider.', target: inDrawer('.brush-mode-btn', 'Collider'), until: { active: true } },

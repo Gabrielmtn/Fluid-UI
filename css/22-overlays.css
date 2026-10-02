@@ -1346,6 +1346,34 @@ input[type="color"].text-swatch::-moz-color-swatch {
 #hkWheel .hk-wheel-val { font-variant-numeric: tabular-nums; }
 #hkWheel .hk-wheel-hint { color: rgba(230, 237, 243, 0.55); }
 
+/* Tab switched the brush (js/59): all three kinds, the current one lit.
+   Same spot and ground as the toast, and monochrome like the radial menu. */
+#brushTypePill {
+    position: fixed;
+    left: 50%;
+    bottom: 96px;
+    transform: translateX(-50%);
+    z-index: 10030;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px 6px 8px;
+    border-radius: 8px;
+    background: rgba(13, 17, 23, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: rgba(230, 237, 243, 0.4);
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+#brushTypePill[hidden], #brushTypePill .bt-hint[hidden] { display: none; }
+#brushTypePill .hk-cap { margin-left: 0; color: #e6edf3; border-color: rgba(255, 255, 255, 0.45); }
+/* Lit by colour and a faint plate, never weight: a bolder name would widen
+   the centred pill and jog the other two sideways on every press. */
+#brushTypePill .bt-name { padding: 2px 6px; border-radius: 4px; }
+#brushTypePill .bt-name.on { color: #e6edf3; background: rgba(255, 255, 255, 0.1); }
+#brushTypePill .bt-hint { color: rgba(230, 237, 243, 0.55); font-style: italic; }
+
 /* Settings → Hotkeys: the same fold-open list Interface uses above it. */
 .hk-block {
     margin-bottom: 12px;

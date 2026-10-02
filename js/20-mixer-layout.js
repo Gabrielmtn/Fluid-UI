@@ -5035,7 +5035,7 @@
         // stroke still routes through splat() exactly like a Fluid one. Making
         // 'pressure' a BRUSH_TARGET would strand it outside every
         // target === 'fluid' test in the paint path.
-        sLabel('Paint Into');
+        sLabel('Paint Into').title = 'Tab switches between Fluid, Pressure and Collider; Shift+Tab goes back.';
         var targetRow = document.createElement('div');
         targetRow.className = 'brush-mode-row';
         var fluidBtn = document.createElement('button');
@@ -5068,15 +5068,6 @@
             try { if (window.settingsManager) window.settingsManager.set('brush.target', t); } catch (_) {}
         }
         SETTERS.target = setBrushTarget;
-        // The buttons drive BOTH values; the setters stay single-purpose so a
-        // preset can apply target and velOnly independently (apply order in
-        // applyBrushPreset puts velOnly last, so it wins).
-        fluidBtn.addEventListener('click', function () {
-            setPressureEnabled(false); setBrushTarget('fluid'); markDirty();
-        });
-        pressureBtn.addEventListener('click', function () {
-            setBrushTarget('fluid'); setPressureEnabled(true); markDirty();
-        });
 
         // ── Pressure: the velocity-only brush ────────────────────────
         // The stroke runs the splat's velocity pass and skips the dye pass
@@ -5190,13 +5181,36 @@
             }
             setBrushTarget('mask');
         }
-        colliderBtn.addEventListener('click', function () {
-            // Clear Pressure on the way in, or the row lights Pressure AND
-            // Collider at once: velocity-only is inert on the mask route (it
-            // lives in splat(), which collider painting never calls), so the
-            // flag would just sit there true and misreport the brush.
-            setPressureEnabled(false); enterColliderPainting(); markDirty();
-        });
+        // The buttons drive BOTH values; the setters stay single-purpose so a
+        // preset can apply target and velOnly independently (apply order in
+        // applyBrushPreset puts velOnly last, so it wins).
+        function chooseBrushType(t) {
+            if (t === 'pressure') {
+                setBrushTarget('fluid'); setPressureEnabled(true);
+            } else if (t === 'collider') {
+                // Clear Pressure on the way in, or the row lights Pressure AND
+                // Collider at once: velocity-only is inert on the mask route (it
+                // lives in splat(), which collider painting never calls), so the
+                // flag would just sit there true and misreport the brush.
+                setPressureEnabled(false); enterColliderPainting();
+            } else {
+                setPressureEnabled(false); setBrushTarget('fluid');
+            }
+            markDirty();
+        }
+        // Which button is lit, by the same rules syncBrushMode lights them.
+        // 'sketch' (a raster layer's paint button in Layers) is none of the three.
+        function brushType() {
+            var c = window.config || {};
+            if (c.BRUSH_VELOCITY_ONLY) return 'pressure';
+            if (c.BRUSH_TARGET === 'mask') return 'collider';
+            return c.BRUSH_TARGET === 'sketch' ? 'sketch' : 'fluid';
+        }
+        fluidBtn.addEventListener('click', function () { chooseBrushType('fluid'); });
+        pressureBtn.addEventListener('click', function () { chooseBrushType('pressure'); });
+        colliderBtn.addEventListener('click', function () { chooseBrushType('collider'); });
+        // Tab steps through the three with the drawer shut (59-brush-type-key).
+        window.BrushType = { get: brushType, set: chooseBrushType };
         try {
             var savedTarget = window.settingsManager && window.settingsManager.get('brush.target');
             setBrushTarget(savedTarget);

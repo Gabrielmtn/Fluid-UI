@@ -216,6 +216,24 @@
       "sheet": "index.html:1098"
     },
     {
+      "keys": "Tab",
+      "event": { "key": "Tab", "code": "Tab", "ctrlKey": false, "shiftKey": false, "altKey": false },
+      "guard": "typing target; !ctrl/meta && !alt; defaultPrevented (the dialogs trap Tab in their own capture handlers); ignored, Tab left native, while a dialog (.delete-modal.show) is up, Ctrl+Shift+H bind mode is active, or the Layer Transform / Mask Editor overlay is open; e.repeat swallowed; no-op until window.BrushType exists (js/59-brush-type-key.js, document keydown, bubble). A listening hotkey picker cancels on Tab and stops it at window capture (js/48)",
+      "effect": "Steps the brush drawer's Paint Into row: Fluid -> Pressure -> Collider -> Fluid, through window.BrushType.set (js/20-mixer-layout.js), the same function the three buttons call. Painting a raster layer (BRUSH_TARGET sketch) steps to Fluid. Pressed during a stroke (window.pointer.down) the switch waits for the lift. Shows #brushTypePill (Tab cap + the three names, current lit) for 1.4 s",
+      "assertion": "window.BrushType.get() goes fluid -> pressure -> collider -> fluid; config.BRUSH_VELOCITY_ONLY true only on pressure, config.BRUSH_TARGET === 'mask' only on collider; #brushTypePill not hidden",
+      "source": "js/59-brush-type-key.js",
+      "sheet": "index.html (Brush)"
+    },
+    {
+      "keys": "Shift+Tab",
+      "event": { "key": "Tab", "code": "Tab", "ctrlKey": false, "shiftKey": true, "altKey": false },
+      "guard": "same as Tab",
+      "effect": "Steps the Paint Into row backwards: Fluid -> Collider -> Pressure -> Fluid",
+      "assertion": "window.BrushType.get() goes fluid -> collider -> pressure -> fluid",
+      "source": "js/59-brush-type-key.js",
+      "sheet": "index.html (Brush)"
+    },
+    {
       "keys": "[",
       "event": { "key": "[", "code": "BracketLeft", "ctrlKey": false, "shiftKey": false, "altKey": false },
       "guard": "typing target; !ctrl/meta && !alt; handler matches e.key==='[' EXACTLY (js/05n-hotkeys-init.js:412)",
