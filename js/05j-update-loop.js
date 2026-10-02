@@ -84,6 +84,10 @@
         // Color Blend (8d): how far it has come back since Freeze let go,
         // 0 (frozen) to 1 (full), over COLOR_BLEND_THAW seconds.
         let colorBlendThaw = 1;
+        // Laminar / Blend: the value the sim runs at, easing after the fader
+        // whenever a move adds blur (see the step), and its spring's speed.
+        // null = not seen yet, so the first step lands on the fader.
+        let colorBlendEff = null, colorBlendEffVel = 0;
         function velToUv() {
             if (config.VELOCITY_ISOTROPIC !== true) return [0.0, 0.0];
             const L = Math.max(simTexWidth, simTexHeight);
@@ -1360,11 +1364,38 @@
                 // then set wetInfluence=0 so dyeMobility() is a bit-exact 1.0.
                 const _wetInfluence = (typeof config.WET_INFLUENCE === 'number' && config.WET_INFLUENCE > 0)
                     ? Math.min(config.WET_INFLUENCE, 1.0) : 0.0;
+                // The Laminar / Blend fader as the sim uses it (colorBlendEff,
+                // read by Laminar at 8 and the blend at 8d). A move that ADDS
+                // blur, rightward anywhere on the fader, eases in on a
+                // critically damped spring that settles in COLOR_BLEND_EASE
+                // seconds of sim time. At full strength at once, Grain
+                // Cleanup's floor coming back (or the blend switching on)
+                // wiped a Laminar picture's fine bands within about a second:
+                // "too fast, destructive" (2026-10-02). The spring starts at
+                // rest, so the first moments barely touch the paint. A move
+                // toward Laminar destroys nothing and lands at once. Frozen,
+                // it holds. COLOR_BLEND_EASE 0 = the fader, unsmoothed.
+                {
+                    const _cbTarget = (typeof config.COLOR_BLEND === 'number')
+                        ? Math.max(-1, Math.min(1, config.COLOR_BLEND)) : 0;
+                    const _cbEaseSec = (typeof config.COLOR_BLEND_EASE === 'number') ? Math.max(0, config.COLOR_BLEND_EASE) : 3;
+                    if (colorBlendEff === null || _cbEaseSec <= 0 || _cbTarget <= colorBlendEff) {
+                        colorBlendEff = _cbTarget;
+                        colorBlendEffVel = 0;
+                    } else if (!_frozen) {
+                        const _w = 4.74 / _cbEaseSec;   // critically damped: ~95% of the way at _cbEaseSec
+                        const _h = Math.min(dt, 0.05);
+                        colorBlendEffVel += (_w * _w * (_cbTarget - colorBlendEff) - 2 * _w * colorBlendEffVel) * _h;
+                        colorBlendEff = Math.min(_cbTarget, colorBlendEff + colorBlendEffVel * _h);
+                        if (_cbTarget - colorBlendEff < 1e-4) { colorBlendEff = _cbTarget; colorBlendEffVel = 0; }
+                    }
+                    window.__colorBlendEff = colorBlendEff;
+                }
                 // Color Blend (8d) reads the map too: wet paint blends where
                 // colours meet, dry paint has set. So it is kept whenever
                 // either is on; with Drying at 0 the dye passes still get
                 // wetInfluence 0, so it never touches the motion.
-                if (_wetInfluence > 0 || (config.COLOR_BLEND || 0) > 0) {
+                if (_wetInfluence > 0 || (config.COLOR_BLEND || 0) > 0 || colorBlendEff > 0) {
                     const _halfLife = (typeof config.WET_DRYING === 'number' && config.WET_DRYING > 0) ? config.WET_DRYING : 3.0;
                     if (_halfLife !== lastWetDrying) { lastWetDrying = _halfLife; wetDryAccum = 0; }
                     // Frozen, the map still rides the braking flow (so it
@@ -1457,6 +1488,20 @@
                 }
                 const macActive = !!config.MACCORMACK &&
                     (window.QualityGovernor ? window.QualityGovernor.fxOn() : true);
+                // Laminar: Color Blend's left half (COLOR_BLEND below 0), 0-1.
+                // Colours slide past each other in layers without mixing: a
+                // smudge stretches their bands into finer filaments instead of
+                // averaging them. Two things smeared them, and both scale back
+                // with it: Grain Cleanup's dye floor (hfFloorDye below) and
+                // MacCormack's back-off to the diffusive step in fast, swirly
+                // flow (uLaminar, macCorrectFrag). Measured 2026-10-02 on a
+                // poured photo, 4 s after one Pressure smudge: the floor was
+                // most of the loss (reports/suspension-smudge-2026-10-02.png).
+                // Crisp Advection off or shed by the governor leaves only the
+                // floor's share.
+                // colorBlendEff, not the fader: a move back toward 0 brings the
+                // floor in on the ease above.
+                const _laminar = Math.max(0, Math.min(1, -colorBlendEff));
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 // P15-1: bind the (freshly advected) wetness field to unit 4 for
                 // all three dye passes. Bound unconditionally — dyeMobility()
@@ -1514,6 +1559,7 @@
                     gl.uniform1f(macCorrectProg.uniforms.wetInfluence, _wetInfluence);
                     // De-band taper (organic no-curl fix — see macCorrectFrag)
                     gl.uniform1f(macCorrectProg.uniforms.deband, config.DEBAND || 0.0);
+                    gl.uniform1f(macCorrectProg.uniforms.uLaminar, _laminar);
                     gl.activeTexture(gl.TEXTURE2);
                     gl.bindTexture(gl.TEXTURE_2D, sharpened.texture);
                     // Unconditional for the same reason as the forward pass above.
@@ -1600,8 +1646,13 @@
                     window.DyeNudge ? window.DyeNudge.restore(dt) : 0.0);
                 gl.uniform1f(advectionProg.uniforms.uRestoreGain,
                     window.DyeNudge ? window.DyeNudge.restoreGain() : 1.0);
-                // M2 dye floor (motion-gated Nyquist removal — see 05b)
-                gl.uniform1f(advectionProg.uniforms.hfFloorDye, config.HF_FLOOR_DYE || 0.0);
+                // M2 dye floor (motion-gated Nyquist removal — see 05b),
+                // scaled back by Laminar (above); the slider is untouched.
+                // Next to walls and the canvas edge the full floor stays
+                // (hfFloorDyeWall) unless LAMINAR_WALL_FLOOR is false.
+                gl.uniform1f(advectionProg.uniforms.hfFloorDye, (config.HF_FLOOR_DYE || 0.0) * (1 - _laminar));
+                gl.uniform1f(advectionProg.uniforms.hfFloorDyeWall,
+                    (config.LAMINAR_WALL_FLOOR === false) ? (config.HF_FLOOR_DYE || 0.0) * (1 - _laminar) : (config.HF_FLOOR_DYE || 0.0));
                 // Wall-drain flow gate: spare dye that is still moving past a
                 // collider (see the drain in advectionFrag). 0 = legacy drain.
                 gl.uniform1f(advectionProg.uniforms.obsFlowKeep,
@@ -1764,7 +1815,9 @@
                 // and `detailed` (y), the dye-res buffers the MacCormack
                 // passes above already borrow (see the note at 8); nothing
                 // reads them again until post-FX overwrites them this frame.
-                const _cb = (typeof config.COLOR_BLEND === 'number') ? Math.max(0, Math.min(1, config.COLOR_BLEND)) : 0;
+                // The eased value (see the Laminar / Blend ease ahead of the
+                // wetness map), so a move up the fader blends in gradually.
+                const _cb = Math.max(0, Math.min(1, colorBlendEff));
                 // Freeze means still, so it stands down while frozen: wet
                 // paint would keep running together on a frozen canvas (Blend
                 // 1, still fills: the border widened 25 -> 35 px in 3 s).

@@ -239,7 +239,7 @@
 
     function nameOf(el, via) {
         var ch = (via || el).closest('.mixer-channel');
-        if (ch && ch.dataset.uiKey && (el.tagName === 'INPUT' || el.tagName === 'SELECT')) return ch.dataset.uiKey;
+        if (ch && ch.dataset.uiKey && (el.tagName === 'INPUT' || el.tagName === 'SELECT')) return ch.dataset.uiLabel || ch.dataset.uiKey;
         var lab = labelText(el);
         if (lab) return clip(lab, 40);
         // A palette tag carries its own delete ×, an opener its chevron; the

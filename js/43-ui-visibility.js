@@ -119,7 +119,7 @@
                 if (el.classList.contains('mixer-divider')) return;
                 var k = el.dataset && el.dataset.uiKey;
                 if (!k) return;                         // unlabelled child: leave it alone
-                items.push({ key: 'strip:' + k, kind: 'strip', label: k, el: el });
+                items.push({ key: 'strip:' + k, kind: 'strip', label: el.dataset.uiLabel || k, el: el });
             });
         }
         var sidebar = document.getElementById('sidebar-right');

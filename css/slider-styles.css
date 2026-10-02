@@ -101,6 +101,21 @@ input[type=range]::-webkit-slider-container {
         var(--ground-950, #0a0b0e);
 }
 
+/* A fader that runs both ways from 0 in the middle (Laminar / Blend, the
+   strip's proxy and the canonical behind it): the heat fill grows from the
+   middle tick toward the knob, so 0 reads as empty instead of half full. */
+#colorBlend::-webkit-slider-container,
+#colorBlendPerceptual::-webkit-slider-container {
+    --fill-l: min(var(--pos), 50%);
+    --fill-r: max(var(--pos), 50%);
+    background:
+        linear-gradient(90deg, transparent var(--fill-l), var(--heat-0, #f0a626) var(--fill-l),
+            var(--heat-1, #e0432a) var(--fill-r), transparent var(--fill-r))
+            1px 50% / calc(var(--js, 0) * (100% - 2px)) calc(100% - 12px) no-repeat,
+        var(--track-ticks) 0 0 / 10% 100%,
+        var(--ground-950, #0a0b0e);
+}
+
 input[type=range]::-webkit-slider-runnable-track {
     margin: 0 calc(-1 * var(--input-px));
     height: var(--thumb-h);

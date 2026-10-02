@@ -215,9 +215,14 @@
           target: { strip: 'Color', sel: '.ch-gate-toggle' } },
         { id: 'color-blend', pillar: 'colour', title: 'Make colours mix together',
           tags: ['blend', 'mix', 'mixing', 'merge', 'melt', 'colour', 'color', 'gradient', 'soft'],
-          answer: 'Drag the Color Blend fader in the top bar. Where colours meet they run into each other while the paint is wet, then settle as it dries; Dry Time sets how long that lasts, and swirling or colliding paint blends more.',
-          target: { strip: 'Color Blend', sel: '#colorBlend' },
-          demo: { label: 'Try Color Blend 0.5', run() { const el = $('colorBlend'); const was = el ? el.value : null; setCtl('colorBlend', 0.5, 'input'); return () => { if (was != null) setCtl('colorBlend', was, 'input'); }; } } },
+          answer: 'Drag the Laminar / Blend fader in the top bar to the right of the middle. Where colours meet they run into each other while the paint is wet, then settle as it dries; Dry Time sets how long that lasts, and swirling or colliding paint blends more.',
+          target: { strip: 'Color Blend', sel: '#colorBlendPerceptual' },
+          demo: { label: 'Try Blend 0.5', run() { const el = $('colorBlend'); const was = el ? el.value : null; setCtl('colorBlend', 0.5, 'input'); return () => { if (was != null) setCtl('colorBlend', was, 'input'); }; } } },
+        { id: 'laminar', pillar: 'colour', title: 'Keep colours from smearing when I stir',
+          tags: ['laminar', 'layers', 'suspension', 'suspend', 'smear', 'smudge', 'muddy', 'mud', 'detail', 'streaks', 'marble', 'marbling', 'separate', 'apart', 'colloid'],
+          answer: 'Drag the Laminar / Blend fader in the top bar to the left of the middle. Colours then slide past each other in layers without mixing: stirring and smudging stretch them into finer streaks instead of smearing them together. Crisp Advection needs to be on.',
+          target: { strip: 'Color Blend', sel: '#colorBlendPerceptual' },
+          demo: { label: 'Try Laminar 1', run() { const el = $('colorBlend'); const was = el ? el.value : null; setCtl('colorBlend', -1, 'input'); return () => { if (was != null) setCtl('colorBlend', was, 'input'); }; } } },
 
         // ── Layers ──
         { id: 'paste-image', pillar: 'layers', title: 'Paste an image as a layer',
@@ -663,6 +668,12 @@
         // panel (js/46-strip-more.js); reveal() opens that panel to point at it.
         const more = $('mixer-more-panel');
         return more ? more.querySelector('[data-ui-key="' + key + '"]') : null;
+    }
+    // What the cell is called on screen: its data-ui-label when the name
+    // shown differs from the key (20's CHANNEL_NAMES), else the key.
+    function stripName(key) {
+        const cell = stripCell(key);
+        return (cell && cell.dataset.uiLabel) || key;
     }
     const POPUPS = {
         brush:   { trigger: () => { const c = stripCell('Brush Size'); return c && c.querySelector('.ch-label'); }, panel: () => document.querySelector('.brush-settings-panel'), isOpen: (p) => p && p.classList.contains('visible') },
@@ -1202,7 +1213,7 @@
     function renderDetail() {
         const r = results[highlight];
         if (!r) { detailEl.innerHTML = '<div class="recipe-empty">' + (searchEl.value ? 'Nothing matches. Try another word, or clear the search.' : 'Type what you want to do, or pick a topic.') + '</div>'; return; }
-        const where = r.target ? (r.target.section ? r.target.section : r.target.strip ? 'Top bar · ' + r.target.strip : r.target.chrome ? 'Bottom-left bar' : r.target.canvas ? 'The canvas' : '') : '';
+        const where = r.target ? (r.target.section ? r.target.section : r.target.strip ? 'Top bar · ' + stripName(r.target.strip) : r.target.chrome ? 'Bottom-left bar' : r.target.canvas ? 'The canvas' : '') : '';
         const hasSteps = !!(r.steps && r.steps.length);
         const steps = hasSteps
             ? '<ol class="recipe-steps">' + r.steps.map((s) => '<li>' + escapeHtml(s.say) + (s.key ? ' ' + keyCap(s.key) : '') + '</li>').join('') + '</ol>'

@@ -892,12 +892,19 @@
         'Fluid': 'Material mode (Swirl / Gloss Paint — Wetness or Thickness) + amount — the ⚙ opens the material picker',
         'Viscosity': 'How thick the fluid is — 0 flows like water, higher smooths the swirls into broad ribbons',
         'Isolation': 'Motion isolation - how much color follows velocity',
-        'Color Blend': 'How much colours blend where they meet, like wet paint: they run together while wet and settle as they dry (Dry Time). The flow itself is unchanged',
+        'Color Blend': 'Left of the middle (Laminar), colours slide past each other in layers without mixing: a smudge stretches them into finer streaks instead of smearing them. Right of the middle (Blend), they blend where they meet, like wet paint, and settle as they dry (Dry Time). The flow itself is unchanged',
         'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — the ⚙ opens arm colors & symmetry',
         'Time': 'Simulation time scale',
         'Density': 'How fast color fades',
         'Velocity': 'How fast motion fades',
         'Color': 'Current brush color'
+    };
+    // What a channel is CALLED where people see it, when that differs from
+    // its key. The key (data-ui-key) stays put: show/hide choices (43), the
+    // More panel's parking order (46) and recipe tours (44) are stored or
+    // written against it. 43, 46 and 49 print data-ui-label when it is set.
+    var CHANNEL_NAMES = {
+        'Color Blend': 'Laminar / Blend'    // 2026-10-02: the fader runs both ways from 0
     };
 
     // ── Perceptual fader curves (Density, Time) ──────────────────────────
@@ -978,6 +985,28 @@
                 const lo = parseFloat(el.min), max = parseFloat(el.max);
                 if (v >= 1) return (v <= 1 || max <= 1) ? a : b + Math.log(v) / Math.log(max) * (1 - b);
                 return a * Math.log(Math.max(lo, v) / lo) / Math.log(1 / lo);
+            }
+        },
+        // Laminar / Blend (2026-10-02) runs both ways from 0: Laminar to
+        // the left, Blend to the right, linear on each side. The curve is
+        // only for its detent on 0 in the middle, so the usual look is easy
+        // to land on and a drag across the middle stops there first.
+        colorBlend: {
+            toCanonical: function (p, el) {
+                const a = curveCfg('BLEND_FADER_HOLD_A', 0.47);
+                const b = curveCfg('BLEND_FADER_HOLD_B', 0.53);
+                const min = parseFloat(el.min), max = parseFloat(el.max);
+                if (p >= b) return (p - b) / (1 - b) * max;
+                if (p > a) return 0;                        // the detent
+                return min * (1 - p / a);
+            },
+            fromCanonical: function (v, el) {
+                const a = curveCfg('BLEND_FADER_HOLD_A', 0.47);
+                const b = curveCfg('BLEND_FADER_HOLD_B', 0.53);
+                const min = parseFloat(el.min), max = parseFloat(el.max);
+                if (v > 0) return (max > 0) ? b + v / max * (1 - b) : b;
+                if (v < 0) return (min < 0) ? a * (1 - v / min) : a;
+                return 0.5 * (a + b);
             }
         }
     };
@@ -1110,7 +1139,8 @@
                 if (window.MaterialModes && window.MaterialModes.resizeLabel) window.MaterialModes.resizeLabel();
             }, 0);
         } else {
-            lbl.textContent = label;
+            lbl.textContent = CHANNEL_NAMES[label] || label;
+            if (CHANNEL_NAMES[label]) ch.dataset.uiLabel = CHANNEL_NAMES[label];
         }
         if (CHANNEL_TOOLTIPS[label]) lbl.title = CHANNEL_TOOLTIPS[label];
         head.appendChild(lbl);

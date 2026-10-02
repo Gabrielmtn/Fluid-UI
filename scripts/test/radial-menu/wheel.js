@@ -34,7 +34,12 @@ const BS = 0, VISC = 2, CB = 4, MB = 5, TIME = 6, DENS = 7;
             window.__begin = 0; window.__ctx = []; window.__ev = { input: 0, change: 0 };
             var b = window.BrushEngine.begin; window.BrushEngine.begin = function(){ window.__begin++; return b.apply(this, arguments); };
             window.addEventListener('contextmenu', function(e){ setTimeout(function(){ window.__ctx.push(e.defaultPrevented); }, 0); }, true);
-            ['input', 'change'].forEach(function(t){ document.getElementById('colorBlend').addEventListener(t, function(){ window.__ev[t]++; }); });
+            // Since 2026-10-02 Laminar / Blend has a perceptual proxy in front of
+            // it (like Density and Time): the wheel drags the proxy, which hands
+            // 'input' on to #colorBlend; letting go sends 'change' on the proxy.
+            // So: input counted on the slider, change on the proxy.
+            document.getElementById('colorBlend').addEventListener('input', function(){ window.__ev.input++; });
+            document.getElementById('colorBlendPerceptual').addEventListener('change', function(){ window.__ev.change++; });
             return 1; })()`);
         const open = () => d.ev('window.RadialMenu.isOpen()');
         const frozen = () => d.ev('!!window.__fluidFrozen');
@@ -62,7 +67,7 @@ const BS = 0, VISC = 2, CB = 4, MB = 5, TIME = 6, DENS = 7;
         check('T1 tap E opens and stays', await open());
         let W = await wedges();
         const names = W.map(w => w.t);
-        check('T1 nine slider wedges, in the top bar\'s order', W.length === 9 && names[0] === 'Brush Size' && names[4] === 'Color Blend' && names[5] === 'Multi-Brush' && names[7] === 'Density' && names[8] === 'Velocity', names);
+        check('T1 nine slider wedges, in the top bar\'s order', W.length === 9 && names[0] === 'Brush Size' && names[4] === 'Laminar / Blend' && names[5] === 'Multi-Brush' && names[7] === 'Density' && names[8] === 'Velocity', names);
         const strip = await d.ev(`${JSON.stringify(IDS)}.map(function(id){ return window.HotkeyBinds.valueTextOf(document.getElementById(id)); })`);
         check('T1 each wedge reads what its fader reads', W.every((w, i) => w.v === strip[i]), W.map(w => w.v));
         const centre = await d.ev(`(function(){ var w = document.querySelector('.radial-wheel'); return [parseFloat(w.style.left), parseFloat(w.style.top)]; })()`);
@@ -71,14 +76,17 @@ const BS = 0, VISC = 2, CB = 4, MB = 5, TIME = 6, DENS = 7;
         // ── T2 drag a slider ──
         let end = await dragAlong(W[CB], 50);
         const mid = await d.ev(`({ v: parseFloat(document.getElementById('colorBlend').value), cfg: window.config.COLOR_BLEND, strip: document.getElementById('colorBlendValue').textContent, wedge: document.querySelectorAll('.radial-label-val')[${CB}].textContent, ev: window.__ev })`);
-        check('T2 drag Color Blend out 50px: slider, config, top bar and wedge agree', mid.v > 0.3 && mid.v < 0.55 && mid.cfg === mid.v && mid.strip === mid.wedge && parseFloat(mid.strip) === mid.v, mid);
+        // Laminar / Blend (2026-10-02) starts on its 0 in the middle of a -1..1
+        // fader, so 50px out lands in the Blend half: what 0.3-0.55 of the old
+        // 0..1 fader was, measured from the middle.
+        check('T2 drag Laminar / Blend out 50px: slider, config, top bar and wedge agree', mid.v > 0.5 && mid.v <= 1 && mid.cfg === mid.v && mid.strip === mid.wedge && parseFloat(mid.strip) === mid.v, mid);
         check('T2 input while dragging, no change yet', mid.ev.input >= 3 && mid.ev.change === 0, mid.ev);
         await d.up(end[0], end[1], 'left'); await sleep(80);
         check('T2 letting go sends one change and leaves the menu open', (await d.ev('window.__ev.change')) === 1 && (await open()));
         W = await wedges();
         end = await dragAlong(W[CB], -220);
         await d.up(end[0], end[1], 'left'); await sleep(60);
-        check('T2 drag back past the hub stops at the minimum', (await val('colorBlend')) === 0 && (await open()));
+        check('T2 drag back past the hub stops at the minimum', (await val('colorBlend')) === -1 && (await open()));
         const visc0 = await val('viscosity');
         await d.click(W[VISC].x, W[VISC].y); await sleep(60);
         check('T2 a press that does not move changes nothing and keeps the menu', (await val('viscosity')) === visc0 && (await open()) && (await begin()) === 0);

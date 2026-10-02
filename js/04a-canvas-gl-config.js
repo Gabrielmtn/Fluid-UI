@@ -382,6 +382,21 @@
                                       // D = l² × (wet × (stir + COLOR_BLEND_CONTACT) + dry ×
                                       // COLOR_BLEND_DRY_STIR × stir), wet = the Drying map: wet colours
                                       // that touch blend, and stop as the paint dries at Dry Time.
+                                      // Below 0 is LAMINAR (2026-10-02, the fader's left half): the
+                                      // blend is off and the transport stops blurring colours together,
+                                      // so a smudge stretches their bands into finer filaments instead
+                                      // of smearing them. At -1 Grain Cleanup's dye floor is off and
+                                      // Crisp Advection no longer backs off in fast, swirly flow (both
+                                      // scale with the fader; 05j). Crisp Advection must be on.
+            COLOR_BLEND_EASE: 3,      // Seconds (sim time) the sim takes to follow the Laminar / Blend fader
+                                      // when a move ADDS blur: a critically damped spring, so it starts
+                                      // gently (2026-10-02; at once, the floor or the blend wiped a laminar
+                                      // picture's bands in about a second). Moves toward Laminar land at
+                                      // once. 0 = follow the fader exactly
+            LAMINAR_WALL_FLOOR: true, // Laminar keeps Grain Cleanup's full dye floor within ~3 dye texels
+                                      // of a collider or the canvas edge (advectionFrag hfFloorDyeWall),
+                                      // where wall-made speckle and bright edge lines grew without it
+                                      // (2026-10-02). false = the floor follows the fader everywhere
             COLOR_BLEND_LENGTH: 0.02, // The mixing length l at COLOR_BLEND 1 (it scales with the fader),
                                       // as a fraction of the canvas's SHORT side
             COLOR_BLEND_CONTACT: 2,   // The stir wet paint counts as having, moving or not (1/s): wet

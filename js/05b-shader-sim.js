@@ -746,6 +746,8 @@
             uniform float uVelCap; // speed ceiling in canvas-widths/s (Max Speed slider)
             uniform float srcGate; // M1: 1 = taper growth amplification by speed headroom
             uniform float hfFloorDye; // M2: dye Nyquist-removal strength (0 = off)
+            uniform float hfFloorDyeWall; // ...within a few texels of a collider or the canvas
+                                          // edge; above hfFloorDye only under Laminar (05j)
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
             uniform float obsFlowKeep; // 1 = spare MOVING dye from the wall drain (0 = legacy)
@@ -894,7 +896,7 @@
                     // never decay: the measured 17.7→24.1→31.6 dyeHF ratchet).
                     // Still dye and frozen artwork: motion gate is exactly 0.
                     // Straight edges: zero Laplacian — moving fronts stay crisp.
-                    if (hfFloorDye > 0.0 && frozen < 0.5) {
+                    if ((hfFloorDye > 0.0 || hfFloorDyeWall > 0.0) && frozen < 0.5) {
                         vec4 nAvg = 0.25 * (
                             texture(uSource, clamp(coord + vec2(srcTexelSize.x, 0.0), 0.0, 1.0)) +
                             texture(uSource, clamp(coord - vec2(srcTexelSize.x, 0.0), 0.0, 1.0)) +
@@ -911,7 +913,31 @@
                         // exactly 0 — frozen artwork untouched.
                         float transportTexels = length(disp / srcTexelSize);
                         float mGate = smoothstep(0.03, 0.3, transportTexels);
-                        float kD = min(hfFloorDye * mGate * (dt * 60.0), 0.85);
+                        // Laminar turns the floor down in open fluid only.
+                        // Within ~3 dye texels of a collider or the canvas edge
+                        // it keeps the full floor (hfFloorDyeWall): that is
+                        // where the speckle above is made. Without it, 40 s
+                        // after four smudges past a disc and a bar the noise
+                        // there was 4x and at the canvas edge 50x the 0 look,
+                        // with bright lines along the edge (2026-10-02). Equal
+                        // floors (Laminar off) skip all of this.
+                        float floorK = hfFloorDye;
+                        if (hfFloorDyeWall > hfFloorDye && mGate > 0.0) {
+                            vec2 edgeT = min(coord, 1.0 - coord) / srcTexelSize;
+                            float wallNear = 1.0 - smoothstep(3.0, 5.0, min(edgeT.x, edgeT.y));
+                            if (hasObstacle == 1) {
+                                float ob = obsTexCoverage(texture(uObstacle, coord), uObsMax);
+                                for (int k = 0; k < 8; k++) {
+                                    float an = float(k) * 0.785398;
+                                    vec2 dir = vec2(cos(an), sin(an)) * srcTexelSize;
+                                    ob = max(ob, obsTexCoverage(texture(uObstacle, clamp(coord + dir * 1.5, 0.0, 1.0)), uObsMax));
+                                    ob = max(ob, obsTexCoverage(texture(uObstacle, clamp(coord + dir * 3.0, 0.0, 1.0)), uObsMax));
+                                }
+                                wallNear = max(wallNear, smoothstep(0.15, 0.5, ob));
+                            }
+                            floorK = mix(hfFloorDye, hfFloorDyeWall, wallNear);
+                        }
+                        float kD = min(floorK * mGate * (dt * 60.0), 0.85);
                         // RGB only: subtracting a Laplacian from the memory
                         // channel would carve contrast into it, and memory has
                         // no visible speckle to remove — it is a scalar the
@@ -1147,6 +1173,8 @@
             uniform vec2 uVelToUv;       // velocity units → UV per axis (rk2Backtrace)
             uniform int hasObstacle;
             uniform float deband;        // 0 = off (bit-exact); >0 softens fast-moving dye cliffs
+            uniform float uLaminar;      // Laminar (COLOR_BLEND below 0), 0-1: how much of the
+                                         // fast-flow back-off below is withdrawn; 0 = bit-exact
             ${obstacleSolidityGLSL}
             ${mobilityGLSL}
             void main() {
@@ -1187,7 +1215,11 @@
                 // fine). A smoothstep keeps those two extremes but ramps the
                 // borderline, so the MacCormack/semi-Lagrangian blend shifts
                 // gradually instead of snapping -- decay stays clean at every curl.
-                revert = max(revert, smoothstep(0.2, 0.55, noisyTransport));
+                // Laminar withdraws this back-off (the domain and wall reverts
+                // above stay): a smudge is exactly fast, swirly transport, and
+                // falling back to the diffusive step there is what smeared its
+                // colours together (2026-10-02).
+                revert = max(revert, smoothstep(0.2, 0.55, noisyTransport) * (1.0 - uLaminar));
                 vec4 phiN  = texture(uSource, vUv);
                 vec4 backN = texture(uForward, clamp(backCoord, 0.0, 1.0));
                 vec4 corrected = fwd + 0.5 * (phiN - backN);

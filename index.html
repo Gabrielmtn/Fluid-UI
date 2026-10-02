@@ -757,8 +757,8 @@
             <input type="range" id="viscosity" min="0" max="1" value="0.3" step="0.01">
         </div>
         <div class="control-group">
-            <label for="colorBlend" title="How much colours blend where they meet, like wet paint. 0 keeps every colour as you painted it; higher lets touching colours run into each other while the paint is wet, then settle as it dries (Dry Time). Churning and colliding paint blends more. The flow itself is unchanged.">Color Blend <span id="colorBlendValue" class="value-display">0.00</span></label>
-            <input type="range" id="colorBlend" min="0" max="1" value="0" step="0.01">
+            <label for="colorBlend" title="Whether colours keep apart or run together. Left of the middle (Laminar), colours slide past each other in layers without mixing: stirring and smudging stretch them into finer streaks instead of smearing them. Right of the middle (Blend), touching colours run into each other like wet paint while it is wet, then settle as it dries (Dry Time); churning and colliding paint blends more. The middle is the usual look. The flow itself is unchanged.">Laminar / Blend <span id="colorBlendValue" class="value-display">0.00</span></label>
+            <input type="range" id="colorBlend" min="-1" max="1" value="0" step="0.01">
         </div>
         <div class="control-group">
             <label for="wetInfluence" title="Drying — wet paint flows, dry paint holds in place. 0 = off (pure fluid). Higher = dry regions set harder, more paint-like.">Drying <span id="wetInfluenceValue" class="value-display">0.14</span></label>

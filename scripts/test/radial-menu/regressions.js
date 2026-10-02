@@ -84,7 +84,8 @@ const E = ['e', 'KeyE', 69];
         await d.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
         await sleep(120);
         const v = await d.ev(`parseFloat(document.getElementById('colorBlend').value)`);
-        check('R4 a finger drags a slider on the wheel; the menu stays', v > 0.2 && v < 0.5 && (await d.ev('window.RadialMenu.isOpen()')) && !(await d.ev('!!window.pointer.down')), v);
+        // From Laminar / Blend's 0 in the middle of its -1..1 fader (2026-10-02).
+        check('R4 a finger drags a slider on the wheel; the menu stays', v > 0.2 && v <= 1 && (await d.ev('window.RadialMenu.isOpen()')) && !(await d.ev('!!window.pointer.down')), v);
         await d.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx + 380, y: cy, id: 3 }] });
         await sleep(40);
         await d.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });

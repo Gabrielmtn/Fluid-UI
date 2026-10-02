@@ -81,7 +81,7 @@
     function overflowing() { return strip.scrollWidth > strip.clientWidth + 1; }
     function labelOf(el) {
         var l = el.querySelector('.ch-label');
-        return el.dataset.uiKey || (l ? l.textContent.trim() : 'fader');
+        return el.dataset.uiLabel || el.dataset.uiKey || (l ? l.textContent.trim() : 'fader');
     }
 
     // ── Placement (canonical order kept on both sides) ─────────────────

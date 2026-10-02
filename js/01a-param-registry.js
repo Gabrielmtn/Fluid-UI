@@ -72,7 +72,10 @@
         // Default 0 skips the pass, so presets saved
         // before it existed land exactly as they did. No `mut` for the reason
         // Viscosity has none: it changes every later stroke, not one frame.
-        colorBlend: {configKey: "COLOR_BLEND", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
+        // Below 0 (2026-10-02) is Laminar, the other way: colours slide past
+        // each other in layers, and a smudge folds their bands finer instead of smearing
+        // them (05j). 0..1 kept its meaning, so saved presets did too.
+        colorBlend: {configKey: "COLOR_BLEND", ui: {min: -1, max: 1, step: 0.01}, hard: {min: -1, max: 1}, def: 0, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
         // Detail work (mandala tracery, fine linework) needs far finer tips
         // than the old 0.1 floor allowed: the splat radius is variance-like,
         // so footprint scales with sqrt(size) — 0.1 still painted a ~31px dab

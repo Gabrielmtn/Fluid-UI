@@ -98,7 +98,7 @@ const E = ['e', 'KeyE', 69];
         // Add another → a slider that is already on the wheel
         await d.ev(`[].filter.call(document.querySelectorAll('#hkBindBar .hk-actions button'), function(b){ return b.textContent === 'Add another'; })[0].click()`);
         await sleep(200);
-        const cbr = await rect('#colorBlend');
+        const cbr = await rect('#colorBlendPerceptual');   // the fader people see (js/20 FADER_CURVES)
         await d.move(cbr.x, cbr.y); await d.down(cbr.x, cbr.y); await sleep(40); await d.up(cbr.x, cbr.y); await sleep(250);
         const t1 = await toast();
         check('A4 a slider already on the menu is refused, with the reason', /already on the radial menu/.test(t1) && (await items()).length === 10 && (await bar()).step === '1', t1);

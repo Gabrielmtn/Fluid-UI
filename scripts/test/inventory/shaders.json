@@ -157,7 +157,7 @@
         }
       ]
     },
-    "bloomCeiling|decayDt|dissipation|dt|edgeAbsorb|edgeAbsorbBand|floorBand|floorDrain|frozen|hasObstacle|hfFloorDye|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelToUv|uVelocity": {
+    "bloomCeiling|decayDt|dissipation|dt|edgeAbsorb|edgeAbsorbBand|floorBand|floorDrain|frozen|hasObstacle|hfFloorDye|hfFloorDyeWall|isDensity|macMode|memDiss|obsDrainDilate|obsDrainRate|obsFlowKeep|obstacleTexelSize|srcGate|srcTexelSize|texelSize|uObstacle|uRestore|uRestoreGain|uSource|uVelCap|uVelToUv|uVelocity": {
       "name": "advection",
       "uniforms": [
         "bloomCeiling",
@@ -171,6 +171,7 @@
         "frozen",
         "hasObstacle",
         "hfFloorDye",
+        "hfFloorDyeWall",
         "isDensity",
         "macMode",
         "memDiss",
@@ -203,7 +204,7 @@
         "uVelocity"
       ]
     },
-    "deband|dt|hasObstacle|srcTexelSize|texelSize|uForward|uObstacle|uSource|uVelToUv|uVelocity": {
+    "deband|dt|hasObstacle|srcTexelSize|texelSize|uForward|uLaminar|uObstacle|uSource|uVelToUv|uVelocity": {
       "name": "macCorrect",
       "uniforms": [
         "deband",
@@ -212,6 +213,7 @@
         "srcTexelSize",
         "texelSize",
         "uForward",
+        "uLaminar",
         "uObstacle",
         "uSource",
         "uVelToUv",
