@@ -2761,6 +2761,8 @@
             ${obsTexelGLSL}
             uniform float toneWhite;      // display's Reinhard white point (0 = plain)
             uniform float toneCeil;       // how much HDR headroom to allow (0 = don't pre-compensate)
+            uniform float vibrance;       // the display's Vibrance pass (05a microDetailFrag); 0 = off
+            uniform float shadeLift;      // Surface Shading's saturation lift (05a displayFrag); 0 = off
             // The display tone-maps dye on the way out (05a displayFrag): plain
             // Reinhard turns 0.93 into 0.48, which is why a poured picture came
             // out half-lit. Deposit the value that tone-maps BACK to the image's
@@ -2773,6 +2775,38 @@
                 float a = (lw > 0.0) ? 1.0 / (lw * lw) : 0.0;
                 vec3 b = 1.0 - d;
                 return 2.0 * d / (b + sqrt(b * b + 4.0 * a * d));
+            }
+            // Two more grades land on every pixel the same way: Vibrance
+            // widens the HDR dye's channel spread before the tone map, and
+            // Surface Shading lifts saturation after it. At the stock
+            // Vibrance 1 a poured cream came out pure yellow. Both keep luma
+            // and only scale the spread about it, so each undoes exactly.
+            // Surface Shading's lift, undone: the spread over (1 + lift x fade).
+            vec3 unShadeLift(vec3 d, float lift) {
+                float gray = dot(d, vec3(0.299, 0.587, 0.114));
+                float k = lift * smoothstep(0.005, 0.06, gray);
+                return vec3(gray) + (d - vec3(gray)) / (1.0 + k);
+            }
+            // Vibrance, undone. Its boost reads the saturation of the colour
+            // it is given, so the boost k that lands on t solves
+            // k = K (1 - s(k)^2), s(k) the saturation of g + (t - g)/(1 + k).
+            // k - K (1 - s^2) is convex, <= 0 at k = 0 and >= 0 at k = K, so
+            // the bisection settles on its upper root: the one a nearly pure
+            // colour's neighbours land on.
+            vec3 unVibrance(vec3 t, float v) {
+                float g = dot(t, vec3(0.299, 0.587, 0.114));
+                if (v <= 0.0 || g < 0.001) return t;
+                float K = v * 1.2 * smoothstep(0.003, 0.03, g);
+                float tMax = max(t.r, max(t.g, t.b));
+                float spread = tMax - min(t.r, min(t.g, t.b));
+                float above = tMax - g;
+                float lo = 0.0, hi = K;
+                for (int i = 0; i < 20; i++) {
+                    float k = 0.5 * (lo + hi);
+                    float s = spread / (g * (1.0 + k) + above);
+                    if (k - K * (1.0 - s * s) <= 0.0) lo = k; else hi = k;
+                }
+                return vec3(g) + (t - vec3(g)) / (1.0 + 0.5 * (lo + hi));
             }
             void main() {
                 vec4 base4 = texture(uTarget, vUv);
@@ -2800,7 +2834,12 @@
                 if (edgeHold.y > 0.0) srcA *= smoothstep(edgeHold.x, edgeHold.y, srcA);
                 float cov = srcA * clamp(amount, 0.0, 1.0);
                 vec3 color = src.rgb;
-                if (toneCeil > 0.0) color = min(unToneMap(color, toneWhite), vec3(toneCeil));
+                // Undone in the reverse of the order the display applies them.
+                if (toneCeil > 0.0) {
+                    if (shadeLift > 0.0) color = unShadeLift(color, shadeLift);
+                    color = min(unToneMap(color, toneWhite), vec3(toneCeil));
+                    color = unVibrance(color, vibrance);
+                }
                 vec3 result;
                 float newMem;
                 if (gateColor == 1) {

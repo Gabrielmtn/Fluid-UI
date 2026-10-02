@@ -501,7 +501,7 @@
         "uSketch"
       ]
     },
-    "amount|edgeHold|gateColor|gateFlow|hasObstacle|toneCeil|toneWhite|uImage|uImageRect|uObsMax|uObstacle|uTarget": {
+    "amount|edgeHold|gateColor|gateFlow|hasObstacle|shadeLift|toneCeil|toneWhite|uImage|uImageRect|uObsMax|uObstacle|uTarget|vibrance": {
       "name": "imageSplat",
       "uniforms": [
         "amount",
@@ -509,13 +509,15 @@
         "gateColor",
         "gateFlow",
         "hasObstacle",
+        "shadeLift",
         "toneCeil",
         "toneWhite",
         "uImage",
         "uImageRect",
         "uObsMax",
         "uObstacle",
-        "uTarget"
+        "uTarget",
+        "vibrance"
       ]
     },
     "curve|threshold|uTexture": {

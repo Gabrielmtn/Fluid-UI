@@ -817,6 +817,18 @@
                 (config.BLOOM_CEILING > 0)
                     ? config.BLOOM_CEILING * ((typeof config.GATE_WHITE_MULT === 'number') ? config.GATE_WHITE_MULT : 1.25)
                     : 0.0);
+            // ...and for the two colour grades the display lays on every
+            // pixel, as the frame will apply them: Vibrance while its pass
+            // runs (05j skips it when the governor's fx gate is shut), and
+            // Surface Shading's saturation lift while shading is up.
+            // config.FLUIDIZE_GRADE = false undoes the tone map alone.
+            const _grade = config.FLUIDIZE_GRADE !== false;
+            const _fxOn = window.QualityGovernor ? window.QualityGovernor.fxOn() : true;
+            const _shade = window.displayShading || 0;
+            gl.uniform1f(imageSplatProg.uniforms.vibrance,
+                (_grade && _fxOn) ? Math.max(0, config.VIBRANCE || 0) : 0.0);
+            gl.uniform1f(imageSplatProg.uniforms.shadeLift,
+                (_grade && _shade > 0) ? 0.15 + _shade * 0.30 : 0.0);
             const _obsActive = !!(window.collisionLayers && window.collisionLayers.enabled && obstacle);
             gl.uniform1i(imageSplatProg.uniforms.hasObstacle, _obsActive ? 1 : 0);
             if (_obsActive) {
