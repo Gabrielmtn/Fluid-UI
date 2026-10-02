@@ -231,7 +231,7 @@
             // so a replay can re-roll a fresh colour and re-dim it the same.
             // Both omitted when the checkbox is off — the common event stays
             // byte-identical.
-            let _rnd, _fm;
+            let _rnd, _fm, _ra;
             if (window.preserveRandomness &&
                 window.multiArmColors && window.multiArmColors[0] &&
                 window.multiArmColors[0].mode === 'random') {
@@ -240,6 +240,23 @@
                 const _sP = pointer.color[0] + pointer.color[1] + pointer.color[2];
                 let f = (_sP > 1e-6) ? _sB / _sP : 1;
                 if (isFinite(f) && Math.abs(f - 1) >= 0.005) _fm = Math.round(f * 1000) / 1000;
+            }
+            // ...and the Multi-Brush arms past the first that roll their own
+            // colour (05g resolveArmColor's per-arm cache), as a bitmask like
+            // `ap`. Their colour never rides the event, so without this a
+            // replay painted them in the cache the live brush had already
+            // advanced to — one frozen colour per arm, every loop, whatever
+            // arm 0 did. Independent of arm 0's mode: a fixed main arm with
+            // random arms beside it is a random brush too.
+            if (window.preserveRandomness && window.multiArmColors) {
+                const _arms = Math.min(window.multiArmColors.length, 30,
+                    Math.max(1, (typeof animationMultiplier === 'number' ? animationMultiplier : 1) | 0));
+                let _m = 0;
+                for (let ai = 1; ai < _arms; ai++) {
+                    const ac = window.multiArmColors[ai];
+                    if (ac && ac.mode === 'random') _m |= (1 << ai);
+                }
+                if (_m) _ra = _m;
             }
             strokeEvents.push({
                 t, x, y, dx, dy, color: color.slice(),
@@ -271,7 +288,8 @@
                 // Omitted at 0, the common case.
                 mir: (window.__strokeMirrorPin | 0) || undefined,
                 rnd: _rnd,
-                fm: _fm
+                fm: _fm,
+                ra: _ra
             });
         }
         function deepCopyEvent(ev) {
@@ -282,7 +300,7 @@
             return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(),
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
                      push: ev.push ? { m: ev.push.m, s: ev.push.s } : null,
-                     ap: ev.ap, mir: ev.mir, rnd: ev.rnd, fm: ev.fm };
+                     ap: ev.ap, mir: ev.mir, rnd: ev.rnd, fm: ev.fm, ra: ev.ra };
         }
         // Preserve Randomness: an event whose colour was rolled by random mode
         // carries rnd:1 (+ fm, the flow factor baked into its recorded colour).
@@ -291,19 +309,39 @@
         // copies for the flagged events, never mutates: a held loop re-resolves
         // the same array every pass, so each loop gets its own roll (and the
         // resolve runs BEFORE the broadcast, so peers see the painter's roll).
+        // Random Multi-Brush arms (`ra`, a bitmask of arms past the first)
+        // get the same treatment: one fresh colour per arm per stroke, handed
+        // to emitReplayDab as `ac` (arm index -> colour), which pins them over
+        // the arm's live cache. Local only — `ac` never rides the broadcast,
+        // so a peer's arms still resolve from its own panel as before.
         function resolveReplayRandomness(events) {
             var any = false;
             for (var i = 0; i < events.length; i++) {
-                if (events[i].rnd) { any = true; break; }
+                if (events[i].rnd || events[i].ra) { any = true; break; }
             }
             if (!any || typeof window.generateVibrantColor !== 'function') return events;
-            var fresh = null;
+            var fresh = null, armFresh = null;
             return events.map(function (ev, idx) {
-                if (idx === 0 || ev.head) fresh = window.generateVibrantColor();
-                if (!ev.rnd) return ev;
+                if (idx === 0 || ev.head) {
+                    fresh = window.generateVibrantColor();
+                    armFresh = {};
+                }
+                if (!ev.rnd && !ev.ra) return ev;
                 var c = deepCopyEvent(ev);
-                var fm = (typeof ev.fm === 'number' && isFinite(ev.fm)) ? ev.fm : 1;
-                c.color = [fresh[0] * fm, fresh[1] * fm, fresh[2] * fm];
+                if (ev.rnd) {
+                    var fm = (typeof ev.fm === 'number' && isFinite(ev.fm)) ? ev.fm : 1;
+                    c.color = [fresh[0] * fm, fresh[1] * fm, fresh[2] * fm];
+                }
+                var ra = (typeof ev.ra === 'number' && isFinite(ev.ra)) ? (ev.ra | 0) : 0;
+                if (ra) {
+                    for (var a = 1; a < 30; a++) {
+                        if ((ra & (1 << a)) && !armFresh[a]) armFresh[a] = window.generateVibrantColor();
+                    }
+                    // Shared by every dab of the stroke: an arm that turns
+                    // random mid-stroke joins the same table, and the whole
+                    // stroke still reads as one roll per arm.
+                    c.ac = armFresh;
+                }
                 return c;
             });
         }
@@ -588,6 +626,25 @@
             // colour scales; Gate is a convergence, idempotent at full flow, so
             // it correctly does not scale at all.
             var col = (k < 1) ? applyPaintFlow(ev.color, normalizePaintFlow(1, k)) : ev.color;
+            // Preserve Randomness rolls for the random arms past the first
+            // (resolveReplayRandomness), pinned over their live cache for this
+            // dab only. A partial dab scales them the way it scales arm 0's
+            // colour above — only additive scales the value; Gate carries the
+            // share in __splatFlow, which every arm already reads.
+            var savedArmColorPin = window.__armColorPin;
+            var armPin = null;
+            if (ev.ac && typeof ev.ac === 'object') {
+                armPin = ev.ac;
+                if (k < 1 && !config.COLOR_GATE) {
+                    var share = normalizePaintFlow(1, k);
+                    armPin = {};
+                    for (var ak in ev.ac) {
+                        var ac = ev.ac[ak];
+                        if (ac) armPin[ak] = [ac[0] * share, ac[1] * share, ac[2] * share];
+                    }
+                }
+            }
+            window.__armColorPin = armPin;
             try {
                 if (typeof window.applyMultiSplatWith === 'function') {
                     window.applyMultiSplatWith(x, y, dx, dy, col,
@@ -625,6 +682,7 @@
                 config.BRUSH_VEL_STRENGTH = savedVelStr;
                 window.__armPushPin = savedArmPush;
                 window.__strokeMirrorPin = savedStrokeMir;
+                window.__armColorPin = savedArmColorPin;
             }
         }
         // ── Replay interpolation (2026-08-22) ────────────────────────────────

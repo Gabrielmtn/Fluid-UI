@@ -17,6 +17,12 @@
             // hijack this gate prevented — a stale non-'main' arm 0 from a
             // multi session overriding the picker — can't happen when the
             // panel and picker mirror each other).
+            // A replayed random arm's fresh roll (05d emitReplayDab, Preserve
+            // Randomness): the stroke's own colour for this arm, ahead of
+            // whatever the panel says now. Arms past the first only — arm 0's
+            // roll rides the event colour itself.
+            var pin = window.__armColorPin;
+            if (pin && armIndex > 0 && pin[armIndex]) return pin[armIndex];
             var cfg = multiArmColors[armIndex];
             if (!cfg || cfg.mode === 'main') return fallbackColor;
             // Arm 0's random/step DEFER to the legacy pointer.color pipeline:
@@ -410,6 +416,9 @@
         // property of the stroke that was painted, not of whoever is watching.
         // null = no pin, read the live panel.
         window.__armPushPin = null;
+        // Per-arm colour pin, same idea for a replayed stroke's random arms
+        // (arm index -> colour, see resolveArmColor). null = no pin.
+        window.__armColorPin = null;
 
         // exactColor: programmatic splat sources (path layers, audio scenes,
         // animations) pass true so their configured color is deposited as-is on
