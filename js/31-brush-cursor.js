@@ -134,18 +134,25 @@
     } catch (_) {}
     var ghostEl = document.createElement('canvas');
     ghostEl.id = 'brushCursorGhost';
-    // One layer under the dot (10050), so the hotspot always reads on top.
-    ghostEl.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;' +
-        'z-index:10049;display:none;will-change:transform,width,height;';
-    document.body.appendChild(ghostEl);
+    ghostEl.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;' +
+        'display:none;will-change:transform,width,height;';
+    // Clipped to the canvas like the arms below: near an edge a big tip used
+    // to spill over the sidebar and the strip (usertest 2026-10-03). One
+    // layer under the dot (10050), so the hotspot always reads on top.
+    var ghostClip = document.createElement('div');
+    ghostClip.id = 'brushCursorGhostClip';
+    ghostClip.style.cssText = 'position:fixed;left:0;top:0;overflow:hidden;pointer-events:none;' +
+        'z-index:10049;display:none;';
+    ghostClip.appendChild(ghostEl);
+    document.body.appendChild(ghostClip);
     // The other Multi-Brush arms' ghosts (see renderGhost). Clipped to the
     // canvas — an arm that lands off the edge paints nothing — and before
-    // ghostEl in the DOM, so the ghost under the pointer stays on top.
+    // the ghost's clip in the DOM, so the ghost under the pointer stays on top.
     var armWrap = document.createElement('div');
     armWrap.id = 'brushCursorArms';
     armWrap.style.cssText = 'position:fixed;left:0;top:0;overflow:hidden;pointer-events:none;' +
         'z-index:10049;display:none;';
-    document.body.insertBefore(armWrap, ghostEl);
+    document.body.insertBefore(armWrap, ghostClip);
     var pressed = false;
 
     var ghostToggle = document.getElementById('brushGhostToggle');
@@ -164,7 +171,7 @@
         ghostToggle.addEventListener('change', function () {
             ghostOn = !!ghostToggle.checked;
             try { localStorage.setItem(GHOST_KEY, ghostOn ? '1' : '0'); } catch (_) {}
-            if (!ghostOn) { ghostEl.style.display = 'none'; armWrap.style.display = 'none'; }
+            if (!ghostOn) { ghostEl.style.display = 'none'; armWrap.style.display = 'none'; ghostClip.style.display = 'none'; }
             applyGhostOpacity();
             requestRender();
         });
@@ -466,11 +473,28 @@
     //   there, k = CSS px per q unit (radiusRoot() × box.height). on = false
     //   hides it all.
     //   hide()
-    function ghostSet(mainTarget, armHost) {
+    // mainClip (optional): a position:fixed box holding mainTarget that this
+    // lays over the canvas and that clips to it, as armHost does for the arms,
+    // so the dab under the pointer can't spill onto the UI around the canvas.
+    function ghostSet(mainTarget, armHost, mainClip) {
         var masks = maskStore(2);
         var main = ghostPainter(mainTarget, masks);
         var arms = [];
-        var hostBox = '';
+        var hostBox = '', clipBox = '';
+        // Where the main ghost is drawn: the pointer itself, or relative to
+        // its clip once that sits over the canvas box.
+        function mainPoint(x, y, box) {
+            if (!mainClip) return { x: x, y: y };
+            var bk = box.left + ',' + box.top + ',' + box.width + ',' + box.height;
+            if (bk !== clipBox) {
+                clipBox = bk;
+                mainClip.style.transform = 'translate(' + box.left + 'px,' + box.top + 'px)';
+                mainClip.style.width = box.width + 'px';
+                mainClip.style.height = box.height + 'px';
+            }
+            if (mainClip.style.display !== 'block') mainClip.style.display = 'block';
+            return { x: x - box.left, y: y - box.top };
+        }
         function armPainter(i) {
             if (!arms[i]) {
                 var cv = armHost.ownerDocument.createElement('canvas');
@@ -485,9 +509,13 @@
             for (var i = from; i < arms.length; i++) arms[i].hide();
             if (!from && armHost.style.display !== 'none') armHost.style.display = 'none';
         }
-        function hide() { main.hide(); hideArms(0); }
+        function hide() {
+            main.hide(); hideArms(0);
+            if (mainClip && mainClip.style.display !== 'none') mainClip.style.display = 'none';
+        }
         function paint(on, k, dpr, x, y, box) {
-            if (!on) { main.paint(null, k, dpr, x, y); hideArms(0); return; }
+            if (!on) { hide(); return; }
+            var mp = mainPoint(x, y, box);
             // The pointer in multiSplat's frame: MAIN-canvas px relative to its
             // centre, through the box (as 02 getCanvasCoordinates maps a press;
             // the pen window's box is the same canvas, letterboxed).
@@ -504,7 +532,7 @@
                 A += window.faceCenterTurn(rx + W * 0.5, ry + H * 0.5, false) * 180 / Math.PI;
             }
             if (!list || (list.length === 1 && isIdentity(list[0].m))) {
-                main.paint(ghostSpec(0), k, dpr, x, y, { angle: A });
+                main.paint(ghostSpec(0), k, dpr, mp.x, mp.y, { angle: A });
                 hideArms(0);
                 return;
             }
@@ -524,7 +552,7 @@
                 // (An even rake has none — its bristles straddle the pointer.)
                 if (!underPointer && isIdentity(m)) {
                     underPointer = true;
-                    main.paint(ghostSpec(arm), k, dpr, x, y, opt);
+                    main.paint(ghostSpec(arm), k, dpr, mp.x, mp.y, opt);
                     continue;
                 }
                 var fx = m[0] * rx + m[1] * ry + m[2] + W * 0.5;
@@ -538,7 +566,7 @@
         return { paint: paint, hide: hide };
     }
 
-    var mainGhost = ghostSet(ghostEl, armWrap);
+    var mainGhost = ghostSet(ghostEl, armWrap, ghostClip);
     function renderGhost(x, y) {
         var r = canvas.getBoundingClientRect();
         mainGhost.paint(ghostOn && !pressed, radiusRoot() * r.height,
@@ -606,6 +634,7 @@
         el.style.display = 'none';
         ghostEl.style.display = 'none';
         armWrap.style.display = 'none';
+        ghostClip.style.display = 'none';
         if (canvas.style.cursor === 'none') canvas.style.cursor = '';
         if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
     }
