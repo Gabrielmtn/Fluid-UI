@@ -356,6 +356,8 @@
                     ? window.computeRenderSize(settleW, settleH)
                     : { w: settleW, h: settleH };
                 if (canvas.width !== settleR.w || canvas.height !== settleR.h) {
+                    if (window.__roomTrace) window.__roomTrace.resize({ from: [canvas.width, canvas.height],
+                        to: [settleR.w, settleR.h], css: [settleW, settleH], dpr: window.devicePixelRatio });   // 61 room report
                     canvas.width = settleR.w;
                     canvas.height = settleR.h;
                     canvas.style.width = settleW + 'px';

@@ -853,6 +853,7 @@
         window.__peerReplayCount = function () { return peerReplays.size; };
         // Allow multiplayer to schedule a stroke replay with normalized events
         window.scheduleStrokeReplay = function(normalizedEvents, senderId, meta) {
+            if (window.__roomTrace) window.__roomTrace.note('recv', 'replay', senderId, normalizedEvents);   // 61 room report
             var remoteEvents = (normalizedEvents || []).map(ev => ({
                 t: ev.t || 0,
                 x: (ev.x || 0) * canvas.width,

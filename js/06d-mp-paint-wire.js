@@ -887,6 +887,7 @@ function broadcastSplat(x, y, dx, dy, color, mult, radius, down) {
     // Publishes the stamp bitmap first if the room has not seen it (see
     // brushWireFields) — so this press stamp's `shape` id always resolves.
     const brush = brushWireFields();
+    if (window.__roomTrace) window.__roomTrace.note('sent', 'press', null, [[x, y]]);   // 61 room report
 
     partySocket.send(JSON.stringify({
         type: 'splat',
@@ -986,6 +987,7 @@ function flushDabs(color, mult, force) {
     _dabFlushAt = now;
     var dabs = _dabQueue.splice(0, DAB_MAX_PER_MSG);
     var last = dabs[dabs.length - 1];
+    if (window.__roomTrace) window.__roomTrace.note('sent', 'dabs', null, dabs);   // 61 room report
     // Footprint for this batch. A stroke paints with one shape, so this rides
     // per MESSAGE like color/mult/sym rather than per dab (~25 bytes, against
     // ~30 bytes for a single dab).
@@ -1023,6 +1025,7 @@ function broadcastCursor(x, y) {
     }
 
     if (!broadcastCursor.lastSent || Date.now() - broadcastCursor.lastSent > 50) {
+        if (window.__roomTrace) window.__roomTrace.note('sent', 'cursor', null, [[x, y]]);   // 61 room report
         partySocket.send(JSON.stringify({
             type: 'cursor',
             data: { x, y },
@@ -1451,6 +1454,7 @@ function handleRemoteSplat(data, from, to) {
                 const _n = Math.min(dabs.length, DAB_MAX_PER_MSG);
                 const _from = (typeof from === 'number') ? Math.max(0, Math.min(_n, from | 0)) : 0;
                 const _to = (typeof to === 'number') ? Math.max(_from, Math.min(_n, to | 0)) : _n;
+                if (window.__roomTrace) window.__roomTrace.note('recv', 'dabs', data.clientId, dabs.slice(_from, _to));   // 61 room report
                 for (let i = _from; i < _to; i++) {
                     const d = dabs[i];
                     if (!Array.isArray(d)) continue;
@@ -1514,6 +1518,8 @@ function handleRemoteSplat(data, from, to) {
             // previous stroke to the start of the next. pointer-up clears the
             // position, but the release TAIL now streams dabs after it and
             // re-seeds it, so the flag is what makes this reliable.
+            if (window.__roomTrace) window.__roomTrace.note('recv', 'press', data.clientId,
+                [[canvasX / Math.max(1, canvas.width), canvasY / Math.max(1, canvas.height)]]);   // 61 room report
             if (_raw.down) remoteLastPositions.delete(data.clientId);
             const lastPos = remoteLastPositions.get(data.clientId);
             // Gap-fill between network messages at ~12px spacing (matching how
@@ -1643,6 +1649,7 @@ function broadcastReplayStroke(events) {
         return o;
     });
     const meta = replayWireMeta();
+    if (window.__roomTrace) window.__roomTrace.note('sent', 'replay', null, q);   // 61 room report
     const chunks = [];
     let cur = [], bytes = 0;
     for (let i = 0; i < q.length; i++) {

@@ -20,6 +20,7 @@
 
 function handleRemoteCursor(data) {
     const { x, y } = data.data;
+    if (window.__roomTrace) window.__roomTrace.note('recv', 'cursor', data.clientId, [[x, y]]);   // 61 room report
     remoteCursors.set(data.clientId, { x, y, timestamp: data.timestamp });
     updateRemoteCursors();
 }

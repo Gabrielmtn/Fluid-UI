@@ -1898,6 +1898,11 @@
          a one-time note about it. Sits beside 52's clock and resets what
          04a/04b/04f/12/20 own, so it loads after all of them. -->
     <script src="js/60-reset-app.js"></script>
+    <!-- Copy room report: a trace of where strokes landed, sent and
+         received, plus the state that decides it, for the room bug nobody
+         could reproduce (strokes flipped between two demo players after a
+         resize). Reads hooks in 06d/06e/05d/05j; loads after the room client. -->
+    <script src="js/61-room-report.js"></script>
     <!-- Delete Palette Confirmation Modal -->
     <div id="deletePaletteModal" class="delete-modal">
         <div class="delete-modal-content">
