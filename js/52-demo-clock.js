@@ -12,9 +12,14 @@
 // underbar, beside Image Sharpness and Motion Detail; at 0:00 a modal asks
 // for a wishlist and opens the full game's store page (5068940 — the
 // wishlist lives on the parent app, not the demo). "Keep painting" winds
-// the clock back to 5:00. Nothing is locked and nothing about it is saved:
-// a relaunch is a fresh five minutes, and that is fine — the ask is the
-// point, not a wall.
+// the clock back, and every keep adds a minute to the next round (usertest
+// 2026-10-03): 5:00, then 6:00, 7:00... The ask counts the keeps, and from
+// the fifth on it offers "Leave me alone", which stops the ask and takes
+// the clock away. Pressing "Wishlist on Steam" does the same once the ask
+// closes: Steam has no way to tell a game that someone wishlisted it, and
+// the press is the best sign there is. Those three facts persist under
+// DEMO_STATE_KEY, outside the fluidUI: namespace so Settings → Clear leaves
+// them; the time itself is never saved, and nothing is ever locked.
 //
 // The clock starts once the first-run questions are answered (PhotoSafe,
 // the Simple | Everything fork) and runs only while the window is on
@@ -50,6 +55,25 @@
     var ARM_DELAY_MS = 600;
     var PITCH = 'The full game is this same canvas with no clock on it. ' +
                 'Wishlist it on Steam and you’ll hear the day it launches.';
+    var MINUTE_MS = 60 * 1000;
+    var QUIET_AFTER_KEEPS = 5;
+    var DEMO_STATE_KEY = 'swirlDemoAsk.v1';
+    // { keeps, quiet, wished } — see the header.
+    var askState = { keeps: 0, quiet: false, wished: false };
+    try {
+        var savedAsk = JSON.parse(localStorage.getItem(DEMO_STATE_KEY) || 'null');
+        if (savedAsk && typeof savedAsk === 'object') {
+            askState.keeps = Math.max(0, Math.min(1000, (savedAsk.keeps | 0)));
+            askState.quiet = !!savedAsk.quiet;
+            askState.wished = !!savedAsk.wished;
+        }
+    } catch (_) {}
+    function saveAskState() {
+        try { localStorage.setItem(DEMO_STATE_KEY, JSON.stringify(askState)); } catch (_) {}
+    }
+    // This round's length: five minutes, plus one for every keep so far.
+    function allowMs() { return DEMO_MS + askState.keeps * MINUTE_MS; }
+    function leftAlone() { return askState.quiet || askState.wished; }
 
     var started = false, expired = false;
     var usedMs = 0, lastMs = null, expiredAt = 0;
@@ -71,7 +95,7 @@
         lastMs = counting() ? now : null;
     }
 
-    function remainingMs() { return Math.max(0, DEMO_MS - usedMs); }
+    function remainingMs() { return Math.max(0, allowMs() - usedMs); }
 
     function fmt(ms) {
         var s = Math.ceil(ms / 1000);
@@ -81,7 +105,13 @@
 
     function tick() {
         fold();
-        if (started && !expired && usedMs >= DEMO_MS) {
+        // Left alone: no ask, ever. The round just starts over unseen.
+        if (leftAlone()) {
+            if (usedMs >= allowMs()) usedMs = 0;
+            render();
+            return;
+        }
+        if (started && !expired && usedMs >= allowMs()) {
             expired = true;
             expiredAt = performance.now();
             lastMs = null;
@@ -143,6 +173,10 @@
         // Nothing on screen until the app is: the clock would otherwise float
         // over the boot for the second before the underbar is built.
         if (!clock || !window.__scriptsReady) return;
+        // Left alone, the clock goes too — once the ask that set it is closed.
+        var gone = leftAlone() && !modalUp();
+        if (clock.hidden !== gone) clock.hidden = gone;
+        if (gone) return;
         place(clock);
         var t = fmt(remainingMs());
         if (btnEl.textContent !== t) {
@@ -167,6 +201,7 @@
                 '<div class="delete-modal-title" id="demoWishlistTitle"></div>' +
                 '<div class="delete-modal-message" id="demoWishlistMsg"></div>' +
                 '<div class="delete-modal-actions">' +
+                    '<button type="button" id="demoWishlistQuiet" hidden>Leave me alone</button>' +
                     '<button type="button" id="demoWishlistBack"></button>' +
                     '<button type="button" id="demoWishlistGo" class="btn--emphasis">Wishlist on Steam</button>' +
                 '</div>' +
@@ -176,6 +211,7 @@
             title: modal.querySelector('#demoWishlistTitle'),
             msg: modal.querySelector('#demoWishlistMsg'),
             back: modal.querySelector('#demoWishlistBack'),
+            quiet: modal.querySelector('#demoWishlistQuiet'),
             go: modal.querySelector('#demoWishlistGo')
         };
         // The scrim is not an answer: the tail of a stroke must not dismiss it.
@@ -186,16 +222,31 @@
         els.back.addEventListener('click', function () {
             if (performance.now() >= armedAt) close();
         });
+        els.quiet.addEventListener('click', function () {
+            if (performance.now() < armedAt) return;
+            askState.quiet = true;
+            saveAskState();
+            close();
+        });
     }
 
     function ask(kind) {
         buildModal();
         var timeUp = kind === 'timeup';
         askKind = kind;
-        els.title.textContent = timeUp ? 'That’s your five minutes' : 'Enjoying Swirl Together?';
+        var mins = Math.round(allowMs() / MINUTE_MS), keeps = askState.keeps;
+        els.title.textContent = timeUp
+            ? (keeps ? 'That’s your ' + mins + ' minutes' : 'That’s your five minutes')
+            : 'Enjoying Swirl Together?';
+        var count = '';
+        if (timeUp && keeps) {
+            count = ' You’ve kept going ' + (keeps === 1 ? 'once' : keeps + ' times') +
+                (keeps < QUIET_AFTER_KEEPS ? '. At ' + QUIET_AFTER_KEEPS + ', you can turn these off.' : '.');
+        }
         els.msg.textContent = (timeUp ? 'Thanks for painting in the Swirl Together demo. '
-                                      : 'This demo runs five minutes at a time. ') + PITCH;
-        els.back.textContent = timeUp ? 'Keep painting' : 'Back to painting';
+                                      : 'This demo runs ' + mins + ' minutes at a time. ') + PITCH + count;
+        els.back.textContent = timeUp ? 'Keep painting, ' + (mins + 1) + ' minutes' : 'Back to painting';
+        els.quiet.hidden = !(timeUp && keeps >= QUIET_AFTER_KEEPS);
         fold();
         modal.classList.add('show');
         fold();
@@ -219,11 +270,17 @@
         render();
     }
 
-    // Back to painting. After the time-up ask that is a fresh five minutes.
+    // Back to painting. After the time-up ask that is a fresh round, a
+    // minute longer than the last unless this close is the one that leaves
+    // the player alone.
     function close() {
         if (!modalUp()) return;
         fold();
-        if (askKind === 'timeup') { usedMs = 0; expired = false; }
+        if (askKind === 'timeup') {
+            if (!leftAlone()) { askState.keeps++; saveAskState(); }
+            usedMs = 0;
+            expired = false;
+        }
         modal.classList.remove('show');
         if (keyHandler) { document.removeEventListener('keydown', keyHandler, true); keyHandler = null; }
         fold();
@@ -248,6 +305,11 @@
         }
         els.msg.textContent = (inSteam ? 'Opening Swirl Together in Steam' : 'Opening Swirl Together’s Steam page') +
             ' — thank you! Your painting will be right here.';
+        // The best sign of a wishlist the demo can get: no more asks once
+        // this one is closed.
+        askState.wished = true;
+        saveAskState();
+        els.quiet.hidden = true;
     }
 
     // ── Start ────────────────────────────────────────────────────────
@@ -314,7 +376,7 @@
         setRemaining: function (ms) {
             if (!api.active) return;
             fold();
-            usedMs = Math.max(0, DEMO_MS - Math.max(0, +ms || 0));
+            usedMs = Math.max(0, allowMs() - Math.max(0, +ms || 0));
             fold();
             render();
         },
@@ -322,9 +384,11 @@
             if (!api.active) return;
             fold();
             started = true;
-            usedMs = DEMO_MS;
+            usedMs = allowMs();
             tick();
         },
+        // Support/test hook: the persisted keeps / quiet / wished.
+        askState: function () { return { keeps: askState.keeps, quiet: askState.quiet, wished: askState.wished }; },
         ask: function () { if (api.active && !modalUp()) ask(expired ? 'timeup' : 'early'); },
         enable: init
     };

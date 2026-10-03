@@ -2297,6 +2297,9 @@ body.mobile-mode #sidebar-right > #mixer-strip.ui-hidden { display: none !import
     align-items: flex-end;
     user-select: none;
 }
+/* "Leave me alone", or a wishlist press: the clock goes (js/52). */
+.demo-clock[hidden],
+.demo-wishlist-modal button[hidden] { display: none; }
 .demo-clock.floating,
 .playtest-label.floating {
     position: fixed;
