@@ -1444,6 +1444,11 @@
         // Expose for stats panel
 
         window.config = config;
+        // Every setting's starting value, before autoload or a preset touches
+        // it: 60-reset-app puts the brush drawer's engine settings (Spacing,
+        // Interval, Texture...) back from these, as the registry keeps no
+        // default for them.
+        window.__CONFIG_DEFAULTS = Object.freeze(JSON.parse(JSON.stringify(config)));
 
         // Snapshot baseline for potential adaptive logic
 

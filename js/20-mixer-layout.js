@@ -4986,6 +4986,9 @@
         }
         // D7-1: let a .fluid project import refresh the brush-preset chips.
         window.__refreshBrushPresets = function () { try { renderPresetChips(); } catch (_) {} };
+        // 60-reset-app drives the drawer back to its defaults through the
+        // same commit path a preset uses (config + persist + display).
+        window.__brushSetters = SETTERS;
         function renderPresetChips() {
             chipsWrap.innerHTML = '';
             var list = loadBrushPresets();
