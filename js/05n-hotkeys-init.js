@@ -446,6 +446,16 @@
                     if (lower === 'l') { toggleCheckbox('lockCanvasBorders'); return; }
                     if (lower === 'r') { toggleCheckbox('randomColor'); return; }
                     if (lower === 'a') { toggleCheckbox('stepPalette'); return; }
+                    // K turns the kaleidoscope on and off (usertest
+                    // 2026-10-03). A SOFT key, unlike the letters above:
+                    // presets already put text lines on K (Word bank, swirl
+                    // logo), so a binding someone made keeps it, and K is
+                    // deliberately absent from js/48's RESERVED.
+                    if (lower === 'k' && !(window.Hotkeys && typeof window.Hotkeys.find === 'function'
+                            && window.Hotkeys.find('KeyK').length)) {
+                        toggleCheckbox('kaleidoToggle');
+                        return;
+                    }
                 }
                 // E opens the radial menu (js/58-radial-menu.js, which owns the
                 // key). It started a video export from here until 2026-09-30;

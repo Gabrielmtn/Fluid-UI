@@ -2759,7 +2759,7 @@
             randomColor: 'Rnd', stepPalette: 'Palette mode', palette: 'Palette',
             multiplier: 'Multi-Brush', brushSize: 'Brush Size',
             kaleidoToggle: 'Kaleido', kaleidoMode: 'Kaleido Mode', kAngle: 'Kaleido Angle',
-            kTwist: 'Kaleido Twist', kZoom: 'Kaleido Zoom', kBlend: 'Kaleido Blend',
+            kTwist: 'Kaleido Twist', kZoom: 'Kaleido Zoom', kBlend: 'Kaleido Opacity',
             kAnimateRot: 'Kaleido Spin', kSpinSpeed: 'Kaleido Spin Speed',
             densityDissipation: 'Density Sustain', velocityDissipation: 'Velocity Sustain',
             pressureDissipation: 'Pressure Dissipation', pressureIteration: 'Pressure Iterations',
@@ -3507,13 +3507,12 @@
 
         moveCheckboxGroup('kaleidoToggle', body);
 
-        // Move contents from kaleidoscope panel
+        // The panel moves WHOLE, like Mandala's: 05f opens it only while
+        // the Kaleido checkbox is on. Emptying it into the body (as before)
+        // left Segments, Mode, Angle, Spin and the rest showing with the
+        // kaleidoscope off (usertest 2026-10-03).
         const panel = document.getElementById('kaleidoPanel');
-        if (panel) {
-            while (panel.firstChild) {
-                body.appendChild(panel.firstChild);
-            }
-        }
+        if (panel) body.appendChild(panel);
 
         return sec;
     }

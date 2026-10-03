@@ -1230,7 +1230,6 @@
         
         #kaleidoPanel.open {
             display: block;
-            min-height: 570px;
             max-height: none;
             margin-top: 10px;
         }

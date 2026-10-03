@@ -256,6 +256,9 @@
         { says: 'already locks the borders', test: function (k) { return k0(k) && k.lower === 'l'; } },
         { says: 'already toggles random colors', test: function (k) { return k0(k) && k.lower === 'r'; } },
         { says: 'already toggles palette mode', test: function (k) { return k0(k) && k.lower === 'a'; } },
+        // K (kaleidoscope on/off, 05n) is left out ON PURPOSE: it is a soft
+        // key that yields to any binding on K, because presets shipped text
+        // lines on it before it existed.
         { says: 'already opens the radial menu', test: function (k) { return k0(k) && k.lower === 'e'; } },
         { says: 'already mutates the settings', test: function (k) { return k0(k) && k.lower === 'm'; } },
         { says: 'already changes the brush size', test: function (k) { return noCA(k) && (k.key === '[' || k.key === ']'); } },
