@@ -64,7 +64,7 @@
       "kind": "slider",
       "configKey": "PRESSURE_DISSIPATION",
       "min": 0.9,
-      "max": 1.0333,
+      "max": 1,
       "step": 0.001,
       "def": 0.95,
       "mapping": "config.PRESSURE_DISSIPATION = parseFloat(value)",
