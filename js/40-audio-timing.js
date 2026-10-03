@@ -928,7 +928,7 @@
         var lead = opts.lead;
         var tNow = pos.time + opts.offsetMs / 1000;
         var pad = Math.max(3 * dpr, W * 0.012);
-        var labelH = fs * 1.9;
+        var labelH = 0;   // the strip that held the column labels (removed)
         var topY = pad;
         var hitY = H - labelH - Math.max(10 * dpr, H * 0.05);
         var travel = hitY - topY;
@@ -1048,40 +1048,9 @@
                 g.fillStyle = gr;
                 g.fillRect(hx, hitY - gh, barW, gh);
             }
-            // Band label under the line; a beat lane shows the tempo it
-            // locked instead (the band itself is on the sidebar row).
-            // FIT the text to its lane: sized off panel height alone, labels
-            // on a narrow panel overflowed and piled into their neighbours.
-            // Shrink to fit; below the legibility floor shorten to the low
-            // edge ("250+"); if even that can't fit, no label beats mush.
-            var txt = (lanes[j].method === 'beat' && lanes[j].bpm)
-                ? '♩ ' + Math.round(lanes[j].bpm)
-                : lanes[j].label;
-            var maxTw = laneW - 3 * dpr;
-            var lfs = fs;
-            g.font = lfs + 'px monospace';
-            var tw = g.measureText(txt).width;
-            if (tw > maxTw) {
-                lfs = Math.max(6.5 * dpr, lfs * maxTw / tw);
-                g.font = lfs + 'px monospace';
-                tw = g.measureText(txt).width;
-                if (tw > maxTw) {
-                    txt = txt.replace(/–.*$/, '+');
-                    if (g.measureText(txt).width > maxTw) txt = '';
-                }
-            }
-            if (txt) {
-                // Centred in the strip BELOW the line, on a dark pill: the
-                // hit-line glow and struck bars falling past the line were
-                // running straight through the text.
-                var ly = hitY + (H - hitY) * 0.5;
-                var tw2 = g.measureText(txt).width;
-                g.fillStyle = 'rgba(5,7,12,0.88)';
-                g.fillRect(hx + barW / 2 - tw2 / 2 - 3 * dpr, ly - lfs * 0.66, tw2 + 6 * dpr, lfs * 1.32);
-                g.fillStyle = rgba(cc, 0.95);
-                g.textAlign = 'center'; g.textBaseline = 'middle';
-                g.fillText(txt, hx + barW / 2, ly);
-            }
+            // No label under the column (usertest 2026-10-03: they added
+            // nothing). A beat lane's tempo is on its sidebar row's method
+            // button, the band on the row itself.
         }
 
         // Paused reads as deliberate, not broken
