@@ -2912,12 +2912,32 @@
             if (tipEl) tipEl.classList.remove('show');
         }
 
+        // Picking a variant, Undo, Redo, Reset and the chain crumbs all
+        // re-apply a look snapshot. Three of its keys belong to the audio
+        // DEVICE, not the look: re-applying them fires a synthetic change
+        // that stops the audio engine and drops a loaded track, which nothing
+        // here can bring back (usertest 2026-10-03: "undo in mutate doesn't
+        // fully undo with audio files"). Look links and the room mirror skip
+        // the same keys. They stay IN the snapshot, where the engine's
+        // feature gates read whether audio is on.
+        var MUTATE_SKIP = { checkboxes: ['audioReactToggle'], selects: ['audioMode', 'audioReactSource'] };
+        function applyMutateLook(snap) {
+            if (!snap) return;
+            var s = Object.assign({}, snap);
+            Object.keys(MUTATE_SKIP).forEach(function (sec) {
+                if (!s[sec]) return;
+                s[sec] = Object.assign({}, s[sec]);
+                MUTATE_SKIP[sec].forEach(function (k) { delete s[sec][k]; });
+            });
+            window.applyPresetSnapshot(s);
+        }
+
         // Apply a specific variant
         function applyVariant(idx) {
             var variant = _variants[idx];
             if (!variant || !window.applyPresetSnapshot) return;
 
-            window.applyPresetSnapshot(variant);
+            applyMutateLook(variant);
 
             // Push to chain
             engine.chain.push(variant, 'Mutation ' + engine.chain.length);
@@ -2975,7 +2995,7 @@
                 crumb.addEventListener('click', function () {
                     var jumped = engine.chain.jump(i);
                     if (jumped && window.applyPresetSnapshot) {
-                        window.applyPresetSnapshot(jumped.snapshot);
+                        applyMutateLook(jumped.snapshot);
                         _baseSnapshot = jumped.snapshot;
                         _variants = [];
                         renderGrid();
@@ -3008,7 +3028,7 @@
         if (undoBtn) undoBtn.addEventListener('click', function () {
             var entry = engine.chain.back();
             if (entry && window.applyPresetSnapshot) {
-                window.applyPresetSnapshot(entry.snapshot);
+                applyMutateLook(entry.snapshot);
                 _baseSnapshot = entry.snapshot;
                 _variants = [];
                 renderGrid();
@@ -3020,7 +3040,7 @@
         if (redoBtn) redoBtn.addEventListener('click', function () {
             var entry = engine.chain.forward();
             if (entry && window.applyPresetSnapshot) {
-                window.applyPresetSnapshot(entry.snapshot);
+                applyMutateLook(entry.snapshot);
                 _baseSnapshot = entry.snapshot;
                 _variants = [];
                 renderGrid();
@@ -3032,7 +3052,7 @@
         if (resetBtn) resetBtn.addEventListener('click', function () {
             var first = engine.chain.length > 0 ? engine.chain.jump(0) : null;
             if (first && window.applyPresetSnapshot) {
-                window.applyPresetSnapshot(first.snapshot);
+                applyMutateLook(first.snapshot);
                 _baseSnapshot = first.snapshot;
             }
             engine.chain.clear();
