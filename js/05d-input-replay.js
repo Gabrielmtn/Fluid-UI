@@ -1327,17 +1327,34 @@
             try { el.setPointerCapture(e.pointerId); } catch (_) {}
             if (typeof window.__sliderApplyFraction === 'function') window.__sliderApplyFraction(el, e.clientX);
         }
-        function chordSliderEnd(e) {
+        function chordSliderEnd(e, atPointer) {
             const cs = chordSlider;
             chordSlider = null;
             if (!cs) return;
             try { cs.el.releasePointerCapture(cs.id); } catch (_) {}
-            if (typeof window.__sliderApplyFraction === 'function') window.__sliderApplyFraction(cs.el, e.clientX);
+            if (atPointer !== false && typeof window.__sliderApplyFraction === 'function') window.__sliderApplyFraction(cs.el, e.clientX);
             cs.el.dispatchEvent(new Event('change', { bubbles: true }));
         }
+        // Letting go of Replay FIRST makes the slider button the last one up,
+        // and the last release is a real pointerup, never a chorded move — so
+        // the move handler below never saw it and the fader followed the
+        // pointer until the window lost focus; clicks could not free it
+        // (usertest 2026-10-03, the Velocity fader). Any pointerup ends the
+        // drag at the release point; a cancel or a lost capture ends it where
+        // it is.
+        function chordSliderRelease(e) {
+            if (!chordSlider || e.pointerId !== chordSlider.id) return;
+            chordSliderEnd(e, e.type === 'pointerup');
+        }
+        document.addEventListener('pointerup', chordSliderRelease, true);
+        document.addEventListener('pointercancel', chordSliderRelease, true);
+        document.addEventListener('lostpointercapture', chordSliderRelease, true);
         document.addEventListener('pointermove', (e) => {
             if (chordSlider && e.pointerId === chordSlider.id) {
                 if (typeof e.button !== 'number' || e.button < 0) {
+                    // Self-heal: a plain move with the grabbing button no
+                    // longer held means its release went missing somewhere.
+                    if (!(e.buttons & buttonBit(chordSlider.button))) { chordSliderEnd(e, false); return; }
                     if (typeof window.__sliderApplyFraction === 'function') window.__sliderApplyFraction(chordSlider.el, e.clientX);
                     return;
                 }
