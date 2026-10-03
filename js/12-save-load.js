@@ -1821,7 +1821,7 @@
     // is exactly the state it used to land on. When a look default changes
     // again: bump LOOK_BASELINE_GEN and add that generation's entry to
     // LOOK_BASELINE_MOVES.
-    var LOOK_BASELINE_GEN = 3;
+    var LOOK_BASELINE_GEN = 4;
     // Per generation, the keys whose default it MOVED, at the value they had
     // before the move. A snapshot taken against generation g fills its gaps
     // from every entry newer than g, the oldest value winning when a key
@@ -1844,7 +1844,10 @@
         },
         // 2026-09-25: Multi-Brush arms turn the tip with them (05g
         // armStampTurn); before, every arm printed at the brush's angle.
-        3: { checkboxes: { symmetrySameAngle: true } }
+        3: { checkboxes: { symmetrySameAngle: true } },
+        // 2026-10-03 (user test 3): the demo opened with Motion Isolation at
+        // its max and paint that never faded. Now 2 and 0.99.
+        4: { sliders: { velocityInfluence: 5, densityDissipation: 1 } }
     };
     var FILL_SECTIONS = { sliders: 1, checkboxes: 1, selects: 1 };
     // What a snapshot of generation `gen` fills its gaps from, or null when

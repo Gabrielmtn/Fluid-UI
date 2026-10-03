@@ -329,7 +329,7 @@
 
             TEXTURE_DOWNSAMPLE: 1,
 
-            DENSITY_DISSIPATION: 1.0,     // No fade: paint stays until it is moved (the "Nice for default" look, 2026-09-24; was 0.993)
+            DENSITY_DISSIPATION: 0.99,    // Paint halves about every 1.1 s (usertest 2026-10-03; was 1.0 "never fades" from 2026-09-24, 0.993 before)
 
             VELOCITY_DISSIPATION: 1.0009, // Motion keeps going; Viscosity and Max Speed bound it (2026-09-24; was 0.999)
 
@@ -443,7 +443,7 @@
 
             SIM_RESOLUTION: 512,      // Ultra physics by default on desktop (mobile overrides below)
 
-            VELOCITY_INFLUENCE: 5,    // Motion isolation (1.0 = full motion, 5.0 = maximum isolation). Default look 2026-09-24 (was 2.5).
+            VELOCITY_INFLUENCE: 2,    // Motion isolation (1.0 = full motion, 5.0 = maximum isolation). 2 since usertest 2026-10-03 (5, the max, from 2026-09-24; 2.5 before).
 
             // ── Max-fidelity tiers (branch: perf-max-tiers) ───────────────
             // Three knobs that buy fidelity a resolution number cannot, each

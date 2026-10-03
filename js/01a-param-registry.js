@@ -25,7 +25,7 @@
     // Dynamically-created controls (no static markup; hydrated from DOM at runtime):
     // ["audioSensitivity","audioBeatThreshold","audioReactToggle","arMapAutoSplat","arMapSize","arMapKaleido","arMapColor","focusModeToggle","streamFormatLock","audioReactSource","audioAutoSplatMode","splatInMode","splatOutMode"]
     var SLIDERS = {
-        densityDissipation: {configKey: "DENSITY_DISSIPATION", ui: {min: 0.85, max: 1.005, step: 0.0001}, hard: {min: 0.85, max: 1.005}, def: 1, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.85, max: 1.005, step: 0.0001, scope: "basic"}},
+        densityDissipation: {configKey: "DENSITY_DISSIPATION", ui: {min: 0.85, max: 1.005, step: 0.0001}, hard: {min: 0.85, max: 1.005}, def: 0.99, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.85, max: 1.005, step: 0.0001, scope: "basic"}},
         velocityDissipation: {configKey: "VELOCITY_DISSIPATION", ui: {min: 0.9, max: 1.0009, step: 0.0001}, hard: {min: 0.5, max: 1.0009}, def: 1.0009, decimals: 4, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0.9, max: 1.0009, step: 0.0001, scope: "basic"}},
         // Max 1.0 (was 1.0333, usertest 2026-10-03): above 1 the warm start
         // multiplies last frame's pressure up every frame (~7x a second at
@@ -52,7 +52,7 @@
         overflowBand: {configKey: null, ui: {min: 0.5, max: 15, step: 0.5}, hard: {min: 0.5, max: 25}, def: 2.5, decimals: 1, category: "effects", perfTier: 0, simSlider: false},
         // Breathing effect (js/45-breathing.js) — read live by the module, not via config.
         breathStrength: {configKey: null, ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 0.5, decimals: 2, category: "effects", perfTier: 0, simSlider: false},
-        velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 5, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
+        velocityInfluence: {configKey: "VELOCITY_INFLUENCE", ui: {min: 1, max: 5, step: 0.001}, hard: {min: 1, max: 5}, def: 2, decimals: 3, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 1, max: 5, step: 0.001, scope: "extended"}},
         curl: {configKey: "CURL", ui: {min: 0, max: 60, step: 1}, hard: {min: 0, max: 60}, def: 0, decimals: 0, category: "simulation", perfTier: 0, simSlider: true, mut: {min: 0, max: 60, step: 1, scope: "basic"}},
         velocityCap: {configKey: "VELOCITY_CAP", ui: {min: 5, max: 60, step: 1}, hard: {min: 5, max: 60}, def: 30, decimals: 0, category: "simulation", perfTier: 0, simSlider: false, mut: {min: 15, max: 60, step: 1, scope: "extended"}},
         // Grain Cleanup (2026-09-18): the M2 dye spectral floor, HF_FLOOR_DYE
