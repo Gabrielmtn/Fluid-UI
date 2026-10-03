@@ -332,7 +332,7 @@
     },
     {
       "name": "strokeReplay",
-      "activate": "window.scheduleStrokeReplay(normalizedEvents);  /* normalizedEvents = [{t, x, y, dx, dy, color:[r,g,b], mult, radius, tip, shape}] with x/y/dx/dy normalized 0..1 (js/05d-input-replay.js:472-489); sets isReplayActive=true and window._activeReplayEvents; processReplay() consumes them inside update() (called at js/05j-update-loop.js:225, even while paused). Interactive path: hold right mouse button on the canvas (js/05d-input-replay.js:510-530). Time-window replay of recent strokes: buildTimeReplayEvents() honors window.replayTimePeriod seconds (js/05d-input-replay.js:224-260). */",
+      "activate": "window.scheduleStrokeReplay(normalizedEvents);  /* normalizedEvents = [{t, x, y, dx, dy, color:[r,g,b], mult, radius, tip, shape}] with x/y/dx/dy normalized 0..1 (js/05d-input-replay.js:472-489); plays on that sender's own playhead (05d peerReplays, keyed by the second arg, senderId; optional third arg = the sender's sym/at/fc/speed), never on this canvas's own replay state; processReplay() advances them inside update() (called at js/05j-update-loop.js:225, even while paused). Interactive path: hold right mouse button on the canvas (js/05d-input-replay.js:510-530). Time-window replay of recent strokes: buildTimeReplayEvents() honors window.replayTimePeriod seconds (js/05d-input-replay.js:224-260). */",
       "deactivate": "isReplayActive = false; window._activeReplayEvents = null;  /* also ends naturally when events are exhausted (js/05d-input-replay.js:459-470) */",
       "activeCheck": "isReplayActive === true",
       "touchesSharedState": [

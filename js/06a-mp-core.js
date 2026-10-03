@@ -663,7 +663,9 @@ function onMultiplayerMessage(event) {
                 // Receive full stroke replay from another client
                 if (data.clientId !== clientId && Array.isArray(data.data?.events)) {
                     if (typeof window.scheduleStrokeReplay === 'function') {
-                        window.scheduleStrokeReplay(data.data.events);
+                        // Sender id: each peer's replay plays on its own
+                        // playhead (05d peerReplays); data.data = its meta.
+                        window.scheduleStrokeReplay(data.data.events, data.clientId, data.data);
                     }
                 }
                 break;

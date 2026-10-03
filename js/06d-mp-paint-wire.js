@@ -1578,7 +1578,27 @@ function handleRemoteSplat(data, from, to) {
 // party/shared.ts) — which is why replay never reached peers: any decent
 // stroke's JSON blows the cap. Quantize the numbers (≈halves the bytes)
 // and chunk under the limit; the receiver reassembles by sid/seq (2026-07-13).
-const STROKE_CHUNK_EVENTS = 80; // ~90 quantized bytes/event → ~7KB/chunk, wide margin
+// Chunks are cut by SIZE (2026-10-03). They were 80 events each, but an event
+// carrying a shape id, push, an arm mask, a mirror and a head runs ~195 bytes,
+// so a chunk could land within bytes of the cap, and one over it is dropped
+// silently, taking the whole replay with it.
+const STROKE_CHUNK_BYTES = 12000;
+const STROKE_CHUNK_MAX = 64;    // handleStrokeChunk refuses a longer train
+// The painter's Multi-Brush layout and Replay Speed ride with a replay
+// (usertest 2026-10-03; read by 05d peerReplayMeta). The layout is the one
+// the painter's own replay folds through right now, the same fields as the
+// live wire's (sym above, at/fc in brushWireFields); without it a peer folded
+// the arms through ITS mode. Speed paces each pass so a held loop takes as
+// long on the peer as here.
+function replayWireMeta() {
+    const cfg = window.config || {};
+    const m = { sym: cfg.SYMMETRY_MODE || 'radial' };
+    if (!cfg.SYM_SAME_ANGLE) m.at = 1;
+    if (cfg.SYM_FACE_CENTER) m.fc = 1;
+    const sp = window.replaySpeed;
+    if (typeof sp === 'number' && isFinite(sp) && sp > 0) m.speed = +sp.toFixed(3);
+    return m;
+}
 function broadcastReplayStroke(events) {
     if (!isMultiplayerEnabled || !partySocket || partySocket.readyState !== WebSocket.OPEN) {
         return;
@@ -1622,16 +1642,31 @@ function broadcastReplayStroke(events) {
         if (ev.mir) o.mir = ev.mir | 0;
         return o;
     });
-    if (q.length <= STROKE_CHUNK_EVENTS) {
-        partySocket.send(JSON.stringify({ type: 'stroke', data: { events: q }, timestamp: Date.now() }));
+    const meta = replayWireMeta();
+    const chunks = [];
+    let cur = [], bytes = 0;
+    for (let i = 0; i < q.length; i++) {
+        const n = JSON.stringify(q[i]).length + 1;
+        if (cur.length && bytes + n > STROKE_CHUNK_BYTES) { chunks.push(cur); cur = []; bytes = 0; }
+        cur.push(q[i]);
+        bytes += n;
+    }
+    if (cur.length) chunks.push(cur);
+    if (!chunks.length) return;
+    if (chunks.length === 1) {
+        partySocket.send(JSON.stringify({ type: 'stroke', data: Object.assign({ events: chunks[0] }, meta), timestamp: Date.now() }));
+        return;
+    }
+    if (chunks.length > STROKE_CHUNK_MAX) {
+        console.warn('[MP] replay too long to send (' + q.length + ' events, ' + chunks.length + ' chunks)');
         return;
     }
     const sid = Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
-    const total = Math.ceil(q.length / STROKE_CHUNK_EVENTS);
+    const total = chunks.length;
     for (let i = 0; i < total; i++) {
         partySocket.send(JSON.stringify({
             type: 'stroke-chunk',
-            data: { sid, seq: i, total, events: q.slice(i * STROKE_CHUNK_EVENTS, (i + 1) * STROKE_CHUNK_EVENTS) },
+            data: Object.assign({ sid, seq: i, total, events: chunks[i] }, meta),
             timestamp: Date.now()
         }));
     }
@@ -1653,10 +1688,14 @@ function handleStrokeChunk(data) {
         buf.chunks[d.seq] = d.events;
         buf.received++;
     }
+    // Every chunk carries the painter's layout and speed (replayWireMeta).
+    if (typeof d.sym === 'string') buf.meta = { sym: d.sym, at: d.at, fc: d.fc, speed: d.speed };
     if (buf.received === buf.total) {
         strokeChunkBuffers.delete(key);
         const all = [].concat.apply([], buf.chunks);
-        if (typeof window.scheduleStrokeReplay === 'function') window.scheduleStrokeReplay(all);
+        if (typeof window.scheduleStrokeReplay === 'function') {
+            window.scheduleStrokeReplay(all, data.clientId, buf.meta || null);
+        }
     }
     // GC stale partial buffers (peer left mid-stroke)
     const now = Date.now();

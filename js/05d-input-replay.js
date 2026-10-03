@@ -15,13 +15,14 @@
         // than re-derived from a start stamp: (now - start) * speed re-scales
         // the whole elapsed history, so moving the Replay Speed slider during a
         // held (looping) replay teleported the playhead — forward if you sped
-        // up, backward if you slowed down. replayFrac is how much of the
-        // segment leading into events[replayIndex] has already been deposited.
-        let replayClock = 0;
-        let replayLastMs = 0;
-        let replayIndex = 0;
-        let replayFrac = 0;
-        let replayDebt = 0;
+        // up, backward if you slowed down. frac is how much of the segment
+        // leading into events[index] has already been deposited.
+        // One playhead per player: this canvas's own replay, and one per peer
+        // whose broadcast replay is playing here (peerReplays, below).
+        function newReplayHead() {
+            return { clock: 0, lastMs: Date.now(), index: 0, frac: 0, debt: 0 };
+        }
+        let replayHead = newReplayHead();
         // History of completed strokes for time-based replay
         let strokeHistory = [];
         // ─── Splat Envelope ───────────────────────────────────────────
@@ -440,11 +441,7 @@
                     }
                 }
             } catch (_) {}
-            replayIndex = 0;
-            replayFrac = 0;
-            replayDebt = 0;
-            replayClock = 0;
-            replayLastMs = Date.now();
+            replayHead = newReplayHead();
             isReplayActive = true;
             // Broadcast full stroke to multiplayer
             if (broadcast && typeof broadcastReplayStroke === 'function') {
@@ -710,66 +707,72 @@
             if (!(span > 0) || span > REPLAY_GAP_MS) return false;
             return Math.hypot(ev.x - prev.x, ev.y - prev.y) <= REPLAY_GAP_FRAC * canvas.width;
         }
+        // Plays `events` on playhead `ph` up to this frame; true once the
+        // last event is down. Shared by this canvas's replay and the peers'.
+        function advanceReplay(ph, events, speed) {
+            // Advance the playhead by THIS frame at the CURRENT speed, so
+            // the slider retimes what is left to play instead of rescaling
+            // what has already played. Capped so a hitch (or a tab that was
+            // in the background) resumes the replay rather than dumping
+            // every dab it owes into one frame.
+            var nowMs = Date.now();
+            var dt = nowMs - ph.lastMs;
+            if (!(dt > 0)) dt = 0; else if (dt > 100) dt = 100;
+            ph.lastMs = nowMs;
+            ph.clock += dt * speed;
+            var elapsed = ph.clock;
+            while (ph.index < events.length) {
+                var ev = events[ph.index];
+                var prev = ph.index > 0 ? events[ph.index - 1] : null;
+                if (!replayLerpable(prev, ev)) {
+                    if (ev.t > elapsed) break;
+                    emitReplayDab(ev, ev.x, ev.y, ev.dx, ev.dy, 1);
+                    ph.index++;
+                    ph.frac = 0;
+                    ph.debt = 0;   // a whole dab opens a fresh account
+                    continue;
+                }
+                // How far into this segment the playhead has reached, and
+                // how much of that is still undeposited — ph.frac is
+                // what earlier frames already laid down.
+                var f = (elapsed - prev.t) / (ev.t - prev.t);
+                if (f > 1) f = 1;
+                if (f > ph.frac) {
+                    var k = f - ph.frac + ph.debt;
+                    // A sliver of a dab deposits nothing anyone can see and
+                    // still costs the splat its two GPU passes. Frame time
+                    // never divides a segment exactly, so one lands at every
+                    // segment boundary: measured k ~ 0.000005, and 19 of a
+                    // 1x replay's 39 dabs were these. Don't spend a splat on
+                    // it — hold it (ph.frac still owes it) or, if the
+                    // segment is finishing, carry it to the next dab. Either
+                    // way the stroke lands exactly the paint it recorded.
+                    if (k >= REPLAY_MIN_K) {
+                        emitReplayDab(ev,
+                            prev.x + (ev.x - prev.x) * f,
+                            prev.y + (ev.y - prev.y) * f,
+                            ev.dx * k, ev.dy * k, k);
+                        ph.frac = f;
+                        ph.debt = 0;
+                    } else if (f >= 1) {
+                        ph.debt = k;
+                    }
+                }
+                if (f < 1) break;   // this segment still has road left
+                ph.index++;
+                ph.frac = 0;
+            }
+            return ph.index >= events.length;
+        }
         function processReplay() {
+            processPeerReplays();
             if (!isReplayActive) return;
             var events = window._activeReplayEvents;
             if (!events || !events.length) { isReplayActive = false; return; }
             try {
                 var speed = (typeof window.replaySpeed === 'number' && window.replaySpeed > 0)
                     ? window.replaySpeed : 1;
-                // Advance the playhead by THIS frame at the CURRENT speed, so
-                // the slider retimes what is left to play instead of rescaling
-                // what has already played. Capped so a hitch (or a tab that was
-                // in the background) resumes the replay rather than dumping
-                // every dab it owes into one frame.
-                var nowMs = Date.now();
-                var dt = nowMs - replayLastMs;
-                if (!(dt > 0)) dt = 0; else if (dt > 100) dt = 100;
-                replayLastMs = nowMs;
-                replayClock += dt * speed;
-                var elapsed = replayClock;
-                while (replayIndex < events.length) {
-                    var ev = events[replayIndex];
-                    var prev = replayIndex > 0 ? events[replayIndex - 1] : null;
-                    if (!replayLerpable(prev, ev)) {
-                        if (ev.t > elapsed) break;
-                        emitReplayDab(ev, ev.x, ev.y, ev.dx, ev.dy, 1);
-                        replayIndex++;
-                        replayFrac = 0;
-                        replayDebt = 0;   // a whole dab opens a fresh account
-                        continue;
-                    }
-                    // How far into this segment the playhead has reached, and
-                    // how much of that is still undeposited — replayFrac is
-                    // what earlier frames already laid down.
-                    var f = (elapsed - prev.t) / (ev.t - prev.t);
-                    if (f > 1) f = 1;
-                    if (f > replayFrac) {
-                        var k = f - replayFrac + replayDebt;
-                        // A sliver of a dab deposits nothing anyone can see and
-                        // still costs the splat its two GPU passes. Frame time
-                        // never divides a segment exactly, so one lands at every
-                        // segment boundary: measured k ~ 0.000005, and 19 of a
-                        // 1x replay's 39 dabs were these. Don't spend a splat on
-                        // it — hold it (replayFrac still owes it) or, if the
-                        // segment is finishing, carry it to the next dab. Either
-                        // way the stroke lands exactly the paint it recorded.
-                        if (k >= REPLAY_MIN_K) {
-                            emitReplayDab(ev,
-                                prev.x + (ev.x - prev.x) * f,
-                                prev.y + (ev.y - prev.y) * f,
-                                ev.dx * k, ev.dy * k, k);
-                            replayFrac = f;
-                            replayDebt = 0;
-                        } else if (f >= 1) {
-                            replayDebt = k;
-                        }
-                    }
-                    if (f < 1) break;   // this segment still has road left
-                    replayIndex++;
-                    replayFrac = 0;
-                }
-                if (replayIndex >= events.length) {
+                if (advanceReplay(replayHead, events, speed)) {
                     // Right button still held → loop, and REBROADCAST each
                     // pass. Loops used to skip the rebroadcast (anti-spam),
                     // so a held replay repeated on the painter's canvas while
@@ -788,8 +791,68 @@
                 window._activeReplayEvents = null;
             }
         }
+        // ── Peers' broadcast replays (usertest 2026-10-03) ──────────────────
+        // A peer's replay used to load into THIS canvas's own player: it set
+        // _activeReplayEvents and isReplayActive, and isReplayActive is what
+        // gates your own pointer, brush engine and stroke recording. So while
+        // a friend held Replay your long drags never left (only press dots
+        // did), and each gap between their loops let a straight run out from
+        // a stale anchor: "something is getting flooded... cuts me off for
+        // small jagged inputs". Holding Replay yourself meanwhile even looped
+        // THEIR stroke and rebroadcast it as yours. Each sender now plays on
+        // its own playhead, keyed by clientId; a new arrival from the same
+        // sender restarts theirs (which keeps a held loop in lockstep). Your
+        // input never waits on it.
+        //   meta (newer senders): sym/at/fc = the painter's Multi-Brush layout
+        //   (their own replay folds through it, so peers fold the same way —
+        //   the receiver's own mode used to fold it), speed = their Replay
+        //   Speed, so each pass takes as long here as there.
+        var peerReplays = new Map();   // clientId -> { events, head, meta }
+        function processPeerReplays() {
+            if (!peerReplays.size) return;
+            var cfg = window.config || config;
+            peerReplays.forEach(function (p, id) {
+                var m = p.meta, saved = null;
+                if (m && m.sym) {
+                    saved = { sym: cfg.SYMMETRY_MODE, same: cfg.SYM_SAME_ANGLE, face: cfg.SYM_FACE_CENTER };
+                    cfg.SYMMETRY_MODE = m.sym;
+                    cfg.SYM_SAME_ANGLE = m.at !== 1;
+                    cfg.SYM_FACE_CENTER = m.fc === 1;
+                }
+                try {
+                    var speed = (m && m.speed) ? m.speed
+                        : ((typeof window.replaySpeed === 'number' && window.replaySpeed > 0) ? window.replaySpeed : 1);
+                    if (advanceReplay(p.head, p.events, speed)) peerReplays.delete(id);
+                } catch (err) {
+                    peerReplays.delete(id);
+                } finally {
+                    if (saved) {
+                        cfg.SYMMETRY_MODE = saved.sym;
+                        cfg.SYM_SAME_ANGLE = saved.same;
+                        cfg.SYM_FACE_CENTER = saved.face;
+                    }
+                }
+            });
+        }
+        function peerReplayMeta(meta) {
+            if (!meta || typeof meta !== 'object' || typeof meta.sym !== 'string') return null;
+            // Coerced like 06d's live pin: a cached bundle can still send a
+            // retired mode, and an unknown one must never reach config.
+            var sym = meta.sym;
+            try {
+                if (window.ParamRegistry && window.ParamRegistry.coerceSelect) {
+                    sym = window.ParamRegistry.coerceSelect('symmetryMode', sym) || 'radial';
+                }
+            } catch (_) { sym = 'radial'; }
+            var out = { sym: sym, at: meta.at === 1 ? 1 : 0, fc: meta.fc === 1 ? 1 : 0, speed: 0 };
+            if (typeof meta.speed === 'number' && isFinite(meta.speed) && meta.speed > 0) {
+                out.speed = Math.max(0.05, Math.min(8, meta.speed));
+            }
+            return out;
+        }
+        window.__peerReplayCount = function () { return peerReplays.size; };
         // Allow multiplayer to schedule a stroke replay with normalized events
-        window.scheduleStrokeReplay = function(normalizedEvents) {
+        window.scheduleStrokeReplay = function(normalizedEvents, senderId, meta) {
             var remoteEvents = (normalizedEvents || []).map(ev => ({
                 t: ev.t || 0,
                 x: (ev.x || 0) * canvas.width,
@@ -826,13 +889,8 @@
                 mir: (typeof ev.mir === 'number' && isFinite(ev.mir)) ? (ev.mir | 0) : undefined
             }));
             if (!remoteEvents.length) return;
-            window._activeReplayEvents = remoteEvents;
-            replayIndex = 0;
-            replayFrac = 0;
-            replayDebt = 0;
-            replayClock = 0;
-            replayLastMs = Date.now();
-            isReplayActive = true;
+            peerReplays.set(senderId != null ? String(senderId) : '?',
+                { events: remoteEvents, head: newReplayHead(), meta: peerReplayMeta(meta) });
         };
         // ── Painting lifecycle: POINTER events (pen + mouse) with capture ──
         // Every other interactive surface here (draggables, layer transforms,
