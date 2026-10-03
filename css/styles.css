@@ -985,6 +985,9 @@
             right: 0;
             bottom: 0;
             height: 38vh;
+            /* Backstop for 03's drag cap: never over 60% of the window. The
+               drawer is zoomed by --ui-scale, so the cap is divided by it. */
+            max-height: calc(60vh / var(--ui-scale, 1));
             background: linear-gradient(180deg, rgba(235, 238, 244, 1), rgba(218, 224, 235, 1));
             border-top: 1px solid rgba(255, 255, 255, 0.6);
             box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45), inset 0 1px rgba(255,255,255,0.8);
@@ -1030,7 +1033,7 @@
         .rec-timeline { width: 100%; max-width: 100%; height: 36px; display: block; margin-top: 6px; background: linear-gradient(180deg, #f6f7fb, #e6eaf3); border-radius: 6px; box-shadow: inset 0 1px rgba(255,255,255,0.9), inset 0 -1px rgba(0,0,0,0.04); position: relative; box-sizing: border-box; }
 .rec-drawer label { color: #2a3142; font-weight: 600; }
         .rec-drawer select, .rec-drawer .time-input { background: linear-gradient(#ffffff, #f2f4f9); color: #1a1f2a; border: 1px solid rgba(0,0,0,0.15); border-radius: 6px; box-shadow: inset 0 1px #fff; padding: 6px 8px; }
-        .rec-resize-handle { height: 10px; cursor: ns-resize; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(240,240,245,0.7)); border-bottom: 1px solid rgba(0,0,0,0.06); }
+        .rec-resize-handle { height: 10px; cursor: ns-resize; touch-action: none; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(240,240,245,0.7)); border-bottom: 1px solid rgba(0,0,0,0.06); }
         .rec-grabber { width: 48px; height: 4px; border-radius: 3px; background: linear-gradient(90deg, rgba(150,158,172,0.9), rgba(200,206,220,0.9)); box-shadow: inset 0 1px rgba(255,255,255,0.8), 0 1px rgba(0,0,0,0.1); }
         .rec-timeline-wrap { position: relative; margin: 8px 12px; }
         .rec-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #1a7cff; box-shadow: 0 0 0 2px rgba(26,124,255,0.15); pointer-events: none; }

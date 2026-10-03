@@ -1238,25 +1238,53 @@
             const drawer = document.getElementById('recDrawer');
             const handle = document.getElementById('recResizeHandle');
             if (!drawer || !handle) return;
-            let resizing = false;
-            let startY = 0;
-            let startH = 0;
-            handle.addEventListener('mousedown', (e) => {
-                resizing = true;
-                startY = e.clientY;
-                startH = drawer.getBoundingClientRect().height;
-                e.preventDefault();
-            });
-            window.addEventListener('mousemove', (e) => {
-                if (!resizing) return;
-                const dy = startY - e.clientY; // move up increases height
-                let newH = Math.max(160, Math.min(window.innerHeight * 0.9, startH + dy));
-                drawer.style.height = `${Math.round(newH)}px`;
+            // The drawer is zoomed by --ui-scale (init-responsive.css), so the
+            // pointer and getBoundingClientRect speak SCREEN px while its CSS
+            // height is pre-zoom. Mixing the two made every grab jump by the
+            // scale, and the 90%-of-window cap became 90% x scale: from about
+            // 1.12 the handle went off the top, the Full audio view could be
+            // dragged over nearly the whole canvas, and only a sliver came
+            // back (usertest 2026-10-03). Work in screen px, convert once, and
+            // keep at least 120 px of canvas above it, at most 60% of the
+            // window.
+            const MIN_PX = 160;
+            const zoomOf = () => {
+                const css = drawer.offsetHeight, scr = drawer.getBoundingClientRect().height;
+                return (css > 0 && scr > 0) ? scr / css : 1;
+            };
+            const maxPx = () => Math.max(MIN_PX, Math.min(window.innerHeight * 0.6, window.innerHeight - 120));
+            const setScreenHeight = (px) => {
+                const h = Math.max(MIN_PX, Math.min(maxPx(), px));
+                drawer.style.height = `${Math.round(h / zoomOf())}px`;
                 recResizeTimelineCanvas();
                 recUpdateHeadsUI();
                 recDrawTimeline();
+            };
+            let resizing = null;   // { id, startY, startH } in screen px
+            handle.addEventListener('pointerdown', (e) => {
+                if (e.button !== 0) return;
+                resizing = { id: e.pointerId, startY: e.clientY, startH: drawer.getBoundingClientRect().height };
+                try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+                e.preventDefault();
             });
-            window.addEventListener('mouseup', () => { resizing = false; });
+            handle.addEventListener('pointermove', (e) => {
+                if (!resizing || e.pointerId !== resizing.id) return;
+                setScreenHeight(resizing.startH + (resizing.startY - e.clientY)); // up = taller
+            });
+            const stop = (e) => {
+                if (!resizing || (e && e.pointerId !== resizing.id)) return;
+                try { handle.releasePointerCapture(resizing.id); } catch (_) {}
+                resizing = null;
+            };
+            handle.addEventListener('pointerup', stop);
+            handle.addEventListener('pointercancel', stop);
+            handle.addEventListener('lostpointercapture', stop);
+            // A smaller window (or a bigger ui scale) takes the drawer down
+            // with it rather than leaving it over the canvas.
+            window.addEventListener('resize', () => {
+                if (!drawer.classList.contains('open')) return;
+                if (drawer.getBoundingClientRect().height > maxPx() + 1) setScreenHeight(maxPx());
+            });
         }
         
         function recSetStatus(text) {
