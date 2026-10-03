@@ -6488,8 +6488,19 @@
     var audioDrawerBuilt = false;
     var audioMiniRaf = null;
 
+    // Audio is being rebuilt around the timing tool (usertest 2026-10-03):
+    // the section and the drawer's Full view both say so. A separate span
+    // from .section-title, which everything that finds a section by name reads.
+    function underConstructionBadge() {
+        var b = document.createElement('span');
+        b.className = 'section-badge audio-construction-badge';
+        b.textContent = 'Under construction';
+        return b;
+    }
+
     function buildAudioSection() {
-        const { sec, body } = makeSection('Audio', 'expressive', true);
+        const { sec, body, header } = makeSection('Audio', 'expressive', true);
+        header.insertBefore(underConstructionBadge(), header.querySelector('.section-chevron'));
 
         // Mode select (Off / Minimized / Full) \u2014 mirrors recMode
         var modeGroup = document.createElement('div');
@@ -7005,6 +7016,11 @@
     function buildAudioDrawerControls(container) {
         container.innerHTML = '';
         var body = container;
+
+        var notice = document.createElement('div');
+        notice.className = 'audio-construction-note';
+        notice.appendChild(underConstructionBadge());
+        body.appendChild(notice);
 
         // Host for the shared enable row (checkbox + source select). The row's
         // DOM nodes live in the sidebar mini widget and are moved here whenever
