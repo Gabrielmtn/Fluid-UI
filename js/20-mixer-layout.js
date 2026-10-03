@@ -4435,10 +4435,10 @@
         var timeInput = document.createElement('input');
         timeInput.type = 'number';
         timeInput.id = 'replayTimePeriod';
-        timeInput.min = '1';
+        timeInput.min = '0.5';
         timeInput.max = '60';
         timeInput.value = '2';   // the default look's period (2026-09-24; was 5) — keep in step with 12's baseline
-        timeInput.step = '1';
+        timeInput.step = '0.1';  // tenths (usertest 2026-10-03: 2.5 used to round down to 2)
 
         var timeSuffix = document.createElement('span');
         timeSuffix.className = 'brush-time-suffix';
@@ -4664,7 +4664,8 @@
 
         // --- Wire time period ---
         timeInput.addEventListener('change', function () {
-            var v = Math.max(1, Math.min(60, parseInt(timeInput.value, 10) || 5));
+            var v = Math.round((parseFloat(timeInput.value) || 2) * 10) / 10;
+            v = Math.max(0.5, Math.min(60, v));
             timeInput.value = v;
             window.replayTimePeriod = v;
             try {
@@ -4698,7 +4699,7 @@
                 if (savedMode === 'time') setMode('time'); else setMode('stroke');
 
                 var savedPeriod = window.settingsManager.get('brush.replayTimePeriod');
-                if (typeof savedPeriod === 'number' && savedPeriod >= 1) {
+                if (typeof savedPeriod === 'number' && savedPeriod >= 0.5) {
                     timeInput.value = savedPeriod;
                     window.replayTimePeriod = savedPeriod;
                 }
