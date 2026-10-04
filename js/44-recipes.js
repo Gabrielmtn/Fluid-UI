@@ -477,17 +477,17 @@
           ] },
         { id: 'room', pillar: 'together', title: 'Invite friends to my canvas',
           tags: ['room', 'code', 'invite', 'friends', 'join', 'share', 'qr', 'link', 'host'],
-          answer: 'Swirl Together → Start a room, then share the code or QR. Friends paste it into Join.',
+          answer: 'Swirl Together → Start a room, then Invite: share the code, a link or a QR. Friends paste it into Join.',
           target: { section: 'Swirl Together', sel: '#createRoomBtn' },
           steps: [
             { say: 'Swirl Together → click Start a room.', target: { section: 'Swirl Together', sel: '#createRoomBtn' }, until: { visible: '#mpConnected' } },
-            { say: 'Share it: Copy link for a chat, Copy code to read out, or switch to QR for phones. Hide keeps it off a stream.', target: { overlay: 'mp', sel: '#copyRoomBtn' }, until: { click: true } },
-            { say: 'Friends paste the code into Join under Swirl Together, and their strokes land on your canvas live.', target: { overlay: 'mp', sel: '#roomName' } }
+            { say: 'Invite holds the ways to share it: Copy link for a chat, Copy code to read out, or QR for phones. Hide keeps it off a stream.', target: { overlay: 'mp', popup: 'invite', sel: '#copyRoomBtn' }, until: { click: true } },
+            { say: 'Friends paste the code into Join under Swirl Together, and their strokes land on your canvas live.', target: { overlay: 'mp', popup: 'invite', sel: '#roomName', fallback: { overlay: 'mp', sel: '#mpInviteBtn' } } }
           ] },
         { id: 'phone', pillar: 'together', title: 'Paint from my phone',
           tags: ['phone', 'use', 'mobile', 'iphone', 'android', 'smartphone', 'remote', 'controller', 'control', 'touch', 'pad', 'scan', 'qr', 'couch', 'tv', 'tablet', 'connect', 'mouse', 'artist', 'friends'],
-          answer: 'Swirl Together → Paint from your phone, then pick how. As your mouse: the phone steers this canvas’s own brush, with all your settings. As an artist: each phone that scans joins your room as a painter of its own. Scan the code with the phone’s camera.',
-          target: { section: 'Swirl Together', sel: '#phonePadBtn', fallback: { overlay: 'mp', sel: '#phonePadRoomBtn' } } },
+          answer: 'Swirl Together → Paint from your phone (in a room it sits under Invite), then pick how. As your mouse: the phone steers this canvas’s own brush, with all your settings. As an artist: each phone that scans joins your room as a painter of its own. Scan the code with the phone’s camera.',
+          target: { section: 'Swirl Together', sel: '#phonePadBtn', fallback: { overlay: 'mp', popup: 'invite', sel: '#phonePadRoomBtn' } } },
         { id: 'turns', pillar: 'together', title: 'Take turns instead of painting at once',
           tags: ['turns', 'turn', 'rotation', 'timer', 'host', 'lock', 'whose'],
           answer: 'Swirl Together → Take turns (host only). The brush passes around on the turn length you set; the chip by the bottom bar shows whose turn it is.',
@@ -686,7 +686,12 @@
     const POPUPS = {
         brush:   { trigger: () => { const c = stripCell('Brush Size'); return c && c.querySelector('.ch-label'); }, panel: () => document.querySelector('.brush-settings-panel'), isOpen: (p) => p && p.classList.contains('visible') },
         arms:    { trigger: () => $('multiplierValue'), panel: () => document.querySelector('.arm-colors-rows'), isOpen: (p) => p && p.style.display !== 'none' && p.style.display !== '' || (p && p.classList.contains('visible')) },
-        presets: { trigger: () => $('mixerPresetsTrigger'), panel: () => document.querySelector('.mixer-presets-panel'), isOpen: (p) => p && p.style.display !== 'none' && p.style.display !== '' }
+        presets: { trigger: () => $('mixerPresetsTrigger'), panel: () => document.querySelector('.mixer-presets-panel'), isOpen: (p) => p && p.style.display !== 'none' && p.style.display !== '' },
+        // The room panel's Invite popover and ⋯ menu (06e). Both live on
+        // <body> and only show while open, so a step aimed inside one pairs
+        // `overlay: 'mp'` (the panel, on screen) with this to open it first.
+        invite:  { trigger: () => $('mpInviteBtn'), panel: () => $('mpInvitePop'), isOpen: (p) => !!p && !p.hidden },
+        room:    { trigger: () => $('mpMenuBtn'), panel: () => $('mpRoomMenu'), isOpen: (p) => !!p && !p.hidden }
     };
     // Overlays: body-mounted editors and the room panel. `section` is opened
     // first so the sidebar-hosted ones are actually on screen.

@@ -1282,39 +1282,18 @@
                     <span id="multiplayerStatus" role="status">Connecting…</span>
                 </div>
 
-                <!-- Invite block. The three share modes exist because a room
-                     code on screen is a live invitation: fine at a table,
-                     not fine on a stream. -->
-                <div class="mp-invite" id="roomDisplay">
-                    <div class="mp-invite-head">
-                        <span class="mp-room-label">Room code</span>
-                        <div class="mp-share-modes" role="group" aria-label="How to share this room">
-                            <button type="button" id="shareModeCode" class="mp-share-mode" aria-pressed="true" title="Show the code so you can read it out or type it">Code</button>
-                            <button type="button" id="shareModeQr" class="mp-share-mode" aria-pressed="false" title="Show a QR code someone can scan with a phone camera to join">QR</button>
-                            <button type="button" id="shareModeHidden" class="mp-share-mode" aria-pressed="false" title="Hide the code — safe to show on a stream or a shared screen">Hide</button>
-                        </div>
-                    </div>
-                    <div class="mp-room-code" id="roomName">------</div>
-                    <div class="mp-qr" id="roomQr" style="display:none"></div>
-                    <div class="mp-share-hint" id="shareHint">Send this code to a friend so they can join.</div>
-                    <!-- Two copies, independent of the Code / QR / Hide display
-                         above: the link is what goes into a chat (it opens the
-                         room on the web, and the join box here accepts a pasted
-                         link too); the bare code is for reading out or typing.
-                         Both keep working in Hide — the clipboard is not the
-                         screen. -->
-                    <div class="mp-share-row" id="copyRoomRow">
-                        <button id="copyRoomBtn" class="mp-btn-share" title="Copy the invite link — paste it into any chat and it opens this room">Copy link</button>
-                        <button id="copyRoomCodeBtn" class="mp-btn-share mp-btn-share-code" title="Copy just the six-character room code">Copy code</button>
-                    </div>
+                <!-- Two doors out of the panel: who else comes in (Invite) and
+                     the room's own settings (⋯). Both open popovers that 06e
+                     moves onto <body> (the .brush-shape-menu pattern), so the
+                     panel stays a few buttons tall. -->
+                <div class="mp-room-bar">
+                    <button type="button" id="mpInviteBtn" class="mp-room-invite" aria-haspopup="dialog" aria-expanded="false" aria-controls="mpInvitePop" title="The code, a QR or a link to send, and your phone">Invite ▾</button>
+                    <button type="button" id="mpMenuBtn" class="btn--icon mp-room-more" aria-haspopup="menu" aria-expanded="false" aria-controls="mpRoomMenu" aria-label="Room options" title="Room options">⋯</button>
                 </div>
 
-                <!-- Host-only. Grouped and labelled so a guest is not reading
-                     three controls that do nothing for them. -->
+                <!-- The rhythm controls. Grouped so they hide as one when
+                     nothing inside applies. -->
                 <div class="mp-host-block" id="mpHostBlock" style="display:none">
-                    <div class="mp-subhead">Room controls</div>
-                    <button id="lockRoomBtn" class="mp-btn-lock" style="display:none" title="Stop anyone new from joining, even with the code">Lock room</button>
-                    <button id="settingsLockBtn" class="mp-btn-lock" style="display:none" title="Guests mirror your look settings; their performance controls stay their own">Lock settings</button>
                     <button id="turnsBtn" class="mp-btn-lock" style="display:none" title="One artist paints at a time while everyone else watches, with the painter’s settings mirrored live">Take turns</button>
                     <div class="control-group mp-turn-length" id="turnLengthRow" style="display:none">
                         <label for="turnLength" title="How long each turn lasts before the brush passes to the next artist">Turn length <span id="turnLengthValue" class="value-display">1:00</span></label>
@@ -1327,6 +1306,46 @@
                 <button id="turnPassBtn" class="mp-btn-pass" style="display:none" title="Hand the brush to the next artist in the rotation">Pass turn</button>
 
                 <button id="disconnectBtn" class="mp-btn-leave">Leave room</button>
+
+                <!-- Invite popover (Invite ▾). The three share modes exist
+                     because a room code on screen is a live invitation: fine
+                     at a table, not fine on a stream. Every id in here is
+                     read elsewhere (06e renderShareMode, 44's tours, the copy
+                     sink), so the popover is one element that lives on
+                     <body> for good and is only shown and hidden, never
+                     rebuilt. 54 adds the phone row at its foot. -->
+                <div id="mpInvitePop" class="brush-shape-menu mp-pop" role="dialog" aria-label="Invite" hidden>
+                    <div class="mp-invite" id="roomDisplay">
+                        <div class="mp-invite-head">
+                            <span class="mp-room-label">Room code</span>
+                            <div class="mp-share-modes" role="group" aria-label="How to share this room">
+                                <button type="button" id="shareModeCode" class="mp-share-mode" aria-pressed="true" title="Show the code so you can read it out or type it">Code</button>
+                                <button type="button" id="shareModeQr" class="mp-share-mode" aria-pressed="false" title="Show a QR code someone can scan with a phone camera to join">QR</button>
+                                <button type="button" id="shareModeHidden" class="mp-share-mode" aria-pressed="false" title="Hide the code, so it is safe to show on a stream or a shared screen">Hide</button>
+                            </div>
+                        </div>
+                        <div class="mp-room-code" id="roomName">------</div>
+                        <div class="mp-qr" id="roomQr" style="display:none"></div>
+                        <div class="mp-share-hint" id="shareHint">Send a friend the link, or read them the code.</div>
+                        <!-- Two copies, independent of the Code / QR / Hide display
+                             above: the link is what goes into a chat (it opens the
+                             room on the web, and the join box accepts a pasted
+                             link too); the bare code is for reading out or typing.
+                             Both keep working in Hide: the clipboard is not the
+                             screen. -->
+                        <div class="mp-share-row" id="copyRoomRow">
+                            <button id="copyRoomBtn" class="mp-btn-share" title="Copy the invite link. Paste it into any chat and it opens this room">Copy link</button>
+                            <button id="copyRoomCodeBtn" class="mp-btn-share mp-btn-share-code" title="Copy just the six-character room code">Copy code</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ⋯ menu, on <body> like the popover. Ticked items are
+                     switches; 61 adds Copy room report at its foot. -->
+                <div id="mpRoomMenu" class="brush-shape-menu mp-pop mp-room-menu" role="menu" aria-label="Room options" hidden>
+                    <button type="button" id="lockRoomBtn" class="brush-shape-menu-item" role="menuitemcheckbox" aria-checked="false" style="display:none" title="Stop anyone new from joining, even with the code">Lock room</button>
+                    <button type="button" id="settingsLockBtn" class="brush-shape-menu-item" role="menuitemcheckbox" aria-checked="false" style="display:none" title="Guests mirror your look settings; their performance controls stay their own">Everyone uses my look</button>
+                </div>
             </div>
         </div>
         <button onclick="togglePause()" id="pauseBtn" style="width: 100%; margin-top: 10px">Pause</button>

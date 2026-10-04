@@ -1143,6 +1143,47 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
 }
+/* ── Invite ▾ and ⋯ ──
+   The room's two doors out of the panel, on one row: Invite takes the width,
+   ⋯ is a square icon button. Both open body-mounted popovers (06e). */
+.mp-room-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.mp-room-bar .mp-room-invite {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.mp-room-bar .mp-room-more {
+    flex: 0 0 34px;
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* The popovers wear the .brush-shape-menu skin (20-mixer-strip.css); these
+   rules only size them. The invite is a fixed width so the code well and the
+   QR do not resize it as the share mode changes. */
+.mp-pop.brush-shape-menu {
+    width: 252px;
+    padding: 8px;
+}
+.mp-pop.mp-room-menu {
+    width: auto;
+    min-width: 200px;
+    padding: 4px;
+}
+/* Switches in the ⋯ menu keep one label and show a tick when on, with a
+   blank of the same width when off so the labels line up. */
+.mp-room-menu .brush-shape-menu-item::before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+}
+.mp-room-menu .brush-shape-menu-item[aria-checked="true"]::before {
+    content: '\2713';
+}
+
 /* ── Invite block ──
    The room code is a live invitation to anyone who can read it, so how it is
    displayed is a choice, not a constant: readable at a table, scannable
@@ -1152,7 +1193,7 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: 8px;
     padding: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 .mp-invite-head {
     display: flex;
@@ -1163,16 +1204,14 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 /* Eyebrows: the one place uppercase-and-tracked is allowed to be small,
    because the shape carries it. Never below 10px, never --ink-500. */
-.mp-room-label,
-.mp-subhead {
+.mp-room-label {
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 1.2px;
     color: var(--ink-300, #b9bec7);
+    white-space: nowrap;
 }
-.mp-room-label { white-space: nowrap; }
-.mp-subhead { margin-bottom: 8px; }
 
 /* Segmented control: Code / QR / Hide. */
 .mp-share-modes {
@@ -1249,6 +1288,12 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 .mp-share-row .mp-btn-share-code {
     flex: 0 0 auto;
+}
+/* The phone row at the foot of the invite popover (54). Alone in it during a
+   stranger swirl, when the invite block above is hidden. */
+.mp-pop .mp-btn-phone {
+    display: block;
+    width: 100%;
 }
 
 /* ── Host controls ──

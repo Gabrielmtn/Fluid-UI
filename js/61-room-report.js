@@ -158,15 +158,19 @@
         return Promise.resolve(viaElectron());
     }
 
-    // A small button at the foot of the room panel, beside Leave room.
+    // The last item of the room panel's ⋯ menu (06e), for host and guest
+    // alike. data-stay keeps the menu open after the press, so "Copied" can
+    // be read where it was asked for.
     (function mount() {
-        var leave = document.getElementById('disconnectBtn');
-        if (!leave) { setTimeout(mount, 500); return; }
+        var menu = document.getElementById('mpRoomMenu');
+        if (!menu) { setTimeout(mount, 500); return; }
         if (document.getElementById('roomReportBtn')) return;
         var b = document.createElement('button');
         b.type = 'button';
         b.id = 'roomReportBtn';
-        b.className = 'mp-btn-share mp-room-report';
+        b.className = 'brush-shape-menu-item mp-room-report';
+        b.setAttribute('role', 'menuitem');
+        b.setAttribute('data-stay', '');
         b.textContent = 'Copy room report';
         b.title = 'Copies where recent strokes landed, sent and received, with this canvas’s size and settings. ' +
             'If strokes show up in the wrong place for someone, both of you press this and send the two reports.';
@@ -176,7 +180,7 @@
                 setTimeout(function () { b.textContent = 'Copy room report'; }, 1600);
             });
         });
-        leave.parentNode.insertBefore(b, leave);
+        menu.appendChild(b);
     })();
 
     window.__roomTrace = { note: note, resize: resize, report: report, copy: copy };

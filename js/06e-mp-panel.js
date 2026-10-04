@@ -192,17 +192,21 @@ function setShown(id, shown) {
 }
 
 // Shown while the lobby is pairing us with a stranger (before we have a room).
+// The invite has nothing to share yet and ⋯ has no room to act on, but the
+// phone door in the popover stays reachable (54).
 function showMatchmaking() {
     setShown('mpDisconnected', false);
     setShown('mpConnected', true);
     renderRoomStatus();
-    ['roomDisplay', 'shareHint', 'copyRoomRow', 'lockRoomBtn'].forEach(function(id) { setShown(id, false); });
+    ['roomDisplay', 'shareHint', 'copyRoomRow', 'lockRoomBtn', 'mpMenuBtn'].forEach(function(id) { setShown(id, false); });
+    if (_openPop === 'menu') closeRoomPop();
 }
 
 function showConnecting() {
     setShown('mpDisconnected', false);
     setShown('mpConnected', true);
     renderRoomStatus();
+    setShown('mpMenuBtn', true);
     setShown('roomDisplay', !isStrangerRoom());
     if (!isStrangerRoom()) renderShareMode();
 }
@@ -253,20 +257,22 @@ function updateConnectedView() {
     // would unmask a room the user deliberately hid.
     if (!stranger) renderShareMode();
 
-    // Lock toggle: only the host of a private room sees it.
+    // The ⋯ menu. Its switches keep one label and carry a tick when on
+    // (aria-checked), so an item says what it does, not what it would undo.
+    setShown('mpMenuBtn', true);
+    // Lock room: only the host of a private room sees it.
     var lockBtn = document.getElementById('lockRoomBtn');
     if (lockBtn) {
         var canLock = !stranger && isHost;
         lockBtn.style.display = canLock ? '' : 'none';
-        lockBtn.textContent = roomLocked ? 'Unlock room' : 'Lock room';
+        lockBtn.setAttribute('aria-checked', String(!!roomLocked));
     }
     // Settings lock (13.5): any host can lock look settings (incl. stranger
     // rooms) — hidden while turns run, which supersede it.
     var sLockBtn = document.getElementById('settingsLockBtn');
     if (sLockBtn) {
         sLockBtn.style.display = (isHost && !turnsOn) ? '' : 'none';
-        sLockBtn.textContent = settingsLockOn ? 'Unlock settings' : 'Lock settings';
-        sLockBtn.classList.toggle('active', settingsLockOn);
+        sLockBtn.setAttribute('aria-checked', String(!!settingsLockOn));
     }
 
     updateTurnUI();   // ends in renderRoomStatus
@@ -276,6 +282,7 @@ function updateConnectedView() {
 }
 
 function showDisconnectedUI() {
+    closeRoomPop();
     var dc = document.getElementById('mpDisconnected');
     var cn = document.getElementById('mpConnected');
     if (dc) dc.style.display = '';
@@ -391,7 +398,7 @@ function renderShareMode() {
 function syncHostBlock() {
     var block = document.getElementById('mpHostBlock');
     if (!block) return;
-    var any = ['lockRoomBtn', 'settingsLockBtn', 'turnsBtn', 'callReturnBtn', 'turnLengthRow'].some(function (id) {
+    var any = ['turnsBtn', 'callReturnBtn', 'turnLengthRow'].some(function (id) {
         var el = document.getElementById(id);
         return el && el.style.display !== 'none';
     });
@@ -441,9 +448,152 @@ function copyRoomCode(fromCreate, what) {
     }
 }
 
+// ── The Invite popover and the ⋯ menu ───────────────────────────────
+// Two body-mounted popovers in the .brush-shape-menu skin (20 openShapeMenu):
+// clear of the sidebar's overflow and stacking, closed by a press outside,
+// Esc or a resize, and kept beside their button when the sidebar scrolls.
+// Unlike the shape menu they are never rebuilt: the invite holds ids
+// other code reads at any time (renderShareMode, copy flashes, 44's tours,
+// the copy sink, 54's phone row), so each is one element, moved onto <body>
+// once and then only shown and hidden. They borrow the room panel's section
+// group, so their buttons take the panel's tint (01-buttons rule 2).
+var ROOM_POPS = {
+    invite: { pop: 'mpInvitePop', btn: 'mpInviteBtn', align: 'left' },
+    menu:   { pop: 'mpRoomMenu', btn: 'mpMenuBtn', align: 'right' }
+};
+var _openPop = null;
+
+function mountRoomPops() {
+    Object.keys(ROOM_POPS).forEach(function (k) {
+        var p = document.getElementById(ROOM_POPS[k].pop);
+        if (p && p.parentElement !== document.body) document.body.appendChild(p);
+    });
+}
+
+function placeRoomPop(pop, btn, align) {
+    var group = btn.closest('[data-group]');
+    pop.setAttribute('data-group', group ? group.getAttribute('data-group') : 'core');
+    pop.style.left = '0px';
+    pop.style.top = '0px';
+    var b = btn.getBoundingClientRect(), r = pop.getBoundingClientRect();
+    // Under the button, lined up with the edge it sits on (Invite's left,
+    // ⋯'s right); flipped above when there is no room below, and kept
+    // inside the window either way.
+    var x = Math.min(align === 'right' ? b.right - r.width : b.left, window.innerWidth - r.width - 8);
+    var y = b.bottom + 6;
+    if (y + r.height > window.innerHeight - 8) y = Math.max(8, b.top - r.height - 6);
+    pop.style.left = Math.max(8, x) + 'px';
+    pop.style.top = Math.max(8, y) + 'px';
+}
+
+function openRoomPop(which) {
+    var cfg = ROOM_POPS[which];
+    var pop = cfg && document.getElementById(cfg.pop);
+    var btn = cfg && document.getElementById(cfg.btn);
+    if (!pop || !btn) return false;
+    if (_openPop && _openPop !== which) closeRoomPop();
+    mountRoomPops();
+    pop.hidden = false;
+    placeRoomPop(pop, btn, cfg.align);
+    btn.setAttribute('aria-expanded', 'true');
+    btn.classList.add('active');
+    if (_openPop !== which) {
+        _openPop = which;
+        // Added straight away: the press that opened it is over by the time
+        // its click runs, so it cannot close it, and an Esc pressed the
+        // moment it appears has to land.
+        document.addEventListener('mousedown', onRoomPopOutside, true);
+        document.addEventListener('keydown', onRoomPopKey, true);
+        document.addEventListener('scroll', onRoomPopScroll, true);
+        window.addEventListener('resize', closeRoomPop);
+    }
+    return true;
+}
+
+function closeRoomPop() {
+    if (!_openPop) return;
+    var cfg = ROOM_POPS[_openPop];
+    _openPop = null;
+    var pop = document.getElementById(cfg.pop), btn = document.getElementById(cfg.btn);
+    if (pop) pop.hidden = true;
+    if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.classList.remove('active'); }
+    document.removeEventListener('mousedown', onRoomPopOutside, true);
+    document.removeEventListener('keydown', onRoomPopKey, true);
+    document.removeEventListener('scroll', onRoomPopScroll, true);
+    window.removeEventListener('resize', closeRoomPop);
+}
+
+function toggleRoomPop(which) {
+    if (_openPop === which) closeRoomPop(); else openRoomPop(which);
+}
+
+function openRoomPopEl() {
+    return _openPop ? document.getElementById(ROOM_POPS[_openPop].pop) : null;
+}
+function onRoomPopOutside(e) {
+    var pop = openRoomPopEl();
+    var btn = _openPop && document.getElementById(ROOM_POPS[_openPop].btn);
+    // A press on the popover's own button is the toggle's to handle:
+    // closing here would let the click that follows open it again.
+    if (pop && !pop.contains(e.target) && !(btn && btn.contains(e.target))) closeRoomPop();
+}
+function onRoomPopKey(e) {
+    if (e.key !== 'Escape') return;
+    var btn = _openPop && document.getElementById(ROOM_POPS[_openPop].btn);
+    closeRoomPop();
+    if (btn) { try { btn.focus(); } catch (_) {} }
+}
+// The sidebar scrolling (a wheel, a guide step bringing the panel into
+// view) carries the button away: the popover follows it while the button is
+// on screen and closes once it is not.
+function onRoomPopScroll(e) {
+    var pop = openRoomPopEl();
+    if (!pop || (e.target instanceof Node && pop.contains(e.target))) return;
+    var cfg = ROOM_POPS[_openPop], btn = document.getElementById(cfg.btn);
+    var b = btn ? btn.getBoundingClientRect() : null;
+    if (!b || !b.width || b.bottom < 0 || b.top > window.innerHeight) { closeRoomPop(); return; }
+    placeRoomPop(pop, btn, cfg.align);
+}
+
+// What happens to a popover when something inside it is picked: ⋯ items
+// close it (the status line shows the result), except one marked data-stay
+// that reports back on itself (Copy room report's "Copied"). In the invite,
+// a control marked data-pop-close (the phone row, which opens a dialog of
+// its own) closes it; Code / QR / Hide and the two copies keep it open.
+function wireRoomPops() {
+    var menu = document.getElementById('mpRoomMenu');
+    if (menu) menu.addEventListener('click', function (e) {
+        var item = e.target.closest ? e.target.closest('button') : null;
+        if (item && !item.hasAttribute('data-stay')) closeRoomPop();
+    });
+    var inv = document.getElementById('mpInvitePop');
+    if (inv) inv.addEventListener('click', function (e) {
+        var item = e.target.closest ? e.target.closest('[data-pop-close]') : null;
+        if (item) closeRoomPop();
+    });
+    [['mpInviteBtn', 'invite'], ['mpMenuBtn', 'menu']].forEach(function (pair) {
+        var b = document.getElementById(pair[0]);
+        if (b) b.addEventListener('click', function () { toggleRoomPop(pair[1]); });
+    });
+}
+
 // Initialize multiplayer UI + auto-join from hash
 function initMultiplayerUI() {
     installWatcherGate(); // 06b: out-of-turn look edits are put back
+    mountRoomPops();
+    wireRoomPops();
+    // A guest enters and leaves the host's look lock straight from a socket
+    // message (06a 'settings-lock' → 06b), and nothing on that path redraws
+    // the panel. Wrapped here, once, so the status line's "host's look"
+    // follows the gate however it is set.
+    if (!setSettingsLockedByHost.__mpStatus) {
+        var lockedByHost = setSettingsLockedByHost;
+        setSettingsLockedByHost = function (locked, snapshot) {
+            lockedByHost(locked, snapshot);
+            renderRoomStatus();
+        };
+        setSettingsLockedByHost.__mpStatus = true;
+    }
     // Wire up buttons
     var createBtn = document.getElementById('createRoomBtn');
     if (createBtn) createBtn.addEventListener('click', createRoom);
@@ -561,6 +711,12 @@ window.toggleCallReturn = toggleCallReturn;
 window.passTurn = passTurn;
 window.copyRoomCode = copyRoomCode;
 window.disconnectMultiplayer = disconnectMultiplayer;
+// The panel's popovers, for 44's tours.
+window.MPPanel = {
+    open: openRoomPop,
+    close: closeRoomPop,
+    isOpen: function (which) { return which ? _openPop === which : !!_openPop; }
+};
 
 console.log('Multiplayer module loaded. PartyKit host:', PARTYKIT_HOST);
 

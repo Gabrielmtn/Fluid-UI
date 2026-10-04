@@ -261,22 +261,23 @@
             if (before && before.parentNode === disc) disc.insertBefore(btn, before);
             else disc.appendChild(btn);
         }
-        // In a room the door belongs to the panel, NOT to the invite block:
-        // the invite is about letting other people in, and a stranger
-        // pairing hides it outright (06e updateConnectedView), as does the
-        // wait for a stranger to turn up. Pairing your own phone has nothing
-        // to do with who else is here, so the door sits beside the invite
-        // and outlives it — reachable from inside any room, in any state.
-        var conn = document.getElementById('mpConnected');
-        if (conn && !document.getElementById('phonePadRoomBtn')) {
+        // In a room the door is the last row of the Invite popover (06e),
+        // AFTER the invite block, not inside it: the invite is about letting
+        // other people in, and a stranger pairing hides it outright (06e
+        // updateConnectedView), as does the wait for a stranger to turn up.
+        // Pairing your own phone has nothing to do with who else is here, so
+        // the row outlives the block: in those two states the popover is
+        // just this door. data-pop-close: the dialog it opens replaces the
+        // popover rather than stacking on it.
+        var pop = document.getElementById('mpInvitePop');
+        if (pop && !document.getElementById('phonePadRoomBtn')) {
             var b2 = el('button', 'mp-btn-share mp-btn-phone', 'Paint from your phone');
             b2.id = 'phonePadRoomBtn';
             b2.type = 'button';
+            b2.setAttribute('data-pop-close', '');
             b2.title = 'Show a code your phone can scan: it becomes this canvas’s mouse, or an artist in this room.';
             b2.addEventListener('click', function () { open(); });
-            var invite = document.getElementById('roomDisplay');
-            if (invite && invite.parentNode === conn) conn.insertBefore(b2, invite.nextSibling);
-            else conn.insertBefore(b2, conn.firstChild);
+            pop.appendChild(b2);
         }
         syncButtons();
     }
@@ -288,8 +289,9 @@
         if (b1) b1.textContent = mouseOn ? PHONE_DOOR + ' · connected' : PHONE_DOOR;
         var b = document.getElementById('phonePadRoomBtn');
         if (!b) return;
-        // Nothing hides this one: the panel it lives in is shown exactly
-        // when the not-in-a-room panel (with the other door) is not. A
+        // Nothing hides this one: the popover it lives in opens from the
+        // room panel, which is shown exactly when the not-in-a-room panel
+        // (with the other door) is not. A
         // stranger pairing has no seat for a phone artist, and waiting for a
         // stranger has no room at all — the phone can be this canvas's mouse
         // through either, so the way in has to survive both.
