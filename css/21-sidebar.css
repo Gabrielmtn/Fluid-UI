@@ -379,12 +379,8 @@
 }
 
 /* ── Saved-animations library (dropdown under the slot grid) ── */
-#animCreateNewBtn {
-    width: 100%;
-    margin-top: 8px;
-}
 .anim-lib {
-    margin-top: 6px;
+    margin-top: 8px;
 }
 .anim-lib-head {
     width: 100%;
@@ -906,16 +902,62 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     max-width: 180px;
 }
 
-/* Recording mini - compact for sidebar */
-#sidebar-right .rec-mini {
-    margin: 0;
+/* ── Record strip (top of Animations, 03 runs it) ──
+   ● Record · ▶ Play · ■ Stop, then the clock and the length chips, then
+   the status line and Edit ⤢. Layout only: colour is 01-buttons.css's. */
+#sidebar-right .rec-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0 0 10px;
     width: 100%;
 }
-#sidebar-right .rec-mini-grid {
-    grid-template-columns: 1fr;
+.rec-strip-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
 }
-#sidebar-right .rec-mini .rec-square {
-    min-height: auto;
+.rec-strip-transport > button {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
+}
+/* The glyphs sit outside the words, so the labels stay plain text for
+   tours, hotkey binds and the copy pass. */
+#recMiniRecordBtn::before { content: '\25CF'; margin-right: 5px; }
+#recMiniPauseBtn::before { content: '\25B6'; margin-right: 5px; font-size: 0.85em; }
+#recMiniPauseBtn.active::before { content: '\275A\275A'; letter-spacing: -1px; }
+#recMiniStopBtn::before { content: '\25A0'; margin-right: 5px; }
+.rec-strip-time {
+    flex: 0 0 auto;
+    min-width: 64px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.9;
+}
+.rec-strip-chips {
+    display: flex;
+    gap: 3px;
+    margin-left: auto;
+}
+.rec-strip-chips > button {
+    padding: 4px 6px;
+    white-space: nowrap;
+}
+.rec-strip-foot {
+    justify-content: space-between;
+}
+.rec-strip-status {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.3;
+    opacity: 0.75;
+}
+#recOpenFullBtn {
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 /* Animation grid buttons */

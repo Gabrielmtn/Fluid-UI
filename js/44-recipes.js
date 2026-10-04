@@ -437,13 +437,13 @@
             { say: 'Replay Mode → Time replays the last few seconds instead of the last stroke.', target: { section: 'Stroke and replay', sel: '.brush-mode-btn', text: 'Time' }, until: { active: true } }
           ] },
         { id: 'record-performance', pillar: 'record', title: 'Record a performance and loop it',
-          tags: ['record', 'loop', 'animation', 'performance', 'timeline', 'save', 'recorder', 'f9'],
-          answer: 'Animations → Create New Animation opens the animation editor. F9 records after a countdown; F8 plays; Save as new drops it into the library, ready for a slot you can loop any time.',
-          hotkey: 'F9', target: { section: 'Animations', sel: '#animCreateNewBtn' },
+          tags: ['record', 'loop', 'animation', 'performance', 'timeline', 'save', 'recorder', 'f9', 'strip', 'length'],
+          answer: 'Animations → Record (F9) counts down 3-2-1, then records what you paint until Stop or the length you picked. Edit ⤢ opens the editor, where Save as new adds it to the library.',
+          hotkey: 'F9', target: { section: 'Animations', sel: '#recMiniRecordBtn' },
           steps: [
-            { say: 'Animations → Create New Animation opens the animation editor.', target: { section: 'Animations', sel: '#animCreateNewBtn' }, until: { visible: '#recRecordBtn' } },
-            { say: 'Record (F9) counts down 3-2-1, then paint your performance.', key: 'F9', target: { overlay: 'recorder', sel: '#recRecordBtn' }, until: { click: true } },
-            { say: 'Stop when you are done. Play part plays it back.', target: { overlay: 'recorder', sel: '#recStopBtn' }, until: { click: true } },
+            { say: 'Animations → Record. It counts down 3-2-1, then records what you paint.', note: 'The chips beside the clock set how long it runs: 4, 8, 15 or 30 seconds.', key: 'F9', target: { section: 'Animations', sel: '#recMiniRecordBtn' }, until: [{ bodyClass: 'rec-countdown' }, { bodyClass: 'rec-recording' }] },
+            { say: 'Paint your performance. Stop ends it, or it stops by itself at the length you picked.', target: { section: 'Animations', sel: '#recMiniStopBtn' }, until: { click: true } },
+            { say: 'Edit ⤢ opens the animation editor.', target: { section: 'Animations', sel: '#recOpenFullBtn' }, until: { visible: '#recSavePresetBtn' } },
             { say: 'Save as new puts it in the Animations library.', target: { overlay: 'recorder', sel: '#recSavePresetBtn' }, until: { click: true } },
             { say: 'Name it and confirm.', target: { overlay: 'recorder', sel: '#recPresetConfirmBtn' }, until: { click: true } },
             { say: 'Back in Animations: drag it from the library into a slot, then click the slot to loop it.', target: { section: 'Animations', sel: '.anim-lib' } }

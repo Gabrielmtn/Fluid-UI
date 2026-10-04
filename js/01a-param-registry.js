@@ -260,7 +260,8 @@
         breathPattern: {options: ["relaxed", "box", "478"], def: "relaxed", mut: null},
         breathColorMode: {options: ["same", "cycle", "breath"], def: "same", mut: null},
         lightShiftMode: {options: ["replace", "tint", "overlay", "multiply", "screen", "add"], def: "replace", mut: {options: null, scope: "extended"}},
-        recMode: {options: ["off", "min", "full"], def: "off", mut: null},
+        // Off went 2026-10-04 (the record strip): a saved 'off' coerces to the strip.
+        recMode: {options: ["min", "full"], def: "min", mut: null},
         recPlaybackSpeed: {options: ["0.25", "0.5", "1", "2", "4"], def: "0.25", mut: null},
         // 'ferro' removed 2026-08-16 — dropping it from options is what makes
         // a saved/mirrored audioMode:'ferro' coerce to the default instead of

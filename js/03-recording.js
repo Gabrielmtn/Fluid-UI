@@ -706,7 +706,7 @@
                     playAll: document.getElementById('recPlayAllBtn'),
                     miniRec: document.getElementById('recMiniRecordBtn'),
                     miniPause: document.getElementById('recMiniPauseBtn'),
-                    miniPlayAll: document.getElementById('recMiniPlayAllBtn')
+                    miniStop: document.getElementById('recMiniStopBtn')
                 };
             }
             return _recBtnCache;
@@ -735,22 +735,126 @@
                 btns.play.classList.toggle('active', !!(a && a.timeline.isPlaying));
             }
             if (btns.playAll) btns.playAll.textContent = recIsPlayingAll ? 'Pause all' : 'Play all';
-            
-            // Mini panel buttons
+
+            recSyncStrip(isRec);
+            recSyncBodyState(isRec, isPlay);
+        }
+
+        // ── The record strip (top of Animations, 2026-10-04) ────────────
+        // ● Record · ▶ Play · ■ Stop, the clock, the length chips and Edit ⤢.
+        // It replaced Recording Mode Off / Minimized / Full: nothing is
+        // captured until Record is pressed, so there is no Off to forget.
+        // Play runs every part together (F8 keeps playing the one part). A
+        // button with nothing to act on is disabled rather than silent.
+        const REC_LENGTHS = [4000, 8000, 15000, 30000];
+
+        // The length a part records up to: its own cap, else the global one.
+        function recPartCapMs(a) {
+            return (a && typeof a.loopMaxMs === 'number' && a.loopMaxMs > 0) ? a.loopMaxMs : recMaxDurationMs;
+        }
+
+        // The animation editor is the drawer with its Animation tab showing.
+        // Delete, ↑/↓ and Ctrl+Shift+N only act on parts while it is (05n).
+        function recEditorOpen() {
+            return !!(window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record');
+        }
+
+        // Anything for Esc to stop: a countdown, a part recording or playing.
+        function recIsBusy() {
+            return !!recCountdownActive || recLayers.some(l => l.timeline.isRecording || l.timeline.isPlaying);
+        }
+
+        // m:ss. A length rounds up, so a half-second part reads 0:01, not 0:00.
+        function recClock(ms, up) {
+            const v = Math.max(0, (ms || 0) / 1000);
+            const s = up ? Math.ceil(v - 0.001) : Math.floor(v);
+            return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+        }
+
+        // "0:03 / 0:08": how far the take or the playhead is, against the
+        // length it runs to. Written only when the text changes, since
+        // playback calls this every frame.
+        let _recStripTimeText = '';
+        function recUpdateStripTime() {
+            const el = document.getElementById('recMiniTime');
+            if (!el) return;
+            const a = recGetActiveLayer();
+            let at = 0, of = recPartCapMs(a);
+            if (a && a.timeline.isRecording) {
+                at = recClockNow(a) - a.timeline.recordingStartTime;
+            } else if (!recCountdownActive) {
+                const p = (a && a.timeline.isPlaying) ? a : recLayers.find(l => l.timeline.isPlaying);
+                if (p) { at = p.timeline.playbackPosition; of = recGetEffectiveDuration(p); }
+                else if (a && a.timeline.interactions.length) of = recGetEffectiveDuration(a);
+            }
+            const text = recClock(Math.min(at, of)) + ' / ' + recClock(of, true);
+            if (text !== _recStripTimeText || el.textContent !== text) { _recStripTimeText = text; el.textContent = text; }
+        }
+
+        function recSyncStrip(isRec) {
+            const btns = _getRecBtns();
+            const anyPlaying = recLayers.some(l => l.timeline.isPlaying);
+            const hasTake = recLayers.some(l => l.timeline.interactions.length > 0);
+            const busy = isRec || !!recCountdownActive;
             if (btns.miniRec) {
                 btns.miniRec.textContent = _recRecordLabel(isRec);
                 btns.miniRec.classList.toggle('active', isRec);
             }
             if (btns.miniPause) {
-                btns.miniPause.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play';
-                btns.miniPause.classList.toggle('active', !!(a && a.timeline.isPlaying));
+                btns.miniPause.textContent = anyPlaying ? 'Pause' : 'Play';
+                btns.miniPause.classList.toggle('active', anyPlaying);
+                btns.miniPause.disabled = busy || (!anyPlaying && !hasTake);
             }
-            if (btns.miniPlayAll) btns.miniPlayAll.textContent = recIsPlayingAll ? 'Pause all' : 'Play all';
-            
-            // Body state classes
+            if (btns.miniStop) btns.miniStop.disabled = !(busy || anyPlaying);
+            const cap = recPartCapMs(recGetActiveLayer());
+            REC_LENGTHS.forEach(ms => {
+                const chip = document.getElementById('recLen' + (ms / 1000));
+                if (!chip) return;
+                chip.setAttribute('aria-pressed', cap === ms ? 'true' : 'false');
+                chip.disabled = isRec;
+            });
+            const edit = document.getElementById('recOpenFullBtn');
+            if (edit) edit.setAttribute('aria-pressed', recEditorOpen() ? 'true' : 'false');
+            recUpdateStripTime();
+        }
+
+        // Body classes drive the canvas badge; the countdown digit rides on
+        // #canvas-area so the badge can read it ("REC 3…", styles.css).
+        function recSyncBodyState(isRec, isPlay) {
             document.body.classList.toggle('rec-recording', isRec);
             document.body.classList.toggle('rec-playing', !isRec && isPlay);
             document.body.classList.toggle('rec-countdown', !!recCountdownActive);
+            const area = document.getElementById('canvas-area');
+            if (area) {
+                if (recCountdownActive) area.setAttribute('data-rec-count', String(recCountdownVal || 3));
+                else if (area.hasAttribute('data-rec-count')) area.removeAttribute('data-rec-count');
+            }
+        }
+
+        // A chip sets the global length AND the active part's own cap: the
+        // global one alone only reached parts made after it changed.
+        function recSetLength(ms) {
+            const a = recGetActiveLayer();
+            if (a && a.timeline.isRecording) return;
+            recMaxDurationMs = ms;
+            if (a) {
+                a.loopMaxMs = ms;
+                if (a.timeline.playbackPosition > recGetEffectiveDuration(a)) a.timeline.playbackPosition = 0;
+            }
+            const dur = document.getElementById('recMaxDuration');
+            if (dur) dur.value = recFormatTime(ms);
+            recRenderUI();
+        }
+
+        // The strip's Play: every part together, or pause whatever plays.
+        function recStripTogglePlay() {
+            if (recLayers.some(l => l.timeline.isPlaying)) {
+                recLayers.forEach(l => { l.timeline.isPlaying = false; });
+                recIsPlayingAll = false;
+                recUpdateButtonStates();
+                return;
+            }
+            recTogglePlaybackAll();
         }
 
         function recRenderUI() {
@@ -824,41 +928,17 @@
             recRefreshTimelinesUI();
             recBindLayerListEvents();
 
-            // Sync minimized UI
-            const mini = document.getElementById('recMini');
+            // The strip, the drawer's state classes and the body's
             const recDrawerElState = document.getElementById('recDrawer');
-            const miniRecBtn = document.getElementById('recMiniRecordBtn');
-            const miniPauseBtn = document.getElementById('recMiniPauseBtn');
-            const miniPlayAllBtn = document.getElementById('recMiniPlayAllBtn');
-            if (miniRecBtn) miniRecBtn.textContent = _recRecordLabel(!!(a && a.timeline.isRecording));
-            if (miniPauseBtn) miniPauseBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play';
-            if (miniPlayAllBtn) miniPlayAllBtn.textContent = recIsPlayingAll ? 'Pause all' : 'Play all';
-            if (miniRecBtn) miniRecBtn.classList.toggle('active', !!(a && a.timeline.isRecording));
-            if (miniPauseBtn) miniPauseBtn.classList.toggle('active', !!(a && a.timeline.isPlaying));
-            if (miniPlayAllBtn) miniPlayAllBtn.classList.toggle('active', !!recIsPlayingAll);
-            if (mini) {
-                mini.classList.toggle('rec-recording', !!(a && a.timeline.isRecording));
-                mini.classList.toggle('rec-countdown', !!recCountdownActive);
-            }
             if (recDrawerElState) {
                 recDrawerElState.classList.toggle('rec-recording', !!(a && a.timeline.isRecording));
                 recDrawerElState.classList.toggle('rec-playing', !!(a && a.timeline.isPlaying));
                 recDrawerElState.classList.toggle('rec-countdown', !!recCountdownActive);
             }
-            // Propagate state to body for global CSS feedback (canvas glow, etc.)
             var isRec = !!(a && a.timeline.isRecording);
             var isPlay = !!(a && a.timeline.isPlaying) || !!recIsPlayingAll;
-            document.body.classList.toggle('rec-recording', isRec);
-            document.body.classList.toggle('rec-playing', !isRec && isPlay);
-            document.body.classList.toggle('rec-countdown', !!recCountdownActive);
-            const miniStatus = document.getElementById('recMiniLayerStatus');
-            if (miniStatus) {
-                const total = recLayers.length || 0;
-                const idx0 = a ? recLayers.findIndex(l => l.id === a.id) : -1;
-                const idx = (idx0 >= 0 ? (idx0 + 1) : 0);
-                miniStatus.textContent = (total > 0 && idx > 0) ? `${idx}/${total}` : '0/0';
-            }
-            recSyncMiniColorMode();
+            recSyncStrip(isRec);
+            recSyncBodyState(isRec, isPlay);
         }
 
         function recBindLayerListEvents() {
@@ -925,7 +1005,6 @@
                     if (layer) {
                         layer.colorMode = modeSel.value;
                         layer._repKey = null; // re-seed generative replay colors
-                        recSyncMiniColorMode();
                     }
                     return;
                 }
@@ -1040,8 +1119,8 @@
             return null;
         }
 
-        // Human-readable labels for the color-mode dropdowns (full + mini +
-        // the Saved Animations library). The names say what each one keeps:
+        // Human-readable labels for the color-mode dropdowns (the part cards
+        // and the Saved Animations library). The names say what each one keeps:
         // the record-time MODE (re-rolled), the record-time OUTPUT (frozen),
         // or nothing at all (whatever the brush is set to right now).
         var REC_COLOR_MODES = [
@@ -1057,26 +1136,6 @@
             if (v === 'original' || v === 'exact' || v === 'live') return v;
             if (v === 'recorded') return 'exact';
             return 'original';
-        }
-
-        // Keep the minimized-panel color-mode dropdown in step with the active
-        // layer (populated once, value set here on every render / layer switch).
-        function recSyncMiniColorMode() {
-            var sel = document.getElementById('recMiniColorMode');
-            if (!sel) return;
-            if (!sel.options.length) {
-                sel.innerHTML = REC_COLOR_MODES.map(function (m) {
-                    return '<option value="' + m.v + '">' + m.label + '</option>';
-                }).join('');
-            }
-            var a = recGetActiveLayer();
-            if (a) {
-                sel.value = a.colorMode || 'original';
-                sel.disabled = false;
-            } else {
-                sel.value = 'original';
-                sel.disabled = true;
-            }
         }
 
         function recColorToCss(arr) {
@@ -1236,12 +1295,13 @@
                 if (a && a.timeline.isRecording && w > 0) {
                     _recRecordheadEl.style.display = 'block';
                     const elapsed = recClockNow(a) - a.timeline.recordingStartTime;
-                    const ratio = Math.min(1, elapsed / recMaxDurationMs);
+                    const ratio = Math.min(1, elapsed / recPartCapMs(a));
                     _recRecordheadEl.style.left = (ratio * w) + 'px';
                 } else {
                     _recRecordheadEl.style.display = 'none';
                 }
             }
+            recUpdateStripTime();
         }
         
         // Clear cached elements when UI is rebuilt
@@ -1832,6 +1892,7 @@
             return true;
         }
 
+        window.recEditorOpen = recEditorOpen;
         window.recDeleteSavedAnimation = recDeleteSavedAnimation;
         window.recGetSavedAnimationColorMode = recGetSavedAnimationColorMode;
         window.recSetSavedAnimationColorMode = recSetSavedAnimationColorMode;
@@ -1845,56 +1906,39 @@
         };
 
         function setupRecUI() {
+            // #recMode stays, hidden inside the strip: 28 (the shared drawer),
+            // 12 (saved settings) and the Audio tab read it. 'min' is the
+            // strip with the editor closed, 'full' the editor open. A saved
+            // 'off' from before the strip, or anything else, reads as 'min'.
             const recModeSel = document.getElementById('recMode');
             const recDrawerEl = document.getElementById('recDrawer');
-            const recMiniEl = document.getElementById('recMini');
             const recMiniRecordBtn = document.getElementById('recMiniRecordBtn');
             const recMiniPauseBtn = document.getElementById('recMiniPauseBtn');
             const recMiniStopBtn = document.getElementById('recMiniStopBtn');
-            const recMiniPlayAllBtn = document.getElementById('recMiniPlayAllBtn');
-            const recMiniMaxInput = document.getElementById('recMiniMaxDuration');
             const recOpenFullBtn = document.getElementById('recOpenFullBtn');
-            const recMiniPrevLayerBtn = document.getElementById('recMiniPrevLayerBtn');
-            const recMiniNextLayerBtn = document.getElementById('recMiniNextLayerBtn');
-            const recMiniAddLayerBtn = document.getElementById('recMiniAddLayerBtn');
+
+            // Capture is always armed: a dab only lands in a part while that
+            // part is recording, so there is nothing for an Off to protect.
+            recEnabled = true;
 
             function applyMode(mode) {
                 const full = (mode === 'full');
-                const min = (mode === 'min');
-                const off = (mode === 'off');
+                if (recModeSel && recModeSel.value !== (full ? 'full' : 'min')) recModeSel.value = full ? 'full' : 'min';
 
-                if (off) {
-                    recEnabled = false;
-                    if (recMiniEl) recMiniEl.style.display = 'none';
+                // There is always a part to record into
+                if (recLayers.length === 0) recAddLayer();
+
+                if (!full) {
                     // The drawer is shared with the Audio tab: only close it when
-                    // Record is the tab actually showing. Touching the class
-                    // directly is a fallback for studioDrawer being absent — an
+                    // the Animation tab is the one showing. Touching the class
+                    // directly is a fallback for studioDrawer being absent; an
                     // unconditional else here closes the drawer mid tab-swap
                     // (the demote to 'min' fires after the tab flips to audio).
                     if (window.studioDrawer) {
                         if (window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record') window.studioDrawer.close();
                     } else if (recDrawerEl) recDrawerEl.classList.remove('open');
-                    // Stop any playback/recording
-                    recStopPlayback();
-                    const a = recGetActiveLayer();
-                    if (a) a.timeline.isRecording = false;
-                    return;
-                }
-
-                // Ensure at least one layer exists when enabled
-                if (recLayers.length === 0) recAddLayer();
-                recEnabled = true;
-
-                if (min) {
-                    if (recMiniEl) recMiniEl.style.display = '';
-                    if (window.studioDrawer) {
-                        if (window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'record') window.studioDrawer.close();
-                    } else if (recDrawerEl) recDrawerEl.classList.remove('open');
-                    // Reflect current max into mini field
-                    if (recMiniMaxInput) recMiniMaxInput.value = recFormatTime(recMaxDurationMs || 10000);
-                    recRenderUI(); // update button texts for mini
-                } else if (full) {
-                    if (recMiniEl) recMiniEl.style.display = 'none';
+                    recRenderUI();
+                } else {
                     if (window.studioDrawer) window.studioDrawer.open('record');
                     else if (recDrawerEl) recDrawerEl.classList.add('open');
                     // Reflect current max into full field
@@ -1915,39 +1959,29 @@
                 recModeSel.addEventListener('change', (e) => applyMode(e.target.value));
                 // Apply initial mode
                 applyMode(recModeSel.value);
+            } else {
+                applyMode('min');
+            }
+            // The shared drawer opens and closes from its own tab bar and ✕ as
+            // well; the strip's Edit ⤢ follows whichever tab is showing.
+            if (recDrawerEl && typeof MutationObserver === 'function') {
+                new MutationObserver(() => recUpdateButtonStates())
+                    .observe(recDrawerEl, { attributes: true, attributeFilter: ['class', 'data-active-tab'] });
             }
 
-    // Mini controls
+    // The strip
     if (recMiniRecordBtn) recMiniRecordBtn.addEventListener('click', recToggleRecord);
-    if (recMiniPauseBtn) recMiniPauseBtn.addEventListener('click', recTogglePlayback);
+    if (recMiniPauseBtn) recMiniPauseBtn.addEventListener('click', recStripTogglePlay);
     if (recMiniStopBtn) recMiniStopBtn.addEventListener('click', recStopAll);
-    if (recMiniPlayAllBtn) recMiniPlayAllBtn.addEventListener('click', recTogglePlaybackAll);
-    if (recMiniMaxInput) recMiniMaxInput.addEventListener('change', (e) => { recMaxDurationMs = recParseTime(e.target.value) || 10000; });
-    if (recOpenFullBtn) recOpenFullBtn.addEventListener('click', () => { if (recModeSel) { recModeSel.value = 'full'; recModeSel.dispatchEvent(new Event('change')); } });
-    if (recMiniPrevLayerBtn) recMiniPrevLayerBtn.addEventListener('click', () => { recCycleLayer(-1); });
-    if (recMiniNextLayerBtn) recMiniNextLayerBtn.addEventListener('click', () => { recCycleLayer(1); });
-    if (recMiniAddLayerBtn) recMiniAddLayerBtn.addEventListener('click', recAddLayer);
-    // Minimized color-mode dropdown: mirrors + sets the active layer's mode,
-    // resyncs when layers are switched (recSyncMiniColorMode runs in render).
-    const recMiniColorMode = document.getElementById('recMiniColorMode');
-    if (recMiniColorMode) {
-        recMiniColorMode.addEventListener('change', () => {
-            const a = recGetActiveLayer();
-            if (a) { a.colorMode = recMiniColorMode.value; a._repKey = null; recRenderUI(); }
-        });
-    }
-    recSyncMiniColorMode();
-    // Click flash effect for lively feedback
-    const miniBtns = document.querySelectorAll('#recMini button');
-    miniBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            btn.classList.remove('clicked');
-            // Force reflow to restart animation
-            // eslint-disable-next-line no-unused-expressions
-            btn.offsetWidth;
-            btn.classList.add('clicked');
-            setTimeout(() => btn.classList.remove('clicked'), 250);
-        });
+    REC_LENGTHS.forEach(ms => {
+        const chip = document.getElementById('recLen' + (ms / 1000));
+        if (chip) chip.addEventListener('click', () => recSetLength(ms));
+    });
+    // Edit ⤢ opens the editor, and closes it again while it is open
+    if (recOpenFullBtn) recOpenFullBtn.addEventListener('click', () => {
+        if (!recModeSel) { if (window.studioDrawer) window.studioDrawer.open('record'); return; }
+        recModeSel.value = recEditorOpen() ? 'min' : 'full';
+        recModeSel.dispatchEvent(new Event('change'));
     });
     const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
     const recBtnFull = document.getElementById('recRecordBtn');
@@ -1967,16 +2001,10 @@
         impBtn.addEventListener('click', () => impFile.click());
         impFile.addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) recImportFromFile(f); e.target.value = ''; });
     }
-    const closeBtn = document.getElementById('recCloseBtn');
-    if (closeBtn) closeBtn.addEventListener('click', () => {
-        // Close full panel -> go to Minimized mode, not Off
-        const modeSel = document.getElementById('recMode');
-        if (modeSel) { modeSel.value = 'min'; modeSel.dispatchEvent(new Event('change')); }
-    });
     const speedSel = document.getElementById('recPlaybackSpeed');
     if (speedSel) speedSel.addEventListener('change', (e) => { recPlaybackSpeed = parseFloat(e.target.value) || 1; });
     const durInput = document.getElementById('recMaxDuration');
-    if (durInput) durInput.addEventListener('change', (e) => { recMaxDurationMs = recParseTime(e.target.value) || 10000; });
+    if (durInput) durInput.addEventListener('change', (e) => { recMaxDurationMs = recParseTime(e.target.value) || 8000; recUpdateButtonStates(); });
     
     const recPresetSel = document.getElementById('recPresetSelect');
     const recSavePresetBtn = document.getElementById('recSavePresetBtn');

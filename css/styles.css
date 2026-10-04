@@ -1070,33 +1070,8 @@
         .rec-recordhead { background: #ff7b72; box-shadow: 0 0 0 2px rgba(255,123,114,0.2); }
         .rec-recordhead::before { background: #ff7b72; box-shadow: 0 0 0 2px rgba(255,123,114,0.25), inset 0 1px rgba(255,255,255,0.2); }
         .rec-drawer .layer-title { background: #0b0f14; color: #e6edf3; border: 1px solid rgba(255,255,255,0.08); }
-        .rec-mini { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 8px; margin-top: 8px; }
-        .rec-mini-row { display: flex; align-items: center; gap: 8px; }
-        .rec-mini-label { font-size: 12px; opacity: 0.8; }
-        .rec-mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-        .rec-square { background: linear-gradient(180deg, rgba(22,27,34,0.9), rgba(13,17,23,0.95)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; box-shadow: inset 0 1px rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.35); aspect-ratio: 1 / 1; min-width: 150px; min-height: 150px; display: flex; }
-        .rec-square-content { padding: 10px; display: grid; grid-template-rows: 0.5fr 1fr; gap: 8px; width: 100%; box-sizing: border-box; }
-        .rec-square-content .row { display: grid; gap: 10px; }
-        .rec-square-content .row.top2 { grid-template-columns: repeat(2, minmax(56px, 1fr)); }
-        .rec-square-content .row.bottom2 { grid-template-columns: repeat(2, minmax(56px, 1fr)); }
-        .rec-square-content .row.layer-top { grid-template-columns: minmax(56px, 1fr) minmax(56px, auto) minmax(56px, 1fr); align-items: center; }
-        .rec-square-content .row.layer-bottom .full { grid-column: 1 / -1; }
-        .rec-square-content .row > * { width: 100%; }
-        .rec-mini button, .rec-mini input.time-input { height: 60px; min-width: 60px; border-radius: 14px; padding: 0 12px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; user-select: none; box-sizing: border-box; }
-        .rec-mini button { letter-spacing: 0.2px; }
-.rec-mini .action-prev, .rec-mini .action-next { font-size: 18px; }
-.rec-mini .clicked { animation: btnFlash 250ms ease-out; }
-        @keyframes btnFlash { 0% { box-shadow: inset 0 0 0 100px #2a2f3a; } 100% { box-shadow: none; } }
-        .rec-mini .rec-layer-status { font-variant-numeric: tabular-nums; letter-spacing: 0.3px; }
-        .rec-mini { line-height: 1.15; }
-        /* The mini recorder's duration field shared a rule with .rec-mini
-           button until the button unification; it needs its own plate now. */
-        .rec-mini input.time-input { text-align: center; font-family: 'Courier New', monospace; letter-spacing: 0.2px; padding: 0; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14); color: #e6edf3; }
-        .rec-square-content .row.layer-top button { aspect-ratio: 1 / 1; padding: 0; }
-        .rec-mini button.full { width: 100%; }
-        .rec-mini-actions { margin-top: 8px; }
-        .rec-layer-status { min-width: 60px; height: 60px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: linear-gradient(#1f2733, #151b24); color: #e6edf3; border: 1px solid rgba(255,255,255,0.14); font-weight: 700; font-size: 14px; }
-        @media (max-width: 420px) { .rec-mini-grid { grid-template-columns: 1fr; } }
+        /* The minimized recorder's 150px squares went with Recording Mode
+           (2026-10-04); the record strip's layout is in 21-sidebar.css. */
 
         /* ── Recording color-mode dropdown (1.3 rework) ── */
         /* Styled select replacing the raw native control ("looks bad"). Scoped
@@ -1104,8 +1079,7 @@
            `#sidebar-right select` (mini) which otherwise win. Dark fill, soft
            border, custom chevron drawn as an inline-SVG background. */
         .rec-drawer .rec-color-mode,
-        #sidebar-right .rec-color-mode,
-        .rec-mini .rec-color-mode {
+        #sidebar-right .rec-color-mode {
             -webkit-appearance: none; -moz-appearance: none; appearance: none;
             width: 100%; box-sizing: border-box;
             background-repeat: no-repeat; background-position: right 10px center;
@@ -1116,23 +1090,11 @@
             transition: border-color 0.15s, background-color 0.15s;
         }
 .rec-drawer .rec-color-mode:disabled,
-        #sidebar-right .rec-color-mode:disabled,
-        .rec-mini .rec-color-mode:disabled { opacity: 0.4; cursor: not-allowed; }
+        #sidebar-right .rec-color-mode:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Full-panel row: label + select on one line */
         .rec-drawer .layer-colormode-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
         .rec-drawer .layer-colormode-row > label { font-size: 11px; opacity: 0.85; flex: 0 0 auto; }
         .rec-drawer .layer-colormode-row .rec-color-mode { flex: 1; }
-        /* Minimized panel: 3-row layers square (mode / prev-status-next / add),
-           the mode select sized to match the big touch buttons */
-        #sidebar-right .rec-square-content.rec-square-layers,
-        .rec-mini .rec-square-content.rec-square-layers { grid-template-rows: auto 1fr auto; }
-        #sidebar-right .rec-color-mode-mini,
-        .rec-mini .rec-color-mode-mini {
-            height: 46px; border-radius: 14px; font-size: 13px;
-            padding: 0 30px 0 14px;
-            background-position: right 12px center;
-        }
-        .rec-mini .row.layer-mode { margin-bottom: 2px; }
 
         /* ── Global recording/playback visual feedback ── */
         /* PERF: Removed box-shadow on canvas-area - causes compositor overhead */
@@ -1167,8 +1129,9 @@
             pointer-events: none;
             z-index: 10;
         }
+        /* The digit rides on #canvas-area (03's recSyncBodyState). */
         body.rec-countdown #canvas-area::after {
-            content: '⏱ ...';
+            content: 'REC ' attr(data-rec-count) '\2026';
             position: absolute;
             top: 10px;
             right: 12px;

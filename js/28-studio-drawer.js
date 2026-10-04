@@ -3,8 +3,9 @@
  *
  * The bottom drawer is shared between the Record feature and the Audio feature.
  * A tab bar at the top switches which panel (.studio-tab-panel[data-tab]) shows.
- * Each feature keeps its own Off/Min/Full mode <select> (recMode / audioMode);
- * "Full" routes through here. The mode selects remain the single source of truth
+ * Each feature keeps its own mode <select> (recMode / audioMode); "Full"
+ * routes through here. recMode is hidden since 2026-10-04 and only says
+ * min / full: the Animations strip writes it, Edit ⤢ is its "full". The mode selects remain the single source of truth
  * for "which feature is Full" — opening one tab demotes the other Full -> Min so
  * the sidebar minis stay correct.
  *

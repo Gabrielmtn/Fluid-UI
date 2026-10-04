@@ -2190,7 +2190,6 @@
         sidebar.appendChild(buildLayersSection(controls));
         sidebar.appendChild(buildMutationSection());
 
-        sidebar.appendChild(buildRecordingSection());
         sidebar.appendChild(buildBrushSection());
         sidebar.appendChild(buildEffectsSection(controls));
         sidebar.appendChild(buildAnimationsSection(controls));
@@ -3235,6 +3234,12 @@
     function buildAnimationsSection(controls) {
         const { sec, body } = makeSection('Animations', 'expressive', true);
 
+        // The record strip leads the section (2026-10-04): the Recording
+        // section folded in here, its Off / Minimized / Full gone. The strip
+        // is #recMini from index.html, run by 03; F9 and F8 work with this
+        // section closed or hidden.
+        moveEl('recMini', body);
+
         // Curated 2026-08-27: the grid is six SLOTS, not six fixed buttons.
         // Every slot starts empty (Smash and Vortex left 2026-10-04: the
         // user makes what they want to see). Slots hold the user's saved
@@ -3336,19 +3341,6 @@
             });
         }
 
-        // Create new: straight into the full recorder — record, then
-        // "Save as New" puts it in the library below.
-        const createBtn = document.createElement('button');
-        createBtn.id = 'animCreateNewBtn';
-        createBtn.textContent = 'Create New Animation';
-        createBtn.title = 'Open the animation editor. Record, then Save as new adds it to this library.';
-        createBtn.addEventListener('click', () => {
-            const sel = document.getElementById('recMode');
-            if (sel) { sel.value = 'full'; sel.dispatchEvent(new Event('change')); }
-            else if (window.studioDrawer) window.studioDrawer.open('record');
-        });
-        body.appendChild(createBtn);
-
         // Library dropdown: every saved recording, playable by click,
         // draggable into a slot above.
         const lib = document.createElement('div');
@@ -3380,7 +3372,7 @@
             if (!names.length) {
                 const empty = document.createElement('div');
                 empty.className = 'anim-lib-empty';
-                empty.textContent = 'No saved animations yet. Create New Animation records one.';
+                empty.textContent = 'No saved animations yet. Record one above.';
                 libList.appendChild(empty);
                 return;
             }
@@ -7297,15 +7289,6 @@
             window.focusMode.registerFormatInfo(fmtInfo);
             window.focusMode.registerLockCheckbox(lockCb);
         }
-
-        return sec;
-    }
-
-    function buildRecordingSection() {
-        const { sec, body } = makeSection('Recording', 'expressive', true);
-
-        moveControlGroup('recMode', body);
-        moveEl('recMini', body);
 
         return sec;
     }

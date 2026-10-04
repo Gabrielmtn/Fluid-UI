@@ -350,7 +350,9 @@
                 if (typeof window.recStopAllSavedAnimations === 'function') {
                     stopped = window.recStopAllSavedAnimations();
                 }
-                if (recEnabled && typeof recStopAll === 'function') {
+                // Only when something runs: the recorder is always armed now,
+                // and an idle Esc must not rebuild its panel or eat the key.
+                if (typeof recIsBusy === 'function' && recIsBusy() && typeof recStopAll === 'function') {
                     recStopAll();
                     stopped = true;
                 }
@@ -358,9 +360,9 @@
                 return;
             }
             // ── Recording transport: F9 ──
+            // Works everywhere, Simple included: there is no Off to pick first.
             if (key === 'F9') {
                 e.preventDefault();
-                if (!recEnabled) return;
                 if (e.shiftKey) {
                     // Shift+F9: record immediately (skip countdown)
                     if (typeof recStartRecording === 'function') recStartRecording();
@@ -385,7 +387,7 @@
             // was open, which took Freeze away the moment the recorder showed.
             if (key === 'F8') {
                 e.preventDefault();
-                if (e.repeat || !recEnabled) return;
+                if (e.repeat) return;
                 if (e.shiftKey) {
                     // Shift+F8: play all / pause all
                     if (typeof recTogglePlaybackAll === 'function') recTogglePlaybackAll();
@@ -425,17 +427,22 @@
                 window.UndoManager.redo();
                 return;
             }
-            // Ctrl+Shift+N: new recording layer
+            // The part keys below act only while the animation editor is open
+            // (the drawer on its Animation tab). With the recorder always armed
+            // they would otherwise take Delete and the arrows from everything.
+            const recEditing = typeof recEditorOpen === 'function' && recEditorOpen();
+            // Ctrl+Shift+N: new part. Swallowed either way: the browser's
+            // own Ctrl+Shift+N opens a private window.
             if (ctrlOrMeta && e.shiftKey && lower === 'n') {
                 e.preventDefault();
-                if (recEnabled && typeof recAddLayer === 'function') recAddLayer();
+                if (recEditing && typeof recAddLayer === 'function') recAddLayer();
                 return;
             }
             // Delete: clear active recording layer. It asks first: a stray
             // Delete used to wipe the take with no way back (Ctrl+Z doesn't
             // hold recordings), and an empty take has nothing to clear.
             if (key === 'Delete' && !ctrlOrMeta && !e.altKey && !e.shiftKey) {
-                if (recEnabled && typeof recClearActive === 'function') {
+                if (recEditing && typeof recClearActive === 'function') {
                     e.preventDefault();
                     const take = typeof recGetActiveLayer === 'function' ? recGetActiveLayer() : null;
                     const n = take && take.timeline && take.timeline.interactions ? take.timeline.interactions.length : 0;
@@ -495,12 +502,12 @@
             }
             // ── Layer navigation: ↑/↓ (unmodified) ──
             if (!ctrlOrMeta && !e.altKey && !e.shiftKey) {
-                if (key === 'ArrowUp' && recEnabled && typeof recCycleLayer === 'function') {
+                if (key === 'ArrowUp' && recEditing && typeof recCycleLayer === 'function') {
                     e.preventDefault();
                     recCycleLayer(-1);
                     return;
                 }
-                if (key === 'ArrowDown' && recEnabled && typeof recCycleLayer === 'function') {
+                if (key === 'ArrowDown' && recEditing && typeof recCycleLayer === 'function') {
                     e.preventDefault();
                     recCycleLayer(1);
                     return;

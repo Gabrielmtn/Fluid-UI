@@ -364,7 +364,7 @@
         let recActiveLayerId = null;
         let recNextLayerId = 1;
         let recIsPlayingAll = false;
-        let recMaxDurationMs = 10000;
+        let recMaxDurationMs = 8000;   // the strip's 8 s chip
         let recLastPlaybackTime = Date.now();
         let recPlaybackSpeed = 1;
         let recRenderQueued = false;

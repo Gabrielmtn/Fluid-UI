@@ -1431,50 +1431,33 @@
             <div style="font-weight: bold; margin-bottom: 5px;">PREVIEW LAYERS</div>
             <div style="font-size: 11px;">Hover to view stacked PNGs</div>
         </div>
-        <div class="control-group" id="recModeGroup" style="margin-top: 10px;">
-            <label for="recMode">Recording Mode</label>
-            <select id="recMode">
-                <option value="off" selected>Off</option>
-                <option value="min">Minimized</option>
-                <option value="full">Full</option>
+        <!-- The record strip: 20 mounts it at the top of Animations; 03 runs it.
+             It replaced Recording Mode Off / Minimized / Full (2026-10-04).
+             #recMode stays, hidden, for 28, 12 and the Audio tab; the strip
+             writes it ('min' = editor closed, 'full' = editor open). -->
+        <div id="recMini" class="rec-strip" data-group="expressive">
+            <div class="rec-strip-row rec-strip-transport">
+                <button type="button" id="recMiniRecordBtn" class="btn--record" title="Record what you paint, after a 3-2-1 countdown (F9). Shift+F9 starts at once.">Record</button>
+                <button type="button" id="recMiniPauseBtn" title="Play / pause what you recorded (F8)">Play</button>
+                <button type="button" id="recMiniStopBtn" title="Stop recording and playback (Esc)">Stop</button>
+            </div>
+            <div class="rec-strip-row rec-strip-length">
+                <span id="recMiniTime" class="rec-strip-time" title="How far it is, and how long it runs">0:00 / 0:08</span>
+                <div class="rec-strip-chips btn-sm" role="group" aria-label="Length">
+                    <button type="button" id="recLen4" title="Record up to 4 seconds">4 s</button>
+                    <button type="button" id="recLen8" title="Record up to 8 seconds">8 s</button>
+                    <button type="button" id="recLen15" title="Record up to 15 seconds">15 s</button>
+                    <button type="button" id="recLen30" title="Record up to 30 seconds">30 s</button>
+                </div>
+            </div>
+            <div class="rec-strip-row rec-strip-foot">
+                <span id="recStripStatus" class="rec-strip-status" aria-live="polite"></span>
+                <button type="button" id="recOpenFullBtn" class="btn--sm" title="Open the animation editor: parts, speed, colours and saving">Edit ⤢</button>
+            </div>
+            <select id="recMode" style="display: none;" aria-hidden="true" tabindex="-1">
+                <option value="min" selected>Strip</option>
+                <option value="full">Editor</option>
             </select>
-        </div>
-        <div id="recMini" class="rec-mini" data-group="expressive" style="display: none;">
-            <div class="rec-mini-grid">
-                <div class="rec-square" id="recMiniSquareControls">
-                    <div class="rec-square-content">
-                        <div class="row top2">
-                            <button id="recMiniRecordBtn" class="action-record btn--record">Record</button>
-                            <input type="text" id="recMiniMaxDuration" class="time-input action-max" value="00:10:000" placeholder="mm:ss:ms">
-                        </div>
-                        <div class="row bottom2">
-                            <button id="recMiniPauseBtn" class="action-pause" title="Play / pause the part (F8)">Pause</button>
-                            <button id="recMiniStopBtn" class="action-stop">Stop</button>
-                        </div>
-                        <div class="row bottom1">
-                            <button id="recMiniPlayAllBtn" class="full action-full" title="Play / pause every part (Shift+F8)">Play all</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="rec-square" id="recMiniSquareLayers">
-                    <div class="rec-square-content rec-square-layers">
-                        <div class="row layer-mode">
-                            <select id="recMiniColorMode" class="full rec-color-mode rec-color-mode-mini" title="How this part's colours replay"></select>
-                        </div>
-                        <div class="row layer-top">
-                            <button id="recMiniPrevLayerBtn" class="action-prev">◀</button>
-                            <div id="recMiniLayerStatus" class="rec-layer-status">0/0</div>
-                            <button id="recMiniNextLayerBtn" class="action-next">▶</button>
-                        </div>
-                        <div class="row layer-bottom">
-                            <button id="recMiniAddLayerBtn" class="full action-add">New part</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="rec-mini-actions">
-                <button id="recOpenFullBtn" class="full action-full" title="Open the animation editor">Open editor</button>
-            </div>
         </div>
         <div class="control-group" style="margin-top: 20px">
             <label>Layers</label>
@@ -1507,7 +1490,7 @@
                     <option value="4">4x</option>
                 </select>
                 <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;">Length</label>
-                <input type="text" id="recMaxDuration" class="time-input" value="00:10:000" placeholder="mm:ss:ms" style="width:110px;">
+                <input type="text" id="recMaxDuration" class="time-input" value="00:08:000" placeholder="mm:ss:ms" style="width:110px;">
             </div>
         </div>
         <div class="rec-header" style="gap:6px;">
@@ -1571,9 +1554,9 @@
                         <li>F9 — Record (3-2-1 countdown)</li>
                         <li>Shift+F9 — Record Immediately</li>
                         <li>Esc — Stop Recording and Playback</li>
-                        <li>↑ / ↓ — Previous / Next Part</li>
-                        <li>Delete — Clear Part</li>
-                        <li>Ctrl+Shift+N — New Part</li>
+                        <li>↑ / ↓ — Previous / Next Part (editor open)</li>
+                        <li>Delete — Clear Part (editor open)</li>
+                        <li>Ctrl+Shift+N — New Part (editor open)</li>
                     </ul>
                 </div>
                 <div>
