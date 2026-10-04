@@ -6557,7 +6557,6 @@
                     '<span id="audioFileName" class="audio-filename"></span>' +
                 '</div>' +
             '</div>' +
-            '<canvas id="audioMiniTimeline" class="audio-mini-timeline" title="Composer segments"></canvas>' +
             '<button id="audioOpenFullBtn" class="audio-mini-full" title="Open full audio panel">\u2b06\ufe0f Full Audio</button>';
         body.appendChild(mini);
 
@@ -6873,13 +6872,11 @@
                 if (enableCb) enableCb.checked = false;
                 if (timingCb && timingCb.checked) { timingCb.checked = false; timingCb.dispatchEvent(new Event('change')); }
                 if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
-                stopAudioMiniLoop();
             } else if (isScene) {
                 mini.style.display = 'none';
                 sceneBox.style.display = '';
                 if (window.AudioScenes) window.AudioScenes.buildControls(mode, sceneCtlHost);
                 if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
-                stopAudioMiniLoop();
                 // Fire-and-forget: a user picking a scene wants sound NOW — start
                 // the engine from the selected source. Restored sessions (synthetic
                 // change events) skip this so page load never pops a mic prompt.
@@ -6896,7 +6893,6 @@
                 mini.style.display = '';
                 suppressReactVisuals();
                 if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
-                startAudioMiniLoop();
                 if (userInitiated) {
                     if (window.audioReactive && !window.audioReactive.isEnabled()) enableFromSource();
                     if (timingCb && !timingCb.checked) { timingCb.checked = true; timingCb.dispatchEvent(new Event('change')); }
@@ -6904,13 +6900,23 @@
             } else if (mode === 'min') {
                 mini.style.display = '';
                 if (window.studioDrawer && window.studioDrawer.isOpen() && window.studioDrawer.activeTab() === 'audio') window.studioDrawer.close();
-                startAudioMiniLoop();
             } else if (mode === 'full') {
                 mini.style.display = 'none';
                 ensureAudioDrawer();
                 if (window.studioDrawer) window.studioDrawer.open('audio');
-                stopAudioMiniLoop();
+                // With a track loaded, the cue editor is the point: scroll the
+                // drawer just enough to show it, never past the transport.
+                setTimeout(revealCueEditor, 380);
             }
+        }
+        function revealCueEditor() {
+            var p = document.getElementById('audioDrawerPanel'), h = document.getElementById('audioCueEditorHost');
+            var ar = window.audioReactive;
+            if (!p || !h || !ar || !ar.getFileBuffer || !ar.getFileBuffer()) return;
+            var pr = p.getBoundingClientRect(), hr = h.getBoundingClientRect();
+            var k = p.clientHeight / (pr.height || 1);   // the drawer is zoomed by --ui-scale
+            var over = (hr.bottom - pr.bottom) * k, room = (hr.top - pr.top) * k - 8;
+            if (over > 0 && room > 0) p.scrollTop += Math.min(over, room);
         }
         modeSel.addEventListener('change', function (e) { applyAudioMode(e.target.value, e.isTrusted); });
 
@@ -6932,80 +6938,6 @@
         audioDrawerBuilt = true;
     }
 
-    // \u2500\u2500 Mini segments timeline (overlapping active areas) \u2500\u2500
-    function startAudioMiniLoop() {
-        if (audioMiniRaf) return;
-        // rAF is uncapped in Electron — throttle to ~30 Hz and skip while the
-        // mini is hidden (a timeline preview needs no more)
-        var lastDraw = 0;
-        var draw = function () {
-            audioMiniRaf = requestAnimationFrame(draw);
-            var now = performance.now();
-            if (now - lastDraw < 33) return;
-            var cv = document.getElementById('audioMiniTimeline');
-            if (!cv || cv.offsetParent === null) return;
-            lastDraw = now;
-            drawAudioMiniTimeline();
-        };
-        audioMiniRaf = requestAnimationFrame(draw);
-    }
-    function stopAudioMiniLoop() {
-        if (audioMiniRaf) { cancelAnimationFrame(audioMiniRaf); audioMiniRaf = null; }
-    }
-    function miniRoundRect(ctx, x, y, w, h, r) {
-        r = Math.min(r, h / 2, w / 2);
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.arcTo(x + w, y, x + w, y + h, r);
-        ctx.arcTo(x + w, y + h, x, y + h, r);
-        ctx.arcTo(x, y + h, x, y, r);
-        ctx.arcTo(x, y, x + w, y, r);
-        ctx.closePath();
-        ctx.fill();
-    }
-    function drawAudioMiniTimeline() {
-        var cv = document.getElementById('audioMiniTimeline');
-        if (!cv) return;
-        var rect = cv.getBoundingClientRect();
-        if (rect.width < 2 || rect.height < 2) return;
-        var dpr = window.devicePixelRatio || 1;
-        var w = Math.max(1, Math.round(rect.width * dpr));
-        var h = Math.max(1, Math.round(rect.height * dpr));
-        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-        var ctx = cv.getContext('2d');
-        ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = 'rgba(0,0,0,0.35)';
-        ctx.fillRect(0, 0, w, h);
-        var comp = window.audioComposer;
-        if (!comp || !comp.getState) return;
-        var st = comp.getState();
-        var dur = (comp.getDurationMs ? comp.getDurationMs() : st.durationMs) || 1;
-        var tracks = st.tracks || [];
-        var palette = comp.palette || ['#b48cff', '#4dd2ff', '#4dff7a', '#ffb24d', '#ff6fae'];
-        var n = Math.max(1, tracks.length);
-        var pad = 2 * dpr;
-        var laneH = (h - pad * (n + 1)) / n;
-        for (var i = 0; i < tracks.length; i++) {
-            var y = pad + i * (laneH + pad);
-            var color = palette[i % palette.length];
-            var segs = tracks[i].segments || [];
-            ctx.globalAlpha = 0.85;
-            for (var j = 0; j < segs.length; j++) {
-                var s = segs[j];
-                var x = (s.startMs / dur) * w;
-                var bw = Math.max(2 * dpr, (s.durMs / dur) * w);
-                ctx.fillStyle = color;
-                miniRoundRect(ctx, x, y, bw, laneH, 2 * dpr);
-            }
-        }
-        ctx.globalAlpha = 1;
-        var ph = comp.getPlayheadMs ? comp.getPlayheadMs() : 0;
-        var px = (ph / dur) * w;
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = Math.max(1, dpr);
-        ctx.beginPath(); ctx.moveTo(px + 0.5, 0); ctx.lineTo(px + 0.5, h); ctx.stroke();
-    }
-
     function buildAudioDrawerControls(container) {
         container.innerHTML = '';
         var body = container;
@@ -7022,6 +6954,30 @@
         enableHost.id = 'audioDrawerEnableHost';
         enableHost.className = 'audio-drawer-enable';
         body.appendChild(enableHost);
+
+        // The cue editor (40b): the track, its spectrogram, every lane's cues
+        // to select, move, delete and add. User test 3: audio rebuilt around
+        // the timing tool.
+        var cueHost = document.createElement('div');
+        cueHost.id = 'audioCueEditorHost';
+        cueHost.className = 'audio-cue-editor-host';
+        body.appendChild(cueHost);
+        (function mountCues() {
+            if (window.AudioCueEditor && window.AudioCueEditor.mount) window.AudioCueEditor.mount(cueHost);
+            else setTimeout(mountCues, 150);
+        })();
+
+        // Everything that reacts LIVE, without timing lanes (what a mic or
+        // system audio needs), folded under one heading. The ids stay in the
+        // page: presets, Mutate locks and the registry read them.
+        var live = document.createElement('details');
+        live.className = 'audio-live-block';
+        var liveSum = document.createElement('summary');
+        liveSum.textContent = 'Live reactions';
+        liveSum.title = 'Reactions to whatever is playing, as it plays, without lanes. These suit a microphone or system audio.';
+        live.appendChild(liveSum);
+        body.appendChild(live);
+        body = live;
 
         // Visualizer canvas
         var vizWrap = document.createElement('div');
@@ -7214,9 +7170,8 @@
             if (window.audioReactive) window.audioReactive.registerViz(vizCanvas);
         });
 
-        // Mirror the engine config onto these controls whenever the composer
-        // applies a segment, so the panel visibly changes as the playhead crosses
-        // segments. (--val is set directly because programmatic .value doesn't
+        // Mirror the engine config onto these controls whenever something
+        // else (a preset, Mutate) sets it. (--val is set directly because programmatic .value doesn't
         // fire the input event the slider fill listens for.)
         function syncAudioUIFromEngine() {
             if (!window.audioReactive || !window.audioReactive.getConfig) return;
@@ -7251,15 +7206,6 @@
         if (window.audioReactive && window.audioReactive.onConfigChange) {
             window.audioReactive.onConfigChange(syncAudioUIFromEngine);
         }
-
-        // Composer segment timeline lives below the React controls in the drawer
-        var compWrap = document.createElement('div');
-        compWrap.className = 'audio-drawer-composer';
-        body.appendChild(compWrap);
-        (function mountComposer() {
-            if (window.audioComposer && window.audioComposer.mount) window.audioComposer.mount(compWrap);
-            else setTimeout(mountComposer, 150);
-        })();
     }
 
     function buildFocusSection() {

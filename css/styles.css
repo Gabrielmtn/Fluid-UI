@@ -1004,7 +1004,6 @@
 .studio-tab-panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
         .studio-tab-panel.active { display: flex; }
         .studio-tab-panel[data-tab="audio"] { overflow-y: auto; overflow-x: hidden; padding: 6px 14px 16px; }
-        .audio-drawer-composer { margin-top: 12px; }
         .rec-header {
             display: flex;
             justify-content: space-between;

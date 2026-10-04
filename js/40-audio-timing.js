@@ -109,8 +109,13 @@
             }
         } catch (_) {}
     }
+    function bandOnly(g) {
+        var c = {};
+        for (var k in g) if (k !== 'cues' && k !== 'edited') c[k] = g[k];
+        return c;
+    }
     function saveGates() {
-        try { localStorage.setItem(LS_GATES, JSON.stringify(gateStore.gates)); } catch (_) {}
+        try { localStorage.setItem(LS_GATES, JSON.stringify(gateStore.gates.map(bandOnly))); } catch (_) {}
         saveTrack();
     }
     function saveOpts() {
@@ -166,7 +171,7 @@
         if (!id) return true;
         var r = readTrack(id);
         if (r) { applyRecord(r); trackSaved = true; }
-        else gateStore.gates = JSON.parse(JSON.stringify(gateStore.gates));
+        else gateStore.gates = JSON.parse(JSON.stringify(gateStore.gates.map(bandOnly)));
         return true;
     }
     // Cues fire with the chart closed too, once a lane on this track does
@@ -744,6 +749,17 @@
         return notes;
     }
 
+    function frozenNotes(g) {
+        var out = [];
+        for (var i = 0; i < g.cues.length; i++) {
+            var c = g.cues[i];
+            if (!c || typeof c[0] !== 'number') continue;
+            out.push({ t: c[0], e: typeof c[1] === 'number' ? c[1] : 0.7 });
+        }
+        out.sort(function (a, b) { return a.t - b.t; });
+        return out;
+    }
+
     // Re-derive the whole chart from cache + gates. Milliseconds, so every
     // gate edit calls this directly — the box lands and the lane re-fills
     // in the same breath.
@@ -754,13 +770,15 @@
         for (var i = 0; i < gateStore.gates.length; i++) {
             var g = gateStore.gates[i];
             var m = laneMethod(g), notes, bpm = null;
-            if (m === 'level') notes = extractLevel(cache, g);
+            // A lane edited in the cue editor (40b) plays its own list.
+            if (g.edited && Array.isArray(g.cues)) notes = frozenNotes(g);
+            else if (m === 'level') notes = extractLevel(cache, g);
             else if (m === 'beat') { var b = extractBeat(cache, g); notes = b.notes; bpm = b.bpm; }
             else if (m === 'pitch') notes = extractPitch(cache, g);
             else notes = extractOnset(cache, g);
             for (var k = 0; k < notes.length; k++) { notes[k].lane = i; all.push(notes[k]); }
             lanes.push({ lo: g.lo, hi: g.hi, th: laneTh(g), method: m,
-                         color: laneColor(g), label: laneLabel(g), bpm: bpm, count: notes.length });
+                         color: laneColor(g), label: laneLabel(g), bpm: bpm, count: notes.length, edited: !!g.edited });
         }
         all.sort(function (a, b2) { return a.t - b2.t; });
         laneFlash = [];   // indices may have shifted — a stale flash lights the wrong lane
@@ -1810,8 +1828,8 @@
 
             var cnt = document.createElement('span');
             cnt.className = 'atv-lane-count';
-            cnt.textContent = lane ? String(lane.count) : '–';
-            cnt.title = 'Cues on this lane';
+            cnt.textContent = (g.edited ? '✎ ' : '') + (lane ? String(lane.count) : '–');
+            cnt.title = g.edited ? 'Cues on this lane, edited by hand in Full Audio' : 'Cues on this lane';
             row.appendChild(cnt);
 
             var del = document.createElement('button');
@@ -1924,6 +1942,54 @@
         trackSaved: function () { return trackSaved; },
         isArmed: function () { return enabled || trackArmed(); },
         exportCues: exportCues,
+        // For the cue editor (40b-audio-cue-editor.js)
+        editor: {
+            cache: function () { return cache; },
+            chart: function () { return chart; },
+            gates: function () { return gateStore.gates; },
+            color: function (i) { var g = gateStore.gates[i]; return g ? laneColor(g) : [255, 255, 255]; },
+            label: function (i) { var g = gateStore.gates[i]; return g ? laneLabel(g) : ''; },
+            nudgeMs: function () { return opts.offsetMs; },
+            analysing: function () { return analysing; },
+            progress: function () { return analysisPct; },
+            // The editor is open on a loaded track: make sure it has cues.
+            ensure: function () {
+                var ar = window.audioReactive;
+                // First open on a track with no lanes: the same three drum bands
+                // the chart starts with, so there is something to edit.
+                if (!gateStore.gates.length && ar && ar.getFileBuffer && ar.getFileBuffer()) { seedLanes(); saveGates(); rebuildAllControls(); }
+                if (!cache && !analysing && !analysisErr && ar && ar.getFileBuffer && ar.getFileBuffer()) buildCache(false);
+            },
+            // A lane's first edit makes its detected cues its own list.
+            freeze: function (i) {
+                var g = gateStore.gates[i];
+                if (!g) return [];
+                if (!g.edited || !Array.isArray(g.cues)) {
+                    g.cues = [];
+                    if (chart) chart.notes.forEach(function (n) {
+                        if (n.lane === i) g.cues.push([+n.t.toFixed(4), +(n.e || 0).toFixed(3)]);
+                    });
+                    g.edited = true;
+                }
+                return g.cues;
+            },
+            setCues: function (i, cues) {
+                var g = gateStore.gates[i];
+                if (!g) return;
+                g.cues = (cues || []).filter(function (c) { return c && typeof c[0] === 'number' && isFinite(c[0]); })
+                    .sort(function (a, b) { return a[0] - b[0]; });
+                g.edited = true;
+                saveGates();
+                extractAll();
+            },
+            redetect: function (i) {
+                var g = gateStore.gates[i];
+                if (!g) return;
+                delete g.cues; delete g.edited;
+                saveGates();
+                extractAll();
+            }
+        },
         actions: ACTIONS.slice(),
         setAction: function (i, act, every) {
             var g = gateStore.gates[i];

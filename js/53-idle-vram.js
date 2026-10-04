@@ -92,8 +92,10 @@
                 window.PenWindow.isOpen()) return 'pen window open';
             // A room means peers are still sending strokes at us.
             if (typeof currentRoom !== 'undefined' && currentRoom) return 'in a room';
-            if (window.audioComposer && window.audioComposer.isPlaying &&
-                window.audioComposer.isPlaying()) return 'audio playing';
+            if (window.audioReactive && window.audioReactive.position) {
+                var ap = window.audioReactive.position();
+                if (ap && !ap.paused) return 'audio playing';
+            }
             if (window.gl && window.gl.isContextLost && window.gl.isContextLost()) return 'context lost';
         } catch (e) {
             return 'guard threw: ' + (e && e.message);

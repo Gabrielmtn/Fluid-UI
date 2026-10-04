@@ -466,6 +466,9 @@
     function isTypingTarget(el) {
         if (!el) return false;
         if (el.isContentEditable) return true;
+        // A focused editor that takes its own keys (the cue editor, 40b):
+        // Delete, the arrows and digits are its edits there, not hotkeys.
+        if (el.closest && el.closest('[data-owns-keys]')) return true;
         var tag = (el.tagName || '').toLowerCase();
         if (tag === 'textarea') return true;
         // A focused <select> consumes letters to jump between options.
