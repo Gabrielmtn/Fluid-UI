@@ -891,13 +891,14 @@
         'Brush Size': 'Brush size for painting fluid — the ⚙ opens brush settings & presets',
         'Fluid': 'Material mode (Swirl / Gloss Paint — Wetness or Thickness) + amount — the ⚙ opens the material picker',
         'Viscosity': 'How thick the fluid is — 0 flows like water, higher smooths the swirls into broad ribbons',
-        'Isolation': 'Motion isolation - how much color follows velocity',
+        // User test 3: Isolation's tip had been wrong since June, and Density and
+        // Velocity read backwards for faders where right means lasts longer.
+        'Isolation': 'Shields paint that is already moving from a new stroke’s push. Left, every stroke stirs whatever it touches; right, moving paint keeps its own path (up to 85% less push).',
         'Color Blend': 'Left of the middle (Laminar), colours slide past each other in layers without mixing: a smudge stretches them into finer streaks instead of smearing them. Right of the middle (Blend), they blend where they meet, like wet paint, and settle as they dry (Dry Time). The flow itself is unchanged',
         'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — the ⚙ opens arm colors & symmetry',
-        'Time': 'Simulation time scale',
-        'Density': 'How fast color fades',
-        'Velocity': 'How fast motion fades',
-        'Color': 'Current brush color'
+        'Time': 'How fast the fluid runs: left is slow motion, 1 is real time, right is fast forward.',
+        'Density': 'How long colour lasts. Further right, it fades more slowly; at 1.000 it never fades.',
+        'Velocity': 'How long motion lasts. Further right, the swirls keep moving longer.'
     };
     // What a channel is CALLED where people see it, when that differs from
     // its key. The key (data-ui-key) stays put: show/hide choices (43), the
