@@ -2184,6 +2184,10 @@
     // #canvas-area), the same cost as a window resize; it snaps, never
     // animates (05j: per-frame resizes are the worst jank there is).
     var LSB_KEY = 'ui.leftSidebar.collapsed';
+    // Sections built for the left sidebar while the right one is being built
+    // (buildSidebar runs first); buildLeftSidebar moves them in, in order.
+    var pendingLeftSections = [];
+    var SECTION_SEL = '#sidebar-right .sidebar-section, #sidebar-left .sidebar-section';
     function buildLeftSidebar(strip) {
         var bar = document.createElement('div');
         bar.id = 'sidebar-left';
@@ -2205,6 +2209,8 @@
 
         var body = document.createElement('div');
         body.className = 'lsb-body';
+        pendingLeftSections.forEach(function (sec) { if (sec) body.appendChild(sec); });
+        pendingLeftSections.length = 0;
         bar.appendChild(body);
 
         var rail = document.createElement('div');
@@ -2226,6 +2232,22 @@
         railLabel.textContent = 'Brush';
         railLabel.title = 'Open the brush bar';
         rail.appendChild(railLabel);
+        // One rail entry per section: a click opens the bar on that section.
+        Array.prototype.forEach.call(body.querySelectorAll(':scope > .sidebar-section'), function (sec) {
+            var t = sec.querySelector('.section-title');
+            if (!t) return;
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'lsb-rail-label lsb-rail-section btn--ghost';
+            if (sec.dataset.group) b.dataset.group = sec.dataset.group;
+            b.textContent = t.textContent.trim();
+            b.title = 'Open ' + b.textContent;
+            b.addEventListener('click', function () {
+                set(false, true);
+                if (sec.classList.contains('collapsed')) toggleSection(sec, false);
+            });
+            rail.appendChild(b);
+        });
         bar.appendChild(rail);
 
         function syncRail() {
@@ -2248,6 +2270,21 @@
         set(saved === null || saved === undefined ? window.innerWidth < 1280 : !!saved, false);
 
         window.Sidebars = window.Sidebars || {};
+        // Every sidebar section, left and right, and finding one by title
+        // (titles are unique across both).
+        window.Sidebars.sections = function () { return Array.prototype.slice.call(document.querySelectorAll(SECTION_SEL)); };
+        window.Sidebars.find = function (title) {
+            var list = window.Sidebars.sections();
+            for (var i = 0; i < list.length; i++) {
+                var t = list[i].querySelector('.section-title');
+                if (t && t.textContent.trim() === title) return list[i];
+            }
+            return null;
+        };
+        window.Sidebars.open = function (secOrTitle) {
+            var sec = typeof secOrTitle === 'string' ? window.Sidebars.find(secOrTitle) : secOrTitle;
+            return sec ? window.openSidebarSection(sec) : false;
+        };
         window.Sidebars.left = {
             el: bar,
             body: body,
@@ -2282,7 +2319,9 @@
         sidebar.appendChild(buildLayersSection(controls));
         sidebar.appendChild(buildMutationSection());
 
-        sidebar.appendChild(buildBrushSection());
+        // Stroke and replay lives in the LEFT sidebar, with the brush it
+        // shapes (20 buildLeftSidebar collects pendingLeftSections).
+        pendingLeftSections.push(buildBrushSection());
         sidebar.appendChild(buildEffectsSection(controls));
         sidebar.appendChild(buildAnimationsSection(controls));
         sidebar.appendChild(buildAudioSection());
@@ -8663,7 +8702,7 @@
     function persistSectionState() {
         try {
             var sections = {};
-            document.querySelectorAll('#sidebar-right .sidebar-section').forEach(function (sec) {
+            document.querySelectorAll(SECTION_SEL).forEach(function (sec) {
                 var titleEl = sec.querySelector('.section-title');
                 if (titleEl) sections[titleEl.textContent.trim()] = sec.classList.contains('collapsed');
             });
@@ -8685,7 +8724,7 @@
 
     function toggleSection(sec, additive) {
         if (!sec) return;
-        const sidebar = (sec.closest && sec.closest('#sidebar-right')) || sec.parentElement;
+        const sidebar = (sec.closest && sec.closest('#sidebar-right, #sidebar-left')) || sec.parentElement;
         const header = sec.querySelector('.section-header');
         const sweeping = !additive && sec.classList.contains('collapsed') && !!sidebar;
 
@@ -8750,6 +8789,8 @@
     window.openSidebarSection = function (sel) {
         var sec = (typeof sel === 'string') ? document.querySelector(sel) : sel;
         if (!sec) return false;
+        // A section in the folded left bar: open the bar first.
+        if (sec.closest && sec.closest('#sidebar-left') && window.Sidebars && window.Sidebars.left && window.Sidebars.left.isCollapsed()) window.Sidebars.left.expand();
         if (sec.classList.contains('collapsed')) toggleSection(sec, false);
         return true;
     };

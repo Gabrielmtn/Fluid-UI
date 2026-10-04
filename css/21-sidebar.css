@@ -147,7 +147,8 @@
 
    The three --g-* live on #sidebar-right so the idle easter egg can redraw all
    three runs with three property writes per frame (js/37-nav-idle-glow.js). */
-#sidebar-right {
+#sidebar-right,
+#sidebar-left {
     --row-h: 34px;
     --row-pad: 9px;
     --g-core:       linear-gradient(in oklch 180deg, oklch(84% 0.160 242) 0%, oklch(60% 0.131 294) 100%);
@@ -191,13 +192,13 @@
    label cascaded to the value (its opacity:1 is relative to the parent),
    so nothing in the row rendered at full contrast. Names are now the
    strongest thing in the row and everything else gives way. */
-#sidebar-right .control-group {
+:is(#sidebar-right, #sidebar-left) .control-group {
     margin-bottom: 6px;
 }
-#sidebar-right .control-group:last-child {
+:is(#sidebar-right, #sidebar-left) .control-group:last-child {
     margin-bottom: 0;
 }
-#sidebar-right .control-group label {
+:is(#sidebar-right, #sidebar-left) .control-group label {
     display: flex;
     justify-content: flex-start;
     align-items: center;
@@ -208,7 +209,7 @@
     opacity: 1;
     letter-spacing: 0.4px;
 }
-#sidebar-right .control-group label .value-display {
+:is(#sidebar-right, #sidebar-left) .control-group label .value-display {
     font-size: 11px;
     text-transform: none;
     opacity: 0.75;
@@ -219,32 +220,32 @@
    its right, at 18px of height per row. The strip dropped it for the same
    reason; the comment there claiming the sidebar has "no value column" has
    been stale ever since these rows gained one. */
-#sidebar-right .fader-scale {
+:is(#sidebar-right, #sidebar-left) .fader-scale {
     display: none;
 }
 /* 44px is the design handoff's RACK-ROW target and it is the single largest
    line item in a row. 32px still clears the 28px coarse-pointer floor, and
    the media query below hands the full 44px back to touch, which is who the
    number was for. */
-#sidebar-right .control-group input[type="range"] {
+:is(#sidebar-right, #sidebar-left) .control-group input[type="range"] {
     --input-py: 5px;
 }
 @media (pointer: coarse) {
-    #sidebar-right .control-group input[type="range"] {
+    :is(#sidebar-right, #sidebar-left) .control-group input[type="range"] {
         --input-py: 11px;
     }
 }
 /* Rows without a value span: the cap alone takes the right margin */
-#sidebar-right .control-group label .hk-cap:first-of-type:last-child,
-#sidebar-right .control-group label > .hk-cap:only-of-type {
+:is(#sidebar-right, #sidebar-left) .control-group label .hk-cap:first-of-type:last-child,
+:is(#sidebar-right, #sidebar-left) .control-group label > .hk-cap:only-of-type {
     margin-left: auto;
 }
-#sidebar-right .checkbox-group > .hk-cap {
+:is(#sidebar-right, #sidebar-left) .checkbox-group > .hk-cap {
     margin-left: auto;
 }
 /* Material mode: the Curl label is a <select> that swaps the slider's role.
    Must out-specify the generic #sidebar-right select block below. */
-#sidebar-right .control-group label select.material-mode-select,
+:is(#sidebar-right, #sidebar-left) .control-group label select.material-mode-select,
 .mixer-channel .ch-label select.material-mode-select {
     width: auto;
     height: auto;
@@ -270,23 +271,23 @@
        this Chromium frames the option list in light-theme white. */
     color-scheme: dark;
 }
-#sidebar-right .control-group label select.material-mode-select:hover,
+:is(#sidebar-right, #sidebar-left) .control-group label select.material-mode-select:hover,
 .mixer-channel .ch-label select.material-mode-select:hover {
     color: #e6edf3;
 }
-#sidebar-right .control-group label select.material-mode-select:focus,
+:is(#sidebar-right, #sidebar-left) .control-group label select.material-mode-select:focus,
 .mixer-channel .ch-label select.material-mode-select:focus,
-#sidebar-right .control-group label select.material-mode-select:focus-visible,
+:is(#sidebar-right, #sidebar-left) .control-group label select.material-mode-select:focus-visible,
 .mixer-channel .ch-label select.material-mode-select:focus-visible {
     outline: none;
 }
-#sidebar-right .control-group label select.material-mode-select option,
+:is(#sidebar-right, #sidebar-left) .control-group label select.material-mode-select option,
 .mixer-channel .ch-label select.material-mode-select option {
     background: #10141a;
     color: #e6edf3;
     text-transform: none;
 }
-#sidebar-right select {
+:is(#sidebar-right, #sidebar-left) select {
     width: 100%;
     height: 28px;
     border-radius: 5px;
@@ -299,16 +300,16 @@
     -moz-appearance: none;
     appearance: none;
 }
-#sidebar-right select option {
+:is(#sidebar-right, #sidebar-left) select option {
     background: #0b0f14;
     color: #e6edf3;
 }
-#sidebar-right select:focus {
+:is(#sidebar-right, #sidebar-left) select:focus {
     outline: none;
     box-shadow: 0 0 0 2px rgba(88,166,255,0.25);
 }
 
-#sidebar-right input[type="color"] {
+:is(#sidebar-right, #sidebar-left) input[type="color"] {
     width: 38px;
     height: 38px;
     border: 1px solid var(--ground-500, #2a2e37);
@@ -661,13 +662,13 @@
 }
 
 /* ── Checkbox groups in sidebar ── */
-#sidebar-right .checkbox-group {
+:is(#sidebar-right, #sidebar-left) .checkbox-group {
     display: flex;
     align-items: center;
     gap: 6px;
     margin-bottom: 8px;
 }
-#sidebar-right .checkbox-group label {
+:is(#sidebar-right, #sidebar-left) .checkbox-group label {
     margin-bottom: 0;
     font-size: 11px;
     opacity: 0.8;
@@ -675,7 +676,7 @@
     text-transform: none;
     letter-spacing: 0;
 }
-#sidebar-right .checkbox-group input[type="checkbox"] {
+:is(#sidebar-right, #sidebar-left) .checkbox-group input[type="checkbox"] {
     width: 14px;
     height: 14px;
 }
@@ -1582,7 +1583,7 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 
 /* Settings buttons row */
-#sidebar-right .control-group > div[style*="display: flex"] {
+:is(#sidebar-right, #sidebar-left) .control-group > div[style*="display: flex"] {
     gap: 4px !important;
 }
 /* Layers panel in sidebar — the max-height/margin-top pair that used to sit
@@ -1595,7 +1596,7 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 
 /* Compact checkboxes in sidebar */
-#sidebar-right .control-group.checkbox-group {
+:is(#sidebar-right, #sidebar-left) .control-group.checkbox-group {
     margin-bottom: 6px;
 }
 
@@ -2029,7 +2030,7 @@ select option {
     gap: 4px;
     margin-top: 4px;
 }
-#sidebar-right .control-group .pen-screen {
+:is(#sidebar-right, #sidebar-left) .control-group .pen-screen {
     display: flex;
     align-items: flex-start;
     gap: 7px;
@@ -2042,17 +2043,17 @@ select option {
     color: var(--ink-300);
     cursor: pointer;
 }
-#sidebar-right .control-group .pen-screen input[type="radio"] {
+:is(#sidebar-right, #sidebar-left) .control-group .pen-screen input[type="radio"] {
     flex: none;
     margin: 1px 0 0;
     accent-color: var(--ink-100);
 }
-#sidebar-right .control-group .pen-screen:has(input:checked) {
+:is(#sidebar-right, #sidebar-left) .control-group .pen-screen:has(input:checked) {
     color: var(--ink-100);
 }
 /* "Mouse Picks Up Where It Left Off" sits right under the screen list —
    a little air so it reads as its own setting, not a fifth screen. */
-#sidebar-right .checkbox-group:has(> #penWindowMouseReturn) {
+:is(#sidebar-right, #sidebar-left) .checkbox-group:has(> #penWindowMouseReturn) {
     margin-top: 10px;
 }
 
@@ -2173,6 +2174,7 @@ select option {
     writing-mode: vertical-rl;
     transform: rotate(180deg);
 }
+.lsb-rail-section { font-weight: 600; opacity: 0.85; }
 .lsb-rail-label {
     padding: 6px 2px;
     min-height: 0;

@@ -201,7 +201,7 @@
         return (el.tagName || 'node').toLowerCase();
     }
     function inUI(el) {
-        return !!(el.closest && (el.closest('#sidebar-right') || el.closest('#mixer-strip')
+        return !!(el.closest && (el.closest('#sidebar-right') || el.closest('#sidebar-left') || el.closest('#mixer-strip')
             || el.closest('#mixer-more-panel') || el.closest('.rec-drawer') || el.closest('#statsPanel')));
     }
     var hoverLabel = '(none)'; // whatever is under the pointer right now

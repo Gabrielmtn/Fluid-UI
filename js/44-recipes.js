@@ -653,7 +653,7 @@
     const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
     function findSection(title) {
-        const secs = document.querySelectorAll('#sidebar-right .sidebar-section');
+        const secs = document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
         for (let i = 0; i < secs.length; i++) {
             const t = secs[i].querySelector('.section-title');
             if (t && t.textContent.trim() === title) return secs[i];

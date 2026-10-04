@@ -465,7 +465,7 @@
             var savedSections = sm.get('sidebar.sections');
             if (savedSections && typeof savedSections === 'object') {
                 (function applySections(tries) {
-                    var sections = document.querySelectorAll('#sidebar-right .sidebar-section');
+                    var sections = document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
                     if (!sections.length) {
                         if (tries < 60) setTimeout(function () { applySections(tries + 1); }, 250);
                         return;
@@ -803,7 +803,7 @@
         // ── Sidebar section collapsed states ──
         var sidebarSections = {};
         try {
-            var sections = document.querySelectorAll('#sidebar-right .sidebar-section');
+            var sections = document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
             sections.forEach(function(sec) {
                 var titleEl = sec.querySelector('.section-title');
                 if (titleEl) {
@@ -1361,7 +1361,7 @@
         // ── Sidebar section collapsed states ──
         try {
             if (snapshot.sidebarSections) {
-                var sections = document.querySelectorAll('#sidebar-right .sidebar-section');
+                var sections = document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
                 sections.forEach(function(sec) {
                     var titleEl = sec.querySelector('.section-title');
                     if (!titleEl) return;

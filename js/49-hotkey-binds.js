@@ -102,7 +102,7 @@
     }
 
     function findSection(title) {
-        var secs = document.querySelectorAll('#sidebar-right .sidebar-section');
+        var secs = document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
         for (var i = 0; i < secs.length; i++) {
             var t = secs[i].querySelector('.section-title');
             if (t && norm(t.textContent) === title) return secs[i];

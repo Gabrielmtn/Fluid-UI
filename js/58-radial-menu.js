@@ -843,7 +843,7 @@
     var autoLabel = '';      // the label the last key suggested, while it is still untouched
 
     function settingsSection() {
-        var secs = document.querySelectorAll('#sidebar-right .sidebar-section');
+        var secs = document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
         for (var i = 0; i < secs.length; i++) {
             var t = secs[i].querySelector('.section-title');
             if (t && t.textContent.replace(/\s+/g, ' ').trim() === 'Settings') return secs[i];
@@ -953,7 +953,7 @@
     function sliderHome(e) {
         if (e.closest('#sidebar-left')) return 'Brush bar';
         if (e.closest('.mixer-channel')) return 'Top bar';
-        var sec = e.closest('#sidebar-right .sidebar-section');
+        var sec = e.closest('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
         var t = sec ? sec.querySelector('.section-title') : null;
         return t ? t.textContent.replace(/\s+/g, ' ').trim() : '';
     }

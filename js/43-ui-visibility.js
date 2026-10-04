@@ -122,8 +122,10 @@
                 items.push({ key: 'strip:' + k, kind: 'strip', label: el.dataset.uiLabel || k, el: el });
             });
         }
-        var sidebar = document.getElementById('sidebar-right');
-        if (sidebar) {
+        // Both sidebars' sections (the left one holds the brush's own).
+        var sidebars = [document.getElementById('sidebar-right'), document.querySelector('#sidebar-left .lsb-body')];
+        sidebars.forEach(function (sidebar) {
+            if (!sidebar) return;
             Array.prototype.forEach.call(sidebar.children, function (sec) {
                 if (!sec.classList || !sec.classList.contains('sidebar-section')) return;
                 var t = sec.querySelector('.section-title');
@@ -131,7 +133,7 @@
                 if (!title) return;
                 items.push({ key: 'section:' + title, kind: 'section', label: title, el: sec });
             });
-        }
+        });
         var ub = document.getElementById('quality-underbar');
         if (ub) items.push({ key: 'chrome:Quality bar', kind: 'chrome', label: 'Quality bar', el: ub });
     }
@@ -181,7 +183,7 @@
         var m = sm(); if (!m) return;
         try {
             var out = {};
-            Array.prototype.forEach.call(document.querySelectorAll('#sidebar-right .sidebar-section'), function (sec) {
+            Array.prototype.forEach.call(document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section'), function (sec) {
                 var t = sec.querySelector('.section-title');
                 if (t) out[t.textContent.trim()] = sec.classList.contains('collapsed');
             });
@@ -254,17 +256,20 @@
     // visible labels would show non-contiguous slices of a ramp sized for
     // rows that are not there, so re-stamp over the visible ones only.
     function restampGroups() {
-        var sidebar = document.getElementById('sidebar-right'); if (!sidebar) return;
-        var byGroup = {};
-        Array.prototype.forEach.call(sidebar.querySelectorAll('.sidebar-section[data-group]'), function (sec) {
-            if (sec.classList.contains('ui-hidden')) return;
-            (byGroup[sec.dataset.group] = byGroup[sec.dataset.group] || []).push(sec);
-        });
-        Object.keys(byGroup).forEach(function (g) {
-            var run = byGroup[g];
-            run.forEach(function (sec, i) {
-                sec.style.setProperty('--rows', run.length);
-                sec.style.setProperty('--i', i);
+        // Each sidebar paints its own ramps.
+        ['sidebar-right', 'sidebar-left'].forEach(function (id) {
+            var sidebar = document.getElementById(id); if (!sidebar) return;
+            var byGroup = {};
+            Array.prototype.forEach.call(sidebar.querySelectorAll('.sidebar-section[data-group]'), function (sec) {
+                if (sec.classList.contains('ui-hidden')) return;
+                (byGroup[sec.dataset.group] = byGroup[sec.dataset.group] || []).push(sec);
+            });
+            Object.keys(byGroup).forEach(function (g) {
+                var run = byGroup[g];
+                run.forEach(function (sec, i) {
+                    sec.style.setProperty('--rows', run.length);
+                    sec.style.setProperty('--i', i);
+                });
             });
         });
     }
@@ -321,8 +326,7 @@
 
     // ── Settings → Interface block ────────────────────────────────────
     function findSection(title) {
-        var sidebar = document.getElementById('sidebar-right'); if (!sidebar) return null;
-        var secs = sidebar.querySelectorAll('.sidebar-section');
+        var secs = document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
         for (var i = 0; i < secs.length; i++) {
             var t = secs[i].querySelector('.section-title');
             if (t && t.textContent.trim() === title) return secs[i];

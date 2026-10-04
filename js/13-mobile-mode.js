@@ -77,7 +77,7 @@
     // 44-recipes does, open it (43's wrapped opener un-hides it in Simple)
     // and scroll it into view.
     function openSectionByTitle(title) {
-        var secs = document.querySelectorAll('#sidebar-right .sidebar-section');
+        var secs = document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
         for (var i = 0; i < secs.length; i++) {
             var t = secs[i].querySelector('.section-title');
             if (!t || t.textContent.trim() !== title) continue;

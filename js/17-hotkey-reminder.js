@@ -44,7 +44,7 @@
             // On a narrow window every fader header may already be parked in
             // the strip's More panel (46-strip-more) — that still counts as built.
             var header = document.querySelector('#mixer-strip .ch-header, #mixer-more-panel .ch-header');
-            var labels = document.querySelectorAll('#sidebar-right .control-group > label').length;
+            var labels = document.querySelectorAll('#sidebar-right .control-group > label, #sidebar-left .control-group > label').length;
             var ready = header && labels > 0 && labels === lastCount;
             lastCount = labels;
             if (ready || waited >= 15000) {
@@ -154,7 +154,7 @@
         // Empty reserved slots: rows without a binding keep the same right
         // margin so columns align and nothing reflows when a modifier lands.
         var slotHosts = document.querySelectorAll(
-            '#sidebar-right .control-group > label');
+            '#sidebar-right .control-group > label, #sidebar-left .control-group > label');
         for (var i = 0; i < slotHosts.length; i++) {
             var host = slotHosts[i];
             var row = host.closest('.control-group, .ch-header') || host;

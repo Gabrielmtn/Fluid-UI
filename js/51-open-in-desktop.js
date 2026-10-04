@@ -259,7 +259,7 @@
             var ready = false, queue = [];
 
             var openRoomPanel = function () {
-                var secs = document.querySelectorAll('#sidebar-right .sidebar-section');
+                var secs = document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
                 for (var i = 0; i < secs.length; i++) {
                     var t = secs[i].querySelector('.section-title');
                     if (!t || t.textContent.trim() !== 'Swirl Together') continue;
