@@ -441,12 +441,12 @@
             { say: 'Back in Animations: drag it from the library into a slot, then click the slot to loop it.', target: { section: 'Animations', sel: '.anim-lib' } }
           ] },
         { id: 'animations', pillar: 'record', title: 'Play a saved animation',
-          tags: ['animation', 'slot', 'play', 'loop', 'smash', 'vortex', 'saved'],
-          answer: 'Animations holds six slots. Click one to loop it, click again to stop. Drag your saved recordings into the empty slots.',
+          tags: ['animation', 'slot', 'play', 'loop', 'saved'],
+          answer: 'Animations holds six slots for your own recordings. Drag a saved recording from the library into a slot, then click the slot to loop it; click again to stop.',
           target: { section: 'Animations', sel: '.anim-slot' },
           steps: [
-            { say: 'Animations holds six slots. Click one to loop it; click again to stop.', target: { section: 'Animations', sel: '.anim-slot' }, until: { click: true } },
-            { say: 'Drag a saved recording from the library into an empty slot.', target: { sel: '.anim-lib-head' } }
+            { say: 'Open Saved Animations and drag a recording into one of the six slots.', target: { section: 'Animations', sel: '.anim-lib-head' }, until: { click: true } },
+            { say: 'Click the slot to loop it; click again to stop.', target: { section: 'Animations', sel: '.anim-slot' } }
           ] },
         { id: 'audio', pillar: 'record', title: 'Make the paint react to music',
           tags: ['audio', 'music', 'sound', 'microphone', 'mic', 'react', 'beat', 'track', 'song'],

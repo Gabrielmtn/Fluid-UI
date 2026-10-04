@@ -1415,48 +1415,6 @@
             reader.readAsText(file);
         }
 
-        function recGenSmashPreset() {
-            const out = [];
-            const w = Math.max(1, canvas.width || 1200);
-            const h = Math.max(1, canvas.height || 800);
-            const centerX = 0.5, centerY = 0.5;
-            const leftX = 0.2, rightX = 0.8;
-            const steps = 16;
-            const dur = 1200;
-            const jitter = 0.02;
-            for (let i = 0; i <= steps; i++) {
-                const t = (i / steps) * (dur * 0.6);
-                const u = i / steps;
-                const x = leftX + (centerX - leftX) * u;
-                const y = centerY + (Math.random() - 0.5) * jitter;
-                const dx = ((centerX - leftX) * w / steps) * 2;
-                const dy = (Math.random() - 0.5) * 2;
-                out.push({ timestamp: t, x, y, vx: dx, vy: dy, color: [0.9, 0.2, 0.3], mult: 1, radius: 0.012 });
-            }
-            for (let i = 0; i <= steps; i++) {
-                const t = 150 + (i / steps) * (dur * 0.6);
-                const u = i / steps;
-                const x = rightX + (centerX - rightX) * u;
-                const y = centerY + (Math.random() - 0.5) * jitter;
-                const dx = ((centerX - rightX) * w / steps) * 2;
-                const dy = (Math.random() - 0.5) * 2;
-                out.push({ timestamp: t, x, y, vx: dx, vy: dy, color: [0.2, 0.7, 0.9], mult: 1, radius: 0.012 });
-            }
-            // After-collision ripples
-            for (let k = 0; k < 3; k++) {
-                const baseT = 700 + k * 120;
-                for (let i = 0; i < 10; i++) {
-                    const angle = (i / 10) * Math.PI * 2;
-                    const x = centerX + 0.06 * Math.cos(angle);
-                    const y = centerY + 0.06 * Math.sin(angle);
-                    const dx = 6 * Math.cos(angle);
-                    const dy = 6 * Math.sin(angle);
-                    out.push({ timestamp: baseT + i * 8, x, y, vx: dx, vy: dy, color: [Math.random(), Math.random(), Math.random()], mult: 1, radius: 0.01 });
-                }
-            }
-            return { interactions: out, duration: dur + 500 };
-        }
-
         function recGenJellyfishPreset() {
             const out = [];
             const w = Math.max(1, canvas.width || 1200);
@@ -1532,48 +1490,10 @@
             return { interactions: out, duration: t + 300 };
         }
 
-        function recGenVortexPreset(clockwise = true) {
-            const out = [];
-            const w = Math.max(1, canvas.width || 1200);
-            const h = Math.max(1, canvas.height || 800);
-            const cx = 0.5, cy = 0.5;
-            const streams = 3;
-            const rotations = 1.6;
-            const steps = 46;
-            const dir = clockwise ? 1 : -1;
-            const colors = [[1,0,0.4],[0,1,0.3],[0,0.4,1]];
-            function emit(startAngle, color, rStart, rEnd, baseSpeed, tOffset = 0) {
-                for (let i = 0; i <= steps; i++) {
-                    const u = i / steps;
-                    const radius = rStart - (rStart - rEnd) * u;
-                    const angle = startAngle + dir * rotations * Math.PI * 2 * u;
-                    const x = cx + (radius) * Math.cos(angle);
-                    const y = cy + (radius) * Math.sin(angle);
-                    const tangent = angle + dir * Math.PI / 2;
-                    const dx = baseSpeed * Math.cos(tangent) - radius * 0.08 * Math.cos(angle);
-                    const dy = baseSpeed * Math.sin(tangent) - radius * 0.08 * Math.sin(angle);
-                    out.push({ timestamp: tOffset + i * 40, x, y, vx: dx * Math.min(w, h), vy: dy * Math.min(w, h), color, mult: 1, radius: 0.004 + (1 - u) * 0.004 });
-                }
-            }
-            const maxR = 0.45;
-            const minR = 0.2;
-            for (let s = 0; s < streams; s++) {
-                const angle = (s / streams) * Math.PI * 2;
-                emit(angle, colors[s], maxR, minR, 0.012, s * 250);
-            }
-            // inner
-            for (let s = 0; s < streams; s++) {
-                const angle = (s / streams) * Math.PI * 2 + Math.PI / streams;
-                emit(angle, colors[(s + 1) % streams], 0.18, 0.03, 0.010, 500 + s * 250);
-            }
-            return { interactions: out, duration: steps * 40 + 1100 };
-        }
-
+        // Smash and Vortex left 2026-10-04: the user makes what they want to see.
         const recBuiltinPresetGenerators = {
-            "Smash": () => recGenSmashPreset(),
             "Jellyfish": () => recGenJellyfishPreset(),
-            "Portrait": () => recGenPortraitPreset(),
-            "Vortex": () => recGenVortexPreset(true)
+            "Portrait": () => recGenPortraitPreset()
         };
 
         function recComputeDurationFromInteractions(interactions) {

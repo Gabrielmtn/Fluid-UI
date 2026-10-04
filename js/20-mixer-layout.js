@@ -3233,44 +3233,26 @@
         const { sec, body } = makeSection('Animations', 'expressive', true);
 
         // Curated 2026-08-27: the grid is six SLOTS, not six fixed buttons.
-        // Smash and Vortex keep their spots by default; the other stock
-        // animations left the panel (their buttons stay wired in the hidden
-        // legacy panel, so nothing 04c binds to disappears). Open slots hold
-        // the user's saved recordings, dragged in from the library below.
+        // Every slot starts empty (Smash and Vortex left 2026-10-04: the
+        // user makes what they want to see). Slots hold the user's saved
+        // recordings, dragged in from the library below.
         const SLOT_COUNT = 6;
-        const SLOT_DEFAULTS = [
-            { kind: 'builtin', name: 'Smash' },
-            { kind: 'builtin', name: 'Vortex' },
-            null, null, null, null
-        ];
-        const BUILTIN_BTN = { Smash: 'smashBtn', Vortex: 'vortexBtn' };
-        // Direct references, captured while the buttons are still in the
-        // document: the section is built detached, so once a button is parked
-        // in the stash getElementById can't see it until the sidebar attaches.
-        const builtinEls = {};
-        Object.keys(BUILTIN_BTN).forEach(k => { builtinEls[k] = document.getElementById(BUILTIN_BTN[k]); });
 
         const grid = document.createElement('div');
         grid.className = 'anim-grid';
         body.appendChild(grid);
 
-        // Unslotted stock buttons wait here so their click wiring survives.
-        const stash = document.createElement('div');
-        stash.style.display = 'none';
-        body.appendChild(stash);
-
         // Slot assignments are user-authored curation: write through
         // immediately, restore every boot — they do not ride Save Settings.
+        // A stored Smash/Vortex entry ({kind:'builtin'}) loads as empty.
         function loadSlots() {
             const sm = window.settingsManager;
             const saved = sm ? sm.get('animSlots', null) : null;
-            const slots = SLOT_DEFAULTS.map(d => d ? { ...d } : null);
+            const slots = new Array(SLOT_COUNT).fill(null);
             if (Array.isArray(saved)) {
                 for (let i = 0; i < SLOT_COUNT; i++) {
                     const s = saved[i];
-                    if (s === null) slots[i] = null;
-                    else if (s && s.kind === 'builtin' && BUILTIN_BTN[s.name]) slots[i] = { kind: 'builtin', name: s.name };
-                    else if (s && s.kind === 'preset' && typeof s.name === 'string') slots[i] = { kind: 'preset', name: s.name };
+                    if (s && s.kind === 'preset' && typeof s.name === 'string') slots[i] = { kind: 'preset', name: s.name };
                 }
             }
             return slots;
@@ -3302,18 +3284,12 @@
         }
 
         function renderSlots() {
-            // Park the stock buttons before wiping the grid so they are
-            // never destroyed with it.
-            Object.values(builtinEls).forEach(b => { if (b) stash.appendChild(b); });
             grid.innerHTML = '';
             const savedNames = window.recListSavedAnimations ? window.recListSavedAnimations() : [];
             slots.forEach((s, idx) => {
                 const cell = document.createElement('div');
                 cell.className = 'anim-slot';
-                if (s && s.kind === 'builtin') {
-                    const btn = builtinEls[s.name];
-                    if (btn) { btn.style.cssText = ''; cell.appendChild(btn); }
-                } else if (s && s.kind === 'preset') {
+                if (s && s.kind === 'preset') {
                     const missing = savedNames.indexOf(s.name) === -1;
                     const playing = !missing && !!(window.recIsSavedAnimationPlaying
                         && window.recIsSavedAnimationPlaying(s.name));
@@ -3338,10 +3314,10 @@
                     const clear = document.createElement('button');
                     clear.className = 'anim-slot-clear';
                     clear.textContent = '✕';
-                    clear.title = SLOT_DEFAULTS[idx] ? `Restore ${SLOT_DEFAULTS[idx].name}` : 'Clear slot';
+                    clear.title = 'Clear slot';
                     clear.addEventListener('click', e => {
                         e.stopPropagation();
-                        slots[idx] = SLOT_DEFAULTS[idx] ? { ...SLOT_DEFAULTS[idx] } : null;
+                        slots[idx] = null;
                         saveSlots();
                         renderSlots();
                     });
@@ -3509,7 +3485,7 @@
             let changed = false;
             slots.forEach((s, idx) => {
                 if (s && s.kind === 'preset' && s.name === gone) {
-                    slots[idx] = SLOT_DEFAULTS[idx] ? { ...SLOT_DEFAULTS[idx] } : null;
+                    slots[idx] = null;
                     changed = true;
                 }
             });
