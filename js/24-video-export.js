@@ -822,12 +822,18 @@
                     throw new Error('could not finish writing the video (' +
                         streamWriteError.message + ') — the file at ' + streamPath + ' is incomplete');
                 }
+                updateUI('rendering', 95);
+                await plainMp4OnDisk(streamPath);
                 toast('Video exported! (' + sizeNote + ')', 'success');
             } else {
-                // WebM needs post-processing for seeking; MP4 is fine as-is
+                // WebM needs post-processing for seeking; MediaRecorder's MP4
+                // is fragmented, which editors refuse (plainMp4Blob).
                 if (ext === 'webm') {
                     updateUI('rendering', 95);
                     blob = await fixWebmForSeeking(blob, duration);
+                } else if (ext === 'mp4') {
+                    updateUI('rendering', 95);
+                    blob = await plainMp4Blob(blob);
                 }
                 var name = cfg.filenamePrefix + Date.now() + '.' + ext;
                 await saveBlob(blob, name);
@@ -839,6 +845,52 @@
             toast('Export failed: ' + err.message, 'error');
         } finally {
             finish();
+        }
+    }
+
+    // ── MediaRecorder's MP4, made plain ─────────────────────────────
+    // MediaRecorder writes the fragmented kind, which editors refuse (see
+    // 24a). Mp4Writer.defragment turns it into the plain kind where it lies:
+    // a few 4-byte renames and a moov on the end, no frame copied. Anything
+    // it doesn't recognise leaves the file as MediaRecorder wrote it, which
+    // still plays in a browser or VLC.
+    async function plainMp4Blob(blob) {
+        if (!(window.Mp4Writer && window.Mp4Writer.defragment)) return blob;
+        try {
+            var u = new Uint8Array(await blob.arrayBuffer());
+            var fix = await window.Mp4Writer.defragment(function (at, len) {
+                return Promise.resolve(u.subarray(at, at + len));
+            }, u.length);
+            if (!fix) return blob;
+            fix.patches.forEach(function (p) { u.set(p.bytes, p.at); });
+            return new Blob([u, fix.tail], { type: 'video/mp4' });
+        } catch (e) {
+            console.warn('[Export] MP4 left fragmented:', e && e.message);
+            return blob;
+        }
+    }
+    async function plainMp4OnDisk(file) {
+        if (!(window.Mp4Writer && window.Mp4Writer.defragment && fs)) return;
+        var fh = null;
+        try {
+            fh = await fs.promises.open(file, 'r+');
+            var st = await fh.stat();
+            var fix = await window.Mp4Writer.defragment(function (at, len) {
+                var b = Buffer.alloc(len);
+                return fh.read(b, 0, len, at).then(function (r) { return new Uint8Array(b.buffer, b.byteOffset, r.bytesRead); });
+            }, st.size);
+            if (!fix) return;
+            // The new moov goes on first, the renames after: stopped in
+            // between, the file is still the fragmented one and still plays.
+            await fh.write(Buffer.from(fix.tail), 0, fix.tail.length, st.size);
+            for (var i = 0; i < fix.patches.length; i++) {
+                var p = fix.patches[i];
+                await fh.write(Buffer.from(p.bytes), 0, p.bytes.length, p.at);
+            }
+        } catch (e) {
+            console.warn('[Export] MP4 left fragmented:', e && e.message);
+        } finally {
+            if (fh) { try { await fh.close(); } catch (_) {} }
         }
     }
 
@@ -910,7 +962,7 @@
         var frameUs = 1e6 / fps;
         var total = Math.max(1, Math.round(duration * fps / 1000));
         var gop = Math.max(1, Math.round(fps));   // a keyframe a second, as MediaRecorder's timeslices gave
-        var next = 0, held = null, t0 = -1, lastSerial = -1, drawn = 0;
+        var next = 0, held = null, t0 = -1, lastSerial = -1, drawn = 0, busySkips = 0, busySerial = -1;
         function encodeAt(src, slot) {
             var f = new VideoFrame(src, { timestamp: Math.round(slot * frameUs), duration: Math.round(frameUs) });
             try { enc.encode(f, { keyFrame: slot % gop === 0 }); } finally { f.close(); }
@@ -929,7 +981,10 @@
                     if (slot < next) continue;                         // this slot has its picture
                     var serial = window.__drawSerial;                  // nothing new drawn: the held
                     if (typeof serial === 'number' && serial === lastSerial) continue;   // picture covers it
-                    if (enc.encodeQueueSize > ENCODE_QUEUE_MAX) continue;   // encoder behind: same
+                    if (enc.encodeQueueSize > ENCODE_QUEUE_MAX) {                          // encoder behind: same
+                        if (serial !== busySerial) { busySkips++; busySerial = serial; }   // (each draw counted once)
+                        continue;
+                    }
                 }
                 if (typeof window.__drawSerial === 'number') lastSerial = window.__drawSerial;
 
@@ -963,11 +1018,16 @@
         if (encError) throw encError;
         if (!mux.frames) throw new Error('the encoder gave back no frames');
 
+        console.log('[Export] encoder: ' + mux.frames + ' frames, ' + drawn + ' drawn, ' + busySkips +
+            ' draws skipped while it caught up; ' + vcfg.codec + ' at ' + (vcfg.bitrate / 1e6).toFixed(1) + ' Mbit/s');
         var tail = mux.moov();
         var patch = mux.mdatPatch();
+        // Under 90% fresh pictures, say who set the pace: the canvas drawing
+        // slowly, or the encoder (a busy GPU, a software encoder) falling behind.
         var drawnFps = Math.round(drawn * fps / total);
+        var pace = busySkips > drawn * 0.25 ? '. The encoder kept up with ' : '. The canvas drew ';
         var sizeNote = 'MP4, ' + W + '×' + H + ', ' + fps + ' fps' +
-            (drawn < total * 0.9 ? '. The canvas drew ' + drawnFps + ' a second, so some frames repeat' : '');
+            (drawn < total * 0.9 ? pace + drawnFps + ' a second, so some frames repeat' : '');
         if (parts) {
             head.set(patch.bytes, patch.at);
             parts.push(tail);
