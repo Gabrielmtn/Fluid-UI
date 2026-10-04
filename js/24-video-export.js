@@ -1,6 +1,7 @@
 // Multi-Format Export System
-// Supports: Video (WebM), GIF (inline encoder), PNG/JPG stills, PNG sequences
-// Zero external dependencies — GIF encoder is fully inline
+// Supports: Video (MP4 through WebCodecs + 24a-mp4-writer; MediaRecorder MP4
+// or WebM where that can't run), GIF (inline encoder), PNG/JPG stills, PNG sequences
+// Zero external dependencies — the GIF encoder and the MP4 writer are inline
 (function () {
     'use strict';
 
@@ -129,6 +130,20 @@
     // WebGL buffer cannot change under us, so the sim is drawn straight
     // into the destination.
     var _comp = null, _scratch = null;
+    // Where a w×h picture goes in a tw×th target: whole, centred, its shape
+    // kept. The video's recording canvas keeps the size the take started at,
+    // and a canvas that changed shape mid-take (a handle drag, a window
+    // resize) used to be STRETCHED into it, so the export drifted off the
+    // ratio the user framed (user test 3). Now it is letterboxed; the bars
+    // take the ground like the rest of the frame. null = within a pixel of
+    // the target: crop instead, never resample (see the fast path).
+    function fitRect(w, h, tw, th) {
+        if (Math.abs(tw - w) <= 1 && Math.abs(th - h) <= 1) return null;
+        var s = Math.min(tw / w, th / h);
+        var dw = Math.max(1, Math.round(w * s)), dh = Math.max(1, Math.round(h * s));
+        return { x: Math.floor((tw - dw) / 2), y: Math.floor((th - dh) / 2), w: dw, h: dh };
+    }
+
     function sizedCanvas(c, w, h) {
         if (!c) c = document.createElement('canvas');
         if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
@@ -340,12 +355,14 @@
                 tctx.globalAlpha = drawList[0].opacity;
                 // Within a pixel of the source (the even-clamped recording
                 // canvas): crop, never resample — a 465→464 squeeze
-                // bilinear-blurs the middle of every frame.
-                if (Math.abs(target.width - w) <= 1 && Math.abs(target.height - h) <= 1) {
+                // bilinear-blurs the middle of every frame. Any other size:
+                // fitted whole, shape kept (fitRect).
+                var fit0 = fitRect(w, h, target.width, target.height);
+                if (!fit0) {
                     var cw0 = Math.min(w, target.width), ch0 = Math.min(h, target.height);
                     tctx.drawImage(simCanvas, 0, 0, cw0, ch0, 0, 0, cw0, ch0);
                 } else {
-                    tctx.drawImage(simCanvas, 0, 0, target.width, target.height);
+                    tctx.drawImage(simCanvas, fit0.x, fit0.y, fit0.w, fit0.h);
                 }
                 tctx.globalAlpha = 1;
                 var dt0 = performance.now() - t0;
@@ -434,11 +451,13 @@
                     var tc = target.getContext('2d');
                     tc.globalAlpha = 1;
                     tc.clearRect(0, 0, target.width, target.height);
-                    if (Math.abs(target.width - w) <= 1 && Math.abs(target.height - h) <= 1) {
+                    var fit1 = fitRect(w, h, target.width, target.height);
+                    if (!fit1) {
                         var cw1 = Math.min(w, target.width), ch1 = Math.min(h, target.height);
                         tc.drawImage(comp, 0, 0, cw1, ch1, 0, 0, cw1, ch1);   // crop, see the fast path
                     } else {
-                        tc.drawImage(comp, 0, 0, target.width, target.height);
+                        fillGround(tc, target.width, target.height, forOpaque);   // the bars
+                        tc.drawImage(comp, fit1.x, fit1.y, fit1.w, fit1.h);
                     }
                     out = target;
                 }
@@ -627,32 +646,43 @@
             recCanvas.height = Math.max(2, simCanvas.height & ~1);
             var recCtx = recCanvas.getContext('2d');
 
-            // captureStream(0) = manual frame control via requestFrame()
-            _stream = recCanvas.captureStream(0);
-            var track = _stream.getVideoTracks()[0];
-
             // Audio (2026-08-16): mux the reactive audio in so an exported
             // video ARRIVES with its soundtrack — the whole point of driving
             // visuals from a track is not having to line it up by hand
             // afterwards. This loop is realtime (rAF, wall-clock duration),
             // so the audio stays in sync. audioReactive withholds mic input;
             // file/system come through.
-            var hasAudio = false;
+            var audioTracks = [];
             try {
                 var aStream = window.audioReactive && window.audioReactive.getOutputStream
                     && window.audioReactive.getOutputStream();
-                if (aStream) {
-                    aStream.getAudioTracks().forEach(function (t) { _stream.addTrack(t); hasAudio = true; });
-                }
+                if (aStream) audioTracks = aStream.getAudioTracks();
             } catch (e) { console.warn('[Export] audio track unavailable:', e && e.message); }
+            var hasAudio = audioTracks.length > 0;
+
+            // No soundtrack to carry: H.264 through WebCodecs into a plain MP4
+            // (24a-mp4-writer) — the file editors open, every frame exactly
+            // 1/fps. MediaRecorder below stays for a take with sound and for
+            // a browser without an H.264 encoder.
+            if (!hasAudio && window.Mp4Writer) {
+                var vcfg = await window.Mp4Writer.pickConfig(recCanvas.width, recCanvas.height, fps, cfg.videoBitrate);
+                if (vcfg) { await recordEncoded(recCanvas, vcfg, fps, duration); return; }
+            }
+
+            // captureStream(0) = manual frame control via requestFrame()
+            _stream = recCanvas.captureStream(0);
+            var track = _stream.getVideoTracks()[0];
+            audioTracks.forEach(function (t) { _stream.addTrack(t); });
 
             // Prefer MP4 (inherently seekable) → fall back to WebM. With an
             // audio track present only codec strings that CARRY audio are
             // valid — a video-only mimeType would make MediaRecorder throw.
+            // AAC before Opus: an editor that opens MP4 reads AAC; Opus in
+            // MP4 is newer than most of them.
             var mimeType = ''; var ext = 'webm';
             var mpTests = hasAudio
-                ? ['video/mp4;codecs=avc1,opus', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4']
-                : ['video/mp4;codecs=avc1,opus', 'video/mp4;codecs=avc1', 'video/mp4'];
+                ? ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs=avc1,opus', 'video/mp4']
+                : ['video/mp4;codecs=avc1', 'video/mp4'];
             for (var mi = 0; mi < mpTests.length; mi++) {
                 if (MediaRecorder.isTypeSupported(mpTests[mi])) {
                     mimeType = mpTests[mi]; ext = 'mp4'; break;
@@ -742,10 +772,13 @@
                     lastSerial = serial;
                 }
 
-                // Throttle to target FPS
+                // Throttle to target FPS on a fixed grid: each capture moves
+                // the mark one interval on, so the rate holds at the ask
+                // instead of slipping by each frame's lateness; a stall longer
+                // than two intervals starts the grid again from now.
                 var now = Date.now();
                 if (now - lastFrame < frameInterval * 0.8) continue;
-                lastFrame = now;
+                lastFrame = (now - lastFrame > frameInterval * 2) ? now : lastFrame + frameInterval;
 
                 // Composite all visible layers INTO the recording canvas. Its
                 // size is FIXED: the canvas buffer can be reallocated
@@ -807,6 +840,150 @@
         } finally {
             finish();
         }
+    }
+
+    // ── Video through WebCodecs into a plain MP4 (24a-mp4-writer) ──────
+    // Every frame of the file sits on a fixed 1/fps grid. A slot takes the
+    // picture the canvas drew nearest its time (rAF timestamps, so the grid
+    // is the display's own clock, not main-thread jitter); a slot the canvas
+    // didn't draw for (a slow frame, a stall, a paused sim) repeats the
+    // picture that was on screen then. The file plays in real time at
+    // exactly the rate asked, which is what an editor wants to see.
+    var ENCODE_QUEUE_MAX = 6;   // frames waiting in the encoder before a capture is skipped (the held picture covers it)
+    async function recordEncoded(recCanvas, vcfg, fps, duration) {
+        var OPAQUE = { opaque: true };
+        var W = recCanvas.width, H = recCanvas.height;
+        var mux = window.Mp4Writer.create({ width: W, height: H, fps: fps });
+        var head = mux.head();
+        var name = cfg.filenamePrefix + Date.now() + '.mp4';
+        var encError = null;
+
+        // Where the bytes go: on the desktop with an output folder, straight
+        // to the file in ~2 MB writes (a long 4K take never sits in RAM),
+        // the header patched in place at the end; otherwise a Blob.
+        var parts = null, fh = null, filePath = null, filePos = 0;
+        var writeChain = Promise.resolve(), writeError = null, pending = [], pendingBytes = 0;
+        if (isElectron && cfg.outputFolder && fs) {
+            try {
+                filePath = path.join(cfg.outputFolder, name);
+                fh = await fs.promises.open(filePath, 'w');
+            } catch (e) {
+                console.warn('[Export] disk streaming unavailable, buffering in RAM:', e.message);
+                fh = null; filePath = null;
+            }
+        }
+        if (!fh) parts = [];
+        function writeAt(buf, at) {
+            writeChain = writeChain
+                .then(function () { return fh.write(buf, 0, buf.length, at); })
+                .catch(function (err) {
+                    writeError = writeError || err;
+                    console.warn('[Export] write failed:', err.message);
+                });
+        }
+        function flush() {
+            if (!pending.length) return;
+            var buf = Buffer.concat(pending.map(function (b) { return Buffer.from(b.buffer, b.byteOffset, b.byteLength); }));
+            pending = []; pendingBytes = 0;
+            writeAt(buf, filePos);
+            filePos += buf.length;
+        }
+        function put(bytes) {
+            if (parts) { parts.push(bytes); return; }
+            pending.push(bytes); pendingBytes += bytes.length;
+            if (pendingBytes >= 2097152) flush();
+        }
+        put(head);   // in RAM this same array is patched at the end
+
+        var enc = new VideoEncoder({
+            output: function (chunk, meta) {
+                if (meta && meta.decoderConfig) mux.config(meta.decoderConfig.description, meta.decoderConfig.colorSpace);
+                var b = new Uint8Array(chunk.byteLength);
+                chunk.copyTo(b);
+                mux.sample(b.length, chunk.type === 'key', chunk.timestamp);
+                put(b);
+            },
+            error: function (e) { encError = encError || e; }
+        });
+        enc.configure(vcfg);
+
+        var frameUs = 1e6 / fps;
+        var total = Math.max(1, Math.round(duration * fps / 1000));
+        var gop = Math.max(1, Math.round(fps));   // a keyframe a second, as MediaRecorder's timeslices gave
+        var next = 0, held = null, t0 = -1, lastSerial = -1, drawn = 0;
+        function encodeAt(src, slot) {
+            var f = new VideoFrame(src, { timestamp: Math.round(slot * frameUs), duration: Math.round(frameUs) });
+            try { enc.encode(f, { keyFrame: slot % gop === 0 }); } finally { f.close(); }
+        }
+
+        toast('Recording (MP4)...', 'info');
+        updateUI('recording', 0);
+        try {
+            while (!_abort && !encError) {
+                var ts = await rafPromise();
+                if (t0 < 0) t0 = ts;
+                var elapsed = ts - t0;
+                if (elapsed >= duration) break;
+                var slot = Math.min(total - 1, Math.round(elapsed * fps / 1000));
+                if (held) {
+                    if (slot < next) continue;                         // this slot has its picture
+                    var serial = window.__drawSerial;                  // nothing new drawn: the held
+                    if (typeof serial === 'number' && serial === lastSerial) continue;   // picture covers it
+                    if (enc.encodeQueueSize > ENCODE_QUEUE_MAX) continue;   // encoder behind: same
+                }
+                if (typeof window.__drawSerial === 'number') lastSerial = window.__drawSerial;
+
+                var c0 = performance.now();
+                await captureCompositeFrame(recCanvas, OPAQUE);
+                while (held && next < slot) encodeAt(held, next++);   // what was on screen in between
+                var pic = new VideoFrame(recCanvas, { timestamp: Math.round(slot * frameUs), duration: Math.round(frameUs) });
+                enc.encode(pic, { keyFrame: slot % gop === 0 });
+                if (held) held.close();
+                held = pic; next = slot + 1; drawn++;
+                var cdt = performance.now() - c0;
+                _compStats.capFrames++; _compStats.capTotalMs += cdt;
+                if (cdt > _compStats.capWorstMs) _compStats.capWorstMs = cdt;
+                updateUI('recording', Math.min(100, (elapsed / duration) * 100));
+            }
+            // The last picture holds to the end of the take.
+            if (!_abort && !encError) while (held && next < total) encodeAt(held, next++);
+        } finally {
+            if (held) held.close();
+        }
+
+        if (_abort || encError) {
+            try { enc.close(); } catch (_) {}
+            if (fh) { await writeChain; try { await fh.close(); } catch (_) {} try { fs.unlinkSync(filePath); } catch (_) {} }
+            if (_abort) { toast('Export cancelled', 'info'); return; }
+            throw encError;
+        }
+        updateUI('rendering', 98);
+        await enc.flush();
+        enc.close();
+        if (encError) throw encError;
+        if (!mux.frames) throw new Error('the encoder gave back no frames');
+
+        var tail = mux.moov();
+        var patch = mux.mdatPatch();
+        var drawnFps = Math.round(drawn * fps / total);
+        var sizeNote = 'MP4, ' + W + '×' + H + ', ' + fps + ' fps' +
+            (drawn < total * 0.9 ? '. The canvas drew ' + drawnFps + ' a second, so some frames repeat' : '');
+        if (parts) {
+            head.set(patch.bytes, patch.at);
+            parts.push(tail);
+            await saveBlob(new Blob(parts, { type: 'video/mp4' }), name);
+        } else {
+            put(tail);
+            flush();
+            writeAt(Buffer.from(patch.bytes), patch.at);
+            await writeChain;
+            try { await fh.close(); } catch (_) {}
+            if (writeError) {
+                throw new Error('could not finish writing the video (' + writeError.message +
+                    ') — the file at ' + filePath + ' is incomplete');
+            }
+        }
+        toast('Video exported! (' + sizeNote + ')', 'success');
     }
 
     // ── GIF Export (inline encoder, no external deps) ───────────────
@@ -1613,5 +1790,5 @@
 
     // ── Init ────────────────────────────────────────────────────────
     loadSettings();
-    console.log('[Export] Ready — Video (WebM), GIF, Still (PNG/JPG), Sequence');
+    console.log('[Export] Ready — Video (MP4/WebM), GIF, Still (PNG/JPG), Sequence');
 })();
