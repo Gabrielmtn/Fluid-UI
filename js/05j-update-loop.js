@@ -833,14 +833,28 @@
                         // its step (05d0 dabFlowShare: step / the reference
                         // spacing, at most 1), so the tail lays the stroke's dye per
                         // pixel.
+                        // The share goes through the stroke's own flow routing
+                        // (05d __normalizePaintFlow / __applyPaintFlow), as the live
+                        // dabs above do. Under Cap Color a dab CONVERGES to its
+                        // colour, so the share scales the convergence and the colour
+                        // stays true. Scaling the colour instead, the additive way,
+                        // made each tail dab converge to a darker copy of the stroke,
+                        // black by the end: a dark brush shape at the lift where the
+                        // stroke should have carried on (user test 3, 2026-10-04).
                         const tailRefPx = (config.BRUSH_SPACING_REF || 0.35) *
                             Math.max(4, 2 * Math.sqrt(config.SPLAT_RADIUS) * canvas.height);
-                        const tailFlow = ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1) *
-                            Math.min(1, tailStep / tailRefPx);
-                        const tailCol = tailFlow === 1 ? splatOutColor
-                            : [splatOutColor[0] * tailFlow, splatOutColor[1] * tailFlow, splatOutColor[2] * tailFlow];
+                        const tailK = Math.min(1, tailStep / tailRefPx);
+                        const tailFlowMul = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
+                        const tailShare = window.__normalizePaintFlow
+                            ? window.__normalizePaintFlow(tailFlowMul, tailK) : tailFlowMul * tailK;
+                        const tailCol = window.__applyPaintFlow
+                            ? window.__applyPaintFlow(splatOutColor, tailShare)
+                            : [splatOutColor[0] * tailShare, splatOutColor[1] * tailShare, splatOutColor[2] * tailShare];
                         const tailRadius = config.SPLAT_RADIUS * splatReleaseInMult * outMult;
+                        window.__splatVelK = tailK;   // the push takes the same step share as a live dab
                         multiSplatWithRadius(splatOutX, splatOutY, splatOutDx, splatOutDy, tailCol, tailRadius);
+                        window.__splatFlow = 1;       // as after a live dab: later splats stay full-flow
+                        window.__splatVelK = 1;
                         // 2026-08-16 fidelity audit: the release tail is part of
                         // the stroke the painter sees — peers used to watch
                         // strokes stop dead at lift while the painter's eased
@@ -849,7 +863,7 @@
                             window.__mpLastDabColor = tailCol;
                             window.__mpBaseColor = splatOutColor;
                             window.queueDab(splatOutX / canvas.width, splatOutY / canvas.height,
-                                splatOutDx, splatOutDy, tailRadius, tailFlow, 1);
+                                splatOutDx, splatOutDy, tailRadius, tailShare, tailK);
                         }
                         if (typeof window.flushDabs === 'function') {
                             window.flushDabs(tailCol,
