@@ -39,7 +39,7 @@ Sizes: **S** under an hour, **M** an afternoon, **L** a day or more.
 | | Slice 5: Stop and save for video and GIF (keeps what was captured), the VIDEO badge (never in the frames) | c9e9b4f |
 | 2 Audio | Snap: a placed cue lands on the hit (Alt places it freely) | c0729fb |
 
-**Built and deployed 2026-10-04:** web v=mutvw09h from c9e9b4f (live check: every new piece present, button audit clean). Demo rebuilt from c9e9b4f into `dist/demo`; its smoke is clean apart from two known test artifacts (a stale look-generation expectation, and the layout chooser swallowing Tab on a fresh profile). **Yours:** `npm run publish:steam:demo -- GabrielMtn`, then set the build live on `default`. Known flaky: mp-phone-mouse "as much dye as the same stroke with the mouse" (0.60-0.81 against 0.8; flaky on the old base too).
+**Built and deployed 2026-10-04:** web v=mutvw09h from c9e9b4f (live check: every new piece present, button audit clean). Demo rebuilt from c9e9b4f into `dist/demo`; its smoke is clean apart from two known test artifacts (a stale look-generation expectation, and the layout chooser swallowing Tab on a fresh profile). **Steam: BuildID 25710408 uploaded and set LIVE on `default` by Gabriel (2026-10-04)**, replacing 25674178 (Oct 2); an 884.9 KB patch. Confirmed in the Steam demo: the left sidebar shows. Known flaky: mp-phone-mouse "as much dye as the same stroke with the mouse" (0.60-0.81 against 0.8; flaky on the old base too).
 
 **What's left after that:** your copy sprints; your calls below; audio's badge and snap-to-hit; multiplayer (b) loop by reference only if 3+ rooms matter (needs a relay deploy); (c) after the fest.
 
