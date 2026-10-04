@@ -1265,7 +1265,14 @@
             // naming the button, never a pointerup, so the stroke used to paint
             // on with the pen in the air until the last button came up (and
             // then stuck — see the pointerup below). End it here.
-            if (pointer.down && paintButton != null && e.button === paintButton
+            //
+            // A REAL move with the button up does the same: the release went
+            // missing (a blur that held off its abort, see below, then the
+            // user left mid-press), and without this the stroke would follow
+            // the hovering cursor. Trusted only: the Pen Input Window and the
+            // phone mouse drive their strokes with synthetic events and end
+            // them with their own lifts.
+            if (pointer.down && paintButton != null && (e.button === paintButton || e.isTrusted)
                 && e.pointerId === window.__paintPointerId
                 && (e.buttons & buttonBit(paintButton)) === 0) {
                 try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
@@ -1587,7 +1594,50 @@
                 archiveCurrentStroke();
             }
         }
-        window.addEventListener('blur', abortPointerStroke);
+        // ── A blur with the button still held (2026-10-04) ──
+        // Coming back to the app inside a host that juggles focus (the Claude
+        // browser pane does), the page gets focus for the press and loses it
+        // again ~7 ms later while the button is still down and every move
+        // keeps arriving. Traced with real clicks: win-focus, pointerdown,
+        // win-blur, then moves with buttons=1. The abort above killed that
+        // stroke after its press dab: "the first drag after returning focus
+        // only clicks". A real departure (alt-tab mid-press) takes the pointer
+        // with it and no held move follows. So a blur with a press live only
+        // ARMS the abort: a move from the press's own pointer with its button
+        // still down disarms it; otherwise it fires after the grace.
+        const BLUR_ABORT_GRACE_MS = 300;
+        let blurAbortTimer = 0;
+        function disarmBlurAbort() {
+            if (blurAbortTimer) { clearTimeout(blurAbortTimer); blurAbortTimer = 0; }
+        }
+        function pressLive() { return pointer.down || isRightMouseDown || !!chordSlider; }
+        function pressStillHeld(e) {
+            if (pointer.down && paintButton != null && e.pointerId === window.__paintPointerId
+                && (e.buttons & buttonBit(paintButton))) return true;
+            if (isRightMouseDown && (replayPointerId == null || e.pointerId === replayPointerId)
+                && (e.buttons & buttonBit(replayButton == null ? 2 : replayButton))) return true;
+            return !!(chordSlider && e.pointerId === chordSlider.id
+                && (e.buttons & buttonBit(chordSlider.button)));
+        }
+        window.addEventListener('blur', () => {
+            disarmBlurAbort();
+            if (!pressLive()) { abortPointerStroke(); return; }
+            blurAbortTimer = setTimeout(() => {
+                blurAbortTimer = 0;
+                // Ended on its own in the meantime: nothing to abort, and a
+                // hard abort would drop that stroke's queued tail dabs.
+                if (pressLive()) abortPointerStroke();
+            }, BLUR_ABORT_GRACE_MS);
+        });
+        window.addEventListener('pointermove', (e) => {
+            if (blurAbortTimer && e.isTrusted && pressStillHeld(e)) disarmBlurAbort();
+        }, true);
+        window.addEventListener('touchmove', (e) => {
+            if (blurAbortTimer && e.isTrusted && pointer.down && e.touches && e.touches.length) disarmBlurAbort();
+        }, { capture: true, passive: true });
+        // A new press, or the focus coming back, means the user is here.
+        window.addEventListener('pointerdown', (e) => { if (e.isTrusted) disarmBlurAbort(); }, true);
+        window.addEventListener('focus', disarmBlurAbort);
         window.addEventListener('dragstart', abortPointerStroke);
         // pointercancel is a NORMAL pen ending on Windows (palm rejection,
         // proximity loss, the OS claiming the gesture) — not an abandonment. So
