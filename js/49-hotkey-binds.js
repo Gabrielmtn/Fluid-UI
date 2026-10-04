@@ -62,8 +62,37 @@
         }).map(function (b) {
             var c = copy(b);
             c.combo = H.normalize(c.combo || '');
+            markMoved(c);
             return c;
         }) : [];
+    }
+
+    // 2026-10-04: the brush drawer and the Multi-Brush window became the
+    // Brush and Multi-Brush sections of the left sidebar. A key made in
+    // either found its control across the whole page, by position among
+    // look-alikes (the drawer's tip buttons share words and titles with the
+    // alternate-brush rows), and the move reordered the page: left alone, a
+    // key would change the wrong brush. Such a target gets its section as
+    // its scope; its position is recounted on first lookup (resolve). The
+    // radial menu (58) marks its items the same way.
+    var MOVED = { 'Brush': 'Brush', 'Multi-brush': 'Multi-Brush' };
+    function markMoved(b) {
+        var t = b && b.target;
+        if (!t || t.id || t.row || (t.scope && (t.scope.section || t.scope.id))) return;
+        if (MOVED[b.where]) t.rescope = MOVED[b.where];
+    }
+    // In the old page the drawer and the window sat after every look-alike
+    // (they were appended to <body> last), so a target's position inside its
+    // section is its old position less the look-alikes outside it.
+    function rescope(loc) {
+        var sec = window.Sidebars && window.Sidebars.find ? window.Sidebars.find(loc.rescope) : null;
+        if (!sec) return false;   // not built yet: try again next lookup
+        var page = { tag: loc.tag, text: loc.text, title: loc.title, aria: loc.aria, bg: loc.bg, cls: loc.cls };
+        var outside = twins(document.body, page).filter(function (c) { return !sec.contains(c); }).length;
+        loc.index = Math.max(0, (loc.index || 0) - outside);
+        loc.scope = { section: loc.rescope };
+        delete loc.rescope;
+        return true;
     }
 
     // Written through on every change, and the views told.
@@ -198,6 +227,10 @@
     // renamed button counts only when its title still names exactly one.
     function resolve(loc) {
         if (!loc) return null;
+        if (loc.rescope && rescope(loc)) { try { save(); } catch (_) {} }
+        // The Multi-Brush proxy slider went with the window; the strip's
+        // own #multiplier is the same control.
+        if (loc.id === 'multiplierPanel') loc.id = 'multiplier';
         if (loc.id) return document.getElementById(loc.id);
         var root = rootOf(loc);
         if (!root) return null;
@@ -1550,6 +1583,7 @@
         // people see in front of a slider.
         run: function (b) { return fire(b); },
         resolve: resolve,
+        markMoved: markMoved,
         describe: describe,
         nameOf: nameOf,
         valueTextOf: valueTextOf,

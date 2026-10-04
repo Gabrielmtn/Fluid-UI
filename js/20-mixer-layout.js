@@ -798,14 +798,12 @@
         // "Multi-Brush" says what it does; the brush-settings panel moved to
         // the Brush Size label, sliding in from the left.)
         var sizeChannel = faderChannel('Brush Size', 'orange', 'brushSize', null, 'mixer-brushValue');
-        // The BRUSH SIZE label is the brush-settings trigger (D1): the everyday
-        // brush controls (presets / target / tip / feel) live in a left slide-in
-        // panel — too common to bury in the sidebar. The sidebar Brush section
-        // keeps the rarer replay + splat-ramp controls.
-        buildBrushPanel(sizeChannel.querySelector('.ch-label'));
-        var sizeGear = makeChGear('Brush settings & presets');
-        wireGearToTrigger(sizeGear, sizeChannel.querySelector('.ch-label'));
-        sizeChannel.querySelector('.ch-header').appendChild(sizeGear);
+        // The brush's everyday settings (presets / target / tip / feel) are
+        // the Brush section at the top of the left sidebar, right under this
+        // fader (2026-10-04; they were a slide-in drawer off this label).
+        var brushSec = makeSection('Brush', 'core', false);
+        buildBrushPanel(brushSec.body);
+        pendingLeftSections.unshift(brushSec.sec);
         // The tip swatch rides the FADER row, not the header: tip and size are
         // the two halves of one answer to "what am I painting with", and the
         // header already carries the label, the value and the gear.
@@ -894,7 +892,7 @@
 
     // Tooltips for mixer channels
     var CHANNEL_TOOLTIPS = {
-        'Brush Size': 'Brush size for painting fluid — the ⚙ opens brush settings & presets',
+        'Brush Size': 'Brush size for painting fluid. The brush settings and presets are right under it, in Brush',
         'Fluid': 'Material mode (Swirl / Gloss Paint — Wetness or Thickness) + amount — the ⚙ opens the material picker',
         'Viscosity': 'How thick the fluid is — 0 flows like water, higher smooths the swirls into broad ribbons',
         // User test 3: Isolation's tip had been wrong since June, and Density and
@@ -4980,43 +4978,16 @@
     // eagerly so saved settings restore at startup, shown on demand.
     // Controls keep their legacy element ids + 'brush.*' settings keys,
     // so values saved when they lived in the sidebar migrate untouched.
-    function buildBrushPanel(trigger) {
-        if (!trigger) return;
-        trigger.classList.add('brush-trigger');
-        var chev = document.createElement('span');
-        chev.className = 'brush-trigger-chev';
-        chev.textContent = '▸'; // panel slides in from the left edge
-        trigger.appendChild(chev);
-
+    function buildBrushPanel(host) {
+        if (!host) return;
+        // The Brush section's content. It keeps the popup skin's classes
+        // (.arm-colors-panel .brush-settings-panel) so every row style built
+        // for it still applies; css/21-sidebar.css undoes the popup parts
+        // (fixed position, zoom, shadow, slide) inside the left sidebar.
         var panel = document.createElement('div');
-        panel.className = 'arm-colors-panel brush-settings-panel slide-left';
-        // Popovers are portaled to <body>, so they carry the paint surface's tint
-        // with them rather than inheriting the app-root system fallback.
+        panel.className = 'arm-colors-panel brush-settings-panel lsb-panel';
         panel.dataset.group = 'core';
-        panel.style.position = 'fixed';
-        document.body.appendChild(panel);
-
-        var PANEL_W = 252;
-        function positionPanel() {
-            // Left-edge drawer: pinned to x=0, top aligned under the strip row
-            // the trigger lives in. Zoomed via --ui-scale: compute in screen
-            // px, divide by zoom (same math as the arm-colors panel).
-            var z = window.UIScale ? window.UIScale.get() : 1;
-            var strip = document.getElementById('mixer-strip');
-            var rect = (strip || trigger).getBoundingClientRect();
-            panel.style.left = '0px';
-            panel.style.top = ((rect.bottom + 6) / z) + 'px';
-            panel.style.width = PANEL_W + 'px';
-            // The panel outgrew short viewports (shapes row, splat-mode row):
-            // cap it to the space under the strip and scroll the overflow.
-            panel.style.maxHeight = Math.max(200, (window.innerHeight - rect.bottom - 18) / z) + 'px';
-            panel.style.overflowY = 'auto';
-        }
-
-        var header = document.createElement('div');
-        header.className = 'arm-colors-header';
-        header.textContent = 'Brush';
-        panel.appendChild(header);
+        host.appendChild(panel);
 
         function num(v, d) { return typeof v === 'number' ? v : d; }
         function pct(v) { return Math.round(v * 100) + '%'; }
@@ -5767,34 +5738,16 @@
         var sizeFader = document.getElementById('brushSize');
         if (sizeFader) sizeFader.addEventListener('input', markDirty);
 
-        // ── Open / close ──
-        trigger.addEventListener('click', function (e) {
-            e.stopPropagation();
-            var open = panel.classList.contains('visible');
-            if (open) {
-                panel.classList.remove('visible');
-                trigger.classList.remove('active');
-            } else {
-                positionPanel(); // position BEFORE the slide-in transition
-                panel.classList.add('visible');
-                trigger.classList.add('active');
-                renderPresetChips();
-                // Time can move without its slider firing (the oscillator
-                // drives window.timeScale directly) — resync on open.
-                if (intervalGroup && intervalGroup.__refreshValue) intervalGroup.__refreshValue();
-            }
-        });
-        document.addEventListener('click', function (e) {
-            if (panel.classList.contains('visible') && !panel.contains(e.target)
-                && e.target !== trigger && !trigger.contains(e.target)) {
-                panel.classList.remove('visible');
-                trigger.classList.remove('active');
-            }
-        });
-        panel.addEventListener('click', function (e) { e.stopPropagation(); });
-        window.addEventListener('resize', function () {
-            if (panel.classList.contains('visible')) positionPanel();
-        });
+        // Opening the section does what opening the drawer did: the chips
+        // re-read the presets, and Interval re-reads Time (the oscillator
+        // drives window.timeScale directly, without its slider firing).
+        function onOpen() {
+            renderPresetChips();
+            if (intervalGroup && intervalGroup.__refreshValue) intervalGroup.__refreshValue();
+        }
+        var sec = host.closest ? host.closest('.sidebar-section') : null;
+        if (sec) sec.__onOpen = onOpen;
+        onOpen();
     }
 
 
@@ -8767,6 +8720,9 @@
         }
 
         sec.classList.toggle('collapsed');
+        if (!sec.classList.contains('collapsed') && typeof sec.__onOpen === 'function') {
+            try { sec.__onOpen(); } catch (_) {}
+        }
 
         if (anchoring) {
             const drift = header.getBoundingClientRect().top - before;

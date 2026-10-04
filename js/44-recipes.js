@@ -107,8 +107,10 @@
     // native dialog, downloads, exports, connects, or reads the clipboard is
     // point-only and has no demo.
     // steps: [{ say, note?, key?, needs?, target?, until? }] — see the header.
-    const BRUSH_DRAWER = { strip: 'Brush Size', popup: 'brush' };
-    function inDrawer(sel, text) { return { strip: 'Brush Size', popup: 'brush', sel: sel, text: text }; }
+    // The brush's settings are the Brush section of the left sidebar
+    // (2026-10-04; a slide-in drawer off the Brush Size label before).
+    const BRUSH_DRAWER = { section: 'Brush' };
+    function inDrawer(sel, text) { return { section: 'Brush', sel: sel, text: text }; }
 
     const RECIPES = [
         // ── Brush ──
@@ -119,14 +121,14 @@
           demo: { label: 'Try a bigger brush', run() { const el = $('brushSize'); const was = el ? el.value : null; setCtl('brushSize', 30, 'input'); return () => { if (was != null) setCtl('brushSize', was, 'input'); }; } } },
         { id: 'brush-settings', pillar: 'brush', title: 'Open the brush settings',
           tags: ['brush', 'settings', 'drawer', 'tip', 'presets', 'gear'],
-          answer: 'Click the Brush Size label in the top bar, or its gear. The drawer holds the tip, custom shapes, spacing, flow and the brush presets.',
+          answer: 'The Brush section on the left, under Brush Size, holds the tip, custom shapes, spacing, flow and the brush presets.',
           target: BRUSH_DRAWER },
         { id: 'brush-tip', pillar: 'brush', title: 'Change the brush tip, or paint with a shape',
           tags: ['tip', 'shape', 'chisel', 'ring', 'streak', 'blob', 'custom', 'rotate', 'angle'],
-          answer: 'In the brush drawer pick Soft, Blob, Chisel, Streak or Ring, or press + to load a shape of your own from an image. Shift+Scroll rotates the tip.',
+          answer: 'In Brush on the left, pick Soft, Blob, Chisel, Streak or Ring, or press + to load a shape of your own from an image. Shift+Scroll rotates the tip.',
           hotkey: 'Shift+Scroll', target: inDrawer('.brush-tip-btn'),
           steps: [
-            { say: 'In the brush drawer, pick a tip: Soft, Blob, Chisel, Streak or Ring.', target: inDrawer('.brush-tip-row'), until: { click: true } },
+            { say: 'In Brush, pick a tip: Soft, Blob, Chisel, Streak or Ring.', target: inDrawer('.brush-tip-row'), until: { click: true } },
             { say: 'Or press + to load a shape of your own from a picture.', note: 'Shift+Scroll over the canvas rotates whichever tip you chose.', key: 'Shift+Scroll', target: inDrawer('.brush-shape-add') }
           ] },
         { id: 'multi-brush', pillar: 'brush', title: 'Paint with several arms at once',
@@ -148,28 +150,28 @@
           target: { strip: 'Fluid', sel: '#materialMode' } },
         { id: 'constant-flow', pillar: 'brush', title: 'Keep painting while holding still',
           tags: ['flow', 'constant', 'hold', 'still', 'spacing', 'interval', 'move'],
-          answer: 'In the brush drawer switch On Move to Constant. The brush keeps depositing while you hold the button; Interval and Flow set the rate.',
+          answer: 'In Brush on the left, switch On Move to Constant. The brush keeps depositing while you hold the button; Interval and Flow set the rate.',
           target: inDrawer('.brush-mode-btn', 'Constant'),
           steps: [
-            { say: 'In the brush drawer switch On Move to Constant.', target: inDrawer('.brush-mode-btn', 'Constant'), until: { active: true } },
+            { say: 'In Brush on the left, switch On Move to Constant.', target: inDrawer('.brush-mode-btn', 'Constant'), until: { active: true } },
             { say: 'Hold the button still on the canvas: the brush keeps depositing. Flow sets how much lands per dab.', note: 'On Move is the way back.', target: inDrawer('#brushFlow') }
           ] },
         { id: 'pressure-brush', pillar: 'brush', title: 'Move paint around without adding any',
           tags: ['smudge', 'spread', 'gather', 'swirl', 'push', 'pressure', 'stir', 'tab'],
-          answer: 'In the brush drawer choose Pressure and a mode: Smudge drags, Spread pushes out, Gather pulls in, Swirl spins. Nothing new is deposited. Tab switches Fluid, Pressure and Collider without opening the drawer.',
+          answer: 'In Brush on the left, choose Pressure and a mode: Smudge drags, Spread pushes out, Gather pulls in, Swirl spins. Nothing new is deposited. Tab switches Fluid, Pressure and Collider from the keyboard.',
           target: inDrawer('.brush-mode-btn', 'Pressure'),
           steps: [
-            { say: 'In the brush drawer choose Pressure.', target: inDrawer('.brush-mode-btn', 'Pressure'), until: { active: true } },
+            { say: 'In Brush on the left, choose Pressure.', target: inDrawer('.brush-mode-btn', 'Pressure'), until: { active: true } },
             { say: 'Pick how it moves the paint: Smudge drags, Spread pushes out, Gather pulls in, Swirl spins.', target: inDrawer('.brush-mode-btn', 'Smudge'),
               until: { check: () => Array.prototype.some.call(document.querySelectorAll('.brush-settings-panel .brush-mode-btn.active'), (b) => /^(Smudge|Spread|Gather|Swirl)$/.test(b.textContent.trim())) } },
             { say: 'Drag on the canvas. Nothing new is deposited. Click Fluid when you want colour again.', target: inDrawer('.brush-mode-btn', 'Fluid') }
           ] },
         { id: 'paint-collider', pillar: 'brush', title: 'Paint walls the fluid flows around',
           tags: ['collider', 'wall', 'collision', 'block', 'obstacle', 'mask', 'tab'],
-          answer: 'In the brush drawer, under Paint Into, click Collider. Strokes become walls; click Fluid to paint dye again. The wall shows in Layers as a collision layer. Tab switches Fluid, Pressure and Collider without opening the drawer.',
+          answer: 'In Brush, under Paint Into, click Collider. Strokes become walls; click Fluid to paint dye again. The wall shows in Layers as a collision layer. Tab switches Fluid, Pressure and Collider from the keyboard.',
           target: inDrawer('.brush-mode-btn', 'Collider'),
           steps: [
-            { say: 'In the brush drawer, under Paint Into, click Collider.', target: inDrawer('.brush-mode-btn', 'Collider'), until: { active: true } },
+            { say: 'In Brush, under Paint Into, click Collider.', target: inDrawer('.brush-mode-btn', 'Collider'), until: { active: true } },
             { say: 'Paint on the canvas. Strokes become walls, shown as a red film while you paint.', target: { canvas: true }, until: [{ layerAdded: true }, { pointer: true }] },
             { say: 'The wall lives in Layers as a collision layer; uncheck Collision to switch it off. Click Fluid to paint dye again.', target: { layer: 'collision', fallback: inDrawer('.brush-mode-btn', 'Fluid') } }
           ] },
@@ -690,7 +692,6 @@
         return (cell && cell.dataset.uiLabel) || key;
     }
     const POPUPS = {
-        brush:   { trigger: () => { const c = stripCell('Brush Size'); return c && c.querySelector('.ch-label'); }, panel: () => document.querySelector('.brush-settings-panel'), isOpen: (p) => p && p.classList.contains('visible') },
         arms:    { trigger: () => $('multiplierValue'), panel: () => document.querySelector('.arm-colors-rows'), isOpen: (p) => p && p.style.display !== 'none' && p.style.display !== '' || (p && p.classList.contains('visible')) },
         presets: { trigger: () => $('mixerPresetsTrigger'), panel: () => document.querySelector('.mixer-presets-panel'), isOpen: (p) => p && p.style.display !== 'none' && p.style.display !== '' },
         // The room panel's Invite popover and ⋯ menu (06e). Both live on

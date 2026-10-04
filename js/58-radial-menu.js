@@ -155,6 +155,9 @@
         var data = null;
         try { data = sm() ? sm().get(KEY) : null; } catch (_) {}
         items = Array.isArray(data) ? coerce(data) : defaults();
+        // Items pointing into the old brush drawer or Multi-Brush window
+        // are re-scoped on first lookup (49 markMoved / rescope).
+        if (B().markMoved) items.forEach(function (it) { B().markMoved(it); });
     }
 
     function save() {

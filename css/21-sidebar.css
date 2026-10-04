@@ -2187,3 +2187,23 @@ select option {
 }
 /* The phone layout keeps its own drawer for now. */
 body.mobile-mode #sidebar-left { display: none; }
+
+/* The Brush section (and Multi-Brush) keep the popup skin's classes so the
+   row styles built for them apply; here they are plain section content.
+   zoom: 1 because #sidebar-left is already zoomed (.arm-colors-panel carries
+   its own --ui-scale zoom for when it floats). */
+#sidebar-left .arm-colors-panel {
+    position: static;
+    zoom: 1;
+    z-index: auto;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    transform: none;
+    visibility: visible;
+    transition: none;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+}
