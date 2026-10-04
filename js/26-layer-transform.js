@@ -10,6 +10,13 @@
  * border / resize handles are dimmed via body.layer-transform-active while
  * the overlay is open.
  *
+ * User test 3 (2026-10-04): "move mode isn't obvious; Done is small and
+ * low-contrast". The overlay is a MODE — every click lands on it — so it now
+ * looks like one: a veil darkens everything outside #canvas-area (sidebar,
+ * strip, titlebar, underbar), the bar floats as a pill that says "Moving
+ * layer", Done is the emphasised button, and the frame is a thick amber
+ * dash over a dark under-stroke with a glow, legible on light paint too.
+ *
  * window.LayerTransform = { open(index), close(), isOpen() }
  */
 (function () {
@@ -162,11 +169,22 @@
         // sheared frame so it matches toLocal's inverse exactly.
         if (g.kx || g.ky) tCtx.transform(1, g.ky, g.kx, 1, 0, 0);
 
-        // Layer rect (dashed amber)
-        tCtx.strokeStyle = CHROME;
-        tCtx.lineWidth = 1.5;
-        tCtx.setLineDash([7, 5]);
+        // Layer rect: a dark under-stroke, then a thick amber dash with a
+        // glow. The old 1.5px dash vanished on light or busy paint; the dark
+        // line underneath shows between the dashes and holds the edge on
+        // anything.
+        tCtx.lineJoin = 'round';
+        tCtx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+        tCtx.lineWidth = 5;
         tCtx.strokeRect(-g.hw, -g.hh, g.hw * 2, g.hh * 2);
+        tCtx.save();
+        tCtx.shadowColor = 'rgba(255, 190, 70, 0.75)';
+        tCtx.shadowBlur = 10;
+        tCtx.strokeStyle = CHROME;
+        tCtx.lineWidth = 2.75;
+        tCtx.setLineDash([10, 6]);
+        tCtx.strokeRect(-g.hw, -g.hh, g.hw * 2, g.hh * 2);
+        tCtx.restore();
         tCtx.setLineDash([]);
 
         // Corner handles
@@ -382,19 +400,36 @@
 
         overlay = document.createElement('div');
         overlay.id = 'layerTransformOverlay';
+        const esc = window.escHtml || function (s) { return String(s); };
         overlay.innerHTML = `
-            <div class="draw-toolbar">
-                <span class="layer-transform-title">⤢ ${layer.title || 'Layer ' + index}</span>
-                <span class="layer-transform-hint">drag to move · corners to resize (Shift = proportional) · edges to skew · ↻ to rotate</span>
-                <button id="layerTransformDone" type="button">Done</button>
-                <button id="layerTransformCancel" type="button">Cancel</button>
-            </div>
+            <div class="lt-veil" aria-hidden="true"></div>
             <div class="draw-canvas-area">
                 <canvas id="layerTransformCanvas"></canvas>
+            </div>
+            <div class="draw-toolbar" data-group="core" role="toolbar" aria-label="Moving layer">
+                <span class="layer-transform-title">Moving layer <b>${esc(layer.title || 'Layer ' + index)}</b></span>
+                <span class="layer-transform-hint">drag to move · corners resize (Shift keeps the shape) · edges skew · ↻ rotates · Enter done · Esc cancel</span>
+                <button id="layerTransformDone" class="btn--emphasis btn--lg" type="button">Done</button>
+                <button id="layerTransformCancel" class="btn--lg" type="button">Cancel</button>
             </div>
         `;
         document.body.appendChild(overlay);
         document.body.classList.add('layer-transform-active');
+
+        // The veil: a window cut over #canvas-area, everything around it
+        // darkened by the box's own shadow. Placed in px from the live rect,
+        // and again on every resize (below).
+        const veil = overlay.querySelector('.lt-veil');
+        const placeVeil = () => {
+            const ca = document.getElementById('canvas-area');
+            if (!veil || !ca) return;
+            const r = ca.getBoundingClientRect();
+            veil.style.left = r.left + 'px';
+            veil.style.top = r.top + 'px';
+            veil.style.width = r.width + 'px';
+            veil.style.height = r.height + 'px';
+        };
+        placeVeil();
 
         tCanvas = document.getElementById('layerTransformCanvas');
         const area = overlay.querySelector('.draw-canvas-area');
@@ -411,9 +446,17 @@
         tCanvas.addEventListener('pointerup', onPointerUp);
         tCanvas.addEventListener('pointercancel', onPointerUp);
 
-        const onResize = () => { sizeCanvas(); draw(); };
+        const onResize = () => { sizeCanvas(); placeVeil(); draw(); };
         window.addEventListener('resize', onResize);
         cleanupFns.push(() => window.removeEventListener('resize', onResize));
+        // The area and the canvas can also move without a window resize (the
+        // layout settling after boot, a drawer, Focus): the veil and the frame
+        // follow them too.
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(() => { if (overlay) onResize(); });
+            ['canvas-area', 'canvas-wrapper'].forEach((id) => { const el = document.getElementById(id); if (el) ro.observe(el); });
+            cleanupFns.push(() => ro.disconnect());
+        }
 
         const onKey = (e) => {
             if (e.key === 'Escape') cancel();

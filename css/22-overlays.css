@@ -1013,35 +1013,67 @@ body.focus-mode #canvas {
     flex-direction: column;
     background: transparent;
 }
+/* Everything outside #canvas-area goes dark while the mode is on (js/26
+   places this box over the area; its shadow is the veil). No opacity on the
+   app's own panels: nothing under the WebGL canvas changes. */
+#layerTransformOverlay .lt-veil {
+    position: absolute;
+    pointer-events: none;
+    box-shadow: 0 0 0 200vmax rgba(4, 6, 10, 0.6);
+    border-radius: 2px;
+}
+#layerTransformOverlay .draw-canvas-area {
+    position: absolute;
+    inset: 0;
+    display: flex;
+}
+/* The bar floats like Text Arrange's (#text-arrange-bar), in amber, with a
+   border strong enough to find at a glance (0.7, was 0.25). The buttons take
+   their colour from data-group="core" (the Layers section's), Done the
+   emphasised one (css/01-buttons.css). */
 #layerTransformOverlay .draw-toolbar {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 10px 12px;
-    background: rgba(15, 20, 27, 0.95);
-    border-bottom: 1px solid rgba(255, 190, 70, 0.25);
+    gap: 14px;
+    /* max-content: with left:50% a shrink-to-fit box only gets half the
+       width, and the hint wrapped to three lines. */
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    padding: 9px 10px 9px 18px;
+    border-radius: 12px;
+    background: rgba(15, 20, 27, 0.97);
+    border: 1.5px solid rgba(255, 190, 70, 0.7);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), 0 0 18px rgba(255, 190, 70, 0.18);
     color: white;
     font-size: 13px;
 }
 #layerTransformOverlay .layer-transform-title {
     font-weight: 600;
     color: rgba(255, 190, 70, 0.95);
+    white-space: nowrap;
+}
+#layerTransformOverlay .layer-transform-title b {
+    color: #fff;
+    font-weight: 600;
+    margin-left: 4px;
 }
 #layerTransformOverlay .layer-transform-hint {
     font-size: 11px;
     color: var(--text-secondary);
+    min-width: 0;
 }
 #layerTransformOverlay .draw-toolbar button {
     cursor: pointer;
+    flex: 0 0 auto;
 }
 #layerTransformDone {
-    background: rgba(80, 200, 120, 0.9);
-    color: white;
-}
-#layerTransformCancel {
-    background: rgba(255, 100, 100, 0.9);
-    color: white;
+    min-width: 88px;
+    font-weight: 600;
 }
 #layerTransformCanvas {
     flex: 1;
