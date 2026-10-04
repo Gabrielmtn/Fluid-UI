@@ -424,11 +424,21 @@
                 if (recEnabled && typeof recAddLayer === 'function') recAddLayer();
                 return;
             }
-            // Delete: clear active recording layer
+            // Delete: clear active recording layer. It asks first: a stray
+            // Delete used to wipe the take with no way back (Ctrl+Z doesn't
+            // hold recordings), and an empty take has nothing to clear.
             if (key === 'Delete' && !ctrlOrMeta && !e.altKey && !e.shiftKey) {
                 if (recEnabled && typeof recClearActive === 'function') {
                     e.preventDefault();
-                    recClearActive();
+                    const take = typeof recGetActiveLayer === 'function' ? recGetActiveLayer() : null;
+                    const n = take && take.timeline && take.timeline.interactions ? take.timeline.interactions.length : 0;
+                    if (!n || document.getElementById('appConfirmModal')?.classList.contains('show')) return;
+                    if (typeof window.appConfirm !== 'function') return;
+                    window.appConfirm({
+                        title: 'Clear this take?',
+                        message: (take.name ? take.name + ' loses' : 'It loses') + ' everything recorded in it. This can\'t be undone.',
+                        confirmLabel: 'Clear take'
+                    }).then((ok) => { if (ok) recClearActive(); });
                     return;
                 }
             }
