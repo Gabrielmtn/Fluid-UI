@@ -930,6 +930,38 @@ body > .controls {
     flex-direction: column;
     gap: 6px;
 }
+/* "Left click also mirrors ↔ · Turn off" (20 updateMirrorNote): the mirror
+   a mouse button adds sits outside every setting in this panel, so the panel
+   says so and offers the way out. */
+.arm-mirror-note {
+    margin: 0 0 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(255, 196, 80, 0.08);
+    border: 1px solid rgba(255, 196, 80, 0.4);
+    font-size: 11px;
+    color: var(--ink-100, #f2f3f5);
+}
+.arm-mirror-note[hidden] { display: none; }
+.arm-mirror-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.arm-mirror-row + .arm-mirror-row { margin-top: 4px; }
+.arm-mirror-off {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+/* ...and the strip's Multi-Brush value shows the axis while the left button
+   mirrors: "1x ↔". An attribute, drawn here, because 05e/05h/04e/05f all
+   write the cell's text. */
+#multiplierValue[data-mirror]::after {
+    content: ' ' attr(data-mirror);
+    color: rgb(255, 196, 80);
+    font-weight: 700;
+}
 .arm-colors-hint {
     font-size: 10px;
     color: rgba(255, 255, 255, 0.5);

@@ -8023,23 +8023,93 @@
         symNote.style.cssText = 'padding:2px 0 6px;font-size:9px;color:rgba(255,255,255,0.45);';
         panel.appendChild(symNote);
 
+        // "Mirror brushstroke" on a mouse button (41 ButtonModes) folds a twin
+        // into every dab AFTER the arms above, so 1x still painted two and no
+        // setting in this panel changed it, while the note below said "1 arm
+        // → 1 dab" (user test 3: "can't turn symmetry off"). The left button
+        // is the one that paints, so its mirror counts in the note and earns
+        // the strip badge; any button that mirrors gets a line with the way out.
+        var MIRROR_SIDE_NAMES = { left: 'Left click', right: 'Right click', middle: 'Middle click' };
+        function leftMirrorCode() {
+            var bm = window.ButtonModes;
+            var left = bm && bm.side ? bm.side('left') : null;
+            return (left && left.mode === 'mirror') ? (bm.mirrorCode(left.mirror) || 1) : 0;
+        }
+        function mirrorGlyph(axisId) {
+            var axes = (window.ButtonModes && window.ButtonModes.MIRROR_AXES) || [];
+            for (var i = 0; i < axes.length; i++) if (axes[i].id === axisId) return axes[i].label;
+            return '↔';
+        }
+        var trigBaseTitle = triggerEl ? triggerEl.title : '';
+        var mirrorNote = document.createElement('div');
+        mirrorNote.className = 'arm-mirror-note';
+        mirrorNote.hidden = true;
+
         function updateSymNote() {
             var slider = document.getElementById('multiplier');
             var n = slider ? parseInt(slider.value, 10) || 1 : 1;
             var mode = (window.config && window.config.SYMMETRY_MODE) || 'radial';
+            var mir = leftMirrorCode();
             var dabs = n;
             if (typeof window.symmetryTransforms === 'function') {
-                try { dabs = window.symmetryTransforms(mode, n, 1, 0).length; } catch (_) {}
+                try { dabs = window.symmetryTransforms(mode, n, 1, 0, mir).length; } catch (_) {}
             }
             // The dab count, not the arm count, is what costs: Quad at 8 arms
             // is 32 splats per stroke sample, and nothing else on screen says so.
             symNote.textContent = n + (n === 1 ? ' arm → ' : ' arms → ') +
-                dabs + (dabs === 1 ? ' dab' : ' dabs') + ' per stroke sample';
+                dabs + (dabs === 1 ? ' dab' : ' dabs') + ' per stroke sample' +
+                (mir ? ', the mirror included' : '');
+        }
+
+        function updateMirrorNote() {
+            var bm = window.ButtonModes;
+            var sides = (bm && bm.SIDES) ? bm.SIDES.filter(function (k) {
+                var s = bm.side(k);
+                return s && s.mode === 'mirror';
+            }) : [];
+            // The strip's value cell (the trigger) carries the glyph as an
+            // attribute, drawn by CSS: several writers set its text to "Nx".
+            var left = bm && bm.side ? bm.side('left') : null;
+            if (triggerEl) {
+                if (left && left.mode === 'mirror') {
+                    triggerEl.setAttribute('data-mirror', mirrorGlyph(left.mirror));
+                    triggerEl.title = trigBaseTitle + '\nLeft click also mirrors every stroke ' + mirrorGlyph(left.mirror);
+                } else {
+                    triggerEl.removeAttribute('data-mirror');
+                    triggerEl.title = trigBaseTitle;
+                }
+            }
+            mirrorNote.innerHTML = '';
+            mirrorNote.hidden = !sides.length;
+            sides.forEach(function (k) {
+                var s = bm.side(k);
+                var row = document.createElement('div');
+                row.className = 'arm-mirror-row';
+                var txt = document.createElement('span');
+                txt.textContent = (MIRROR_SIDE_NAMES[k] || k) + ' also mirrors\u00a0' + mirrorGlyph(s.mirror);
+                var off = document.createElement('button');
+                off.type = 'button';
+                off.className = 'btn--sm arm-mirror-off';
+                off.textContent = 'Turn off';
+                off.title = 'Back to an ordinary brushstroke on this button (Stroke and replay → Mouse buttons sets it again)';
+                off.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    bm.setMode(k, 'paint');
+                });
+                row.appendChild(txt);
+                row.appendChild(off);
+                mirrorNote.appendChild(row);
+            });
         }
         if (symGroup) {
             var symSel = symGroup.querySelector('#symmetryMode');
             if (symSel) symSel.addEventListener('change', updateSymNote);
         }
+        panel.appendChild(mirrorNote);
+        if (window.ButtonModes && typeof window.ButtonModes.onChange === 'function') {
+            window.ButtonModes.onChange(function () { updateMirrorNote(); updateSymNote(); });
+        }
+        updateMirrorNote();
 
         var rowsWrap = document.createElement('div');
         rowsWrap.className = 'arm-colors-rows';
