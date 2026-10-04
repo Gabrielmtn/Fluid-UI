@@ -422,6 +422,12 @@ body.focus-mode #canvas {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
+/* The rows that did not fit the window (20 tipShow trims them). */
+.mutation-tip-more {
+    margin-top: 3px;
+    font-size: 11px;
+    opacity: 0.6;
+}
 .mutation-tip-val .mutation-color-dot,
 .mutation-diff-val .mutation-color-dot {
     width: 10px;

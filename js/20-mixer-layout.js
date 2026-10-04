@@ -2893,6 +2893,19 @@
             // itself, a right-hand card's list covered the cards beside it.
             // Screen px in, zoomed CSS px out (fxTipShow's rule).
             var z = window.UIScale ? window.UIScale.get() : 1;
+            // A big mutation lists more rows than the window is tall, and a
+            // tooltip can't scroll (pointer-events: none): keep the rows that
+            // fit and say how many more there are (user test 3).
+            if (el.offsetHeight * z > window.innerHeight - 8) {
+                var rows = el.querySelectorAll('.mutation-tip-row');
+                var more = document.createElement('div');
+                more.className = 'mutation-tip-more';
+                el.appendChild(more);
+                for (var ri = rows.length - 1; ri > 0 && el.offsetHeight * z > window.innerHeight - 8; ri--) {
+                    rows[ri].remove();
+                    more.textContent = '+ ' + (rows.length - ri) + ' more';
+                }
+            }
             var r = card.getBoundingClientRect();
             var side = card.closest('#sidebar-right') || card.parentNode;
             var sr = side.getBoundingClientRect();
