@@ -54,13 +54,15 @@
 
     // Beat detection
     var beatThreshold = 0.55;
-    var beatCooldownMs = 160;
+    // 260 ms (230 BPM at most): at 160 a kick's falling pitch, sweeping
+    // down the bass bins, landed a second hit after every real one.
+    var beatCooldownMs = 260;
     var lastBeatTime = 0;
     var beatDetected = false;
 
     // Mid/treble beat detection (for splats on mid and treble hits)
     var midBeatThreshold = 0.5;
-    var midBeatCooldown = 200;
+    var midBeatCooldown = 220;
     var lastMidBeatTime = 0;
     var midBeatDetected = false;
 
@@ -96,6 +98,36 @@
     var lastWrittenSplatRadius = null;
     var lastColorStepTime = 0;
 
+    // ── Calmer reactions (user test 3, 2026-10-04) ──────────────────
+    // "kaleido rotation triggering constantly, making them way too intense,
+    // users need controls for these insane impacts"; "color cycle ... it's
+    // totally out of control"; "volume is too intense and fast".
+    //  · A beat is a HIT: a jump in the band's own bins against their running
+    //    mean (the full-band onset's recipe, per band), on a band loud enough
+    //    to pass the Beat Threshold. Beats fired on the level alone, and loud
+    //    music pins the levels (dB-linear bytes × the band gains: mids and
+    //    treble sit at 1.0, bass within 0.05 of its peak on a kick), so a
+    //    loud band "beat" every cooldown: bass at 375 BPM on a 120 BPM track.
+    //    An edge on the level never re-arms on the same music; a kick is a
+    //    jump in the bass bins whatever the level.
+    //  · Colour cycling counts beats: a step every colorEveryBeats of them,
+    //    never faster than COLOR_MIN_MS. It stepped every 350 - 300·treble
+    //    ms, ~15 times a second on a loud mix.
+    //  · Kaleido spin is a RATE in degrees a second, up to kaleidoSpinMax,
+    //    eased toward what the mids ask for. It turned mid·sens·0.12 rad a
+    //    tick, ~500-620°/s on a loud mix.
+    var BAND_HIT_RATIO = 1.7, BAND_HIT_FLOOR = 0.006;
+    var bassFluxAvg = 0, midFluxAvg = 0, trebleFluxAvg = 0;
+    var bassFluxI = 0, midFluxI = 0, trebleFluxI = 0;
+    var colorEveryBeats = 4;     // UI: Every N beats (1, 2, 4, 8, 16)
+    var COLOR_MIN_MS = 250;
+    var colorBeatCount = 0;
+    var COLOR_BEAT_GAP_MS = 200;  // a kick's onset and its bass hit count as one beat
+    var lastColorBeatMs = 0;
+    var kaleidoSpinMax = 45;     // UI: Spin speed, °/s at full mids (0-180)
+    var SPIN_ATTACK_MS = 250, SPIN_RELEASE_MS = 900;
+    var spinRate = 0;            // rad/s, eased
+
     // Visualizer
     var vizCanvas = null;
     var vizCtx = null;
@@ -123,6 +155,10 @@
                 if (typeof bt === 'number') beatThreshold = bt;
                 var mv = window.settingsManager.get('audio.monitorVolume');
                 if (typeof mv === 'number') monitorVolume = Math.max(0, Math.min(1, mv));
+                var ceb = window.settingsManager.get('audio.colorEveryBeats');
+                if (typeof ceb === 'number' && ceb >= 1) colorEveryBeats = Math.round(ceb);
+                var ksm = window.settingsManager.get('audio.kaleidoSpinMax');
+                if (typeof ksm === 'number' && ksm >= 0) kaleidoSpinMax = Math.min(360, ksm);
             }
         } catch (_) {}
     }
@@ -616,15 +652,22 @@
         if (!prevFreqData || prevFreqData.length !== freqData.length) {
             prevFreqData = new Uint8Array(freqData.length);
         }
-        var fsum = 0, cNum = 0, cDen = 0, sq = 0;
+        var fsum = 0, cNum = 0, cDen = 0, sq = 0, fBass = 0, fMid = 0, fTreble = 0;
         for (var fi = BASS_START; fi < TREBLE_END && fi < freqData.length; fi++) {
             var fv = freqData[fi];
             var fd = fv - prevFreqData[fi];
-            if (fd > 0) fsum += fd;            // half-wave-rectified flux
+            if (fd > 0) {
+                fsum += fd;                    // half-wave-rectified flux
+                if (fi < BASS_END) fBass += fd; else if (fi < MID_END) fMid += fd; else fTreble += fd;
+            }
             cNum += fi * fv; cDen += fv;       // centroid numerator/denominator
             var fn = fv / 255; sq += fn * fn;  // energy for RMS
         }
         prevFreqData.set(freqData);
+        // Per-band flux, 0..1 per bin, and its running mean (the beat hits)
+        bassFluxI = fBass / (Math.max(1, BASS_END - BASS_START) * 255);
+        midFluxI = fMid / (Math.max(1, MID_END - BASS_END) * 255);
+        trebleFluxI = fTreble / (Math.max(1, TREBLE_END - MID_END) * 255);
         var fspan = (TREBLE_END - BASS_START) || 1;
         fluxInstant = Math.min(1, fsum / (fspan * 48));
         flux = flux * 0.6 + fluxInstant * 0.4;
@@ -639,15 +682,22 @@
         midBeatDetected = false;
         trebleBeatDetected = false;
 
-        if (bass * sensitivity > beatThreshold && (now - lastBeatTime) > beatCooldownMs) {
+        // A hit in the band, on a band loud enough (see "Calmer reactions").
+        var bassHit = bassFluxI > bassFluxAvg * BAND_HIT_RATIO + BAND_HIT_FLOOR;
+        var midHit = midFluxI > midFluxAvg * BAND_HIT_RATIO + BAND_HIT_FLOOR;
+        var trebleHit = trebleFluxI > trebleFluxAvg * BAND_HIT_RATIO + BAND_HIT_FLOOR;
+        bassFluxAvg = bassFluxAvg * 0.95 + bassFluxI * 0.05;
+        midFluxAvg = midFluxAvg * 0.95 + midFluxI * 0.05;
+        trebleFluxAvg = trebleFluxAvg * 0.95 + trebleFluxI * 0.05;
+        if (bassHit && bass * sensitivity > beatThreshold && (now - lastBeatTime) > beatCooldownMs) {
             beatDetected = true;
             lastBeatTime = now;
         }
-        if (mid * sensitivity > midBeatThreshold && (now - lastMidBeatTime) > midBeatCooldown) {
+        if (midHit && mid * sensitivity > midBeatThreshold && (now - lastMidBeatTime) > midBeatCooldown) {
             midBeatDetected = true;
             lastMidBeatTime = now;
         }
-        if (treble * sensitivity > trebleBeatThreshold && (now - lastTrebleBeatTime) > trebleBeatCooldown) {
+        if (trebleHit && treble * sensitivity > trebleBeatThreshold && (now - lastTrebleBeatTime) > trebleBeatCooldown) {
             trebleBeatDetected = true;
             lastTrebleBeatTime = now;
         }
@@ -675,7 +725,7 @@
         beatPulse += (0 - beatPulse) * (1 - Math.exp(-dt / PULSE_RELEASE_MS));
 
         // Apply mappings
-        applyMappings(now);
+        applyMappings(now, dt);
 
         // Feed the active audio scene (30-audio-scenes.js), if any. Reuses one
         // frame object to stay allocation-free at 60fps.
@@ -757,7 +807,7 @@
         } catch (_) { return false; }
     }
 
-    function applyMappings(now) {
+    function applyMappings(now, dt) {
         var s = sensitivity;
         var painting = paintInProgress();
 
@@ -798,18 +848,26 @@
             // Kaleidoscope rotation when enabled
             if (window.kaleidoEnabled) {
                 try {
-                    var rotSpeed = mid * s * 0.12;
+                    // A rate (rad/s) eased toward what the mids ask for, up to
+                    // kaleidoSpinMax °/s — see "Calmer reactions" above.
+                    var spinTarget = Math.min(1, mid * s) * kaleidoSpinMax * Math.PI / 180;
+                    var spinTau = spinTarget > spinRate ? SPIN_ATTACK_MS : SPIN_RELEASE_MS;
+                    var spinDt = (typeof dt === 'number' && dt > 0) ? dt : 16;
+                    spinRate += (spinTarget - spinRate) * (1 - Math.exp(-spinDt / spinTau));
+                    var rotSpeed = spinRate;
                     // PhotoSafe: the second kaleido-spin advance site (the
                     // first is the kSpinSpeed animator in 05j). Cap the audio-
-                    // driven rate to ~PHOTOSAFE_SPIN_CAP deg/s at 60fps so a
-                    // hot mix cannot whip the fold into a strobe-speed spin.
+                    // driven rate to PHOTOSAFE_SPIN_CAP deg/s so a hot mix
+                    // cannot whip the fold into a strobe-speed spin.
                     if (window.config && window.config.PHOTOSAFE) {
                         var _psCapDeg = (window.config.PHOTOSAFE_SPIN_CAP != null) ? window.config.PHOTOSAFE_SPIN_CAP : 90;
-                        var _psCapTick = (_psCapDeg * Math.PI / 180) / 60;
-                        rotSpeed = Math.max(-_psCapTick, Math.min(_psCapTick, rotSpeed));
+                        var _psCap = _psCapDeg * Math.PI / 180;
+                        rotSpeed = Math.max(-_psCap, Math.min(_psCap, rotSpeed));
                     }
-                    window.kAngle = ((window.kAngle || 0) + rotSpeed) % (Math.PI * 2);
+                    window.kAngle = ((window.kAngle || 0) + rotSpeed * spinDt / 1000) % (Math.PI * 2);
                 } catch (_) {}
+            } else {
+                spinRate = 0;
             }
             // Also fire mid-energy splats for visible mid-range response
             if (midBeatDetected) {
@@ -817,12 +875,16 @@
             }
         }
 
-        // Treble → Color cycling + sparkle splats
+        // Beats → Color cycling (the key is still trebleToColor, which saved
+        // configs and composer segments carry) + treble sparkle splats
         if (mapTrebleToColor) {
-            // Color step at rate proportional to treble energy
-            if (treble * s > 0.15 && !painting) {
-                var stepInterval = Math.max(60, 350 - treble * s * 300);
-                if (now - lastColorStepTime > stepInterval) {
+            // A palette step every colorEveryBeats beats — the bass beat or an
+            // onset, what fires the auto-splat — never faster than COLOR_MIN_MS.
+            if ((beatDetected || onsetDetected) && !painting && now - lastColorBeatMs > COLOR_BEAT_GAP_MS) {
+                lastColorBeatMs = now;
+                colorBeatCount++;
+                if (colorBeatCount >= colorEveryBeats && now - lastColorStepTime > COLOR_MIN_MS) {
+                    colorBeatCount = 0;
                     lastColorStepTime = now;
                     try {
                         if (typeof window.stepPaletteOnce === 'function') {
@@ -1242,6 +1304,17 @@
                 }
             }
         },
+        setColorEveryBeats: function (n) {
+            n = Math.max(1, Math.min(64, Math.round(n) || 1));
+            colorEveryBeats = n;
+            colorBeatCount = 0;
+            try { if (window.settingsManager) window.settingsManager.set('audio.colorEveryBeats', n); } catch (_) {}
+        },
+        setKaleidoSpinMax: function (deg) {
+            deg = Math.max(0, Math.min(360, +deg || 0));
+            kaleidoSpinMax = deg;
+            try { if (window.settingsManager) window.settingsManager.set('audio.kaleidoSpinMax', deg); } catch (_) {}
+        },
         setAutoSplatMode: function (mode) { autoSplatMode = mode; },
         getAutoSplatMode: function () { return autoSplatMode; },
         // Snapshot / restore the whole reactive config — the payload a composer
@@ -1252,6 +1325,8 @@
                 sensitivity: sensitivity,
                 beatThreshold: beatThreshold,
                 autoSplatMode: autoSplatMode,
+                colorEveryBeats: colorEveryBeats,
+                kaleidoSpinMax: kaleidoSpinMax,
                 mappings: {
                     bassAutoSplat: mapBassAutoSplat,
                     overallToSize: mapOverallToSize,
@@ -1269,6 +1344,8 @@
                 trebleBeatThreshold = beatThreshold * 0.69;
             }
             if (typeof cfg.autoSplatMode === 'string') autoSplatMode = cfg.autoSplatMode;
+            if (typeof cfg.colorEveryBeats === 'number' && cfg.colorEveryBeats >= 1) colorEveryBeats = Math.round(cfg.colorEveryBeats);
+            if (typeof cfg.kaleidoSpinMax === 'number' && cfg.kaleidoSpinMax >= 0) kaleidoSpinMax = Math.min(360, cfg.kaleidoSpinMax);
             if (cfg.mappings) {
                 var mp = cfg.mappings;
                 if (typeof mp.bassAutoSplat === 'boolean') mapBassAutoSplat = mp.bassAutoSplat;

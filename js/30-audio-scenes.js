@@ -121,6 +121,21 @@
         if (band === 'any') return Math.max(frame.bass, frame.mid, frame.treble, frame.flux);
         return Math.max(frame.bass, frame.flux); // 'bass'
     }
+    // ── Gain is a dB offset (user test 3, 2026-10-04) ───────────────
+    // "top of the gain is wildly maxed out pretty much from 50% to 100%".
+    // The analyser's levels are LINEAR IN dB (-90..-10 dB → 0..1, 22's
+    // analysers), so multiplying them by a gain of 2 clipped everything above
+    // -50 dB — nearly all music — at the slider's midpoint. An offset slides
+    // the range instead: +6 dB lifts every level by 6/80 and clips only what
+    // was within 6 dB of the top. opts.gainDb, -24..+24, 0 = as heard. An
+    // opts without gainDb (the timing chart's gate store) reads as 0 dB.
+    var DB_SPAN = 80;
+    function withGain(v, opts) {
+        var g = (opts && typeof opts.gainDb === 'number') ? opts.gainDb : 0;
+        if (!(v > 0.005)) return 0;
+        return Math.max(0, Math.min(1, v + g / DB_SPAN));
+    }
+
     // ── Noise gate (the "make it feel intentional" layer) ───────────
     // With a gate set, the scene fires on the USER'S drawn line, not the
     // engine's hidden thresholds: post-gain band energy crossing the gate
@@ -128,10 +143,10 @@
     // 80% of the gate and a cooldown so sustained loudness can't
     // machine-gun). Gate at 0 = original engine-beat behavior.
     var lastFireMs = 0; // for the meter's trigger flash
-    function gateTrigger(state, frame, band, gain, gate, cooldownMs) {
+    function gateTrigger(state, frame, band, opts, gate, cooldownMs) {
         var fired = false;
         if (gate > 0.01) {
-            var v = bandEnergy(frame, band) * (gain || 1);
+            var v = withGain(bandEnergy(frame, band), opts);
             var armed = !state.above && (frame.now - (state.lastFire || 0)) > (cooldownMs || 170);
             if (v >= gate && armed) { fired = true; state.lastFire = frame.now; }
             if (v >= gate) state.above = true;
@@ -171,14 +186,14 @@
     }
     // Returns fire energy (0 = none): max over fired gates of the threshold
     // excess, rescaled 0..1 — a hit just over the line is soft, a slam is 1.
-    function gatesTrigger(states, frame, gates, gain, sceneName) {
+    function gatesTrigger(states, frame, gates, opts, sceneName) {
         var hr = (window.audioReactive && window.audioReactive.getHiRes) ? window.audioReactive.getHiRes() : null;
         if (!hr) return 0;
         var fired = 0;
         for (var i = 0; i < gates.length; i++) {
             var g = gates[i];
             var st = states[i] || (states[i] = { above: false, lastFire: 0 });
-            var v = Math.min(1, gateBandMax(hr, g) * (gain || 1));
+            var v = withGain(gateBandMax(hr, g), opts);
             var armed = !st.above && (frame.now - st.lastFire) > 170;
             if (v >= g.th && armed) {
                 st.lastFire = frame.now;
@@ -293,13 +308,20 @@
     }
 
     // ─── Scene: TUNNEL ──────────────────────────────────────────────
+    var RING_MS = 660;        // a ring's travel at Speed 1
+    var RING_MIN_MS = 260;    // the closest two rings can launch at Speed 1
     scenes.tunnel = {
         label: 'Tunnel',
         // 'overflow' left this scene 2026-08-24 — it is an Effects checkbox
         // now (config.EDGE_ABSORB). Dropping the key from defaults is what
         // retires it: loadOpts only copies saved keys that still exist here,
         // so a stale saved overflow:true is inert rather than resurrected.
-        defaults: { dir: 'out', trigger: 'bass', gates: [], gain: 1, volume: 1, spin: false },
+        // 2026-10-04 (user test 3: "tunnel is too fast and has no controls to
+        // slow it", "volume is too intense and fast"): gain → gainDb (dB, see
+        // withGain; a saved multiplier 'gain' is dropped by loadOpts), Volume
+        // is intensity only, Speed sets how fast a ring travels, and rings
+        // can't follow each other faster than RING_MIN_MS / Speed.
+        defaults: { dir: 'out', trigger: 'bass', gates: [], gainDb: 0, volume: 1, speed: 0.6, spin: false },
         controls: [
             { type: 'cycle', key: 'dir', label: 'Direction',
               values: ['out', 'in', 'alt'],
@@ -308,8 +330,15 @@
             { type: 'cycle', key: 'trigger', label: 'No-gate mode',
               values: ['bass', 'mid', 'treble', 'onset', 'any'],
               names: { bass: 'Bass', mid: 'Mids', treble: 'Treble', onset: 'Onset', any: 'Any hit' } },
-            { type: 'slider', key: 'gain', label: 'Gain', min: 0.1, max: 4, step: 0.05 },
-            { type: 'slider', key: 'volume', label: 'Volume', min: 0, max: 2, step: 0.01 },
+            { type: 'slider', key: 'gainDb', label: 'Gain', min: -24, max: 24, step: 1,
+              fmt: function (v) { return (v > 0 ? '+' : '') + Math.round(v) + ' dB'; },
+              title: 'How loud the music reads, in dB. 0 is as heard; raise it for a quiet track, lower it for a loud one.' },
+            { type: 'slider', key: 'volume', label: 'Volume', min: 0, max: 2, step: 0.01,
+              fmt: function (v) { return Math.round(v * 100) + '%'; },
+              title: 'How strong each ring is: its thickness, its push and its colour. It no longer changes how fast rings travel.' },
+            { type: 'slider', key: 'speed', label: 'Speed', min: 0.25, max: 2, step: 0.05,
+              fmt: function (v) { return v.toFixed(2) + '×'; },
+              title: 'How fast each ring travels, and how soon the next one can follow.' },
             { type: 'toggle', key: 'spin', label: 'Spin' }
         ],
         enter: function (o, F) {
@@ -329,14 +358,19 @@
             // Drawn gates rule when present; otherwise fall back to engine
             // beats on the selected band
             var fired = 0;
+            var speed = (typeof o.speed === 'number' && o.speed > 0) ? o.speed : 1;
             if (o.gates && o.gates.length) {
                 if (!this._gss) this._gss = [];
-                fired = F.gatesTrigger(this._gss, frame, o.gates, o.gain, 'tunnel');
+                fired = F.gatesTrigger(this._gss, frame, o.gates, o, 'tunnel');
                 if (!fired) return;
             } else {
                 if (!this._gs) this._gs = { above: false, lastFire: 0 };
-                if (!F.gateTrigger(this._gs, frame, o.trigger, o.gain, 0, 170)) return;
+                if (!F.gateTrigger(this._gs, frame, o.trigger, o, 0, 170)) return;
             }
+            // At most one ring every RING_MIN_MS / Speed: the old no-gate path
+            // could launch ~11 a second.
+            if (frame.now - (this._lastRing || 0) < RING_MIN_MS / speed) return;
+            this._lastRing = frame.now;
             var c = F.canvas(); if (!c) return;
             var W = c.width, H = c.height, minDim = Math.min(W, H);
             var dir = o.dir;
@@ -359,7 +393,7 @@
             // keeps barely-crossing hits visible)
             var energy = Math.min(1, (fired > 0
                 ? 0.35 + 0.65 * fired
-                : F.bandEnergy(frame, o.trigger) * (o.gain || 1)) * vol);
+                : withGain(F.bandEnergy(frame, o.trigger), o)) * vol);
             var dyeK = Math.min(1.2, 0.45 * vol);    // per-frame band deposit strength
             var col = F.pickerColor();               // frozen per ring: each hoop reads as one color
             var basePh = Math.random() * Math.PI * 2;
@@ -370,7 +404,9 @@
 
             var spin = !!o.spin;
             F.spawnEmitter({
-                duration: 660 - energy * 180,
+                // Speed alone sets the travel time (loudness used to shorten it
+                // too, to 0.48 s); energy sets thickness, push and colour.
+                duration: RING_MS / speed,
                 update: function (t) {
                     // Ring scale s: fraction of maxR. 'out' recedes 1→0
                     // accelerating away; 'in' erupts 0→1 rushing past.
@@ -384,7 +420,7 @@
                         // ~40 frames of band overlap per beat would flood at
                         // full strength.
                         var th = (0.00025 + 0.0006 * energy) * (0.3 + 0.7 * s);
-                        var rs = (140 + 380 * energy) * (dir === 'out' ? -1 : 1);
+                        var rs = (140 + 380 * energy) * Math.sqrt(speed) * (dir === 'out' ? -1 : 1);
                         window.applyRingSplat(vpx, vpy, r, th, rs, 20, squash,
                             [col[0] * dyeK, col[1] * dyeK, col[2] * dyeK]);
                         return;
@@ -394,7 +430,7 @@
                     var rad = (0.003 + 0.008 * energy) * (0.3 + 0.7 * s);
                     // Fluid velocity streams along the ring's travel direction —
                     // restrained, so the hoop stays crisp instead of flooding
-                    var vmag = (110 + 320 * energy) * (dir === 'out' ? -1 : 1);
+                    var vmag = (110 + 320 * energy) * Math.sqrt(speed) * (dir === 'out' ? -1 : 1);
                     ph += 2.39996;                    // golden-angle rotation fills the hoop over its life
                     var n = 6;
                     for (var i = 0; i < n; i++) {
@@ -463,7 +499,7 @@
             ctx.fillRect(0, 0, w, h);
             var enabled = window.audioReactive && window.audioReactive.isEnabled();
             var bands = enabled ? window.audioReactive.getBands() : null;
-            var v = Math.min(1, meterLevel(bands, opts.trigger || 'any') * (opts.gain || 1));
+            var v = withGain(meterLevel(bands, opts.trigger || 'any'), opts);
             // Level bar: green → amber → red
             var grad = ctx.createLinearGradient(0, 0, w, 0);
             grad.addColorStop(0, '#3ddc78'); grad.addColorStop(0.6, '#ffd24d'); grad.addColorStop(1, '#ff5a5a');
@@ -749,7 +785,6 @@
             ctx.fillText('20k', w - 2 * dpr, 2 * dpr);
 
             var hr = (window.audioReactive && window.audioReactive.getHiRes) ? window.audioReactive.getHiRes() : null;
-            var gain = opts.gain || 1;
             var cols = Math.max(2, Math.floor(w / dpr));
             if (hr) {
                 buildLUT(cols, hr.sampleRate, hr.fftSize);
@@ -765,7 +800,7 @@
                     var b0 = colBins[c], b1 = Math.max(b0 + 1, colBins[c + 1]);
                     var mx = 0;
                     for (var b = b0; b < b1 && b < hr.data.length; b++) if (hr.data[b] > mx) mx = hr.data[b];
-                    var v = Math.min(1, (mx / 255) * gain);
+                    var v = withGain(mx / 255, opts);
                     ctx.lineTo((c / cols) * w, h - v * h);
                 }
                 ctx.lineTo(w, h);
@@ -784,7 +819,7 @@
                 var g = gates[i];
                 var gx = g.lo * w, gw = (g.hi - g.lo) * w, gy = (1 - g.th) * h;
                 var hot = false;
-                if (hr) hot = Math.min(1, gateBandMax(hr, g) * gain) >= g.th;
+                if (hr) hot = withGain(gateBandMax(hr, g), opts) >= g.th;
                 var fl = gateFlash[sceneName + ':' + i] || 0;
                 var flashing = now - fl < 150;
                 var grabbed = editing && editing.idx === i;
@@ -864,8 +899,18 @@
                 input.type = 'range';
                 input.min = spec.min; input.max = spec.max; input.step = spec.step;
                 input.value = opts[spec.key];
+                if (spec.title) { input.title = spec.title; lbl.title = spec.title; }
+                var readout = null;
+                if (spec.fmt) {
+                    readout = document.createElement('span');
+                    readout.className = 'value-display';
+                    readout.textContent = spec.fmt(+opts[spec.key]);
+                    lbl.appendChild(document.createTextNode(' '));
+                    lbl.appendChild(readout);
+                }
                 input.addEventListener('input', function () {
                     opts[spec.key] = parseFloat(input.value);
+                    if (readout) readout.textContent = spec.fmt(opts[spec.key]);
                     changed(spec.key);
                 });
                 row.appendChild(input);

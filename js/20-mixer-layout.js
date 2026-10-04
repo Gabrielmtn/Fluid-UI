@@ -7101,8 +7101,61 @@
             // engine disagrees with would lie until the user toggled it.
             { id: 'arMapSize', label: 'Energy \u2192 Brush Size', key: 'overallToSize', def: false },
             { id: 'arMapKaleido', label: 'Mid \u2192 Kaleido Rotation', key: 'midToKaleido', def: true },
-            { id: 'arMapColor', label: 'Treble \u2192 Color Cycle', key: 'trebleToColor', def: false }
+            // Counts beats now, not treble level (22 "Calmer reactions"); the
+            // key stays, saved configs and composer segments carry it.
+            { id: 'arMapColor', label: 'Beats \u2192 Color Cycle', key: 'trebleToColor', def: false }
         ];
+        // The two controls the calmer reactions brought (user test 3: "users
+        // need controls for these insane impacts"), each under its mapping.
+        var spinGroup = null, spinSlider = null, everySel = null;
+        function buildSpinRow() {
+            spinGroup = document.createElement('div');
+            spinGroup.className = 'control-group ar-sub-control';
+            var lbl = document.createElement('label');
+            lbl.setAttribute('for', 'audioKaleidoSpin');
+            lbl.innerHTML = 'Spin speed <span class="value-display" id="audioKaleidoSpinValue">45°/s</span>';
+            lbl.title = 'How fast the mids can turn the kaleidoscope, in degrees a second at full mids. It speeds up and settles smoothly.';
+            spinSlider = document.createElement('input');
+            spinSlider.type = 'range';
+            spinSlider.id = 'audioKaleidoSpin';
+            spinSlider.min = '0'; spinSlider.max = '180'; spinSlider.step = '5';
+            spinSlider.value = String((window.audioReactive && window.audioReactive.getConfig().kaleidoSpinMax) || 45);
+            spinSlider.setAttribute('data-no-scale', '1');
+            spinSlider.title = lbl.title;
+            spinSlider.addEventListener('input', function () {
+                var v = parseFloat(spinSlider.value);
+                var out = document.getElementById('audioKaleidoSpinValue');
+                if (out) out.textContent = Math.round(v) + '°/s';
+                if (window.audioReactive && window.audioReactive.setKaleidoSpinMax) window.audioReactive.setKaleidoSpinMax(v);
+            });
+            spinGroup.appendChild(lbl);
+            spinGroup.appendChild(spinSlider);
+            return spinGroup;
+        }
+        function buildEveryRow() {
+            var g = document.createElement('div');
+            g.className = 'control-group ar-sub-control';
+            var lbl = document.createElement('label');
+            lbl.setAttribute('for', 'audioColorEvery');
+            lbl.textContent = 'Change colour every';
+            lbl.title = 'Step the palette once every this many beats, never more than four times a second.';
+            everySel = document.createElement('select');
+            everySel.id = 'audioColorEvery';
+            everySel.title = lbl.title;
+            [1, 2, 4, 8, 16].forEach(function (n) {
+                var o = document.createElement('option');
+                o.value = String(n);
+                o.textContent = n === 1 ? 'beat' : n + ' beats';
+                everySel.appendChild(o);
+            });
+            everySel.value = String((window.audioReactive && window.audioReactive.getConfig().colorEveryBeats) || 4);
+            everySel.addEventListener('change', function () {
+                if (window.audioReactive && window.audioReactive.setColorEveryBeats) window.audioReactive.setColorEveryBeats(parseInt(everySel.value, 10));
+            });
+            g.appendChild(lbl);
+            g.appendChild(everySel);
+            return g;
+        }
 
         mappings.forEach(function (m) {
             var g = document.createElement('div');
@@ -7119,6 +7172,8 @@
             g.appendChild(cb);
             g.appendChild(lbl);
             body.appendChild(g);
+            if (m.id === 'arMapKaleido') body.appendChild(buildSpinRow());
+            if (m.id === 'arMapColor') body.appendChild(buildEveryRow());
 
             cb.addEventListener('change', function () {
                 if (window.audioReactive) window.audioReactive.setMapping(m.key, cb.checked);
@@ -7206,6 +7261,12 @@
             if (typeof c.autoSplatMode === 'string') {
                 Object.keys(patBtns).forEach(function (k) { patBtns[k].classList.toggle('active', k === c.autoSplatMode); });
             }
+            if (typeof c.kaleidoSpinMax === 'number' && spinSlider) {
+                spinSlider.value = c.kaleidoSpinMax;
+                spinSlider.style.setProperty('--val', String(c.kaleidoSpinMax));
+                var ksv = document.getElementById('audioKaleidoSpinValue'); if (ksv) ksv.textContent = Math.round(c.kaleidoSpinMax) + '°/s';
+            }
+            if (typeof c.colorEveryBeats === 'number' && everySel) everySel.value = String(c.colorEveryBeats);
         }
         if (window.audioReactive && window.audioReactive.onConfigChange) {
             window.audioReactive.onConfigChange(syncAudioUIFromEngine);
