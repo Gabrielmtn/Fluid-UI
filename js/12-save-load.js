@@ -527,7 +527,7 @@
                 // no confirmation (root cause of the 2026-07 preset loss). Now it
                 // confirms and PRESERVES presets (clearExceptPresets); the on-disk
                 // Preset Vault is untouched either way.
-                if (!window.confirm('Reset saved settings to defaults?\n\nYour presets are kept. This only clears window/layout, colors, and other UI settings.')) {
+                if (!window.confirm('Reset saved settings to defaults?\n\nWhat you made is kept: presets, animations, the brush library, text, palettes and hotkeys. This clears the window and layout, colour choices and other settings.')) {
                     return;
                 }
                 try {

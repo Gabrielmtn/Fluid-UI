@@ -270,11 +270,18 @@ class SettingsManager {
      */
     clearExceptPresets() {
         const prefix = `${this.namespace}:`;
-        const presetPrefix = `${this.namespace}:preset.`;
+        // Everything the user MADE stays, not just look presets: saved
+        // animations and their slots, the brush library, text lines,
+        // palettes, and hotkeys (controls, stroke locks, the radial menu).
+        // It used to keep only preset.*, so this "settings" reset deleted
+        // every saved animation while saying the presets were kept.
+        const KEEP = ['preset.', 'recPreset.', 'animSlots', 'brush.presets', 'brush.shapes',
+            'text.overlays', 'branding.overlays', 'palettes.custom', 'palettes.user', 'hotkeys.'];
+        const keep = (rest) => KEEP.some((k) => k.endsWith('.') ? rest.startsWith(k) : rest === k);
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key && key.startsWith(prefix) && !key.startsWith(presetPrefix)) {
+            if (key && key.startsWith(prefix) && !keep(key.slice(prefix.length))) {
                 keysToRemove.push(key);
             }
         }
