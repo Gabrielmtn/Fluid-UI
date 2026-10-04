@@ -38,6 +38,8 @@ Sizes: **S** under an hour, **M** an afternoon, **L** a day or more.
 8. **Recording: Stop asks Keep · Discard** (default) rather than keeping every take: auto-keep would fill the ~20-animation localStorage budget.
 9. **Recording: look presets stop restoring your current recording** (projects still do), so switching looks can never replace your animation. Default: yes.
 10. **Recording: Animations stays out of Simple** (default), but F9, F8 and the REC badge work there.
+11. **Left sidebar in Simple:** the head (Brush Size) and Brush only (default). Simple hides both faders today.
+12. **Brush Size and Multi-Brush leave the top bar entirely** (default). The wheel, [ ], 1-8 and the radial menu still reach them, and the rail shows the size.
 
 ---
 
@@ -78,7 +80,25 @@ Sizes: **S** under an hour, **M** an afternoon, **L** a day or more.
 
 ## 3. Left sidebar
 
-(plan pending)
+**What moves:** the Brush Size channel (`#brushSize`, `#mixer-brushValue`, the tip swatch; 20:794-811), the brush drawer (`buildBrushPanel` 20:4772-5587, a body-mounted 252px slide-in closed by any outside click at 5576), the Multi-Brush window (`buildArmColorsDropdown` 20:7922-8507, body-mounted 220px, closed by an outside pointerdown at 8469-8479), and Stroke and replay (`buildBrushSection` 20:4397-4764, now in the right sidebar at 2194). "Settings" in the note = the drawer (its gear says "Brush settings & presets"); the right sidebar's Settings stays.
+
+**Reuse:** `makeSection` (20:8628) and the collapse CSS (21-sidebar.css:52-65, 104-125) name no sidebar. These hard-code `#sidebar-right` and must take both: 20:8537, 8559, 8621; 12:468, 806, 1364; 43:125, 184, 257; the findSection copies at 44:649, 49:104, 13:80, 51:262. Add `SECTION_SEL` for both bars and `window.Sidebars = {sections, find, open, left:{collapse, expand, toggle, isCollapsed}}`; `open` expands the rail first. One `sidebar.sections` map keyed by title (titles are unique). `onOpen` on `makeSection` takes the drawer's and Multi's open-time work. Sideways state = `ui.leftSidebar.collapsed`. Don't copy `initSidebarResize` (20:208): it writes a variable no CSS reads.
+
+**Target:** `#sidebar-left` in `#main-area` before `#canvas-area` (20:60-74), 248px × `--ui-scale`, open by default.
+1. Head (sticky): the Brush Size channel moved whole (keeps COS 07:329, radial readouts, 49's `valueTextOf`), plus «.
+2. **Brush** (open): the drawer's content in its current order.
+3. **Multi-Brush** (collapsed): the `#multiplier` channel with its ↔ badge, symmetry, the notes, arm rows, legend.
+4. **Stroke and replay** (collapsed): title verbatim (tours, saved state and hotkey scopes key on it).
+
+Collapsed sideways: a 32px rail with », the live size, and each section's title as vertical text; a click opens that section. Auto-collapse below ~1280 CSS px until the user picks.
+
+**Traps:**
+- **Canvas width:** a change runs ResizeObserver (01:970, 80 ms) → `fitCanvasIntoArea` → 180 ms settle (05j:312-345) → one buffer realloc + `initFramebuffers` (copies dye, velocity, pressure, layers, masks). Same cost as a window resize. Snap, never animate (05j:318-331). The underbar (`left:0`, z 1200) must trim its left edge in `place()` (20:2285).
+- **Hotkeys silently retarget:** id-less binds search the whole body by position; the drawer's tip buttons share text and title with the three alt-brush tip rows (20:5293 vs 4184), so moving the drawer earlier in the page makes a key change the wrong brush. Migration in 49's `load()` over `hotkeys.controls` and `hotkeys.radialMenu`: binds whose `where` was Brush / Multi-brush get a section scope and a recount; ambiguous ones stay unresolved; map `multiplierPanel` → `multiplier`. Keep every moved control's title and text verbatim.
+- 43: `collect` lists left sections, `restampGroups` per sidebar, hide the bar when all its sections are hidden, bump `SIMPLE_VERSION`. 13 (mobile): move `#sidebar-left` like the strip, `zoom:1` when nested. ui-scale: drop `.arm-colors-panel` from moved containers (its own zoom doubles), widen ~30 rules in 21-sidebar.css to `:is(#sidebar-right,#sidebar-left)`. 58's `sliderHome` (953) labels anything in a `.mixer-channel` "Top bar". Remove both panels' click stopPropagation (5583, 8483) or they swallow other popups' outside-click closers.
+- 44: `BRUSH_DRAWER`/`inDrawer` (110-111) → `{section:'Brush'}`, strip targets (118-164), POPUPS (679-680) and the 320 ms slide wait (756) go; ~12 strings say "drawer" / "its gear".
+
+**Slices:** 1 Shell (M: the left column with Brush Size, the canvas refits). 2 Generalise sections, move Stroke and replay (M). 3 Brush section, drawer gone, 49 migration (M+). 4 Multi-Brush section, floating window gone (M). 5 Sideways collapse (M). 6 Simple, mobile, cleanup (M). Checks after each: boot, ut3 verifier, the ten affected tours, a profile with saved hotkeys, `--ui-scale` 1.35.
 
 ## 4. Recording's information architecture
 
@@ -150,7 +170,15 @@ Sizes: **S** under an hour, **M** an afternoon, **L** a day or more.
 
 Save as New becomes the **[+ New]** tag (copies the active colours into "<name> 2", name field inside the tag); Save Color becomes the **[+]** chip; Update and Clear All go. Drag uses the layer rows' pattern (05k:10-40, with 32-file-drop:21-36's guard). Migration: old index keys move to `name:` once; new `palettes.order` and `palette.currentName` (keep writing `currentIndex` for older builds). Keep the tag's tooltip and the `palette-chip` class (js/49 bindings).
 
-**Slices:** 1 One palette (M: hide tray, [+] chip, Shift+S/⇧X on the palette, "Unsaved colours", palette in undo). 2 New / Rename / Reset (M). 3 Hotkeys in sight (S: `kbd` labels, tooltips, "Cycle" text, help modal). 4 Drag colours (M). 5 Drag palettes + order migration (M). The five-app study (Procreate, Krita, Photoshop, Clip Studio, Aseprite) is still running; check it for auto-save and "new = empty or copy" before slice 2.
+**Slices:** 1 One palette (M: hide tray, [+] chip, Shift+S/⇧X on the palette, "Unsaved colours", palette in undo). 2 New / Rename / Reset (M). 3 Hotkeys in sight (S: `kbd` labels, tooltips, "Cycle" text, help modal). 4 Drag colours (M). 5 Drag palettes + order migration (M).
+
+**What the five apps do (official docs, 2026-10-04):**
+- **Saving:** Photoshop saves new swatches to its preferences automatically; Procreate documents no save step; Krita versions on Save, on switching palette, or on a normal quit. Auto-save matches the norm.
+- **New:** Procreate's + sits at the top of the palette list and makes "Untitled"; Duplicate lives in each palette's ⋯ menu. Clip Studio's new set is empty, Duplicate is separate. Nobody has a free-floating "Save as New". So: [+ New] makes an empty palette named "Untitled", and Duplicate (in the menu) copies.
+- **Adding a colour:** tap an empty slot (Procreate, Krita, Photoshop's empty row). Aseprite shows its add icon only when the current colour isn't in the palette yet, so the button doubles as a status: do the same with [+].
+- **Reorder:** drag is the norm (Procreate, Krita, Photoshop); Procreate holds before dragging a palette, Clip Studio needs a modifier, both to stop accidental moves.
+- **Hotkeys:** few apps have any; Aseprite's [ and ] step colours but are brush size in Photoshop (and here). Showing the key in the tooltip matters more than which key.
+- Sources: help.procreate.com colors-palettes; docs.krita.org palette_docker; helpx.adobe.com customizing-color-pickers-swatches; help.clip-studio.com Color_Set_palette; aseprite.org color-bar-tutorial.
 
 ## 6. Multiplayer panel and hardening
 
