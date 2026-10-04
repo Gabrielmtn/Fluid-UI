@@ -96,12 +96,26 @@
         // PERF: Non-blocking async timer to auto-stop recording at max duration
         let _recAutoStopTimerId = null;
         
+        // The clock a take is stamped on: the one its playhead rides
+        // (recUpdatePlayback, config.REC_SIM_CLOCK). Stamped on the wall clock
+        // and played on the sim clock, a take ran slow: about 4% at 60 Hz,
+        // where the sim's 16 ms step clamp drops 0.67 ms a frame, and far more
+        // when frames drop (user test 3, "is replay speed accurate?"). An
+        // overdub slid off the loop it was laid over by the same amount.
+        // Picked once per take, so a take never mixes the two.
+        function recClockNow(a) {
+            return (a && a.timeline.recClock === 'sim' && typeof window.__simTimeMs === 'number')
+                ? window.__simTimeMs : Date.now();
+        }
+
         function recStartRecording() {
             let a = recGetActiveLayer();
             if (!a) { recAddLayer(); a = recGetActiveLayer(); }
             if (!a) return;
             a.timeline.isRecording = true;
-            a.timeline.recordingStartTime = Date.now() - a.timeline.playbackPosition;
+            a.timeline.recClock = ((window.config && window.config.REC_SIM_CLOCK === false)
+                || typeof window.__simTimeMs !== 'number') ? 'wall' : 'sim';
+            a.timeline.recordingStartTime = recClockNow(a) - a.timeline.playbackPosition;
             a.timeline.duration = recMaxDurationMs;
             // Capture the brush's color mode at record start so 'Preserve Mode'
             // can reproduce it on replay (random keeps being random, etc.)
@@ -117,7 +131,10 @@
             recClearAutoStopTimer();
             const layerMaxMs = (typeof a.loopMaxMs === 'number' && a.loopMaxMs > 0) ? a.loopMaxMs : recMaxDurationMs;
             const remaining = layerMaxMs - a.timeline.playbackPosition;
-            if (remaining > 0) {
+            // A sim-clock take is stopped by recUpdatePlayback when its own
+            // clock reaches the end: below Time 1 the wall clock gets there
+            // first and would cut the take short.
+            if (remaining > 0 && a.timeline.recClock !== 'sim') {
                 _recAutoStopTimerId = setTimeout(function() {
                     _recAutoStopTimerId = null;
                     const current = recGetActiveLayer();
@@ -279,7 +296,7 @@
             if (!recEnabled) return;
             const a = recGetActiveLayer();
             if (!a || !a.timeline.isRecording) return;
-            const timestamp = Date.now() - a.timeline.recordingStartTime;
+            const timestamp = recClockNow(a) - a.timeline.recordingStartTime;
             const layerMaxMs = (typeof a.loopMaxMs === 'number' && a.loopMaxMs > 0) ? a.loopMaxMs : recMaxDurationMs;
             if (timestamp > layerMaxMs) {
                 a.timeline.isRecording = false;
@@ -619,9 +636,16 @@
                 : window.__simDtMs;
             let anyPlaying = false;
             let anyRecording = false;
+            let takeFull = false;
             
             recLayers.forEach(layer => {
-                if (layer.timeline.isRecording) anyRecording = true;
+                if (layer.timeline.isRecording) {
+                    anyRecording = true;
+                    if (layer.timeline.recClock === 'sim') {
+                        const maxMs = (typeof layer.loopMaxMs === 'number' && layer.loopMaxMs > 0) ? layer.loopMaxMs : recMaxDurationMs;
+                        if (recClockNow(layer) - layer.timeline.recordingStartTime >= maxMs) takeFull = true;
+                    }
+                }
                 if (!layer.timeline.isPlaying || !layer.visible) return;
                 anyPlaying = true;
                 const scaledDelta = delta * recPlaybackSpeed;
@@ -644,6 +668,10 @@
                 }
             });
             recLastPlaybackTime = now;
+            if (takeFull) {
+                const cur = recGetActiveLayer();
+                if (cur && cur.timeline.isRecording) recStopRecording();
+            }
             
             // PERF: Only update heads UI if something is actually playing or recording
             // and throttle during recording to reduce DOM overhead
@@ -1196,7 +1224,7 @@
             if (_recRecordheadEl) {
                 if (a && a.timeline.isRecording && w > 0) {
                     _recRecordheadEl.style.display = 'block';
-                    const elapsed = Date.now() - a.timeline.recordingStartTime;
+                    const elapsed = recClockNow(a) - a.timeline.recordingStartTime;
                     const ratio = Math.min(1, elapsed / recMaxDurationMs);
                     _recRecordheadEl.style.left = (ratio * w) + 'px';
                 } else {
