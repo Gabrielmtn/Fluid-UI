@@ -7548,8 +7548,13 @@
         videoBtn.textContent = 'Video';
         videoBtn.title = 'Save a clip of the canvas as it moves. MP4 where the browser can, WebM otherwise; the background goes under the paint.';
         videoBtn.style.cssText = 'cursor:pointer;';
+        // While its export captures, the button reads "■ Stop and save"
+        // (24 sets the words) and a click keeps what was captured so far;
+        // Cancel export below throws it away.
         videoBtn.addEventListener('click', function() {
-            if (window.fluidExport) window.fluidExport.video();
+            if (!window.fluidExport) return;
+            if (window.fluidExport.isExporting()) { window.fluidExport.finishEarly(); return; }
+            window.fluidExport.video();
         });
         quickGrid.appendChild(videoBtn);
 
@@ -7559,7 +7564,9 @@
         gifBtn.title = 'Save a short looping GIF (640 px wide, background included).';
         gifBtn.style.cssText = 'cursor:pointer;';
         gifBtn.addEventListener('click', function() {
-            if (window.fluidExport) window.fluidExport.gif();
+            if (!window.fluidExport) return;
+            if (window.fluidExport.isExporting()) { window.fluidExport.finishEarly(); return; }
+            window.fluidExport.gif();
         });
         quickGrid.appendChild(gifBtn);
 
@@ -7609,10 +7616,12 @@
         groundRow.appendChild(groundSel);
         body.appendChild(groundRow);
 
-        // Stop button (hidden until export starts)
+        // Cancel (hidden until an export starts): stops and throws the
+        // capture away, where the running button's Stop and save keeps it.
         var stopBtn = document.createElement('button');
         stopBtn.id = 'exportStopBtn';
-        stopBtn.textContent = 'Cancel Export';
+        stopBtn.textContent = 'Cancel export';
+        stopBtn.title = 'Stop and throw away what was captured';
         stopBtn.style.cssText = 'display:none;width:100%;cursor:pointer;margin-bottom:12px;';
         stopBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.stop();

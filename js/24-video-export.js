@@ -16,7 +16,10 @@
 
     // ── State ───────────────────────────────────────────────────────
     let _busy = false;
-    let _abort = false;
+    let _abort = false;     // Cancel: stop and throw away what was captured
+    let _finishEarly = false;   // Stop and save: stop and keep it (video, GIF)
+    let _kind = null;       // 'video' | 'gif' | 'still' | 'sequence' while busy
+    let _phase = null;      // 'capture' while frames are taken, then 'save'
     let _recorder = null;   // MediaRecorder ref (video only)
     let _stream = null;     // MediaStream ref   (video only)
 
@@ -177,6 +180,8 @@
         _recorder = null;
         _busy = false;
         _abort = false;
+        _finishEarly = false;
+        _kind = null; _phase = null;
         window.__exporting = false; // D3-4: re-allow the mask film after export
         _imgCache.clear();
         _comp = null; _scratch = null; _geom = null;   // free the capture surfaces
@@ -194,16 +199,26 @@
         _compStats = { frames: 0, totalMs: 0, worstMs: 0, capFrames: 0, capTotalMs: 0, capWorstMs: 0 };
         _uiLastMs = 0;
         updateUI('idle', 0);
+        syncExportUI();
     }
 
-    function guard() {
+    function guard(kind) {
         if (_busy) { toast('Export already in progress', 'warn'); return false; }
-        _busy = true; _abort = false;
+        _busy = true; _abort = false; _finishEarly = false;
+        _kind = kind || null; _phase = 'capture';
         window.__exporting = true; // D3-4: suppress the red mask film in captures
         // The ladder must not read export-side frame loss as sim overload —
         // see the hold() note in 08a. Released in finish().
         if (window.QualityGovernor && window.QualityGovernor.hold) window.QualityGovernor.hold(true);
+        syncExportUI();
         return true;
+    }
+
+    // Capturing is over, saving begins: Stop and save has nothing left to
+    // stop, and the canvas badge goes.
+    function toSaving() {
+        _phase = 'save';
+        syncExportUI();
     }
 
     function saveBlob(blob, filename) {
@@ -636,7 +651,7 @@
         return Math.max(1000, Math.min(max, ms));
     }
     async function exportVideo(options) {
-        if (!guard()) return;
+        if (!guard('video')) return;
         options = options || {};
         var duration = clampMs(options.duration || cfg.videoDuration, DEFAULTS.videoDuration, MAX_VIDEO_MS);
         var fps     = options.fps || cfg.videoFPS;
@@ -767,7 +782,7 @@
             var lastFrame = 0;
             var lastSerial = -1;
 
-            while (!_abort) {
+            while (!_abort && !_finishEarly) {
                 var elapsed = Date.now() - t0;
                 if (elapsed >= duration) break;
 
@@ -809,13 +824,19 @@
                     'Video ' + clock(elapsed) + ' / ' + clock(duration));
             }
 
+            // Stopped by Stop and save: the take ends here, and what came
+            // before it is saved like a whole one.
+            var early = _finishEarly && !_abort;
+            if (!_abort) toSaving();
+
             // What actually reached the encoder — the toast reports this, not
             // the requested rate: captures follow the sim's own draws, so a
             // 60 fps ask on a busy frame lands lower, and the size is the
             // even-clamped recording canvas, not the working canvas.
             var recordedMs = Math.max(1, Date.now() - t0);
             var fpsActual = Math.round(_compStats.capFrames * 1000 / recordedMs);
-            var sizeNote = ext.toUpperCase() + ', ' + recCanvas.width + '×' + recCanvas.height + ', ' + fpsActual + ' fps';
+            var sizeNote = (early ? clock(recordedMs) + ' of ' + clock(duration) + ', ' : '') +
+                ext.toUpperCase() + ', ' + recCanvas.width + '×' + recCanvas.height + ', ' + fpsActual + ' fps';
 
             // Stop the recorder (fires onstop → resolves blobReady)
             if (_recorder && _recorder.state === 'recording') _recorder.stop();
@@ -823,9 +844,11 @@
             var blob = await blobReady;           // null when disk-streaming
             if (streamPath) await writeChain;      // last chunk flushed
 
-            if (_abort) {
+            // Stopped before the first frame: there is no video to keep.
+            var nothing = early && !_compStats.capFrames;
+            if (_abort || nothing) {
                 if (streamPath) { try { fs.unlinkSync(streamPath); } catch (_) {} }
-                toast('Export cancelled', 'info');
+                toast(nothing ? 'Stopped before the first frame, so there was nothing to save' : 'Export cancelled', 'info');
                 return;
             }
 
@@ -842,7 +865,7 @@
                 // is fragmented, which editors refuse (plainMp4Blob).
                 if (ext === 'webm') {
                     updateUI('rendering', 95, 'Video: saving');
-                    blob = await fixWebmForSeeking(blob, duration);
+                    blob = await fixWebmForSeeking(blob, early ? recordedMs : duration);
                 } else if (ext === 'mp4') {
                     updateUI('rendering', 95, 'Video: saving');
                     blob = await plainMp4Blob(blob);
@@ -982,8 +1005,9 @@
 
         toast('Video 0:00 / ' + clock(duration) + ' (MP4)', 'info');
         updateUI('recording', 0, 'Video 0:00 / ' + clock(duration));
+        var early = false;
         try {
-            while (!_abort && !encError) {
+            while (!_abort && !encError && !_finishEarly) {
                 var ts = await rafPromise();
                 if (t0 < 0) t0 = ts;
                 var elapsed = ts - t0;
@@ -1013,22 +1037,34 @@
                 updateUI('recording', Math.min(100, (elapsed / duration) * 100),
                     'Video ' + clock(elapsed) + ' / ' + clock(duration));
             }
-            // The last picture holds to the end of the take.
-            if (!_abort && !encError) while (held && next < total) encodeAt(held, next++);
+            // The last picture holds to the end of the take. Stopped by Stop
+            // and save, the take ends at the last slot that had a picture.
+            early = _finishEarly && !_abort && !encError;
+            if (!_abort && !encError) toSaving();
+            if (!_abort && !encError && !early) while (held && next < total) encodeAt(held, next++);
         } finally {
             if (held) held.close();
         }
 
-        if (_abort || encError) {
+        var nothing = early && !drawn;   // stopped before the first frame
+        if (_abort || encError || nothing) {
             try { enc.close(); } catch (_) {}
             if (fh) { await writeChain; try { await fh.close(); } catch (_) {} try { fs.unlinkSync(filePath); } catch (_) {} }
             if (_abort) { toast('Export cancelled', 'info'); return; }
+            if (nothing) { toast('Stopped before the first frame, so there was nothing to save', 'info'); return; }
             throw encError;
         }
+        var made = early ? next : total;   // slots in the file
         updateUI('rendering', 98, 'Video: saving');
         await enc.flush();
         enc.close();
         if (encError) throw encError;
+        // Cancel export pressed while the encoder caught up still throws it away
+        if (_abort) {
+            if (fh) { await writeChain; try { await fh.close(); } catch (_) {} try { fs.unlinkSync(filePath); } catch (_) {} }
+            toast('Export cancelled', 'info');
+            return;
+        }
         if (!mux.frames) throw new Error('the encoder gave back no frames');
 
         console.log('[Export] encoder: ' + mux.frames + ' frames, ' + drawn + ' drawn, ' + busySkips +
@@ -1037,10 +1073,11 @@
         var patch = mux.mdatPatch();
         // Under 90% fresh pictures, say who set the pace: the canvas drawing
         // slowly, or the encoder (a busy GPU, a software encoder) falling behind.
-        var drawnFps = Math.round(drawn * fps / total);
+        var drawnFps = Math.round(drawn * fps / made);
         var pace = busySkips > drawn * 0.25 ? '. The encoder kept up with ' : '. The canvas drew ';
-        var sizeNote = 'MP4, ' + W + '×' + H + ', ' + fps + ' fps' +
-            (drawn < total * 0.9 ? pace + drawnFps + ' a second, so some frames repeat' : '');
+        var sizeNote = (early ? clock(made * 1000 / fps) + ' of ' + clock(duration) + ', ' : '') +
+            'MP4, ' + W + '×' + H + ', ' + fps + ' fps' +
+            (drawn < made * 0.9 ? pace + drawnFps + ' a second, so some frames repeat' : '');
         if (parts) {
             head.set(patch.bytes, patch.at);
             parts.push(tail);
@@ -1061,7 +1098,7 @@
 
     // ── GIF Export (inline encoder, no external deps) ───────────────
     async function exportGIF(options) {
-        if (!guard()) return;
+        if (!guard('gif')) return;
         options = options || {};
         var OPAQUE = { opaque: true };   // GIF has no alpha: the ground goes under the paint
         var duration   = clampMs(options.duration || cfg.gifDuration, DEFAULTS.gifDuration, MAX_GIF_MS);
@@ -1095,6 +1132,7 @@
             var smallCtx = small.getContext('2d', { willReadFrequently: true });
             for (var i = 0; i < frameCount; i++) {
                 if (_abort) { toast('Export cancelled', 'info'); return; }
+                if (_finishEarly) break;   // Stop and save: the GIF is the frames so far
 
                 // Wait for a fresh render
                 await rafPromise();
@@ -1122,12 +1160,17 @@
             }
 
             if (_abort) { toast('Export cancelled', 'info'); return; }
+            var early = _finishEarly && frames.length < frameCount;
+            if (!frames.length) { toast('Stopped before the first frame, so there was nothing to save', 'info'); return; }
+            toSaving();
 
             // Phase 2: encode GIF  (50 → 100 %)
             toast('GIF: saving', 'info');
             var gifBytes = await encodeGIF(ow, oh, frames, function (p) {
                 updateUI('rendering', 50 + p * 50, 'GIF: saving ' + Math.round(p * 100) + '%');
             });
+            // Cancel export pressed while it encoded still throws it away
+            if (_abort) { toast('Export cancelled', 'info'); return; }
 
             var blob = new Blob([gifBytes], { type: 'image/gif' });
             var name = cfg.filenamePrefix + Date.now() + '.gif';
@@ -1136,7 +1179,7 @@
                 options.onBlob(blob, name);
             } else {
                 await saveBlob(blob, name);
-                toast('GIF saved', 'success');
+                toast(early ? 'GIF saved (' + clock(frames.length * frameDelay) + ' of ' + clock(duration) + ')' : 'GIF saved', 'success');
             }
 
         } catch (err) {
@@ -1537,7 +1580,7 @@
 
     // ── Still Image Export ──────────────────────────────────────────
     async function exportStill(options) {
-        if (!guard()) return;
+        if (!guard('still')) return;
         options = options || {};
 
         try {
@@ -1665,7 +1708,7 @@
 
     // ── PNG Sequence Export (ZIP output) ─────────────────────────
     async function exportSequence(options) {
-        if (!guard()) return;
+        if (!guard('sequence')) return;
         options = options || {};
 
         var duration   = options.duration || cfg.sequenceDuration;
@@ -1729,6 +1772,7 @@
             }
 
             if (_abort) { toast('Export cancelled', 'info'); return; }
+            toSaving();
 
             if (seqDir) {
                 toast('Sequence saved: ' + frameCount + ' frames → ' + seqDir, 'success');
@@ -1758,12 +1802,62 @@
     }
 
     // ── Stop (for video, or any running export) ────────────────────
+    // Cancel: whatever was captured is thrown away.
     function stopExport() {
         _abort = true;
         if (_recorder && _recorder.state === 'recording') {
             _recorder.stop();
         }
         toast('Export cancelled', 'info');
+    }
+
+    // ── Stop and save (2026-10-04) ──────────────────────────────────
+    // A video or GIF stops capturing now and saves what it has: each
+    // capture loop reads the flag and leaves the way it would at the end of
+    // its length (exportVideo's MediaRecorder loop, recordEncoded's WebCodecs
+    // loop, exportGIF's frame loop). False when nothing is capturing.
+    function finishEarly() {
+        if (!_busy || _abort || _phase !== 'capture' || (_kind !== 'video' && _kind !== 'gif')) return false;
+        _finishEarly = true;
+        return true;
+    }
+
+    // ── What an export looks like while it runs ─────────────────────
+    // The running Video or GIF button reads "■ Stop and save" while it
+    // captures (the record plate, pressed: capture is under way), and
+    // "Saving…" after; the other Quick Export buttons wait. The canvas
+    // wears "VIDEO 0:04 / 0:15" (updateUI writes the clock): CSS on
+    // #canvas-area (styles.css, body.export-capturing), never a canvas or a
+    // layer, so captureCompositeFrame above has nothing to draw it from.
+    var QUICK_BTNS = { video: 'exportVideoBtn', gif: 'exportGifBtn', still: 'exportStillBtn', sequence: 'exportSequenceBtn' };
+    var _quickWords = {};   // each button's own words and tooltip, from before it changed
+    function syncExportUI() {
+        var capturing = _busy && _phase === 'capture';
+        Object.keys(QUICK_BTNS).forEach(function (k) {
+            var b = document.getElementById(QUICK_BTNS[k]);
+            if (!b) return;
+            if (!_quickWords[k]) _quickWords[k] = { text: b.textContent, title: b.title };
+            var mine = _busy && _kind === k;
+            var stop = mine && capturing && (k === 'video' || k === 'gif');
+            var text = stop ? '■ Stop and save' : (mine && _phase === 'save' ? 'Saving…' : _quickWords[k].text);
+            var title = stop ? 'Stop now and save what was captured so far. Cancel export throws it away.' : _quickWords[k].title;
+            if (b.textContent !== text) b.textContent = text;
+            if (b.title !== title) b.title = title;
+            b.classList.toggle('btn--record', stop);
+            b.classList.toggle('active', stop);
+            b.disabled = _busy && !stop;
+        });
+        var badge = capturing && _kind !== 'still';
+        document.body.classList.toggle('export-capturing', badge);
+        var area = document.getElementById('canvas-area');
+        if (area && !badge && area.hasAttribute('data-export-clock')) area.removeAttribute('data-export-clock');
+    }
+    // "Video 0:04 / 0:15" → "VIDEO 0:04 / 0:15", written when it changes
+    function setBadgeClock(say) {
+        var area = document.getElementById('canvas-area');
+        if (!area || !say) return;
+        var text = say.replace(/^[A-Za-z]+/, function (w) { return w.toUpperCase(); });
+        if (area.getAttribute('data-export-clock') !== text) area.setAttribute('data-export-clock', text);
     }
 
     // ── Micro-utilities ─────────────────────────────────────────────
@@ -1801,6 +1895,7 @@
                 statusEl.style.display = 'block';
             }
         }
+        if (state !== 'idle' && _phase === 'capture' && _kind !== 'still') setBadgeClock(say);
         if (progressEl && progressBar) {
             if (state === 'idle') { progressEl.style.display = 'none'; }
             else { progressEl.style.display = 'block'; progressBar.style.width = progress + '%'; }
@@ -1856,8 +1951,11 @@
         gif:      exportGIF,
         still:    exportStill,
         sequence: exportSequence,
-        stop:     stopExport,
+        stop:     stopExport,          // Cancel: throw the capture away
+        finishEarly: finishEarly,      // Stop and save: keep what was captured (video, GIF)
         isExporting: function () { return _busy; },
+        // What runs: { kind, phase } ('capture' | 'save'), or null
+        state: function () { return _busy ? { kind: _kind, phase: _phase } : null; },
         getConfig:   function () { return Object.assign({}, cfg); },
         setConfig:   function (key, val) { cfg[key] = val; saveSettings(); },
         pickFolder:  pickOutputFolder,

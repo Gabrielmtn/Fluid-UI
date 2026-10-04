@@ -513,7 +513,7 @@
           target: { section: 'Export', sel: 'button', text: 'Video' },
           steps: [
             { say: 'Export → Quick Export → Video. GIF, Save picture and Sequence sit beside it.', note: 'Settings → Radial Menu → Add from the interface puts Video on the radial menu (E).', target: { section: 'Export', sel: 'button', text: ['Video', 'GIF'] }, until: { click: true } },
-            { say: 'It keeps capturing while you paint; the status line counts the clock, and Cancel Export stops it early. The file downloads when it finishes.', target: { sel: '#exportStopBtn', fallback: { section: 'Export', sel: '#exportStatus' } } }
+            { say: 'It keeps capturing while you paint, and the canvas counts the clock. Stop and save ends it early and keeps what it has; Cancel export throws it away.', note: 'The file downloads when it finishes.', target: { section: 'Export', sel: 'button', text: '■ Stop and save', fallback: { sel: '#exportStopBtn', fallback: { section: 'Export', sel: '#exportStatus' } } } }
           ] },
         { id: 'export-still', pillar: 'export', title: 'Save a picture of the canvas',
           tags: ['screenshot', 'still', 'png', 'jpg', 'image', 'picture', 'save', 'keep', 'background', 'transparent'],

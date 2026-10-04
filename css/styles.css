@@ -1169,6 +1169,32 @@
             z-index: 1004;
         }
 
+        /* A video, GIF or sequence capturing (24's syncExportUI): "VIDEO 0:04
+           / 0:15" where the REC badge sits, the recorder's badge and its Keep
+           card one row lower. CSS on #canvas-area, never a canvas or a layer:
+           the export compositor only draws those, so the badge stays out of
+           the file. */
+        body.export-capturing #canvas-area[data-export-clock]::before {
+            content: attr(data-export-clock);
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            font-variant-numeric: tabular-nums;
+            color: #ff4040;
+            background: #000;
+            padding: 3px 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 1004;
+        }
+        body.export-capturing.rec-recording #canvas-area::after,
+        body.export-capturing.rec-playing #canvas-area::after,
+        body.export-capturing.rec-countdown #canvas-area::after { top: 36px; }
+        body.export-capturing .rec-take-prompt { top: 62px; }
+
         /* Keep · Discard on the canvas, under the badge, when the strip is
            out of sight (03's recShowTakePrompt). No animation: it sits over
            the canvas. */
