@@ -61,6 +61,17 @@
                 e.preventDefault();
                 e.stopPropagation();
                 if (bordersLocked) return;
+                // A stream format (21-focus-mode) owns the shape: every re-fit
+                // puts its ratio back. Locked, the handles stay put like Lock
+                // Canvas Borders. Unlocked, a drag is a new freeform shape, so the
+                // format lets go; it used to stay lit as "9:16" over the dragged
+                // shape until the next window resize snapped it back (user test 3).
+                const fm = window.focusMode;
+                if (fm && typeof fm.getActiveFormat === 'function' && fm.getActiveFormat()) {
+                    const fmtLock = document.getElementById('streamFormatLock');
+                    if (fmtLock && fmtLock.checked) return;
+                    fm.clearFormat();
+                }
                 if (typeof pushUndo === 'function') pushUndo();
                 isResizing = true;
                 activeResizePointerId = e.pointerId;

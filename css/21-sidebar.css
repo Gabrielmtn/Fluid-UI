@@ -2008,3 +2008,12 @@ select option {
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 #sidebar-right .fx-group { margin-bottom: 10px; }
+
+/* Export → "Comes out 464 × 826 · 9:16" under the Quick Export buttons
+   (js/62-canvas-readout.js). The Background row after it pulls up 6px. */
+.export-size-readout {
+    margin: -6px 0 12px;
+    font-size: 11px;
+    color: #8b949e;
+    font-variant-numeric: tabular-nums;
+}

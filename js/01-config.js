@@ -720,9 +720,12 @@
             canvas.style.width = newWidth + 'px';
             canvas.style.height = newHeight + 'px';
 
+            // The ratio too (62-canvas-readout names it: 9:16, 3:2, 1.41:1),
+            // so a handle drag can land on the shape the export needs.
+            const ratio = window.CanvasReadout ? ' · ' + window.CanvasReadout.ratioLabel(newWidth, newHeight) : '';
             sizeDisplay.textContent = r.scale === 1
-                ? `${newWidth} × ${newHeight}`
-                : `${newWidth} × ${newHeight} (${r.w}×${r.h})`;
+                ? `${newWidth} × ${newHeight}${ratio}`
+                : `${newWidth} × ${newHeight} (${r.w}×${r.h})${ratio}`;
 
             // Flag to reinitialize framebuffers after WebGL context is set up
             window.needsFramebufferReinit = true;

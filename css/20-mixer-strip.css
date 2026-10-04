@@ -153,6 +153,32 @@
     font-size: 9px;
     opacity: 0.55;
 }
+/* Canvas size readout (js/62-canvas-readout.js): the canvas in pixels and
+   its ratio, after the pills, captioned like them. Not a control: no pill,
+   no chevron, the default cursor; it takes the pointer only for its title.
+   It is the first thing to go when the bar runs short (before the hotkey
+   chips below): two pills plus the readout measured ~690px, three ~810. */
+#quality-underbar > .qub-size {
+    flex-shrink: 0;
+    align-self: flex-end;
+}
+#quality-underbar .qub-size-val {
+    height: 22px;
+    line-height: 22px;
+    padding: 0 8px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(230, 237, 243, 0.85);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.55);
+    white-space: nowrap;
+    cursor: default;
+}
+@container underbar (max-width: 700px) {
+    #quality-underbar > .qub-size { display: none; }
+}
+@container underbar (max-width: 820px) {
+    #quality-underbar.qub-shading > .qub-size { display: none; }
+}
 /* Shading Detail shows only while Surface Shading is on: 20-mixer-layout
    mirrors the switch onto the bar as .qub-shading. */
 #quality-underbar:not(.qub-shading) .qub-dd-shade {
