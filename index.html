@@ -1486,7 +1486,7 @@
                 <span id="recStatus" style="font-size:12px; opacity:0.7; margin-left:8px;">Ready</span>
             </div>
             <div class="rec-right">
-                <label for="recPlaybackSpeed" style="font-size:12px; opacity:0.8;">Speed</label>
+                <label for="recPlaybackSpeed" style="font-size:12px; opacity:0.8;" title="How fast the parts play here in the editor. Saved animations in the slots play at their own pace.">Preview speed</label>
                 <select id="recPlaybackSpeed">
                     <option value="0.25">0.25x</option>
                     <option value="0.5">0.5x</option>
@@ -1494,38 +1494,35 @@
                     <option value="2">2x</option>
                     <option value="4">4x</option>
                 </select>
-                <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;">Length</label>
+                <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;" title="How long the next part records for. The strip's 4, 8, 15 and 30 s chips set it too.">Record length</label>
                 <input type="text" id="recMaxDuration" class="time-input" value="00:08:000" placeholder="mm:ss:ms" style="width:110px;">
             </div>
         </div>
-        <div class="rec-header" style="gap:6px;">
-            <div class="rec-left" style="gap:6px;">
-                <button class="btn--record" id="recRecordBtn">Record</button>
-                <button id="recPlayBtn" title="Play / pause the part (F8)">Play part</button>
-                <button id="recPlayAllBtn" title="Play / pause every part (Shift+F8)">Play all</button>
-                <button id="recStopBtn">Stop</button>
-                <button id="recAddLayerBtn">New part</button>
-                <button id="recDuplicateLayerBtn">Duplicate</button>
-                <button class="btn--destructive" id="recDeleteLayerBtn">Delete part</button>
-                <button class="btn--destructive" id="recClearBtn">Clear part</button>
-                <button id="recExportBtn" title="Save these parts to a file">Save to file</button>
-                <button id="recImportBtn" title="Open parts from a file">Open file</button>
+        <!-- Play · Edit · File (2026-10-04). What acts on one part sits on its
+             card instead: ▶ plays it alone, ⋯ holds Duplicate, Clear, Delete,
+             Loop length and Colours (03 recRenderUI / recOpenPartMenu). Opening
+             a saved animation is the library's ⤢ in Animations. -->
+        <div class="rec-header rec-toolbar">
+            <div class="rec-group" role="group" aria-label="Play">
+                <button type="button" class="btn--record" id="recRecordBtn" title="Record a new part, after a 3-2-1 countdown (F9)">Record</button>
+                <button type="button" id="recPlayAllBtn" title="Play / pause every part together (Shift+F8)">Play all</button>
+                <button type="button" id="recStopBtn" title="Stop recording and playback (Esc)">Stop</button>
+            </div>
+            <div class="rec-group" role="group" aria-label="Edit">
+                <button type="button" id="recAddLayerBtn" title="Add an empty part (Ctrl+Shift+N)">+ New part</button>
+            </div>
+            <div class="rec-group rec-group-file" role="group" aria-label="File">
+                <input type="text" id="recAnimName" class="rec-anim-name" maxlength="60" placeholder="Animation 1" aria-label="Animation name" title="This animation's name. Save keeps it under this name.">
+                <button type="button" id="recSaveBtn" title="Save this animation under the name beside it">Save</button>
+                <button type="button" id="recSavePresetBtn" title="Save these parts as a new animation, leaving the one you opened as it was">Save as new</button>
+                <button type="button" id="recFileBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="recFileMenu" title="Open a file, save to a file, or start empty">File ▾</button>
                 <input type="file" id="recImportFile" accept=".json" style="display:none;" />
             </div>
         </div>
-        <div class="rec-header" style="gap:6px;">
-            <div class="rec-left" style="gap:6px; align-items:center;">
-                <label for="recPresetSelect" style="font-size:12px; opacity:0.8;">Animations</label>
-                <select id="recPresetSelect" style="min-width:200px;"></select>
-                <button id="recSaveBtn" title="Save over the animation you opened, or name a new one">Save</button>
-                <button id="recSavePresetBtn" title="Save these parts as a new animation">Save as new</button>
-                <button class="btn--destructive" id="recDeletePresetBtn" title="Permanently delete the selected saved animation">Delete animation</button>
-                <div id="recPresetNameRow" style="display:none; gap:6px; align-items:center;">
-                    <input type="text" id="recNewPresetName" placeholder="Animation name" style="width:200px;">
-                    <button id="recPresetConfirmBtn">Save</button>
-                    <button id="recPresetCancelBtn">Cancel</button>
-                </div>
-            </div>
+        <div id="recFileMenu" class="brush-shape-menu rec-menu" role="menu" aria-label="File" data-group="expressive" hidden>
+            <button type="button" id="recImportBtn" class="btn--ghost rec-menu-item" role="menuitem" title="Open parts from a file. They replace the parts here.">Open file…</button>
+            <button type="button" id="recExportBtn" class="btn--ghost rec-menu-item" role="menuitem" title="Save these parts to a file">Save to file…</button>
+            <button type="button" id="recStartEmptyBtn" class="btn--ghost rec-menu-item" role="menuitem" title="Clear the editor for a new animation. Saved animations stay as they are.">Start empty</button>
         </div>
         <div class="rec-timeline-wrap">
             <canvas id="recTimelineCanvas" class="rec-timeline"></canvas>

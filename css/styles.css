@@ -1056,9 +1056,6 @@
         .rec-header { background: linear-gradient(180deg, rgba(22,27,34,0.9), rgba(13,17,23,0.9)); border-bottom: 1px solid rgba(255,255,255,0.06); box-shadow: inset 0 1px rgba(255,255,255,0.04); }
 .rec-drawer label { color: #c9d1d9; }
         .rec-drawer select, .rec-drawer .time-input { background: linear-gradient(#0e1319, #0b0f14); color: #e6edf3; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; box-shadow: inset 0 1px rgba(255,255,255,0.08); }
-        #recPresetSelect { height: 36px; padding: 6px 10px; font-size: 13px; background: linear-gradient(180deg, #0f1620, #0b1016); color: #e6edf3; border: 1px solid rgba(255,255,255,0.16); border-radius: 8px; box-shadow: inset 0 1px rgba(255,255,255,0.1); }
-        #recPresetSelect:focus { outline: none; border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.25), inset 0 1px rgba(255,255,255,0.12); }
-        #recPresetSelect option { background: #0b0f14; color: #e6edf3; }
         .rec-item { background: linear-gradient(180deg, rgba(25,31,41,0.95), rgba(15,20,29,0.95)); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 3px 10px rgba(0,0,0,0.6), inset 0 1px rgba(255,255,255,0.04); }
         .rec-item.active-layer { border-color: rgba(26,124,255,0.5); box-shadow: 0 0 0 2px rgba(26,124,255,0.15), inset 0 1px rgba(255,255,255,0.04); }
         .rec-timeline { background: linear-gradient(180deg, #0f141b, #0b0f14); box-shadow: inset 0 1px rgba(255,255,255,0.04), inset 0 -1px rgba(0,0,0,0.4); }
@@ -1073,12 +1070,40 @@
         /* The minimized recorder's 150px squares went with Recording Mode
            (2026-10-04); the record strip's layout is in 21-sidebar.css. */
 
+        /* ── The editor's toolbar: Play · Edit · File (03, 2026-10-04) ──
+           Three groups on one row with a hairline between them, File on the
+           right edge. It wraps on a narrow window instead of scrolling. */
+        .rec-toolbar { justify-content: flex-start; flex-wrap: wrap; row-gap: 8px; padding: 8px 12px; }
+        .rec-group { display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+        .rec-group:first-child { padding-left: 0; }
+        .rec-group + .rec-group { border-left: 1px solid rgba(255,255,255,0.08); }
+        .rec-group-file { margin-left: auto; padding-right: 0; }
+        .rec-drawer .rec-anim-name { width: 180px; box-sizing: border-box; padding: 6px 8px; font-size: 12px; font-family: inherit; border-radius: 6px; background: #0b0f14; color: #e6edf3; border: 1px solid rgba(255,255,255,0.12); }
+        .rec-drawer .rec-anim-name::placeholder { color: rgba(230,237,243,0.45); }
+        .rec-drawer .rec-anim-name:focus { outline: none; border-color: #58a6ff; }
+        /* A part card: name, ▶ 👁 🔁 ⋯, one line of state, its timeline */
+        .rec-part-meta { font-size: 12px; opacity: 0.85; margin: 2px 0 4px; }
+        .rec-drawer .rec-part-more { font-size: 16px; line-height: 1; }
+
+        /* The editor's menus (a part's ⋯, File ▾) wear the .brush-shape-menu
+           skin (20-mixer-strip.css). Rows are ghost buttons like the room
+           menu's (21-sidebar.css), so only their layout is set here. */
+        .rec-menu { min-width: 200px; }
+        .rec-menu .rec-menu-item { display: block; width: 100%; padding: 7px 10px; text-align: left; white-space: nowrap; }
+        .rec-menu .rec-menu-item[role="menuitemradio"]::before { content: ''; display: inline-block; width: 16px; }
+        .rec-menu .rec-menu-item[aria-checked="true"]::before { content: '\2713'; }
+        .rec-menu-sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,0.08); }
+        .rec-menu-label { padding: 6px 10px 3px; font-size: 11px; font-weight: 600; color: #8b949e; }
+        .rec-menu-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 10px 6px; font-size: 12px; }
+        .rec-menu-field .time-input { width: 100px; box-sizing: border-box; padding: 4px 6px; border-radius: 6px; background: #0b0f14; color: #e6edf3; border: 1px solid rgba(255,255,255,0.12); }
+        .rec-menu-field .time-input:focus { outline: none; border-color: #58a6ff; }
+        .rec-menu-field .time-input:disabled { opacity: 0.5; }
+
         /* ── Recording color-mode dropdown (1.3 rework) ── */
         /* Styled select replacing the raw native control ("looks bad"). Scoped
-           to out-specify `.rec-drawer select` (full panel) and
-           `#sidebar-right select` (mini) which otherwise win. Dark fill, soft
-           border, custom chevron drawn as an inline-SVG background. */
-        .rec-drawer .rec-color-mode,
+           to out-specify `#sidebar-right select`, which otherwise wins. Dark
+           fill, soft border, custom chevron drawn as an inline-SVG background.
+           The editor's part cards set colours from their ⋯ menu now. */
         #sidebar-right .rec-color-mode {
             -webkit-appearance: none; -moz-appearance: none; appearance: none;
             width: 100%; box-sizing: border-box;
@@ -1089,12 +1114,7 @@
             cursor: pointer; outline: none;
             transition: border-color 0.15s, background-color 0.15s;
         }
-.rec-drawer .rec-color-mode:disabled,
         #sidebar-right .rec-color-mode:disabled { opacity: 0.4; cursor: not-allowed; }
-/* Full-panel row: label + select on one line */
-        .rec-drawer .layer-colormode-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-        .rec-drawer .layer-colormode-row > label { font-size: 11px; opacity: 0.85; flex: 0 0 auto; }
-        .rec-drawer .layer-colormode-row .rec-color-mode { flex: 1; }
 
         /* ── Global recording/playback visual feedback ── */
         /* PERF: Removed box-shadow on canvas-area - causes compositor overhead */
