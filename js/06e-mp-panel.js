@@ -197,18 +197,35 @@ function setShown(id, shown) {
 function showMatchmaking() {
     setShown('mpDisconnected', false);
     setShown('mpConnected', true);
-    renderRoomStatus();
     ['roomDisplay', 'shareHint', 'copyRoomRow', 'lockRoomBtn', 'mpMenuBtn'].forEach(function(id) { setShown(id, false); });
     if (_openPop === 'menu') closeRoomPop();
+    syncInviteBtn();
+    updateTurnUI();   // no room: the rhythm switch and Pass step away; ends in renderRoomStatus
 }
 
 function showConnecting() {
     setShown('mpDisconnected', false);
     setShown('mpConnected', true);
-    renderRoomStatus();
-    setShown('mpMenuBtn', true);
+    setShown('mpMenuBtn', !isStrangerRoom());
     setShown('roomDisplay', !isStrangerRoom());
     if (!isStrangerRoom()) renderShareMode();
+    syncInviteBtn();
+    updateTurnUI();   // ends in renderRoomStatus
+}
+
+// Invite ▾ in a private room. A stranger pairing has nobody to invite (and
+// while the lobby looks there is no room at all), so there the button is
+// the phone door, and the popover holds just that row (54).
+function syncInviteBtn() {
+    var b = document.getElementById('mpInviteBtn');
+    if (!b) return;
+    var phoneOnly = !currentRoom || isStrangerRoom();
+    var label = phoneOnly ? '📱 Phone' : 'Invite ▾';
+    if (b.textContent !== label) b.textContent = label;
+    b.setAttribute('aria-label', phoneOnly ? 'Paint from your phone' : 'Invite');
+    b.title = phoneOnly
+        ? 'Paint from your phone: it becomes this canvas’s mouse'
+        : 'The code, a QR or a link to send, and your phone';
 }
 
 function showConnectedUI() {
@@ -257,9 +274,13 @@ function updateConnectedView() {
     // would unmask a room the user deliberately hid.
     if (!stranger) renderShareMode();
 
+    syncInviteBtn();
+
     // The ⋯ menu. Its switches keep one label and carry a tick when on
     // (aria-checked), so an item says what it does, not what it would undo.
-    setShown('mpMenuBtn', true);
+    // Nothing in it applies while a stranger pairing waits for its other
+    // half, so the button waits too.
+    setShown('mpMenuBtn', !(stranger && connectedClients < 2));
     // Lock room: only the host of a private room sees it.
     var lockBtn = document.getElementById('lockRoomBtn');
     if (lockBtn) {
@@ -267,11 +288,13 @@ function updateConnectedView() {
         lockBtn.style.display = canLock ? '' : 'none';
         lockBtn.setAttribute('aria-checked', String(!!roomLocked));
     }
-    // Settings lock (13.5): any host can lock look settings (incl. stranger
-    // rooms) — hidden while turns run, which supersede it.
+    // Settings lock (13.5): the host of a private room — hidden while turns
+    // run, which supersede it. A stranger pair has no real host ("host" is
+    // whoever connected first), so neither half may put the other on their
+    // look; until 2026-10-04 the first to connect could.
     var sLockBtn = document.getElementById('settingsLockBtn');
     if (sLockBtn) {
-        sLockBtn.style.display = (isHost && !turnsOn) ? '' : 'none';
+        sLockBtn.style.display = (isHost && !stranger && !turnsOn) ? '' : 'none';
         sLockBtn.setAttribute('aria-checked', String(!!settingsLockOn));
     }
 
@@ -391,18 +414,6 @@ function renderShareMode() {
             mode === 'hidden' ? 'Hidden, so it is safe to show on a stream. Copy still works.' :
                                 'Send a friend the link, or read them the code.';
     }
-}
-
-// The room-wide controls hide as a group when nothing inside them applies, so
-// a guest is never left looking at an empty labelled box.
-function syncHostBlock() {
-    var block = document.getElementById('mpHostBlock');
-    if (!block) return;
-    var any = ['turnsBtn', 'callReturnBtn', 'turnLengthRow'].some(function (id) {
-        var el = document.getElementById(id);
-        return el && el.style.display !== 'none';
-    });
-    block.style.display = any ? '' : 'none';
 }
 
 // Copy the invite. Two buttons, independent of how the code is DISPLAYED
@@ -649,22 +660,28 @@ function initMultiplayerUI() {
     var sLockBtn = document.getElementById('settingsLockBtn');
     if (sLockBtn) sLockBtn.addEventListener('click', toggleSettingsLock);
 
-    var turnsBtn = document.getElementById('turnsBtn');
-    if (turnsBtn) turnsBtn.addEventListener('click', toggleTurns);
+    // Together | Turns | Call & return (06c pickRhythm).
+    [['togetherBtn', 'free'], ['turnsBtn', 'timer'], ['callReturnBtn', 'stroke']].forEach(function (pair) {
+        var b = document.getElementById(pair[0]);
+        if (b) b.addEventListener('click', function () { pickRhythm(pair[1]); });
+    });
 
+    // Pass is the painter's; Skip (in ⋯) is the host moving someone else's
+    // turn on. Both are the same message: the relay decides who may.
     var turnPassBtn = document.getElementById('turnPassBtn');
     if (turnPassBtn) turnPassBtn.addEventListener('click', passTurn);
-
-    var callReturnBtn = document.getElementById('callReturnBtn');
-    if (callReturnBtn) callReturnBtn.addEventListener('click', toggleCallReturn);
+    var turnSkipBtn = document.getElementById('turnSkipBtn');
+    if (turnSkipBtn) turnSkipBtn.addEventListener('click', passTurn);
 
     var turnLength = document.getElementById('turnLength');
     if (turnLength) {
         turnLength.addEventListener('input', renderTurnLengthValue);
         turnLength.addEventListener('change', function () {
-            // Host changing the length mid-round applies it immediately
-            // (restarts the current turn's clock server-side). Only the timed
-            // rhythm has a length; call and return ignores it.
+            // The row is hidden once a rotation runs, but a bound hotkey
+            // (49) still moves the slider: a host changing the length
+            // mid-round applies it immediately (restarts the current turn's
+            // clock server-side). Only the timed rhythm has a length; call
+            // and return ignores it.
             if (turnsOn && turnModeLocal === 'timer' && myRole === 'host' &&
                 partySocket && partySocket.readyState === WebSocket.OPEN) {
                 partySocket.send(JSON.stringify({
@@ -711,11 +728,14 @@ window.toggleCallReturn = toggleCallReturn;
 window.passTurn = passTurn;
 window.copyRoomCode = copyRoomCode;
 window.disconnectMultiplayer = disconnectMultiplayer;
-// The panel's popovers, for 44's tours.
+window.pickRhythm = pickRhythm;
+// The panel's popovers, and whether this person may pick the rhythm, for
+// 44's tours.
 window.MPPanel = {
     open: openRoomPop,
     close: closeRoomPop,
-    isOpen: function (which) { return which ? _openPop === which : !!_openPop; }
+    isOpen: function (which) { return which ? _openPop === which : !!_openPop; },
+    canPick: function () { return !!currentRoom && roomSocketOpen() && canPickRhythm(); }
 };
 
 console.log('Multiplayer module loaded. PartyKit host:', PARTYKIT_HOST);

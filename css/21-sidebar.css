@@ -1173,14 +1173,24 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     min-width: 200px;
     padding: 4px;
 }
+/* The menu rows are ghost buttons (01-buttons: rows that sit on an open
+   menu), not .brush-shape-menu-item, which still sets its own colours and
+   fails the button audit. Only their layout is set here. */
+.mp-room-menu .mp-menu-item {
+    display: block;
+    width: 100%;
+    padding: 7px 10px;
+    text-align: left;
+    white-space: nowrap;
+}
 /* Switches in the ⋯ menu keep one label and show a tick when on, with a
    blank of the same width when off so the labels line up. */
-.mp-room-menu .brush-shape-menu-item::before {
+.mp-room-menu .mp-menu-item::before {
     content: '';
     display: inline-block;
     width: 16px;
 }
-.mp-room-menu .brush-shape-menu-item[aria-checked="true"]::before {
+.mp-room-menu .mp-menu-item[aria-checked="true"]::before {
     content: '\2713';
 }
 
@@ -1296,42 +1306,52 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     width: 100%;
 }
 
-/* ── Host controls ──
-   Grouped and labelled. A guest never sees this block, so they are not left
-   reading three switches that do nothing for them. */
-.mp-host-block {
-    margin-bottom: 12px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+/* ── How the room paints ──
+   Together | Turns | Call & return: one segmented switch, the running rhythm
+   pressed (aria-pressed, 01-buttons). Sized at the container like the
+   Code / QR / Hide modes, and each segment takes the width its word needs. */
+.mp-rhythm {
+    --btn-size: 11px;
+    --btn-pad-y: 6px;
+    --btn-pad-x: 6px;
+    display: flex;
+    gap: 3px;
+    margin-bottom: 10px;
 }
-.mp-btn-lock {
-    width: 100%;
-    margin-bottom: 6px;
+.mp-rhythm button {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
 }
-/* Non-host view of a host-only control: present, explained, inert. */
-.mp-btn-lock.mp-btn-muted,
-.mp-btn-lock.mp-btn-muted:hover {
-    cursor: default;
-    opacity: 0.55;
+/* A guest's switch is disabled, and a disabled button drops its pressed
+   fill, so the running rhythm would vanish. A bar under the segment keeps
+   it readable without giving the button a colour of its own. */
+.mp-rhythm button:disabled[aria-pressed="true"] {
+    box-shadow: inset 0 -2px 0 currentColor;
 }
-/* Turn-length slider, shown with the timed rhythm (Take turns). It is a
-   sidebar .control-group, so the label, value and fader come from the
-   sidebar rules; only its spacing inside the plate is set here. */
+/* Each turn: a sidebar .control-group, so the label, value and fader come
+   from the sidebar rules; only its spacing inside the plate is set here. */
 #multiArtistPanel .mp-turn-length {
-    margin: 4px 0 8px;
+    margin: 0 0 10px;
 }
 
+/* Pass and Leave share the foot of the panel. Pass only exists while the
+   brush is yours; Leave takes the whole row the rest of the time. */
+.mp-foot {
+    display: flex;
+    gap: 8px;
+}
+/* Pass the brush: the take-turns primary action (.btn--emphasis). */
+.mp-btn-pass {
+    flex: 1 1 0;
+    min-width: 0;
+}
 /* Leaving is reversible — the same code gets you back in — so this is a
    normal button, not a destructive one. See the reserved-class test in
    css/01-buttons.css. */
 .mp-btn-leave {
-    width: 100%;
-    margin-top: 2px;
-}
-/* Pass/Skip the brush — the take-turns primary action. */
-.mp-btn-pass {
-    width: 100%;
-    margin-bottom: 8px;
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 /* "Shall we take turns?" prompt — stranger pairs, shown to the person asked.

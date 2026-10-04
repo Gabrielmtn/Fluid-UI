@@ -1,7 +1,7 @@
 // ================================================================
 // 06c-mp-turns.js — Swirl Together client: take turns / call and return.
 // Rotation state and the two paint/settings gates, the countdown, the chip,
-// the queue in the panel, the two rhythm buttons and the length slider,
+// the queue in the panel, the rhythm switch and the length slider,
 // stranger-pair invites, and the call-and-return auto-pass.
 //
 // The multiplayer client was one 3,600-line file until 2026-09-11. It is now
@@ -92,6 +92,7 @@ function applyTurnState(wasMyTurn) {
     if (isMyTurn()) broadcastTurnLook();
     // The gate just opened — the brush reached us, or the rotation ended.
     if (wasBlocked && !window.__mpTurnBlocked) flushStagedWork();
+    continueRhythmSwitch();
     updateConnectedView();
 }
 
@@ -135,6 +136,7 @@ function resetTurnState() {
     _oneSwirlPassSent = false;
     _stagedHintShown = false;
     clearInviteWait();
+    clearRhythmNext();
     dismissTurnInvitePrompt();
     stopTurnTick();
     syncTurnGates(); // clears BOTH gates (turnsOn is false)
@@ -349,65 +351,68 @@ function renderTurnWheel() {
     }
 }
 
-// Panel widgets: the host's Take turns toggle + turn-length picker, the
-// rotation queue, and the Pass/Skip button (painter passes; host can skip an
-// AFK painter). Ends by redrawing the status line, which carries the clock.
+// Panel widgets: the rhythm switch and its turn-length picker, the rotation
+// queue, Pass (yours to press only while the brush is), and the host's Skip
+// in the ⋯ menu. Ends by redrawing the status line, which carries the clock.
+//
+// One switch, three rhythms: Together | Turns | Call & return, the running
+// one pressed. The host picks. A guest sees the switch, disabled, with the
+// reason; hiding it made the feature invisible to everyone but the host,
+// who then had to explain it exists. A stranger pair has no real host, so
+// either painter picks, and picking a rhythm asks the other: the segment
+// reads "Asking…" until they answer. Picking while another rhythm runs
+// stops that one first (pickRhythm). Until 2026-10-04 this was two toggle
+// buttons that swapped to "Stop …" while running, plus a Pass/Skip button.
+var RHYTHMS = [
+    { id: 'togetherBtn', mode: 'free', title: 'Everyone paints at once' },
+    { id: 'turnsBtn', mode: 'timer',
+      title: 'One artist paints at a time on a clock while everyone else watches, with the painter’s settings mirrored live',
+      askTitle: 'Ask your partner to take turns. Nothing changes unless they agree' },
+    { id: 'callReturnBtn', mode: 'stroke',
+      title: 'One swirl each, back and forth: make your call, they answer, and the brush comes back to you. No clock.',
+      askTitle: 'Ask your partner to play call and return. Nothing changes unless they agree' }
+];
+var RHYTHM_LABELS = { free: 'Together', timer: 'Turns', stroke: 'Call & return' };
+
+function currentRhythm() { return !turnsOn ? 'free' : (turnModeLocal === 'stroke' ? 'stroke' : 'timer'); }
+
+// Who may pick: the host of a private room, and either half of a pair.
+function canPickRhythm() { return myRole === 'host' || isStrangerRoom(); }
+
 function updateTurnUI() {
     updateTurnChip();
     var isHost = myRole === 'host';
-    // Stranger pairs have no meaningful host, so both painters drive turns:
-    // either may ask (consent flow) and either may stop.
     var pair = isStrangerRoom();
-    var canDrive = isHost || pair;
+    var canDrive = canPickRhythm();
     var stroke = turnModeLocal === 'stroke';
+    var now = currentRhythm();
+    // Nothing to pick before the room has answered, or while a stranger
+    // pairing is still waiting for its other half.
+    var live = !!currentRoom && roomSocketOpen() && !(pair && connectedClients < 2);
+    var busy = invitePending || !!_rhythmNext;
+    var asking = invitePending ? invitePendingMode : (pair ? _rhythmNext : null);
 
-    // Two rhythms, one button each. While one runs only ITS button shows (as
-    // "Stop …") so the panel never offers to start a second rotation on top of
-    // the first. Non-drivers see both, disabled — hiding them outright made
-    // the whole feature invisible to everyone but the host, who then had to
-    // explain it exists. Once a rhythm runs the wheel/chip/status carry the
-    // state, so a non-driver's dead buttons step out of the way.
-    var rhythms = [
-        { id: 'turnsBtn', mode: 'timer', start: 'Take turns', ask: 'Ask to take turns', stop: 'Stop taking turns',
-          startTitle: "Take turns painting — one artist at a time while everyone else watches with the painter's settings mirrored live",
-          askTitle: 'Ask your partner to take turns — nothing changes unless they agree' },
-        { id: 'callReturnBtn', mode: 'stroke', start: 'Call and return', ask: 'Ask for call and return', stop: 'Stop call and return',
-          startTitle: 'One swirl each, back and forth: make your call, they answer, and the brush comes back to you. No clock.',
-          askTitle: 'Ask your partner to play call and return — one swirl each, back and forth. Nothing changes unless they agree' }
-    ];
-    rhythms.forEach(function (r) {
+    var group = document.getElementById('mpRhythm');
+    if (group) group.style.display = live ? '' : 'none';
+    RHYTHMS.forEach(function (r) {
         var b = document.getElementById(r.id);
         if (!b) return;
-        var running = turnsOn && (stroke === (r.mode === 'stroke'));
-        var waiting = invitePending && invitePendingMode === r.mode;
-        var show = turnsOn ? (running && canDrive) : (!invitePending || waiting);
-        b.style.display = show ? '' : 'none';
-        b.disabled = !canDrive || invitePending;
-        if (waiting) {
-            b.textContent = 'Waiting for their answer…';
-            b.title = 'Your partner has been asked';
-        } else if (!canDrive) {
-            b.textContent = r.start + ' · host only';
-            b.title = 'Only the room host can start this';
-        } else if (running) {
-            b.textContent = r.stop;
-            b.title = 'Go back to painting at the same time';
-        } else {
-            b.textContent = pair ? r.ask : r.start;
-            b.title = pair ? r.askTitle : r.startTitle;
-        }
-        b.classList.toggle('active', running);
-        b.classList.toggle('mp-btn-muted', !canDrive || invitePending);
+        var on = now === r.mode;
+        b.setAttribute('aria-pressed', String(on));
+        b.disabled = !canDrive || busy;
+        b.textContent = asking === r.mode ? 'Asking…' : RHYTHM_LABELS[r.mode];
+        b.title = !canDrive ? 'The host picks how the room paints'
+            : asking === r.mode ? 'Your partner has been asked'
+            : (pair && r.askTitle && !on) ? r.askTitle : r.title;
     });
 
-    // The length belongs to the timed rhythm only. The asker picks it (it
-    // rides along in the invite), so both members of a pair see it while
-    // nothing runs; while turns run only the host does, because changing it
-    // mid-round restarts the current turn's clock server-side.
+    // The length belongs to the timed rhythm, and is set before it starts:
+    // the asker picks it (it rides along in the invite), so both halves of
+    // a pair see it while nothing runs. Once a rotation runs the row steps
+    // out of the way; the status line carries the clock.
     var row = document.getElementById('turnLengthRow');
     if (row) {
-        var showRow = (canDrive && !turnsOn && !invitePending) || (isHost && turnsOn && !stroke);
-        row.style.display = showRow ? '' : 'none';
+        row.style.display = (live && canDrive && !turnsOn && !busy) ? '' : 'none';
         var s = document.getElementById('turnLength');
         // While turns run the slider must read the ROOM, not whatever this
         // client last chose — a host handover otherwise leaves the new host
@@ -424,21 +429,25 @@ function updateTurnUI() {
 
     var pBtn = document.getElementById('turnPassBtn');
     if (pBtn) {
-        // Skipping SOMEONE ELSE's turn is a host power, and a stranger pair has
-        // no real host — so in a pair you may only pass your own turn.
-        var showPass = turnsOn && (isMyTurn() || (isHost && !pair));
-        pBtn.style.display = showPass ? '' : 'none';
-        pBtn.disabled = isMyTurn() && _oneSwirlSpent; // pass already on its way
-        pBtn.textContent = isMyTurn()
-            ? (_oneSwirlSpent ? 'Passing…' : (stroke ? 'Pass my call' : 'Pass turn'))
-            : 'Skip turn';
-        pBtn.title = isMyTurn()
-            ? (stroke
-                ? 'Hand the brush on now, without using your swirl'
-                : 'Hand the brush to the next artist in the rotation')
-            : 'Skip this artist and move the brush on';
+        var mine = isMyTurn();
+        pBtn.style.display = mine ? '' : 'none';
+        pBtn.disabled = mine && _oneSwirlSpent; // pass already on its way
+        pBtn.textContent = (mine && _oneSwirlSpent) ? 'Passing…' : 'Pass';
+        pBtn.title = stroke
+            ? 'Hand the brush on now, without using your swirl'
+            : 'Hand the brush to the next artist';
     }
-    syncHostBlock();
+    // Skipping SOMEONE ELSE's turn is a host power, and a stranger pair has
+    // no real host, so in a pair you may only pass your own turn.
+    var skip = document.getElementById('turnSkipBtn');
+    if (skip) {
+        var canSkip = isHost && !pair && turnsOn && !!turnHolderId && !isMyTurn();
+        skip.style.display = canSkip ? '' : 'none';
+        if (canSkip) {
+            skip.textContent = 'Skip ' + shortName(turnHolderId);
+            skip.title = 'Move the brush past ' + shortName(turnHolderId) + ' to the next artist';
+        }
+    }
     renderTurnWheel();
     renderRoomStatus();
     if (turnsOn && turnDeadlineLocal) ensureTurnTick(); else stopTurnTick();
@@ -593,9 +602,57 @@ function startOrStopTurns(mode) {
     }));
 }
 
-// The two rhythms. Same machinery, different way for a turn to end.
+// The two rhythms. Same machinery, different way for a turn to end. These
+// two toggle (start, or stop whichever runs) and stay for callers outside
+// the panel; the panel's switch goes through pickRhythm.
 function toggleTurns() { startOrStopTurns('timer'); }
 function toggleCallReturn() { startOrStopTurns('stroke'); }
+
+// The rhythm switch. 'free' (Together) stops whatever runs. A rhythm picked
+// while another runs is a stop, then a start (or, in a pair, an ask) once
+// the relay has confirmed the stop: sent back to back, a pair's invite
+// would reach a relay that still has turns on and is refused there, and a
+// private room would never pass through Together, so the gates and the
+// look mirror would carry over from one rotation into the next.
+var _rhythmNext = null;        // rhythm to start once the running one stops
+var _rhythmNextTimer = null;
+var RHYTHM_SWITCH_MS = 5000;   // the stop's turn-state must beat this
+
+function clearRhythmNext() {
+    _rhythmNext = null;
+    if (_rhythmNextTimer) { clearTimeout(_rhythmNextTimer); _rhythmNextTimer = null; }
+}
+
+function startRhythm(mode) {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN || turnsOn) return;
+    if (isStrangerRoom()) { sendTurnInvite(mode); return; }
+    partySocket.send(JSON.stringify({
+        type: 'turns', on: true, seconds: turnTimerSeconds(), mode: mode === 'stroke' ? 'stroke' : 'timer'
+    }));
+}
+
+function pickRhythm(mode) {
+    if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    if (!canPickRhythm() || invitePending || _rhythmNext) return;
+    if (mode === currentRhythm()) return;
+    if (!turnsOn) { startRhythm(mode); return; }
+    // Stopping never needs permission, whichever rhythm is running.
+    if (mode !== 'free') {
+        _rhythmNext = mode;
+        _rhythmNextTimer = setTimeout(function () { clearRhythmNext(); updateTurnUI(); }, RHYTHM_SWITCH_MS);
+    }
+    partySocket.send(JSON.stringify({ type: 'turns', on: false }));
+    updateTurnUI();
+}
+
+// Called with every rotation update (applyTurnState): the stop a switch was
+// waiting for has landed, so start what was picked.
+function continueRhythmSwitch() {
+    if (turnsOn || !_rhythmNext) return;
+    var next = _rhythmNext;
+    clearRhythmNext();
+    startRhythm(next);
+}
 
 function passTurn() {
     if (!partySocket || partySocket.readyState !== WebSocket.OPEN) return;

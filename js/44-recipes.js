@@ -490,19 +490,20 @@
           target: { section: 'Swirl Together', sel: '#phonePadBtn', fallback: { overlay: 'mp', popup: 'invite', sel: '#phonePadRoomBtn' } } },
         { id: 'turns', pillar: 'together', title: 'Take turns instead of painting at once',
           tags: ['turns', 'turn', 'rotation', 'timer', 'host', 'lock', 'whose'],
-          answer: 'Swirl Together → Take turns (host only). The brush passes around on the turn length you set; the chip by the bottom bar shows whose turn it is.',
+          answer: 'Swirl Together → Turns (the host picks). The brush passes around on the length you set under Each turn; the status line and the chip by the bottom bar show whose turn it is.',
           target: { section: 'Swirl Together', sel: '#turnsBtn' },
           steps: [
-            { say: 'Swirl Together → click Take turns.', needs: 'host', target: { overlay: 'mp', sel: '#turnsBtn' }, until: { click: true } },
-            { say: 'The slider sets how long each turn lasts; the chip by the bottom bar shows whose turn it is.', target: { overlay: 'mp', sel: '#turnLength', fallback: { overlay: 'mp', sel: '#turnsBtn' } } }
+            // Length first: the row steps away once a rotation runs.
+            { say: 'Each turn sets how long the brush stays with one artist. Set it before you start.', needs: 'host', target: { overlay: 'mp', sel: '#turnLength', fallback: { overlay: 'mp', sel: '#turnsBtn' } } },
+            { say: 'Click Turns. The status line and the chip by the bottom bar show whose turn it is, and Pass hands the brush on early.', needs: 'host', target: { overlay: 'mp', sel: '#turnsBtn' }, until: { click: true } }
           ] },
         { id: 'call-return', pillar: 'together', title: 'Play call and return',
           tags: ['call', 'return', 'response', 'swirl', 'one', 'each', 'turns', 'game', 'back', 'forth'],
-          answer: 'Swirl Together → Call and return. One swirl each, back and forth: make your call, they answer, and the brush comes back to you. No clock.',
+          answer: 'Swirl Together → Call & return. One swirl each, back and forth: make your call, they answer, and the brush comes back to you. No clock.',
           target: { section: 'Swirl Together', sel: '#callReturnBtn' },
           steps: [
-            { say: 'Swirl Together → click Call and return. With a stranger this asks them first.', needs: 'host', target: { overlay: 'mp', sel: '#callReturnBtn' }, until: { click: true } },
-            { say: 'Make one swirl. When it settles the brush passes on, and the chip by the bottom bar says whose call it is.', target: { overlay: 'mp', sel: '#turnWheel', fallback: { overlay: 'mp', sel: '#callReturnBtn' } } }
+            { say: 'Swirl Together → click Call & return. With a stranger this asks them first.', needs: 'host', target: { overlay: 'mp', sel: '#callReturnBtn' }, until: { click: true } },
+            { say: 'Make one swirl. When it settles the brush passes on, and the status line says whose call it is.', target: { overlay: 'mp', sel: '#turnWheel', fallback: { overlay: 'mp', sel: '#callReturnBtn' } } }
           ] },
 
         // ── Export ──
@@ -917,7 +918,8 @@
         layer:      { ok: () => layerRows('any').length > 0, text: 'You need a layer first.', recipe: 'paste-image', label: 'Paste one' },
         imageLayer: { ok: () => layerRows('image').length > 0, text: 'You need a picture layer first.', recipe: 'paste-image', label: 'Paste one' },
         connected:  { ok: () => isShown($('mpConnected')), text: 'You need to be in a room first.', recipe: 'room', label: 'Start one' },
-        host:       { ok: () => isShown($('mpHostBlock')), text: 'Only the host can do this. Start a room and you are the host.', recipe: 'room', label: 'Start one' }
+        // The rhythm switch is live for the host, and for both halves of a stranger pair (06e).
+        host:       { ok: () => !!(window.MPPanel && window.MPPanel.canPick && window.MPPanel.canPick()), text: 'Only the host can do this. Start a room and you are the host.', recipe: 'room', label: 'Start one' }
     };
     function needGap(need) {
         const n = NEEDS[need];

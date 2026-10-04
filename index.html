@@ -1291,21 +1291,28 @@
                     <button type="button" id="mpMenuBtn" class="btn--icon mp-room-more" aria-haspopup="menu" aria-expanded="false" aria-controls="mpRoomMenu" aria-label="Room options" title="Room options">⋯</button>
                 </div>
 
-                <!-- The rhythm controls. Grouped so they hide as one when
-                     nothing inside applies. -->
-                <div class="mp-host-block" id="mpHostBlock" style="display:none">
-                    <button id="turnsBtn" class="mp-btn-lock" style="display:none" title="One artist paints at a time while everyone else watches, with the painter’s settings mirrored live">Take turns</button>
-                    <div class="control-group mp-turn-length" id="turnLengthRow" style="display:none">
-                        <label for="turnLength" title="How long each turn lasts before the brush passes to the next artist">Turn length <span id="turnLengthValue" class="value-display">1:00</span></label>
-                        <input type="range" id="turnLength" min="30" max="300" step="15" value="60" aria-label="Turn length in seconds">
-                    </div>
-                    <button id="callReturnBtn" class="mp-btn-lock" style="display:none" title="One swirl each, back and forth: make your call, they answer, and the brush comes back to you. No clock.">Call and return</button>
+                <!-- How the room paints: one switch, one pressed segment (06c
+                     updateTurnUI). The host picks; a guest sees it disabled;
+                     in a stranger pair either painter picks, and picking asks
+                     the other. Each turn sets the clock before Turns starts. -->
+                <div class="mp-rhythm" id="mpRhythm" role="group" aria-label="How the room paints" style="display:none">
+                    <button type="button" id="togetherBtn" aria-pressed="true">Together</button>
+                    <button type="button" id="turnsBtn" aria-pressed="false">Turns</button>
+                    <button type="button" id="callReturnBtn" aria-pressed="false">Call &amp; return</button>
+                </div>
+                <div class="control-group mp-turn-length" id="turnLengthRow" style="display:none">
+                    <label for="turnLength" title="How long each turn lasts before the brush passes to the next artist">Each turn <span id="turnLengthValue" class="value-display">1:00</span></label>
+                    <input type="range" id="turnLength" min="30" max="300" step="15" value="60" aria-label="Turn length in seconds">
                 </div>
 
                 <div id="turnWheel" class="mp-turn-wheel" style="display:none"></div>
-                <button id="turnPassBtn" class="mp-btn-pass" style="display:none" title="Hand the brush to the next artist in the rotation">Pass turn</button>
 
-                <button id="disconnectBtn" class="mp-btn-leave">Leave room</button>
+                <!-- Pass only shows while the brush is yours; the host's Skip
+                     for someone else's turn lives in ⋯. -->
+                <div class="mp-foot">
+                    <button id="turnPassBtn" class="mp-btn-pass btn--emphasis" style="display:none" title="Hand the brush to the next artist">Pass</button>
+                    <button id="disconnectBtn" class="mp-btn-leave" title="Leave this room. The same code gets you back in">Leave</button>
+                </div>
 
                 <!-- Invite popover (Invite ▾). The three share modes exist
                      because a room code on screen is a live invitation: fine
@@ -1343,8 +1350,9 @@
                 <!-- ⋯ menu, on <body> like the popover. Ticked items are
                      switches; 61 adds Copy room report at its foot. -->
                 <div id="mpRoomMenu" class="brush-shape-menu mp-pop mp-room-menu" role="menu" aria-label="Room options" hidden>
-                    <button type="button" id="lockRoomBtn" class="brush-shape-menu-item" role="menuitemcheckbox" aria-checked="false" style="display:none" title="Stop anyone new from joining, even with the code">Lock room</button>
-                    <button type="button" id="settingsLockBtn" class="brush-shape-menu-item" role="menuitemcheckbox" aria-checked="false" style="display:none" title="Guests mirror your look settings; their performance controls stay their own">Everyone uses my look</button>
+                    <button type="button" id="lockRoomBtn" class="btn--ghost mp-menu-item" role="menuitemcheckbox" aria-checked="false" style="display:none" title="Stop anyone new from joining, even with the code">Lock room</button>
+                    <button type="button" id="settingsLockBtn" class="btn--ghost mp-menu-item" role="menuitemcheckbox" aria-checked="false" style="display:none" title="Guests mirror your look settings; their performance controls stay their own">Everyone uses my look</button>
+                    <button type="button" id="turnSkipBtn" class="btn--ghost mp-menu-item" role="menuitem" style="display:none">Skip</button>
                 </div>
             </div>
         </div>

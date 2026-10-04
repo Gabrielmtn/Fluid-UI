@@ -168,7 +168,7 @@
         var b = document.createElement('button');
         b.type = 'button';
         b.id = 'roomReportBtn';
-        b.className = 'brush-shape-menu-item mp-room-report';
+        b.className = 'btn--ghost mp-menu-item mp-room-report';
         b.setAttribute('role', 'menuitem');
         b.setAttribute('data-stay', '');
         b.textContent = 'Copy room report';
