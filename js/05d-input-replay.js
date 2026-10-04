@@ -1140,6 +1140,7 @@
             splatOutActive = false;
             moveTrail.length = 0;
             applyPickerColor();
+            if (typeof window.pinArmSteps === 'function') window.pinArmSteps();
             // D2/D3 routing: sketch and mask strokes are surface paint — no
             // fluid replay events, no recording timelines, no multiplayer
             // broadcast (local-only until D7's unified schema). The gate used
@@ -1740,6 +1741,7 @@
             splatOutActive = false;
             moveTrail.length = 0;
             applyPickerColor();
+            if (typeof window.pinArmSteps === 'function') window.pinArmSteps();
             // Same sketch/mask routing as the pointerdown press (see the
             // audit note there): mask presses stamp the mask, never the fluid.
             const _sketchTargetT = config.BRUSH_TARGET === 'sketch';

@@ -157,9 +157,27 @@
             return ('#' + v).toUpperCase();
         }
 
+        // A palette's edits are keyed by its NAME ('name:<palette name>').
+        // They were keyed by position, so deleting a palette left every later
+        // palette reading the edits of the one after it (user test 3). A
+        // positional key from an older save is still read, moves to the name
+        // key the next time that palette is edited, and moves down with its
+        // palette when one before it is deleted.
+        function userPaletteKey(index) {
+            const p = curatedPalettes[index];
+            return p ? 'name:' + p.name : String(index);
+        }
+        function userPaletteOverlay(index) {
+            const up = window.userPalettes;
+            if (!up) return null;
+            const byName = up[userPaletteKey(index)];
+            if (Array.isArray(byName)) return byName;
+            const byIndex = up[String(index)];
+            return Array.isArray(byIndex) ? byIndex : null;
+        }
+
         function getPaletteColorsForIndex(index) {
-            const key = String(index);
-            const overlay = window.userPalettes && Array.isArray(window.userPalettes[key]) ? window.userPalettes[key] : null;
+            const overlay = userPaletteOverlay(index);
             if (overlay && overlay.length) return uniqueColors(overlay.map(hexToFull));
             const p = curatedPalettes[index];
             if (!p) return [];
@@ -207,9 +225,9 @@
         }
 
         function setPaletteColorsForIndex(index, colors) {
-            const key = String(index);
             const list = uniqueColors((colors || []).map(hexToFull));
-            window.userPalettes[key] = list;
+            window.userPalettes[userPaletteKey(index)] = list;
+            delete window.userPalettes[String(index)];   // a positional key moves to the name
             persistPalettes();
             renderPalettePreview(index);
             updatePaletteStepIndicator();
@@ -287,7 +305,20 @@
             if (isNaN(i) || !curatedPalettes[i]) return;
             currentPaletteIndex = i;
             const list = getPaletteColorsForIndex(i);
+            // paletteStepIndex is the colour IN the picker: the one the next
+            // stroke paints (advance = increment, then load; 05g/05n).
             paletteStepIndex = 0;
+            // The tray first: the step switch below fires 'change', and what it
+            // runs reads the tray (getStepColorList). Written after, a palette
+            // picked with the nav toggle off painted the PREVIOUS palette
+            // (user test 3: "the color ignores the palette being active").
+            const swatches = getCurrentPaletteHexList();
+            if (typeof colorStorage !== 'undefined') {
+                savedColors = swatches.slice();
+                // A look opened from a link (js/50-look-links.js) selects its
+                // palette live and must not rewrite the saved tray.
+                if (!window.__lookLinkApplying) colorStorage.save(savedColors);
+            }
             const cp = document.getElementById('colorPicker');
             // During a snapshot/preset/multiplayer-lock restore the brush colour
             // and step mode come FROM the snapshot and are already applied — the
@@ -306,13 +337,7 @@
                 if (!(stepEl && stepEl.checked) && typeof updateColor === 'function') updateColor();
             }
             currentTrailColorCss = hexToRgbaCss(list[1] || list[0] || '#FFFFFF', 0.5);
-            const swatches = getCurrentPaletteHexList();
-            if (typeof colorStorage !== 'undefined') {
-                savedColors = swatches.slice();
-                // A look opened from a link (js/50-look-links.js) selects its
-                // palette live and must not rewrite the saved tray.
-                if (!window.__lookLinkApplying) colorStorage.save(savedColors);
-            }
+            if (typeof window.pinArmSteps === 'function') window.pinArmSteps();   // step arms show the new palette now
             renderPalettePreview(i);
             refreshPaletteCarousel();
             // Quota exhaustion here must not abort the rest of the selection.
@@ -339,6 +364,14 @@
         window.confirmDeletePalette = function() {
             if (pendingDeleteIndex < 0 || pendingDeleteIndex >= curatedPalettes.length) return;
             const palette = curatedPalettes[pendingDeleteIndex];
+            // Its edits go with it (by name, read BEFORE the splice); positional
+            // keys after it move down with their palettes.
+            const up = window.userPalettes || {};
+            delete up[userPaletteKey(pendingDeleteIndex)];
+            delete up[String(pendingDeleteIndex)];
+            Object.keys(up).filter(k => /^\d+$/.test(k) && +k > pendingDeleteIndex)
+                .sort((a, b) => a - b)
+                .forEach(k => { up[String(+k - 1)] = up[k]; delete up[k]; });
             const isDefault = defaultPalettes.some(dp => dp.name === palette.name);
             if (isDefault && !window.deletedDefaultPalettes.includes(palette.name)) {
                 window.deletedDefaultPalettes.push(palette.name);
@@ -346,7 +379,6 @@
             curatedPalettes.splice(pendingDeleteIndex, 1);
             const customIdx = window.customPalettes.findIndex(cp => cp.name === palette.name);
             if (customIdx >= 0) window.customPalettes.splice(customIdx, 1);
-            delete window.userPalettes[String(pendingDeleteIndex)];
             if (currentPaletteIndex === pendingDeleteIndex) {
                 currentPaletteIndex = Math.max(0, Math.min(currentPaletteIndex, curatedPalettes.length - 1));
                 applyPalette(currentPaletteIndex);

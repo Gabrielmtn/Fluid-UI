@@ -82,12 +82,11 @@
         var arr = window.multiArmColors, cfg = arr && arr[i];
         if (!i || !cfg || cfg.mode === 'main') return paintColorHex();
         if (cfg.mode === 'fixed') return HEX_RE.test(cfg.color || '') ? cfg.color : '#ffffff';
-        if (cfg.cachedColor && cfg.cachedColor.length >= 3) return rgbHex(cfg.cachedColor);
-        if (cfg.mode === 'step' && typeof getStepColorList === 'function') {
-            var list = getStepColorList() || [];
-            var h = list.length ? list[(cfg.stepIndex || 0) % list.length] : null;
+        if (cfg.mode === 'step' && typeof window.nextStepHex === 'function') {
+            var h = window.nextStepHex();   // the one palette counter (05g)
             if (HEX_RE.test(h || '')) return h;
         }
+        if (cfg.cachedColor && cfg.cachedColor.length >= 3) return rgbHex(cfg.cachedColor);
         // A Random arm before its first stroke has no colour yet: neutral.
         return cfg.mode === 'random' ? '#ffffff' : paintColorHex();
     }

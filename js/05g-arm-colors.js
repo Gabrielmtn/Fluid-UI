@@ -48,26 +48,47 @@
                 return cfg.cachedColor;
             }
             if (cfg.mode === 'step') {
-                // Color set once on mouseup; held for the whole stroke
-                if (!cfg.cachedColor) {
-                    var list0 = (typeof getStepColorList === 'function') ? getStepColorList() : [];
-                    if (!list0.length) return fallbackColor;
-                    var idx0 = (cfg.stepIndex || 0) % list0.length;
-                    var h0 = list0[idx0];
-                    cfg.cachedColor = [
-                        parseInt(h0.slice(1, 3), 16) / 255,
-                        parseInt(h0.slice(3, 5), 16) / 255,
-                        parseInt(h0.slice(5, 7), 16) / 255
-                    ];
-                }
-                return cfg.cachedColor;
+                // Every step arm paints the palette colour its stroke began on
+                // (pinArmSteps): one counter for the whole brush, so red, white,
+                // blue goes red, white, blue on every arm, and a new palette
+                // shows on the next stroke. Arms kept their own counters and a
+                // cached colour, and switching palettes reset neither (user
+                // test 3: "step palette should've been red white blue but they
+                // got off sync").
+                if (!armStepColor) pinArmSteps();
+                return armStepColor || fallbackColor;
             }
             return fallbackColor;
         }
-        // Called on mouseup — advances random/step cached colors for next stroke
+        // The step colour, pinned at each stroke's start (05d pointerdown /
+        // touchstart) and held to its end, tail included: arm 0 advances the
+        // counter at mouseup, while the tail and the stabilizer's catch-up
+        // dabs still paint this stroke.
+        var armStepColor = null;
+        function nextStepHex() {
+            var list = (typeof getStepColorList === 'function') ? getStepColorList() : [];
+            if (!list.length) return null;
+            var len = list.length;
+            return list[((paletteStepIndex % len) + len) % len];
+        }
+        function pinArmSteps() {
+            var h = nextStepHex();
+            armStepColor = h ? [
+                parseInt(h.slice(1, 3), 16) / 255,
+                parseInt(h.slice(3, 5), 16) / 255,
+                parseInt(h.slice(5, 7), 16) / 255
+            ] : null;
+        }
+        window.pinArmSteps = pinArmSteps;
+        window.nextStepHex = nextStepHex;
+        // Called once a stroke has fully settled — rolls each Random arm's next
+        // colour, and moves the palette counter when only arms past the first
+        // step (arm 0 stepping moves it itself, in advanceColor).
         function advanceArmColors() {
             var arr = window.multiArmColors;
             if (!arr) return;
+            var arm0Steps = !!(arr[0] && arr[0].mode === 'step');
+            var otherSteps = false;
             for (var i = 0; i < arr.length; i++) {
                 var cfg = arr[i];
                 if (!cfg) continue;
@@ -78,18 +99,15 @@
                 if (cfg.mode === 'random') {
                     cfg.cachedColor = generateVibrantColor();
                 }
-                if (cfg.mode === 'step') {
-                    var list = (typeof getStepColorList === 'function') ? getStepColorList() : [];
-                    if (!list.length) { cfg.cachedColor = null; continue; }
-                    cfg.stepIndex = ((cfg.stepIndex || 0) + 1) % list.length;
-                    var hex = list[cfg.stepIndex];
-                    cfg.cachedColor = [
-                        parseInt(hex.slice(1, 3), 16) / 255,
-                        parseInt(hex.slice(3, 5), 16) / 255,
-                        parseInt(hex.slice(5, 7), 16) / 255
-                    ];
-                }
+                if (cfg.mode === 'step') { cfg.cachedColor = null; otherSteps = true; }
             }
+            if (otherSteps && !arm0Steps) {
+                var sl = (typeof getStepColorList === 'function') ? getStepColorList() : [];
+                if (sl.length) paletteStepIndex = (paletteStepIndex + 1) % sl.length;
+                if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
+            }
+            // The Multi-Brush rows show each arm's next colour (20).
+            if (typeof window.refreshArmColorRows === 'function') window.refreshArmColorRows();
         }
         window.advanceArmColors = advanceArmColors;
 
@@ -650,7 +668,7 @@
                 if (e.target.checked) {
                     const rnd = document.getElementById('randomColor');
                     if (rnd) rnd.checked = false;
-                    advanceColor();
+                    seedStepColor();
                 }
                 updatePaletteStepIndicator();
                 mirrorCheckboxToArm0('step', e.target.checked);
@@ -758,10 +776,14 @@
             if (stepEl && stepEl.checked) {
                 const list = getStepColorList();
                 if (list.length > 0) {
+                    // Increment, THEN load: the index is the colour in the picker.
+                    // It loaded list[i] and then incremented, so after picking a
+                    // palette (index 0, colour 0 in the picker) the second stroke
+                    // painted colour 0 again: red, red, white, blue — and the Next
+                    // chip ran one ahead of the picker (user test 3).
                     const len = list.length;
-                    const idx = paletteStepIndex % len;
-                    const col = list[idx];
                     paletteStepIndex = (paletteStepIndex + 1) % len;
+                    const col = list[paletteStepIndex];
                     if (col) {
                         syncPickerIndicator(
                             parseInt(col.slice(1, 3), 16) / 255,
@@ -780,6 +802,24 @@
                 syncPickerIndicator(c[0], c[1], c[2]);
                 return;
             }
+        }
+        // Turning Palette (step) on shows the colour the counter is ON, the next
+        // stroke's, without moving it. advanceColor happened to do that while it
+        // loaded before incrementing; now it moves on, so switching seeds instead
+        // (picking a red-white-blue palette starts on red).
+        function seedStepColor() {
+            const list = getStepColorList();
+            if (!list.length) return;
+            const len = list.length;
+            const col = list[((paletteStepIndex % len) + len) % len];
+            if (col) {
+                syncPickerIndicator(
+                    parseInt(col.slice(1, 3), 16) / 255,
+                    parseInt(col.slice(3, 5), 16) / 255,
+                    parseInt(col.slice(5, 7), 16) / 255
+                );
+            }
+            if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
         }
         // Legacy wrapper — reads picker then advances (used by non-pointer callers)
         function updateColor() {
@@ -865,7 +905,7 @@
             // reads them): seed the picker "next" preview for random/step, set
             // pointer.color for fixed.
             if (mode === 'random' || mode === 'step') {
-                advanceColor();
+                if (mode === 'step') seedStepColor(); else advanceColor();
                 if (typeof updatePaletteStepIndicator === 'function') updatePaletteStepIndicator();
             } else if (mode === 'fixed') {
                 applyPickerColor();

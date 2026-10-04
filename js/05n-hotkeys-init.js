@@ -238,8 +238,10 @@
             if (!list || !list.length) return;
             const len = list.length;
             if (forward) {
-                const hex = list[paletteStepIndex % len];
+                // Increment, then load (05g advanceColor): the first press used
+                // to load the colour already in the picker and change nothing.
                 paletteStepIndex = (paletteStepIndex + 1) % len;
+                const hex = list[paletteStepIndex];
                 const cp = document.getElementById('colorPicker');
                 if (cp) cp.value = hex;
                 const r = parseInt(hex.slice(1, 3), 16) / 255;

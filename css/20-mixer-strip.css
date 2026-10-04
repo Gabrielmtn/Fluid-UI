@@ -930,6 +930,13 @@ body > .controls {
     flex-direction: column;
     gap: 6px;
 }
+/* The arm buttons' key, under the rows (20 buildArmColorsDropdown). */
+.arm-legend {
+    margin-top: 8px;
+    font-size: 10px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.55);
+}
 /* "Left click also mirrors ↔ · Turn off" (20 updateMirrorNote): the mirror
    a mouse button adds sits outside every setting in this panel, so the panel
    says so and offers the way out. */

@@ -8175,6 +8175,12 @@
         var rowsWrap = document.createElement('div');
         rowsWrap.className = 'arm-colors-rows';
         panel.appendChild(rowsWrap);
+        // What the row buttons mean, on the panel itself (user test 3: "tooltips
+        // on the multi brush items aren't enough").
+        var armLegend = document.createElement('div');
+        armLegend.className = 'arm-legend';
+        armLegend.textContent = '\u25CF brush colour \u00B7 \u25C6 fixed \u00B7 R random \u00B7 P palette \u00B7 \u2248 push';
+        panel.appendChild(armLegend);
 
         function ensureArmConfig(count) {
             var arr = window.multiArmColors;
@@ -8284,11 +8290,13 @@
                     // clear of the four-button group, so it doesn't read as a
                     // fifth option in it.
                     var modes = [
-                        { key: 'main',    text: '\u25CF', title: 'Follow pointer color' },
-                        { key: 'fixed',   text: '\u25C6', title: 'Fixed color' },
+                        { key: 'main',    text: '\u25CF', title: 'Brush colour: this arm paints whatever the brush is set to' },
+                        { key: 'fixed',   text: '\u25C6', title: 'Fixed: this arm keeps the colour in its swatch' },
                         // 'rainbow' removed 2026-08-15 (photosensitivity)
-                        { key: 'random',  text: 'R',      title: 'Random — new color each stroke' },
-                        { key: 'step',    text: 'S',      title: 'Palette mode — new palette colour each stroke' }
+                        { key: 'random',  text: 'R',      title: 'Random: a new colour each stroke' },
+                        // P, not S (user test 3: "P for palette"): the next palette
+                        // colour each stroke, in step with every other P arm.
+                        { key: 'step',    text: 'P',      title: 'Palette: the next palette colour each stroke, in step with every other P arm' }
                     ];
 
                     var modeWrap = document.createElement('div');
@@ -8340,20 +8348,31 @@
                         // handler (which flips the arm to 'fixed' and persists)
                         // never fires. Rebuilds re-run this on every default-color
                         // change while the popup is open, so it tracks live.
-                        if (cfg.mode === 'main') {
-                            var mainPk = document.getElementById('colorPicker');
-                            picker.value = (mainPk && mainPk.value) || cfg.color || '#ffffff';
-                        } else {
-                            picker.value = cfg.color || '#ffffff';
+                        // Each swatch shows the colour the arm paints NEXT (user
+                        // test 3: "colors don't show up in multi brush window" —
+                        // Palette and Random rows showed a dimmed white). A
+                        // Palette arm paints the one palette counter (05g
+                        // nextStepHex); arm 0 on Palette or Random IS the main
+                        // picker; another Random arm has its next colour rolled
+                        // already. Display-only: .value set by property never
+                        // fires the input handler (which would make it Fixed).
+                        var mainPk = document.getElementById('colorPicker');
+                        var shown = null;
+                        if (cfg.mode === 'main' || (idx === 0 && (cfg.mode === 'step' || cfg.mode === 'random'))) {
+                            shown = mainPk && mainPk.value;
+                        } else if (cfg.mode === 'step') {
+                            shown = (typeof window.nextStepHex === 'function') ? window.nextStepHex() : null;
+                        } else if (cfg.mode === 'random' && cfg.cachedColor && cfg.cachedColor.length >= 3) {
+                            shown = '#' + cfg.cachedColor.slice(0, 3).map(function (v) {
+                                var h = Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16);
+                                return h.length === 1 ? '0' + h : h;
+                            }).join('');
                         }
+                        picker.value = shown || cfg.color || '#ffffff';
                         picker.disabled = cfg.mode !== 'fixed';
-                        // Generative modes (random/step) dim the swatch — no single
-                        // color is "the" color. A 'main' arm's swatch is accurate
-                        // (it IS the default color), so keep it readable. Pressure
-                        // doesn't touch this: a push arm keeps the colour mode it
-                        // paints in the moment you switch it back.
-                        picker.style.opacity = (cfg.mode === 'fixed') ? '1'
-                                             : (cfg.mode === 'main')  ? '0.8' : '0.35';
+                        // Dimmed only while the colour is unknown (a Random arm
+                        // before its first roll); Fixed is the one you can edit.
+                        picker.style.opacity = (cfg.mode === 'fixed') ? '1' : (shown ? '0.85' : '0.35');
                     }
 
                     modes.forEach(function(m) {
@@ -8487,6 +8506,11 @@
 
         // Expose rebuild for external use
         window.rebuildArmColorRows = rebuildRows;
+        // After each stroke (05g advanceArmColors): the swatches move on with
+        // the palette and the Random rolls, while the panel is open.
+        window.refreshArmColorRows = function () {
+            if (panel.style.display !== 'none') rebuildRows();
+        };
 
         return { toggle: toggle };
     }
