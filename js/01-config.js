@@ -84,6 +84,7 @@
             try { sm.set('palettes.custom', window.customPalettes || []); } catch (_) {}
             try { sm.set('palettes.deletedDefaults', window.deletedDefaultPalettes || []); } catch (_) {}
             try { sm.set('palettes.user', window.userPalettes || {}); } catch (_) {}
+            try { sm.set('palettes.order', curatedPalettes.map(p => p.name)); } catch (_) {}
         }
         window.persistPalettes = persistPalettes;
 
@@ -105,6 +106,28 @@
                 const up = sm.get('palettes.user');
                 if (up && typeof up === 'object') window.userPalettes = up;
             } catch (_) {}
+            // Edits saved by POSITION ('0', '1'…, before 2026-10-04) move to
+            // their palette's name now, while positions still mean what they
+            // meant: after a reorder they would point at the wrong palette.
+            const up2 = window.userPalettes || {};
+            let moved = false;
+            Object.keys(up2).filter(k => /^\d+$/.test(k)).forEach((k) => {
+                const p = curatedPalettes[+k];
+                if (p && !Array.isArray(up2['name:' + p.name])) up2['name:' + p.name] = up2[k];
+                delete up2[k];
+                moved = true;
+            });
+            try {
+                const order = sm.get('palettes.order');
+                if (Array.isArray(order) && order.length) {
+                    const rank = new Map(order.map((n, i) => [n, i]));
+                    const ranked = curatedPalettes.map((p, i) => ({ p, i, r: rank.has(p.name) ? rank.get(p.name) : order.length + i }));
+                    ranked.sort((a, b) => a.r - b.r);
+                    curatedPalettes.length = 0;
+                    ranked.forEach(x => curatedPalettes.push(x.p));
+                }
+            } catch (_) {}
+            if (moved) persistPalettes();
         }
 
         Object.defineProperty(window, 'savedColors', {
@@ -379,11 +402,12 @@
                 tag.className = 'palette-tag';
                 tag.dataset.index = String(idx);
                 if (idx === currentPaletteIndex) tag.classList.add('active');
-                tag.title = p.name + '. Click to paint with it, right-click to rename, duplicate or delete it.';
+                tag.title = p.name + '. Click to paint with it, drag to move it, right-click to rename, duplicate or delete it.';
                 const nameSpan = document.createElement('span');
                 nameSpan.textContent = p.name;
                 tag.appendChild(nameSpan);
                 tag.onclick = () => applyPalette(idx);
+                wireTagDrag(tag, idx);
                 tag.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -478,6 +502,113 @@
             setPaletteColorsForIndex(index, next);
         }
 
+        // ── Drag to reorder (user test 3: "drag to reorder") ──
+        // HTML5 drags with our own types: the file-drop guard (32) only acts
+        // on drags carrying Files. A line shows where it will land.
+        const COLOUR_DRAG = 'application/x-swirl-palette-colour';
+        const PALETTE_DRAG = 'application/x-swirl-palette';
+        function dropSide(e, el) {
+            const r = el.getBoundingClientRect();
+            return (e.clientX - r.left) < r.width / 2 ? 'before' : 'after';
+        }
+        function clearDropMarks(root) {
+            if (!root) return;
+            root.querySelectorAll('.drop-before, .drop-after, .dragging').forEach(n => n.classList.remove('drop-before', 'drop-after', 'dragging'));
+        }
+        function hasType(e, t) {
+            const ts = e.dataTransfer && e.dataTransfer.types;
+            return !!ts && [].indexOf.call(ts, t) >= 0;
+        }
+        let dragHex = null;
+        function wireChipDrag(wrap, hex) {
+            wrap.draggable = true;
+            wrap.addEventListener('dragstart', (e) => {
+                dragHex = hex;
+                e.dataTransfer.setData(COLOUR_DRAG, hex);
+                e.dataTransfer.effectAllowed = 'move';
+                wrap.classList.add('dragging');
+            });
+            wrap.addEventListener('dragend', () => { dragHex = null; clearDropMarks(wrap.parentElement); });
+            wrap.addEventListener('dragover', (e) => {
+                if (!hasType(e, COLOUR_DRAG)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                const side = dropSide(e, wrap);
+                wrap.classList.toggle('drop-before', side === 'before');
+                wrap.classList.toggle('drop-after', side === 'after');
+            });
+            wrap.addEventListener('dragleave', () => wrap.classList.remove('drop-before', 'drop-after'));
+            wrap.addEventListener('drop', (e) => {
+                if (!hasType(e, COLOUR_DRAG)) return;
+                e.preventDefault();
+                const from = e.dataTransfer.getData(COLOUR_DRAG) || dragHex;
+                const side = dropSide(e, wrap);
+                clearDropMarks(wrap.parentElement);
+                moveColour(from, hex, side);
+            });
+        }
+        // The colour in the picker keeps its place in the step order: the
+        // next stroke paints what it would have painted.
+        function moveColour(fromHex, toHex, side) {
+            const f = hexToFull(fromHex), t = hexToFull(toHex);
+            if (!f || f === t) return;
+            const inPicker = pickerHex();
+            editActiveColors((list) => {
+                if (!list.includes(f) || !list.includes(t)) return null;
+                const next = list.filter(c => c !== f);
+                let at = next.indexOf(t) + (side === 'after' ? 1 : 0);
+                next.splice(at, 0, f);
+                const k = next.indexOf(inPicker);
+                if (k >= 0) paletteStepIndex = k;
+                return next;
+            });
+            updatePaletteStepIndicator();
+        }
+        let dragPaletteIdx = -1;
+        function wireTagDrag(tag, idx) {
+            tag.draggable = true;
+            tag.addEventListener('dragstart', (e) => {
+                dragPaletteIdx = idx;
+                e.dataTransfer.setData(PALETTE_DRAG, String(idx));
+                e.dataTransfer.effectAllowed = 'move';
+                tag.classList.add('dragging');
+            });
+            tag.addEventListener('dragend', () => { dragPaletteIdx = -1; clearDropMarks(tag.parentElement); });
+            tag.addEventListener('dragover', (e) => {
+                if (!hasType(e, PALETTE_DRAG)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                const side = dropSide(e, tag);
+                tag.classList.toggle('drop-before', side === 'before');
+                tag.classList.toggle('drop-after', side === 'after');
+            });
+            tag.addEventListener('dragleave', () => tag.classList.remove('drop-before', 'drop-after'));
+            tag.addEventListener('drop', (e) => {
+                if (!hasType(e, PALETTE_DRAG)) return;
+                e.preventDefault();
+                const raw = e.dataTransfer.getData(PALETTE_DRAG);
+                const from = raw !== '' ? parseInt(raw, 10) : dragPaletteIdx;
+                const side = dropSide(e, tag);
+                clearDropMarks(tag.parentElement);
+                movePalette(from, idx, side);
+            });
+        }
+        // Edits are keyed by name, so moving a palette moves nothing else.
+        function movePalette(from, to, side) {
+            if (!(from >= 0) || from === to || !curatedPalettes[from] || !curatedPalettes[to]) return;
+            const active = curatedPalettes[currentPaletteIndex];
+            const target = curatedPalettes[to];
+            const [p] = curatedPalettes.splice(from, 1);
+            let at = curatedPalettes.indexOf(target) + (side === 'after' ? 1 : 0);
+            curatedPalettes.splice(at, 0, p);
+            currentPaletteIndex = Math.max(0, curatedPalettes.indexOf(active));
+            try { localStorage.setItem('curatedPaletteIndex', String(currentPaletteIndex)); } catch (_) {}
+            persistPalettes();
+            refreshPaletteCarousel();
+        }
+        window.movePalette = movePalette;
+        window.movePaletteColour = moveColour;
+
         function renderActiveHead(unsaved) {
             const head = document.getElementById('paletteActiveHead');
             if (!head) return;
@@ -511,7 +642,7 @@
                 const chip = document.createElement('div');
                 chip.className = 'palette-chip';
                 chip.style.backgroundColor = hex;
-                chip.title = hex + '. Click to paint with it, right-click to replace or remove it.';
+                chip.title = hex + '. Click to paint with it, drag to move it, right-click to replace or remove it.';
                 chip.onclick = () => window.setColor(hex);
                 chip.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
@@ -519,6 +650,7 @@
                     openChipMenu(hex, e.clientX, e.clientY);
                 });
                 wrap.appendChild(chip);
+                wireChipDrag(wrap, hex);
                 el.appendChild(wrap);
             });
             const add = document.createElement('button');

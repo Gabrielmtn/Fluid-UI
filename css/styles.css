@@ -659,6 +659,15 @@
         /* Weight unchanged: a bold active tag was wider, and moved the rest. */
         .palette-tag.active { background: rgba(100,200,255,0.3); border-color: rgba(100,200,255,0.6); }
         .palette-tag-new { background: transparent; border-style: dashed; color: var(--ink-300, #c9d1d9); }
+        /* Drag to reorder: a bright edge where it will land */
+        .palette-tag { position: relative; }
+        .palette-tag.dragging, .palette-chip-wrap.dragging { opacity: 0.4; }
+        .palette-tag.drop-before::before, .palette-tag.drop-after::after,
+        .palette-chip-wrap.drop-before::before, .palette-chip-wrap.drop-after::after {
+            content: ''; position: absolute; top: -2px; bottom: -2px; width: 2px; border-radius: 1px; background: rgba(100,200,255,0.95);
+        }
+        .palette-tag.drop-before::before, .palette-chip-wrap.drop-before::before { left: -5px; }
+        .palette-tag.drop-after::after, .palette-chip-wrap.drop-after::after { right: -5px; }
         .palette-tag.editing { padding: 2px 4px; }
         .palette-tag-input { font: inherit; font-size: 13px; padding: 2px 4px; border-radius: 4px; border: 1px solid rgba(100,200,255,0.6); background: rgba(0,0,0,0.35); color: #e6edf3; min-width: 6ch; }
         .palette-active { margin-top: 2px; }
