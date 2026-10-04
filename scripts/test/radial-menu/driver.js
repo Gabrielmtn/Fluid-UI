@@ -3,7 +3,8 @@
 // WebSocket (Node 22+, no `ws`), trusted mouse / key / touch input, and a
 // clean Chrome profile per boot with the PhotoSafe warning, the startup fork
 // and the first-run hint already answered. boot({ seed }) puts more
-// localStorage keys in place before the app's first script runs.
+// localStorage keys in place before the app's first script runs; args adds
+// Chrome flags (the audio checks need --autoplay-policy=no-user-gesture-required).
 //
 // CHROME= overrides the browser; SHOT_DIR= makes shot(name) write PNGs there.
 'use strict';
@@ -50,7 +51,7 @@ async function boot(opts) {
     const dbg = 9400 + Math.floor(Math.random() * 400);
     const profile = path.join(os.tmpdir(), 'fluid-radial-e2e-' + dbg);
     const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=' + dbg, '--user-data-dir=' + profile,
-        '--window-size=1600,900', '--no-first-run', '--no-default-browser-check', '--mute-audio', 'about:blank'], { stdio: 'ignore' });
+        '--window-size=1600,900', '--no-first-run', '--no-default-browser-check', '--mute-audio'].concat(opts.args || [], ['about:blank']), { stdio: 'ignore' });
     let target = null;
     for (let i = 0; i < 80 && !target; i++) {
         await sleep(250);
