@@ -804,7 +804,13 @@
                 if (splatOutActive && depositCredit) {
                     const outMult = getSplatOutMult();
                     const outVel2 = splatOutDx * splatOutDx + splatOutDy * splatOutDy;
-                    if (outMult <= 0.001 || outVel2 < 0.0002) {
+                    // Ends on the taper, on a crawl (under 0.3 px a frame; it used
+                    // to wait for ~0 and dab the lift point for seconds), or after
+                    // TAIL_MAX_FRAMES credited frames. Over time keeps its own
+                    // clock (05d getSplatOutMult), so the frame cap skips it.
+                    splatTailFrames++;
+                    const tailCapped = window.splatOutMode !== 'time' && splatTailFrames > TAIL_MAX_FRAMES;
+                    if (outMult <= 0.001 || outVel2 < TAIL_END_V2 || tailCapped) {
                         // Arm-color advance no longer flushes here: the tail
                         // can die while stabilizer dabs still drain. The
                         // full-idle gate above owns the flush.
@@ -820,8 +826,17 @@
                                 (typeof animationMultiplier === 'number' ? animationMultiplier : 1), true);
                         }
                     } else {
-                        // Tail dye honors the Flow slider like the stroke it ends
-                        const tailFlow = (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
+                        // Tail dye honors the Flow slider like the stroke it ends,
+                        // and the distance it covers: the tail lays one dab a FRAME,
+                        // so a slow one stacked full dabs on the lift point. Each
+                        // dab takes the brush engine's share for its step (05d0
+                        // dabFlowShare: step / the reference spacing, at most 1), so
+                        // the tail lays the stroke's dye per pixel.
+                        const tailStep = Math.sqrt(outVel2) / 10;
+                        const tailRefPx = (config.BRUSH_SPACING_REF || 0.35) *
+                            Math.max(4, 2 * Math.sqrt(config.SPLAT_RADIUS) * canvas.height);
+                        const tailFlow = ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1) *
+                            Math.min(1, tailStep / tailRefPx);
                         const tailCol = tailFlow === 1 ? splatOutColor
                             : [splatOutColor[0] * tailFlow, splatOutColor[1] * tailFlow, splatOutColor[2] * tailFlow];
                         // Easing inertia: decay velocity with a cubic ease-out

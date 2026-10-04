@@ -40,6 +40,57 @@
         // of the canvas width; accumulated in the update loop (05j).
         let splatStrokeDist = 0;   // travel since press (drives splat-in)
         let splatTailDist = 0;     // travel of the post-release tail (drives splat-out)
+        let splatTailFrames = 0;   // credited frames the tail has run (05j caps it)
+        // ─── Release velocity (user test 3: "no motion inertia after mouseup") ──
+        // The tail used to start from the LAST move event's delta alone: a
+        // hand that eased off before lifting gave it almost nothing, and one
+        // that stopped, held, then lifted got a stale delta from before it
+        // stopped. Then, barely moving, it never travelled far enough to finish
+        // its taper and laid full-size dabs at the lift point until the speed
+        // decayed to ~0 (measured ~2.7 s). Now the speed is the hand's average
+        // over its last ~80 ms; below a floor there is no tail, it ends when it
+        // moves under a third of a pixel a frame, and it never runs more than
+        // TAIL_MAX_FRAMES. Units are the tail's own: px per frame × 10, what
+        // pointer.dx carries.
+        const RELEASE_WINDOW_MS = 80;
+        const TAIL_START_V2 = 36;   // < 0.6 px a frame at the lift: the hand had stopped, no tail
+        const TAIL_END_V2 = 9;      // < 0.3 px a frame: done (was 0.0002, ~0.0014 px)
+        const TAIL_MAX_FRAMES = 54; // ~0.9 s at 60 Hz, whatever else
+        const moveTrail = [];       // { x, y, t } of the live stroke, canvas px / ms
+        function noteStrokeMove(x, y) {
+            const t = performance.now();
+            moveTrail.push({ x: x, y: y, t: t });
+            while (moveTrail.length > 2 && t - moveTrail[0].t > RELEASE_WINDOW_MS * 2) moveTrail.shift();
+        }
+        function releaseVelocity() {
+            const n = moveTrail.length;
+            if (!n) return { dx: 0, dy: 0 };
+            const last = moveTrail[n - 1];
+            if (performance.now() - last.t > RELEASE_WINDOW_MS) return { dx: 0, dy: 0 };   // stopped before the lift
+            let j = n - 1;
+            while (j > 0 && last.t - moveTrail[j - 1].t <= RELEASE_WINDOW_MS) j--;
+            const first = moveTrail[j];
+            const dt = last.t - first.t;
+            if (dt < 4) return { dx: pointer.dx, dy: pointer.dy };   // a single sample: its own delta
+            const k = 10 * (1000 / 60) / dt;
+            return { dx: (last.x - first.x) * k, dy: (last.y - first.y) * k };
+        }
+        // Arms the tail at a release (pointerup/cancel and touchend share it).
+        function armReleaseTail() {
+            const v = releaseVelocity();
+            moveTrail.length = 0;
+            if (v.dx * v.dx + v.dy * v.dy < TAIL_START_V2) { splatOutActive = false; return; }
+            splatUpTime = Date.now();
+            splatOutActive = true;
+            splatTailDist = 0;
+            splatTailFrames = 0;
+            splatReleaseInMult = getSplatInMult(); // size at release → no jump
+            splatOutX = pointer.x;
+            splatOutY = pointer.y;
+            splatOutDx = v.dx;
+            splatOutDy = v.dy;
+            splatOutColor = pointer.color.slice();
+        }
         let splatReleaseInMult = 1.0; // brush size fraction at release (so splat-out
                                       // tapers from the current size, not a jump to full)
         // Smallest radius multiplier the ramp will hand the shader. Not a
@@ -1068,6 +1119,7 @@
             splatDownTime = Date.now();
             splatStrokeDist = 0;
             splatOutActive = false;
+            moveTrail.length = 0;
             applyPickerColor();
             // D2/D3 routing: sketch and mask strokes are surface paint — no
             // fluid replay events, no recording timelines, no multiplayer
@@ -1192,6 +1244,7 @@
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
+            if (pointer.down) noteStrokeMove(coords.x, coords.y);
             if (typeof broadcastCursor === 'function') {
                 broadcastCursor(coords.x / canvas.width, coords.y / canvas.height);
             }
@@ -1234,15 +1287,7 @@
             // squirt a dye tail into the fluid at the wall's end, locally and
             // (once tails rode the wire) on every peer. Audit 2026-08-16.
             if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid') {
-                splatUpTime = Date.now();
-                splatOutActive = true;
-                splatTailDist = 0;
-                splatReleaseInMult = getSplatInMult(); // size at release → no jump
-                splatOutX = pointer.x;
-                splatOutY = pointer.y;
-                splatOutDx = pointer.dx;
-                splatOutDy = pointer.dy;
-                splatOutColor = pointer.color.slice();
+                armReleaseTail();
             }
             pointer.down = false;
             pointer.moved = false;
@@ -1674,6 +1719,7 @@
             splatDownTime = Date.now();
             splatStrokeDist = 0;
             splatOutActive = false;
+            moveTrail.length = 0;
             applyPickerColor();
             // Same sketch/mask routing as the pointerdown press (see the
             // audit note there): mask presses stamp the mask, never the fluid.
@@ -1719,6 +1765,7 @@
             pointer.dy = (coords.y - pointer.y) * 10.0;
             pointer.x = coords.x;
             pointer.y = coords.y;
+            if (pointer.down) noteStrokeMove(coords.x, coords.y);
             // D1 engine feed for touch (see pointermove note); spacing governs density
             if (pointer.down && window.BrushEngine && window.BrushEngine.isActive() && !isReplayActive) {
                 window.BrushEngine.move(coords.x, coords.y);
@@ -1756,15 +1803,7 @@
             if (pointer.down) {
                 // Same fluid-only tail gate as finishLeftStroke (audit note there)
                 if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid') {
-                    splatUpTime = Date.now();
-                    splatOutActive = true;
-                    splatTailDist = 0;
-                    splatReleaseInMult = getSplatInMult(); // size at release → no jump
-                    splatOutX = pointer.x;
-                    splatOutY = pointer.y;
-                    splatOutDx = pointer.dx;
-                    splatOutDy = pointer.dy;
-                    splatOutColor = pointer.color.slice();
+                    armReleaseTail();
                 }
                 pointer.down = false;
                 pointer.moved = false;
