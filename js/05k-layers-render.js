@@ -35,16 +35,27 @@
         // (click anywhere that is not those two), and the state reads off a
         // caret on the top border instead of a button competing for the same
         // space. o.visTarget is 'sim' or the layer index.
+        // A layer row (not the Sim's) also carries a trash button, shown only
+        // while the row is collapsed: an open row has Delete in its body, and
+        // a closed one had no way to delete at all (user test 3). It sits
+        // outside the show/hide column so that column stays one box wide and
+        // lines up with the Feather value of an open row.
+        const LAYER_TRASH_SVG = '<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">' +
+            '<path d="M2 3.4h8M4.6 3.4V2.1h2.8v1.3M3.2 3.4l.5 6.5h4.6l.5-6.5M5 5.2v3M7 5.2v3" fill="none" ' +
+            'stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         function layerHeaderHTML(o) {
             const titleAttrs = o.readonly
                 ? ' readonly'
                 : ` onchange="updateLayerTitle(${o.index}, this.value)"`;
+            const trash = o.readonly ? '' :
+                `<button type="button" class="btn--ghost btn--icon layer-head-delete" title="Delete this layer. Ctrl+Z brings it back." aria-label="Delete layer">${LAYER_TRASH_SVG}</button>`;
             return `<div class="layer-item-header">
                                 <span class="layer-collapse-caret" aria-hidden="true"></span>
                                 <div class="layer-thumbnail"${o.thumbStyle ? ` style="${o.thumbStyle}"` : ''}>${o.thumbText || ''}</div>
                                 <div class="layer-info">
                                     <input type="text" class="layer-title" value="${window.escHtml(o.title)}"${titleAttrs}>
                                 </div>
+                                ${trash}
                                 <div class="layer-controls">
                                     <label class="layer-vis" title="Show or hide this layer">
                                         <input type="checkbox" class="layer-vis-check" data-vis="${o.visTarget}"${o.visible ? ' checked' : ''}>
@@ -487,6 +498,19 @@
                         const t = visCheck.dataset.vis;
                         if (t === 'sim') { if (typeof toggleSimLayer === 'function') toggleSimLayer(); }
                         else if (typeof toggleLayer === 'function') toggleLayer(parseInt(t, 10));
+                    });
+                }
+                // The collapsed row's trash: its presses stop here too, so the
+                // header neither collapses nor starts a drag under them.
+                const headDelete = element.querySelector('.layer-head-delete');
+                if (headDelete) {
+                    const swallow = (ev) => ev.stopPropagation();
+                    ['mousedown','pointerdown','touchstart','dblclick'].forEach(evt =>
+                        headDelete.addEventListener(evt, swallow));
+                    headDelete.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        const idx = parseInt(element.dataset.layerIndex, 10);
+                        if (!isNaN(idx) && typeof window.deleteLayer === 'function') window.deleteLayer(idx);
                     });
                 }
                 // Mask / collision enable — same control, in the body row.

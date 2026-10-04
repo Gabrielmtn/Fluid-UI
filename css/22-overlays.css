@@ -873,6 +873,23 @@ body.focus-mode #canvas {
     outline: 2px solid rgba(120, 190, 255, 0.65);
     outline-offset: 2px;
 }
+/* Delete on a COLLAPSED layer row (05k layerHeaderHTML): a trash glyph just
+   left of the show/hide column. An open row has Delete in its body, so the
+   glyph goes; the column itself never changes width, so the boxes line up
+   down the list whichever rows are open. (Scoped under .layer-item so
+   display:none outranks button.btn--icon's inline-flex.) */
+.layer-item .layer-head-delete {
+    display: none;
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    opacity: 0.55;
+}
+.layer-item.collapsed .layer-head-delete { display: inline-flex; }
+.layer-head-delete:hover,
+.layer-head-delete:focus-visible { opacity: 1; }
+.layer-head-delete svg { display: block; }
 .layer-item-collapsible .layer-item-body {
     overflow: hidden;
     min-height: 0;
