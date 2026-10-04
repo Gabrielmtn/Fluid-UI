@@ -198,7 +198,8 @@
         // be from a right click menu"). A × appeared on hover, a misclick away
         // from the palette name, and its appearing pushed the tags onto new lines.
         // The menu is the brush-shape menu's (20 openShapeMenu): same look,
-        // body-mounted, Escape or a click elsewhere closes it.
+        // body-mounted, Escape or a click elsewhere closes it. Colours get one
+        // too (Paint with it, Replace, Remove).
         let paletteMenuEl = null;
         function closePaletteMenu() {
             if (!paletteMenuEl) return;
@@ -209,25 +210,30 @@
         }
         function onPaletteMenuOutside(e) { if (paletteMenuEl && !paletteMenuEl.contains(e.target)) closePaletteMenu(); }
         function onPaletteMenuKey(e) { if (e.key === 'Escape') closePaletteMenu(); }
-        function openPaletteMenu(idx, name, x, y) {
+        function openPalMenu(title, items, x, y, swatch) {
             closePaletteMenu();
             const m = document.createElement('div');
             m.className = 'brush-shape-menu palette-menu';
             const head = document.createElement('div');
             head.className = 'brush-shape-menu-head';
-            head.textContent = name;
-            head.title = name;
+            head.textContent = title;
+            head.title = title;
+            if (swatch) {
+                const sw = document.createElement('span');
+                sw.className = 'palette-menu-swatch';
+                sw.style.backgroundColor = swatch;
+                head.prepend(sw);
+            }
             m.appendChild(head);
-            const item = (label, cls, fn) => {
+            items.forEach((it) => {
+                if (!it) return;
                 const b = document.createElement('button');
                 b.type = 'button';
-                b.className = 'brush-shape-menu-item' + (cls ? ' ' + cls : '');
-                b.textContent = label;
-                b.addEventListener('click', () => { closePaletteMenu(); fn(); });
+                b.className = 'brush-shape-menu-item' + (it.cls ? ' ' + it.cls : '');
+                b.textContent = it.label;
+                b.addEventListener('click', () => { closePaletteMenu(); it.fn(); });
                 m.appendChild(b);
-            };
-            item('Use this palette', '', () => applyPalette(idx));
-            item('Delete…', 'danger', () => showDeleteModal(idx, name));
+            });
             document.body.appendChild(m);
             const r = m.getBoundingClientRect();
             m.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
@@ -238,6 +244,131 @@
                 document.addEventListener('keydown', onPaletteMenuKey, true);
             }, 0);
         }
+        function hasColourEdits(idx) { return !!userPaletteOverlay(idx); }
+        function openPaletteMenu(idx, name, x, y) {
+            openPalMenu(name, [
+                { label: 'Use this palette', fn: () => applyPalette(idx) },
+                { label: 'Rename', fn: () => renameInline(idx) },
+                { label: 'Duplicate', fn: () => duplicatePalette(idx) },
+                hasColourEdits(idx) ? { label: 'Reset colours', fn: () => resetPaletteColors(idx) } : null,
+                { label: 'Delete…', cls: 'danger', fn: () => showDeleteModal(idx, name) }
+            ], x, y);
+        }
+        function openChipMenu(hex, x, y) {
+            const pick = pickerHex();
+            openPalMenu(hex, [
+                { label: 'Paint with this colour', fn: () => window.setColor(hex) },
+                pick !== hex ? { label: 'Replace with the picker colour', fn: () => replacePaletteColor(hex, pick) } : null,
+                { label: 'Remove', cls: 'danger', fn: () => window.removeColorFromPalette(hex) }
+            ], x, y, hex);
+        }
+
+        // ── Names ──
+        function nameTaken(name, exceptIdx) {
+            const n = String(name || '').trim().toLowerCase();
+            return curatedPalettes.some((p, i) => i !== exceptIdx && p.name.toLowerCase() === n);
+        }
+        function freeName(base) {
+            if (!nameTaken(base)) return base;
+            for (let k = 2; k < 1000; k++) if (!nameTaken(base + ' ' + k)) return base + ' ' + k;
+            return base + ' ' + Date.now();
+        }
+        // A palette of your own, appended and painted with at once.
+        function addOwnPalette(name, colors) {
+            const list = uniqueColors(colors.map(hexToFull));
+            curatedPalettes.push({ name, colors: list });
+            window.customPalettes.push({ name, colors: list.slice() });
+            persistPalettes();
+            applyPalette(curatedPalettes.length - 1);
+            return curatedPalettes.length - 1;
+        }
+        // + New starts a palette with the colour in the picker, named
+        // "Untitled", and puts its name up for editing in its tag. (Procreate's
+        // + sits at the end of the list too; Duplicate is in each palette's menu.)
+        function newPalette() {
+            const idx = addOwnPalette(freeName('Untitled'), [pickerHex()]);
+            renameInline(idx);
+        }
+        function duplicatePalette(idx) {
+            const colors = getPaletteColorsForIndex(idx);
+            const i = addOwnPalette(freeName(getPaletteName(idx)), colors.length ? colors : [pickerHex()]);
+            renameInline(i);
+        }
+        // Colours a look or preset brought, kept as a palette of their own.
+        function keepUnsavedColors() {
+            const colors = uniqueColors((savedColors || []).map(hexToFull));
+            if (!colors.length) return;
+            const idx = addOwnPalette(freeName('Look colours'), colors);
+            renameInline(idx);
+        }
+        function renamePalette(idx, newName) {
+            const p = curatedPalettes[idx];
+            const name = String(newName || '').trim();
+            if (!p || !name || name === p.name) return true;
+            if (nameTaken(name, idx)) { flashPaletteStatus('That name is taken', true); return false; }
+            const oldKey = userPaletteKey(idx);
+            const colors = getPaletteColorsForIndex(idx);
+            const custom = window.customPalettes.find(cp => cp.name === p.name);
+            if (custom) {
+                custom.name = name;
+                p.name = name;
+            } else {
+                // A built-in renamed becomes your own palette; the original
+                // name joins the deleted built-ins so it doesn't come back twice.
+                if (!window.deletedDefaultPalettes.includes(p.name)) window.deletedDefaultPalettes.push(p.name);
+                curatedPalettes[idx] = { name, colors: colors.slice() };
+                window.customPalettes.push({ name, colors: colors.slice() });
+            }
+            const up = window.userPalettes || {};
+            if (up[oldKey]) { up['name:' + name] = up[oldKey]; delete up[oldKey]; }
+            persistPalettes();
+            refreshPaletteCarousel();
+            renderPalettePreview(currentPaletteIndex);
+            return true;
+        }
+        // The tag's name becomes a text field: Enter keeps it, Escape or a
+        // click elsewhere leaves the name as it was.
+        function renameInline(idx) {
+            refreshPaletteCarousel();
+            const carousel = document.getElementById('paletteCarousel');
+            const tag = carousel && carousel.querySelector('.palette-tag[data-index="' + idx + '"]');
+            const p = curatedPalettes[idx];
+            if (!tag || !p) return;
+            tag.classList.add('editing');
+            tag.onclick = null;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'palette-tag-input';
+            input.value = p.name;
+            input.setAttribute('aria-label', 'Palette name');
+            input.style.width = Math.max(6, p.name.length + 1) + 'ch';
+            tag.innerHTML = '';
+            tag.appendChild(input);
+            let done = false;
+            const finish = (keep) => {
+                if (done) return;
+                done = true;
+                if (keep) renamePalette(idx, input.value);   // a taken name says so and keeps the old one
+                refreshPaletteCarousel();
+            };
+            input.addEventListener('input', () => { input.style.width = Math.max(6, input.value.length + 1) + 'ch'; });
+            input.addEventListener('keydown', (e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+                else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+            });
+            input.addEventListener('blur', () => finish(true));
+            input.focus();
+            input.select();
+        }
+        function resetPaletteColors(idx) {
+            const up = window.userPalettes || {};
+            delete up[userPaletteKey(idx)];
+            delete up[String(idx)];
+            persistPalettes();
+            if (idx === currentPaletteIndex) applyPalette(idx);
+            else renderPalettePreview(currentPaletteIndex);
+        }
 
         function refreshPaletteCarousel() {
             const carousel = document.getElementById('paletteCarousel');
@@ -246,8 +377,9 @@
             curatedPalettes.forEach((p, idx) => {
                 const tag = document.createElement('div');
                 tag.className = 'palette-tag';
+                tag.dataset.index = String(idx);
                 if (idx === currentPaletteIndex) tag.classList.add('active');
-                tag.title = p.name + '. Click to paint with it, right-click to delete it.';
+                tag.title = p.name + '. Click to paint with it, right-click to rename, duplicate or delete it.';
                 const nameSpan = document.createElement('span');
                 nameSpan.textContent = p.name;
                 tag.appendChild(nameSpan);
@@ -259,15 +391,14 @@
                 });
                 carousel.appendChild(tag);
             });
-        }
-
-        function canSaveNewPalette(name) {
-            if (!name || !name.trim()) return { valid: false, reason: 'Name is required' };
-            const nameTaken = curatedPalettes.some(p => p.name.toLowerCase() === name.toLowerCase());
-            if (nameTaken) return { valid: false, reason: 'Name already exists' };
-            const list = Array.isArray(savedColors) ? savedColors : [];
-            if (list.length === 0) return { valid: false, reason: 'No colors saved' };
-            return { valid: true };
+            const add = document.createElement('button');
+            add.type = 'button';
+            add.className = 'palette-tag palette-tag-new';
+            add.id = 'paletteNewBtn';
+            add.textContent = '+ New';
+            add.title = 'A new palette, starting with the colour in the picker';
+            add.addEventListener('click', newPalette);
+            carousel.appendChild(add);
         }
 
         function setPaletteColorsForIndex(index, colors) {
@@ -286,16 +417,93 @@
             } catch (_) {}
         }
 
+        // ── The palette you paint with: one row, edits save themselves ──
+        // User test 3: "Save as New isn't intuitively positioned", "'Save
+        // color' isn't good". There used to be two copies: a swatch tray (what
+        // Palette mode painted) and the palette (what Update saved it into).
+        // Now the row IS the palette: [+] adds the picker's colour (Shift+S),
+        // right-click a colour to replace or remove it (Shift+X removes the
+        // picker's), and every edit writes through. The tray stays only as the
+        // internal mirror the colour readers use. Colours a look or preset
+        // brought that match no palette show as "Unsaved colours · Keep".
+        function pickerHex() {
+            const cp = document.getElementById('colorPicker');
+            return hexToFull(cp ? cp.value : '#FFFFFF');
+        }
+        function trayIsUnsaved() {
+            const tray = Array.isArray(savedColors) ? savedColors : [];
+            return tray.length > 0 && colorsKey(tray) !== colorsKey(getPaletteColorsForIndex(currentPaletteIndex));
+        }
+        window.paletteIsUnsaved = trayIsUnsaved;
+        function flashPaletteStatus(text, bad) {
+            const status = document.getElementById('paletteImportStatus');
+            if (!status) return;
+            status.textContent = text;
+            status.style.color = bad ? '#ff6b6b' : '';
+            status.classList.add('show');
+            clearTimeout(status._t);
+            status._t = setTimeout(() => { status.classList.remove('show'); status.style.color = ''; status.textContent = ''; }, 1600);
+        }
+        function editActiveColors(fn) {
+            if (trayIsUnsaved()) {
+                const next = fn(uniqueColors(savedColors.map(hexToFull)));
+                if (next && typeof colorStorage !== 'undefined') colorStorage.save(next);
+            } else {
+                const next = fn(getPaletteColorsForIndex(currentPaletteIndex));
+                if (next) setPaletteColorsForIndex(currentPaletteIndex, next);
+            }
+            if (typeof window.pinArmSteps === 'function') window.pinArmSteps();
+        }
+        window.addColorToPalette = function (hex) {
+            const h = hexToFull(hex || pickerHex());
+            editActiveColors((list) => {
+                if (list.includes(h)) { flashPaletteStatus('Already in this palette'); return null; }
+                return list.concat([h]);
+            });
+        };
+        window.removeColorFromPalette = function (hex) {
+            const h = hexToFull(hex || pickerHex());
+            editActiveColors((list) => {
+                if (!list.includes(h)) { flashPaletteStatus('That colour isn\'t in this palette'); return null; }
+                return list.filter(c => c !== h);
+            });
+        };
+        function replacePaletteColor(oldHex, newHex) {
+            const o = hexToFull(oldHex), n = hexToFull(newHex);
+            editActiveColors((list) => list.includes(n) ? list.filter(c => c !== o) : list.map(c => c === o ? n : c));
+        }
         function removePaletteColor(index, hex) {
             const list = getPaletteColorsForIndex(index);
             const next = list.filter(c => c.toUpperCase() !== hexToFull(hex).toUpperCase());
             setPaletteColorsForIndex(index, next);
         }
 
+        function renderActiveHead(unsaved) {
+            const head = document.getElementById('paletteActiveHead');
+            if (!head) return;
+            head.innerHTML = '';
+            const name = document.createElement('span');
+            name.className = 'palette-active-name';
+            name.textContent = unsaved ? 'Unsaved colours' : getPaletteName(currentPaletteIndex);
+            head.appendChild(name);
+            if (unsaved) {
+                name.title = 'These came with a look or preset and match none of your palettes';
+                const keep = document.createElement('button');
+                keep.type = 'button';
+                keep.className = 'palette-keep btn--ghost';
+                keep.textContent = 'Keep';
+                keep.title = 'Keep these colours as a palette of your own';
+                keep.addEventListener('click', keepUnsavedColors);
+                head.appendChild(keep);
+            }
+        }
+
         function renderPalettePreview(index) {
             const el = document.getElementById('palettePreview');
-            if (!el || !curatedPalettes[index]) return;
-            const list = getPaletteColorsForIndex(index);
+            if (!el) return;
+            const unsaved = trayIsUnsaved();
+            const list = unsaved ? uniqueColors(savedColors.map(hexToFull)) : getPaletteColorsForIndex(currentPaletteIndex);
+            renderActiveHead(unsaved);
             el.innerHTML = '';
             list.forEach(hex => {
                 const wrap = document.createElement('div');
@@ -303,16 +511,24 @@
                 const chip = document.createElement('div');
                 chip.className = 'palette-chip';
                 chip.style.backgroundColor = hex;
+                chip.title = hex + '. Click to paint with it, right-click to replace or remove it.';
                 chip.onclick = () => window.setColor(hex);
-                const rm = document.createElement('button');
-                rm.className = 'palette-remove';
-                rm.textContent = '×';
-                rm.title = 'Remove from palette';
-                rm.onclick = (e) => { e.stopPropagation(); removePaletteColor(index, hex); };
+                chip.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openChipMenu(hex, e.clientX, e.clientY);
+                });
                 wrap.appendChild(chip);
-                wrap.appendChild(rm);
                 el.appendChild(wrap);
             });
+            const add = document.createElement('button');
+            add.type = 'button';
+            add.id = 'paletteAddChip';
+            add.className = 'palette-chip palette-add';
+            add.textContent = '+';
+            add.title = 'Add the colour in the picker to this palette (Shift+S)';
+            add.addEventListener('click', () => window.addColorToPalette());
+            el.appendChild(add);
         }
 
         function updatePaletteStepIndicator() {
@@ -443,119 +659,6 @@
             const autoload = window.settingsManager?.get('settings.autoload');
             if (!autoload && curatedPalettes.length > 0) {
                 applyPalette(currentPaletteIndex || 0);
-            }
-            const updateBtn = document.getElementById('updatePaletteBtn');
-            const saveNewBtn = document.getElementById('saveNewPaletteBtn');
-            const nameInputRow = document.getElementById('paletteNameInput');
-            const nameInput = document.getElementById('newPaletteName');
-            const confirmBtn = document.getElementById('confirmSaveBtn');
-            const cancelBtn = document.getElementById('cancelSaveBtn');
-            const splitRow = document.querySelector('.palette-row-split');
-            const paletteLeft = document.querySelector('.palette-left');
-            const paletteRight = document.querySelector('.palette-right');
-
-            if (updateBtn) {
-                updateBtn.addEventListener('click', () => {
-                    const list = Array.isArray(savedColors) ? savedColors.slice() : [];
-                    if (list.length === 0) {
-                        const status = document.getElementById('paletteImportStatus');
-                        if (status) {
-                            status.textContent = 'No colors to update';
-                            status.style.color = '#ff6b6b';
-                            status.classList.add('show');
-                            setTimeout(() => { status.classList.remove('show'); status.style.color = '#3fb950'; status.textContent = ''; }, 2000);
-                        }
-                        return;
-                    }
-                    const normalized = uniqueColors(list.map(hexToFull));
-                    setPaletteColorsForIndex(currentPaletteIndex, normalized);
-                    // Also update the curatedPalettes array directly
-                    if (curatedPalettes[currentPaletteIndex]) {
-                        curatedPalettes[currentPaletteIndex].colors = normalized;
-                    }
-                    // Update customPalettes if this is a custom palette
-                    const paletteName = getPaletteName(currentPaletteIndex);
-                    const customIdx = window.customPalettes.findIndex(cp => cp.name === paletteName);
-                    if (customIdx >= 0) {
-                        window.customPalettes[customIdx].colors = list.slice();
-                    }
-                    persistPalettes();
-                    refreshPaletteCarousel();
-                    renderPalettePreview(currentPaletteIndex);
-                    const status = document.getElementById('paletteImportStatus');
-                    if (status) {
-                        status.textContent = 'Updated';
-                        status.classList.add('show');
-                        setTimeout(() => { status.classList.remove('show'); status.textContent = ''; }, 1200);
-                    }
-                    // Flash the button for feedback
-                    updateBtn.textContent = 'Updated';
-                    setTimeout(() => { updateBtn.textContent = 'Update'; }, 1200);
-                });
-            }
-            
-            const btnRow = document.querySelector('.palette-btn-row');
-            if (saveNewBtn) {
-                saveNewBtn.addEventListener('click', () => {
-                    if (btnRow) btnRow.style.display = 'none';
-                    if (nameInputRow) nameInputRow.style.display = 'flex';
-                    if (nameInput) { nameInput.value = ''; nameInput.focus(); }
-                    if (splitRow) splitRow.classList.add('full-width');
-                    if (paletteLeft) paletteLeft.style.display = 'none';
-                    if (paletteRight) paletteRight.classList.add('full-width');
-                });
-            }
-            
-            if (cancelBtn) {
-                cancelBtn.addEventListener('click', () => {
-                    if (nameInputRow) nameInputRow.style.display = 'none';
-                    if (btnRow) btnRow.style.display = 'flex';
-                    if (nameInput) nameInput.value = '';
-                    if (splitRow) splitRow.classList.remove('full-width');
-                    if (paletteLeft) paletteLeft.style.display = 'block';
-                    if (paletteRight) paletteRight.classList.remove('full-width');
-                });
-            }
-            
-            if (confirmBtn && nameInput) {
-                const doSave = () => {
-                    const name = (nameInput.value || '').trim();
-                    const validation = canSaveNewPalette(name);
-                    if (!validation.valid) {
-                        const status = document.getElementById('paletteImportStatus');
-                        if (status) {
-                            status.textContent = validation.reason;
-                            status.style.color = '#ff6b6b';
-                            status.classList.add('show');
-                            setTimeout(() => {
-                                status.classList.remove('show');
-                                status.style.color = '#3fb950';
-                                status.textContent = '';
-                            }, 2000);
-                        }
-                        return;
-                    }
-                    const list = Array.isArray(savedColors) ? savedColors.slice() : [];
-                    const normalized = uniqueColors(list.map(hexToFull));
-                    curatedPalettes.push({ name, colors: normalized });
-                    window.customPalettes.push({ name, colors: list.slice() });
-                    persistPalettes();
-                    refreshPaletteCarousel();
-                    applyPalette(curatedPalettes.length - 1);
-                    if (nameInputRow) nameInputRow.style.display = 'none';
-                    if (btnRow) btnRow.style.display = 'flex';
-                    nameInput.value = '';
-                    if (splitRow) splitRow.classList.remove('full-width');
-                    if (paletteLeft) paletteLeft.style.display = 'block';
-                    if (paletteRight) paletteRight.classList.remove('full-width');
-                    const status = document.getElementById('paletteImportStatus');
-                    if (status) { status.textContent = 'Saved'; status.classList.add('show'); setTimeout(() => { status.classList.remove('show'); status.textContent=''; }, 1200); }
-                };
-                confirmBtn.addEventListener('click', doSave);
-                nameInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); doSave(); }
-                    if (e.key === 'Escape') { e.preventDefault(); cancelBtn.click(); }
-                });
             }
         }
 

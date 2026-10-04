@@ -83,6 +83,9 @@
             return {
                 paletteIndex: (typeof currentPaletteIndex !== 'undefined') ? currentPaletteIndex : 0,
                 savedColors: Array.isArray(savedColors) ? savedColors.slice() : [],
+                // Shift+S / Shift+X edit the palette itself now, so undo keeps
+                // its colour edits too.
+                userPalettes: JSON.parse(JSON.stringify(window.userPalettes || {})),
                 randomOn: !!document.getElementById('randomColor')?.checked,
                 stepOn: !!document.getElementById('stepPalette')?.checked,
                 colorPickerValue: document.getElementById('colorPicker')?.value || '#ffffff',
@@ -108,6 +111,10 @@
                 const visualSel = document.getElementById('visualResolution');
                 const physSel = document.getElementById('physicsResolution');
                 const cp = document.getElementById('colorPicker');
+                if (s.userPalettes && typeof s.userPalettes === 'object') {
+                    window.userPalettes = JSON.parse(JSON.stringify(s.userPalettes));
+                    if (typeof window.persistPalettes === 'function') window.persistPalettes();
+                }
                 if (typeof applyPalette === 'function' && typeof s.paletteIndex === 'number') {
                     applyPalette(s.paletteIndex);
                 }

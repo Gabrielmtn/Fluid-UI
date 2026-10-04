@@ -3901,13 +3901,6 @@
     function buildColorsSection(controls) {
         const { sec, body } = makeSection('Colors and palettes', 'core', true);
 
-        // Color action buttons (Save / Clear)
-        const colorActions = controls.querySelector('.color-actions');
-        if (colorActions) body.appendChild(colorActions);
-
-        // Saved colors swatch area
-        moveEl('savedColors', body);
-
         // Step palette checkbox
         moveCheckboxGroup('stepPalette', body);
 

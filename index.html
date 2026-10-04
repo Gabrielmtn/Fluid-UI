@@ -576,11 +576,6 @@
         <div class="control-group">
             <label for="colorPicker">Fluid Color</label>
             <input type="color" id="colorPicker" value="#ff0000">
-            <div class="color-actions">
-                <button onclick="saveColor()">Save Color</button>
-                <button class="btn--destructive" onclick="clearColors()">Clear All</button>
-            </div>
-            <div class="saved-colors" id="savedColors"></div>
             <div class="control-group checkbox-group" style="margin-top: 8px;">
                 <input type="checkbox" id="randomColor" checked>
                 <label for="randomColor" style="margin: 0">Random Colors</label>
@@ -592,30 +587,15 @@
             <div style="margin-top: 10px;">
                 <label>Palettes <span id="paletteImportStatus" class="import-status"></span></label>
                 <div class="palette-carousel" id="paletteCarousel"></div>
-                <div class="palette-row-split">
-                    <div class="palette-left">
-                        <div class="palette-preview" id="palettePreview"></div>
-                        <div class="palette-step" id="paletteStepIndicator"></div>
-                    </div>
-                    <div class="palette-right">
-                        <div class="palette-create" id="paletteCreateRow">
-                            <div class="palette-btn-row">
-                                <button id="updatePaletteBtn">Update</button>
-                                <button id="saveNewPaletteBtn">+ Save as New</button>
-                            </div>
-                            <div class="palette-name-input" id="paletteNameInput" style="display:none;">
-                                <input type="text" id="newPaletteName" placeholder="Enter Palette Name" />
-                                <div class="palette-name-input-buttons">
-                                    <button id="confirmSaveBtn">Save</button>
-                                    <button id="cancelSaveBtn">Cancel</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="palette-active">
+                    <div class="palette-active-head" id="paletteActiveHead"></div>
+                    <div class="palette-preview" id="palettePreview"></div>
+                    <div class="palette-step" id="paletteStepIndicator"></div>
+                    <div class="palette-keys" id="paletteKeys">N / ⇧N step · ⇧S add · ⇧X remove · Ctrl+← → palette</div>
                 </div>
                 <div class="palette-actions">
-                    <button onclick="exportCurrentPaletteFluid()">Export Current</button>
-                    <button onclick="exportAllPalettesFluid()">Export All</button>
+                    <button onclick="exportCurrentPaletteFluid()">Export this</button>
+                    <button onclick="exportAllPalettesFluid()">Export all</button>
                     <button onclick="document.getElementById('paletteFluidFile').click()">Import</button>
                     <input type="file" id="paletteFluidFile" accept=".fluid,text/plain" style="display:none" onchange="importPalettesFluidFromFile(this.files[0]); this.value='';" />
                 </div>
@@ -1614,8 +1594,8 @@
                         <li>R — Toggle Random Colors</li>
                         <li>A — Toggle Palette Mode (new colour each stroke)</li>
                         <li>N — Next Color</li>
-                        <li>Shift+S — Save Color</li>
-                        <li>Shift+X — Clear Colors</li>
+                        <li>Shift+S — Add the picker colour to the palette</li>
+                        <li>Shift+X — Remove the picker colour from the palette</li>
                         <li>Ctrl+← / Ctrl+→ — Prev/Next Palette</li>
                     </ul>
                 </div>

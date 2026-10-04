@@ -10,11 +10,12 @@
 
         
 
+        // Shift+S and Shift+X: the picker's colour into, or out of, the
+        // palette you paint with (01-config). There is no separate tray of
+        // saved colours any more.
         window.saveColor = () => {
 
-            const color = document.getElementById('colorPicker').value;
-
-            colorStorage.add(color);
+            if (typeof window.addColorToPalette === 'function') window.addColorToPalette();
 
         };
 
@@ -22,53 +23,21 @@
 
         window.clearColors = () => {
 
-            colorStorage.clear();
+            if (typeof window.removeColorFromPalette === 'function') window.removeColorFromPalette();
 
         };
 
         
 
+        // The tray is the active palette's mirror now; its one view is the
+        // palette row, which also shows colours a look brought ("Unsaved").
         function renderSavedColors() {
 
-            const container = document.getElementById('savedColors');
-
-            container.innerHTML = '';
-
-            savedColors.forEach(color => {
-
-                const wrap = document.createElement('div');
-
-                wrap.className = 'swatch-wrap';
-
-                const swatch = document.createElement('div');
-
-                swatch.className = 'color-swatch';
-
-                swatch.style.backgroundColor = color;
-
-                swatch.onclick = () => window.setColor(color);
-
-                const rm = document.createElement('button');
-
-                rm.className = 'swatch-remove';
-
-                rm.textContent = '×';
-
-                rm.title = 'Remove color';
-
-                rm.onclick = (e) => { e.stopPropagation(); colorStorage.remove(color); };
-
-                wrap.appendChild(swatch);
-
-                wrap.appendChild(rm);
-
-                container.appendChild(wrap);
-
-            });
+            if (typeof renderPalettePreview === 'function') renderPalettePreview();
 
         }
 
-        
+
 
         function trackMouseMovement(e) {
 

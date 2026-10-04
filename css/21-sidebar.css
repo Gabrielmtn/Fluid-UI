@@ -956,38 +956,14 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 #sidebar-right .palette-actions button {
     flex: 1;
-}
-#sidebar-right .palette-row-split {
-    gap: 6px;
-    flex-direction: column;
-}
-#sidebar-right .palette-left,
-#sidebar-right .palette-right {
-    width: 100%;
+    padding: 4px 6px;
+    font-size: var(--font-xs, 10px);
+    white-space: nowrap;
 }
 #sidebar-right .palette-preview {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-}
-#sidebar-right .palette-btn-row {
-    display: flex;
-    gap: 4px;
-    width: 100%;
-}
-#sidebar-right .palette-btn-row button {
-    flex: 1;
-}
-#sidebar-right .palette-create button {
-    width: 100%;
-}
-#sidebar-right .palette-name-input {
-    width: 100%;
-}
-#sidebar-right .palette-name-input input {
-    width: 100%;
-    box-sizing: border-box;
-    font-size: 11px;
 }
 
 /* Preview toggle in sidebar */
@@ -998,10 +974,6 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     font-size: 11px;
 }
 
-/* Color actions in sidebar */
-#sidebar-right .color-actions {
-    margin-top: 0;
-}
 /* Saved colors in sidebar */
 #sidebar-right .saved-colors {
     min-height: 30px;

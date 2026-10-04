@@ -194,12 +194,20 @@
           ] },
         { id: 'random-colour', pillar: 'colour', title: 'A new colour every stroke',
           tags: ['random', 'rnd', 'cycle', 'palette', 'each', 'stroke', 'colour', 'change'],
-          answer: 'In the Color cell switch Rnd for a random colour per stroke, or Cycle to walk through the palette. R and A toggle them from the keyboard.',
+          answer: 'In the Color cell switch Rnd for a random colour per stroke, or Palette to walk through the palette. R and A toggle them from the keyboard.',
           hotkey: 'R / A', target: { strip: 'Color', sel: '.ch-text-toggle', text: 'Rnd' },
           demo: { label: 'Try random colours', run() { if (typeof window.setActiveBrushColorMode !== 'function') return; window.setActiveBrushColorMode('random'); return () => window.setActiveBrushColorMode('fixed'); } },
           steps: [
             { say: 'In the Color cell switch Rnd on.', key: 'R', target: { strip: 'Color', sel: '.ch-text-toggle', text: 'Rnd' }, until: { active: true } },
-            { say: 'Paint: every stroke gets a new colour. Cycle walks the palette in order instead.', note: 'Click Rnd again for one fixed colour.', target: { canvas: true }, until: { pointer: true } }
+            { say: 'Paint: every stroke gets a new colour. Palette walks the palette in order instead.', note: 'Click Rnd again for one fixed colour.', target: { canvas: true }, until: { pointer: true } }
+          ] },
+        { id: 'make-palette', pillar: 'colour', title: 'Make a palette of your own',
+          tags: ['palette', 'new', 'make', 'create', 'save', 'colour', 'add', 'remove', 'rename', 'duplicate'],
+          answer: 'Colors and palettes → + New starts a palette with the colour in the picker. The + after its colours adds the picker colour (Shift+S); right-click a colour to replace or remove it. Every change saves itself.',
+          hotkey: 'Shift+S', target: { section: 'Colors and palettes', sel: '#paletteNewBtn' },
+          steps: [
+            { say: 'Click + New. It starts with the colour in the picker; type a name and press Enter.', target: { section: 'Colors and palettes', sel: '#paletteNewBtn' }, until: { click: true } },
+            { say: 'Pick a colour, then click + to add it (or press Shift+S). Right-click a colour to replace or remove it.', target: { section: 'Colors and palettes', sel: '#paletteAddChip' } }
           ] },
         { id: 'palettes', pillar: 'colour', title: 'Use a palette',
           tags: ['palette', 'palettes', 'curated', 'set', 'scheme', 'next', 'previous'],

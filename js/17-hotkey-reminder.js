@@ -80,11 +80,8 @@
             return g ? (g.querySelector('label') || g) : null;
         };
     }
-    function colorActionBtn(index) {
-        return function () {
-            var btns = document.querySelectorAll('.color-actions button');
-            return btns[index] || null;
-        };
+    function byId(id) {
+        return function () { return document.getElementById(id); };
     }
     function paletteRow() {
         return function () {
@@ -109,8 +106,8 @@
     // the channel labels need. Strip bindings live in the appended row and
     // the F1 modal; in-place caps are a sidebar affordance.
     var CAPS = [
-        { keys: '⇧S',     mod: '',           title: 'Shift+S — save current colour',      where: colorActionBtn(0) },
-        { keys: '⇧X',     mod: '',           title: 'Shift+X — clear saved colours',      where: colorActionBtn(1) },
+        { keys: '⇧S',     mod: '',           title: 'Shift+S — add the picker colour to the palette',      where: byId('paletteAddChip') },
+        { keys: '⇧X',     mod: '',           title: 'Shift+X — remove the picker colour from the palette', where: byId('palettePreview') },
         { keys: '⌃←→',    mod: 'ctrl',       title: 'Ctrl+← / → — cycle palette',         where: paletteRow() },
         { keys: 'N',      mod: '',           title: 'N — next colour (Shift: previous)',  where: paletteRow() },
         { keys: 'C',      mod: '',           title: 'Toggle brush cursor',                where: checkboxRow('cursorToggle') },
