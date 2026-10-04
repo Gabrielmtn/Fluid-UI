@@ -265,17 +265,17 @@
           steps: [
             { say: 'Click the 🧱 button in the Layers header.', target: { section: 'Layers', sel: 'button[title^="Add Collision Layer"]' }, until: { visible: '.collision-source-menu' } },
             { say: 'Choose From Image… and pick a picture, or From Canvas to use what is painted right now.', target: { sel: '.collision-source-menu' }, until: { visible: '#maskEditorOverlay' } },
-            { say: 'Cut the subject out: click it, then Instant Roto It. Brush and Stamps refine the edge.', target: { overlay: 'mask', sel: '#samSegmentBtn', fallback: { overlay: 'mask', sel: '#smartSelectBtn' } }, until: [{ click: '#samSegmentBtn' }, { hidden: '#maskEditorOverlay' }] },
+            { say: 'Cut the subject out. On a plain background, drag Filter’s Cut amount until only the shape is left; otherwise open Instant Roto, click the subject, then Instant Roto It.', target: { overlay: 'mask', sel: '#filterThreshold', fallback: { overlay: 'mask', sel: '#smartSelectBtn' } }, until: [{ change: '#filterThreshold' }, { click: '#samSegmentBtn' }, { hidden: '#maskEditorOverlay' }] },
             { say: 'Next softens the edge; Apply Mask finishes. The cut-out becomes a wall.', target: { overlay: 'mask', sel: '.mask-apply-btn', fallback: { overlay: 'mask', sel: '#maskWizardNext' } }, until: { hidden: '#maskEditorOverlay' } },
             { say: 'The wall is a collision layer in Layers. Uncheck Collision to switch it off; Edit Collider redraws it.', target: { layer: 'collision', fallback: { section: 'Layers' } } }
           ] },
         { id: 'mask-layer', pillar: 'layers', title: 'Cut an object out of a picture',
           tags: ['mask', 'cut', 'out', 'roto', 'instant', 'background', 'remove', 'feather'],
-          answer: 'Create Mask on a layer row opens the mask editor. Instant Roto clicks an object out for you; brush and shapes refine it. The same screen can make it a collider.',
+          answer: 'Create Mask on a layer row opens the mask editor. Filter keys out a plain background with one slider; Instant Roto clicks an object out for you; brush and shapes refine it. The same screen can make it a collider.',
           target: { section: 'Layers' },
           steps: [
             { say: 'Open the picture’s row in Layers and click Create Mask.', needs: 'imageLayer', target: { layer: 'image', sel: '.mask-control-btn', text: ['Create Mask', 'Edit Mask'] }, until: { visible: '#maskEditorOverlay' } },
-            { say: 'Instant Roto: click the object, then Instant Roto It. Brush and Stamps refine what it found.', target: { overlay: 'mask', sel: '#samSegmentBtn', fallback: { overlay: 'mask', sel: '#smartSelectBtn' } }, until: [{ click: '#samSegmentBtn' }, { hidden: '#maskEditorOverlay' }] },
+            { say: 'Filter opens first: on a plain background, drag Cut amount until only the object is left. Otherwise open Instant Roto, click the object, then Instant Roto It.', target: { overlay: 'mask', sel: '#filterThreshold', fallback: { overlay: 'mask', sel: '#smartSelectBtn' } }, until: [{ change: '#filterThreshold' }, { click: '#samSegmentBtn' }, { hidden: '#maskEditorOverlay' }] },
             { say: 'Next softens the edge. Tick “Also make this a collision layer” if the paint should flow around it, then Apply Mask.', target: { overlay: 'mask', sel: '.mask-apply-btn', fallback: { overlay: 'mask', sel: '#maskWizardNext' } }, until: { hidden: '#maskEditorOverlay' } }
           ] },
         { id: 'fluidize', pillar: 'layers', title: 'Pour a picture into the fluid',

@@ -173,7 +173,35 @@
 .mask-actions {
     display: flex;
     gap: 8px;
-    margin-left: auto;
+}
+
+/* Delete / Clear All and the zoom, floating on the image's corner (js/15,
+   user test 3). Only the bar takes the pointer; the canvas keeps the rest. */
+.mask-canvas-bar {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: rgba(13, 17, 23, 0.86);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+.mask-zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+#maskZoomLevel {
+    min-width: 48px;
+    text-align: center;
+    font-size: 12px;
+    color: #c9d1d9;
+    font-variant-numeric: tabular-nums;
 }
 
 .mask-action-btn {
@@ -493,7 +521,7 @@
     cursor: default;
 }
 
-/* ── Step 1 tool tabs: Instant Roto · Stamps · Filter ────────────────────────
+/* ── Step 1 tool tabs: Filter · Instant Roto · Stamps ────────────────────────
    One panel below, one selected tab above. The tabs sit on the panel rather
    than floating over it, so the group reads as a single control. */
 .mask-tool-tabs {
@@ -604,6 +632,20 @@
     font-size: 12px;
     color: #8b949e;
     cursor: pointer;
+}
+/* Invert rides at the end of the Background row. */
+.mask-filter-row .mask-filter-check { margin-left: auto; }
+
+/* Cut amount: the one control the Filter tab is about. The panel's last row,
+   so it sits right above the picture; capped (it stretched across a 1200 px
+   panel) and ringed so the eye goes to it first (user test 3). */
+.mask-filter-row.mask-filter-cut {
+    max-width: 480px;
+    margin: 4px 0 0;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: rgba(88, 166, 255, 0.1);
+    box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.6), 0 0 16px rgba(88, 166, 255, 0.35);
 }
 
 /* Each tool keeps its own accent so the tabs stay recognisable at a glance

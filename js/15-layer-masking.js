@@ -347,16 +347,18 @@
                     <!-- Step 1's three ways to make a selection, as tabs over
                          one panel. #smartSelectBtn / #stampMenuBtn keep their
                          ids: toggleSmartSelect and updateStampMenuDisplay
-                         drive them by id and are unchanged. -->
+                         drive them by id and are unchanged. Filter comes
+                         first and is the tab the editor opens on (user test
+                         3; wizardBegin). -->
                     <div class="mask-tools-row mask-tool-tabs" role="tablist">
+                        <button id="filterToolBtn" class="mask-tool-tab" data-tool="filter" onclick="window.setMaskTool('filter')" title="Key out a solid background&#10;Pick the background colour, drag the cut up — the shape falls out of it">
+                            <span class="mask-tool-tab-icon">🎚️</span> Filter
+                        </button>
                         <button id="smartSelectBtn" class="mask-tool-tab" data-tool="magic" onclick="window.setMaskTool('magic')" title="AI-powered object masking&#10;Click objects and the model cuts them out for you&#10;First use: downloads a ~40 MB model (cached locally)">
                             <span class="mask-tool-tab-icon">🪄</span> Instant Roto
                         </button>
                         <button id="stampMenuBtn" class="mask-tool-tab" data-tool="stamps" onclick="window.setMaskTool('stamps')" title="Stamp shapes onto the mask&#10;Rectangles, circles, stars and more — drag to place, resize with the handle">
                             <span class="mask-tool-tab-icon">▦</span> Stamps
-                        </button>
-                        <button id="filterToolBtn" class="mask-tool-tab" data-tool="filter" onclick="window.setMaskTool('filter')" title="Key out a solid background&#10;Pick the background colour, drag the cut up — the shape falls out of it">
-                            <span class="mask-tool-tab-icon">🎚️</span> Filter
                         </button>
                         <span id="samLoadingStatus" style="font-size: 12px; color: #8b949e; align-self: center;"></span>
                     </div>
@@ -385,14 +387,16 @@
                             <input type="color" id="filterBgColor" value="#000000" title="The colour being cut away">
                             <button type="button" id="filterPickBtn" class="mask-action-btn" title="Then click the background on the image">Pick</button>
                             <button type="button" id="filterAutoBtn" class="mask-action-btn" title="Guess it from the edges of the image">Auto</button>
+                            <label class="mask-filter-check" title="Keep the background and drop the subject instead">
+                                <input type="checkbox" id="filterInvert"> Invert
+                            </label>
                         </div>
-                        <label class="mask-filter-row">
+                        <!-- Last in the panel, so nothing sits between it and
+                             the picture it cuts; ringed so it is found first. -->
+                        <label class="mask-filter-row mask-filter-cut">
                             <span class="mask-filter-label">Cut amount</span>
                             <input type="range" id="filterThreshold" min="0" max="100" step="1" value="0" data-no-scale="1">
                             <span id="filterThresholdValue" class="mask-filter-value">0%</span>
-                        </label>
-                        <label class="mask-filter-check">
-                            <input type="checkbox" id="filterInvert"> Invert — keep the background, drop the subject
                         </label>
                     </div>
                     <div id="smartSelectControls" class="mask-tool-panel" style="display: none; background: rgba(63, 185, 80, 0.08); padding: 12px; margin-bottom: 8px; border: 1px solid rgba(63, 185, 80, 0.2);">
@@ -405,7 +409,7 @@
                             • Shift+Click: Pan view
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button id="samSegmentBtn" class="mask-action-btn" onclick="window.runSAMSegmentation()" style="flex: 1; background: linear-gradient(180deg, #238636, #1a7f37);" disabled>
+                            <button id="samSegmentBtn" class="mask-action-btn" onclick="window.runSAMSegmentation()" style="flex: 0 0 auto; background: linear-gradient(180deg, #238636, #1a7f37);" disabled>
                                 ✨ Instant Roto It
                             </button>
                             <button class="mask-action-btn" onclick="window.clearSAMPoints()">
@@ -457,22 +461,28 @@
                             <span id="maskRotationValue" style="min-width: 50px; text-align: right; font-weight: 600; color: #58a6ff;">0°</span>
                         </label>
                     </div>
-                    <div class="mask-actions">
-                        <button class="mask-action-btn" onclick="window.deleteMaskShape()">Delete</button>
-                        <button class="mask-action-btn" onclick="window.clearMaskShapes()">Clear All</button>
-                    </div>
-                    <div class="mask-zoom-controls" style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 6px;">
-                        <button class="mask-zoom-btn" onclick="window.maskZoomOut()" title="Zoom Out">−</button>
-                        <span id="maskZoomLevel" style="min-width: 60px; text-align: center; font-size: 13px; color: #c9d1d9;">100%</span>
-                        <button class="mask-zoom-btn" onclick="window.maskZoomIn()" title="Zoom In">+</button>
-                        <button class="mask-zoom-btn" onclick="window.maskResetZoom()" title="Reset Zoom" style="margin-left: 8px;">⊙</button>
-                    </div>
                 </div>
                 <div id="maskHint" class="mask-hint" style="padding: clamp(4px, 0.8vh, 8px) clamp(12px, 2vw, 20px); background: rgba(88, 166, 255, 0.1); border-top: 1px solid rgba(88, 166, 255, 0.2); border-bottom: 1px solid rgba(88, 166, 255, 0.2); font-size: clamp(11px, 1.3vh, 13px); color: #8b949e; text-align: center; flex-shrink: 0;">
                     <strong style="color: #58a6ff;">💡 Tip:</strong> Scroll to zoom • Middle-click to pan • Shift+Drag for fine positioning
                 </div>
                 <div class="mask-canvas-container">
                     <canvas id="maskEditorCanvas" class="mask-editor-canvas"></canvas>
+                    <!-- On the image (user test 3): Delete / Clear All act on
+                         what is drawn there, and as rows of their own these
+                         put two more rows between the tools and the picture.
+                         The wizard still shows .mask-actions in step 1 only. -->
+                    <div class="mask-canvas-bar">
+                        <div class="mask-actions">
+                            <button class="mask-action-btn" onclick="window.deleteMaskShape()" title="Delete the selected shape">Delete</button>
+                            <button class="mask-action-btn" onclick="window.clearMaskShapes()" title="Remove every shape from the mask">Clear All</button>
+                        </div>
+                        <div class="mask-zoom-controls">
+                            <button class="mask-zoom-btn" onclick="window.maskZoomOut()" title="Zoom Out">−</button>
+                            <span id="maskZoomLevel">100%</span>
+                            <button class="mask-zoom-btn" onclick="window.maskZoomIn()" title="Zoom In">+</button>
+                            <button class="mask-zoom-btn" onclick="window.maskResetZoom()" title="Reset Zoom">⊙</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="mask-editor-footer">
                     <button class="mask-cancel-btn" onclick="window.exitMaskMode(false)">Cancel</button>
@@ -2400,7 +2410,7 @@
     const TOUCHUP_HISTORY = 6; // full-canvas snapshots — deep enough to fix a slip
 
     const STEP_HINTS = {
-        1: '<strong style="color:#58a6ff;">Step 1 — Select:</strong> 🪄 Instant Roto clicks an object out for you, or stamp shapes by hand • Scroll to zoom • Middle-click to pan',
+        1: '<strong style="color:#58a6ff;">Step 1 — Select:</strong> Filter cuts a plain background away, Instant Roto clicks an object out, Stamps by hand • Scroll to zoom • Middle-click to pan',
         2: '<strong style="color:#3fb950;">Step 2 — Touch up:</strong> Erase the strays, add anything missed • Right-drag = the other tool • Shift+drag pans',
         3: '<strong style="color:#d2a8ff;">Step 3 — Soften &amp; finish:</strong> Blue shows what the mask covers • Set the edge softness, then Apply'
     };
@@ -3254,6 +3264,19 @@
         maskState.filterBgPicked = false;
         maskState.filterShape = null;
         invalidateFilterPreview();
+        // Instant Roto left on by a cancelled session reopened engaged, still
+        // holding that session's picture (user test 3). Every open comes
+        // through here, so it stands down here.
+        if (maskState.smartSelectMode && typeof window.toggleSmartSelect === 'function') {
+            try { window.toggleSmartSelect(); } catch (_) {}
+        }
+        maskState.stampMenuOpen = false;
+        // Filter is the tab the editor opens on (user test 3): a picture
+        // brought in to cut out usually sits on a plain background, and the
+        // cut is one slider. Left at 0 it adds nothing to the mask.
+        setFilterMode(true);
+        if (!maskState.filterBgPicked) retryFilterAutoPick();
+        updateStampMenuDisplay();
         filterSyncControls();
         syncMaskToolTabs();
 
@@ -3272,6 +3295,24 @@
         if (tv) tv.textContent = String(maskState.touchUpSize);
         touchUpSyncButtons();
         wizardSyncUI();
+    }
+
+    // The picture may still be decoding when the editor opens: keep trying
+    // the background guess for a couple of seconds, while Filter is still the
+    // tab and no colour has been picked by hand.
+    function retryFilterAutoPick() {
+        let tries = 0;
+        (function again() {
+            if (!maskState.filterMode || maskState.filterBgPicked || tries++ > 20) return;
+            if (autoPickFilterBackground()) {
+                maskState.filterBgPicked = true;
+                invalidateFilterPreview();
+                filterSyncControls();
+                scheduleMaskRender();
+                return;
+            }
+            setTimeout(again, 100);
+        })();
     }
 
     function wizardEnd() {
