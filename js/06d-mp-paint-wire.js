@@ -1107,21 +1107,42 @@ function broadcastPreset(presetName) {
 // no offsets: their batch is due all at once, exactly the old behaviour.
 //
 // Kill switch: config.MP_INBOUND_QUEUE = false restores apply-on-arrival.
-var _inboundSplats = [];       // [{data, n, idx, base}] — base = local ms at which dab t=0 plays
-var _inboundQueuedDabs = 0;    // dabs still to apply across the queue
+//
+// ONE QUEUE PER SENDER (2026-10-04, user test 3: "any number of users get
+// their motions effectively and accurately sent"). It used to be one FIFO
+// and one stream clock for the whole room: a message not due yet held up
+// everyone behind it, one painter's burst pushed another's paint out of the
+// cap, and two painters' clocks fought over one offset. Now each sender
+// keeps its own queue and its own stream clock, the frame's budget is
+// shared out in turn (a rotating start, unspent shares offered on), and an
+// overflow evicts from whoever has queued the most. A phone artist joining
+// two computers is already three senders.
+var _inboundQueues = new Map();   // clientId → { id, q: [{data, n, idx, base}|{kind:'text',…}], dabs, paceOffset, lastArrival, dropped }
+var _inboundQueuedDabs = 0;    // dabs still to apply across every queue
 var _inboundDropped = 0;
-// Stream clock: the smallest (local arrival − sender timestamp) seen for the
-// current burst of messages. Skew and latency ride in it together, which is
-// fine — only the DIFFERENCE between consecutive messages matters — and a
-// quiet gap re-baselines it so a new stroke never inherits a stale estimate.
-var _paceOffset = null;
-var _paceLastArrival = 0;
+var _inboundRR = 0;            // whose turn starts the next drain
+// Stream clock, per sender: the smallest (local arrival − sender timestamp)
+// seen for that sender's current burst. Skew and latency ride in it
+// together, which is fine — only the DIFFERENCE between consecutive
+// messages matters — and a quiet gap re-baselines it so a new stroke never
+// inherits a stale estimate.
 var PACE_STREAM_GAP_MS = 800;
 // Cap in QUEUED DABS rather than messages, since a message is 1 to 96 of them.
 // 2000 is half a second of the drain budget: long enough to ride out a burst
 // or a slow frame, short enough that a client which simply cannot keep up
 // stays close to live instead of playing back an ever-lengthening tape.
 var INBOUND_QUEUE_MAX_DABS = 2000;
+var INBOUND_IDLE_FORGET_MS = 15000;   // an empty queue nobody has written to for this long goes
+
+function inboundQueue(id) {
+    var key = id || '?';
+    var Q = _inboundQueues.get(key);
+    if (!Q) {
+        Q = { id: key, q: [], dabs: 0, paceOffset: null, lastArrival: 0, dropped: 0 };
+        _inboundQueues.set(key, Q);
+    }
+    return Q;
+}
 
 function inboundDabCount(data) {
     var d = data && data.data;
@@ -1141,50 +1162,57 @@ function enqueueRemoteSplat(data) {
     // for dab i is (timestamp − span + t_i); shift that onto ours and add the
     // jitter buffer. A message without offsets has span 0 and plays whole.
     var span = (Array.isArray(dabs) && dabs.length) ? dabTime(dabs[Math.min(dabs.length, DAB_MAX_PER_MSG) - 1]) : 0;
-    _inboundSplats.push({ data: data, n: n, idx: 0, base: paceBase(data, span) });
+    var Q = inboundQueue(data && data.clientId);
+    Q.q.push({ data: data, n: n, idx: 0, base: paceBase(data, span, Q) });
+    Q.dabs += n;
     _inboundQueuedDabs += n;
     trimInbound();
 }
 
 // Local ms at which element t=0 of this message plays: the sender's clock
 // for its last element is the message timestamp, so element i is at
-// (timestamp − span + t_i) there — shifted onto ours through the stream
-// clock, plus the jitter buffer. Shared by dab trains and text pours, so a
-// painter's strokes and pours keep their relative timing here.
-function paceBase(data, span) {
+// (timestamp − span + t_i) there — shifted onto ours through that SENDER's
+// stream clock, plus the jitter buffer. Shared by dab trains and text pours,
+// so a painter's strokes and pours keep their relative timing here.
+function paceBase(data, span, Q) {
+    Q = Q || inboundQueue(data && data.clientId);
     var now = Date.now();
     var ts = (data && typeof data.timestamp === 'number' && isFinite(data.timestamp)) ? data.timestamp : now;
-    if (_paceOffset === null || now - _paceLastArrival > PACE_STREAM_GAP_MS) _paceOffset = now - ts;
-    else _paceOffset = Math.min(_paceOffset, now - ts);
-    _paceLastArrival = now;
-    return ts - span + _paceOffset + DAB_PACE_JITTER_MS;
+    if (Q.paceOffset === null || now - Q.lastArrival > PACE_STREAM_GAP_MS) Q.paceOffset = now - ts;
+    else Q.paceOffset = Math.min(Q.paceOffset, now - ts);
+    Q.lastArrival = now;
+    return ts - span + Q.paceOffset + DAB_PACE_JITTER_MS;
 }
 
-// Overflow drops from the FRONT. Dropping paint diverges this canvas from
-// the sender's permanently (there is no resync path), so it is a genuine
-// loss either way — but dropping the OLDEST keeps the visible stroke head
-// moving with the peer's cursor, where dropping the newest would show a
-// stroke lagging further behind reality the longer the overload lasts.
+// Overflow drops from the FRONT of the BUSIEST sender's queue. Dropping
+// paint diverges this canvas from the sender's permanently (there is no
+// resync path), so it is a genuine loss either way — but dropping the OLDEST
+// keeps the visible stroke head moving with the peer's cursor, and taking it
+// from whoever has queued the most means a flood costs the flooder, not the
+// friend drawing one long line next to it.
 function trimInbound() {
-    while (_inboundQueuedDabs > INBOUND_QUEUE_MAX_DABS && _inboundSplats.length > 1) {
-        var gone = _inboundSplats.shift();
-        _inboundQueuedDabs -= (gone.n - gone.idx);
+    while (_inboundQueuedDabs > INBOUND_QUEUE_MAX_DABS) {
+        var worst = null;
+        _inboundQueues.forEach(function (Q) {
+            if (Q.q.length > 1 && (!worst || Q.dabs > worst.dabs)) worst = Q;
+        });
+        if (!worst) break;   // every sender is down to one message: keep it
+        var gone = worst.q.shift();
+        var left = gone.n - gone.idx;
+        worst.dabs -= left;
+        _inboundQueuedDabs -= left;
+        worst.dropped++;
         _inboundDropped++;
     }
 }
 
-// Drained once per frame from 05j. Applies every dab whose play time has come,
-// oldest first, up to the budget; a message that is not due yet holds the
-// queue (nothing behind it can be due before it). Always retires at least one
-// due dab so a train larger than the budget can never wedge the queue.
-window.__mpDrainInbound = function (budget) {
-    if (!_inboundSplats.length) return;
-    var now = Date.now();
-    var bud = Math.max(1, budget | 0);
+// One sender's share of a frame: every element whose play time has come,
+// oldest first, up to cap. A message that is not due yet holds THIS
+// sender's queue only. Returns what it spent.
+function drainSender(Q, cap, now, ctx) {
     var spent = 0;
-    var poured = 0;
-    while (_inboundSplats.length && spent < bud) {
-        var e = _inboundSplats[0];
+    while (Q.q.length && spent < cap) {
+        var e = Q.q[0];
         if (e.kind === 'text') {
             // Beside the shared budget a pour keeps the local hold's own
             // ceiling per frame (23 pourRoom: the dab budget, held to eight
@@ -1194,36 +1222,66 @@ window.__mpDrainInbound = function (budget) {
             if (T && typeof T.pourRoom === 'function') {
                 try { textCap = T.pourRoom(e.owner, e.look, e.cw, e.ch); } catch (_) {}
             }
-            var room = Math.min(bud - spent, textCap - poured);
+            var room = Math.min(cap - spent, textCap - ctx.poured);
             var jt = e.idx;
             while (jt < e.n && (jt - e.idx) < room && e.base + e.pours[jt][3] <= now) jt++;
             if (jt === e.idx) break; // not due yet, or this frame's pours are spent
             applyRemoteTextPours(e, e.idx, jt);
-            poured += (jt - e.idx);
+            ctx.poured += (jt - e.idx);
             spent += (jt - e.idx);
-            _inboundQueuedDabs -= (jt - e.idx);
+            Q.dabs -= (jt - e.idx);
             e.idx = jt;
-            if (e.idx >= e.n) _inboundSplats.shift();
+            if (e.idx >= e.n) Q.q.shift();
             continue;
         }
         var dabs = e.data && e.data.data && e.data.data.dabs;
         if (!Array.isArray(dabs) || !dabs.length) {
             // Legacy single splat (press stamp, or a peer on the old wire).
             if (e.base > now) break;
-            _inboundSplats.shift();
-            _inboundQueuedDabs -= (e.n - e.idx);
+            Q.q.shift();
+            Q.dabs -= (e.n - e.idx);
             spent += 1;
             handleRemoteSplat(e.data);
             continue;
         }
         var j = e.idx;
-        while (j < e.n && e.base + dabTime(dabs[j]) <= now && (spent + (j - e.idx)) < bud) j++;
+        while (j < e.n && e.base + dabTime(dabs[j]) <= now && (spent + (j - e.idx)) < cap) j++;
         if (j === e.idx) break; // the head is not due yet
         handleRemoteSplat(e.data, e.idx, j);
         spent += (j - e.idx);
-        _inboundQueuedDabs -= (j - e.idx);
+        Q.dabs -= (j - e.idx);
         e.idx = j;
-        if (e.idx >= e.n) _inboundSplats.shift();
+        if (e.idx >= e.n) Q.q.shift();
+    }
+    return spent;
+}
+
+// Drained once per frame from 05j, under the same budget a local brush
+// gets. Each sender with something due gets an equal share, starting from
+// a sender that rotates every frame; whatever a share leaves unspent goes
+// round again to whoever still has paint due. Every share is at least one
+// element, so a train larger than the budget can never wedge a queue.
+window.__mpDrainInbound = function (budget) {
+    if (!_inboundQueuedDabs) return;
+    var now = Date.now();
+    var bud = Math.max(1, budget | 0);
+    var live = [];
+    _inboundQueues.forEach(function (Q, key) {
+        if (Q.q.length) live.push(Q);
+        else if (now - Q.lastArrival > INBOUND_IDLE_FORGET_MS) _inboundQueues.delete(key);
+    });
+    if (!live.length) { _inboundQueuedDabs = 0; return; }
+    var ctx = { poured: 0 };
+    var spentAll = 0;
+    var start = (_inboundRR++) % live.length;
+    for (var pass = 0; pass < 2 && spentAll < bud; pass++) {
+        var share = Math.max(1, Math.ceil((bud - spentAll) / live.length));
+        for (var k = 0; k < live.length && spentAll < bud; k++) {
+            var Q = live[(start + k) % live.length];
+            var got = drainSender(Q, Math.min(share, bud - spentAll), now, ctx);
+            spentAll += got;
+            _inboundQueuedDabs -= got;
+        }
     }
     if (_inboundQueuedDabs < 0) _inboundQueuedDabs = 0;
     if (_inboundDropped && !window.__mpDropWarned) {
@@ -1240,7 +1298,7 @@ window.__mpDrainInbound = function (budget) {
 // those dabs were drawn and then erased a moment later. Net result identical,
 // minus the work.
 window.__mpFlushInbound = function () {
-    _inboundSplats.length = 0;
+    _inboundQueues.forEach(function (Q) { Q.q.length = 0; Q.dabs = 0; });
     _inboundQueuedDabs = 0;
 };
 
@@ -1252,8 +1310,15 @@ window.__mpFlushInbound = function () {
 // smallest opening that lets a test drive the real receive path.
 window.__mpInboundProbe = {
     push: function (msg) { enqueueRemoteSplat(msg); },
-    depth: function () { return { messages: _inboundSplats.length, dabs: _inboundQueuedDabs, dropped: _inboundDropped }; },
-    reset: function () { window.__mpFlushInbound(); _inboundDropped = 0; _paceOffset = null; }
+    depth: function () {
+        var messages = 0, senders = {};
+        _inboundQueues.forEach(function (Q) {
+            messages += Q.q.length;
+            senders[Q.id] = { messages: Q.q.length, dabs: Q.dabs, dropped: Q.dropped };
+        });
+        return { messages: messages, dabs: _inboundQueuedDabs, dropped: _inboundDropped, senders: senders };
+    },
+    reset: function () { _inboundQueues.clear(); _inboundQueuedDabs = 0; _inboundDropped = 0; }
 };
 
 // Peer paint numerics are UNTRUSTED. The relay enforces a 16KB size cap and
@@ -1899,8 +1964,10 @@ function enqueueRemoteTextPour(data) {
     if (!pours.length) return;
     var e = { kind: 'text', owner: data.clientId, look: d.look, cw: cw, ch: ch, pours: pours, n: pours.length, idx: 0, base: 0 };
     if (window.config && window.config.MP_INBOUND_QUEUE === false) { applyRemoteTextPours(e, 0, e.n); return; }
-    e.base = paceBase(data, pours[pours.length - 1][3]);
-    _inboundSplats.push(e);
+    var Q = inboundQueue(data.clientId);
+    e.base = paceBase(data, pours[pours.length - 1][3], Q);
+    Q.q.push(e);
+    Q.dabs += e.n;
     _inboundQueuedDabs += e.n;
     trimInbound();
 }
