@@ -101,12 +101,88 @@ function clearRemoteCursors() {
     cursors.forEach(cursor => cursor.remove());
 }
 
-// Update multiplayer status in UI
-function updateMultiplayerStatus(status) {
-    const statusEl = document.getElementById('multiplayerStatus');
-    if (statusEl) {
-        statusEl.textContent = status;
+// ── The status line ─────────────────────────────────────────────────
+// One line says everything about the room, and it is built here and nowhere
+// else:   {Activity}[ · clock] · {people}[ · lock]
+// The activity is the most important thing that is true right now: getting
+// connected beats everything, then a stranger search, then whose turn it is,
+// then just being together. The clock is the countdown when the rotation has
+// one; people is "just you" or "N here" (left off until the room has
+// answered, when there is no count to give); the lock says nobody new can
+// come in, or whose look the room runs on. The dot is green once someone
+// else is here and amber until then. The room code is never printed: it is
+// an invitation (see renderShareMode), and this line is on screen in every
+// share mode. Until 2026-10-04 the panel said the same things in three
+// places (a status row, a lock badge and a line under the queue), and a turn
+// showed its clock three times.
+function roomSocketOpen() {
+    return isMultiplayerEnabled && !!partySocket && partySocket.readyState === WebSocket.OPEN;
+}
+
+function roomActivity() {
+    if (!currentRoom) return 'Finding a stranger…';   // the lobby has not given us a room yet
+    if (!roomSocketOpen()) return 'Connecting…';      // first connect and every reconnect
+    var stranger = isStrangerRoom();
+    if (stranger && connectedClients < 2) return 'Waiting for a stranger…';
+    if (turnsOn) {
+        var once = isOneSwirlMode();
+        if (isMyTurn()) return once ? (_oneSwirlSpent ? 'Passing…' : 'Your call') : 'Your turn';
+        // No holder is the instant between two painters.
+        if (!turnHolderId) return 'Passing…';
+        return shortName(turnHolderId) + (once ? '’s call' : '’s turn');
     }
+    if (connectedClients >= 2) return stranger ? 'Swirling with a stranger' : 'Swirling together';
+    return 'Waiting for friends';
+}
+
+// The parts after the activity, with the sentence each one stands for (the
+// line's tooltip), so a word like "locked" is never left unexplained.
+function roomStatusParts() {
+    var parts = [], tips = [];
+    var open = !!currentRoom && roomSocketOpen();
+    if (open && turnsOn && !isOneSwirlMode() && turnDeadlineLocal) {
+        parts.push(fmtRemaining());
+        tips.push('The brush passes on when the clock runs out.');
+    } else if (open && isOneSwirlMode()) {
+        tips.push('One swirl each, then the brush passes on.');
+    }
+    if (open) {
+        parts.push(connectedClients >= 2 ? connectedClients + ' here' : 'just you');
+        if (!isStrangerRoom() && roomLocked) {
+            parts.push('locked');
+            tips.push('Locked: nobody new can join, even with the code.');
+        }
+        // Turns supersede the look lock (the painter's look is the room's).
+        if (!turnsOn && myRole === 'host' && settingsLockOn) {
+            parts.push('your look');
+            tips.push('Everyone in the room uses your look settings.');
+        } else if (!turnsOn && window.__mpSettingsLocked) {
+            parts.push('host’s look');
+            tips.push('Your look settings follow the host’s while they lock them.');
+        }
+    }
+    return { parts: parts, tip: tips.join('\n'), open: open, together: open && connectedClients >= 2 };
+}
+
+function renderRoomStatus() {
+    var el = document.getElementById('multiplayerStatus');
+    var dot = document.getElementById('connectionDot');
+    var p = roomStatusParts();
+    var text = [roomActivity()].concat(p.parts).join(' · ');
+    if (el) {
+        if (el.textContent !== text) el.textContent = text;
+        el.title = p.tip;
+    }
+    // Amber pulses while there is no room yet, and holds steady once we
+    // are in one with nobody else.
+    if (dot) dot.className = 'mp-dot ' + (p.together ? 'mp-dot-connected' : p.open ? 'mp-dot-alone' : 'mp-dot-connecting');
+}
+
+// 06a still calls this with its own words ("Reconnecting (2)..."). The line
+// is built from state now, so a reconnect reads "Connecting…" like any other
+// connect, and nothing outside this file writes the line directly.
+function updateMultiplayerStatus() {
+    renderRoomStatus();
 }
 
 // ─── UI helpers ───
@@ -119,18 +195,14 @@ function setShown(id, shown) {
 function showMatchmaking() {
     setShown('mpDisconnected', false);
     setShown('mpConnected', true);
-    var dot = document.getElementById('connectionDot');
-    if (dot) dot.className = 'mp-dot mp-dot-connecting';
-    updateMultiplayerStatus('Finding a stranger…');
-    ['roomDisplay', 'shareHint', 'copyRoomRow', 'lockRoomBtn', 'lockBadge'].forEach(function(id) { setShown(id, false); });
+    renderRoomStatus();
+    ['roomDisplay', 'shareHint', 'copyRoomRow', 'lockRoomBtn'].forEach(function(id) { setShown(id, false); });
 }
 
 function showConnecting() {
     setShown('mpDisconnected', false);
     setShown('mpConnected', true);
-    var dot = document.getElementById('connectionDot');
-    if (dot) dot.className = 'mp-dot mp-dot-connecting';
-    updateMultiplayerStatus(isStrangerRoom() ? 'Finding a stranger…' : 'Connecting…');
+    renderRoomStatus();
     setShown('roomDisplay', !isStrangerRoom());
     if (!isStrangerRoom()) renderShareMode();
 }
@@ -138,8 +210,6 @@ function showConnecting() {
 function showConnectedUI() {
     setShown('mpDisconnected', false);
     setShown('mpConnected', true);
-    var dot = document.getElementById('connectionDot');
-    if (dot) dot.className = 'mp-dot mp-dot-connected';
     updateConnectedView();
 }
 
@@ -150,13 +220,10 @@ function updateConnectedView() {
     var isHost = myRole === 'host';
 
     if (stranger) {
-        var alone = connectedClients < 2;
-        updateMultiplayerStatus(alone ? 'Waiting for a stranger…' : 'Swirling with a stranger');
-        // Waiting alone is NOT the same as swirling together, so the dot goes
-        // amber while alone. It only ever reads "alone" before anyone arrives
+        // Waiting alone is NOT the same as swirling together (the status
+        // line says which). It only ever reads "alone" before anyone arrives
         // now — a partner LEAVING ends the room outright (strangerPartnerLeft).
-        var dot = document.getElementById('connectionDot');
-        if (dot) dot.className = alone ? 'mp-dot mp-dot-connecting' : 'mp-dot mp-dot-connected';
+        var alone = connectedClients < 2;
         if (alone) {
             if (strangerWasPaired) {
                 // They left, so the pairing is over (see strangerPartnerLeft).
@@ -176,7 +243,6 @@ function updateConnectedView() {
         }
     } else {
         stopStrangerKeepAlive();
-        updateMultiplayerStatus(roomLocked ? 'Room locked' : 'Connected');
     }
 
     // Room code / share / copy: private rooms only (you can't invite to a 1:1 pairing).
@@ -202,11 +268,8 @@ function updateConnectedView() {
         sLockBtn.textContent = settingsLockOn ? 'Unlock settings' : 'Lock settings';
         sLockBtn.classList.toggle('active', settingsLockOn);
     }
-    // Locked badge: non-host members see why no one else can join.
-    setShown('lockBadge', !stranger && roomLocked && !isHost);
 
-    updateTurnUI();
-    updateUsersDisplay();
+    updateTurnUI();   // ends in renderRoomStatus
     // Host changes, counts and room kind decide the phone door and who
     // answers phones (js/54-phone-pads.js).
     if (window.PhonePads) window.PhonePads.onRoom();
@@ -223,11 +286,6 @@ function showDisconnectedUI() {
     var rc = document.getElementById('reconnectBtn');
     if (rc) rc.style.display = 'none';
     if (window.PhonePads) window.PhonePads.onRoom();
-}
-
-function updateUsersDisplay() {
-    var el = document.getElementById('connectedUsers');
-    if (el) el.textContent = connectedClients + (connectedClients === 1 ? ' artist' : ' artists');
 }
 
 // `notice` marks an outcome that is not a failure (a stranger leaving) so it
@@ -323,7 +381,7 @@ function renderShareMode() {
         hintEl.textContent =
             (hintOverride && Date.now() < hintOverride.until) ? hintOverride.text :
             mode === 'qr'     ? 'Point a phone camera at this to join.' :
-            mode === 'hidden' ? 'Hidden — safe to show on a stream. Copy still works.' :
+            mode === 'hidden' ? 'Hidden, so it is safe to show on a stream. Copy still works.' :
                                 'Send a friend the link, or read them the code.';
     }
 }
@@ -371,7 +429,7 @@ function copyRoomCode(fromCreate, what) {
         // button half the panel wide cannot. renderShareMode puts the mode's
         // own hint back.
         if (fromCreate) {
-            hintOverride = { text: 'Link copied — send it to a friend.', until: Date.now() + 3000 };
+            hintOverride = { text: 'Link copied. Send it to a friend.', until: Date.now() + 3000 };
             renderShareMode();
             setTimeout(function () { hintOverride = null; renderShareMode(); }, 3100);
         }

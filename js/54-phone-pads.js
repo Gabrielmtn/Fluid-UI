@@ -244,24 +244,22 @@
         return e;
     }
 
+    var PHONE_DOOR = '📱 Paint from your phone';
+
     function mountButtons() {
         var disc = document.getElementById('mpDisconnected');
         if (disc && !document.getElementById('phonePadBtn')) {
+            // The third way in, a step quieter than the two doors above it
+            // (ghost: no plate until hover). What it does is the tooltip;
+            // the line of explanation under it went with the panel's others.
             var before = document.getElementById('mpError');
-            var btn = el('button', 'mp-btn-primary btn--emphasis', 'Paint from your phone');
+            var btn = el('button', 'btn--ghost mp-btn-phone-door', PHONE_DOOR);
             btn.id = 'phonePadBtn';
             btn.type = 'button';
-            btn.title = 'Show a code your phone can scan: it becomes this canvas’s mouse, or an artist in your room. Nothing to install.';
+            btn.title = 'Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.';
             btn.addEventListener('click', function () { open(); });
-            var nodes = [
-                el('div', 'mp-or', 'or'),
-                btn,
-                el('div', 'mp-sub', 'Use your phone as this canvas’s mouse, or let phones join as artists. Scan a code, paint on the phone, watch it here. Nothing to install.')
-            ];
-            nodes.forEach(function (n) {
-                if (before && before.parentNode === disc) disc.insertBefore(n, before);
-                else disc.appendChild(n);
-            });
+            if (before && before.parentNode === disc) disc.insertBefore(btn, before);
+            else disc.appendChild(btn);
         }
         // In a room the door belongs to the panel, NOT to the invite block:
         // the invite is about letting other people in, and a stranger
@@ -287,7 +285,7 @@
         var pm = mouse();
         var mouseOn = !!(pm && pm.hasPhone());
         var b1 = document.getElementById('phonePadBtn');
-        if (b1) b1.textContent = mouseOn ? 'Paint from your phone · connected' : 'Paint from your phone';
+        if (b1) b1.textContent = mouseOn ? PHONE_DOOR + ' · connected' : PHONE_DOOR;
         var b = document.getElementById('phonePadRoomBtn');
         if (!b) return;
         // Nothing hides this one: the panel it lives in is shown exactly

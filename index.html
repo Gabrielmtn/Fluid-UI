@@ -1258,28 +1258,29 @@
         <div id="multiArtistPanel">
             <!-- ── Not in a room ── -->
             <div id="mpDisconnected">
-                <div class="mp-hint">Paint on the same canvas as someone else, live.</div>
-                <button id="createRoomBtn" class="mp-btn-primary btn--emphasis">Start a room</button>
-                <div class="mp-sub">You get a code to send to whoever you want.</div>
-                <div class="mp-join-row">
-                    <input type="text" id="joinRoomInput" placeholder="Paste a room code" maxlength="48" spellcheck="false" autocomplete="off" aria-label="Room code to join">
-                    <button id="joinRoomBtn">Join</button>
+                <!-- The two ways in side by side, then the join box. What each
+                     one does lives in its tooltip: the panel is for doing,
+                     and three paragraphs of explanation buried the buttons. -->
+                <div class="mp-door-row">
+                    <button id="createRoomBtn" class="mp-btn-primary btn--emphasis" title="Paint on the same canvas as someone else, live. You get a code to send to whoever you want.">Start a room</button>
+                    <button id="strangerBtn" class="mp-btn-primary btn--emphasis" title="Swirl with a stranger: pairs you with one other person who is also looking. When either of you leaves, the swirl ends.">Stranger</button>
                 </div>
-                <div class="mp-or">or</div>
-                <button id="strangerBtn" class="mp-btn-primary btn--emphasis">Swirl With a Stranger</button>
-                <div class="mp-sub">Pairs you with one other person who is also looking. When either of you leaves, the swirl is over — ask again for a new one.</div>
+                <div class="mp-join-row">
+                    <input type="text" id="joinRoomInput" placeholder="Paste a code" maxlength="48" spellcheck="false" autocomplete="off" aria-label="Room code to join">
+                    <button id="joinRoomBtn" title="Join a friend's room with the code or link they sent you">Join</button>
+                </div>
                 <div id="mpError" class="mp-error" style="display:none" role="alert"></div>
                 <button id="reconnectBtn" style="display:none; width:100%; margin-top:8px;">Reconnect</button>
             </div>
 
             <!-- ── In a room ── -->
             <div id="mpConnected" style="display:none">
+                <!-- One line for the whole room, built by 06e renderRoomStatus:
+                     what is happening, the turn clock, who is here, the locks. -->
                 <div class="mp-status-row">
-                    <div id="connectionDot" class="mp-dot mp-dot-connected"></div>
-                    <span id="multiplayerStatus">Connected</span>
-                    <span id="connectedUsers" class="mp-users">1 here</span>
+                    <div id="connectionDot" class="mp-dot mp-dot-connecting"></div>
+                    <span id="multiplayerStatus" role="status">Connecting…</span>
                 </div>
-                <div id="lockBadge" class="mp-lock-badge" style="display:none">Locked — invite only</div>
 
                 <!-- Invite block. The three share modes exist because a room
                      code on screen is a live invitation: fine at a table,
@@ -1323,7 +1324,6 @@
                 </div>
 
                 <div id="turnWheel" class="mp-turn-wheel" style="display:none"></div>
-                <div id="turnStatus" class="mp-turn-status" style="display:none"></div>
                 <button id="turnPassBtn" class="mp-btn-pass" style="display:none" title="Hand the brush to the next artist in the rotation">Pass turn</button>
 
                 <button id="disconnectBtn" class="mp-btn-leave">Leave room</button>

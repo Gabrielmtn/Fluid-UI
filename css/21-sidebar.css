@@ -1019,24 +1019,6 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
         oklch(12% 0.020 var(--sec-h, 242) / 0.85) 100%);
 }
 
-/* One-line answer to "what is this section" — a headline, not a footnote. */
-.mp-hint {
-    font-size: 13px;
-    line-height: 1.4;
-    font-weight: 500;
-    color: var(--ink-100, #f2f3f5);
-    margin: 0 0 12px;
-}
-/* The line under a choice that says what picking it actually does. Both
-   entry points are one click, so the difference between them has to be
-   readable before you commit. */
-.mp-sub {
-    font-size: 11px;
-    line-height: 1.45;
-    color: var(--ink-300, #b9bec7);
-    margin: 6px 0 0;
-}
-
 /* The two ways in. Same weight: neither is the "real" one. Sized here (the
    container sets the button-size variables, per 01-buttons) — the emphasis
    tint comes from the class in the markup. */
@@ -1047,6 +1029,20 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     width: 100%;
     margin: 0;
     font-weight: 600;
+}
+
+/* The two ways in sit side by side, and wrap to a stack when the sidebar is
+   dragged narrow. What each one does is its tooltip (2026-10-04): the lines
+   of explanation that used to sit under them pushed the buttons apart. */
+.mp-door-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.mp-door-row .mp-btn-primary {
+    flex: 1 1 96px;
+    width: auto;
+    min-width: 0;
 }
 
 .mp-join-row {
@@ -1086,24 +1082,13 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     flex: 0 0 auto;
 }
 
-/* Rule — or — rule. A bare "or" floating between two buttons was the
-   quietest thing in the panel; the lines make it a divider. */
-.mp-or {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 11px;
-    letter-spacing: 1.2px;
-    text-transform: uppercase;
-    color: var(--ink-300, #b9bec7);
-    margin: 14px 0 12px;
-}
-.mp-or::before,
-.mp-or::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: oklch(45% 0.04 var(--sec-h, 242) / 0.45);
+/* The third way in (54 mounts it): a ghost row under the join box, quieter
+   than the two doors, since pairing your own phone is not meeting anyone. */
+.mp-btn-phone-door {
+    display: block;
+    width: 100%;
+    margin: 8px 0 0;
+    text-align: left;
 }
 
 .mp-error {
@@ -1148,31 +1133,16 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     box-shadow: 0 0 6px rgba(255, 165, 0, 0.4);
     animation: mp-pulse 1s infinite;
 }
+/* Connected, but nobody else is here yet: amber like connecting, without the
+   pulse, which means "still working on it". */
+.mp-dot-alone {
+    background: var(--warn, #ffa500);
+    box-shadow: 0 0 6px rgba(255, 165, 0, 0.4);
+}
 @keyframes mp-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
 }
-/* Pushed to the end of the status line: it is a count, not a heading. */
-.mp-users {
-    margin-left: auto;
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--ink-300, #b9bec7);
-}
-
-/* Badge shown to non-host members of a locked room. */
-.mp-lock-badge {
-    font-size: 11px;
-    line-height: 1.4;
-    text-align: center;
-    color: var(--ink-100, #f2f3f5);
-    background: rgba(236, 48, 19, 0.12);
-    border: 1px solid rgba(236, 48, 19, 0.3);
-    border-radius: 6px;
-    padding: 6px 8px;
-    margin-bottom: 10px;
-}
-
 /* ── Invite block ──
    The room code is a live invitation to anyone who can read it, so how it is
    displayed is a choice, not a constant: readable at a table, scannable
@@ -1446,45 +1416,12 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
    "Artist-9C (you)" into an ellipsis. Hidden rather than removed in JS so the
    node stays available if the row ever gets a wider home. */
 .mp-turn-qbrush { display: none; }
-.mp-turn-qclock {
-    flex: 0 0 auto;
-    font-size: 13px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    color: #ffb347;
-}
-.mp-turn-qclock.you { color: var(--ok, #3fb950); }
-/* "One swirl each" puts a rule where the countdown normally sits — it reads as
-   a caption, not a number, so it steps back a size and loses the clock weight. */
-.mp-turn-qclock.rule {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-}
 .mp-turn-qhint {
     font-size: 11px;
     color: var(--ink-300, #b9bec7);
     text-align: center;
     padding: 8px 0 3px;
 }
-/* Rotation status line ("Your turn · 0:41 · 3 artists") */
-.mp-turn-status {
-    font-size: 11.5px;
-    font-weight: 600;
-    text-align: center;
-    color: var(--ink-100, #f2f3f5);
-    background: rgba(255, 178, 71, 0.10);
-    border: 1px solid rgba(255, 178, 71, 0.3);
-    border-radius: 6px;
-    padding: 6px 8px;
-    margin-bottom: 10px;
-}
-.mp-turn-status.mp-turn-you {
-    color: var(--ok, #3fb950);
-    background: rgba(63, 185, 80, 0.12);
-    border-color: rgba(63, 185, 80, 0.4);
-}
-
 /* Name label on a remote user's cursor (positioned beside the colored dot) */
 .remote-cursor-label {
     position: absolute;

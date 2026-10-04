@@ -161,33 +161,26 @@ function fmtRemaining() {
     return m + ':' + (r < 10 ? '0' : '') + r;
 }
 
-// What the countdown slot says. "One swirl each" has no clock, so the slot
-// carries the rule instead — the thing a watcher actually wants to know is
-// how the current turn ends, not that it has no timer.
-function turnClockText() {
-    if (isOneSwirlMode()) return 'one swirl';
-    return fmtRemaining();
-}
-
 function stopTurnTick() {
     if (turnTickTimer) { clearInterval(turnTickTimer); turnTickTimer = null; }
 }
 
+// The clock is drawn in exactly two places: the panel's status line (06e
+// renderRoomStatus) and the chip. The queue used to carry a third copy.
 function ensureTurnTick() {
     if (turnTickTimer) return;
     turnTickTimer = setInterval(function () {
         if (!turnsOn || !turnDeadlineLocal) { stopTurnTick(); return; }
         updateTurnChip();
-        updateTurnStatusLine();
-        var clock = document.getElementById('turnWheelClock');
-        if (clock) clock.textContent = fmtRemaining();
+        renderRoomStatus();
     }, 500);
 }
 
 // Current-artist presence, bubbled onto the screen: a compact chip in the
 // quality underbar (2026-08-15 user-test — replaces the fixed top-center
-// banner, so turn state lives in exactly two places: the queue in the panel
-// and this chip). The "settings mirror" explanation moved into the tooltip.
+// banner). The chip is for when the panel is out of sight; in the panel the
+// status line says the same thing. The "settings mirror" explanation moved
+// into the tooltip.
 function updateTurnChip() {
     var legacy = document.getElementById('mpTurnBanner');
     if (legacy) legacy.remove();
@@ -265,7 +258,8 @@ function updateTurnChip() {
 // its arrows): "Now" is the active painter, then Next / 2nd / 3rd… in exact
 // pass order. Rows render from a generic {kind:'artist'|'phase'} list so a
 // future prepare-phase row slots in without another rewrite. Dot colors
-// match the artists' remote-cursor colors; your own row says "(you)".
+// match the artists' remote-cursor colors; your own row says "(you)". The
+// queue is WHO and in what order; how long is left is the status line's job.
 var _wheelKey = '';
 
 function turnPosLabel(i) {
@@ -308,16 +302,6 @@ function turnQueueRow(item, posText, isNow) {
         ph.textContent = item.label || 'waiting…';
         row.appendChild(ph);
     }
-    if (isNow) {
-        // Keeps the id contract with ensureTurnTick — the 500ms tick only
-        // rewrites this node's text; rotation changes rebuild the list.
-        var clock = document.createElement('span');
-        clock.id = 'turnWheelClock';
-        clock.className = 'mp-turn-qclock' + (isMyTurn() ? ' you' : '') +
-            (isOneSwirlMode() ? ' rule' : '');
-        clock.textContent = turnClockText();
-        row.appendChild(clock);
-    }
     return row;
 }
 
@@ -334,11 +318,8 @@ function renderTurnWheel() {
     var ids = turnOrder.slice();
     if (!ids.length && turnHolderId) ids = [turnHolderId];
     var key = ids.join('|') + '#' + (turnHolderId || '') + '#' + (clientId || '') +
-        '#' + (turnDeadlineLocal ? 1 : 0) + '#' + turnModeLocal;
-    if (key === _wheelKey) {
-        // Rotation unchanged — the tick only refreshes the clock text.
-        return;
-    }
+        '#' + turnModeLocal;
+    if (key === _wheelKey) return;   // rotation unchanged
     _wheelKey = key;
 
     var holder = (turnHolderId && ids.indexOf(turnHolderId) !== -1) ? turnHolderId : null;
@@ -368,28 +349,9 @@ function renderTurnWheel() {
     }
 }
 
-// Countdown + rotation-size line under the wheel (refreshed by the tick).
-function updateTurnStatusLine() {
-    var tStat = document.getElementById('turnStatus');
-    if (!tStat) return;
-    if (!turnsOn) {
-        tStat.style.display = 'none';
-        return;
-    }
-    tStat.style.display = '';
-    var n = turnOrder.length;
-    var once = isOneSwirlMode();
-    var t = once ? 'one swirl each' : fmtRemaining();
-    var who = isMyTurn()
-        ? (once ? 'Your call' : 'Your turn')
-        : (turnHolderId ? shortName(turnHolderId) + (once ? '\u2019s call' : ' painting') : 'Waiting');
-    tStat.textContent = who + (t ? ' · ' + t : '') + ' · ' + n + (n === 1 ? ' artist' : ' artists');
-    tStat.classList.toggle('mp-turn-you', isMyTurn());
-}
-
 // Panel widgets: the host's Take turns toggle + turn-length picker, the
-// rotation wheel, the countdown line, and the Pass/Skip button (painter
-// passes; host can skip an AFK painter).
+// rotation queue, and the Pass/Skip button (painter passes; host can skip an
+// AFK painter). Ends by redrawing the status line, which carries the clock.
 function updateTurnUI() {
     updateTurnChip();
     var isHost = myRole === 'host';
@@ -478,7 +440,7 @@ function updateTurnUI() {
     }
     syncHostBlock();
     renderTurnWheel();
-    updateTurnStatusLine();
+    renderRoomStatus();
     if (turnsOn && turnDeadlineLocal) ensureTurnTick(); else stopTurnTick();
 }
 

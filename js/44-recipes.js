@@ -469,10 +469,10 @@
         // ── Together ──
         { id: 'stranger', pillar: 'together', title: 'Paint with a stranger',
           tags: ['stranger', 'multiplayer', 'together', 'online', 'someone', 'random', 'partner', 'play'],
-          answer: 'Swirl Together → Swirl With a Stranger pairs you with whoever is waiting. Their strokes land on your canvas live.',
+          answer: 'Swirl Together → Stranger pairs you with whoever is waiting. Their strokes land on your canvas live.',
           target: { section: 'Swirl Together', sel: '#strangerBtn' },
           steps: [
-            { say: 'Swirl Together → click Swirl With a Stranger.', target: { section: 'Swirl Together', sel: '#strangerBtn' }, until: { visible: '#mpConnected' } },
+            { say: 'Swirl Together → click Stranger.', target: { section: 'Swirl Together', sel: '#strangerBtn' }, until: { visible: '#mpConnected' } },
             { say: 'You are in. When someone else is waiting you are paired, and their strokes land on your canvas live.', target: { overlay: 'mp', sel: '#multiplayerStatus' } }
           ] },
         { id: 'room', pillar: 'together', title: 'Invite friends to my canvas',
