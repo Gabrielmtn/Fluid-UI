@@ -1267,10 +1267,52 @@
         return first.length > 32 ? first.slice(0, 31) + '…' : first;
     }
 
+    // A long line makes a sliver of a brush: a brush fits a shape's LONG side
+    // to the brush size, so a 20:1 line painted letters at a twentieth of it
+    // (user test 3, "long text converts tiny"). Past 3:1 the words are wrapped
+    // into lines first, as near 2:1 as the words allow. Breaks the user typed
+    // stay; a single word too long to break is left as it is. The line on the
+    // canvas is not touched, only the stamp.
+    var BRUSH_WRAP_ASPECT = 3, BRUSH_WRAP_TARGET = 2;
+    function wrapAt(paras, maxChars) {
+        var out = [];
+        paras.forEach(function (p) {
+            var words = p.split(/\s+/).filter(Boolean), line = '';
+            words.forEach(function (w) {
+                if (line && line.length + 1 + w.length > maxChars) { out.push(line); line = w; }
+                else line = line ? line + ' ' + w : w;
+            });
+            out.push(line);
+        });
+        return out.join('\n');
+    }
+    function wrapForBrush(look) {
+        var box = measureBox(look, '#fff');
+        if (!(box.w > 0 && box.h > 0) || box.w / box.h <= BRUSH_WRAP_ASPECT) return look;
+        var paras = String(look.content || '').split('\n');
+        var longest = 0;
+        paras.forEach(function (p) { longest = Math.max(longest, p.length); });
+        var best = look, bestErr = Math.abs(Math.log(box.w / box.h / BRUSH_WRAP_TARGET));
+        // Narrower and narrower (a character, or a tenth, at a time) until the
+        // block is no longer wider than the target; keep the closest.
+        for (var chars = longest - 1; chars >= 4; chars = Math.min(chars - 1, Math.floor(chars * 0.9))) {
+            var cand = {};
+            for (var k in look) cand[k] = look[k];
+            cand.content = wrapAt(paras, chars);
+            var b = measureBox(cand, '#fff');
+            if (!(b.w > 0 && b.h > 0)) continue;
+            var err = Math.abs(Math.log(b.w / b.h / BRUSH_WRAP_TARGET));
+            if (err < bestErr) { bestErr = err; best = cand; }
+            if (b.w / b.h < BRUSH_WRAP_TARGET) break;
+        }
+        return best;
+    }
+
     function paintBrushStamp(ov) {
         var look = {};
         for (var k in ov) if (ov.hasOwnProperty(k) && k !== 'el') look[k] = ov[k];
         look.bgEnabled = false;
+        look = wrapForBrush(look);
         var box = measureBox(look, '#fff');
         var s = BRUSH_STAMP_LONG / Math.max(1, box.w, box.h);
         // Room for what overhangs the advance box: italics, swashes, accents.
