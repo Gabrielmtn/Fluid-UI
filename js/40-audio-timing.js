@@ -36,6 +36,12 @@
     var LS_GATES = 'fluidui.audioTiming.gates';
     var LS_OPTS  = 'fluidui.audioTiming.opts';
     var LS_RECT  = 'fluidui.audioTiming.rect';
+    // One record per TRACK (user test 3: "a dedicated timing tool file for
+    // each audio file"), keyed by the track's bytes (audioReactive.trackId).
+    // Outside the fluidUI: namespace, so Settings → Clear and Reset app leave
+    // it alone. The global LS_GATES stays as the lanes a new track starts
+    // from: the ones you used last.
+    var LS_TRACK = 'swirlCues.v1:';
 
     // Analysis constants. fftSize/smoothing/dB range MIRROR the hi-res
     // analyser in 22-audio-reactive.js (ensureHiRes) — a threshold drawn
@@ -105,10 +111,67 @@
     }
     function saveGates() {
         try { localStorage.setItem(LS_GATES, JSON.stringify(gateStore.gates)); } catch (_) {}
+        saveTrack();
     }
     function saveOpts() {
         try { localStorage.setItem(LS_OPTS, JSON.stringify(opts)); } catch (_) {}
+        saveTrack();
     }
+
+    // ─── PER-TRACK LANES ────────────────────────────────────────────
+    var trackId = '';            // the loaded track's id, '' with none
+    var trackSaved = false;      // its lanes come from (and write to) its own record
+    function trackRecord() {
+        var ar = window.audioReactive;
+        var buf = (ar && ar.getFileBuffer) ? ar.getFileBuffer() : null;
+        return {
+            format: 'swirlcues', v: 1,
+            track: { id: trackId, name: (ar && ar.fileName) ? ar.fileName() : '', duration: buf ? +buf.duration.toFixed(3) : 0 },
+            nudgeMs: opts.offsetMs,
+            lanes: gateStore.gates,
+            saved: Date.now()
+        };
+    }
+    function notice(msg, type) { var ar = window.audioReactive; if (ar && ar.notice) ar.notice(msg, type); }
+    var trackFullWarned = false;
+    function saveTrack() {
+        if (!trackId) return;
+        try {
+            localStorage.setItem(LS_TRACK + trackId, JSON.stringify(trackRecord()));
+            trackSaved = true;
+        } catch (_) {
+            if (!trackFullWarned) {
+                trackFullWarned = true;
+                notice('Couldn\'t keep this track\'s lanes: storage is full', 'warn');
+            }
+        }
+    }
+    function readTrack(id) {
+        try {
+            var r = JSON.parse(localStorage.getItem(LS_TRACK + id));
+            return (r && r.format === 'swirlcues' && Array.isArray(r.lanes)) ? r : null;
+        } catch (_) { return null; }
+    }
+    function applyRecord(r) {
+        gateStore.gates = r.lanes;
+        if (typeof r.nudgeMs === 'number') opts.offsetMs = clamp(r.nudgeMs, -500, 500);
+    }
+    // A new track brings back its own lanes, or starts from a COPY of the
+    // ones you had, so editing them for this song never rewrites another's.
+    function adoptTrack() {
+        var ar = window.audioReactive;
+        var id = (ar && ar.trackId) ? ar.trackId() : '';
+        if (id === trackId) return false;
+        trackId = id; trackSaved = false;
+        if (!id) return true;
+        var r = readTrack(id);
+        if (r) { applyRecord(r); trackSaved = true; }
+        else gateStore.gates = JSON.parse(JSON.stringify(gateStore.gates));
+        return true;
+    }
+    // Cues fire with the chart closed too, once a lane on this track does
+    // something: the chart is the editor, not the switch.
+    function trackArmed() { return !!trackId && anyBound(); }
     function saveRect() {
         if (!panel) return;
         try {
@@ -729,7 +792,7 @@
         if (!gateStore.gates.length) return 'Draw a band to make a lane';
         if (!chart) return 'Ready';
         return chart.lanes.length + (chart.lanes.length === 1 ? ' lane · ' : ' lanes · ')
-             + chart.notes.length + ' cues';
+             + chart.notes.length + ' cues' + (trackSaved ? ' · kept for this track' : '');
     }
     function refreshStatus() {
         var t = statusText();
@@ -1156,7 +1219,7 @@
 
     function fireDue(nowMs) {
         drainSpin(nowMs);
-        if (!enabled || !chart || !chart.notes.length || !anyBound()) { fireT = -1; return; }
+        if (!(enabled || trackArmed()) || !chart || !chart.notes.length || !anyBound()) { fireT = -1; return; }
         var ar = window.audioReactive;
         var pos = (ar && ar.position) ? ar.position() : null;
         if (!pos || pos.paused) { fireT = -1; return; }
@@ -1215,7 +1278,9 @@
         // A long track's cache is ~29 MB of Uint8Array; holding it behind an
         // unchecked box for the rest of the session is rude. Small caches
         // stay (re-enabling is then instant); big ones re-read on demand.
-        if (cache && cache.levels && cache.levels.length > 8 * 1024 * 1024) cache = null;
+        if (cache && cache.levels && cache.levels.length > 8 * 1024 * 1024 && !trackArmed()) cache = null;
+        // A track whose lanes do something keeps firing with the chart closed.
+        if (trackArmed() && !cache) buildCache(false);
         refreshStatus();
         rebuildAllControls();
     }
@@ -1599,9 +1664,92 @@
         foot.appendChild(re);
         host.appendChild(foot);
 
+        // A track's lanes as a file, to keep or to share with the song.
+        var files = document.createElement('div');
+        files.className = 'atv-foot atv-cue-files';
+        var saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'atv-reread';
+        saveBtn.textContent = 'Save cues…';
+        saveBtn.title = 'Save this track\'s lanes and what they do as a .swirlcues file';
+        saveBtn.addEventListener('click', exportCues);
+        var openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'atv-reread';
+        openBtn.textContent = 'Open cues…';
+        openBtn.title = 'Load lanes from a .swirlcues file onto this track';
+        var picker = document.createElement('input');
+        picker.type = 'file';
+        picker.accept = '.swirlcues,application/json';
+        picker.style.display = 'none';
+        openBtn.addEventListener('click', function () { picker.value = ''; picker.click(); });
+        picker.addEventListener('change', function () { if (picker.files && picker.files[0]) importCues(picker.files[0]); });
+        files.appendChild(saveBtn);
+        files.appendChild(openBtn);
+        files.appendChild(picker);
+        host.appendChild(files);
+
         host._atvEls = { laneList: laneList, leadCtl: leadCtl, nudgeCtl: nudgeCtl };
         updateDynamic(host);
         refreshStatus();
+    }
+
+    function cueFileName() {
+        var n = (window.audioReactive && window.audioReactive.fileName) ? window.audioReactive.fileName() : '';
+        return (n.replace(/\.[^.]+$/, '') || 'track').replace(/[\\/:*?"<>|]+/g, '-') + '.swirlcues';
+    }
+    function exportCues() {
+        if (!trackId) { notice('Load a track first', 'warn'); return; }
+        var json = JSON.stringify(trackRecord(), null, 1);
+        // Desktop: write the file for real. The <a download> path does
+        // nothing in Electron (see 12-save-load.js's project save).
+        if (window.IS_ELECTRON) {
+            try {
+                var remote = require('@electron/remote'), nfs = require('fs'), path = require('path');
+                var dir = ''; try { dir = remote.app.getPath('documents'); } catch (_) {}
+                var target = remote.dialog.showSaveDialogSync(remote.getCurrentWindow(), {
+                    title: 'Save cues', defaultPath: dir ? path.join(dir, cueFileName()) : cueFileName(),
+                    filters: [{ name: 'Swirl Together cues', extensions: ['swirlcues'] }]
+                });
+                if (!target) return;
+                nfs.writeFileSync(target, json, 'utf8');
+                notice('Cues saved', 'success');
+                return;
+            } catch (e) { console.warn('[AudioTiming] save failed', e); }
+        }
+        var url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        var a = document.createElement('a');
+        a.href = url; a.download = cueFileName();
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+    function importCues(file) {
+        if (!trackId) { notice('Load the track first, then its cues', 'warn'); return; }
+        var reader = new FileReader();
+        reader.onload = function () {
+            var r = null;
+            try { r = JSON.parse(reader.result); } catch (_) {}
+            if (!r || r.format !== 'swirlcues' || !Array.isArray(r.lanes)) {
+                notice('That isn\'t a cue file', 'error');
+                return;
+            }
+            var use = function () {
+                applyRecord({ lanes: r.lanes.filter(function (g) { return g && typeof g.lo === 'number' && typeof g.hi === 'number'; }), nudgeMs: r.nudgeMs });
+                saveGates();
+                onGatesChanged();
+                rebuildAllControls();
+                notice('Cues loaded', 'success');
+            };
+            var other = r.track && r.track.id && r.track.id !== trackId;
+            if (other && typeof window.appConfirm === 'function') {
+                window.appConfirm({
+                    title: 'Use cues made for another track?',
+                    message: 'These were made for ' + ((r.track && r.track.name) || 'a different file') + '. They replace this track\'s lanes.',
+                    confirmLabel: 'Use them', danger: false
+                }).then(function (ok) { if (ok) use(); });
+            } else use();
+        };
+        reader.readAsText(file);
     }
 
     function updateDynamic(host) {
@@ -1710,6 +1858,7 @@
                 fireCounts[i] = 0;
                 saveGates();
                 if (g.act === 'spin' && !window.kaleidoEnabled) actSel.title = 'Turns the kaleidoscope when it is on (it is off now)';
+                if (!cache && !analysing && trackArmed()) buildCache(false);
             });
             evSel.addEventListener('change', function () {
                 g.every = parseInt(evSel.value, 10) || 1;
@@ -1730,7 +1879,13 @@
     document.addEventListener('DOMContentLoaded', function () {
         if (window.audioReactive && window.audioReactive.onSourceChange) {
             window.audioReactive.onSourceChange(function () {
-                if (!enabled) return;
+                var changed = adoptTrack();
+                if (!enabled) {
+                    if (changed) rebuildAllControls();
+                    if (trackArmed()) buildCache(false);
+                    return;
+                }
+                if (changed) rebuildAllControls();
                 // buildCache keys on the file: a new track re-reads, the same
                 // track just re-extracts, mic/off clears the chart.
                 lastSeenTime = -1;
@@ -1765,6 +1920,10 @@
         },
         methods: METHODS.slice(),
         fireDue: fireDue,
+        trackId: function () { return trackId; },
+        trackSaved: function () { return trackSaved; },
+        isArmed: function () { return enabled || trackArmed(); },
+        exportCues: exportCues,
         actions: ACTIONS.slice(),
         setAction: function (i, act, every) {
             var g = gateStore.gates[i];

@@ -186,6 +186,7 @@
     var fileOffset = 0;          // seconds into the buffer while paused
     var fileLoop = true;
     var fileName = '';
+    var fileId = '';             // the track's identity, from its bytes (hashTrack)
     // Generation token. Starting a source is ASYNC (file decode, getUserMedia,
     // getDisplayMedia) and those completions used to attach unconditionally —
     // so turning audio off mid-decode left the finished decode starting
@@ -347,6 +348,25 @@
         } catch (_) {}
     }
 
+    // A track's identity is its bytes: the same song loaded again, from any
+    // folder or under any name, finds its timing lanes (40-audio-timing.js
+    // keeps them per track). digest() copies the bytes when it is called, so
+    // this runs before decodeAudioData detaches them. Without SubtleCrypto
+    // (an insecure origin) the size and name stand in.
+    function hashTrack(bytes, file) {
+        var fallback = 'size:' + (bytes ? bytes.byteLength : 0) + ':' + ((file && file.name) || '');
+        try {
+            if (window.crypto && window.crypto.subtle && bytes) {
+                return window.crypto.subtle.digest('SHA-256', bytes).then(function (d) {
+                    var a = new Uint8Array(d), h = '';
+                    for (var i = 0; i < 8; i++) h += (a[i] < 16 ? '0' : '') + a[i].toString(16);
+                    return 'sha256:' + h;
+                }, function () { return fallback; });
+            }
+        } catch (_) {}
+        return Promise.resolve(fallback);
+    }
+
     function startFile(file, token) {
         return new Promise(function (resolve, reject) {
             var reader = new FileReader();
@@ -362,10 +382,13 @@
             reader.onabort = fail;
             reader.onload = function () {
                 ensureContext();
+                var idP = hashTrack(reader.result, file);   // before decode detaches the bytes
                 var p = audioCtx.decodeAudioData(reader.result, function (buffer) {
+                  idP.then(function (id) {
                     // Audio was turned off (or re-sourced) while we decoded —
                     // attach nothing, or it plays on with the UI showing off.
                     if (token !== startToken) { resolve(); return; }
+                    fileId = id;
                     if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} }
                     fileBuffer = buffer;
                     srcKind = 'file';
@@ -381,6 +404,7 @@
                     }
                     notifySourceChanged();
                     resolve();
+                  });
                 }, fail);
                 // decodeAudioData honours the callbacks AND returns a promise;
                 // the returned one rejects too, and unhandled it surfaced as
@@ -582,6 +606,7 @@
         if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
         fileBuffer = null;
         fileName = '';
+        fileId = '';
         filePaused = false;
         fileOffset = 0;
         srcKind = null;
@@ -1220,6 +1245,10 @@
         fireGenerator: function (name, energy) {
             emitPattern(name, 'cue', Math.max(0, Math.min(1, Number(energy) || 0)));
         },
+        // The audio section's toast, for the timing chart's messages.
+        notice: function (msg, type) { audioNotice(msg, type || 'info'); },
+        // The loaded track's identity (sha256:… from its bytes), '' with none.
+        trackId: function () { return (srcKind === 'file' && fileBuffer) ? fileId : ''; },
         // A stroke in progress owns the brush (see paintInProgress).
         isPainting: paintInProgress,
         onSourceChange: function (fn) { if (typeof fn === 'function') sourceListeners.push(fn); },
