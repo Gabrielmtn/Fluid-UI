@@ -26,8 +26,18 @@ Sizes: **S** under an hour, **M** an afternoon, **L** a day or more.
 | 5 Palette | Slices 1-3: one palette that saves itself, + New, Rename, Duplicate, Reset, keys in sight | 17c6b65 |
 | | Slices 4-5: drag colours and palettes into order, kept by name | dfeac3c |
 | 6 Multiplayer | (d) fair per-sender queues: a friend's long line under a 2x flood lost 176 of 720 dabs before, 0 now | 399b4d7 |
+| | Slices 1-3: one status line, Invite popover + ⋯ menu, Together / Turns / Call & return switch, Pass only on your turn (mp-panel-e2e 79/79, phone-mouse 77/77) | 79af2b1 b1179cb 1c548fb 6dbda33 |
+| 4 Recording | Slices 1, 2, 4: one word per thing (Part, Animation, Video), the record strip replaces Off / Minimized / Full, Keep · Discard, rename, Save writes back | e9e5f51 eabd275 b5d49f6 |
+| 2 Audio | Tunnel ring as a lane action; a committed suite, `node scripts/test/audio/run.js` (24/24) | fe0a90b 4b069bd |
+| 3 Left sidebar | Slice 1: Brush Size heads a left bar that folds to a rail | 08eed81 |
+| | Slice 2: Stroke and replay moves in; sections work in either sidebar | 1d66481 |
+| | Slice 3: the brush drawer is the Brush section; saved keys made in it are re-scoped so they can't hit the wrong brush | acd4279 |
+| | Slice 4: Multi-Brush is a section (the arm count with everything it governs) | 495eff6 |
+| | Slice 6: on a phone it rides in the menu; Simple keeps Brush Size and Brush (slice 5, the fold, came with slice 1) | 9c8fcf5 |
 
-Running in worktrees: multiplayer panel slices 1-3, recording slices 1, 2, 4. Still to start: the left sidebar (after recording lands, they share js/20 and js/43).
+Still running: recording slices 3 (the drawer's play / edit / file rows) and 5 (Stop and save, the VIDEO badge).
+
+**What's left after that:** your copy sprints; your calls below; audio's badge and snap-to-hit; multiplayer (b) loop by reference only if 3+ rooms matter (needs a relay deploy); (c) after the fest.
 
 ## Schedule
 
