@@ -253,7 +253,10 @@
         }
 
         var nSel = sel.length;
-        statusEl.textContent = nSel ? nSel + (nSel === 1 ? ' cue selected' : ' cues selected') : '';
+        if (nSel || !statusEl.classList.contains('ace-status-done')) {
+            statusEl.classList.remove('ace-status-done');
+            statusEl.textContent = nSel ? nSel + (nSel === 1 ? ' cue selected' : ' cues selected') : '';
+        }
     }
 
     function firstAtOrAfter(notes, t) {
@@ -615,11 +618,29 @@
         b.addEventListener('click', function () { fn(); touch(); });
         return b;
     }
+    function setupSong() {
+        var e = AT();
+        if (!e) return;
+        var go = function () {
+            var r = e.setupSong();
+            sel = []; undoStack = []; redoStack = [];
+            statusEl.textContent = r.text;
+            statusEl.classList.toggle('ace-status-done', !!r.ok);
+        };
+        if (e.anyEdited() && typeof window.appConfirm === 'function') {
+            window.appConfirm({
+                title: 'Set up this song again?',
+                message: 'Its lanes are replaced, cues you edited by hand with them.',
+                confirmLabel: 'Set it up'
+            }).then(function (ok) { if (ok) go(); });
+        } else go();
+    }
     function zoom(k) { var mid = view.t0 + view.span / 2; view.span *= k; clampView(); view.t0 = mid - view.span / 2; clampView(); }
     function selectedLanes() { return sel.map(function (q) { return q.lane; }).filter(function (v, i, a) { return a.indexOf(v) === i; }); }
     function paintButtons(ready) {
         var e = AT();
         btn.zoomIn.disabled = btn.zoomOut.disabled = btn.fit.disabled = !ready;
+        btn.setup.disabled = !(e && e.cache());
         btn.undo.disabled = !undoStack.length;
         btn.redo.disabled = !redoStack.length;
         var lanes = selectedLanes();
@@ -657,6 +678,10 @@
         [btn.zoomOut, btn.zoomIn, btn.fit, btn.follow].forEach(function (b) { bar.appendChild(b); });
         var sp = document.createElement('span'); sp.className = 'ace-sep'; bar.appendChild(sp);
         [btn.redetect, btn.undo, btn.redo].forEach(function (b) { bar.appendChild(b); });
+        var sp2 = document.createElement('span'); sp2.className = 'ace-sep'; bar.appendChild(sp2);
+        btn.setup = mkBtn('Set up this song', 'Find this track\'s three liveliest bands, name them Low, Mid and High, fit each to the track, and give each something to do', setupSong);
+        btn.setup.classList.add('btn--emphasis');
+        bar.appendChild(btn.setup);
         statusEl = document.createElement('span');
         statusEl.className = 'ace-status';
         bar.appendChild(statusEl);
@@ -735,6 +760,7 @@
         _match: function () { return match ? { busy: !!match.busy, n: match.peaks ? match.peaks.length : 0, sim: match.sim, mode: match.mode, times: (match.peaks || []).map(function (p) { return +p.t.toFixed(3); }) } : null; },
         _setSim: function (v) { if (match) { match.sim = v; pickPeaks(); paintMatch(); } },
         _makeLane: makeLane,
+        _setup: setupSong,
         _hit: function (lane, x) { return hitTick(lane, x, cv.clientWidth); }
     };
 })();

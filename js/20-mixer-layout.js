@@ -6960,6 +6960,19 @@
             else setTimeout(mountCues, 150);
         })();
 
+        // The lanes themselves, under the editor: the band boxes, each lane's
+        // method, action and how often, Lead and Nudge, Save / Open cues.
+        // The same controls as the sidebar's timing panel, always shown here
+        // (user test 3: "audio gate UI isn't available in Full").
+        var laneHost = document.createElement('div');
+        laneHost.id = 'audioDrawerLanes';
+        laneHost.className = 'atv-controls audio-drawer-lanes';
+        body.appendChild(laneHost);
+        (function mountLanes() {
+            if (window.AudioTiming && window.AudioTiming.mountControls) window.AudioTiming.mountControls(laneHost, { always: true });
+            else setTimeout(mountLanes, 150);
+        })();
+
         // Everything that reacts LIVE, without timing lanes (what a mic or
         // system audio needs), folded under one heading. The ids stay in the
         // page: presets, Mutate locks and the registry read them.

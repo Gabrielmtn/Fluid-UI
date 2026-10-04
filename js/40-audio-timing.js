@@ -1552,7 +1552,7 @@
     function fillControls(host) {
         host.innerHTML = '';
         host._atvEls = null;
-        if (!enabled) { host.style.display = 'none'; return; }
+        if (!enabled && !host._atvAlways) { host.style.display = 'none'; return; }
         host.style.display = '';
 
         // (The Choose Track button lives up in the Audio enable row, beside
@@ -1807,7 +1807,7 @@
 
             var lbl = document.createElement('span');
             lbl.className = 'atv-lane-label';
-            lbl.textContent = laneLabel(g) + ' Hz';
+            lbl.textContent = (g.name ? g.name + ' · ' : '') + laneLabel(g) + ' Hz';
             lbl.title = 'This lane’s frequency band — redraw the box above to change it';
             row.appendChild(lbl);
 
@@ -1924,8 +1924,11 @@
         toggle: function (on) { if (on === undefined) on = !enabled; if (on) enable(); else disable(); return enabled; },
         isEnabled: function () { return enabled; },
         // Called by 20-mixer-layout to fill the row under the checkbox.
-        mountControls: function (host) {
+        mountControls: function (host, o) {
             if (!host) return;
+            // { always: true }: show the lanes whether or not the chart is on
+            // (Full Audio is where they're edited now).
+            if (o && o.always) host._atvAlways = true;
             if (controlHosts.indexOf(host) < 0) controlHosts.push(host);
             fillControls(host);
         },
@@ -1952,7 +1955,35 @@
             chart: function () { return chart; },
             gates: function () { return gateStore.gates; },
             color: function (i) { var g = gateStore.gates[i]; return g ? laneColor(g) : [255, 255, 255]; },
-            label: function (i) { var g = gateStore.gates[i]; return g ? laneLabel(g) : ''; },
+            label: function (i) { var g = gateStore.gates[i]; return g ? (g.name ? g.name + ' · ' : '') + laneLabel(g) : ''; },
+            // "Set up this song" (user test 3: "a wizard to pick low/medium/
+            // high patterns ... a much easier workflow than the gates"): the
+            // three liveliest bands, named Low, Mid and High, each edge fitted
+            // to this track, each already doing something. Returns a line
+            // saying what it did, or why it couldn't.
+            setupSong: function () {
+                if (!cache) return { ok: false, text: analysing ? 'Still reading the track…' : 'Load a track first' };
+                var found = autoLanes(cache);
+                if (!found.length) return { ok: false, text: 'No lively bands in this track' };
+                var names = found.length >= 3 ? ['Low', 'Mid', 'High'] : found.length === 2 ? ['Low', 'High'] : ['Main'];
+                var plan = { Low: { act: 'burst', every: 1 }, Mid: { act: 'color', every: 4 }, High: { act: 'scatter', every: 2 }, Main: { act: 'burst', every: 1 } };
+                cancelGateAnims();
+                gateStore.gates = found.slice(0, 3).map(function (g, i) {
+                    var lane = { lo: g.lo, hi: g.hi, th: g.th, method: 'onset', name: names[i] };
+                    var cal = calibrateTh(cache, lane, 'onset');
+                    if (cal !== null) lane.th = cal;
+                    lane.act = plan[names[i]].act;
+                    lane.every = plan[names[i]].every;
+                    return lane;
+                });
+                saveGates();
+                extractAll();
+                rebuildAllControls();
+                return { ok: true, text: gateStore.gates.map(function (g) {
+                    return g.name + ': ' + ACTION_LABEL[g.act] + (g.every > 1 ? ' ' + EVERY_LABEL[g.every].replace(' cue', '') : '');
+                }).join(' · ') };
+            },
+            anyEdited: function () { return gateStore.gates.some(function (g) { return !!g.edited; }); },
             nudgeMs: function () { return opts.offsetMs; },
             analysing: function () { return analysing; },
             progress: function () { return analysisPct; },
