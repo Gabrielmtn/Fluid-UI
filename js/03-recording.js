@@ -857,10 +857,13 @@
             const list = document.getElementById('recLayersList');
             if (!list || list._recBound) return;
             list.addEventListener('click', (e) => {
-                // Avoid re-render-on-click when interacting with inputs/selects/buttons inside a layer card
-                if (e.target.closest('input, textarea, select, button')) return;
+                // Avoid re-render-on-click when interacting with inputs/selects inside a layer card.
+                // Buttons are let through when they carry an action: the guard used to
+                // cover every button, so 👁 ▶ 🔁 and the mask buttons did nothing.
+                if (e.target.closest('input, textarea, select')) return;
                 const target = e.target.closest('[data-action]');
                 if (!target) return;
+                if (e.target.closest('button') && !target.matches('button')) return;
                 const action = target.getAttribute('data-action');
                 const id = parseInt(target.getAttribute('data-id'), 10);
                 if (!isFinite(id)) return;
@@ -1641,7 +1644,9 @@
             if (Object.prototype.hasOwnProperty.call(all, key)) {
                 return 'exists';
             }
-            sm.set(key, { version: 2, layers, duration: Math.max(1, duration) }, false);
+            // set() reports a full localStorage as false; it used to be ignored,
+            // so a take that never landed still said it was saved.
+            if (!sm.set(key, { version: 2, layers, duration: Math.max(1, duration) }, false)) return 'full';
             return true;
         }
 
@@ -2008,9 +2013,11 @@
             const sel = document.getElementById('recPresetSelect');
             if (sel) sel.value = name;
             const n = recLayers.filter(l => l && l.timeline && (l.timeline.interactions || []).length > 0).length;
-            recSetStatus(n > 1 ? `Preset saved (${n} layers)` : 'Preset saved');
+            recSetStatus(n > 1 ? `Animation saved (${n} layers)` : 'Animation saved');
         } else if (result === 'exists') {
-            recSetStatus('Preset already exists');
+            recSetStatus(`An animation called "${name}" already exists. Pick another name.`);
+        } else if (result === 'full') {
+            recSetStatus("Couldn't save: storage is full. Delete an old animation and try again.");
         } else if (result === 'empty') {
             recSetStatus('Nothing recorded yet');
         } else {
