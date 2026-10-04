@@ -237,19 +237,36 @@
     // unreachable. Relocate it into the top of the slide-out menu so mobile users
     // get everything. Reparenting preserves the wired handlers; CSS reflows it to
     // fit (flex-wrap). Done lazily on first menu-open (the layout exists by then).
-    var mixerStripHome = null;
+    // The left sidebar (Brush Size, Brush, Multi-Brush, Stroke and replay,
+    // 2026-10-04) goes the same way, right under the strip: in the phone
+    // layout there is no room beside the canvas, and without it the brush
+    // could not be sized or set at all.
+    var mixerStripHome = null, leftBarHome = null;
     function relocateMixerStripToMenu() {
         var strip = document.getElementById('mixer-strip');
         var menu = document.getElementById('sidebar-right');
-        if (!strip || !menu || strip.parentElement === menu) return;
-        mixerStripHome = { parent: strip.parentElement, next: strip.nextElementSibling };
-        menu.insertBefore(strip, menu.firstChild);
+        if (!strip || !menu) return;
+        if (strip.parentElement !== menu) {
+            mixerStripHome = { parent: strip.parentElement, next: strip.nextElementSibling };
+            menu.insertBefore(strip, menu.firstChild);
+        }
+        var left = document.getElementById('sidebar-left');
+        if (left && left.parentElement !== menu) {
+            leftBarHome = { parent: left.parentElement, next: left.nextElementSibling };
+            menu.insertBefore(left, strip.nextSibling);
+        }
     }
     function restoreMixerStrip() {
         var strip = document.getElementById('mixer-strip');
-        if (!strip || !mixerStripHome || !mixerStripHome.parent) return;
-        mixerStripHome.parent.insertBefore(strip, mixerStripHome.next);
-        mixerStripHome = null;
+        if (strip && mixerStripHome && mixerStripHome.parent) {
+            mixerStripHome.parent.insertBefore(strip, mixerStripHome.next);
+            mixerStripHome = null;
+        }
+        var left = document.getElementById('sidebar-left');
+        if (left && leftBarHome && leftBarHome.parent) {
+            leftBarHome.parent.insertBefore(left, leftBarHome.next);
+            leftBarHome = null;
+        }
     }
 
     // Toggle menu visibility

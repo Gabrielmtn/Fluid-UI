@@ -2185,8 +2185,25 @@ select option {
     writing-mode: vertical-rl;
     transform: rotate(180deg);
 }
-/* The phone layout keeps its own drawer for now. */
-body.mobile-mode #sidebar-left { display: none; }
+/* The phone layout: no room beside the canvas. js/13 moves the bar into the
+   slide-out menu, under the strip, always unfolded; there it is plain
+   content (the menu is already zoomed, so its own zoom would double). */
+body.mobile-mode #main-area > #sidebar-left { display: none; }
+body.mobile-mode #sidebar-right > #sidebar-left {
+    display: flex;
+    flex: none;
+    zoom: 1;
+    position: static;
+    overflow: visible;
+    background: transparent;
+    border-right: 0;
+    backdrop-filter: none;
+}
+body.mobile-mode #sidebar-right > #sidebar-left.collapsed > .lsb-head,
+body.mobile-mode #sidebar-right > #sidebar-left.collapsed > .lsb-body { display: flex; }
+body.mobile-mode #sidebar-right > #sidebar-left > .lsb-rail,
+body.mobile-mode #sidebar-right > #sidebar-left .lsb-collapse { display: none; }
+body.mobile-mode #sidebar-right > #sidebar-left > .lsb-head { position: static; background: transparent; }
 
 /* The Brush section (and Multi-Brush) keep the popup skin's classes so the
    row styles built for them apply; here they are plain section content.

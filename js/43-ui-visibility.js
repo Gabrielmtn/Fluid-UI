@@ -51,9 +51,16 @@
         'strip:Color': true,
         'strip:Transport': true,
         'section:Swirl Together': true,
-        'section:Export': true
+        'section:Export': true,
+        // The left sidebar's Brush (2026-10-04): Simple used to leave no way
+        // to set the brush at all. Brush Size heads the bar and is always on.
+        'section:Brush': true
     };
-    var SIMPLE_VERSION = 2;
+    var SIMPLE_VERSION = 3;
+    // Sections that did not exist when a profile last reconciled Simple, and
+    // that Simple keeps hidden: without this they would show up for it (they
+    // are not in its hidden list), while a fresh Simple hides them.
+    var SIMPLE_NEW_HIDDEN = { 3: ['section:Multi-Brush'] };
     var KEY_SIMPLE_VER = 'ui.simpleVersion';   // last SIMPLE_VERSION this profile's Simple was reconciled to
     // Never hideable: Settings is the way back, and the ? cell is how you
     // find what Simple hid.
@@ -96,6 +103,10 @@
         var changed = false;
         Object.keys(SIMPLE_KEEP).forEach(function (k) {
             if (hidden[k]) { delete hidden[k]; changed = true; }
+        });
+        Object.keys(SIMPLE_NEW_HIDDEN).forEach(function (ver) {
+            if (v >= +ver) return;
+            SIMPLE_NEW_HIDDEN[ver].forEach(function (k) { if (!hidden[k]) { hidden[k] = true; changed = true; } });
         });
         if (changed) saveHidden();
         m.set(KEY_SIMPLE_VER, SIMPLE_VERSION);
