@@ -52,6 +52,7 @@ const SUITE = {
         const k = r.dblclickAndKey;
         check('editor: double-click adds, Delete removes, the recorder never asks', k.afterDbl === k.before + 1 && k.afterDelete === k.before && !k.appConfirmOpen, k);
         check('editor: the cue fires where it was moved to', r.firesAtMoved.fired.some((t) => Math.abs(t - r.firesAtMoved.want) < 0.05), r.firesAtMoved);
+        check('editor: a cue placed 25 ms off a hit snaps onto it', r.snap && r.snap.added === 1 && r.snap.landedOnKick, r.snap);
     },
     matcher(r) {
         check('matcher: a box around one snare finds the 16 snares and no kick', r.pointerBox === 16, r.pointerBox);

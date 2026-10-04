@@ -81,6 +81,7 @@
     var cache = null;        // { levels:Uint8Array, frames, cols, t0, dt, duration, key }
     var chart = null;        // { notes, duration, lanes } — extracted from cache + gates
     var analysing = false, analysisPct = 0, analysisErr = '';
+    var snapFlux = null;     // { key, flux } for the cue editor's snap (editor.snap)
     var worker = null, workerUrl = null, pumpTimer = null, jobSerial = 0;
 
     var panel = null, cv = null, headStatus = null, rafId = null;
@@ -2034,6 +2035,21 @@
             // Every extractor's cue stamps carry this, so a matched cue lands
             // where a detected one would.
             lagComp: function () { return LAG_COMP; },
+            // The strongest attack in lane i's band within ±win seconds of t,
+            // stamped the way the extractors stamp (LAG_COMP), or t itself
+            // when nothing rises there. The band's flux is kept per band.
+            snap: function (i, t, win) {
+                var g = gateStore.gates[i];
+                if (!g || !cache) return t;
+                var cr = colRange(g, cache.cols), key = cache.key + '|' + cr[0] + '|' + cr[1];
+                if (!snapFlux || snapFlux.key !== key) snapFlux = { key: key, flux: bandFlux(cache, cr[0], cr[1]) };
+                var fl = snapFlux.flux, w = win || 0.04;
+                var f0 = Math.max(1, Math.floor((t - LAG_COMP - w - cache.t0) / cache.dt));
+                var f1 = Math.min(cache.frames - 1, Math.ceil((t - LAG_COMP + w - cache.t0) / cache.dt));
+                var best = -1, bv = 0;
+                for (var f = f0; f <= f1; f++) if (fl[f] > bv) { bv = fl[f]; best = f; }
+                return (best < 0 || bv < 0.01) ? t : cache.t0 + best * cache.dt + LAG_COMP;
+            },
             redetect: function (i) {
                 var g = gateStore.gates[i];
                 if (!g) return;

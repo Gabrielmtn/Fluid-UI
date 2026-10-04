@@ -318,7 +318,15 @@
         for (var i = 0; i < list.length; i++) if (Math.abs(list[i][0] - t) < 1e-4) return i;
         return -1;
     }
-    function moveSelected(dt) {
+    // A cue you place lands on the nearest hit in its lane's band (±40 ms),
+    // so a hand-dragged or tapped cue doesn't sit a few ms off the sound.
+    // Hold Alt to place it exactly where you let go.
+    var snapping = true;
+    function snapT(lane, t) {
+        var e = AT();
+        return (snapping && e && e.snap) ? e.snap(lane, t, 0.04) : t;
+    }
+    function moveSelected(dt, noSnap) {
         if (!sel.length || !dt) return;
         var d = duration();
         var lanes = sel.map(function (q) { return q.lane; });
@@ -326,7 +334,10 @@
             sel.forEach(function (q) {
                 var L = lists[q.lane], k = indexIn(L, q.t);
                 if (k < 0) return;
-                L[k][0] = +clamp(q.t + dt, 0, d).toFixed(4);
+                var nt = q.t + dt;
+                // One cue dragged snaps; a group keeps its spacing.
+                if (!noSnap && sel.length === 1) nt = snapT(q.lane, nt);
+                L[k][0] = +clamp(nt, 0, d).toFixed(4);
                 q.t = L[k][0];
             });
         });
@@ -341,7 +352,7 @@
     }
     function addCue(lane, t, e100) {
         var d = duration();
-        t = +clamp(t, 0, d).toFixed(4);
+        t = +clamp(snapT(lane, t), 0, d).toFixed(4);
         edit([lane], function (lists) { lists[lane].push([t, e100 == null ? 0.7 : e100]); });
         sel = [{ lane: lane, t: t }];
     }
@@ -358,6 +369,7 @@
     }
     function onDown(ev) {
         if (ev.button !== 0) return;
+        snapping = !ev.altKey;
         // No scroll: focusing a canvas half out of view scrolls the drawer,
         // and the row under the pointer moves before the click is read.
         cv.focus({ preventScroll: true });
@@ -423,6 +435,7 @@
         if (d.moved) moveSelected(d.dt);
     }
     function onDbl(ev) {
+        snapping = !ev.altKey;
         var p = local(ev), lane = laneOfY(p.y);
         if (lane < 0 || hitTick(lane, p.x, p.W)) return;
         addCue(lane, tOf(p.x, p.W));
@@ -444,10 +457,11 @@
     }
     function onKey(ev) {
         var k = ev.key, mod = ev.ctrlKey || ev.metaKey, handled = true;
+        snapping = !ev.altKey;
         if (k === 'Delete' || k === 'Backspace') deleteSelected();
         else if (mod && (k === 'z' || k === 'Z') && !ev.shiftKey) undo();
         else if (mod && ((k === 'z' || k === 'Z') && ev.shiftKey || k === 'y' || k === 'Y')) redoEdit();
-        else if (k === 'ArrowLeft' || k === 'ArrowRight') moveSelected((k === 'ArrowLeft' ? -1 : 1) * (ev.shiftKey ? 0.05 : 0.01));
+        else if (k === 'ArrowLeft' || k === 'ArrowRight') moveSelected((k === 'ArrowLeft' ? -1 : 1) * (ev.shiftKey ? 0.05 : 0.01), true);
         else if (k === 'Escape') { if (box) { box = null; match = null; paintMatch(); } else sel = []; }
         else if (k === ' ') { var ar = AR(); if (ar && ar.togglePlay) ar.togglePlay(); }
         else if (!mod && /^[1-8]$/.test(k)) {
@@ -741,7 +755,7 @@
 
         hint = document.createElement('div');
         hint.className = 'ace-hint';
-        hint.textContent = 'Click a cue to select it, drag to move it, Delete removes it, double-click a row to add one. While it plays, keys 1-8 tap cues onto lanes 1-8. Click the spectrogram to jump there; drag across it to box a shape and find every repeat.';
+        hint.textContent = 'Click a cue to select it, drag to move it (it lands on the nearest hit; Alt places it freely), Delete removes it, double-click a row to add one. While it plays, keys 1-8 tap cues onto lanes 1-8. Click the spectrogram to jump there; drag across it to box a shape and find every repeat.';
         wrap.appendChild(hint);
         host.appendChild(wrap);
         if (raf === null) raf = requestAnimationFrame(draw);
@@ -755,6 +769,7 @@
         selection: function () { return sel.map(function (q) { return { lane: q.lane, t: q.t }; }); },
         select: function (lane, t) { sel = [{ lane: lane, t: t }]; },
         move: moveSelected, remove: deleteSelected, add: addCue, undo: undo, redo: redoEdit,
+        setSnap: function (on) { snapping = !!on; },
         _canvas: function () { return cv; },
         _box: function (t0, t1, u0, u1, mode) { box = { t0: t0, t1: t1, u0: u0, u1: u1 }; match = mode ? { mode: mode } : null; runMatch(); },
         _match: function () { return match ? { busy: !!match.busy, n: match.peaks ? match.peaks.length : 0, sim: match.sim, mode: match.mode, times: (match.peaks || []).map(function (p) { return +p.t.toFixed(3); }) } : null; },

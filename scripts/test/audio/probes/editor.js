@@ -27,6 +27,7 @@
   var lane0 = ch.notes.filter(function (q) { return q.lane === 0; });
   var t0 = lane0[3].t;
   // move a cue +0.1 s
+  CE.setSnap(false);   // exact positions below; snap has its own check at the end
   CE.select(0, t0); CE.move(0.1);
   var after = AT.chart().notes.filter(function (q) { return q.lane === 0; }).map(function (q) { return q.t; });
   out.moved = { from: +t0.toFixed(3), foundAt: after.some(function (t) { return Math.abs(t - (t0 + 0.1)) < 0.002; }), oldGone: !after.some(function (t) { return Math.abs(t - t0) < 0.002; }), edited: !!AT.gates()[0].edited };
@@ -53,7 +54,7 @@
   var tick = lane1[0];
   var laneY = r.top + (14 + 72 + 6 + 1 * 20 + 10) * ky;
   var x = r.left + (tick.t - 0) / 8 * W;
-  function pe(type, px, py, extra) { cv.dispatchEvent(new PointerEvent(type, Object.assign({ clientX: px, clientY: py, button: 0, buttons: type === 'pointerup' ? 0 : 1, pointerId: 1, bubbles: true }, extra || {}))); }
+  function pe(type, px, py, extra) { cv.dispatchEvent(new PointerEvent(type, Object.assign({ clientX: px, clientY: py, button: 0, buttons: type === 'pointerup' ? 0 : 1, pointerId: 1, bubbles: true, altKey: true }, extra || {}))); }
   var reached = []; cv.addEventListener('pointerdown', function (e) { reached.push(['target', e.button, e.defaultPrevented]); }); window.addEventListener('pointerdown', function (e) { if (e.target === cv) reached.push(['window-capture']); }, true);
   out.dbg = { view: CE.view(), rect: [r.left, r.top, r.width, r.height], tickT: tick.t, x: x, laneY: laneY, topEl: (document.elementFromPoint(x, laneY) || {}).className };
   pe('pointerdown', x, laneY); out.dbg.selAfterDown = CE.selection(); out.dbg.reached = reached; out.dbg.nCanvas = document.querySelectorAll(".ace-canvas").length; out.dbg.same = CE._canvas() === cv; out.dbg.hit = CE._hit(1, x - r.left); pe('pointermove', x + 20, laneY); pe('pointermove', x + 40, laneY); pe('pointerup', x + 40, laneY);
@@ -62,7 +63,7 @@
   out.drag = { lane1Edited: !!AT.gates()[1].edited, movedBy: +dt.toFixed(3), landed: AT.chart().notes.some(function (q) { return q.lane === 1 && Math.abs(q.t - (tick.t + dt)) < 0.01; }) };
   var lane2Before = AT.chart().notes.filter(function (q) { return q.lane === 2; }).length;
   var ly2 = r.top + (14 + 72 + 6 + 2 * 20 + 10) * ky;
-  cv.dispatchEvent(new MouseEvent('dblclick', { clientX: r.left + W * 0.37, clientY: ly2, bubbles: true }));
+  cv.dispatchEvent(new MouseEvent('dblclick', { clientX: r.left + W * 0.37, clientY: ly2, bubbles: true, altKey: true }));
   await sleep(50);
   var lane2After = AT.chart().notes.filter(function (q) { return q.lane === 2; }).length;
   cv.focus({ preventScroll: true });
@@ -79,6 +80,13 @@
   await sleep(700);
   ar.fireGenerator = og;
   out.firesAtMoved = { want: +(t0 + 0.1).toFixed(3), fired: fired };
+  // snap: a cue added 25 ms after a detected kick lands on it
+  CE.setSnap(true);
+  var kick = AT.chart().notes.filter(function (q) { return q.lane === 0 && q.t > 9 && q.t < 12; })[0];
+  var before0 = AT.chart().notes.filter(function (q) { return q.lane === 0; }).length;
+  CE.add(0, kick.t + 0.025, 0.8);
+  var near = AT.chart().notes.filter(function (q) { return q.lane === 0 && Math.abs(q.t - kick.t) < 0.012; }).length;
+  out.snap = { kick: +kick.t.toFixed(3), added: AT.chart().notes.filter(function (q) { return q.lane === 0; }).length - before0, landedOnKick: near >= 2, sel: CE.selection()[0] && +CE.selection()[0].t.toFixed(3) };
   CE.setView(0, 16);
   await sleep(300);
   return out;
