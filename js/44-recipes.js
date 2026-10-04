@@ -671,6 +671,13 @@
         const strip = $('mixer-strip');
         const cell = strip ? strip.querySelector('[data-ui-key="' + key + '"]') : null;
         if (cell) return cell;
+        // Brush Size heads the left sidebar since 2026-10-04.
+        const left = $('sidebar-left');
+        const leftCell = left ? left.querySelector('[data-ui-key="' + key + '"]') : null;
+        if (leftCell) {
+            if (window.Sidebars && window.Sidebars.left && window.Sidebars.left.isCollapsed()) window.Sidebars.left.expand();
+            return leftCell;
+        }
         // A fader the bar could not fit at this width is parked in the More
         // panel (js/46-strip-more.js); reveal() opens that panel to point at it.
         const more = $('mixer-more-panel');

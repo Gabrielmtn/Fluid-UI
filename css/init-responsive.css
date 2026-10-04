@@ -187,6 +187,7 @@ html.boot-fade.booting #splash-screen,
 html.boot-fade.booting #custom-titlebar,
 html.boot-fade.booting #mixer-strip,
 html.boot-fade.booting #sidebar-right,
+html.boot-fade.booting #sidebar-left,
 html.boot-fade.booting #canvas-area {
     transition: none !important;
 }
@@ -257,6 +258,9 @@ html.boot-fade.booting #canvas-area {
    --ui-scale is set by JS in initResponsiveScale() based on screen DPI/resolution. */
 
 #sidebar-right {
+    zoom: var(--ui-scale);
+}
+#sidebar-left {
     zoom: var(--ui-scale);
 }
 #mixer-strip {

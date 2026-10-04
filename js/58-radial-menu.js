@@ -951,6 +951,7 @@
 
     // Where a slider lives, for its row: the top bar, or its section.
     function sliderHome(e) {
+        if (e.closest('#sidebar-left')) return 'Brush bar';
         if (e.closest('.mixer-channel')) return 'Top bar';
         var sec = e.closest('#sidebar-right .sidebar-section');
         var t = sec ? sec.querySelector('.section-title') : null;

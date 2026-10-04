@@ -417,7 +417,7 @@
             });
             const add = document.createElement('button');
             add.type = 'button';
-            add.className = 'palette-tag palette-tag-new';
+            add.className = 'palette-new btn--ghost';   // the button system's colours, not a tag's
             add.id = 'paletteNewBtn';
             add.textContent = '+ New';
             add.title = 'A new palette, starting with the colour in the picker';
@@ -656,7 +656,7 @@
             const add = document.createElement('button');
             add.type = 'button';
             add.id = 'paletteAddChip';
-            add.className = 'palette-chip palette-add';
+            add.className = 'palette-add btn--ghost';
             add.textContent = '+';
             add.title = 'Add the colour in the picker to this palette (Shift+S)';
             add.addEventListener('click', () => window.addColorToPalette());

@@ -73,6 +73,12 @@
         // Append sidebar to main-area
         mainArea.appendChild(sidebar);
 
+        // The left sidebar (user test 3: "one left side sidebar ... side
+        // collapsable (open by default) ... brush size slider is top of the
+        // sidebar"): Brush Size on top, the brush's own sections under it.
+        const leftBar = buildLeftSidebar(strip);
+        if (leftBar) mainArea.insertBefore(leftBar, canvasArea);
+
         // Move any remaining dynamic content from .controls to sidebar
         // (e.g., component system)
         const remaining = controls.querySelectorAll('.collapsible-section, #component-controls');
@@ -2167,6 +2173,92 @@
     }
 
     // ─── SIDEBAR ─────────────────────────────────────────────────
+    // ── LEFT SIDEBAR ──────────────────────────────────────────────────────
+    // Brush Size leaves the top bar for the head of a left column, moved
+    // WHOLE (the .mixer-channel and its fader, value and tip swatch), so
+    // everything that reads it by structure keeps working: the radial menu,
+    // 49's valueTextOf, the oscillator. The bar folds sideways to a 32px rail
+    // that keeps the size in view; « and » flip it, and the state is kept
+    // (ui.leftSidebar.collapsed). Below ~1280 CSS px it starts folded until
+    // you pick. A width change refits the canvas once (01's ResizeObserver on
+    // #canvas-area), the same cost as a window resize; it snaps, never
+    // animates (05j: per-frame resizes are the worst jank there is).
+    var LSB_KEY = 'ui.leftSidebar.collapsed';
+    function buildLeftSidebar(strip) {
+        var bar = document.createElement('div');
+        bar.id = 'sidebar-left';
+        bar.setAttribute('aria-label', 'Brush');
+
+        var head = document.createElement('div');
+        head.className = 'lsb-head';
+        var sizeInput = strip.querySelector('#brushSize');
+        var sizeChannel = sizeInput ? sizeInput.closest('.mixer-channel') : null;
+        if (sizeChannel) head.appendChild(sizeChannel);
+        var fold = document.createElement('button');
+        fold.type = 'button';
+        fold.className = 'lsb-collapse btn--icon';
+        fold.textContent = '«';
+        fold.title = 'Fold the brush bar to the side';
+        fold.setAttribute('aria-label', 'Fold the brush bar');
+        head.appendChild(fold);
+        bar.appendChild(head);
+
+        var body = document.createElement('div');
+        body.className = 'lsb-body';
+        bar.appendChild(body);
+
+        var rail = document.createElement('div');
+        rail.className = 'lsb-rail';
+        var unfold = document.createElement('button');
+        unfold.type = 'button';
+        unfold.className = 'lsb-expand btn--icon';
+        unfold.textContent = '»';
+        unfold.title = 'Open the brush bar';
+        unfold.setAttribute('aria-label', 'Open the brush bar');
+        rail.appendChild(unfold);
+        var railSize = document.createElement('span');
+        railSize.className = 'lsb-rail-size';
+        railSize.title = 'Brush Size';
+        rail.appendChild(railSize);
+        var railLabel = document.createElement('button');
+        railLabel.type = 'button';
+        railLabel.className = 'lsb-rail-label btn--ghost';
+        railLabel.textContent = 'Brush';
+        railLabel.title = 'Open the brush bar';
+        rail.appendChild(railLabel);
+        bar.appendChild(rail);
+
+        function syncRail() {
+            var v = document.getElementById('mixer-brushValue');
+            railSize.textContent = v ? v.textContent : '';
+        }
+        if (sizeInput) { sizeInput.addEventListener('input', syncRail); sizeInput.addEventListener('change', syncRail); }
+
+        function set(collapsed, keep) {
+            bar.classList.toggle('collapsed', !!collapsed);
+            syncRail();
+            if (keep) { try { if (window.settingsManager) window.settingsManager.set(LSB_KEY, !!collapsed); } catch (_) {} }
+        }
+        fold.addEventListener('click', function () { set(true, true); });
+        unfold.addEventListener('click', function () { set(false, true); });
+        railLabel.addEventListener('click', function () { set(false, true); });
+
+        var saved = null;
+        try { saved = window.settingsManager ? window.settingsManager.get(LSB_KEY, null) : null; } catch (_) {}
+        set(saved === null || saved === undefined ? window.innerWidth < 1280 : !!saved, false);
+
+        window.Sidebars = window.Sidebars || {};
+        window.Sidebars.left = {
+            el: bar,
+            body: body,
+            collapse: function () { set(true, true); },
+            expand: function () { set(false, true); },
+            toggle: function () { set(!bar.classList.contains('collapsed'), true); },
+            isCollapsed: function () { return bar.classList.contains('collapsed'); }
+        };
+        return bar;
+    }
+
     function buildSidebar(controls) {
         const sidebar = document.createElement('div');
         sidebar.id = 'sidebar-right';
@@ -2283,12 +2375,15 @@
         // on it catches every case; no fragile position tracking.
         const place = function () {
             const ca = document.getElementById('canvas-area');
-            let right = 0;
+            let right = 0, left = 0;
             if (ca) {
                 const r = ca.getBoundingClientRect();
                 if (r.right > 1 && r.right < window.innerWidth - 1) right = Math.round(window.innerWidth - r.right);
+                // The left sidebar sits beside the canvas too: start there.
+                if (r.left > 1) left = Math.round(r.left);
             }
             bar.style.right = right + 'px';
+            bar.style.left = left + 'px';
         };
         requestAnimationFrame(place);
         setTimeout(place, 400);
