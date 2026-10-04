@@ -1726,6 +1726,13 @@ body.rec-open #sidebar-right {
 .ace-canvas { display: block; width: 100%; height: 160px; border-radius: 6px; background: #05070c; cursor: default; outline: none; }
 .ace-canvas:focus-visible { box-shadow: 0 0 0 1px var(--ink-300); }
 .ace-hint { margin-top: 4px; font-size: var(--font-xs, 10px); color: var(--ink-500); }
+/* The pattern matcher's row: shown while a shape is boxed */
+.ace-match { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; padding: 4px 6px; border-radius: 6px; background: rgba(120, 220, 255, 0.08); border: 1px solid rgba(120, 220, 255, 0.35); }
+.ace-match[hidden] { display: none; }
+.ace-match-info { font-size: var(--font-xs, 10px); color: var(--ink-100, #e6edf3); font-variant-numeric: tabular-nums; margin-right: 4px; }
+.ace-sim { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-xs, 10px); color: var(--ink-300); }
+.ace-sim input[type="range"] { width: 120px; }
+.ace-sim-val { min-width: 3ch; font-variant-numeric: tabular-nums; }
 /* The live controls, folded under one heading */
 .audio-live-block { max-width: 680px; margin-top: 6px; border-top: 1px solid var(--ground-500, rgba(255,255,255,0.12)); padding-top: 6px; }
 .audio-live-block > summary { cursor: pointer; font-size: var(--font-xs, 10px); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-300); padding: 4px 0; }

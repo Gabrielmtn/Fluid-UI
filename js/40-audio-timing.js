@@ -216,14 +216,17 @@
     }
 
     var METHODS = ['onset', 'level', 'beat', 'pitch'];
-    var METHOD_LABEL = { onset: 'Onset', level: 'Level', beat: 'Beat', pitch: 'Pitch' };
+    var METHOD_LABEL = { onset: 'Onset', level: 'Level', beat: 'Beat', pitch: 'Pitch', pattern: 'Shape' };
     var METHOD_TIP = {
         onset: 'Onset — fires on attacks (vibrato-suppressed spectral flux vs an adaptive threshold). Box edge = sensitivity. Best default for real music.',
         level: 'Level — fires when the band crosses the box’s top edge, exactly like the live gates.',
         beat:  'Beat — locks a steady grid to this band’s tempo; the box edge mutes ticks where the band goes quiet.',
-        pitch: 'Pitch — follows the band’s dominant note: a cue lands on each note change, and the bar’s position across the lane tracks how high the note is. Box edge mutes quiet passages.'
+        pitch: 'Pitch — follows the band’s dominant note: a cue lands on each note change, and the bar’s position across the lane tracks how high the note is. Box edge mutes quiet passages.',
+        pattern: 'Shape — every place the track repeats a shape you boxed in the cue editor (Full Audio). Its cues are found once and kept; edit them there.'
     };
-    function laneMethod(g) { return METHODS.indexOf(g.method) >= 0 ? g.method : 'onset'; }
+    // A 'pattern' lane's cues come from the cue editor's matcher (40b) and
+    // are kept as its own list; it is never re-extracted.
+    function laneMethod(g) { return g.method === 'pattern' ? 'pattern' : METHODS.indexOf(g.method) >= 0 ? g.method : 'onset'; }
 
     // What a lane DOES when one of its cues reaches the hit line (user test
     // 3: "binding small controllable events to the detected timing events").
@@ -1812,8 +1815,9 @@
             mb.type = 'button';
             mb.className = 'atv-method';
             mb.textContent = METHOD_LABEL[m] + (m === 'beat' && lane && lane.bpm ? ' ♩' + Math.round(lane.bpm) : '');
-            mb.title = METHOD_TIP[m] + ' Click to switch.';
+            mb.title = METHOD_TIP[m] + (m === 'pattern' ? '' : ' Click to switch.');
             mb.addEventListener('click', function () {
+                if (m === 'pattern') return;   // found by its shape, not by a method
                 g.method = METHODS[(METHODS.indexOf(m) + 1) % METHODS.length];
                 onGatesChanged();
                 // The right edge differs per method (a level threshold and an
@@ -1982,6 +1986,19 @@
                 saveGates();
                 extractAll();
             },
+            // A lane made in the editor (the pattern matcher): its band, its
+            // cues as its own list, what it does. Returns its index.
+            addLane: function (g) {
+                if (!g || typeof g.lo !== 'number' || typeof g.hi !== 'number') return -1;
+                gateStore.gates.push(g);
+                saveGates();
+                extractAll();
+                rebuildAllControls();
+                return gateStore.gates.length - 1;
+            },
+            // Every extractor's cue stamps carry this, so a matched cue lands
+            // where a detected one would.
+            lagComp: function () { return LAG_COMP; },
             redetect: function (i) {
                 var g = gateStore.gates[i];
                 if (!g) return;

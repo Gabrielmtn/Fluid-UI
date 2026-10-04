@@ -17,6 +17,15 @@
 //
 // The spectrogram is drawn ONCE per track into an offscreen strip and
 // sliced per frame, so following the playhead costs a drawImage.
+//
+// PATTERN MATCHER (user test 3: "a pattern matcher which uses a
+// spectrograph... to decide what shapes you want to cause triggers").
+// Drag a box across the spectrogram around one snare, one vocal stab, one
+// riser: a worker slides it along the whole track (zero-mean normalised
+// cross-correlation over the box's band, weighed by how close each place's
+// loudness is to the shape's, so a faint bleed of it doesn't count), every
+// repeat lights up, Similarity tunes how
+// alike they must be, and Make a lane turns them into a lane of cues.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -36,6 +45,12 @@
     var drag = null;                // { x0, dt, moved }
     var undoStack = [], redoStack = [];
     var strip = null, stripKey = '';
+    // The matcher: the boxed shape, its scores along the track, the picks.
+    var box = null;                 // { t0, t1, u0, u1 } seconds, 0-1 log frequency
+    var boxDrag = null;             // { x0, y0, W, moved }
+    var match = null;               // { scores, L, anchor, sim, mode, peaks, busy, key }
+    var matchEl = null, matchInfo = null, simInput = null, simOut = null, modeBtns = {}, makeBtn = null;
+    var MATCH_MAX_S = 1.5, MATCH_MAX_BINS = 24;
 
     function AT() { return window.AudioTiming && window.AudioTiming.editor ? window.AudioTiming.editor : null; }
     function AR() { return window.audioReactive || null; }
@@ -172,6 +187,29 @@
             g.fillRect(0, y0, cssW, Math.max(1, y1 - y0));
             g.fillStyle = rgba(col, 0.55);
             g.fillRect(0, y0, 3, Math.max(1, y1 - y0));
+        }
+
+        // The boxed shape and every place it repeats
+        if (box) {
+            var by0 = RULER_H + SPEC_H * (1 - box.u1), by1 = RULER_H + SPEC_H * (1 - box.u0), bw = box.t1 - box.t0;
+            if (match && match.peaks) {
+                g.fillStyle = 'rgba(120, 220, 255, 0.22)';
+                g.strokeStyle = 'rgba(120, 220, 255, 0.8)';
+                g.lineWidth = 1;
+                for (var mi = 0; mi < match.peaks.length; mi++) {
+                    var ms = match.peaks[mi].start;
+                    if (ms + bw < view.t0 || ms > view.t0 + view.span) continue;
+                    var mx0 = xOf(ms, cssW), mx1 = xOf(ms + bw, cssW);
+                    g.fillRect(mx0, by0, Math.max(2, mx1 - mx0), by1 - by0);
+                    var ax = xOf(match.peaks[mi].t, cssW);
+                    g.fillRect(Math.round(ax), RULER_H - 5, 1, 5);
+                }
+            }
+            g.setLineDash([4, 3]);
+            g.strokeStyle = 'rgba(255,255,255,0.95)';
+            g.lineWidth = 1;
+            g.strokeRect(xOf(box.t0, cssW) + 0.5, by0 + 0.5, Math.max(2, xOf(box.t1, cssW) - xOf(box.t0, cssW)), by1 - by0);
+            g.setLineDash([]);
         }
 
         // Lane rows with their ticks
@@ -323,9 +361,10 @@
         touch();
         var p = local(ev);
         if (p.y < RULER_H + SPEC_H) {
-            // The ruler and the spectrogram are the scrub bar.
-            var ar = AR();
-            if (ar && ar.seek) ar.seek(clamp(tOf(p.x, p.W) - (AT().nudgeMs() / 1000), 0, duration()));
+            // A click on the ruler or the spectrogram seeks; a DRAG on the
+            // spectrogram boxes a shape for the matcher.
+            boxDrag = { x0: p.x, y0: p.y, W: p.W, moved: false };
+            try { cv.setPointerCapture(ev.pointerId); } catch (_) {}
             return;
         }
         var lane = laneOfY(p.y);
@@ -341,7 +380,21 @@
         drag = { x0: p.x, W: p.W, dt: 0, moved: false };
         try { cv.setPointerCapture(ev.pointerId); } catch (_) {}
     }
+    function uOfY(y) { return clamp(1 - (y - RULER_H) / SPEC_H, 0, 1); }
     function onMove(ev) {
+        if (boxDrag) {
+            var q = local(ev);
+            if (Math.abs(q.x - boxDrag.x0) > 4 || Math.abs(q.y - boxDrag.y0) > 4) boxDrag.moved = true;
+            if (boxDrag.moved && boxDrag.y0 >= RULER_H) {
+                var ta = tOf(boxDrag.x0, q.W), tb = tOf(q.x, q.W);
+                var ua = uOfY(boxDrag.y0), ub = uOfY(q.y);
+                box = { t0: Math.min(ta, tb), t1: Math.max(ta, tb), u0: Math.min(ua, ub), u1: Math.max(ua, ub) };
+                match = null;
+                paintMatch();
+            }
+            touch();
+            return;
+        }
         if (!drag) return;
         var p = local(ev);
         var dx = p.x - drag.x0;
@@ -349,7 +402,19 @@
         drag.dt = dx / drag.W * view.span;
         touch();
     }
-    function onUp() {
+    function onUp(ev) {
+        if (boxDrag) {
+            var bd = boxDrag; boxDrag = null;
+            if (!bd.moved || bd.y0 < RULER_H) {
+                var ar = AR();
+                if (ar && ar.seek) ar.seek(clamp(tOf(bd.x0, bd.W) - (AT().nudgeMs() / 1000), 0, duration()));
+                return;
+            }
+            if (box && box.t1 - box.t0 > MATCH_MAX_S) box.t1 = box.t0 + MATCH_MAX_S;
+            if (!box || box.t1 - box.t0 < 0.03 || box.u1 - box.u0 < 0.01) { box = null; paintMatch(); return; }
+            runMatch();
+            return;
+        }
         if (!drag) return;
         var d = drag; drag = null;
         if (d.moved) moveSelected(d.dt);
@@ -380,7 +445,7 @@
         else if (mod && (k === 'z' || k === 'Z') && !ev.shiftKey) undo();
         else if (mod && ((k === 'z' || k === 'Z') && ev.shiftKey || k === 'y' || k === 'Y')) redoEdit();
         else if (k === 'ArrowLeft' || k === 'ArrowRight') moveSelected((k === 'ArrowLeft' ? -1 : 1) * (ev.shiftKey ? 0.05 : 0.01));
-        else if (k === 'Escape') sel = [];
+        else if (k === 'Escape') { if (box) { box = null; match = null; paintMatch(); } else sel = []; }
         else if (k === ' ') { var ar = AR(); if (ar && ar.togglePlay) ar.togglePlay(); }
         else if (!mod && /^[1-8]$/.test(k)) {
             // Tap along: a cue on lane N where the track is NOW.
@@ -388,6 +453,156 @@
             if (lane < nLanes() && pos && !pos.paused) addCue(lane, nowT(), 0.8);
         } else handled = false;
         if (handled) { ev.preventDefault(); ev.stopPropagation(); }
+    }
+
+    // ─── THE MATCHER ────────────────────────────────────────────────
+    // Runs in a worker: ~frames × template cells multiply-adds (a 4-minute
+    // track and a 1 s box: about 60 M), never on the frame that paints.
+    function nccJob(job) {
+        var X = job.X, F = job.frames, B = job.B, f0 = job.f0, L = job.L;
+        var Y = X, f, b, i;
+        if (job.mode === 'attack') {
+            Y = new Float32Array(F * B);
+            for (f = 1; f < F; f++) for (b = 0; b < B; b++) {
+                var dv = X[f * B + b] - X[(f - 1) * B + b];
+                Y[f * B + b] = dv > 0 ? dv : 0;
+            }
+        }
+        var n = L * B, T = new Float32Array(n), mu = 0;
+        for (i = 0; i < n; i++) { T[i] = Y[f0 * B + i]; mu += T[i]; }
+        mu /= n;
+        var tLevel = mu;   // the shape's mean level, before it is centred
+        var tss = 0;
+        for (i = 0; i < n; i++) { T[i] -= mu; tss += T[i] * T[i]; }
+        var tsd = Math.sqrt(tss) || 1e-9;
+        var rs = new Float64Array(F + 1), rq = new Float64Array(F + 1);
+        for (f = 0; f < F; f++) {
+            var sm = 0, sq = 0;
+            for (b = 0; b < B; b++) { var v = Y[f * B + b]; sm += v; sq += v * v; }
+            rs[f + 1] = rs[f] + sm; rq[f + 1] = rq[f] + sq;
+        }
+        var P = Math.max(0, F - L + 1), out = new Float32Array(P);
+        for (var p = 0; p < P; p++) {
+            var num = 0, base = p * B;
+            for (i = 0; i < n; i++) num += Y[base + i] * T[i];
+            var s1 = rs[p + L] - rs[p], s2 = rq[p + L] - rq[p];
+            var vw = s2 - s1 * s1 / n;
+            // Correlation alone ignores loudness: a faint bleed of the same
+            // shape (a kick's click in the snare band) scores like the real
+            // thing. Weigh it by how close its level is to the shape's.
+            var wl = s1 / n, lr = (wl > 0 && tLevel > 0) ? Math.min(wl, tLevel) / Math.max(wl, tLevel) : 0;
+            out[p] = vw > 1e-9 ? (num / (Math.sqrt(vw) * tsd)) * lr * lr : 0;
+        }
+        // Anchor: the template frame with the strongest rise, so a match's
+        // cue lands on its hit rather than where the box happened to start.
+        var anchor = 0, best = -1;
+        for (var a = 1; a < L; a++) {
+            var rise = 0;
+            for (b = 0; b < B; b++) { var d2 = X[(f0 + a) * B + b] - X[(f0 + a - 1) * B + b]; if (d2 > 0) rise += d2; }
+            if (rise > best) { best = rise; anchor = a; }
+        }
+        return { scores: out, anchor: anchor };
+    }
+    var nccWorkerUrl = null;
+    function runNcc(job, done) {
+        try {
+            if (nccWorkerUrl === null) {
+                nccWorkerUrl = (window.Worker && window.Blob && window.URL) ? URL.createObjectURL(new Blob(
+                    ['var J=' + nccJob.toString() + ';self.onmessage=function(e){var r=J(e.data);self.postMessage(r,[r.scores.buffer]);};'],
+                    { type: 'text/javascript' })) : false;
+            }
+            if (nccWorkerUrl) {
+                var w = new Worker(nccWorkerUrl);
+                w.onmessage = function (e) { w.terminate(); done(e.data); };
+                w.onerror = function () { w.terminate(); done(nccJob(job)); };
+                w.postMessage(job, [job.X.buffer]);
+                return;
+            }
+        } catch (_) {}
+        done(nccJob(job));
+    }
+    function runMatch() {
+        var e = AT(), c = e && e.cache();
+        if (!c || !box) return;
+        var mode = (match && match.mode) || 'texture';
+        var c0 = clamp(Math.floor(box.u0 * c.cols), 0, c.cols - 1), c1 = clamp(Math.ceil(box.u1 * c.cols) - 1, c0, c.cols - 1);
+        var span = c1 - c0 + 1, B = Math.min(MATCH_MAX_BINS, span);
+        var F = c.frames, X = new Float32Array(F * B), lv = c.levels, cols = c.cols;
+        for (var f = 0; f < F; f++) {
+            for (var b = 0; b < B; b++) {
+                var a0 = c0 + Math.floor(b * span / B), a1 = c0 + Math.floor((b + 1) * span / B), mx = 0;
+                for (var col = a0; col < Math.max(a1, a0 + 1); col++) { var v = lv[f * cols + col]; if (v > mx) mx = v; }
+                X[f * B + b] = mx / 255;
+            }
+        }
+        var f0 = clamp(Math.round((box.t0 - c.t0) / c.dt), 0, F - 2);
+        var L = clamp(Math.round((box.t1 - box.t0) / c.dt), 2, F - f0);
+        var key = [f0, L, c0, c1, mode].join(':');
+        // 0.65: on a test beat, every snare and no kick (texture, 0.6-0.8).
+        var sim = match && match.sim ? match.sim : 0.65;
+        match = { busy: true, mode: mode, sim: sim, key: key, L: L, peaks: [] };
+        paintMatch();
+        runNcc({ X: X, frames: F, B: B, f0: f0, L: L, mode: mode }, function (r) {
+            if (!match || match.key !== key) return;   // a newer box took over
+            match.busy = false;
+            match.scores = r.scores;
+            match.anchor = r.anchor;
+            pickPeaks();
+            paintMatch();
+        });
+    }
+    // Every place at least sim alike, strongest first, no two closer than
+    // half the shape: the pick is instant, so the slider redraws as you drag.
+    function pickPeaks() {
+        var e = AT(), c = e && e.cache();
+        if (!match || !match.scores || !c) return;
+        var sc = match.scores, P = sc.length, sim = match.sim, r = Math.max(1, Math.floor(match.L / 2));
+        var cand = [];
+        for (var p = 0; p < P; p++) if (sc[p] >= sim) cand.push(p);
+        cand.sort(function (a, b) { return sc[b] - sc[a]; });
+        var taken = new Uint8Array(P), peaks = [];
+        for (var k = 0; k < cand.length && peaks.length < 2000; k++) {
+            var q = cand[k];
+            if (taken[q]) continue;
+            for (var z = Math.max(0, q - r); z <= Math.min(P - 1, q + r); z++) taken[z] = 1;
+            var start = c.t0 + q * c.dt;
+            peaks.push({ start: start, t: start + match.anchor * c.dt + e.lagComp(), score: sc[q] });
+        }
+        peaks.sort(function (a, b) { return a.t - b.t; });
+        match.peaks = peaks;
+    }
+    function hzText(u) {
+        var hz = (window.AudioScenes && window.AudioScenes.x01ToHz) ? window.AudioScenes.x01ToHz(u) : 20 * Math.pow(1000, u);
+        return hz >= 1000 ? (hz / 1000).toFixed(hz >= 10000 ? 0 : 1) + 'k' : Math.round(hz) + '';
+    }
+    function paintMatch() {
+        if (!matchEl) return;
+        matchEl.hidden = !box;
+        if (!box) return;
+        var dur = box.t1 - box.t0;
+        matchInfo.textContent = 'Shape ' + dur.toFixed(2) + ' s · ' + hzText(box.u0) + '–' + hzText(box.u1) + ' Hz · '
+            + (!match || match.busy ? 'finding its repeats…' : match.peaks.length + (match.peaks.length === 1 ? ' match' : ' matches'));
+        var mode = (match && match.mode) || 'texture';
+        modeBtns.attack.classList.toggle('active', mode === 'attack');
+        modeBtns.texture.classList.toggle('active', mode === 'texture');
+        var sim = (match && match.sim) || 0.65;
+        simInput.value = String(sim);
+        simOut.textContent = sim.toFixed(2);
+        makeBtn.disabled = !(match && !match.busy && match.peaks.length);
+    }
+    function makeLane() {
+        var e = AT();
+        if (!e || !box || !match || !match.peaks.length) return;
+        var sim = match.sim;
+        var cues = match.peaks.map(function (p) {
+            return [+p.t.toFixed(4), +(0.5 + 0.5 * clamp((p.score - sim) / Math.max(0.05, 1 - sim), 0, 1)).toFixed(3)];
+        });
+        var i = e.addLane({ lo: +box.u0.toFixed(4), hi: +box.u1.toFixed(4), th: 0.5, method: 'pattern', act: 'burst', every: 1,
+                            edited: true, cues: cues, pattern: { t0: +box.t0.toFixed(3), t1: +box.t1.toFixed(3), mode: match.mode, sim: sim } });
+        box = null; match = null;
+        paintMatch();
+        sel = [];
+        statusEl.textContent = i >= 0 ? 'Lane ' + (i + 1) + ': ' + cues.length + ' cues, doing Burst' : '';
     }
 
     // ─── TOOLBAR ────────────────────────────────────────────────────
@@ -408,7 +623,7 @@
         btn.undo.disabled = !undoStack.length;
         btn.redo.disabled = !redoStack.length;
         var lanes = selectedLanes();
-        btn.redetect.disabled = !(e && lanes.some(function (i) { var g = e.gates()[i]; return g && g.edited; }));
+        btn.redetect.disabled = !(e && lanes.some(function (i) { var g = e.gates()[i]; return g && g.edited && g.method !== 'pattern'; }));
         btn.follow.classList.toggle('active', follow);
         btn.follow.setAttribute('aria-pressed', follow ? 'true' : 'false');
     }
@@ -430,7 +645,7 @@
         btn.fit = mkBtn('Fit', 'Show the whole track', function () { view.t0 = 0; view.span = duration() || 20; clampView(); });
         btn.follow = mkBtn('Follow', 'Keep the playhead in view while the track plays', function () { follow = !follow; lastTouchMs = 0; });
         btn.redetect = mkBtn('Re-detect', 'Give the selected cues\' lanes back to the detector: your edits on them go', function () {
-            var e = AT(), lanes = selectedLanes().filter(function (i) { return e.gates()[i] && e.gates()[i].edited; });
+            var e = AT(), lanes = selectedLanes().filter(function (i) { return e.gates()[i] && e.gates()[i].edited && e.gates()[i].method !== 'pattern'; });
             if (!lanes.length) return;
             var before = snapshot(lanes);
             lanes.forEach(function (i) { e.redetect(i); });
@@ -446,6 +661,40 @@
         statusEl.className = 'ace-status';
         bar.appendChild(statusEl);
         wrap.appendChild(bar);
+
+        matchEl = document.createElement('div');
+        matchEl.className = 'ace-match';
+        matchEl.hidden = true;
+        matchInfo = document.createElement('span');
+        matchInfo.className = 'ace-match-info';
+        matchEl.appendChild(matchInfo);
+        modeBtns.attack = mkBtn('Attacks', 'Match the shape\'s hits: how it rises, not how loud it sits (drums, plucks)', function () { if (match) match.mode = 'attack'; else match = { mode: 'attack' }; runMatch(); });
+        modeBtns.texture = mkBtn('Texture', 'Match the shape as it sounds, loudness and all (pads, vocals, risers)', function () { if (match) match.mode = 'texture'; else match = { mode: 'texture' }; runMatch(); });
+        matchEl.appendChild(modeBtns.texture);
+        matchEl.appendChild(modeBtns.attack);
+        var simLbl = document.createElement('label');
+        simLbl.className = 'ace-sim';
+        simLbl.textContent = 'Similarity ';
+        simLbl.title = 'How alike a place must be to count as a repeat';
+        simInput = document.createElement('input');
+        simInput.type = 'range'; simInput.min = '0.3'; simInput.max = '0.98'; simInput.step = '0.01'; simInput.value = '0.65';
+        simInput.setAttribute('data-no-scale', '1');
+        simInput.addEventListener('input', function () {
+            if (!match) return;
+            match.sim = parseFloat(simInput.value) || 0.65;
+            pickPeaks();
+            paintMatch();
+        });
+        simOut = document.createElement('span');
+        simOut.className = 'ace-sim-val';
+        simLbl.appendChild(simInput);
+        simLbl.appendChild(simOut);
+        matchEl.appendChild(simLbl);
+        makeBtn = mkBtn('Make a lane', 'Turn every match into a cue on a new lane, set to Burst; pick what it does in its row', makeLane);
+        makeBtn.classList.add('btn--emphasis');
+        matchEl.appendChild(makeBtn);
+        matchEl.appendChild(mkBtn('Cancel', 'Drop the box (Escape)', function () { box = null; match = null; paintMatch(); }));
+        wrap.appendChild(matchEl);
 
         cv = document.createElement('canvas');
         cv.className = 'ace-canvas';
@@ -467,7 +716,7 @@
 
         hint = document.createElement('div');
         hint.className = 'ace-hint';
-        hint.textContent = 'Click a cue to select it, drag to move it, Delete removes it, double-click a row to add one. While it plays, keys 1-8 tap cues onto lanes 1-8. Click the spectrogram to jump there.';
+        hint.textContent = 'Click a cue to select it, drag to move it, Delete removes it, double-click a row to add one. While it plays, keys 1-8 tap cues onto lanes 1-8. Click the spectrogram to jump there; drag across it to box a shape and find every repeat.';
         wrap.appendChild(hint);
         host.appendChild(wrap);
         if (raf === null) raf = requestAnimationFrame(draw);
@@ -482,6 +731,10 @@
         select: function (lane, t) { sel = [{ lane: lane, t: t }]; },
         move: moveSelected, remove: deleteSelected, add: addCue, undo: undo, redo: redoEdit,
         _canvas: function () { return cv; },
+        _box: function (t0, t1, u0, u1, mode) { box = { t0: t0, t1: t1, u0: u0, u1: u1 }; match = mode ? { mode: mode } : null; runMatch(); },
+        _match: function () { return match ? { busy: !!match.busy, n: match.peaks ? match.peaks.length : 0, sim: match.sim, mode: match.mode, times: (match.peaks || []).map(function (p) { return +p.t.toFixed(3); }) } : null; },
+        _setSim: function (v) { if (match) { match.sim = v; pickPeaks(); paintMatch(); } },
+        _makeLane: makeLane,
         _hit: function (lane, x) { return hitTick(lane, x, cv.clientWidth); }
     };
 })();
