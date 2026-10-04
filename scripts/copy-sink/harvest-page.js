@@ -112,7 +112,7 @@
         if (info.tag === 'select') info.options = Array.prototype.slice.call(el.options, 0, 10).map(function (o) { return txt(o); });
         if (info.tag === 'input' && info.type === 'range') { info.min = el.min; info.max = el.max; info.value = el.value; }
         if (info.tag === 'input' && info.type === 'checkbox') info.checked = !!el.checked;
-        if (info.tag === 'button') info.caption = txt(el).slice(0, 40);
+        if (info.tag === 'button' || info.tag === 'a') info.caption = txt(el).slice(0, 40);
         return info;
     }
     function push(el, attr, text, extra) {

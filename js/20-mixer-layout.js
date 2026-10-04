@@ -3113,6 +3113,9 @@
         // Collision layer button with source picker
         var collisionBtn = document.createElement('button');
         collisionBtn.type = 'button';
+        // The id is what tours and hotkeys find it by, so its title can be
+        // reworded freely.
+        collisionBtn.id = 'addCollisionLayerBtn';
         collisionBtn.textContent = '🧱';
         collisionBtn.title = 'Add Collision Layer — pick a picture, cut the subject out, get a wall';
         collisionBtn.style.cssText = 'cursor:pointer;position:relative;';

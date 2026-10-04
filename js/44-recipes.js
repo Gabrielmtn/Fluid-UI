@@ -261,9 +261,9 @@
         { id: 'collider-from-image', pillar: 'layers', title: 'Make the paint flow around a picture',
           tags: ['collider', 'collision', 'around', 'wall', 'flow', 'image', 'object', 'terrain'],
           answer: 'Layers → Add Collision Layer: pick a picture, cut the object out with the mask tools, and it becomes a wall. A layer row also has Generate Collision Layer.',
-          target: { section: 'Layers', sel: 'button[title^="Add Collision Layer"]' },
+          target: { section: 'Layers', sel: '#addCollisionLayerBtn' },
           steps: [
-            { say: 'Click the 🧱 button in the Layers header.', target: { section: 'Layers', sel: 'button[title^="Add Collision Layer"]' }, until: { visible: '.collision-source-menu' } },
+            { say: 'Click the 🧱 button in the Layers header.', target: { section: 'Layers', sel: '#addCollisionLayerBtn' }, until: { visible: '.collision-source-menu' } },
             { say: 'Choose From Image… and pick a picture, or From Canvas to use what is painted right now.', target: { sel: '.collision-source-menu' }, until: { visible: '#maskEditorOverlay' } },
             { say: 'Cut the subject out. On a plain background, drag Filter’s Cut amount until only the shape is left; otherwise open Instant Roto, click the subject, then Instant Roto It.', target: { overlay: 'mask', sel: '#filterThreshold', fallback: { overlay: 'mask', sel: '#smartSelectBtn' } }, until: [{ change: '#filterThreshold' }, { click: '#samSegmentBtn' }, { hidden: '#maskEditorOverlay' }] },
             { say: 'Next softens the edge; Apply Mask finishes. The cut-out becomes a wall.', target: { overlay: 'mask', sel: '.mask-apply-btn', fallback: { overlay: 'mask', sel: '#maskWizardNext' } }, until: { hidden: '#maskEditorOverlay' } },

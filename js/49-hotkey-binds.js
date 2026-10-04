@@ -210,6 +210,17 @@
             });
             if (titled.length === 1) return titled[0];
         }
+        // Its tooltip was reworded (the copy pass rewrites help text, not
+        // labels): a control that has words of its own is still the one
+        // control there saying them. Wordless ones (an SVG icon, a colour
+        // chip) have nothing else to go on, so they stay strict.
+        if (loc.text) {
+            var worded = [].filter.call(root.querySelectorAll(loc.tag), function (c) {
+                var s = signature(c);
+                return s.text === loc.text && s.bg === (loc.bg || '') && s.cls === (loc.cls || '');
+            });
+            if (worded.length === 1) return worded[0];
+        }
         return null;
     }
 

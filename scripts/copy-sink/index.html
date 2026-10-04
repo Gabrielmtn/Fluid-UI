@@ -266,6 +266,19 @@ body.sprinting .entry .sprint-tools { display: flex; }
         return '<div class="mock">' + lab + (c ? '<div class="ctl">' + c + '</div>' : '') + '<div class="where" title="' + esc(where) + '">' + esc(where) + esc(id) + '</div></div>';
     }
 
+    // A tooltip or aria-label that a saved hotkey needs to find its control
+    // (js/49 resolve): the control has no id and no words of its own, so its
+    // title is all there is. Labelled controls fall back to their words.
+    // (Labels, selects and textareas carry words: their text or options.)
+    function hotkeyKeyed(e) {
+        if (e.kind !== 'title' && e.kind !== 'aria-label') return false;
+        var r = rt(e); if (!r || !r.el) return false;
+        var el = r.el;
+        if (el.id || (e.ctx && e.ctx.id)) return false;
+        if (el.tag === 'input') return true;
+        return (el.tag === 'button' || el.tag === 'a') && !el.caption;
+    }
+
     var dups = {};
     function buildDups() { dups = {}; cat.entries.forEach(function (e) { (dups[e.text] = dups[e.text] || []).push(e); }); }
 
@@ -276,6 +289,7 @@ body.sprinting .entry .sprint-tools { display: flex; }
         if (e.enc === 'js-template-expr') flags.push('<span class="flag" title="Template literal — keep the ${…} parts">template</span>');
         if (e.parts > 1) flags.push('<span class="flag" title="Joined from ' + e.parts + ' literals; writes back as one">' + e.parts + ' parts</span>');
         if (ro) flags.push('<span class="flag" style="color:var(--bad)" title="Seen at runtime but no source literal matched — built from pieces">unbound</span>');
+        if (hotkeyKeyed(e)) flags.push('<span class="flag" title="A Ctrl+Shift+H hotkey finds this control by this text: it has no id and no words of its own. Rewording it unbinds any key someone set on it. Give the control an id first (see addCollisionLayerBtn in js/20).">⚠ hotkey finds it by this</span>');
         var fileLine = e.file ? '<span class="file" title="' + esc(e.file) + ':' + e.line + '"><b>' + esc(e.file.replace(/^js\//, '')) + '</b>:' + e.line + '</span>' : '<span class="file">runtime only</span>';
         return '<div class="entry' + (isChanged(e) ? ' changed' : '') + (ro ? ' ro' : '') + '" data-key="' + esc(e.key) + '">' +
             mockHtml(e) +
