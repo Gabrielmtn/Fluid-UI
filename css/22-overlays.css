@@ -2577,4 +2577,3 @@ body.mobile-mode .playtest-label.floating {
    part of it — the invite comes and goes with the kind of room, this does
    not (js/54-phone-pads.js mountButtons). Same 12px rhythm as the rows it
    sits between (21-sidebar.css); adjacent margins collapse. */
-#multiArtistPanel .mp-btn-phone { width: 100%; margin: 0 0 12px; }

@@ -332,7 +332,7 @@ function strangerPartnerLeft() {
     // "not in a room" panel with no Reconnect button (there is nothing to
     // reconnect TO: the room's other seat is empty and the lobby has let it go).
     disconnectMultiplayer();
-    showMpError('Your partner left, so the swirl ended. Swirl With a Stranger again to meet someone new.', true);
+    showMpError('Your partner left, so the swirl ended. Press Stranger to meet someone new.', true);
 }
 
 // Host-only: toggle the room lock. The server confirms via a 'lock-state' broadcast.

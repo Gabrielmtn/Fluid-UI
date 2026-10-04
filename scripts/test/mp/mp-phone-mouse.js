@@ -189,13 +189,18 @@ const DIALOG = "(function(){var m=document.getElementById('phonePadModal'); if(!
     " qr: !!m.querySelector('#phonePadQr svg'), code: m.querySelector('#phonePadCode').textContent," +
     " status: m.querySelector('#phonePadStatus').textContent, note: m.querySelector('#phonePadNote').hidden ? '' : m.querySelector('#phonePadNote').textContent," +
     " body: !m.querySelector('#phonePadBody').hidden, stop: !m.querySelector('#phonePadStop').hidden};})()";
-// The door in the room panel. "Shown" is judged only as far as the panel
-// itself, so a collapsed sidebar section never reads as the panel hiding its
-// own door.
+// The door in a room. Since the 2026-10-04 panel redesign it lives in the
+// Invite popover (#mpInvitePop, on <body>), whose button reads "📱 Phone"
+// in a stranger pair: the door is reachable when that button is on screen.
+// "Shown" is judged only as far as the panel or the popover itself, so a
+// collapsed sidebar section, or the popover being closed, never reads as
+// hiding the door.
 const DOOR = "(function(){ function shown(sel){ var e = document.querySelector(sel); if (!e) return 'missing'; var n = e;" +
-    " while (n && n.id !== 'multiArtistPanel') { if (n.hidden) return 'hidden'; if (getComputedStyle(n).display === 'none') return 'display:none'; n = n.parentElement; }" +
-    " return n ? 'shown' : 'detached'; } var b = document.getElementById('phonePadRoomBtn');" +
-    " return { room: shown('#phonePadRoomBtn'), invite: shown('#roomDisplay'), parent: b && b.parentElement ? b.parentElement.id : null, text: b ? b.textContent : null }; })()";
+    " while (n && n.id !== 'multiArtistPanel' && n.id !== 'mpInvitePop') { if (n.hidden) return 'hidden'; if (getComputedStyle(n).display === 'none') return 'display:none'; n = n.parentElement; }" +
+    " return n ? 'shown' : 'detached'; } var b = document.getElementById('phonePadRoomBtn'); var inPop = !!(b && b.closest('#mpInvitePop'));" +
+    " var opener = document.getElementById('mpInviteBtn');" +
+    " return { room: inPop ? (opener ? shown('#mpInviteBtn') : 'missing') : shown('#phonePadRoomBtn'), inPop: inPop, opener: opener ? opener.textContent : null," +
+    " invite: shown('#roomDisplay'), text: b ? b.textContent : null }; })()";
 
 (async () => {
     const srv = await serve();
@@ -340,7 +345,7 @@ const DOOR = "(function(){ function shown(sel){ var e = document.querySelector(s
 
         // ── The door from inside a room, in every kind of room ───────
         const inRoom = await a.eval(DOOR);
-        check(inRoom.room === 'shown' && inRoom.parent === 'mpConnected', 'in a room the door is a row of the panel, not part of the invite block', inRoom);
+        check(inRoom.room === 'shown' && inRoom.inPop, 'in a room the door is in the Invite popover, its button on screen', inRoom);
         check(/your mouse/.test(inRoom.text), 'and says the phone already has the mouse', inRoom.text);
         // A stranger pairing hides the invite block outright (06e
         // updateConnectedView), and the wait for a stranger has no room at
