@@ -1885,9 +1885,23 @@ body.text-arrange-active #canvas-size-display {
 .atv-lanes { display: flex; flex-direction: column; gap: 3px; }
 .atv-lane {
     display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap;
     padding: 3px 4px; border-radius: 6px;
     background: var(--ground-700);
     min-width: 0;
+}
+/* Second line of a lane row: what its cues do, and how often */
+.atv-lane-act {
+    flex: 1 0 100%;
+    display: flex; align-items: center; gap: 6px;
+    padding-left: 15px;
+    min-width: 0;
+}
+.atv-act-arrow { flex: 0 0 auto; font-size: var(--font-xs, 9px); color: var(--ink-500); }
+.atv-act, .atv-every {
+    flex: 1 1 0; min-width: 0;
+    font-size: var(--font-xs, 9px);
+    padding: 2px 4px; border-radius: 5px;
 }
 .atv-dot {
     flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%;

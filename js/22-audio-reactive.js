@@ -727,6 +727,12 @@
         // Apply mappings
         applyMappings(now, dt);
 
+        // Cues the timing chart has bound to actions (40-audio-timing.js)
+        // fire here, on the same ~60 Hz clock as everything else audio does.
+        if (window.AudioTiming && window.AudioTiming.fireDue) {
+            try { window.AudioTiming.fireDue(now); } catch (_) {}
+        }
+
         // Feed the active audio scene (30-audio-scenes.js), if any. Reuses one
         // frame object to stay allocation-free at 60fps.
         if (window.AudioScenes && window.AudioScenes.active()) {
@@ -999,11 +1005,18 @@
     });
 
     function fireAutoSplat(band) {
-        var canvas = document.getElementById('canvas') || document.querySelector('canvas');
-        if (!canvas) return;
         var energy = band === 'treble' ? treble : band === 'mid' ? mid : bass;
         // bass uses the user-picked pattern; mid/treble keep their character.
         var name = band === 'mid' ? 'ring' : band === 'treble' ? 'scatter' : (autoSplatMode || 'center');
+        emitPattern(name, band, energy);
+    }
+
+    // One pattern by name at a given strength. The live engine's bands use
+    // it, and so does a timing-chart cue whose lane is bound to a splat
+    // (band 'cue': its strength is the cue's, not the live band's).
+    function emitPattern(name, band, energy) {
+        var canvas = document.getElementById('canvas') || document.querySelector('canvas');
+        if (!canvas) return;
         var gen = positionGenerators[name] || positionGenerators.center;
         var g = {
             W: canvas.width, H: canvas.height,
@@ -1202,6 +1215,13 @@
         // know what is COMING — something no live analyser can tell you.
         // Files only: there is no future to read off a microphone.
         getFileBuffer: function () { return (srcKind === 'file') ? fileBuffer : null; },
+        // A named auto-splat pattern (center, random, circular, grid, spiral,
+        // radialBurst…) at strength 0-1, for timing-chart cues.
+        fireGenerator: function (name, energy) {
+            emitPattern(name, 'cue', Math.max(0, Math.min(1, Number(energy) || 0)));
+        },
+        // A stroke in progress owns the brush (see paintInProgress).
+        isPainting: paintInProgress,
         onSourceChange: function (fn) { if (typeof fn === 'function') sourceListeners.push(fn); },
         // Playhead + duration (files only) — for the transport UI.
         position: function () {

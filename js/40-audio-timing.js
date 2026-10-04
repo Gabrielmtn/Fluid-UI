@@ -156,6 +156,23 @@
         pitch: 'Pitch — follows the band’s dominant note: a cue lands on each note change, and the bar’s position across the lane tracks how high the note is. Box edge mutes quiet passages.'
     };
     function laneMethod(g) { return METHODS.indexOf(g.method) >= 0 ? g.method : 'onset'; }
+
+    // What a lane DOES when one of its cues reaches the hit line (user test
+    // 3: "binding small controllable events to the detected timing events").
+    // The chart used to only flash; now a lane can splat a pattern, step the
+    // palette or turn the kaleidoscope, on every cue or every Nth. Stored on
+    // the gate box itself, so it saves with the lanes.
+    var ACTIONS = ['none', 'splat', 'burst', 'scatter', 'orbit', 'spiral', 'grid', 'color', 'spin'];
+    var ACTION_LABEL = {
+        none: 'Nothing', splat: 'Splat', burst: 'Burst', scatter: 'Scatter', orbit: 'Orbit',
+        spiral: 'Spiral', grid: 'Grid', color: 'Next colour', spin: 'Spin kaleido'
+    };
+    // Splat actions are 22's auto-splat patterns, by name.
+    var ACTION_GEN = { splat: 'center', burst: 'radialBurst', scatter: 'random', orbit: 'circular', spiral: 'spiral', grid: 'grid' };
+    var EVERY = [1, 2, 4, 8];
+    var EVERY_LABEL = { 1: 'every cue', 2: 'every 2nd cue', 4: 'every 4th cue', 8: 'every 8th cue' };
+    function laneAct(g) { return ACTIONS.indexOf(g.act) >= 0 ? g.act : 'none'; }
+    function laneEvery(g) { return EVERY.indexOf(g.every) >= 0 ? g.every : 1; }
     function laneTh(g) { return clamp(g.th, 0.05, 0.98); }
 
     // ─── SPECTROGRAM KERNEL ─────────────────────────────────────────
@@ -684,6 +701,7 @@
         }
         all.sort(function (a, b2) { return a.t - b2.t; });
         laneFlash = [];   // indices may have shifted — a stale flash lights the wrong lane
+        fireCounts = []; lastLaneMs = [];
         chart = { notes: all, duration: cache.duration, lanes: lanes };
         AT.lastExtractMs = performance.now() - t0;
         refreshStatus();
@@ -1064,6 +1082,98 @@
         }
     }
 
+    // ─── FIRING CUES ────────────────────────────────────────────────
+    // Called from 22's tick (~60 Hz), never from a loop of its own. Fires the
+    // cues that crossed the hit line since the last call, on the SAME clock
+    // the chart draws with (playhead + Nudge), so what you see strike is what
+    // happens. A seek or a stall resets the window without firing what was
+    // skipped; a loop wrap fires the end of the track, then its start.
+    var fireT = -1;              // chart time of the last call, -1 = re-arm
+    var fireCounts = [];         // per-lane cue counter, for "every Nth"
+    var lastLaneMs = [];         // per-lane last action, wall clock
+    var lastColorMs = 0;
+    var spinPending = 0, spinLastMs = 0;
+    var MAX_ACTIONS_PER_TICK = 3;          // one cue can be dozens of splats
+    var SPIN_STEP = 22.5 * Math.PI / 180;  // one cue turns the fold this far…
+    var SPIN_RATE = 90 * Math.PI / 180;    // …eased at PhotoSafe's spin cap
+
+    function photoSafe() { return !!(window.config && window.config.PHOTOSAFE); }
+
+    function runAction(g, n, nowMs) {
+        var act = laneAct(g), lane = n.lane;
+        if (act === 'none') return false;
+        if (act === 'color') {
+            // A stroke in progress owns the colour (22 holds it too); a floor
+            // keeps a busy lane from strobing the palette.
+            var ar = window.audioReactive;
+            if (ar && ar.isPainting && ar.isPainting()) return false;
+            if (nowMs - lastColorMs < (photoSafe() ? 500 : 250)) return false;
+            lastColorMs = nowMs;
+            if (typeof window.stepPaletteOnce === 'function') window.stepPaletteOnce(true);
+            return true;
+        }
+        if (act === 'spin') {
+            if (!window.kaleidoEnabled) return false;
+            spinPending = Math.min(spinPending + SPIN_STEP, SPIN_STEP * 4);
+            return true;
+        }
+        var gen = ACTION_GEN[act];
+        if (!gen || !window.audioReactive || !window.audioReactive.fireGenerator) return false;
+        if (nowMs - (lastLaneMs[lane] || 0) < (photoSafe() ? 120 : 60)) return false;
+        lastLaneMs[lane] = nowMs;
+        window.audioReactive.fireGenerator(gen, 0.35 + 0.65 * clamp(n.e || 0, 0, 1));
+        return true;
+    }
+
+    function drainSpin(nowMs) {
+        var dt = spinLastMs ? Math.min(100, nowMs - spinLastMs) : 16;
+        spinLastMs = nowMs;
+        if (spinPending <= 0) return;
+        if (!window.kaleidoEnabled) { spinPending = 0; return; }
+        var rate = SPIN_RATE;
+        if (photoSafe() && window.config.PHOTOSAFE_SPIN_CAP != null) rate = Math.min(rate, window.config.PHOTOSAFE_SPIN_CAP * Math.PI / 180);
+        var step = Math.min(spinPending, rate * dt / 1000);
+        spinPending -= step;
+        window.kAngle = ((window.kAngle || 0) + step) % (Math.PI * 2);
+    }
+
+    function anyBound() {
+        for (var i = 0; i < gateStore.gates.length; i++) if (laneAct(gateStore.gates[i]) !== 'none') return true;
+        return false;
+    }
+
+    function fireRange(notes, from, to, nowMs, budget) {
+        var gates = gateStore.gates;
+        for (var i = firstNoteAtOrAfter(notes, from + 1e-6); i < notes.length && notes[i].t <= to; i++) {
+            var n = notes[i], g = gates[n.lane];
+            if (!g || laneAct(g) === 'none') continue;
+            fireCounts[n.lane] = (fireCounts[n.lane] || 0) + 1;
+            if ((fireCounts[n.lane] - 1) % laneEvery(g)) continue;
+            if (budget.left <= 0) return;
+            if (runAction(g, n, nowMs)) budget.left--;
+        }
+    }
+
+    function fireDue(nowMs) {
+        drainSpin(nowMs);
+        if (!enabled || !chart || !chart.notes.length || !anyBound()) { fireT = -1; return; }
+        var ar = window.audioReactive;
+        var pos = (ar && ar.position) ? ar.position() : null;
+        if (!pos || pos.paused) { fireT = -1; return; }
+        var t = pos.time + opts.offsetMs / 1000;
+        var dur = chart.duration || pos.duration || 0;
+        var budget = { left: MAX_ACTIONS_PER_TICK };
+        if (fireT >= 0 && pos.loop && dur && t < fireT - 0.05 && fireT > dur - 0.75 && t < 0.75) {
+            fireRange(chart.notes, fireT, dur, nowMs, budget);    // the end of the lap…
+            fireRange(chart.notes, -1, t, nowMs, budget);         // …and the start of the next
+            fireT = t;
+            return;
+        }
+        if (fireT < 0 || t < fireT - 0.05 || t > fireT + 0.75) { fireT = t; return; }
+        if (t > fireT) fireRange(chart.notes, fireT, t, nowMs, budget);
+        fireT = t;
+    }
+
     // ─── DEFAULT LANES ──────────────────────────────────────────────
     // Checking the box with an empty editor would show an empty chart and
     // read as broken, so first use seeds the three bands a drum kit lives
@@ -1075,8 +1185,8 @@
     }
     function seedLanes() {
         gateStore.gates = [
-            { lo: hzX(40),   hi: hzX(110),   th: 0.55, method: 'onset' },   // kick
-            { lo: hzX(250),  hi: hzX(1200),  th: 0.50, method: 'onset' },   // snare / body
+            { lo: hzX(40),   hi: hzX(110),   th: 0.55, method: 'onset', act: 'burst' },            // kick
+            { lo: hzX(250),  hi: hzX(1200),  th: 0.50, method: 'onset', act: 'color', every: 4 },  // snare / body
             { lo: hzX(6000), hi: hzX(14000), th: 0.42, method: 'onset' }    // hats / transients
         ];
         saveGates();
@@ -1568,6 +1678,48 @@
             });
             row.appendChild(del);
 
+            // What a cue on this lane does, and how often.
+            var actLine = document.createElement('div');
+            actLine.className = 'atv-lane-act';
+            var arrow = document.createElement('span');
+            arrow.className = 'atv-act-arrow';
+            arrow.textContent = '→';
+            actLine.appendChild(arrow);
+            var actSel = document.createElement('select');
+            actSel.className = 'atv-act';
+            actSel.title = 'What happens on the canvas when a cue on this lane reaches the line';
+            ACTIONS.forEach(function (a) {
+                var o = document.createElement('option');
+                o.value = a; o.textContent = ACTION_LABEL[a];
+                actSel.appendChild(o);
+            });
+            actSel.value = laneAct(g);
+            var evSel = document.createElement('select');
+            evSel.className = 'atv-every';
+            evSel.title = 'Thin a busy lane: act on every Nth cue only';
+            EVERY.forEach(function (k) {
+                var o = document.createElement('option');
+                o.value = String(k); o.textContent = EVERY_LABEL[k];
+                evSel.appendChild(o);
+            });
+            evSel.value = String(laneEvery(g));
+            evSel.style.display = laneAct(g) === 'none' ? 'none' : '';
+            actSel.addEventListener('change', function () {
+                g.act = actSel.value;
+                evSel.style.display = g.act === 'none' ? 'none' : '';
+                fireCounts[i] = 0;
+                saveGates();
+                if (g.act === 'spin' && !window.kaleidoEnabled) actSel.title = 'Turns the kaleidoscope when it is on (it is off now)';
+            });
+            evSel.addEventListener('change', function () {
+                g.every = parseInt(evSel.value, 10) || 1;
+                fireCounts[i] = 0;
+                saveGates();
+            });
+            actLine.appendChild(actSel);
+            actLine.appendChild(evSel);
+            row.appendChild(actLine);
+
             list.appendChild(row);
         });
     }
@@ -1612,6 +1764,18 @@
             return true;
         },
         methods: METHODS.slice(),
+        fireDue: fireDue,
+        actions: ACTIONS.slice(),
+        setAction: function (i, act, every) {
+            var g = gateStore.gates[i];
+            if (!g || ACTIONS.indexOf(act) < 0) return false;
+            g.act = act;
+            if (every !== undefined && EVERY.indexOf(every) >= 0) g.every = every;
+            fireCounts[i] = 0;
+            saveGates();
+            updateLaneLists();
+            return true;
+        },
         gates: function () { return gateStore.gates; },
         chart: function () { return chart; },
         reread: function () { buildCache(true); },
