@@ -233,10 +233,10 @@
     // The chart used to only flash; now a lane can splat a pattern, step the
     // palette or turn the kaleidoscope, on every cue or every Nth. Stored on
     // the gate box itself, so it saves with the lanes.
-    var ACTIONS = ['none', 'splat', 'burst', 'scatter', 'orbit', 'spiral', 'grid', 'color', 'spin'];
+    var ACTIONS = ['none', 'splat', 'burst', 'scatter', 'orbit', 'spiral', 'grid', 'ring', 'color', 'spin'];
     var ACTION_LABEL = {
         none: 'Nothing', splat: 'Splat', burst: 'Burst', scatter: 'Scatter', orbit: 'Orbit',
-        spiral: 'Spiral', grid: 'Grid', color: 'Next colour', spin: 'Spin kaleido'
+        spiral: 'Spiral', grid: 'Grid', ring: 'Tunnel ring', color: 'Next colour', spin: 'Spin kaleido'
     };
     // Splat actions are 22's auto-splat patterns, by name.
     var ACTION_GEN = { splat: 'center', burst: 'radialBurst', scatter: 'random', orbit: 'circular', spiral: 'spiral', grid: 'grid' };
@@ -1200,6 +1200,10 @@
             if (!window.kaleidoEnabled) return false;
             spinPending = Math.min(spinPending + SPIN_STEP, SPIN_STEP * 4);
             return true;
+        }
+        if (act === 'ring') {
+            // The Tunnel's own spacing caps how close rings come.
+            return !!(window.AudioScenes && window.AudioScenes.fireRing && window.AudioScenes.fireRing(0.35 + 0.65 * clamp(n.e || 0, 0, 1)));
         }
         var gen = ACTION_GEN[act];
         if (!gen || !window.audioReactive || !window.audioReactive.fireGenerator) return false;

@@ -760,7 +760,7 @@
 
         // Feed the active audio scene (30-audio-scenes.js), if any. Reuses one
         // frame object to stay allocation-free at 60fps.
-        if (window.AudioScenes && window.AudioScenes.active()) {
+        if (window.AudioScenes && (window.AudioScenes.active() || (window.AudioScenes.busy && window.AudioScenes.busy()))) {
             var sf = _sceneFrame;
             sf.now = now; sf.dt = dt;
             sf.bass = bass; sf.mid = mid; sf.treble = treble; sf.overall = overall;

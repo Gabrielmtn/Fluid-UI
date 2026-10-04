@@ -281,8 +281,18 @@
     // is ever missed.
     var _lastSceneTick = 0;
     var _pendBeats = null;
+    function tickEmitters(frame) {
+        for (var i = emitters.length - 1; i >= 0; i--) {
+            var e = emitters[i];
+            var t = (frame.now - e.born) / e.duration;
+            if (t >= 1) { emitters.splice(i, 1); continue; }
+            try { e.update(t, frame); } catch (_) { emitters.splice(i, 1); }
+        }
+    }
     function tickFrame(frame) {
-        if (!activeName) return;
+        // No scene, but rings a timing-chart cue launched are still in
+        // flight: they keep travelling.
+        if (!activeName) { if (emitters.length) tickEmitters(frame); return; }
         if (_pendBeats) {
             frame.beat = frame.beat || _pendBeats.beat;
             frame.midBeat = frame.midBeat || _pendBeats.midBeat;
@@ -297,12 +307,7 @@
         _lastSceneTick = frame.now;
         // Tick animated emitters first so rings/trails advance even if the
         // scene itself only reacts to beats.
-        for (var i = emitters.length - 1; i >= 0; i--) {
-            var e = emitters[i];
-            var t = (frame.now - e.born) / e.duration;
-            if (t >= 1) { emitters.splice(i, 1); continue; }
-            try { e.update(t, frame); } catch (_) { emitters.splice(i, 1); }
-        }
+        tickEmitters(frame);
         var scene = scenes[activeName];
         if (scene && scene.tick) scene.tick(frame, activeOpts, F);
     }
@@ -371,6 +376,12 @@
             // could launch ~11 a second.
             if (frame.now - (this._lastRing || 0) < RING_MIN_MS / speed) return;
             this._lastRing = frame.now;
+            this.ring(o, F, fired > 0 ? 0.35 + 0.65 * fired : withGain(F.bandEnergy(frame, o.trigger), o));
+        },
+        // One ring, at strength e (0-1, before Volume). The scene's beats
+        // launch it, and so can a timing-chart cue (AudioScenes.fireRing).
+        ring: function (o, F, e01) {
+            var speed = (typeof o.speed === 'number' && o.speed > 0) ? o.speed : 1;
             var c = F.canvas(); if (!c) return;
             var W = c.width, H = c.height, minDim = Math.min(W, H);
             var dir = o.dir;
@@ -391,9 +402,7 @@
             if (vol <= 0.01) return;                 // volume zero = silent scene
             // Gate-fired hits carry the threshold-excess as punch (a floor
             // keeps barely-crossing hits visible)
-            var energy = Math.min(1, (fired > 0
-                ? 0.35 + 0.65 * fired
-                : withGain(F.bandEnergy(frame, o.trigger), o)) * vol);
+            var energy = Math.min(1, Math.max(0, e01) * vol);
             var dyeK = Math.min(1.2, 0.45 * vol);    // per-frame band deposit strength
             var col = F.pickerColor();               // frozen per ring: each hoop reads as one color
             var basePh = Math.random() * Math.PI * 2;
@@ -975,6 +984,22 @@
         deactivate: deactivate,
         active: function () { return activeName; },
         tickFrame: tickFrame,
+        // Rings still travelling (22 keeps ticking scenes while any are).
+        busy: function () { return emitters.length > 0; },
+        // A Tunnel ring from a timing-chart cue (40), with the Tunnel's own
+        // Direction, Speed and Volume, and its spacing: never two closer
+        // than RING_MIN_MS / Speed.
+        fireRing: function (e01) {
+            var T = scenes.tunnel;
+            if (!T) return false;
+            var o = activeName === 'tunnel' ? activeOpts : loadOpts('tunnel');
+            var speed = (typeof o.speed === 'number' && o.speed > 0) ? o.speed : 1;
+            var now = performance.now();
+            if (now - (T._lastRing || 0) < RING_MIN_MS / speed) return false;
+            T._lastRing = now;
+            T.ring(o, F, e01);
+            return true;
+        },
         buildControls: buildControls,
 
         // ── Gate-editor widget, lent out (2026-08-26) ────────────────
