@@ -552,6 +552,18 @@ function serve(port) {
                 return res.end(fs.readFileSync(path.join(SINK_DIR, 'index.html')));
             }
             if (p === '/__sink/catalog') return json(res, 200, catalog());
+            if (p === '/__sink/locate.js') {
+                res.writeHead(200, { 'Content-Type': MIME['.js'], 'Cache-Control': 'no-store' });
+                return res.end(fs.readFileSync(path.join(SINK_DIR, 'locate.js')));
+            }
+            // The app, with the sprint's "show me where" hook added on the way out
+            // (copy-sink/locate.js): the shipped index.html never carries it.
+            if (p === '/' || p === '/index.html') {
+                const html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8')
+                    .replace('</body>', '<script src="/__sink/locate.js"></script></body>');
+                res.writeHead(200, { 'Content-Type': MIME['.html'], 'Cache-Control': 'no-store' });
+                return res.end(html);
+            }
             if (p === '/__sink/apply' && req.method === 'POST') {
                 const body = JSON.parse(await readBody(req) || '{}');
                 return json(res, 200, apply(body.edits || []));

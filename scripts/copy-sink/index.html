@@ -90,6 +90,20 @@ main { padding: 12px 16px 120px; max-width: 1500px; margin: 0 auto; }
 .toast.bad { border-color: var(--bad); }
 kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--muted); }
 @media (max-width: 1000px) { .entry { grid-template-columns: 1fr; } .meta { flex-direction: row; flex-wrap: wrap; gap: 10px; } }
+/* Sprint mode (2026-10-04): the help text in pomodoro-sized batches */
+.sprint { display: none; gap: 10px; align-items: center; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--line); }
+body.sprinting .sprint { display: flex; }
+body.sprinting #sprintBtn { border-color: var(--ok); color: var(--ok); }
+.sprint .big { font-size: 14px; font-weight: 600; }
+.sprint .bar { flex: 0 0 220px; height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; }
+.sprint .bar > i { display: block; height: 100%; width: 0; background: var(--ok); }
+.sprint .clock { font: 600 16px var(--mono); min-width: 64px; font-variant-numeric: tabular-nums; }
+.sprint .clock.up { color: var(--warn); }
+.sprint .done-all { color: var(--ok); font-weight: 600; }
+.entry .sprint-tools { display: none; gap: 6px; flex-wrap: wrap; }
+body.sprinting .entry .sprint-tools { display: flex; }
+.entry.sp-done { opacity: .45; }
+.entry.sp-done .sp-done-btn { border-color: var(--ok); color: var(--ok); }
 </style>
 </head>
 <body>
@@ -99,6 +113,7 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
         <span class="stat"><b id="nAll">0</b> strings · <b id="nVis">0</b> shown · <b id="nCh" class="ch">0</b> changed · <b id="nRt">0</b> placed</span>
         <span style="flex:1"></span>
         <input class="in search" id="q" type="search" placeholder="Search text, label, id, file…  ( / )" autocomplete="off" spellcheck="false">
+        <button class="btn" id="sprintBtn" title="Work through the help text in pomodoro-sized batches (~300 words, 25 minutes), with Done, Skip and Show me where">Sprint</button>
         <button class="btn" id="frBtn" title="Find & replace across the shown strings">Find &amp; replace</button>
         <button class="btn" id="harvestBtn" title="Load the app in headless Chrome and attach each string to its labeled control (section, label, control type)">Place strings</button>
         <button class="btn" id="reloadBtn" title="Re-read the source">Reload</button>
@@ -119,6 +134,18 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
         <button class="btn small ghost" id="importBtn">Import…</button>
         <input type="file" id="importFile" accept=".json,.tsv,.txt" hidden>
         <button class="btn small ghost" id="discardBtn">Discard all edits</button>
+    </div>
+    <div class="row sprint" id="sprintBar">
+        <span class="big" id="spTitle">Sprint</span>
+        <span class="stat" id="spWords"></span>
+        <span class="bar"><i id="spFill"></i></span>
+        <span class="clock" id="spClock">25:00</span>
+        <button class="btn small" id="spStart">Start</button>
+        <button class="btn small ghost" id="spReset">Reset clock</button>
+        <span class="stat" id="spLeft"></span>
+        <span style="flex:1"></span>
+        <button class="btn small" id="spNext" title="Leave what is not done for later and take the next ~300 words">Next sprint →</button>
+        <button class="btn small ghost" id="spExit">Exit sprint</button>
     </div>
     <div class="row tight fr" id="fr">
         <input class="in" id="frFind" placeholder="find (text or /regex/)" spellcheck="false">
@@ -259,8 +286,104 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
             (n > 1 ? '<span class="dup" title="The same text appears in ' + n + ' places — click to copy this edit to all of them">×' + n + ' same · apply to all</span>' : '') +
             '<span style="flex:1"></span><button class="btn small ghost reset" title="Back to the source text">↺</button></div></div>' +
             '<div class="meta"><span class="kind ' + esc(e.kind) + '">' + esc(e.kind) + '</span>' + fileLine + (flags.length ? '<span>' + flags.join(' ') + '</span>' : '') +
-            (rt(e) && rt(e).path ? '<span class="path" title="' + esc(rt(e).path) + '">' + esc(rt(e).path) + '</span>' : '') + '</div></div>';
+            (rt(e) && rt(e).path ? '<span class="path" title="' + esc(rt(e).path) + '">' + esc(rt(e).path) + '</span>' : '') +
+            sprintToolsHtml(e) + '</div></div>';
     }
+
+    // ── Sprint mode ──────────────────────────────────────────────────
+    // The help text (player-facing, 6+ words) in batches of ~300 words, one
+    // 25-minute pomodoro each, in the order the app shows them. Done and Skip
+    // are remembered in this browser, by file + kind + text, and a string
+    // rewritten and written to source counts as done.
+    var SP_DONE = 'copySink.sprint.done.v1', SP_SKIP = 'copySink.sprint.skip.v1', SP_BATCH = 'copySink.sprint.batch.v1';
+    var SPRINT_WORDS = 300, SPRINT_MS = 25 * 60 * 1000;
+    function lsGet(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (_) { return d; } }
+    function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+    var spDone = lsGet(SP_DONE, {}), spSkip = lsGet(SP_SKIP, {}), spBatch = lsGet(SP_BATCH, []);
+    var sprinting = false;
+    function sid(e) { return (e.file || '') + '|' + e.kind + '|' + e.text; }
+    function sidOf(file, kind, text) { return (file || '') + '|' + kind + '|' + text; }
+    function wordsIn(t) { return (String(t).replace(/<[^>]+>/g, ' ').match(/[A-Za-z\u00C0-\u024F][\w'’-]*/g) || []).length; }
+    function isHelp(e) { return !isNoise(e) && e.enc !== 'runtime-only' && wordsIn(e.text) >= 6; }
+    function inBatch(e) { return spBatch.indexOf(sid(e)) >= 0; }
+    function sprintToolsHtml(e) {
+        if (!isHelp(e)) return '';
+        var r = rt(e) || {}, el = r.el || {};
+        var loc = { attr: r.attr || (e.kind === 'placeholder' ? 'placeholder' : 'title'), text: e.text, id: el.id || (e.ctx && e.ctx.id) || '' };
+        var where = (r.path || el.id || (e.ctx && e.ctx.id)) ?
+            '<a class="btn small ghost sp-where" target="swirlApp" href="/#locate=' + esc(encodeURIComponent(JSON.stringify(loc))) + '" title="Open the app at this control (one tab, reused)">Show me where</a>' : '';
+        return '<div class="sprint-tools"><button class="btn small sp-done-btn" title="Read and right: take it off the list">✓ Done</button>' +
+            '<button class="btn small ghost sp-skip-btn" title="Not now: it goes to the back of the queue">Skip</button>' + where + '</div>';
+    }
+    function sprintQueue() {
+        var list = sortedEntries().filter(isHelp).filter(function (e) { return !spDone[sid(e)]; });
+        return list.filter(function (e) { return !spSkip[sid(e)]; }).concat(list.filter(function (e) { return spSkip[sid(e)]; }));
+    }
+    function takeBatch() {
+        var q = sprintQueue(), out = [], w = 0;
+        for (var i = 0; i < q.length && (w < SPRINT_WORDS || !out.length); i++) { out.push(sid(q[i])); w += wordsIn(curText(q[i])); }
+        spBatch = out; lsSet(SP_BATCH, spBatch);
+    }
+    function sprintStats() {
+        var help = cat.entries.filter(isHelp);
+        var doneW = 0, leftW = 0, leftN = 0, bW = 0, bDoneW = 0;
+        help.forEach(function (e) {
+            var w = wordsIn(curText(e));
+            if (spDone[sid(e)]) doneW += w; else { leftW += w; leftN++; }
+            if (inBatch(e)) { bW += w; if (spDone[sid(e)] || spSkip[sid(e)]) bDoneW += w; }
+        });
+        return { doneW: doneW, leftW: leftW, leftN: leftN, bW: bW, bDoneW: bDoneW };
+    }
+    function paintSprint() {
+        if (!sprinting) return;
+        var s = sprintStats();
+        $('spTitle').textContent = 'Sprint ' + (Math.floor(s.doneW / SPRINT_WORDS) + 1);
+        $('spWords').innerHTML = s.bW ? '<b>' + s.bDoneW + '</b> / ' + s.bW + ' words' : '<span class="done-all">All the help text is done.</span>';
+        $('spFill').style.width = s.bW ? Math.round(100 * s.bDoneW / s.bW) + '%' : '100%';
+        $('spLeft').textContent = s.leftN + ' strings, ' + s.leftW + ' words left · about ' + Math.ceil(s.leftW / SPRINT_WORDS) + ' sprints';
+        $('spNext').classList.toggle('primary', s.bW > 0 && s.bDoneW >= s.bW);
+        cat.entries.forEach(function (e) { var row = els.get(e.key); if (row) row.classList.toggle('sp-done', !!spDone[sid(e)]); });
+    }
+    function setSprinting(on) {
+        sprinting = !!on;
+        document.body.classList.toggle('sprinting', sprinting);
+        if (sprinting && !spBatch.some(function (k) { return cat.entries.some(function (e) { return sid(e) === k && !spDone[k]; }); })) takeBatch();
+        applyFilter(); paintSprint();
+        requestAnimationFrame(autosizeAll);
+    }
+    $('sprintBtn').addEventListener('click', function () { setSprinting(!sprinting); });
+    $('spExit').addEventListener('click', function () { setSprinting(false); });
+    $('spNext').addEventListener('click', function () { takeBatch(); applyFilter(); paintSprint(); requestAnimationFrame(autosizeAll); window.scrollTo(0, 0); });
+    $('main').addEventListener('click', function (ev) {
+        var row = ev.target.closest('.entry'); if (!row) return;
+        var e = byKey(row.dataset.key); if (!e) return;
+        if (ev.target.classList.contains('sp-done-btn')) {
+            if (spDone[sid(e)]) delete spDone[sid(e)]; else { spDone[sid(e)] = 1; delete spSkip[sid(e)]; }
+            lsSet(SP_DONE, spDone); lsSet(SP_SKIP, spSkip); paintSprint();
+        }
+        if (ev.target.classList.contains('sp-skip-btn')) {
+            spSkip[sid(e)] = 1; lsSet(SP_SKIP, spSkip); paintSprint();
+        }
+    });
+    // The clock: 25 minutes, Start / Pause, then a nudge to take a break.
+    var spLeftMs = SPRINT_MS, spTick = 0, spLast = 0;
+    function paintClock() {
+        var s = Math.max(0, Math.ceil(spLeftMs / 1000));
+        $('spClock').textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+        $('spClock').classList.toggle('up', spLeftMs <= 0);
+    }
+    function stopClock() { clearInterval(spTick); spTick = 0; $('spStart').textContent = spLeftMs > 0 ? 'Start' : 'Start'; }
+    $('spStart').addEventListener('click', function () {
+        if (spTick) { stopClock(); $('spStart').textContent = 'Start'; return; }
+        if (spLeftMs <= 0) spLeftMs = SPRINT_MS;
+        spLast = Date.now(); $('spStart').textContent = 'Pause';
+        spTick = setInterval(function () {
+            var now = Date.now(); spLeftMs -= now - spLast; spLast = now; paintClock();
+            if (spLeftMs <= 0) { stopClock(); toast('Time is up. Take five, then the next sprint.'); }
+        }, 250);
+    });
+    $('spReset').addEventListener('click', function () { stopClock(); spLeftMs = SPRINT_MS; paintClock(); });
+    paintClock();
 
     function autosize(ta) { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; }
     function autosizeAll() { if ($('main').offsetWidth < 320) return; $('main').querySelectorAll('.entry:not(.hidden) textarea').forEach(autosize); }
@@ -269,15 +392,20 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
     var rsT = 0, lastW = 0;
     window.addEventListener('resize', function () { clearTimeout(rsT); rsT = setTimeout(function () { if (innerWidth !== lastW) { lastW = innerWidth; autosizeAll(); } }, 80); });
 
-    function render() {
-        var main = $('main'); var by = $('groupBy').value;
-        var groups = {}; var orderKeys = [];
-        var sorted = cat.entries.slice().sort(function (a, b) {
+    // The app's own order: placed strings as the page lays them out, then the
+    // rest by file and position. Rendering and the sprint queue share it.
+    function sortedEntries() {
+        return cat.entries.slice().sort(function (a, b) {
             var ra = rt(a), rb = rt(b);
             if (ra && rb) return ra.order - rb.order;
             if (ra) return -1; if (rb) return 1;
             return (a.file || '').localeCompare(b.file || '') || a.start - b.start;
         });
+    }
+    function render() {
+        var main = $('main'); var by = $('groupBy').value;
+        var groups = {}; var orderKeys = [];
+        var sorted = sortedEntries();
         sorted.forEach(function (e) {
             var g = by === 'scope' ? scopeOf(e) : by === 'file' ? (e.file || 'runtime only') : e.kind;
             if (!groups[g]) { groups[g] = []; orderKeys.push(g); }
@@ -319,6 +447,7 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
     }
 
     function matches(e) {
+        if (sprinting) return inBatch(e);
         var q = $('q').value.trim().toLowerCase();
         if (playerOnly() && isNoise(e)) return false;
         if (kindOn[e.kind] === false) return false;
@@ -484,7 +613,16 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
             .then(function (r) { return r.json(); })
             .then(function (rep) {
                 if (rep.error) throw new Error(rep.error);
-                (rep.applied || []).forEach(function (a) { delete edits[a.key]; });
+                (rep.applied || []).forEach(function (a) {
+                    var ed = list.filter(function (x) { return x.key === a.key; })[0];
+                    if (ed) {
+                        var was = sidOf(ed.file, ed.kind, ed.orig), now = sidOf(ed.file, ed.kind, ed.text);
+                        spDone[now] = 1;
+                        var bi = spBatch.indexOf(was); if (bi >= 0) spBatch[bi] = now;
+                    }
+                    delete edits[a.key];
+                });
+                lsSet(SP_DONE, spDone); lsSet(SP_BATCH, spBatch);
                 saveEdits();
                 var sk = (rep.skipped || []).filter(function (s) { return s.reason !== 'unchanged'; });
                 toast('Wrote ' + rep.applied.length + ' string' + (rep.applied.length === 1 ? '' : 's') + ' to source.' + (sk.length ? '\n' + sk.length + ' skipped:\n' + sk.map(function (s) { return '• ' + s.key.split('#')[0] + ' — ' + s.reason; }).join('\n') : ''), !!sk.length);
@@ -513,6 +651,7 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line2); border-bottom-widt
             saveEdits();
             buildDups(); buildChips(); render(); counts();
             cat.entries.forEach(refreshRow);
+            paintSprint();
         }).catch(function (err) { $('main').innerHTML = '<div class="empty">Could not load the catalog: ' + esc(err.message) + '<br>Run <code>node scripts/copy-sink.js serve</code> and open this page from that server.</div>'; });
     }
     load();
