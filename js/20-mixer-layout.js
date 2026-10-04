@@ -843,11 +843,14 @@
         // second door to the same popup.
         // Query from the (detached) channel: faderChannel already re-parented
         // the value element, so document.getElementById would miss it here.
-        buildArmColorsDropdown(brushChannel.querySelector('#multiplierValue'));
-        var armGear = makeChGear('Multi-brush arm colors & symmetry');
-        wireGearToTrigger(armGear, brushChannel.querySelector('#multiplierValue'));
-        brushChannel.querySelector('.ch-header').appendChild(armGear);
-        strip.appendChild(brushChannel);
+        // Multi-Brush is a section of the left sidebar (2026-10-04): this
+        // channel itself (the arm count, its ↔ mirror badge), then symmetry,
+        // the notes, the arm rows and the legend. It was a floating window off
+        // this channel's value cell.
+        var multiSec = makeSection('Multi-Brush', 'core', true);
+        multiSec.body.appendChild(brushChannel);
+        buildArmColorsDropdown(brushChannel.querySelector('#multiplierValue'), multiSec.body);
+        pendingLeftSections.push(multiSec.sec);
         strip.appendChild(faderChannel('Time', 'pink', 'timeScale', 'timeScaleValue'));
         strip.appendChild(faderChannel('Density', 'cyan', 'densityDissipation', 'densityValue'));
         strip.appendChild(faderChannel('Velocity', 'cyan', 'velocityDissipation', 'velocityValue'));
@@ -899,7 +902,7 @@
         // Velocity read backwards for faders where right means lasts longer.
         'Isolation': 'Shields paint that is already moving from a new stroke’s push. Left, every stroke stirs whatever it touches; right, moving paint keeps its own path (up to 85% less push).',
         'Color Blend': 'Left of the middle (Laminar), colours slide past each other in layers without mixing: a smudge stretches them into finer streaks instead of smearing them. Right of the middle (Blend), they blend where they meet, like wet paint, and settle as they dry (Dry Time). The flow itself is unchanged',
-        'Multi-Brush': 'Brush arms (1-8x mirrored strokes) — the ⚙ opens arm colors & symmetry',
+        'Multi-Brush': 'Brush arms (1-8x mirrored strokes). Symmetry and each arm\'s colour are in its section on the left',
         'Time': 'How fast the fluid runs: left is slow motion, 1 is real time, right is fast forward.',
         'Density': 'How long colour lasts. Further right, it fades more slowly; at 1.000 it never fades.',
         'Velocity': 'How long motion lasts. Further right, the swirls keep moving longer.'
@@ -8040,11 +8043,14 @@
 
     // ─── ARM COLORS DROPDOWN ────────────────────────────────────
 
-    function buildArmColorsDropdown(triggerEl) {
+    function buildArmColorsDropdown(triggerEl, host) {
         // Use an existing element (e.g. the multiplier value) as the toggle, or
         // fall back to a standalone gold icon button.
         var toggle;
-        if (triggerEl) {
+        if (triggerEl && host) {
+            // In the Multi-Brush section the value is just the arm count.
+            toggle = triggerEl;
+        } else if (triggerEl) {
             toggle = triggerEl;
             toggle.classList.add('arm-colors-trigger');
             toggle.title = 'Per-arm brush colors \u2014 click to configure';
@@ -8064,9 +8070,18 @@
         // Popovers are portaled to <body>, so they carry the paint surface's tint
         // with them rather than inheriting the app-root system fallback.
         panel.dataset.group = 'core';
-        panel.style.display = 'none';
-        panel.style.position = 'fixed';
-        document.body.appendChild(panel);
+        if (host) host.appendChild(panel);
+        else {
+            panel.style.display = 'none';
+            panel.style.position = 'fixed';
+            document.body.appendChild(panel);
+        }
+        // Showing = its section open (in the left sidebar), or the popup up.
+        function isShown() {
+            if (!host) return panel.style.display !== 'none';
+            var sec = panel.closest ? panel.closest('.sidebar-section') : null;
+            return !!sec && !sec.classList.contains('collapsed');
+        }
 
         // Once the user has dragged the panel somewhere, it stays there for the
         // rest of that opening — re-anchoring under the trigger would undo the
@@ -8102,14 +8117,14 @@
         var header = document.createElement('div');
         header.className = 'arm-colors-header arm-colors-grip';
         header.title = 'Drag to move';
-        panel.appendChild(header);
+        if (!host) panel.appendChild(header);   // a section doesn't float
 
         // Drag by the header so the panel can be moved off whatever you are
         // trying to look at — the whole point being to pick a colour against
         // the art underneath it. Draggable handles pointer capture, viewport
         // clamping and the --ui-scale zoom conversion this panel needs.
         try {
-            if (typeof Draggable !== 'undefined') {
+            if (!host && typeof Draggable !== 'undefined') {
                 new Draggable(panel, {
                     handle: header,
                     constrainToViewport: true,
@@ -8151,7 +8166,7 @@
         multSlider.value = mainMult ? mainMult.value : '1';
         multGroup.appendChild(multLbl);
         multGroup.appendChild(multSlider);
-        panel.appendChild(multGroup);
+        if (!host) panel.appendChild(multGroup);
 
         // panel → strip. Setting .value never fires an event on its own, so the
         // dispatch is what keeps the two honest; the strip's 'input' handler
@@ -8348,7 +8363,7 @@
                     else if (rndEl && rndEl.checked) arr[0].mode = 'random';
                 }
             }
-            if (panel.style.display !== 'none') rebuildRows();
+            if (isShown()) rebuildRows();
             // Reconcile every colour widget to arm0.mode at startup.
             if (typeof window.syncBrushColorUI === 'function') window.syncBrushColorUI({ skipPanel: true });
         })();
@@ -8550,69 +8565,78 @@
             }
         }
 
-        function closePanel() {
-            panel.style.display = 'none';
-            toggle.classList.remove('active');
-            userMoved = false;   // next open re-anchors under the trigger
-        }
-
-        toggle.addEventListener('click', function(e) {
-            e.stopPropagation();
-            var open = panel.style.display !== 'none';
-            if (open) {
-                closePanel();
-            } else {
-                panel.style.display = 'block';
-                toggle.classList.add('active');
-                pullMultiplier();
-                positionPanel();
-                rebuildRows();
+        // The floating window opens, closes and follows its trigger; the
+        // section opens and closes like any section, and rebuilds its rows
+        // when it opens.
+        if (host) {
+            var hostSec = host.closest ? host.closest('.sidebar-section') : null;
+            if (hostSec) hostSec.__onOpen = function () { pullMultiplier(); rebuildRows(); };
+        } else {
+            function closePanel() {
+                panel.style.display = 'none';
+                toggle.classList.remove('active');
+                userMoved = false;   // next open re-anchors under the trigger
             }
-        });
-
-        // Close when pressing elsewhere in the UI — but NOT on the artwork. Any
-        // canvas click used to dismiss this, so you could never hold a colour
-        // open while working against the art you were picking for, which is
-        // most of the reason to move the panel at all.
-        //
-        // Two things made this feel broken (2026-08-27). The exemption covered
-        // all of #canvas-area — the entire region the panel floats over, empty
-        // letterbox included — so nearly every click that looked like "outside
-        // the dropdown" was inside the exemption and nothing happened. And it
-        // listened for a BUBBLED click, which half the strip never delivers:
-        // every ⚙ stops propagation (wireGearToTrigger), so opening another
-        // channel's popup left this one hanging open behind it.
-        //
-        // pointerdown in the CAPTURE phase fixes the second: document capture
-        // runs before any handler in the tree, so nothing can swallow it. The
-        // exemption is now the artboard itself — #canvas and the wrapper that
-        // carries its resize handles — not the room it sits in.
-        document.addEventListener('pointerdown', function(e) {
-            if (panel.style.display === 'none') return;
-            var t = e.target;
-            if (t && panel.contains(t)) return;
-            // The trigger and its gear own the open/close toggle themselves.
-            if (t === toggle || (t && toggle.contains(t))) return;
-            var gear = toggle.__chGear;
-            if (gear && (t === gear || gear.contains(t))) return;
-            if (t && t.closest && t.closest('#canvas, #canvas-wrapper')) return;
-            closePanel();
-        }, true);
-        // Left in place for the OTHER popups' bubble-phase closers, which is
-        // all it ever guarded: this panel's own closer reads pointerdown and
-        // checks panel.contains() directly.
-        panel.addEventListener('click', function(e) { e.stopPropagation(); });
-
-        // Reposition or close on resize
-        window.addEventListener('resize', function() {
-            if (panel.style.display !== 'none') positionPanel();
-        });
+    
+            toggle.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var open = isShown();
+                if (open) {
+                    closePanel();
+                } else {
+                    panel.style.display = 'block';
+                    toggle.classList.add('active');
+                    pullMultiplier();
+                    positionPanel();
+                    rebuildRows();
+                }
+            });
+    
+            // Close when pressing elsewhere in the UI — but NOT on the artwork. Any
+            // canvas click used to dismiss this, so you could never hold a colour
+            // open while working against the art you were picking for, which is
+            // most of the reason to move the panel at all.
+            //
+            // Two things made this feel broken (2026-08-27). The exemption covered
+            // all of #canvas-area — the entire region the panel floats over, empty
+            // letterbox included — so nearly every click that looked like "outside
+            // the dropdown" was inside the exemption and nothing happened. And it
+            // listened for a BUBBLED click, which half the strip never delivers:
+            // every ⚙ stops propagation (wireGearToTrigger), so opening another
+            // channel's popup left this one hanging open behind it.
+            //
+            // pointerdown in the CAPTURE phase fixes the second: document capture
+            // runs before any handler in the tree, so nothing can swallow it. The
+            // exemption is now the artboard itself — #canvas and the wrapper that
+            // carries its resize handles — not the room it sits in.
+            document.addEventListener('pointerdown', function(e) {
+                if (!isShown()) return;
+                var t = e.target;
+                if (t && panel.contains(t)) return;
+                // The trigger and its gear own the open/close toggle themselves.
+                if (t === toggle || (t && toggle.contains(t))) return;
+                var gear = toggle.__chGear;
+                if (gear && (t === gear || gear.contains(t))) return;
+                if (t && t.closest && t.closest('#canvas, #canvas-wrapper')) return;
+                closePanel();
+            }, true);
+            // Left in place for the OTHER popups' bubble-phase closers, which is
+            // all it ever guarded: this panel's own closer reads pointerdown and
+            // checks panel.contains() directly.
+            panel.addEventListener('click', function(e) { e.stopPropagation(); });
+    
+            // Reposition or close on resize
+            window.addEventListener('resize', function() {
+                if (isShown()) positionPanel();
+            });
+    
+        }
 
         // Rebuild when multiplier changes
         if (mainMult) {
             mainMult.addEventListener('input', function() {
                 pullMultiplier();
-                if (panel.style.display !== 'none') rebuildRows();
+                if (isShown()) rebuildRows();
             });
         }
 
@@ -8621,7 +8645,7 @@
         // After each stroke (05g advanceArmColors): the swatches move on with
         // the palette and the Random rolls, while the panel is open.
         window.refreshArmColorRows = function () {
-            if (panel.style.display !== 'none') rebuildRows();
+            if (isShown()) rebuildRows();
         };
 
         return { toggle: toggle };

@@ -2207,3 +2207,14 @@ body.mobile-mode #sidebar-left { display: none; }
     box-shadow: none;
     padding: 0;
 }
+/* A strip channel inside a left section (Multi-Brush's arm count): full width. */
+#sidebar-left .sidebar-section .mixer-channel {
+    max-width: none;
+    width: 100%;
+    min-width: 0;
+    background: transparent;
+    border-right: 0;
+    padding: 2px 0 8px;
+}
+#sidebar-left .sidebar-section .ch-fader .fader-stack { flex: 1 1 auto; min-width: 0; }
+#sidebar-left .sidebar-section .ch-fader input[type="range"] { width: 100%; }

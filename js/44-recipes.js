@@ -134,15 +134,15 @@
         { id: 'multi-brush', pillar: 'brush', title: 'Paint with several arms at once',
           tags: ['multi', 'arms', 'multiplier', 'mirror', 'symmetry', 'many', 'copies'],
           answer: 'Drag the Multi-Brush fader, or press 1 to 8. Click the 1x value to give each arm its own colour and pick a symmetry.',
-          hotkey: '1 – 8', target: { strip: 'Multi-Brush', sel: '#multiplier' },
+          hotkey: '1 – 8', target: { section: 'Multi-Brush', sel: '#multiplier' },
           demo: { label: 'Try four arms', run() { const el = $('multiplier'); const was = el ? el.value : null; setCtl('multiplier', 4, 'input'); return () => { if (was != null) setCtl('multiplier', was, 'input'); }; } } },
         { id: 'arm-colours', pillar: 'brush', title: 'Give each arm its own colour, or a symmetry',
           tags: ['arms', 'colour', 'symmetry', 'mirror', 'rake', 'radial', 'quad'],
-          answer: 'Click the Multi-Brush value cell (or its gear). Each arm gets a colour mode; Symmetry sets how the arms are laid out across the canvas.',
-          target: { strip: 'Multi-Brush', popup: 'arms' },
+          answer: 'Open Multi-Brush on the left. Each arm gets a colour mode; Symmetry sets how the arms are laid out across the canvas.',
+          target: { section: 'Multi-Brush' },
           steps: [
-            { say: 'Click the Multi-Brush value cell. Symmetry sets how the arms are laid out: radial, mirrored, a rake.', target: { strip: 'Multi-Brush', popup: 'arms', sel: '#symmetryModeGroup' }, until: { change: true, any: true } },
-            { say: 'Each arm below gets its own colour mode: same as the brush, random, or a colour of its own.', target: { popup: 'arms', sel: '.arm-colors-rows' } }
+            { say: 'In Multi-Brush on the left, Symmetry sets how the arms are laid out: radial, mirrored, a rake.', target: { section: 'Multi-Brush', sel: '#symmetryModeGroup' }, until: { change: true, any: true } },
+            { say: 'Each arm below gets its own colour mode: same as the brush, random, or a colour of its own.', target: { section: 'Multi-Brush', sel: '.arm-colors-rows' } }
           ] },
         { id: 'material', pillar: 'brush', title: 'Switch between fluid, wet paint and thick paint',
           tags: ['material', 'paint', 'wet', 'thick', 'gloss', 'fluid', 'swirl', 'acrylic', 'clay', 'dry'],
@@ -692,7 +692,6 @@
         return (cell && cell.dataset.uiLabel) || key;
     }
     const POPUPS = {
-        arms:    { trigger: () => $('multiplierValue'), panel: () => document.querySelector('.arm-colors-rows'), isOpen: (p) => p && p.style.display !== 'none' && p.style.display !== '' || (p && p.classList.contains('visible')) },
         presets: { trigger: () => $('mixerPresetsTrigger'), panel: () => document.querySelector('.mixer-presets-panel'), isOpen: (p) => p && p.style.display !== 'none' && p.style.display !== '' },
         // The room panel's Invite popover and ⋯ menu (06e). Both live on
         // <body> and only show while open, so a step aimed inside one pairs
