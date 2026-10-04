@@ -331,6 +331,8 @@
             }
             strokeEvents.push({
                 t, x, y, dx, dy, color: color.slice(),
+                // The canvas size this was painted at (fitReplayToCanvas).
+                cw: canvas.width, ch: canvas.height,
                 mult: (typeof animationMultiplier === 'number' ? animationMultiplier : 1),
                 radius: effR,
                 tip: config.BRUSH_TIP | 0,
@@ -368,7 +370,7 @@
             // spreads a dab along the path into it, and must never do that
             // across the gap between two separate strokes in a Time replay —
             // that would draw a line the painter never made.
-            return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(),
+            return { t: ev.t, x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, color: ev.color.slice(), cw: ev.cw, ch: ev.ch,
                      mult: ev.mult, radius: ev.radius, tip: ev.tip, shape: ev.shape, head: ev.head,
                      push: ev.push ? { m: ev.push.m, s: ev.push.s } : null,
                      ap: ev.ap, mir: ev.mir, rnd: ev.rnd, fm: ev.fm, ra: ev.ra };
@@ -477,6 +479,25 @@
             }
             return out;
         }
+        // Stroke events are kept in canvas pixels, and the canvas can change
+        // size between painting and replaying: a window resize, the sidebar,
+        // a format. Each event notes the size it was painted at, and a replay
+        // scales it to today's canvas, so a stroke painted 15% of the way down
+        // replays 15% of the way down. After a 606 to 546 px resize it used to
+        // land at 20%, here and on every peer (user test 3). Works on the
+        // replay's own copies, never on strokeEvents; a held loop re-fits each
+        // pass, so a resize mid-loop is followed too.
+        function fitReplayToCanvas(events) {
+            var W = canvas.width, H = canvas.height;
+            for (var i = 0; i < events.length; i++) {
+                var ev = events[i];
+                if (!(ev.cw > 0 && ev.ch > 0) || (ev.cw === W && ev.ch === H)) continue;
+                var sx = W / ev.cw, sy = H / ev.ch;
+                ev.x *= sx; ev.dx *= sx;
+                ev.y *= sy; ev.dy *= sy;
+                ev.cw = W; ev.ch = H;
+            }
+        }
         function replayStroke(broadcast = true, reuse = false) {
             var eventsToReplay;
             if (reuse && window._activeReplayEvents && window._activeReplayEvents.length) {
@@ -497,6 +518,7 @@
             if (!eventsToReplay || !eventsToReplay.length) { isReplayActive = false; return; }
             // Re-roll rnd-flagged colours per stroke — see resolveReplayRandomness.
             eventsToReplay = resolveReplayRandomness(eventsToReplay);
+            fitReplayToCanvas(eventsToReplay);
             // Store the active replay events for processReplay
             window._activeReplayEvents = eventsToReplay;
             // Warm every stamp this replay will ask for. The GL upload is lazy
