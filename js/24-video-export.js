@@ -758,8 +758,8 @@
 
             // 1-second timeslice → keyframe at the start of each chunk
             _recorder.start(1000);
-            toast('Recording (' + ext.toUpperCase() + ')...', 'info');
-            updateUI('recording', 0);
+            toast('Video 0:00 / ' + clock(duration) + ' (' + ext.toUpperCase() + ')', 'info');
+            updateUI('recording', 0, 'Video 0:00 / ' + clock(duration));
 
             // Frame-by-frame composited recording
             var t0 = Date.now();
@@ -805,7 +805,8 @@
                 _compStats.capFrames++; _compStats.capTotalMs += cdt;
                 if (cdt > _compStats.capWorstMs) _compStats.capWorstMs = cdt;
 
-                updateUI('recording', Math.min(100, (elapsed / duration) * 100));
+                updateUI('recording', Math.min(100, (elapsed / duration) * 100),
+                    'Video ' + clock(elapsed) + ' / ' + clock(duration));
             }
 
             // What actually reached the encoder — the toast reports this, not
@@ -833,22 +834,22 @@
                     throw new Error('could not finish writing the video (' +
                         streamWriteError.message + ') — the file at ' + streamPath + ' is incomplete');
                 }
-                updateUI('rendering', 95);
+                updateUI('rendering', 95, 'Video: saving');
                 await plainMp4OnDisk(streamPath);
-                toast('Video exported! (' + sizeNote + ')', 'success');
+                toast('Video saved (' + sizeNote + ')', 'success');
             } else {
                 // WebM needs post-processing for seeking; MediaRecorder's MP4
                 // is fragmented, which editors refuse (plainMp4Blob).
                 if (ext === 'webm') {
-                    updateUI('rendering', 95);
+                    updateUI('rendering', 95, 'Video: saving');
                     blob = await fixWebmForSeeking(blob, duration);
                 } else if (ext === 'mp4') {
-                    updateUI('rendering', 95);
+                    updateUI('rendering', 95, 'Video: saving');
                     blob = await plainMp4Blob(blob);
                 }
                 var name = cfg.filenamePrefix + Date.now() + '.' + ext;
                 await saveBlob(blob, name);
-                toast('Video exported! (' + sizeNote + ')', 'success');
+                toast('Video saved (' + sizeNote + ')', 'success');
             }
 
         } catch (err) {
@@ -979,8 +980,8 @@
             try { enc.encode(f, { keyFrame: slot % gop === 0 }); } finally { f.close(); }
         }
 
-        toast('Recording (MP4)...', 'info');
-        updateUI('recording', 0);
+        toast('Video 0:00 / ' + clock(duration) + ' (MP4)', 'info');
+        updateUI('recording', 0, 'Video 0:00 / ' + clock(duration));
         try {
             while (!_abort && !encError) {
                 var ts = await rafPromise();
@@ -1009,7 +1010,8 @@
                 var cdt = performance.now() - c0;
                 _compStats.capFrames++; _compStats.capTotalMs += cdt;
                 if (cdt > _compStats.capWorstMs) _compStats.capWorstMs = cdt;
-                updateUI('recording', Math.min(100, (elapsed / duration) * 100));
+                updateUI('recording', Math.min(100, (elapsed / duration) * 100),
+                    'Video ' + clock(elapsed) + ' / ' + clock(duration));
             }
             // The last picture holds to the end of the take.
             if (!_abort && !encError) while (held && next < total) encodeAt(held, next++);
@@ -1023,7 +1025,7 @@
             if (_abort) { toast('Export cancelled', 'info'); return; }
             throw encError;
         }
-        updateUI('rendering', 98);
+        updateUI('rendering', 98, 'Video: saving');
         await enc.flush();
         enc.close();
         if (encError) throw encError;
@@ -1054,7 +1056,7 @@
                     ') — the file at ' + filePath + ' is incomplete');
             }
         }
-        toast('Video exported! (' + sizeNote + ')', 'success');
+        toast('Video saved (' + sizeNote + ')', 'success');
     }
 
     // ── GIF Export (inline encoder, no external deps) ───────────────
@@ -1078,8 +1080,8 @@
             // GIF dimensions must be even for some decoders
             ow = ow & ~1; oh = oh & ~1;
 
-            toast('Capturing ' + frameCount + ' frames...', 'info');
-            updateUI('rendering', 0);
+            toast('GIF 0:00 / ' + clock(duration), 'info');
+            updateUI('rendering', 0, 'GIF 0:00 / ' + clock(duration));
 
             // Phase 1: capture frames  (0 → 50 %)
             // One downscaled surface for the whole capture; the composite is
@@ -1105,7 +1107,8 @@
                 if (cdt > _compStats.capWorstMs) _compStats.capWorstMs = cdt;
                 frames.push({ data: imgData.data, delay: frameDelay });
 
-                updateUI('rendering', ((i + 1) / frameCount) * 50);
+                updateUI('rendering', ((i + 1) / frameCount) * 50,
+                    'GIF ' + clock((i + 1) * frameDelay) + ' / ' + clock(duration));
 
                 // Bake hook (scripts/bake-effect-previews.js): a caller may
                 // change the scene between frames — the effect previews flip
@@ -1121,9 +1124,9 @@
             if (_abort) { toast('Export cancelled', 'info'); return; }
 
             // Phase 2: encode GIF  (50 → 100 %)
-            toast('Encoding GIF...', 'info');
+            toast('GIF: saving', 'info');
             var gifBytes = await encodeGIF(ow, oh, frames, function (p) {
-                updateUI('rendering', 50 + p * 50);
+                updateUI('rendering', 50 + p * 50, 'GIF: saving ' + Math.round(p * 100) + '%');
             });
 
             var blob = new Blob([gifBytes], { type: 'image/gif' });
@@ -1133,7 +1136,7 @@
                 options.onBlob(blob, name);
             } else {
                 await saveBlob(blob, name);
-                toast('GIF exported!', 'success');
+                toast('GIF saved', 'success');
             }
 
         } catch (err) {
@@ -1673,8 +1676,8 @@
         var frameCount = Math.ceil(duration / interval);
 
         try {
-            toast('Capturing ' + frameCount + ' frames...', 'info');
-            updateUI('rendering', 0);
+            toast('Sequence 0:00 / ' + clock(duration) + ', ' + frameCount + ' frames', 'info');
+            updateUI('rendering', 0, 'Sequence 0:00 / ' + clock(duration));
 
             var mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
             var ext  = format === 'jpg' ? '.jpg' : '.png';
@@ -1719,7 +1722,8 @@
                     files.push({ name: 'frame_' + num + ext, data: new Uint8Array(arrBuf) });
                 }
 
-                updateUI('rendering', ((i + 1) / frameCount) * (seqDir ? 95 : 70));
+                updateUI('rendering', ((i + 1) / frameCount) * (seqDir ? 95 : 70),
+                    'Sequence ' + clock((i + 1) * interval) + ' / ' + clock(duration));
 
                 if (i < frameCount - 1) await sleep(interval);
             }
@@ -1727,22 +1731,22 @@
             if (_abort) { toast('Export cancelled', 'info'); return; }
 
             if (seqDir) {
-                toast('Sequence exported: ' + frameCount + ' frames → ' + seqDir, 'success');
+                toast('Sequence saved: ' + frameCount + ' frames → ' + seqDir, 'success');
             } else {
                 // Phase 2: build ZIP (70 → 95%)
-                toast('Building ZIP...', 'info');
-                updateUI('rendering', 75);
+                toast('Sequence: saving the ZIP', 'info');
+                updateUI('rendering', 75, 'Sequence: saving');
                 await sleep(0); // yield to UI
 
                 var zipBlob = buildZIP(files);
                 files = null; // free frame memory
 
-                updateUI('rendering', 95);
+                updateUI('rendering', 95, 'Sequence: saving');
 
                 // Phase 3: save
                 var name = cfg.filenamePrefix + 'sequence_' + Date.now() + '.zip';
                 await saveBlob(zipBlob, name);
-                toast('Sequence exported: ' + frameCount + ' frames (ZIP)', 'success');
+                toast('Sequence saved: ' + frameCount + ' frames (ZIP)', 'success');
             }
 
         } catch (err) {
@@ -1771,8 +1775,15 @@
     // width were written on every captured frame (60/s), each a style
     // invalidation in the sidebar during the frame the painter needs most.
     // State changes (idle ↔ recording ↔ rendering) always go through.
+    // `say` is what the status line reads: the kind and the clock while it
+    // captures ("Video 0:07 / 0:15"), the kind while it saves. Without one
+    // it falls back to a bare percentage.
     var _uiLastMs = 0, _uiLastState = null;
-    function updateUI(state, progress) {
+    function clock(ms) {
+        var s = Math.max(0, Math.floor((ms || 0) / 1000));
+        return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }
+    function updateUI(state, progress, say) {
         var nowMs = performance.now();
         if (state === _uiLastState && state !== 'idle' && nowMs - _uiLastMs < 100) return;
         _uiLastMs = nowMs; _uiLastState = state;
@@ -1786,8 +1797,7 @@
                 statusEl.textContent = '';
                 statusEl.style.display = 'none';
             } else {
-                var label = state === 'recording' ? 'Recording' : 'Rendering';
-                statusEl.textContent = label + '... ' + Math.round(progress) + '%';
+                statusEl.textContent = say || ('Saving ' + Math.round(progress) + '%');
                 statusEl.style.display = 'block';
             }
         }

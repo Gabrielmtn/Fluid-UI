@@ -1448,18 +1448,18 @@
                             <input type="text" id="recMiniMaxDuration" class="time-input action-max" value="00:10:000" placeholder="mm:ss:ms">
                         </div>
                         <div class="row bottom2">
-                            <button id="recMiniPauseBtn" class="action-pause" title="Play / pause the active layer (F8)">Pause</button>
+                            <button id="recMiniPauseBtn" class="action-pause" title="Play / pause the part (F8)">Pause</button>
                             <button id="recMiniStopBtn" class="action-stop">Stop</button>
                         </div>
                         <div class="row bottom1">
-                            <button id="recMiniPlayAllBtn" class="full action-full" title="Play / pause every layer (Shift+F8)">Play All</button>
+                            <button id="recMiniPlayAllBtn" class="full action-full" title="Play / pause every part (Shift+F8)">Play all</button>
                         </div>
                     </div>
                 </div>
                 <div class="rec-square" id="recMiniSquareLayers">
                     <div class="rec-square-content rec-square-layers">
                         <div class="row layer-mode">
-                            <select id="recMiniColorMode" class="full rec-color-mode rec-color-mode-mini" title="Replay color mode for the active layer"></select>
+                            <select id="recMiniColorMode" class="full rec-color-mode rec-color-mode-mini" title="How this part's colours replay"></select>
                         </div>
                         <div class="row layer-top">
                             <button id="recMiniPrevLayerBtn" class="action-prev">◀</button>
@@ -1467,13 +1467,13 @@
                             <button id="recMiniNextLayerBtn" class="action-next">▶</button>
                         </div>
                         <div class="row layer-bottom">
-                            <button id="recMiniAddLayerBtn" class="full action-add">New Layer</button>
+                            <button id="recMiniAddLayerBtn" class="full action-add">New part</button>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="rec-mini-actions">
-                <button id="recOpenFullBtn" class="full action-full" title="Open full recorder">Full Recorder</button>
+                <button id="recOpenFullBtn" class="full action-full" title="Open the animation editor">Open editor</button>
             </div>
         </div>
         <div class="control-group" style="margin-top: 20px">
@@ -1481,12 +1481,12 @@
             <div class="layers-panel" id="layersPanel"></div>
         </div>
     </div>
-    <!-- Recorded Layers Drawer (full-width) -->
+    <!-- Animation editor drawer (full-width), shared with Audio -->
     <div id="recDrawer" class="rec-drawer studio-drawer" data-group="expressive" data-active-tab="record">
         <div id="recResizeHandle" class="rec-resize-handle"><div class="rec-grabber"></div></div>
         <div class="studio-tabbar">
             <div class="studio-tabs">
-                <button type="button" class="studio-tab active" data-tab="record">Record</button>
+                <button type="button" class="studio-tab active" data-tab="record">Animation</button>
                 <button type="button" class="studio-tab" data-tab="audio">Audio</button>
             </div>
             <button id="studioCloseBtn" class="rec-close" title="Close">✕</button>
@@ -1494,7 +1494,7 @@
         <div class="studio-tab-panel active" data-tab="record">
         <div class="rec-header">
             <div class="rec-left">
-                <strong>Recorded Layers</strong>
+                <strong>Parts</strong>
                 <span id="recStatus" style="font-size:12px; opacity:0.7; margin-left:8px;">Ready</span>
             </div>
             <div class="rec-right">
@@ -1506,22 +1506,22 @@
                     <option value="2">2x</option>
                     <option value="4">4x</option>
                 </select>
-                <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;">Max</label>
+                <label for="recMaxDuration" style="font-size:12px; opacity:0.8; margin-left:10px;">Length</label>
                 <input type="text" id="recMaxDuration" class="time-input" value="00:10:000" placeholder="mm:ss:ms" style="width:110px;">
             </div>
         </div>
         <div class="rec-header" style="gap:6px;">
             <div class="rec-left" style="gap:6px;">
                 <button class="btn--record" id="recRecordBtn">Record</button>
-                <button id="recPlayBtn" title="Play / pause the active layer (F8)">Play Layer</button>
-                <button id="recPlayAllBtn" title="Play / pause every layer (Shift+F8)">Play All</button>
+                <button id="recPlayBtn" title="Play / pause the part (F8)">Play part</button>
+                <button id="recPlayAllBtn" title="Play / pause every part (Shift+F8)">Play all</button>
                 <button id="recStopBtn">Stop</button>
-                <button id="recAddLayerBtn">Add Layer</button>
+                <button id="recAddLayerBtn">New part</button>
                 <button id="recDuplicateLayerBtn">Duplicate</button>
-                <button class="btn--destructive" id="recDeleteLayerBtn">Delete</button>
-                <button class="btn--destructive" id="recClearBtn">Clear Active</button>
-                <button id="recExportBtn">Export</button>
-                <button id="recImportBtn">Import</button>
+                <button class="btn--destructive" id="recDeleteLayerBtn">Delete part</button>
+                <button class="btn--destructive" id="recClearBtn">Clear part</button>
+                <button id="recExportBtn" title="Save these parts to a file">Save to file</button>
+                <button id="recImportBtn" title="Open parts from a file">Open file</button>
                 <input type="file" id="recImportFile" accept=".json" style="display:none;" />
             </div>
         </div>
@@ -1529,10 +1529,10 @@
             <div class="rec-left" style="gap:6px; align-items:center;">
                 <label for="recPresetSelect" style="font-size:12px; opacity:0.8;">Animations</label>
                 <select id="recPresetSelect" style="min-width:200px;"></select>
-                <button id="recSavePresetBtn">Save as New</button>
-                <button class="btn--destructive" id="recDeletePresetBtn" title="Permanently delete the selected saved animation">Delete Animation</button>
+                <button id="recSavePresetBtn">Save as new</button>
+                <button class="btn--destructive" id="recDeletePresetBtn" title="Permanently delete the selected saved animation">Delete animation</button>
                 <div id="recPresetNameRow" style="display:none; gap:6px; align-items:center;">
-                    <input type="text" id="recNewPresetName" placeholder="Enter Animation Name" style="width:200px;">
+                    <input type="text" id="recNewPresetName" placeholder="Animation name" style="width:200px;">
                     <button id="recPresetConfirmBtn">Save</button>
                     <button id="recPresetCancelBtn">Cancel</button>
                 </div>
@@ -1564,16 +1564,16 @@
                     </ul>
                 </div>
                 <div>
-                    <h3>Recording & Transport</h3>
+                    <h3>Animations</h3>
                     <ul>
-                        <li>F8 — Play / Pause Layer (Record mode)</li>
-                        <li>Shift+F8 — Play All / Pause All (Record mode)</li>
+                        <li>F8 — Play / Pause Part</li>
+                        <li>Shift+F8 — Play / Pause Every Part</li>
                         <li>F9 — Record (3-2-1 countdown)</li>
                         <li>Shift+F9 — Record Immediately</li>
-                        <li>Esc — Stop All (recording + playback)</li>
-                        <li>↑ / ↓ — Cycle Layers</li>
-                        <li>Delete — Clear Active Layer</li>
-                        <li>Ctrl+Shift+N — New Layer</li>
+                        <li>Esc — Stop Recording and Playback</li>
+                        <li>↑ / ↓ — Previous / Next Part</li>
+                        <li>Delete — Clear Part</li>
+                        <li>Ctrl+Shift+N — New Part</li>
                     </ul>
                 </div>
                 <div>

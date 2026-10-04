@@ -223,7 +223,7 @@
     function noCA(k) { return !k.ctrl && !k.alt; }
     var RESERVED = [
         // Everywhere — the picker's own keys, a focused button's, the browser's
-        { says: 'already cancels and stops recordings', test: function (k) { return k.key === 'Escape'; } },
+        { says: 'already stops recording and playback', test: function (k) { return k.key === 'Escape'; } },
         { says: 'already switches the brush: Fluid, Pressure, Collider', test: function (k) { return k.key === 'Tab' && noCA(k); } },
         { says: 'already belongs to the browser', native: true, test: function (k) { return k.key === 'Tab'; } },
         { says: 'already presses the focused button', native: true, test: function (k) { return k.key === 'Enter' && k0(k); } },
@@ -231,12 +231,12 @@
         { says: 'already opens the hotkey list', test: function (k) { return k.key === 'F1' || (k.shift && (k.key === '?' || k.key === '/')); } },
         { says: 'already switches fullscreen', test: function (k) { return k.key === 'F11'; } },
         { says: 'already starts recording', test: function (k) { return k.key === 'F9'; } },
-        { says: 'already plays and pauses recordings', test: function (k) { return k.key === 'F8'; } },
+        { says: 'already plays and pauses the recorded parts', test: function (k) { return k.key === 'F8'; } },
         { says: 'already reloads the app', native: true, test: function (k) { return k.key === 'F5' || (k.ctrl && k.lower === 'r'); } },
         { says: 'already opens developer tools', native: true, test: function (k) { return k.key === 'F12' || (k.ctrl && k.shift && (k.lower === 'i' || k.lower === 'j')); } },
         { says: 'already resets all local data', native: true, test: function (k) { return k.ctrl && k.shift && k.lower === 'd'; } },
         { says: 'already binds a hotkey to a control', test: function (k) { return k.ctrl && k.shift && k.lower === 'h'; } },
-        { says: 'already adds a recording layer', test: function (k) { return k.ctrl && k.shift && k.lower === 'n'; } },
+        { says: 'already adds a part to the animation', test: function (k) { return k.ctrl && k.shift && k.lower === 'n'; } },
         { says: 'already frees memory (developer)', test: function (k) { return k.ctrl && k.shift && k.lower === 'g'; } },
         { says: 'already undoes', test: function (k) { return k.ctrl && k.lower === 'z' && !k.shift; } },
         { says: 'already redoes', test: function (k) { return k.ctrl && (k.lower === 'y' || k.lower === 'z'); } },
@@ -250,7 +250,7 @@
         // 05n — canvas, recording, colour
         { says: 'already captures a layer', test: function (k) { return k.key === 'Enter' && k.shift && noCA(k); } },
         { says: 'already sends the canvas to ComfyUI', test: function (k) { return k.key === 'Enter' && k.ctrl && !k.shift && !k.alt; } },
-        { says: 'already clears the recording layer', test: function (k) { return k.key === 'Delete' && k0(k); } },
+        { says: 'already clears the animation part', test: function (k) { return k.key === 'Delete' && k0(k); } },
         { says: 'already toggles the cursor', test: function (k) { return k0(k) && k.lower === 'c'; } },
         { says: 'already toggles the border and handles', test: function (k) { return k0(k) && k.lower === 'h'; } },
         { says: 'already locks the borders', test: function (k) { return k0(k) && k.lower === 'l'; } },
@@ -265,7 +265,7 @@
         { says: 'already steps through the palette', test: function (k) { return noCA(k) && k.lower === 'n'; } },
         { says: 'already saves the color', test: function (k) { return noCA(k) && k.shift && k.lower === 's'; } },
         { says: 'already clears the colors', test: function (k) { return noCA(k) && k.shift && k.lower === 'x'; } },
-        { says: 'already cycles recording layers', test: function (k) { return k0(k) && (k.key === 'ArrowUp' || k.key === 'ArrowDown'); } },
+        { says: 'already steps through the animation parts', test: function (k) { return k0(k) && (k.key === 'ArrowUp' || k.key === 'ArrowDown'); } },
         { says: 'already changes the palette', test: function (k) { return k.ctrl && (k.key === 'ArrowLeft' || k.key === 'ArrowRight'); } },
         { says: 'already changes the resolution', test: function (k) { return k.alt && !k.ctrl && (k.key === 'ArrowUp' || k.key === 'ArrowDown'); } },
         // 05e — reads e.code, so Ctrl and Alt still reach it; Shift is left free

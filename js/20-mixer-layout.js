@@ -3305,7 +3305,7 @@
                     btn.appendChild(t);
                     btn.appendChild(sub);
                     btn.title = missing
-                        ? `The recording "${s.name}" no longer exists`
+                        ? `The animation "${s.name}" no longer exists`
                         : `Loop "${s.name}" — click again to stop`;
                     if (missing) btn.classList.add('anim-slot-missing');
                     // aria-pressed carries the playing state (and its styling)
@@ -3341,7 +3341,7 @@
         const createBtn = document.createElement('button');
         createBtn.id = 'animCreateNewBtn';
         createBtn.textContent = 'Create New Animation';
-        createBtn.title = 'Open the recorder — record a performance, then "Save as New" to add it to this library';
+        createBtn.title = 'Open the animation editor. Record, then Save as new adds it to this library.';
         createBtn.addEventListener('click', () => {
             const sel = document.getElementById('recMode');
             if (sel) { sel.value = 'full'; sel.dispatchEvent(new Event('change')); }
@@ -3380,7 +3380,7 @@
             if (!names.length) {
                 const empty = document.createElement('div');
                 empty.className = 'anim-lib-empty';
-                empty.textContent = 'No saved animations yet — Create New Animation records one.';
+                empty.textContent = 'No saved animations yet. Create New Animation records one.';
                 libList.appendChild(empty);
                 return;
             }
@@ -7378,9 +7378,13 @@
         var quickGrid = document.createElement('div');
         quickGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;';
 
+        // Ids first (2026-10-04): a saved Ctrl+Shift+H key finds an id-less
+        // control by its words, so these four got ids before any of their
+        // tooltips changed.
         var videoBtn = document.createElement('button');
+        videoBtn.id = 'exportVideoBtn';
         videoBtn.textContent = 'Video';
-        videoBtn.title = 'Record a clip of the canvas as it moves. MP4 where the browser can, WebM otherwise; the background goes under the paint.';
+        videoBtn.title = 'Save a clip of the canvas as it moves. MP4 where the browser can, WebM otherwise; the background goes under the paint.';
         videoBtn.style.cssText = 'cursor:pointer;';
         videoBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.video();
@@ -7388,8 +7392,9 @@
         quickGrid.appendChild(videoBtn);
 
         var gifBtn = document.createElement('button');
+        gifBtn.id = 'exportGifBtn';
         gifBtn.textContent = 'GIF';
-        gifBtn.title = 'Record a short looping GIF (640 px wide, background included).';
+        gifBtn.title = 'Save a short looping GIF (640 px wide, background included).';
         gifBtn.style.cssText = 'cursor:pointer;';
         gifBtn.addEventListener('click', function() {
             if (window.fluidExport) window.fluidExport.gif();
@@ -7400,6 +7405,7 @@
         // what is on screen has to say so — "Save" elsewhere in the app means
         // settings, a preset or a project.
         var stillBtn = document.createElement('button');
+        stillBtn.id = 'exportStillBtn';
         stillBtn.textContent = 'Save picture';
         stillBtn.title = 'Save a PNG of what you see — background, layers and text included. Background, below, switches between As seen and Transparent.';
         stillBtn.style.cssText = 'cursor:pointer;';
@@ -7409,6 +7415,7 @@
         quickGrid.appendChild(stillBtn);
 
         var seqBtn = document.createElement('button');
+        seqBtn.id = 'exportSequenceBtn';
         seqBtn.textContent = 'Sequence';
         seqBtn.title = 'Save every frame of a few seconds as numbered PNGs (a ZIP in the browser, a folder in the desktop app).';
         seqBtn.style.cssText = 'cursor:pointer;';

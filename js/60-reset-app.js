@@ -127,7 +127,7 @@
             '<div class="delete-modal-content">' +
                 '<div class="delete-modal-title" id="resetAppTitle">Reset Swirl Together?</div>' +
                 '<div class="delete-modal-message" id="resetAppMsg">Clears the canvas and puts every setting ' +
-                    'back the way the app starts. Your presets, palettes, hotkeys, layers and recordings stay.</div>' +
+                    'back the way the app starts. Your presets, palettes, hotkeys, layers and animations stay.</div>' +
                 '<div class="delete-modal-actions">' +
                     '<button type="button" class="delete-modal-cancel" id="resetAppCancel">Cancel</button>' +
                     '<button type="button" class="delete-modal-confirm btn--destructive" id="resetAppGo">Reset</button>' +

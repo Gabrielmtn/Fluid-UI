@@ -98,7 +98,7 @@
     // ── Pillars (the tag chips) ────────────────────────────────────────
     const PILLARS = [
         ['brush', 'Brush'], ['colour', 'Colour'], ['layers', 'Layers'], ['effects', 'Effects'],
-        ['motion', 'Motion'], ['record', 'Record'], ['together', 'Together'], ['export', 'Export'],
+        ['motion', 'Motion'], ['record', 'Perform'], ['together', 'Together'], ['export', 'Export'],
         ['interface', 'Interface']
     ];
 
@@ -438,22 +438,22 @@
           ] },
         { id: 'record-performance', pillar: 'record', title: 'Record a performance and loop it',
           tags: ['record', 'loop', 'animation', 'performance', 'timeline', 'save', 'recorder', 'f9'],
-          answer: 'Animations → Create New Animation opens the recorder. F9 records after a countdown; F8 plays; Save as New drops it into an animation slot you can loop any time.',
+          answer: 'Animations → Create New Animation opens the animation editor. F9 records after a countdown; F8 plays; Save as new drops it into the library, ready for a slot you can loop any time.',
           hotkey: 'F9', target: { section: 'Animations', sel: '#animCreateNewBtn' },
           steps: [
-            { say: 'Animations → Create New Animation opens the recorder.', target: { section: 'Animations', sel: '#animCreateNewBtn' }, until: { visible: '#recRecordBtn' } },
+            { say: 'Animations → Create New Animation opens the animation editor.', target: { section: 'Animations', sel: '#animCreateNewBtn' }, until: { visible: '#recRecordBtn' } },
             { say: 'Record (F9) counts down 3-2-1, then paint your performance.', key: 'F9', target: { overlay: 'recorder', sel: '#recRecordBtn' }, until: { click: true } },
-            { say: 'Stop when you are done. Play Layer plays it back.', target: { overlay: 'recorder', sel: '#recStopBtn' }, until: { click: true } },
-            { say: 'Save as New puts it in the Animations library.', target: { overlay: 'recorder', sel: '#recSavePresetBtn' }, until: { click: true } },
+            { say: 'Stop when you are done. Play part plays it back.', target: { overlay: 'recorder', sel: '#recStopBtn' }, until: { click: true } },
+            { say: 'Save as new puts it in the Animations library.', target: { overlay: 'recorder', sel: '#recSavePresetBtn' }, until: { click: true } },
             { say: 'Name it and confirm.', target: { overlay: 'recorder', sel: '#recPresetConfirmBtn' }, until: { click: true } },
             { say: 'Back in Animations: drag it from the library into a slot, then click the slot to loop it.', target: { section: 'Animations', sel: '.anim-lib' } }
           ] },
         { id: 'animations', pillar: 'record', title: 'Play a saved animation',
           tags: ['animation', 'slot', 'play', 'loop', 'saved'],
-          answer: 'Animations holds six slots for your own recordings. Drag a saved recording from the library into a slot, then click the slot to loop it; click again to stop.',
+          answer: 'Animations holds six slots for your own animations. Drag a saved animation from the library into a slot, then click the slot to loop it; click again to stop.',
           target: { section: 'Animations', sel: '.anim-slot' },
           steps: [
-            { say: 'Open Saved Animations and drag a recording into one of the six slots.', target: { section: 'Animations', sel: '.anim-lib-head' }, until: { click: true } },
+            { say: 'Open Saved Animations and drag an animation into one of the six slots.', target: { section: 'Animations', sel: '.anim-lib-head' }, until: { click: true } },
             { say: 'Click the slot to loop it; click again to stop.', target: { section: 'Animations', sel: '.anim-slot' } }
           ] },
         { id: 'audio', pillar: 'record', title: 'Make the paint react to music',
@@ -509,11 +509,11 @@
         // ── Export ──
         { id: 'export-video', pillar: 'export', title: 'Save a video or GIF',
           tags: ['export', 'video', 'gif', 'mp4', 'webm', 'record', 'share', 'clip'],
-          answer: 'Export → Quick Export: Video, GIF, Save picture or Sequence. Painting keeps working while it records.',
+          answer: 'Export → Quick Export: Video, GIF, Save picture or Sequence. Painting keeps working while it captures.',
           target: { section: 'Export', sel: 'button', text: 'Video' },
           steps: [
             { say: 'Export → Quick Export → Video. GIF, Save picture and Sequence sit beside it.', note: 'Settings → Radial Menu → Add from the interface puts Video on the radial menu (E).', target: { section: 'Export', sel: 'button', text: ['Video', 'GIF'] }, until: { click: true } },
-            { say: 'It records while you keep painting; Cancel Export stops it early. The file downloads when it finishes.', target: { sel: '#exportStopBtn', fallback: { section: 'Export', sel: '#exportStatus' } } }
+            { say: 'It keeps capturing while you paint; the status line counts the clock, and Cancel Export stops it early. The file downloads when it finishes.', target: { sel: '#exportStopBtn', fallback: { section: 'Export', sel: '#exportStatus' } } }
           ] },
         { id: 'export-still', pillar: 'export', title: 'Save a picture of the canvas',
           tags: ['screenshot', 'still', 'png', 'jpg', 'image', 'picture', 'save', 'keep', 'background', 'transparent'],

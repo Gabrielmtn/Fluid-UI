@@ -75,6 +75,14 @@
         function recGetActiveLayer() {
             return recLayers.find(l => l.id === recActiveLayerId);
         }
+
+        // A recorded pass is a "part" on screen (image and path layers keep
+        // "layer"). Names stored before the rename read "Layer 3"; they show
+        // as "Part 3" and stay as they are on disk.
+        function recPartLabel(name) {
+            const s = (typeof name === 'string') ? name : '';
+            return /^Layer \d+$/.test(s) ? 'Part ' + s.slice(6) : s;
+        }
         
         function recSetActiveLayer(id) {
             recActiveLayerId = id;
@@ -192,7 +200,7 @@
             const id = recNextLayerId++;
             const layer = {
                 id,
-                name: name || `Layer ${id}`,
+                name: name || `Part ${id}`,
                 visible: true,
                 isLooping: true,
                 // Replay color behavior (1.3 rework): 'original' (default) =
@@ -226,7 +234,7 @@
         function recDuplicateActiveLayer() {
             const a = recGetActiveLayer();
             if (!a) return;
-            const nl = recCreateLayer(a.name + ' Copy');
+            const nl = recCreateLayer(recPartLabel(a.name) + ' copy');
             nl.timeline.interactions = JSON.parse(JSON.stringify(a.timeline.interactions));
             nl.timeline.duration = a.timeline.duration;
             nl.isLooping = a.isLooping;
@@ -242,7 +250,7 @@
         }
         
         function recDeleteActiveLayer() {
-            if (recLayers.length <= 1) { alert('Cannot delete the last layer'); return; }
+            if (recLayers.length <= 1) { alert("The last part can't be deleted. Clear part empties it."); return; }
             const idx = recLayers.findIndex(l => l.id === recActiveLayerId);
             if (idx >= 0) {
                 recLayers.splice(idx, 1);
@@ -723,10 +731,10 @@
                 btns.rec.classList.toggle('active', isRec);
             }
             if (btns.play) {
-                btns.play.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play Layer';
+                btns.play.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play part';
                 btns.play.classList.toggle('active', !!(a && a.timeline.isPlaying));
             }
-            if (btns.playAll) btns.playAll.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
+            if (btns.playAll) btns.playAll.textContent = recIsPlayingAll ? 'Pause all' : 'Play all';
             
             // Mini panel buttons
             if (btns.miniRec) {
@@ -737,7 +745,7 @@
                 btns.miniPause.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play';
                 btns.miniPause.classList.toggle('active', !!(a && a.timeline.isPlaying));
             }
-            if (btns.miniPlayAll) btns.miniPlayAll.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
+            if (btns.miniPlayAll) btns.miniPlayAll.textContent = recIsPlayingAll ? 'Pause all' : 'Play all';
             
             // Body state classes
             document.body.classList.toggle('rec-recording', isRec);
@@ -762,7 +770,7 @@
                     <div class="layer-item-header">
                         <div class="layer-thumbnail" style="background: linear-gradient(135deg, rgba(100,200,255,0.4), rgba(150,100,255,0.4)); display:flex; align-items:center; justify-content:center; font-size: 18px;">🎬</div>
                         <div class="layer-info">
-                            <input type="text" class="layer-title" value="${window.escHtml(layer.name)}" data-action="rename" data-id="${layer.id}">
+                            <input type="text" class="layer-title" value="${window.escHtml(recPartLabel(layer.name))}" data-action="rename" data-id="${layer.id}">
                         </div>
                         <div class="layer-controls">
                             <button class="layer-btn" data-action="toggle-visibility" data-id="${layer.id}">${layer.visible ? '👁️' : '👁️‍🗨️'}</button>
@@ -784,13 +792,13 @@
                     </div>
                     `}
                     <div class="layer-max-row" style="margin-bottom:6px; display:flex; align-items:center; gap:6px;">
-                        <label style="font-size:11px; opacity:0.85;">Max
+                        <label style="font-size:11px; opacity:0.85;">Length
                             <input type="text" class="time-input layer-max" data-id="${layer.id}" value="${recFormatTime((typeof layer.loopMaxMs === 'number' ? layer.loopMaxMs : (typeof recMaxDurationMs === 'number' ? recMaxDurationMs : layer.timeline.duration || 0)))}" style="margin-left:6px; width:110px;">
                         </label>
                     </div>
                     <div class="layer-colormode-row">
-                        <label>Colors</label>
-                        <select class="rec-color-mode" data-id="${layer.id}" title="How replay colors this layer's splats">
+                        <label>Colours</label>
+                        <select class="rec-color-mode" data-id="${layer.id}" title="How this part's colours replay">
                             ${REC_COLOR_MODES.map(m => `<option value="${m.v}" ${(layer.colorMode || 'original') === m.v ? 'selected' : ''}>${m.label}</option>`).join('')}
                         </select>
                     </div>
@@ -809,8 +817,8 @@
             const playAllBtn = document.getElementById('recPlayAllBtn');
             const a = recGetActiveLayer();
             if (recordBtn) recordBtn.textContent = _recRecordLabel(!!(a && a.timeline.isRecording));
-            if (playBtn) playBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play Layer';
-            if (playAllBtn) playAllBtn.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
+            if (playBtn) playBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play part';
+            if (playAllBtn) playAllBtn.textContent = recIsPlayingAll ? 'Pause all' : 'Play all';
             if (recordBtn) recordBtn.classList.toggle('active', !!(a && a.timeline.isRecording));
             if (playBtn) playBtn.classList.toggle('active', !!(a && a.timeline.isPlaying));
             recRefreshTimelinesUI();
@@ -824,7 +832,7 @@
             const miniPlayAllBtn = document.getElementById('recMiniPlayAllBtn');
             if (miniRecBtn) miniRecBtn.textContent = _recRecordLabel(!!(a && a.timeline.isRecording));
             if (miniPauseBtn) miniPauseBtn.textContent = a && a.timeline.isPlaying ? 'Pause' : 'Play';
-            if (miniPlayAllBtn) miniPlayAllBtn.textContent = recIsPlayingAll ? 'Pause All' : 'Play All';
+            if (miniPlayAllBtn) miniPlayAllBtn.textContent = recIsPlayingAll ? 'Pause all' : 'Play all';
             if (miniRecBtn) miniRecBtn.classList.toggle('active', !!(a && a.timeline.isRecording));
             if (miniPauseBtn) miniPauseBtn.classList.toggle('active', !!(a && a.timeline.isPlaying));
             if (miniPlayAllBtn) miniPlayAllBtn.classList.toggle('active', !!recIsPlayingAll);
@@ -890,7 +898,7 @@
                 } else if (action === 'clear-mask') {
                     const layer = recLayers.find(l => l.id === id);
                     if (layer && layer.mask) {
-                        if (confirm('Clear mask for this layer?')) {
+                        if (confirm('Clear the mask on this part?')) {
                             layer.mask.shapes = [];
                             layer.mask.enabled = false;
                             recScheduleRender();
@@ -1037,9 +1045,9 @@
         // the record-time MODE (re-rolled), the record-time OUTPUT (frozen),
         // or nothing at all (whatever the brush is set to right now).
         var REC_COLOR_MODES = [
-            { v: 'original', label: 'Preserve Mode' },
-            { v: 'exact', label: 'Exact Recording' },
-            { v: 'live', label: 'Current Settings' }
+            { v: 'original', label: 'As painted' },
+            { v: 'exact', label: 'Exact colours' },
+            { v: 'live', label: 'Current brush' }
         ];
 
         // Migrate saved color-mode values to the reworked set (2026-07-18):
@@ -1331,7 +1339,7 @@
             a.timeline.playbackPosition = 0;
             a.timeline.isRecording = false;
             a.timeline.isPlaying = false;
-            recSetStatus('Timeline cleared');
+            recSetStatus('Part cleared');
             recRenderUI();
         }
         
@@ -1368,7 +1376,7 @@
             a.download = `timeline-${Date.now()}.json`;
             a.click();
             URL.revokeObjectURL(url);
-            recSetStatus('Exported');
+            recSetStatus('Saved to file');
         }
         
         function recImportFromFile(file) {
@@ -1400,7 +1408,7 @@
                             layer.timeline.playbackPosition = 0;
                         });
                     } else if (data.timeline) {
-                        const layer = recCreateLayer('Imported Layer');
+                        const layer = recCreateLayer('Imported part');
                         layer.timeline.interactions = data.timeline.interactions || [];
                         layer.timeline.duration = data.timeline.duration || 0;
                         layer.timeline.playbackPosition = 0;
@@ -1409,9 +1417,9 @@
                     // Reset active to first
                     recActiveLayerId = recLayers[0] ? recLayers[0].id : null;
                     recRenderUI();
-                    recSetStatus('Imported');
+                    recSetStatus('Opened');
                 } catch (err) {
-                    recSetStatus('Import error');
+                    recSetStatus("Couldn't open that file");
                     console.error('Import error:', err);
                 }
             };
@@ -1528,7 +1536,7 @@
                 if (!l || !Array.isArray(l.interactions) || !l.interactions.length) return;
                 const interactions = l.interactions.slice();
                 tracks.push({
-                    name: (typeof l.name === 'string' && l.name) ? l.name : `Layer ${idx + 1}`,
+                    name: (typeof l.name === 'string' && l.name) ? l.name : `Part ${idx + 1}`,
                     interactions,
                     duration: (typeof l.duration === 'number' && l.duration > 0)
                         ? l.duration : recComputeDurationFromInteractions(interactions),
@@ -1597,11 +1605,11 @@
         function recApplyPresetByName(name) {
             if (!name) return;
             const preset = recGetPresetByName(name);
-            if (!preset) { recSetStatus('Preset not found'); return; }
+            if (!preset) { recSetStatus('Animation not found'); return; }
             const multi = preset.tracks.length > 1;
             let first = null;
             preset.tracks.forEach(t => {
-                const layer = recCreateLayer(multi ? `${name} — ${t.name}` : name);
+                const layer = recCreateLayer(multi ? `${name} · ${recPartLabel(t.name)}` : name);
                 layer.timeline.interactions = JSON.parse(JSON.stringify(t.interactions));
                 layer.timeline.duration = t.duration;
                 layer.timeline.playbackPosition = 0;
@@ -1613,7 +1621,7 @@
             });
             if (first) recSetActiveLayer(first.id);
             recRenderUI();
-            recSetStatus(`Loaded preset "${name}"` + (multi ? ` (${preset.tracks.length} layers)` : ''));
+            recSetStatus(`Added "${name}"` + (multi ? ` (${preset.tracks.length} parts)` : ''));
         }
 
         // Save the whole stack, not just the selected layer: a performance is
@@ -1705,7 +1713,7 @@
         }
 
         // Ticked every frame from the update loop, whatever the recorder is
-        // doing (see 05j) — an animation plays with Recording Mode Off.
+        // doing (see 05j), with nothing recording.
         function recAnimTick() {
             const now = Date.now();
             const wallDelta = now - recAnimLastTime;
@@ -1994,7 +2002,7 @@
     if (recDeletePresetBtn) recDeletePresetBtn.addEventListener('click', () => {
         const name = recPresetSel ? recPresetSel.value : '';
         if (!name) { recSetStatus('Pick an animation to delete'); return; }
-        if (recIsBuiltinAnimation(name)) { recSetStatus(`"${name}" is built in — it can't be deleted`); return; }
+        if (recIsBuiltinAnimation(name)) { recSetStatus(`"${name}" is built in, so it can't be deleted`); return; }
         if (!window.confirm(`Delete the animation "${name}"?\n\nThis cannot be undone.`)) return;
         if (recDeleteSavedAnimation(name)) {
             if (recPresetSel) recPresetSel.value = '';
@@ -2013,7 +2021,7 @@
             const sel = document.getElementById('recPresetSelect');
             if (sel) sel.value = name;
             const n = recLayers.filter(l => l && l.timeline && (l.timeline.interactions || []).length > 0).length;
-            recSetStatus(n > 1 ? `Animation saved (${n} layers)` : 'Animation saved');
+            recSetStatus(n > 1 ? `Animation saved (${n} parts)` : 'Animation saved');
         } else if (result === 'exists') {
             recSetStatus(`An animation called "${name}" already exists. Pick another name.`);
         } else if (result === 'full') {
@@ -2021,7 +2029,7 @@
         } else if (result === 'empty') {
             recSetStatus('Nothing recorded yet');
         } else {
-            recSetStatus('Failed to save preset');
+            recSetStatus("Couldn't save the animation");
         }
     });
 

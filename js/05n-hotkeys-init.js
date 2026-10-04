@@ -441,10 +441,11 @@
                     const n = take && take.timeline && take.timeline.interactions ? take.timeline.interactions.length : 0;
                     if (!n || document.getElementById('appConfirmModal')?.classList.contains('show')) return;
                     if (typeof window.appConfirm !== 'function') return;
+                    const label = (typeof recPartLabel === 'function') ? recPartLabel(take.name) : take.name;
                     window.appConfirm({
-                        title: 'Clear this take?',
-                        message: (take.name ? take.name + ' loses' : 'It loses') + ' everything recorded in it. This can\'t be undone.',
-                        confirmLabel: 'Clear take'
+                        title: 'Clear this part?',
+                        message: (label ? label + ' loses' : 'It loses') + ' everything recorded in it. This can\'t be undone.',
+                        confirmLabel: 'Clear part'
                     }).then((ok) => { if (ok) recClearActive(); });
                     return;
                 }
