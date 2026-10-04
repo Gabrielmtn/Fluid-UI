@@ -35,27 +35,39 @@
         let splatOutColor = [1, 0, 0];
         let pendingArmAdvance = false;
         // Distance-based envelope: the brush grows from nothing to full
-        // size over splatInDist of cursor travel (speed-independent), and on
-        // release trails off, tapering over splatOutDist. Distances are fractions
-        // of the canvas width; accumulated in the update loop (05j).
+        // size over splatInDist of cursor travel (speed-independent). Distances
+        // are fractions of the canvas width; accumulated in the update loop (05j).
         let splatStrokeDist = 0;   // travel since press (drives splat-in)
-        let splatTailDist = 0;     // travel of the post-release tail (drives splat-out)
-        let splatTailFrames = 0;   // credited frames the tail has run (05j caps it)
-        // ─── Release velocity (user test 3: "no motion inertia after mouseup") ──
-        // The tail used to start from the LAST move event's delta alone: a
-        // hand that eased off before lifting gave it almost nothing, and one
-        // that stopped, held, then lifted got a stale delta from before it
-        // stopped. Then, barely moving, it never travelled far enough to finish
-        // its taper and laid full-size dabs at the lift point until the speed
-        // decayed to ~0 (measured ~2.7 s). Now the speed is the hand's average
-        // over its last ~80 ms; below a floor there is no tail, it ends when it
-        // moves under a third of a pixel a frame, and it never runs more than
-        // TAIL_MAX_FRAMES. Units are the tail's own: px per frame × 10, what
-        // pointer.dx carries.
+        // ─── The release tail: an EASE-OUT past the lift ────────────────────
+        // User test 3, and Gabriel's tester on Easing: "it just stayed in place
+        // for a moment and painted, without continuing on with inertia, it's
+        // not an ease out at all". The old tail took its speed from the LAST
+        // move event alone (an eased-off lift gave it almost nothing, a
+        // stop-hold-lift a stale delta), decayed it per frame, and tapered its
+        // size over a fixed share of the canvas width (Ramp). Inertia carried it
+        // ~20x its first step, so at any ordinary speed the taper was nowhere
+        // near done when it stopped moving, and it sat at the end painting
+        // half-size dabs until the speed reached ~0 (measured 2.5 s, 151 dabs on
+        // 24 px). Now the lift PLANS the run (armReleaseTail):
+        //   speed  — the hand's average over its last ~80 ms; under
+        //            TAIL_MIN_STEP the hand had stopped and there is no tail;
+        //   length — inertia's reach, TAIL_REACH frames of that speed, capped by
+        //            Ramp; on Over time, whatever the set time allows;
+        //   path   — a cubic ease-out along the release direction: it leaves at
+        //            the release speed and slows to a stop exactly at the end,
+        //            while its size eases to nothing on the same clock (05j).
+        // Speeds are px per 60 Hz frame; the stored velocity keeps pointer.dx's
+        // x10 unit.
         const RELEASE_WINDOW_MS = 80;
-        const TAIL_START_V2 = 36;   // < 0.6 px a frame at the lift: the hand had stopped, no tail
-        const TAIL_END_V2 = 9;      // < 0.3 px a frame: done (was 0.0002, ~0.0014 px)
-        const TAIL_MAX_FRAMES = 54; // ~0.9 s at 60 Hz, whatever else
+        const TAIL_FRAME_MS = 1000 / 60;
+        const TAIL_MIN_STEP = 0.6;  // px a frame at the lift: slower and the hand had stopped
+        const TAIL_REACH = 15;      // the run is at most 15 frames of the release speed (~0.75 s);
+                                    // window.splatOutReach overrides it from the console
+        let splatTailX0 = 0, splatTailY0 = 0, splatTailUx = 0, splatTailUy = 0;
+        let splatTailLen = 0;       // px along the release direction
+        let splatTailN = 1;         // duration in 60 Hz frames of the sim clock
+        let splatTailT = 0;         // elapsed, same unit (05j advances it)
+        let splatTailE = 0;         // eased progress at the last dab
         const moveTrail = [];       // { x, y, t } of the live stroke, canvas px / ms
         function noteStrokeMove(x, y) {
             const t = performance.now();
@@ -75,21 +87,45 @@
             const k = 10 * (1000 / 60) / dt;
             return { dx: (last.x - first.x) * k, dy: (last.y - first.y) * k };
         }
-        // Arms the tail at a release (pointerup/cancel and touchend share it).
+        // Plans the tail at a release (pointerup/cancel and touchend share it).
+        // A cubic ease-out x(u) = L(1 - (1-u)^3) leaves at 3L/N per frame, so a
+        // run of N = 3L/s0 frames starts at exactly the release speed s0.
         function armReleaseTail() {
             const v = releaseVelocity();
             moveTrail.length = 0;
-            if (v.dx * v.dx + v.dy * v.dy < TAIL_START_V2) { splatOutActive = false; return; }
+            splatOutActive = false;
+            const s0 = Math.sqrt(v.dx * v.dx + v.dy * v.dy) / 10;
+            if (!(s0 >= TAIL_MIN_STEP)) return;
+            let len, frames;
+            if (window.splatOutMode === 'time') {
+                frames = (window.splatOutMs || 0) / TAIL_FRAME_MS;
+                len = s0 * frames / 3;
+            } else {
+                const reach = (window.splatOutReach > 0) ? window.splatOutReach : TAIL_REACH;
+                len = Math.min((window.splatOutDist || 0) * canvas.width, reach * s0);
+                frames = 3 * len / s0;
+            }
+            if (!(len >= 1) || !(frames >= 1)) return;   // Ramp or Time at zero: no tail
             splatUpTime = Date.now();
             splatOutActive = true;
-            splatTailDist = 0;
-            splatTailFrames = 0;
             splatReleaseInMult = getSplatInMult(); // size at release → no jump
-            splatOutX = pointer.x;
-            splatOutY = pointer.y;
+            splatTailX0 = splatOutX = pointer.x;
+            splatTailY0 = splatOutY = pointer.y;
+            splatTailUx = v.dx / (s0 * 10);
+            splatTailUy = v.dy / (s0 * 10);
+            splatTailLen = len;
+            splatTailN = frames;
+            splatTailT = 0;
+            splatTailE = 0;
             splatOutDx = v.dx;
             splatOutDy = v.dy;
             splatOutColor = pointer.color.slice();
+        }
+        // The tail's size at eased-clock progress u: Linear or Easing, as
+        // picked; Over time eases.
+        function tailSizeShape(u) {
+            const mode = window.splatOutMode;
+            return rampShape(mode === 'time' ? 'easing' : mode, Math.max(0, 1 - u));
         }
         let splatReleaseInMult = 1.0; // brush size fraction at release (so splat-out
                                       // tapers from the current size, not a jump to full)
@@ -147,23 +183,6 @@
             // this floor the dab is ~2px across and carries zero dye, so it is
             // invisible — the perceptual start is still zero.
             return Math.max(SPLAT_MIN_MULT, shape);
-        }
-        function getSplatOutMult() {
-            const mode = window.splatOutMode;
-            if (mode === 'instant') return 0.0;
-            let t;
-            if (mode === 'time') {
-                const ms = window.splatOutMs || 0;
-                if (ms <= 1) return 0.0;
-                t = Math.min((Date.now() - splatUpTime) / ms, 1.0);
-            } else {
-                const D = window.splatOutDist || 0;
-                if (D <= 0.0001) return 0.0;
-                t = Math.min(splatTailDist / D, 1.0);
-            }
-            if (t >= 1.0) return 0.0;
-            const remaining = 1.0 - t;
-            return rampShape(mode === 'time' ? 'easing' : mode, remaining);
         }
         // The ramp scales the dab's RADIUS, but the splat shader's centre
         // deposit is exp(0) = 1 whatever the radius — so a size-only ramp still

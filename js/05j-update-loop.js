@@ -788,29 +788,29 @@
                     advanceArmColors();
                     pendingArmAdvance = false;
                 }
-                // Splat-out: a trailing tail along the release velocity, tapering
-                // in size over splatOutDist of travel. Ends when the size taper
-                // completes OR the velocity has effectively died (so it can never
-                // stall splatting at a fixed point).
+                // Splat-out: the stroke EASES OUT past the lift along the run
+                // 05d armReleaseTail planned — leaving at the release speed,
+                // slowing on a cubic ease-out to a stop exactly at the end, its
+                // size easing to nothing on the same clock, so it can neither
+                // stall in place nor stop short.
                 //
-                // The tail is a per-FRAME process — one dab, one position step,
-                // one velocity decay per frame — so it rides depositCredit like
-                // the constant-flow hose: unchanged at Time ≥ 1, and at Time
-                // 0.25 it advances one frame in four. Uncredited frames freeze
-                // it entirely (position, decay, taper and the termination test
-                // together), so the tail keeps its exact shape and simply takes
-                // four times as long to lay down — instead of stamping its whole
-                // length into a fluid that has barely moved.
-                if (splatOutActive && depositCredit) {
-                    const outMult = getSplatOutMult();
-                    const outVel2 = splatOutDx * splatOutDx + splatOutDy * splatOutDy;
-                    // Ends on the taper, on a crawl (under 0.3 px a frame; it used
-                    // to wait for ~0 and dab the lift point for seconds), or after
-                    // TAIL_MAX_FRAMES credited frames. Over time keeps its own
-                    // clock (05d getSplatOutMult), so the frame cap skips it.
-                    splatTailFrames++;
-                    const tailCapped = window.splatOutMode !== 'time' && splatTailFrames > TAIL_MAX_FRAMES;
-                    if (outMult <= 0.001 || outVel2 < TAIL_END_V2 || tailCapped) {
+                // The clock is the sim's (frameDt carries the Time slider and
+                // the stability clamp): the run keeps its shape at any frame
+                // rate, and at Time 0.25 it takes four times as long to lay down
+                // instead of stamping its whole length into a fluid that has
+                // barely moved (what riding depositCredit used to do in steps).
+                if (splatOutActive) {
+                    splatTailT += frameDt * 1000 / TAIL_FRAME_MS;
+                    const tailU = Math.min(1, splatTailT / splatTailN);
+                    const tailE = 1 - (1 - tailU) * (1 - tailU) * (1 - tailU);
+                    const tailStep = splatTailLen * (tailE - splatTailE);   // px since the last dab
+                    splatTailE = tailE;
+                    splatOutX = splatTailX0 + splatTailUx * splatTailLen * tailE;
+                    splatOutY = splatTailY0 + splatTailUy * splatTailLen * tailE;
+                    splatOutDx = splatTailUx * tailStep * 10;   // the dab's push: this frame's motion
+                    splatOutDy = splatTailUy * tailStep * 10;
+                    const outMult = tailSizeShape(tailU);
+                    if (tailU >= 1 || outMult <= 0.001) {
                         // Arm-color advance no longer flushes here: the tail
                         // can die while stabilizer dabs still drain. The
                         // full-idle gate above owns the flush.
@@ -825,28 +825,22 @@
                             window.flushDabs(window.__mpLastDabColor,
                                 (typeof animationMultiplier === 'number' ? animationMultiplier : 1), true);
                         }
-                    } else {
+                    } else if (tailStep > 0) {
                         // Tail dye honors the Flow slider like the stroke it ends,
                         // and the distance it covers: the tail lays one dab a FRAME,
-                        // so a slow one stacked full dabs on the lift point. Each
-                        // dab takes the brush engine's share for its step (05d0
-                        // dabFlowShare: step / the reference spacing, at most 1), so
-                        // the tail lays the stroke's dye per pixel.
-                        const tailStep = Math.sqrt(outVel2) / 10;
+                        // and frames get shorter steps as it slows (or at a higher
+                        // refresh rate). Each dab takes the brush engine's share for
+                        // its step (05d0 dabFlowShare: step / the reference
+                        // spacing, at most 1), so the tail lays the stroke's dye per
+                        // pixel.
                         const tailRefPx = (config.BRUSH_SPACING_REF || 0.35) *
                             Math.max(4, 2 * Math.sqrt(config.SPLAT_RADIUS) * canvas.height);
                         const tailFlow = ((typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1) *
                             Math.min(1, tailStep / tailRefPx);
                         const tailCol = tailFlow === 1 ? splatOutColor
                             : [splatOutColor[0] * tailFlow, splatOutColor[1] * tailFlow, splatOutColor[2] * tailFlow];
-                        // Easing inertia: decay velocity with a cubic ease-out
-                        // curve (1 - (1-t)^3) instead of a fixed 0.9 multiplier.
-                        // This keeps momentum early in the tail and settles
-                        // softly — no abrupt stop.
-                        const outProgress = 1.0 - outMult; // 0 at start → 1 at end
-                        const decayRate = 0.96 - 0.06 * outProgress; // 0.96 → 0.90
                         const tailRadius = config.SPLAT_RADIUS * splatReleaseInMult * outMult;
-                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx * decayRate, splatOutDy * decayRate, tailCol, tailRadius);
+                        multiSplatWithRadius(splatOutX, splatOutY, splatOutDx, splatOutDy, tailCol, tailRadius);
                         // 2026-08-16 fidelity audit: the release tail is part of
                         // the stroke the painter sees — peers used to watch
                         // strokes stop dead at lift while the painter's eased
@@ -855,19 +849,12 @@
                             window.__mpLastDabColor = tailCol;
                             window.__mpBaseColor = splatOutColor;
                             window.queueDab(splatOutX / canvas.width, splatOutY / canvas.height,
-                                splatOutDx * decayRate, splatOutDy * decayRate, tailRadius, tailFlow, 1);
+                                splatOutDx, splatOutDy, tailRadius, tailFlow, 1);
                         }
                         if (typeof window.flushDabs === 'function') {
                             window.flushDabs(tailCol,
                                 (typeof animationMultiplier === 'number' ? animationMultiplier : 1), false);
                         }
-                        // Advance the tail along the decaying velocity + accumulate
-                        // its travel for the distance-based taper.
-                        splatOutX += splatOutDx / 10;
-                        splatOutY += splatOutDy / 10;
-                        splatTailDist += Math.sqrt(outVel2) / 10 / Math.max(1, canvas.width);
-                        splatOutDx *= decayRate;
-                        splatOutDy *= decayRate;
                     }
                 }
                 if (recEnabled) {
