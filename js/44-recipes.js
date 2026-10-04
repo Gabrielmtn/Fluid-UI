@@ -438,19 +438,17 @@
           ] },
         { id: 'record-performance', pillar: 'record', title: 'Record a performance and loop it',
           tags: ['record', 'loop', 'animation', 'performance', 'timeline', 'save', 'recorder', 'f9', 'strip', 'length'],
-          answer: 'Animations → Record (F9) counts down 3-2-1, then records what you paint until Stop or the length you picked. Edit ⤢ opens the editor, where Save as new adds it to the library.',
+          answer: 'Animations → Record (F9) counts down 3-2-1, then records what you paint until Stop or the length you picked. Keep saves it as an animation in the first empty slot; click the slot to loop it.',
           hotkey: 'F9', target: { section: 'Animations', sel: '#recMiniRecordBtn' },
           steps: [
             { say: 'Animations → Record. It counts down 3-2-1, then records what you paint.', note: 'The chips beside the clock set how long it runs: 4, 8, 15 or 30 seconds.', key: 'F9', target: { section: 'Animations', sel: '#recMiniRecordBtn' }, until: [{ bodyClass: 'rec-countdown' }, { bodyClass: 'rec-recording' }] },
-            { say: 'Paint your performance. Stop ends it, or it stops by itself at the length you picked.', target: { section: 'Animations', sel: '#recMiniStopBtn' }, until: { click: true } },
-            { say: 'Edit ⤢ opens the animation editor.', target: { section: 'Animations', sel: '#recOpenFullBtn' }, until: { visible: '#recSavePresetBtn' } },
-            { say: 'Save as new puts it in the Animations library.', target: { overlay: 'recorder', sel: '#recSavePresetBtn' }, until: { click: true } },
-            { say: 'Name it and confirm.', target: { overlay: 'recorder', sel: '#recPresetConfirmBtn' }, until: { click: true } },
-            { say: 'Back in Animations: drag it from the library into a slot, then click the slot to loop it.', target: { section: 'Animations', sel: '.anim-lib' } }
+            { say: 'Paint your performance. Stop ends it, or it stops by itself at the length you picked.', target: { section: 'Animations', sel: '#recMiniStopBtn' }, until: [{ visible: '#recKeepBtn' }, { visible: '#recTakeKeepBtn' }] },
+            { say: 'Keep saves it as an animation and puts it in the first empty slot. Discard throws it away.', target: { section: 'Animations', sel: '#recKeepBtn', fallback: { section: 'Animations', sel: '#recMiniRecordBtn' } }, until: { click: true } },
+            { say: 'Click the slot to loop it; click again to stop.', note: 'Edit ⤢ opens the editor: parts, speed, colours, and Save.', target: { section: 'Animations', sel: '.anim-slot' } }
           ] },
         { id: 'animations', pillar: 'record', title: 'Play a saved animation',
           tags: ['animation', 'slot', 'play', 'loop', 'saved'],
-          answer: 'Animations holds six slots for your own animations. Drag a saved animation from the library into a slot, then click the slot to loop it; click again to stop.',
+          answer: 'Animations holds six slots for your own animations. Keep puts a new one in the first empty slot, and any saved one drags in from the library. Click a slot to loop it; click again to stop.',
           target: { section: 'Animations', sel: '.anim-slot' },
           steps: [
             { say: 'Open Saved Animations and drag an animation into one of the six slots.', target: { section: 'Animations', sel: '.anim-lib-head' }, until: { click: true } },

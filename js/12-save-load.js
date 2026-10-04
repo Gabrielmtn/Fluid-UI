@@ -1909,6 +1909,14 @@
         ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
             merged[sec] = Object.assign({}, base[sec], legacy[sec] || {}, snapshot[sec] || {});
         });
+        // A look preset is a look (2026-10-04): it no longer replaces the
+        // parts in the recorder (switching looks could swap your animation
+        // for whatever was on the bench when the preset was saved), and it
+        // no longer opens or closes the animation editor. Projects and the
+        // crash restore still bring both: they apply through
+        // applyPresetSnapshot directly.
+        delete merged.recordedLayers;
+        delete merged.selects.recMode;
         ['colors', 'kaleido', 'brushState', 'material', 'brushTip', 'lightPos', 'armColors'].forEach(function (sec) {
             if (snapshot[sec] === undefined || snapshot[sec] === null) {
                 merged[sec] = legacy[sec] ? legacy[sec] : base[sec];

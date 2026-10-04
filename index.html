@@ -1450,6 +1450,11 @@
                     <button type="button" id="recLen30" title="Record up to 30 seconds">30 s</button>
                 </div>
             </div>
+            <div id="recKeepRow" class="rec-strip-row rec-strip-keep" style="display: none;">
+                <span class="rec-strip-ask">Keep what you painted?</span>
+                <button type="button" id="recKeepBtn" class="btn--emphasis" title="Save it as an animation, in the first empty slot">Keep</button>
+                <button type="button" id="recDiscardBtn" class="btn--destructive" title="Throw away what you just recorded">Discard</button>
+            </div>
             <div class="rec-strip-row rec-strip-foot">
                 <span id="recStripStatus" class="rec-strip-status" aria-live="polite"></span>
                 <button type="button" id="recOpenFullBtn" class="btn--sm" title="Open the animation editor: parts, speed, colours and saving">Edit ⤢</button>
@@ -1512,7 +1517,8 @@
             <div class="rec-left" style="gap:6px; align-items:center;">
                 <label for="recPresetSelect" style="font-size:12px; opacity:0.8;">Animations</label>
                 <select id="recPresetSelect" style="min-width:200px;"></select>
-                <button id="recSavePresetBtn">Save as new</button>
+                <button id="recSaveBtn" title="Save over the animation you opened, or name a new one">Save</button>
+                <button id="recSavePresetBtn" title="Save these parts as a new animation">Save as new</button>
                 <button class="btn--destructive" id="recDeletePresetBtn" title="Permanently delete the selected saved animation">Delete animation</button>
                 <div id="recPresetNameRow" style="display:none; gap:6px; align-items:center;">
                     <input type="text" id="recNewPresetName" placeholder="Animation name" style="width:200px;">

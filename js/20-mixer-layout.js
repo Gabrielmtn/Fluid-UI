@@ -3271,6 +3271,24 @@
             if (sm) sm.set('animSlots', slots.map(s => s ? { ...s } : null), false);
         }
 
+        // Keep (the record strip, 03) puts a new animation in the first empty
+        // slot. Returns that slot's index, the one it already sits in, or -1
+        // when all six are taken.
+        window.animSlots = {
+            assignFirstEmpty(name) {
+                if (!name) return -1;
+                const have = slots.findIndex(s => s && s.kind === 'preset' && s.name === name);
+                if (have >= 0) return have;
+                const idx = slots.findIndex(s => !s);
+                if (idx < 0) return -1;
+                slots[idx] = { kind: 'preset', name };
+                saveSlots();
+                renderSlots();
+                return idx;
+            },
+            names() { return slots.map(s => (s && s.name) || null); }
+        };
+
         let dragName = null; // library entry currently being dragged
 
         function makeDropTarget(cell, idx) {
@@ -3455,9 +3473,65 @@
                     if (!window.confirm(`Delete the animation "${name}"?\n\nThis cannot be undone.`)) return;
                     if (window.recDeleteSavedAnimation) window.recDeleteSavedAnimation(name);
                 });
+                // Open it in the editor (03 asks first when that would replace
+                // parts nobody kept), and rename it in place.
+                const edit = document.createElement('button');
+                edit.className = 'anim-lib-act anim-lib-edit';
+                edit.draggable = false;
+                edit.textContent = '⤢';
+                edit.title = `Open "${name}" in the animation editor`;
+                edit.addEventListener('click', e => {
+                    e.stopPropagation();
+                    if (window.recEditSavedAnimation) window.recEditSavedAnimation(name);
+                });
+                const ren = document.createElement('button');
+                ren.className = 'anim-lib-act anim-lib-rename';
+                ren.draggable = false;
+                ren.textContent = '✎';
+                ren.title = `Rename "${name}"`;
+                ren.addEventListener('click', e => {
+                    e.stopPropagation();
+                    startRename(row, label, name);
+                });
+                row.appendChild(edit);
+                row.appendChild(ren);
                 row.appendChild(del);
                 libList.appendChild(row);
             });
+        }
+
+        // The name becomes a field. Enter or leaving it keeps the new name
+        // (03 moves the stored key, and a taken name bumps), Esc keeps the
+        // old one. The row's own click and drag stand down while it edits.
+        function startRename(row, label, name) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'anim-lib-rename-input';
+            input.value = name;
+            input.maxLength = 60;
+            input.setAttribute('aria-label', 'New name');
+            row.draggable = false;
+            label.replaceWith(input);
+            input.focus();
+            input.select();
+            let done = false;
+            const finish = (commit) => {
+                if (done) return;
+                done = true;
+                const to = input.value.trim();
+                if (commit && to && to !== name && window.recRenameSavedAnimation) {
+                    window.recRenameSavedAnimation(name, to);
+                }
+                renderLib();
+            };
+            input.addEventListener('keydown', e => {
+                e.stopPropagation();
+                if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+                else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+            });
+            input.addEventListener('blur', () => finish(true));
+            ['click', 'mousedown', 'pointerdown'].forEach(t => input.addEventListener(t, e => e.stopPropagation()));
+            input.addEventListener('dragstart', e => { e.preventDefault(); e.stopPropagation(); });
         }
 
         function refreshAnimViews() {
@@ -3474,6 +3548,21 @@
         // it: if the store were ever slow or empty at boot, "the preset isn't
         // there" would silently wipe the user's curation. Slots that go
         // missing any other way keep showing Missing for the user to clear.
+        // A rename moved the stored key (03); the slots follow it, the same
+        // way a delete clears them.
+        window.addEventListener('recAnimationRenamed', e => {
+            const d = e && e.detail;
+            if (!d || !d.from || !d.to) return;
+            let changed = false;
+            slots.forEach((s, idx) => {
+                if (s && s.kind === 'preset' && s.name === d.from) {
+                    slots[idx] = { kind: 'preset', name: d.to };
+                    changed = true;
+                }
+            });
+            if (changed) saveSlots();
+            refreshAnimViews();
+        });
         window.addEventListener('recAnimationDeleted', e => {
             const gone = e && e.detail && e.detail.name;
             if (!gone) return;

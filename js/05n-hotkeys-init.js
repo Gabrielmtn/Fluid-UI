@@ -594,6 +594,8 @@
                 layer.timeline.playbackPosition = 0;
             });
             recActiveLayerId = recLayers[0] ? recLayers[0].id : null;
+            // Restored parts came from a saved project: nothing to Keep
+            if (typeof recForgetBench === 'function') recForgetBench();
             recRenderUI();
         };
         window.recGetActiveLayerId = function() { return recActiveLayerId; };

@@ -466,6 +466,30 @@
 .anim-lib-delete:focus-visible {
     opacity: 0.8;
 }
+/* Open in the editor and rename: always there, quieter than the name */
+.anim-lib-act {
+    order: 2;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1;
+    border-radius: 50%;
+    opacity: 0.45;
+}
+.anim-lib-row:hover .anim-lib-act,
+.anim-lib-act:focus-visible {
+    opacity: 0.9;
+}
+.anim-lib-rename-input {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    padding: 2px 6px;
+}
 
 /* ── Animation toggle rows ── */
 .anim-toggle-row {
@@ -958,6 +982,19 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 #recOpenFullBtn {
     flex: 0 0 auto;
     white-space: nowrap;
+}
+/* Keep · Discard, while the strip asks after a take: the question on its
+   own line, the two answers side by side under it */
+.rec-strip-keep {
+    flex-wrap: wrap;
+}
+.rec-strip-keep .rec-strip-ask {
+    flex: 1 0 100%;
+    font-size: 12px;
+}
+.rec-strip-keep > button {
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 /* Animation grid buttons */
