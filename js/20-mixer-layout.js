@@ -7649,17 +7649,30 @@
             if (window.fluidExport) {
                 var c = window.fluidExport.getConfig();
                 durationInput.value = Math.round(c.videoDuration / 1000);
+                wholeSecondsIn(durationInput, 1, 300, 15);   // a saved value out of range shows as what plays
                 fpsSelect.value = String(c.videoFPS);
                 gifDurationInput.value = Math.round(c.gifDuration / 1000);
+                wholeSecondsIn(gifDurationInput, 1, 10, 3);
                 gifFpsSelect.value = String(c.gifFPS);
                 groundSel.value = (c.ground === 'transparent') ? 'transparent' : 'seen';
             }
         }, 500);
 
         // Wire settings changes
+        // The fields' min and max only bound the spinner; a typed 600 went
+        // straight through (user test 3, "how long can it record stably").
+        // Pulled into range and shown, so the field says what will happen.
+        function wholeSecondsIn(input, lo, hi, fallback) {
+            var s = parseInt(input.value, 10);
+            if (!(s > 0)) s = fallback;
+            s = Math.max(lo, Math.min(hi, s));
+            input.value = String(s);
+            return s;
+        }
         durationInput.addEventListener('change', function() {
+            var s = wholeSecondsIn(durationInput, 1, 300, 15);
             if (window.fluidExport) {
-                window.fluidExport.setConfig('videoDuration', parseInt(durationInput.value) * 1000);
+                window.fluidExport.setConfig('videoDuration', s * 1000);
             }
         });
 
@@ -7670,8 +7683,9 @@
         });
 
         gifDurationInput.addEventListener('change', function() {
+            var s = wholeSecondsIn(gifDurationInput, 1, 10, 3);
             if (window.fluidExport) {
-                window.fluidExport.setConfig('gifDuration', parseInt(gifDurationInput.value) * 1000);
+                window.fluidExport.setConfig('gifDuration', s * 1000);
             }
         });
 

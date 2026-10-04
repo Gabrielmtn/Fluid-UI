@@ -624,10 +624,21 @@
     }
 
     // ── Video Export ────────────────────────────────────────────────
+    // The longest takes the Duration fields offer (20-mixer-layout), held
+    // here too: a typed value skipped the fields' max, a saved setting can
+    // carry anything, and a GIF keeps every raw frame in memory until it is
+    // encoded (tens of MB a second at 640 px): 120 s typed in would run the
+    // page out of memory.
+    var MAX_VIDEO_MS = 300000, MAX_GIF_MS = 10000;
+    function clampMs(ms, fallback, max) {
+        ms = +ms;
+        if (!(ms > 0)) ms = fallback;
+        return Math.max(1000, Math.min(max, ms));
+    }
     async function exportVideo(options) {
         if (!guard()) return;
         options = options || {};
-        var duration = options.duration || cfg.videoDuration;
+        var duration = clampMs(options.duration || cfg.videoDuration, DEFAULTS.videoDuration, MAX_VIDEO_MS);
         var fps     = options.fps || cfg.videoFPS;
         var OPAQUE = { opaque: true };   // no alpha in a video container: the ground goes under the paint
 
@@ -1051,7 +1062,7 @@
         if (!guard()) return;
         options = options || {};
         var OPAQUE = { opaque: true };   // GIF has no alpha: the ground goes under the paint
-        var duration   = options.duration || cfg.gifDuration;
+        var duration   = clampMs(options.duration || cfg.gifDuration, DEFAULTS.gifDuration, MAX_GIF_MS);
         var fps        = options.fps      || cfg.gifFPS;
         var maxW       = options.width    || cfg.gifMaxWidth;
         var frameDelay = 1000 / fps;
