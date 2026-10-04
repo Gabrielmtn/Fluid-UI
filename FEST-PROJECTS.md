@@ -12,6 +12,23 @@ Sizes: **S** under an hour, **M** an afternoon, **L** a day or more.
   `npm run publish:steam:demo -- GabrielMtn`
 - 93a60e1: the copy pass can't unbind hotkeys any more (project 1's blocker).
 
+## Done 2026-10-04 (committed on main, not pushed since 93a60e1)
+
+| Project | What landed | Commits |
+|---|---|---|
+| 1 Copy | Rewording can't unbind hotkeys; the sprint tool flags the 2 that would | 93a60e1 |
+| 2 Audio | Slice 1: a lane's cues fire an action (Splat, Burst, Scatter, Orbit, Spiral, Grid, Next colour, Spin kaleido; every Nth) | dcc4d40 |
+| | Slice 2: lanes kept per track (SHA-256 of the file), fire with the chart closed, Save / Open cues | 1e91c03 |
+| | Slice 3: Full Audio = the cue editor (select, drag, Delete, double-click, 1-8 taps, undo); the Composer is gone | d9d43bc |
+| | Slice 5: the pattern matcher (box a shape, every repeat lights up, Make a lane) | 837b085 |
+| | Slice 6: Set up this song (Low / Mid / High, fitted, each doing something); the lanes edited in Full | 8e7bf1b |
+| 4 Recording | The four bugs that lose work: Settings Clear keeps animations, Delete asks, the card buttons work, Save says why | 574d7af 5d16cd2 96512ce |
+| 5 Palette | Slices 1-3: one palette that saves itself, + New, Rename, Duplicate, Reset, keys in sight | 17c6b65 |
+| | Slices 4-5: drag colours and palettes into order, kept by name | dfeac3c |
+| 6 Multiplayer | (d) fair per-sender queues: a friend's long line under a 2x flood lost 176 of 720 dabs before, 0 now | 399b4d7 |
+
+Running in worktrees: multiplayer panel slices 1-3, recording slices 1, 2, 4. Still to start: the left sidebar (after recording lands, they share js/20 and js/43).
+
 ## Schedule
 
 | Days | Project | Slices | Demo cut |
@@ -40,6 +57,8 @@ Sizes: **S** under an hour, **M** an afternoon, **L** a day or more.
 10. **Recording: Animations stays out of Simple** (default), but F9, F8 and the REC badge work there.
 11. **Left sidebar in Simple:** the head (Brush Size) and Brush only (default). Simple hides both faders today.
 12. **Brush Size and Multi-Brush leave the top bar entirely** (default). The wheel, [ ], 1-8 and the radial menu still reach them, and the rail shows the size.
+13. **Audio: drop the "Under construction" badge** now that Full is the cue editor? Default: keep it until you've played a song through Set up this song and the matcher.
+14. **Palette: + New starts with the picker colour** (default) rather than empty. The study found Procreate's + makes an empty "Untitled"; one colour makes it paint at once.
 
 ---
 
