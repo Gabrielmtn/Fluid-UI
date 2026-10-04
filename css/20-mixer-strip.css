@@ -1017,20 +1017,9 @@ body > .controls {
 }
 
 
-/* ── Brush settings panel (D1): left slide-in off the Brush Size label ── */
-#mixer-strip .ch-label.brush-trigger {
-    cursor: pointer;
-    user-select: none;
-}
-#mixer-strip .ch-label.brush-trigger:hover,
-#mixer-strip .ch-label.brush-trigger.active {
-    color: var(--ink-100, #f2f3f5);
-}
-.brush-trigger-chev {
-    font-size: 8px;
-    margin-left: 3px;
-    opacity: 0.6;
-}
+/* ── Brush settings panel (D1). Since 2026-10-04 it is the Brush section of
+   the left sidebar (21-sidebar.css undoes the popup shell there); the
+   Brush Size label is no longer its trigger. ── */
 .brush-settings-panel {
     max-height: calc(100vh - 120px);
     overflow-y: auto;
@@ -1561,15 +1550,6 @@ body > .controls {
 /* Same as the bar: the header carries the value, no printed scale. */
 #mixer-more-panel .fader-scale {
     display: none;
-}
-/* The Brush Size label keeps its drawer-trigger affordance in here. */
-#mixer-more-panel .ch-label.brush-trigger {
-    cursor: pointer;
-    user-select: none;
-}
-#mixer-more-panel .ch-label.brush-trigger:hover,
-#mixer-more-panel .ch-label.brush-trigger.active {
-    color: var(--ink-100, #f2f3f5);
 }
 #mixer-more-panel .mixer-more-note {
     padding: 7px 10px 8px;
