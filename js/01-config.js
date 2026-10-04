@@ -194,6 +194,51 @@
             return uniqueColors((list || []).map(hexToFull)).sort().join(',');
         }
 
+        // Delete lives on a right-click menu (user test 3: "we need the delete to
+        // be from a right click menu"). A × appeared on hover, a misclick away
+        // from the palette name, and its appearing pushed the tags onto new lines.
+        // The menu is the brush-shape menu's (20 openShapeMenu): same look,
+        // body-mounted, Escape or a click elsewhere closes it.
+        let paletteMenuEl = null;
+        function closePaletteMenu() {
+            if (!paletteMenuEl) return;
+            paletteMenuEl.remove();
+            paletteMenuEl = null;
+            document.removeEventListener('mousedown', onPaletteMenuOutside, true);
+            document.removeEventListener('keydown', onPaletteMenuKey, true);
+        }
+        function onPaletteMenuOutside(e) { if (paletteMenuEl && !paletteMenuEl.contains(e.target)) closePaletteMenu(); }
+        function onPaletteMenuKey(e) { if (e.key === 'Escape') closePaletteMenu(); }
+        function openPaletteMenu(idx, name, x, y) {
+            closePaletteMenu();
+            const m = document.createElement('div');
+            m.className = 'brush-shape-menu palette-menu';
+            const head = document.createElement('div');
+            head.className = 'brush-shape-menu-head';
+            head.textContent = name;
+            head.title = name;
+            m.appendChild(head);
+            const item = (label, cls, fn) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'brush-shape-menu-item' + (cls ? ' ' + cls : '');
+                b.textContent = label;
+                b.addEventListener('click', () => { closePaletteMenu(); fn(); });
+                m.appendChild(b);
+            };
+            item('Use this palette', '', () => applyPalette(idx));
+            item('Delete…', 'danger', () => showDeleteModal(idx, name));
+            document.body.appendChild(m);
+            const r = m.getBoundingClientRect();
+            m.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
+            m.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
+            paletteMenuEl = m;
+            setTimeout(() => {
+                document.addEventListener('mousedown', onPaletteMenuOutside, true);
+                document.addEventListener('keydown', onPaletteMenuKey, true);
+            }, 0);
+        }
+
         function refreshPaletteCarousel() {
             const carousel = document.getElementById('paletteCarousel');
             if (!carousel) return;
@@ -202,15 +247,16 @@
                 const tag = document.createElement('div');
                 tag.className = 'palette-tag';
                 if (idx === currentPaletteIndex) tag.classList.add('active');
+                tag.title = p.name + '. Click to paint with it, right-click to delete it.';
                 const nameSpan = document.createElement('span');
                 nameSpan.textContent = p.name;
                 tag.appendChild(nameSpan);
-                const delBtn = document.createElement('span');
-                delBtn.className = 'palette-tag-delete';
-                delBtn.textContent = '×';
-                delBtn.onclick = (e) => { e.stopPropagation(); showDeleteModal(idx, p.name); };
-                tag.appendChild(delBtn);
                 tag.onclick = () => applyPalette(idx);
+                tag.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openPaletteMenu(idx, p.name, e.clientX, e.clientY);
+                });
                 carousel.appendChild(tag);
             });
         }

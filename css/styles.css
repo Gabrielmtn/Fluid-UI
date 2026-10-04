@@ -652,13 +652,9 @@
         
         .swatch-remove { position: absolute; top: -8px; right: -8px; width: 16px; height: 16px; border-radius: 10px; font-size: 12px; line-height: 16px; text-align: center; cursor: pointer; padding: 0; display: none; }
         .swatch-wrap:hover .swatch-remove { display: block; }
-        /* The × takes a slot it always has, and shows by opacity: it went from
-           display:none to inline-block on hover (+20px), and the tags jumped
-           lines under the mouse (user test 3). */
-        .palette-tag-delete { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 14px; color: #fa6b6b; opacity: 0; pointer-events: none; font-size: 16px; line-height: 1; text-align: center; }
-        .palette-tag:hover > .palette-tag-delete { opacity: 1; pointer-events: auto; }
+
         .palette-carousel { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 0; margin-bottom: 8px;         margin-right: -5px;; margin-left: -5px;}
-        .palette-tag { position: relative; padding: 6px 20px 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.1); color: #e6edf3; font-size: 14px; white-space: nowrap; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; gap: 4px; }
+        .palette-tag { padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.1); color: #e6edf3; font-size: 14px; white-space: nowrap; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; gap: 4px; }
         
         /* Weight unchanged: a bold active tag was wider, and moved the rest. */
         .palette-tag.active { background: rgba(100,200,255,0.3); border-color: rgba(100,200,255,0.6); }

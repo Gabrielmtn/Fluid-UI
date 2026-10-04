@@ -945,12 +945,9 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
 }
 #sidebar-right .palette-tag {
     font-size: 11px;
-    padding: 4px 18px 4px 8px;   /* the × slot (styles.css) */
+    padding: 4px 8px;
     border-radius: 5px;
     min-width: 0;
-}
-#sidebar-right .palette-tag-delete {
-    font-size: 13px;
 }
 #sidebar-right .palette-actions {
     display: flex;
