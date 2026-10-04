@@ -1731,6 +1731,21 @@ body.rec-open #sidebar-right {
 }
 .audio-drawer-enable { margin: 6px 0 2px; }
 .audio-drawer-enable .audio-mini-src { flex: 0 0 auto; min-width: 110px; }
+/* Full Audio (the studio drawer's Audio tab, #audioDrawerPanel) sits outside
+   #sidebar-right, so it got the 44px rack fader with its min/mid/max row,
+   stretched across the whole window: "the UI sliders in full are wayyy to
+   big" (user test 3). Its sliders now take the sidebar's treatment (the
+   hit box trimmed, not the track: the fill needs the 22px well) and its
+   controls a column of readable width. The visualizer and the composer
+   timeline keep the full width. */
+#audioDrawerPanel input[type="range"] { --input-py: 4px; }
+@media (pointer: coarse) {
+    #audioDrawerPanel input[type="range"] { --input-py: 11px; }
+}
+#audioDrawerPanel .fader-scale { display: none; }
+#audioDrawerPanel > .control-group,
+#audioDrawerPanel > .audio-drawer-enable,
+#audioDrawerPanel > .audio-construction-note { max-width: 680px; }
 .audio-mini-enable {
     display: flex; align-items: center; gap: 6px;
     margin: 0; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
