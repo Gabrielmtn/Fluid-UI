@@ -277,6 +277,35 @@ button.btn--record.active,
     border-color: oklch(62% 0.190 25);
     color: oklch(98% 0.030 25);
 }
+/* ...and it pulses while it runs. A brighter plate behind the label
+   fades in and out: opacity only, so the compositor animates it and
+   painting never pays for it. 1.6 s a beat, far under PhotoSafe's
+   3 Hz line. */
+button.btn--record[aria-pressed="true"],
+button.btn--record.active {
+    position: relative;
+    isolation: isolate;
+}
+button.btn--record[aria-pressed="true"]::after,
+button.btn--record.active::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    background: oklch(58% 0.210 25);
+    box-shadow: 0 0 14px oklch(62% 0.220 25 / 0.7);
+    pointer-events: none;
+    animation: recordPulse 1.6s ease-in-out infinite;
+}
+@keyframes recordPulse {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    button.btn--record[aria-pressed="true"]::after,
+    button.btn--record.active::after { animation: none; opacity: 0.5; }
+}
 button.btn--destructive:disabled,
 button.btn--record:disabled {
     background: oklch(12% 0.005 25);
