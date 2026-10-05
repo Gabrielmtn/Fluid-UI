@@ -119,6 +119,6 @@
     { "file": "js/08b-jank-monitor.js:407-520", "what": "window.LookWatchdog — polls every look-affecting config/resolution/governor state and logs changes; use snapshot()/history to assert nothing mutated sim parameters mid-run" },
     { "file": "js/05g-arm-colors.js:294-303", "what": "window.applyMultiSplatWith(x, y, dx, dy, color, mult, radius, exactColor) — deterministic programmatic dye+velocity injection; exactColor=true bypasses arm-color randomness (js/05g-arm-colors.js:277)" },
     { "file": "js/05i-sim-stats.js (splatScissorRect/splatPass at :22-58)", "what": "splat-scissor machinery with kill switch config.SPLAT_SCISSOR (default true, js/04a-canvas-gl-config.js:346) — flip false for an A/B lane if a scissor regression is ever suspected" },
-    { "file": "TODO-NEXT.md:50", "what": "prior-art note: 'Screenshots fail on a hidden tab. Use gl.readPixels; preserveDrawingBuffer is on' — confirms the hidden-tab constraint and the readPixels escape hatch" }
+    { "file": "notes/planning/TODO-NEXT.md:50", "what": "prior-art note: 'Screenshots fail on a hidden tab. Use gl.readPixels; preserveDrawingBuffer is on' — confirms the hidden-tab constraint and the readPixels escape hatch" }
   ]
 }

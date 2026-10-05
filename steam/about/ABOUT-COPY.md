@@ -144,7 +144,7 @@ images with a line of context under each.
 
 
 - **[DECIDE]** whether the communal-ledger / wishlist line goes in here. Rules
-  verdict (REFACTOR-AUDIT.md §9.3): allowed in the description, but keep it out
+  verdict (notes/audits/REFACTOR-AUDIT.md §9.3): allowed in the description, but keep it out
   of every capsule image, no fake Steam UI, no external links, and have softer
   fallback phrasing ready if a reviewer reads it as a feature-removal threat.
 - **[DECIDE]** whether eight inline images is the right density. Dropping

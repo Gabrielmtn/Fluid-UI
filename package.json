@@ -78,6 +78,7 @@
       "!.wrangler/**",
       "!comfyui-node/**",
       "!docs/**",
+      "!notes/**",
       "!sam-test.*",
       "!reset-pressure.html",
       "!server-relay.js",

@@ -173,7 +173,7 @@ Three colors leave the palette: the warm yellow accent, the cool blue `#4fc3f7`,
 | Overlays | `css/22-overlays.css` |
 | Hotkey reminder | `js/17-hotkey-reminder.js`, `.hotkey-reminder` rules in `css/styles.css`, `css/init-responsive.css` |
 | Slider behaviour | `js/05h-slider-bindings.js`, `js/06-slider-updater.js` |
-| Control registry | `js/01a-param-registry.js`, `CONTROL-MAPPING.md` |
+| Control registry | `js/01a-param-registry.js`, `notes/architecture/CONTROL-MAPPING.md` |
 | Kaleidoscope | `js/05f-kaleido-controls.js` |
 | Light Shift playhead | `js/14-light-shift.js` |
 | Full hotkey reference | `js/05n-hotkeys-init.js`, the `#hotkeyOverlay` markup in `index.html` |

@@ -2,7 +2,7 @@
 
 Headless WebSocket clients that speak the same wire protocol as the client (`js/06a…06e-mp-*.js`), for
 measuring relay behaviour without opening eight browsers. Written for the 2026-08-23 audit
-(`MP-AUDIT-2026-08-23.md` at the repo root).
+(`notes/audits/MP-AUDIT-2026-08-23.md`).
 
 Start a relay first — everything except `mp-prod-version.js` points at `127.0.0.1:1999`:
 

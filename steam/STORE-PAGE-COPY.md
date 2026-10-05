@@ -2,7 +2,7 @@
 
 App ID 5068940 · store item 1276064 · target: submit for review by **Mon Aug 24**
 (Next Fest registration closes 🔴 Aug 31 11:59pm PDT and requires a *published,
-public* page — see REFACTOR-AUDIT.md §9.)
+public* page — see notes/audits/REFACTOR-AUDIT.md §9.)
 
 Everything below is ready to paste. Items marked **[DECIDE]** need Gabriel.
 Items marked **[BLOCKED]** can't be filled yet.
@@ -51,7 +51,7 @@ shipped is a review bounce.
   linux target configured.
 - `steamworks.js` ships `win64/steam_api64.dll` via `extraFiles` — Windows-specific.
 - A macOS build cannot be produced on this machine (needs a Mac or macOS CI —
-  RELEASE.md).
+  notes/release/RELEASE.md).
 - A checked box is a promise: Valve expects a working depot per platform, and
   the badge appears on the store page.
 

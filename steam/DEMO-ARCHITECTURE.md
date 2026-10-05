@@ -7,7 +7,7 @@
 > None of the gate schedule below was built. Demo **AppID 5162690**, depot
 > **5162691** (from `steamcmd +app_info_print 5162690`: type Demo, parent
 > 5068940) — §9 item 1 is answered. Build and upload: `npm run dist:demo`, then
-> `npm run publish:steam:demo -- <builder-login>` (RELEASE.md §3). The edition
+> `npm run publish:steam:demo -- <builder-login>` (notes/release/RELEASE.md §3). The edition
 > flag is a stamp in the packaged package.json (`swirlEdition`), read by
 > electron-main.js and handed to the page on argv, not the `js/00b-edition.js`
 > module sketched in §3.
@@ -15,7 +15,7 @@
 **Written 2026-08-23**, the day the demo app was created on Steamworks (store
 item `1299084`; the demo **AppID itself is still needed** — see §9).
 
-This supersedes NEXT-FEST-PLAN.md Workstream A and REFACTOR-AUDIT.md §9.2's
+This supersedes notes/planning/NEXT-FEST-PLAN.md Workstream A and notes/audits/REFACTOR-AUDIT.md §9.2's
 WS-A row. The fest dates in §9 still govern: demo exists ~**Sep 7** for the test
 window, demo build + store page in review **Sep 21** for Press Preview.
 

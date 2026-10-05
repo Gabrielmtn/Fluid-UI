@@ -12,12 +12,12 @@ nobody re-derives them:
 
 | v1 said | Actually |
 |---|---|
-| "Recorder state crosses the wire" (§6) | **False.** Replay calls `multiSplat(..., shouldBroadcast=false)` — hard-coded at [05g:294](js/05g-arm-colors.js:294). Only `recMode`/`recPlaybackSpeed` appear in multiplayer, both deliberately local ([06:338](js/06-multiplayer.js:338)). R10 carries zero relay risk. |
-| R10: "shape id isn't in the schema, add it" | **Wrong fix.** Replay is gaussian *by construction*: `applyMultiSplatWith(…, exactColor=true)` → `__brushTipOn = !exactColor` ([05g:259](js/05g-arm-colors.js:259)) → both the tip ([05i:86](js/05i-sim-stats.js:86)) and the custom stamp ([05i:193](js/05i-sim-stats.js:193)) are gated off. Adding the field changes nothing. |
+| "Recorder state crosses the wire" (§6) | **False.** Replay calls `multiSplat(..., shouldBroadcast=false)` — hard-coded at [05g:294](../../js/05g-arm-colors.js:294). Only `recMode`/`recPlaybackSpeed` appear in multiplayer, both deliberately local ([06:338](js/06-multiplayer.js:338)). R10 carries zero relay risk. |
+| R10: "shape id isn't in the schema, add it" | **Wrong fix.** Replay is gaussian *by construction*: `applyMultiSplatWith(…, exactColor=true)` → `__brushTipOn = !exactColor` ([05g:259](../../js/05g-arm-colors.js:259)) → both the tip ([05i:86](../../js/05i-sim-stats.js:86)) and the custom stamp ([05i:193](../../js/05i-sim-stats.js:193)) are gated off. Adding the field changes nothing. |
 | R8: "reuse 24-path-layers.js" | **Would destroy every recording.** Path layers are *arc-length* parameterised (`position` 0–1 of total length, points carry no time); recorder interactions are *timestamped*, and the timing is the content. Round-tripping silently applies AE's "rove across time" to every take. |
 | §2 fact 1: "tap `splat()` to bake built-ins" | **Wrong tap point.** 04c calls bare `splat()`; 04e calls `multiSplat(…)` which expands one dab into N arm splats *before* splat(). A splat() tap captures 04e post-arm and replay re-expands it — 64 dabs per dab at Multi-Brush 8. Tap `multiSplat`'s entry instead. |
 | R5: "may be a `clientWidth === 0` measurement" | **Disproven.** Every open does a synchronous `classList.add('open')` before `recRenderUI()`. Don't spend budget there — it's pure geometry. |
-| R7: "prefer baking over hand-authoring" | **Half the work already exists.** `recBuiltinPresetGenerators` ([03:1387](js/03-recording.js:1387)) already maps Smash / Jellyfish / Portrait / Vortex to recorder-native generators emitting real interaction arrays. Start there. |
+| R7: "prefer baking over hand-authoring" | **Half the work already exists.** `recBuiltinPresetGenerators` ([03:1387](../../js/03-recording.js:1387)) already maps Smash / Jellyfish / Portrait / Vortex to recorder-native generators emitting real interaction arrays. Start there. |
 
 v2 also added four requirements the first pass missed entirely (R12–R15), a **§4 list of
 bugs that must be fixed before any of this is built**, and a hard control budget.
@@ -59,29 +59,29 @@ The test everything is judged against:
 
 | Thing | Location |
 |---|---|
-| Recorder core | [js/03-recording.js](js/03-recording.js) — 1667 lines |
-| Capture hooks | [05d:521](js/05d-input-replay.js:521), `:758`, `:830`, `:1120`, `:1159`; [05j:339](js/05j-update-loop.js:339) |
-| Interaction schema | [03:301](js/03-recording.js:301) — `{timestamp, x, y, vx, vy, color, mult, radius}` |
-| Layer model | [03:176](js/03-recording.js:176) |
-| **Recorder-native built-in generators** | [03:1233-1392](js/03-recording.js:1233) — `recGenSmashPreset`, `recGenJellyfishPreset`, `recGenPortraitPreset`, `recGenVortexPreset`, indexed by `recBuiltinPresetGenerators` |
-| Full recorder markup | [index.html:1209](index.html:1209) — `#recDrawer`, **shared with the Audio Composer via `.studio-tabbar`** |
+| Recorder core | [js/03-recording.js](../../js/03-recording.js) — 1667 lines |
+| Capture hooks | [05d:521](../../js/05d-input-replay.js:521), `:758`, `:830`, `:1120`, `:1159`; [05j:339](../../js/05j-update-loop.js:339) |
+| Interaction schema | [03:301](../../js/03-recording.js:301) — `{timestamp, x, y, vx, vy, color, mult, radius}` |
+| Layer model | [03:176](../../js/03-recording.js:176) |
+| **Recorder-native built-in generators** | [03:1233-1392](../../js/03-recording.js:1233) — `recGenSmashPreset`, `recGenJellyfishPreset`, `recGenPortraitPreset`, `recGenVortexPreset`, indexed by `recBuiltinPresetGenerators` |
+| Full recorder markup | [index.html:1209](../../index.html:1209) — `#recDrawer`, **shared with the Audio Composer via `.studio-tabbar`** |
 | Mini recorder | `#recMini` — a *second* transport with its own Record/Pause/PlayAll/Max/prev/next |
-| "Preset" UI to rename | [index.html:1256](index.html:1256); storage `recPreset.<name>` ([03:1477](js/03-recording.js:1477)) |
-| Drawer geometry | [css/styles.css:977](css/styles.css:977) — `.rec-drawer{height:38vh}` |
-| Built-in animations | [04c-anim-burst.js](js/04c-anim-burst.js) (bare `splat()`) · [04e-anim-portal.js](js/04e-anim-portal.js) (`multiSplat(…, exactColor=true)`) |
-| Brush shapes | [js/33-brush-shapes.js](js/33-brush-shapes.js) — `config.BRUSH_SHAPE_ID` |
-| Correct in-canvas overlay pattern | [34-mandala-mode.js:216-245](js/34-mandala-mode.js:216) — the only correctly-registered persistent overlay in the app; inherits Zoom View's transform for free |
-| Correct drag lifecycle | [26-layer-transform.js](js/26-layer-transform.js) — pointerdown → setPointerCapture → snapshot → recompute-from-snapshot → Esc cancels |
-| Point-to-segment distance (for hit testing) | `perpendicularDistance` [24:329](js/24-path-layers.js:329) — written for Douglas-Peucker, usable unchanged |
-| Replay dab with tip/shape pinned | `emitReplayDab` [05d:450-524](js/05d-input-replay.js:450) — the template for R10 |
-| Undo providers | [05n:212-214](js/05n-hotkeys-init.js:212) — three registered, **zero from the recorder** |
+| "Preset" UI to rename | [index.html:1256](../../index.html:1256); storage `recPreset.<name>` ([03:1477](../../js/03-recording.js:1477)) |
+| Drawer geometry | [css/styles.css:977](../../css/styles.css:977) — `.rec-drawer{height:38vh}` |
+| Built-in animations | [04c-anim-burst.js](../../js/04c-anim-burst.js) (bare `splat()`) · [04e-anim-portal.js](../../js/04e-anim-portal.js) (`multiSplat(…, exactColor=true)`) |
+| Brush shapes | [js/33-brush-shapes.js](../../js/33-brush-shapes.js) — `config.BRUSH_SHAPE_ID` |
+| Correct in-canvas overlay pattern | [34-mandala-mode.js:216-245](../../js/34-mandala-mode.js:216) — the only correctly-registered persistent overlay in the app; inherits Zoom View's transform for free |
+| Correct drag lifecycle | [26-layer-transform.js](../../js/26-layer-transform.js) — pointerdown → setPointerCapture → snapshot → recompute-from-snapshot → Esc cancels |
+| Point-to-segment distance (for hit testing) | `perpendicularDistance` [24:329](../../js/24-path-layers.js:329) — written for Douglas-Peucker, usable unchanged |
+| Replay dab with tip/shape pinned | `emitReplayDab` [05d:450-524](../../js/05d-input-replay.js:450) — the template for R10 |
+| Undo providers | [05n:212-214](../../js/05n-hotkeys-init.js:212) — three registered, **zero from the recorder** |
 
 **Four facts that shape the design:**
 
 1. **You cannot scrub a fluid sim backwards.** Stateful and destructive. No re-simulation,
    no re-renderable timeline. Every professional tool in §5 assumes one — that's why
    this brief keeps having to walk their idioms back.
-2. **Bake built-ins at `multiSplat`'s entry** ([05g:244](js/05g-arm-colors.js:244)), not at
+2. **Bake built-ins at `multiSplat`'s entry** ([05g:244](../../js/05g-arm-colors.js:244)), not at
    `splat()` — and only behind an explicit bake mode with an origin tag (see §4.3).
    For 04c you must first route its eight bare `splat()` calls through `multiSplat`,
    which is worth doing anyway (04c currently bypasses `__unsavedWork` entirely).
@@ -143,11 +143,11 @@ Every one verified by reading the code. Several make v1's acceptance tests unpas
 and two are live data-loss paths. **None of R1–R15 should be built on top of them.**
 
 **4.1 — Every per-layer button in the drawer is dead.**
-[03:680](js/03-recording.js:680): `if (e.target.closest('input, textarea, select, button')) return;`
+[03:680](../../js/03-recording.js:680): `if (e.target.closest('input, textarea, select, button')) return;`
 sits *above* `const target = e.target.closest('[data-action]')`. On a button click
 `e.target` **is** the button, so all six per-row controls — visibility, play, loop, mask
 enable, edit mask, clear mask — hit the guard and return. Only the row background
-dispatches. [24:728-735](js/24-path-layers.js:728) does it correctly: resolve
+dispatches. [24:728-735](../../js/24-path-layers.js:728) does it correctly: resolve
 `[data-action]` first, apply the input guard only in the no-action fallback.
 *There is no working baseline in the layer list to preserve.*
 
@@ -163,7 +163,7 @@ every arm path cancel the countdown unconditionally.
 
 **4.3 — In a multiplayer room, your peers' brushwork is recorded into your layer.**
 `emitReplayDab` ends with an unconditional `recRecordInteraction(x, y, dx, dy, col)`
-([05d:521](js/05d-input-replay.js:521)) and is the common sink for *inbound peer strokes*
+([05d:521](../../js/05d-input-replay.js:521)) and is the common sink for *inbound peer strokes*
 ([06:1519](js/06-multiplayer.js:1519) → `scheduleStrokeReplay`). Arm Record in a Swirl
 Together room, let a peer paint, stop — their dabs are in your layer, and under R1 they
 get saved into a named Animation. Fix: tag origin once at `multiSplat`'s entry
@@ -175,9 +175,9 @@ multiplayer at all.
 
 **4.4 — The Settings "Clear" button deletes every saved recording while its dialog
 promises it won't.** `clearExceptPresets()` preserves only `fluidUI:preset.`
-([09:271-284](js/09-settings-manager.js:271)); saved recordings are `fluidUI:recPreset.*`,
+([09:271-284](../../js/09-settings-manager.js:271)); saved recordings are `fluidUI:recPreset.*`,
 which matches the removal prefix and misses the preserve prefix. The confirm text reads
-*"Your presets are kept."* ([12:508](js/12-save-load.js:508)). Meanwhile the live layer
+*"Your presets are kept."* ([12:508](../../js/12-save-load.js:508)). Meanwhile the live layer
 array rides the settings snapshot as `recordedLayers`, and the quota degradation ladder
 strips `recordedLayers[].timeline.interactions = []` **first**, before depth data and
 layer images, with only a `console.warn`. The situation is exactly inverted from the
@@ -186,8 +186,8 @@ persistence contract: the ephemeral working set is snapshotted, the named saves 
 
 **4.5 — A save that exceeds quota reports success.**
 `recSaveActiveLayerAsPreset` ignores `sm.set()`'s return, which is `false` on
-QuotaExceeded ([09:135](js/09-settings-manager.js:135)). Copy `BrushShapes.add()`'s
-pattern ([33:291](js/33-brush-shapes.js:291)), which checks and surfaces *"Saved only for
+QuotaExceeded ([09:135](../../js/09-settings-manager.js:135)). Copy `BrushShapes.add()`'s
+pattern ([33:291](../../js/33-brush-shapes.js:291)), which checks and surfaces *"Saved only for
 this session"*.
 
 **4.6 — Built-in animations bypass the Take Turns paint gate.**
@@ -198,7 +198,7 @@ in a sim with no resync path. R1 multiplies this from 8 fixed buttons to unbound
 user content.
 
 **4.7 — Velocity is stored in raw canvas pixels while position is normalised.**
-[03:301](js/03-recording.js:301) stores `x: x/canvas.width` but `vx: dx` — and `dx`
+[03:301](../../js/03-recording.js:301) stores `x: x/canvas.width` but `vx: dx` — and `dx`
 originates as `(coords.x - pointer.x) * 10.0` in canvas px. `broadcastReplayStroke`
 normalises velocity for the wire precisely because it must; the recorder doesn't. So a
 recording replays with correct positions and wrong forces at any other window size.
@@ -208,8 +208,8 @@ decision: x and y are normalised independently, so a 16:9 recording replays on 4
 non-uniform stretch — letterbox the Animation's coordinate frame, or accept it.
 
 **4.8 — Recorder masks are 100% inert, and a quota bomb if they ever aren't.**
-[15-layer-masking.js](js/15-layer-masking.js) reads `window.recLayers` in eight places;
-`recLayers` is a top-level `let` in a classic script ([02:352](js/02-palettes.js:352)) and
+[15-layer-masking.js](../../js/15-layer-masking.js) reads `window.recLayers` in eight places;
+`recLayers` is a top-level `let` in a classic script ([02:352](../../js/02-palettes.js:352)) and
 is therefore **not** a window property. `checkMaskPoint()` always takes the `!layer`
 branch and returns true. Separately, recorder masks serialise raw — a `sam-mask`
 `Uint8Array` becomes `{"0":…,"1":…}` at ~8-10 bytes/pixel, so one 400×400 Smart-Select
@@ -221,7 +221,7 @@ layer it can never find.
 **4.9 — Two vestigial things not to trust.** `recThrottledRefreshUI` and its four
 tuned-looking constants have **zero callers** anywhere — 35 lines of fiction; don't port
 them forward as if measured. And `body.rec-countdown #canvas-area::after` renders
-`content: '⏱ ...'` — a literal static ellipsis ([styles.css:1157](css/styles.css:1157)).
+`content: '⏱ ...'` — a literal static ellipsis ([styles.css:1157](../../css/styles.css:1157)).
 The countdown digit exists only as the Record button's `textContent`, inside a drawer
 that can be closed.
 
@@ -349,7 +349,7 @@ Sources:
   surface is one button with two mouse buttons, so variant #3 is unreachable by design.
   Procreate 5.4 shipped folders and produced migration states where users had both
   "Procreate Library" and "Procreate Library 1".
-- **Bare arrow keys for R8's nudge.** [05n:426](js/05n-hotkeys-init.js:426) binds
+- **Bare arrow keys for R8's nudge.** [05n:426](../../js/05n-hotkeys-init.js:426) binds
   ArrowUp/Down to layer cycling whenever `recEnabled`. Use Shift+Arrow.
 - **A longer/bigger countdown, or a coach-mark tour.** See (h). A large high-contrast
   countdown flashing over a bright canvas is also the stimulus class PhotoSafe exists for.
@@ -437,7 +437,7 @@ Force-hide while recording, and whenever the room panel is on stream.
 **Build a new overlay**, don't adapt the existing one: `enterDrawMode` sizes its backing
 store from the wrapper rect but displays at the full `.draw-canvas-area`, so stored 0–1
 values are relative to the viewport and playback denormalises against the sim canvas —
-draw a circle, get an offset ellipse. Copy [34-mandala-mode.js:216](js/34-mandala-mode.js:216)
+draw a circle, get an offset ellipse. Copy [34-mandala-mode.js:216](../../js/34-mandala-mode.js:216)
 instead. Two canvases: a static one redrawn only on edit/resize/selection-change, and a
 small head canvas for the moving heads.
 **Static opacity only** — the overlay is outside PhotoSafe's reach (§6 anti-patterns).
@@ -478,7 +478,7 @@ a single per-row thumbnail, on the grounds that R4's canvas overlay already answ
 build for the smallest payoff. I've kept it and staged it so you can judge the cheap half
 first — but you should know the argument exists.*
 **Stage 1:** one path thumbnail per layer row, from the existing `drawPathPreview`
-([24:676](js/24-path-layers.js:676)) extended with bounds.
+([24:676](../../js/24-path-layers.js:676)) extended with bounds.
 **Upgrade unlocked by fact 4:** a clip in a grid is identified by *an image of its own
 output*, not by its name — Resolume even lets you regenerate a thumbnail from the current
 frame, and a whole third-party market exists purely to make VJ grids scannable, which is
@@ -505,7 +505,7 @@ strip looks worse than the flat one it replaces.
 row "Path map" — not "Preview", which promises re-simulation.
 
 ### R7 — Prune built-ins, keep a few as worked examples
-**Start from `recBuiltinPresetGenerators`** ([03:1387](js/03-recording.js:1387)) — Smash,
+**Start from `recBuiltinPresetGenerators`** ([03:1387](../../js/03-recording.js:1387)) — Smash,
 Jellyfish, Portrait and Vortex already have recorder-native generators emitting real
 interaction arrays. Promote those to real multi-layer Animations. Use the gated bake path
 (fact 2 + 4.3) only for a survivor with no generator.
@@ -538,7 +538,7 @@ seam breaks.
 Optional Smooth slider defaulting to **0**, non-destructive, survivors keep their
 original timestamps. Be honest in the label: each interaction is a *deposit*, and replay
 emits one dab per interaction with no interpolation, so decimation genuinely removes
-paint — either port 05d's replay interpolator ([05d:544](js/05d-input-replay.js:544),
+paint — either port 05d's replay interpolator ([05d:544](../../js/05d-input-replay.js:544),
 which exists because dropped deposits turned strokes into "a string of separate blobs")
 or label it "fewer, cleaner points; thins the stroke".
 **Blocked on R14.** Defer Bezier handles — a second selection state whose hit target
@@ -558,18 +558,18 @@ alternate can be detached again**, which forces the detach affordance to exist.
 Not a schema gap — a gate. `applyMultiSplatWith(…, exactColor=true)` → `__brushTipOn =
 false` → tip *and* stamp off. Recorder playback also silently discards BRUSH_TIP
 (Soft/Blob/Chisel/Streak/Ring) and BRUSH_ANGLE.
-**Do not flip `exactColor`** — [05g:277](js/05g-arm-colors.js:277) branches on the same
+**Do not flip `exactColor`** — [05g:277](../../js/05g-arm-colors.js:277) branches on the same
 flag for arm colour resolution, and the recorder has *already* resolved colour per
 `layer.colorMode` by then. Flipping it resolves colour twice: `REC_COLOR_MODES` silently
 stops working and every existing recording changes colour. Instead pin `__brushTipOn`
 (and BRUSH_TIP / BRUSH_SHAPE_ID / `__remoteStroke`) explicitly around the recorder's call,
 or add a separate parameter. Copy `emitReplayDab`'s pin-then-restore-in-`finally`
-([05d:450-524](js/05d-input-replay.js:450)) — it already handles the missing-stamp case.
+([05d:450-524](../../js/05d-input-replay.js:450)) — it already handles the missing-stamp case.
 Never call `BrushShapes.setActive()` on replay (it persists and publishes to the room).
 Pre-warm every shape id at play-start or the opening dabs print untextured.
 **This is a decision, not just a fix:** is the recorder a user-stroke source or a
 programmatic one? The code currently classes animations as programmatic *deliberately*
-([05g:240-250](js/05g-arm-colors.js:240)), and flipping it changes how every existing
+([05g:240-250](../../js/05g-arm-colors.js:240)), and flipping it changes how every existing
 recording looks.
 
 ### R11 — Loop behaviour is explicit and per-layer

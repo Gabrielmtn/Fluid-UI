@@ -47,10 +47,10 @@ These stand regardless of what you decide about scope. Three are live data-loss 
 **This is where I'd start.**
 
 - [ ] **B1. Dead per-layer buttons.** Move the input guard below the `[data-action]`
-      lookup in [03:680](js/03-recording.js:680). Six controls come back to life. **S**
+      lookup in [03:680](../../js/03-recording.js:680). Six controls come back to life. **S**
       → do B8 first or this exposes the mask editor against a layer it can't find.
 - [ ] **B2. Clear button eats every saved recording.** Add the recording key to
-      `clearExceptPresets`'s preserve list ([09:271](js/09-settings-manager.js:271)) — its
+      `clearExceptPresets`'s preserve list ([09:271](../../js/09-settings-manager.js:271)) — its
       dialog already promises "Your presets are kept." **S**
 - [ ] **B3. Check `brush.shapes` and `palettes.*` against that same prefix** — they look
       like they fail it too. **S**
@@ -61,7 +61,7 @@ These stand regardless of what you decide about scope. Three are live data-loss 
       binary-searched array; F9-then-Shift+F9 double-arms. Establish the sorted invariant,
       cancel the countdown on every arm path. **M**
 - [ ] **B6. Peer paint is recorded into your layer.** Tag origin at `multiSplat`'s entry;
-      `recRecordInteraction` accepts `input` only ([05d:521](js/05d-input-replay.js:521)).
+      `recRecordInteraction` accepts `input` only ([05d:521](../../js/05d-input-replay.js:521)).
       Also fixes "an Animation fired mid-recording bakes itself into the take". **M**
       → must land before anything touches the capture surface.
 - [ ] **B7. Animations bypass the Take Turns paint gate.** A blocked watcher can fire
@@ -75,7 +75,7 @@ These stand regardless of what you decide about scope. Three are live data-loss 
 - [ ] **B10. Delete `recThrottledRefreshUI`** — 35 lines with zero callers and
       authoritative-looking PERF comments that describe behaviour the app doesn't have. **S**
 - [ ] **B11. Countdown shows a literal `⏱ ...`** on canvas
-      ([styles.css:1157](css/styles.css:1157)). Write the digit into a CSS var. **S**
+      ([styles.css:1157](../../css/styles.css:1157)). Write the digit into a CSS var. **S**
 
 ---
 
