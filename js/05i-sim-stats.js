@@ -705,6 +705,35 @@
         // The dye is the live simulation, not a document — like every dab, this
         // is not undoable; it dissolves on its own.
         window.__dyeTexSize = function () { return { w: dyeTexWidth, h: dyeTexHeight }; };
+        // Ridges' sharpen as the frame will run it (05j hands sharpenProg
+        // these), or null while it is off. A pour lays the picture so this
+        // sharpen lands it back on itself, so both read it from here.
+        function ridgesSharpenParams() {
+            const fxOn = window.QualityGovernor ? window.QualityGovernor.fxOn() : true;
+            // RIDGES 0 makes the kernel a mathematical no-op (zero-radius
+            // offsets, detail = 0), so the frame skips the pass outright.
+            const ridges = config.RIDGES || 0;
+            if (!fxOn || !(config.SHARPNESS > 0) || !(ridges > 0)) return null;
+            return {
+                // Ridges 0..1 is the AMOUNT at a one-texel radius; past 1 it
+                // is the RADIUS (coarse emboss). Before this the slider was the
+                // radius alone, and 0-0.9 was bit-dead: sub-texel taps sit
+                // inside one bilinear cell and the unsharp mask cancels to
+                // nothing (measured by the sweep harness, 2026-08-21).
+                sharpness: config.SHARPNESS * Math.min(1, ridges),
+                // Kernel radius normalized to the 2048 reference: the sharpen
+                // LOOK stays constant when dye resolution changes (boot ascent,
+                // governor) — resolution now only affects fidelity, not
+                // character. RIDGES > 1 recreates the coarse emboss (the
+                // boot-ascent "ridges" look) deliberately.
+                kernelScale: Math.max(1, ridges) * (Math.max(dyeTexWidth, dyeTexHeight) / 2048)
+            };
+        }
+        function bindSharpenUniforms(prog, p) {
+            gl.uniform1f(prog.uniforms.sharpness, p.sharpness);
+            gl.uniform2f(prog.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
+            gl.uniform1f(prog.uniforms.kernelScale, p.kernelScale);
+        }
         // Uploads a canvas/image on unit 2, the way the image splat samples
         // it. Null if the upload throws.
         function uploadDyeImage(src) {
@@ -771,6 +800,31 @@
                 tex = uploadDyeImage(src);
                 if (!tex) return false;
             }
+            gl.disable(gl.BLEND);
+            // Ridges, undone (05b unsharpenFrag): a whole-dye pour is laid so
+            // the display's sharpen hands back the picture instead of an
+            // embossed copy of it. Not a placed bitmap: that is a held text
+            // key pouring every texel or so of travel, and the solve is this
+            // many whole-dye passes. config.FLUIDIZE_UNSHARPEN = 0 pours the
+            // picture as-is, as before.
+            const _solvePasses = (typeof config.FLUIDIZE_UNSHARPEN === 'number')
+                ? Math.max(0, Math.round(config.FLUIDIZE_UNSHARPEN)) : 12;
+            const _sharp = (!rect && _solvePasses > 0 && sharpened && detailed)
+                ? ridgesSharpenParams() : null;
+            if (_sharp) {
+                // What the screen shows now: the dye through the frame's own
+                // sharpen, into `sharpened`, as the frame itself would.
+                sharpenProg.bind();
+                gl.uniform1i(sharpenProg.uniforms.uTexture, 0);
+                gl.uniform1i(sharpenProg.uniforms.uVelocity, 1);
+                bindSharpenUniforms(sharpenProg, _sharp);
+                gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                blit(sharpened.fbo);
+            }
             imageSplatProg.bind();
             // Lower-left corner and size in dye UV. Guarded: a shader build
             // without the uniform draws the image full-dye as before, and
@@ -784,7 +838,6 @@
                     gl.uniform4f(imageSplatProg.uniforms.uImageRect, 0, 0, 1, 1);
                 }
             }
-            gl.disable(gl.BLEND);
             gl.uniform1i(imageSplatProg.uniforms.uTarget, 0);
             gl.uniform1i(imageSplatProg.uniforms.uObstacle, 1);
             gl.uniform1i(imageSplatProg.uniforms.uImage, 2);
@@ -857,7 +910,47 @@
                     _pass = [_x0, _y0, _x1 - _x0, _y1 - _y0];
                 }
             }
+            if (_sharp) {
+                // What the screen should show: this same pour laid over what
+                // it shows now, into `detailed`. Then the dye as usual.
+                gl.bindTexture(gl.TEXTURE_2D, sharpened.texture);
+                blit(detailed.fbo);
+                gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+            }
             splatPass(density, dyeTexWidth, dyeTexHeight, _pass);
+            if (_sharp) {
+                // Then solve from there. Far from the picture the dye
+                // already sharpens to what was on screen, so it stays put.
+                unsharpenProg.bind();
+                gl.uniform1i(unsharpenProg.uniforms.uDye, 0);
+                gl.uniform1i(unsharpenProg.uniforms.uObstacle, 1);
+                gl.uniform1i(unsharpenProg.uniforms.uWant, 2);
+                gl.uniform1i(unsharpenProg.uniforms.uVelocity, 3);
+                gl.uniform1i(unsharpenProg.uniforms.hasObstacle, _obsActive ? 1 : 0);
+                gl.uniform1f(unsharpenProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+                bindSharpenUniforms(unsharpenProg, _sharp);
+                const _park = (obstacle || detailed).texture;
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, _park);
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, detailed.texture);
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+                gl.activeTexture(gl.TEXTURE0);
+                for (let i = 0; i < _solvePasses; i++) {
+                    gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
+                    blit(density.write.fbo);
+                    density.swap();
+                }
+                // velocity.read is the next sub-step's render target once it
+                // swaps, and WebGL refuses a draw whose bound samplers hold
+                // its target (05j, the Color Blend note): leave the obstacle
+                // on 2 and 3 instead, as the step does.
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, _park);
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, _park);
+            }
             if (!stamp) { try { gl.deleteTexture(tex); } catch (_) {} }
             gl.activeTexture(gl.TEXTURE0);
             return true;

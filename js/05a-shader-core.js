@@ -831,6 +831,47 @@
                 }
             }
         `;
+        // Ridges' unsharp mask as one function, because two shaders have to
+        // agree on it exactly: sharpenFrag runs it on every frame, and
+        // Fluidize (05b unsharpenFrag) solves for the dye it maps onto a
+        // poured picture. `strength` hands back the amount it used (0 where
+        // the dye is too faint to sharpen).
+        const ridgesSharpenGLSL = `
+            vec3 ridgesSharpen(sampler2D tex, sampler2D velTex, vec2 uv, vec2 off, float sharpness, out float strength) {
+                vec3 center = texture(tex, uv).rgb;
+                float centerIntensity = dot(center, vec3(0.299, 0.587, 0.114));
+                strength = 0.0;
+                // Early exit only for truly black pixels. The old hard cutoff
+                // at 0.01 drew a visible seam where faint dye met sharpened
+                // dye; sharpening now fades in smoothly across that range.
+                if (centerIntensity < 0.001) return center;
+                float lowFade = smoothstep(0.003, 0.03, centerIntensity);
+                // Sample neighbors for detail extraction (unsharp mask technique)
+                vec3 blur = vec3(0.0);
+                blur += texture(tex, uv + vec2(off.x, 0.0)).rgb;
+                blur += texture(tex, uv - vec2(off.x, 0.0)).rgb;
+                blur += texture(tex, uv + vec2(0.0, off.y)).rgb;
+                blur += texture(tex, uv - vec2(0.0, off.y)).rgb;
+                blur *= 0.25;
+                // Extract high-frequency detail, bounded to the local
+                // intensity so faint dye is never more than ~doubled
+                // (quantization steps would otherwise amplify into speckle)
+                vec3 detail = center - blur;
+                detail = clamp(detail, vec3(-centerIntensity), vec3(centerIntensity));
+                // Velocity-adaptive sharpening (sharpen more where fluid moves),
+                // faded out smoothly at low intensities so faint dye is never
+                // contrast-amplified into jagged noise.
+                vec2 vel = texture(velTex, uv).xy;
+                float velocityMag = length(vel);
+                strength = sharpness * (0.8 + min(velocityMag * 3.0, 1.2)) * lowFade;
+                // Apply sharpening with clamping to prevent overshooting
+                vec3 sharpened = center + detail * strength;
+                // Clamp to valid range [0, max(center * 2.0, 1.0)]
+                // This prevents white halos while allowing brightening
+                vec3 maxVal = max(center * 2.0, vec3(1.0));
+                return clamp(sharpened, vec3(0.0), maxVal);
+            }
+        `;
         const sharpenFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
@@ -845,43 +886,10 @@
                                        // boot-ascent changes dye resolution, and
                                        // values >1 recreate the coarse "ridges"
                                        // emboss deliberately (Ridges slider).
+            ${ridgesSharpenGLSL}
             void main() {
-                vec3 center = texture(uTexture, vUv).rgb;
-                float centerIntensity = dot(center, vec3(0.299, 0.587, 0.114));
-                // Early exit only for truly black pixels. The old hard cutoff
-                // at 0.01 drew a visible seam where faint dye met sharpened
-                // dye; sharpening now fades in smoothly across that range.
-                if (centerIntensity < 0.001) {
-                    fragColor = vec4(center, 1.0);
-                    return;
-                }
-                float lowFade = smoothstep(0.003, 0.03, centerIntensity);
-                // Sample neighbors for detail extraction (unsharp mask technique)
-                vec2 off = texelSize * kernelScale;
-                vec3 blur = vec3(0.0);
-                blur += texture(uTexture, vUv + vec2(off.x, 0.0)).rgb;
-                blur += texture(uTexture, vUv - vec2(off.x, 0.0)).rgb;
-                blur += texture(uTexture, vUv + vec2(0.0, off.y)).rgb;
-                blur += texture(uTexture, vUv - vec2(0.0, off.y)).rgb;
-                blur *= 0.25;
-                // Extract high-frequency detail, bounded to the local
-                // intensity so faint dye is never more than ~doubled
-                // (quantization steps would otherwise amplify into speckle)
-                vec3 detail = center - blur;
-                detail = clamp(detail, vec3(-centerIntensity), vec3(centerIntensity));
-                // Velocity-adaptive sharpening (sharpen more where fluid moves),
-                // faded out smoothly at low intensities so faint dye is never
-                // contrast-amplified into jagged noise.
-                vec2 vel = texture(uVelocity, vUv).xy;
-                float velocityMag = length(vel);
-                float adaptiveStrength = sharpness * (0.8 + min(velocityMag * 3.0, 1.2)) * lowFade;
-                // Apply sharpening with clamping to prevent overshooting
-                vec3 sharpened = center + detail * adaptiveStrength;
-                // Clamp to valid range [0, max(center * 2.0, 1.0)]
-                // This prevents white halos while allowing brightening
-                vec3 maxVal = max(center * 2.0, vec3(1.0));
-                sharpened = clamp(sharpened, vec3(0.0), maxVal);
-                fragColor = vec4(sharpened, 1.0);
+                float strength;
+                fragColor = vec4(ridgesSharpen(uTexture, uVelocity, vUv, texelSize * kernelScale, sharpness, strength), 1.0);
             }
         `;
         // â”€â”€â”€ Micro Detail Pass â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

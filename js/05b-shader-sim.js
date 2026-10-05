@@ -2885,6 +2885,44 @@
                 fragColor = vec4(result, newMem);
             }
         `;
+        // Ridges sharpens the dye on its way to the screen (05a
+        // ridgesSharpen, stock radius 6 at strength 2), so a picture poured
+        // as-is came out with a dark echo of every edge one radius away on
+        // all four sides, and its fine grain at twice the file's contrast.
+        // The sharpen is display-only, so a pour can be laid as the dye that
+        // the sharpen turns BACK into the picture. One pass is one step of
+        // that solve: move each texel by what the sharpen still gets wrong
+        // there, over 1 + strength (the texel's own weight in the sharpen,
+        // so the step is a Jacobi step and converges at strength/(1 +
+        // strength) a pass: 0.62 still, 0.8 in fast flow). uWant is what
+        // the frame should show: the pour imageSplatFrag lays, over what
+        // the screen already showed (05i __splatImageToDye).
+        const unsharpenFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uDye;       // the dye being solved for
+            uniform sampler2D uWant;      // what the sharpen should hand on
+            uniform sampler2D uVelocity;  // the sharpen reads motion, so the solve does too
+            uniform sampler2D uObstacle;
+            uniform int hasObstacle;
+            uniform float uObsMax;
+            uniform float sharpness;
+            uniform vec2 texelSize;
+            uniform float kernelScale;
+            ${obsTexelGLSL}
+            ${ridgesSharpenGLSL}
+            void main() {
+                vec4 dye = texture(uDye, vUv);
+                float strength;
+                vec3 shown = ridgesSharpen(uDye, uVelocity, vUv, texelSize * kernelScale, sharpness, strength);
+                vec3 fix = (texture(uWant, vUv).rgb - shown) / (1.0 + strength);
+                // A wall refuses a pour (imageSplatFrag), so it refuses the
+                // correction too: the dye inside it stays as it was.
+                if (hasObstacle == 1) fix *= 1.0 - obsTexDyeBlock(texture(uObstacle, vUv), uObsMax);
+                fragColor = vec4(max(dye.rgb + fix, vec3(0.0)), dye.a);
+            }
+        `;
         // ─── D2 bridge: Capture — freeze the fluid dye into the sketch ──
         // Emits a premultiplied color for over-compositing onto the sketch:
         // alpha = the dye's max channel, so bright dye lands opaque and faint

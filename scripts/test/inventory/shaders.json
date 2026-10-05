@@ -1,6 +1,6 @@
 {
   "generated": "node scripts/test/gen-shader-inventory.js",
-  "shaders": 46,
+  "shaders": 47,
   "collisionGroups": 2,
   "table": {
     "uTexture": {
@@ -520,6 +520,20 @@
         "uObstacle",
         "uTarget",
         "vibrance"
+      ]
+    },
+    "hasObstacle|kernelScale|sharpness|texelSize|uDye|uObsMax|uObstacle|uVelocity|uWant": {
+      "name": "unsharpen",
+      "uniforms": [
+        "hasObstacle",
+        "kernelScale",
+        "sharpness",
+        "texelSize",
+        "uDye",
+        "uObsMax",
+        "uObstacle",
+        "uVelocity",
+        "uWant"
       ]
     },
     "curve|threshold|uTexture": {

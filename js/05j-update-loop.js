@@ -1982,32 +1982,18 @@
             gl.disable(gl.BLEND);
             // [GOVERNOR HOOK] post-FX gate (sharpen, micro-detail, glow)
             const _fxOn = window.QualityGovernor ? window.QualityGovernor.fxOn() : true;
-            // Apply sharpness pass if enabled. RIDGES 0 makes the kernel a
-            // mathematical no-op (zero-radius offsets → detail = 0), so skip
-            // the whole dye-res pass — sharpening is opt-in via the Ridges
-            // slider now (default 0 = the smooth look).
-            const sharpnessEnabled = _fxOn && config.SHARPNESS > 0 && (config.RIDGES || 0) > 0;
+            // Apply the sharpness pass (Ridges) if it is up. When it runs and
+            // with what numbers live in 05i ridgesSharpenParams, because
+            // Fluidize lays a picture so this exact pass lands it back on
+            // itself (__splatImageToDye).
+            const _sharp = ridgesSharpenParams();
             let displayTexture = density.read.texture;
-            if (sharpnessEnabled) {
+            if (_sharp) {
                 gl.viewport(0, 0, dyeTexWidth, dyeTexHeight);
                 sharpenProg.bind();
                 gl.uniform1i(sharpenProg.uniforms.uTexture, 0);
                 gl.uniform1i(sharpenProg.uniforms.uVelocity, 1);
-                // Ridges 0..1 is the AMOUNT at a one-texel radius; past 1 it is
-                // the RADIUS (coarse emboss). Before this the slider was the
-                // radius alone, and 0-0.9 was bit-dead: sub-texel taps sit
-                // inside one bilinear cell and the unsharp mask cancels to
-                // nothing (measured by the sweep harness, 2026-08-21).
-                const _ridges = config.RIDGES || 0;
-                gl.uniform1f(sharpenProg.uniforms.sharpness, config.SHARPNESS * Math.min(1, _ridges));
-                gl.uniform2f(sharpenProg.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
-                // Kernel radius normalized to the 2048 reference: the sharpen
-                // LOOK stays constant when dye resolution changes (boot ascent,
-                // governor) — resolution now only affects
-                // fidelity, not character. RIDGES > 1 recreates the coarse
-                // emboss (the boot-ascent "ridges" look) deliberately.
-                gl.uniform1f(sharpenProg.uniforms.kernelScale,
-                    Math.max(1, _ridges) * (Math.max(dyeTexWidth, dyeTexHeight) / 2048));
+                bindSharpenUniforms(sharpenProg, _sharp);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, density.read.texture);
                 gl.activeTexture(gl.TEXTURE1);

@@ -41,6 +41,7 @@
         const rasterStampProg = new Program(baseVert, rasterStampFrag);
         const igniteProg = new Program(baseVert, igniteFrag);   // D2 bridge: sketch → dye
         const imageSplatProg = new Program(baseVert, imageSplatFrag); // image → dye (Splat to Fluid)
+        const unsharpenProg = new Program(baseVert, unsharpenFrag);   // ...laid so Ridges sharpens it back to the picture
         const captureProg = new Program(baseVert, captureFrag); // D2 bridge: dye → sketch
         const blurProg = new Program(blurVert, blurFrag);
         const obstacleBlurProg = new Program(blurVert, obstacleBlurFrag); // obstacle finish blur that keeps thin walls
