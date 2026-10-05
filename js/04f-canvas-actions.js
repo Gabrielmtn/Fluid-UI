@@ -737,6 +737,10 @@
                     e.quit.classList.remove('app-close-safe');
                     modal.classList.add('show');
                     e.keep.focus();
+                    // Re-shown over itself (a new question replaced the old):
+                    // one Esc handler, not one per question. A leftover kept
+                    // swallowing Escape app-wide after the modal closed.
+                    if (onModalKey) document.removeEventListener('keydown', onModalKey, true);
                     onModalKey = function (ev) {
                         if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); answer(false); }
                     };
@@ -772,12 +776,22 @@
                             if (ok) window.__closeApproved = true; // keep beforeunload quiet
                             try { ipc.send('app-ask-response', { id: id, ok: !!ok }); } catch (_) {}
                         };
-                        askKind = kind;
-                        pendingReply = reply;
+                        // A question still on screen is replaced by this one,
+                        // so answer it "no" — main waits on every question it
+                        // sends, and one dropped silently here (X, then F5 over
+                        // the close prompt) left the X doing nothing at all.
+                        if (pendingReply) {
+                            var replaced = pendingReply;
+                            pendingReply = null;
+                            hideModal();
+                            replaced(false);
+                        }
                         // Losing an unsaved painting is the only thing worth
                         // interrupting for — a wipe always asks, but a close or
                         // reload with nothing at stake just goes through.
                         if (kind !== 'nuclear' && !window.__unsavedWork) { reply(true); return; }
+                        askKind = kind;
+                        pendingReply = reply;
                         try {
                             showModal(kind);
                             // Ack only once the question is actually on screen —
@@ -788,6 +802,7 @@
                             console.warn('[ask] in-app prompt failed, falling back to a dialog', err);
                             var go = true;
                             try { ipc.send('app-ask-ack', id); go = askNatively(); } catch (_) {}
+                            pendingReply = null;
                             reply(go);
                         }
                     });

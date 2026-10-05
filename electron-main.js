@@ -805,6 +805,9 @@ function createWindow() {
         if (d && (d.isSameDocument || d.isMainFrame === false)) return;
         rendererTakesLinks = false;
     });
+    // A new page has replaced the one that was asking (did-navigate fires on
+    // commit only, so a navigation will-navigate blocks never gets here).
+    mainWindow.webContents.on('did-navigate', () => dropAsks());
 
     // Open DevTools in development (optional)
     // mainWindow.webContents.openDevTools();
@@ -993,25 +996,27 @@ function createWindow() {
     // message-box chime, and an unparented box could sit BEHIND this
     // frameless maximized window, so the app looked frozen and every click
     // rang the blocked-window beep.
+    //
+    // Every close asks afresh, even with a question already out, and only the
+    // newest answer is acted on. It used to wait on the first question and
+    // ignore every X until that one was answered — and a question can be lost:
+    // X, then F5 (whose reload prompt took over the modal), then "Keep
+    // painting" answered only the reload, and the X was dead for the rest of
+    // the session, reloads included (2026-10-04). The renderer answers the
+    // question it replaces "no" (04f), so a repeat X swaps the prompt, never
+    // stacks one.
     mainWindow.__allowClose = false;
+    let closeAsk = 0;   // the newest close question; older answers are stale
     mainWindow.on('close', (e) => {
         if (mainWindow.__allowClose) return;
         const wc = mainWindow.webContents;
         // Nobody home to ask (crashed/destroyed renderer) — let it close.
         if (!wc || wc.isDestroyed() || wc.isCrashed()) return;
         e.preventDefault();
-        if (mainWindow.__closeAsking) {
-            // Second X while the modal is already up — surface it instead of
-            // stacking another prompt.
-            if (mainWindow.isMinimized()) mainWindow.restore();
-            mainWindow.focus();
-            return;
-        }
-        mainWindow.__closeAsking = true;
+        const ask = ++closeAsk;
         askRenderer('close').then((ok) => {
+            if (ask !== closeAsk || !ok) return;
             if (!mainWindow || mainWindow.isDestroyed()) return;
-            mainWindow.__closeAsking = false;
-            if (!ok) return;
             mainWindow.__allowClose = true;
             mainWindow.close();
         });
@@ -1072,6 +1077,13 @@ function askRenderer(kind) {
         mainWindow.focus();
         wc.send('app-ask', { id: id, kind: kind });
     });
+}
+
+// The page that would answer these is gone. Answer them "no" rather than
+// leave anyone waiting on a prompt that no longer exists.
+function dropAsks() {
+    _asks.forEach((a) => { clearTimeout(a.timer); a.resolve(false); });
+    _asks.clear();
 }
 
 ipcMain.on('app-ask-ack', (evt, id) => {
