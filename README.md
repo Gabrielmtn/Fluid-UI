@@ -105,7 +105,6 @@ npm run deploy
 │   └── 06a…06e-mp-*.js     # multiplayer client (core, look, turns, paint wire, panel)
 ├── party/
 │   └── index.ts            # PartyKit server code
-├── notes/                  # Plans, user tests, audits, release notes (notes/README.md)
 ├── index.html              # Main HTML file
 ├── package.json
 ├── partykit.json          # PartyKit configuration

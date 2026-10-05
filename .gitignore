@@ -62,3 +62,6 @@ scripts/copy-sink/runtime.json
 scripts/bake-headless.log
 .wrangler/
 .dev.vars
+
+# Personal working notes: kept on this machine, never committed
+notes/
