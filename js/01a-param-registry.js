@@ -71,6 +71,11 @@
         // that thickens the fluid changes how every later stroke behaves, not
         // just how the frame looks — worth a feel-test before Mutate deals it.
         viscosity: {configKey: "VISCOSITY", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.3, decimals: 2, category: "simulation", perfTier: 1, simSlider: true},
+        // Hold symmetry (2026-10-05, Multi-Brush panel): the fluid held to the
+        // arms' symmetry (05j pass 2d). Default 0 skips the pass, so presets
+        // saved before it existed land exactly as they did. No `mut`, as for
+        // symmetryMode: it changes how every later stroke evolves.
+        symmetryHold: {configKey: "SYMMETRY_HOLD", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0, decimals: 2, category: "simulation", perfTier: 0, simSlider: true},
         // Color Blend (2026-09-29): colours blend where they meet while the
         // paint is wet, more where the fluid stirs them (05j pass 8d).
         // Default 0 skips the pass, so presets saved

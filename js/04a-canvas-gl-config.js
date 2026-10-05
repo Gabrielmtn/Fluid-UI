@@ -1208,6 +1208,13 @@
                                       // arm — this is what stops it whipping. 0 disables.
             SYM_RAKE_SPACING: 1.0,    // 'rake' bristle gap in brush diameters, so the rake
                                       // opens and closes with the Size fader
+            SYMMETRY_HOLD: 0,         // Hold symmetry (05j pass 2d, 05b symmetryHoldFrag): keeps
+                                      // the Multi-Brush arms' flows mirror images of each other.
+                                      // The fader, 0 = off (pass skipped), 1 = exact every step;
+                                      // its square is the share of their drift apart taken back
+                                      // every 1/60 s of sim time. #symmetryHold in the
+                                      // Multi-Brush panel. window.SymmetryHold.measure() reads
+                                      // how far apart the arms are.
 
             // ── Perceptual fader curves (Density, Time) ────────────────────
             // These shape the VISIBLE Density and Time faders only. The

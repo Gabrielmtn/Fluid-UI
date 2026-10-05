@@ -34,6 +34,7 @@
         const obstacleUploadProg = new Program(baseVert, obstacleUploadFrag); // CPU compose canvas → obstacle (knee + packing)
         const hfFloorProg = new Program(baseVert, hfFloorFrag); // M2 spectral floor
         const viscosityProg = new Program(baseVert, viscosityFrag); // viscous diffusion (one axis per pass)
+        const symmetryHoldProg = new Program(baseVert, symmetryHoldFrag); // Hold symmetry: velocity pulled toward its arms' average
         const colorBlendStirProg = new Program(baseVert, colorBlendStirFrag); // Color Blend: the smoothed stir (sim res)
         const colorBlendProg = new Program(baseVert, colorBlendFrag); // Color Blend: colour diffusion (one axis per pass)
         const wetnessAdvectProg = new Program(baseVert, wetnessAdvectFrag); // P15-1 wetness advect+dry

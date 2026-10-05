@@ -1841,6 +1841,83 @@
                 fragColor = vec4(v, 0.0, 1.0);
             }
         `;
+        // Hold symmetry (2026-10-05): keeps the Multi-Brush arms' flows mirror
+        // images of each other. The fluid is chaotic, so the rounding left
+        // between two mirrored arms (fp16 storage, filtered reads at mirrored
+        // spots, a grid that cannot turn by 60 degrees) keeps doubling until
+        // the arms paint different pictures. This pass pulls the velocity
+        // toward its own average over the arms' transforms. A flow that is
+        // already symmetric is its own average and passes through untouched,
+        // so all it takes out is the drift.
+        // Velocity only: the dye rides the flow, so a symmetric flow keeps the
+        // shapes symmetric while each arm keeps its own colour.
+        // Each texel averages itself with the texels the transforms carry onto
+        // it, their vectors turned (and flipped) the same way. A transform
+        // that maps the grid onto itself texel for texel (the mirrors, the half
+        // turn, quarter turns on a square grid) reads that texel exactly and
+        // holds right up to the canvas edge. The others land between texels,
+        // read filtered, and fade out near the edge, where the rectangle itself
+        // is not symmetric: their weight is the edge fade at BOTH ends, so two
+        // texels always weigh each other alike. Colliders are not symmetric
+        // either: an image inside one drops out, and a solid texel is left be.
+        // Runs before the projection, which takes out any divergence the
+        // filtered reads leave.
+        const symmetryHoldFrag = `#version 300 es
+            precision ${PRECISION} float;
+            in vec2 vUv;
+            out vec4 fragColor;
+            uniform sampler2D uVelocity;
+            uniform sampler2D uObstacle;
+            uniform int hasObstacle;
+            uniform int uCount;        // transforms besides the identity, at most 31
+            uniform vec4 uM[31];       // each one's linear part (a, b, c, d) in square units, y up
+            uniform float uExact[31];  // 1 = it maps the grid onto itself texel for texel
+            uniform vec2 uSq;          // UV to square units: the canvas sides over its long side
+            uniform vec2 uVelSq;       // stored velocity to square units
+            uniform vec2 uSim;         // the sim grid in texels
+            uniform float uEdge;       // the edge fade's width in texels
+            uniform float uK;          // this step's pull, 0 to 1
+            ${obstacleSolidityGLSL}
+            float edgeFade(vec2 uv) {
+                vec2 d = min(uv, 1.0 - uv) * uSim;
+                return smoothstep(0.0, uEdge, min(d.x, d.y));
+            }
+            void main() {
+                vec2 c = texture(uVelocity, vUv).xy;
+                float k = uK;
+                if (hasObstacle == 1) k *= 1.0 - solidity(vUv);
+                if (k <= 0.0) { fragColor = vec4(c, 0.0, 1.0); return; }
+                vec2 p = (vUv - 0.5) * uSq;
+                float ownFade = edgeFade(vUv);
+                vec2 sum = c * uVelSq;
+                float wsum = 1.0;
+                for (int i = 0; i < 31; i++) {
+                    if (i >= uCount) break;
+                    vec4 m = uM[i];
+                    // The point this transform carries onto p is M^T p (M is
+                    // orthogonal, so its transpose is its inverse).
+                    vec2 uv = vec2(m.x * p.x + m.z * p.y, m.y * p.x + m.w * p.y) / uSq + 0.5;
+                    vec2 v;
+                    float w;
+                    if (uExact[i] > 0.5) {
+                        ivec2 ij = clamp(ivec2(floor(uv * uSim)), ivec2(0), ivec2(uSim) - 1);
+                        uv = (vec2(ij) + 0.5) / uSim;
+                        v = texelFetch(uVelocity, ij, 0).xy;
+                        w = 1.0;
+                    } else {
+                        w = ownFade * edgeFade(uv);
+                        if (w <= 0.0) continue;
+                        v = texture(uVelocity, uv).xy;
+                    }
+                    if (hasObstacle == 1) w *= 1.0 - solidity(uv);
+                    v *= uVelSq;
+                    sum += vec2(m.x * v.x + m.y * v.y, m.z * v.x + m.w * v.y) * w;
+                    wsum += w;
+                }
+                vec2 avg = sum / wsum / uVelSq;
+                fragColor = vec4(mix(c, avg, k), 0.0, 1.0);
+            }
+        `;
         // Color Blend (2026-09-29): colours travel through the paint and mix,
         // while the fluid (velocity, pressure) is untouched. Colour travels
         // far: each texel takes on the paint-weighted average colour of its

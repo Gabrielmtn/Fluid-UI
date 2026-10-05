@@ -315,6 +315,23 @@
       "registered": true
     },
     {
+      "id": "symmetryHold",
+      "kind": "slider",
+      "configKey": "SYMMETRY_HOLD",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "def": 0,
+      "mapping": "config.SYMMETRY_HOLD = parseFloat(value); the square is the share of the arms' velocity drift taken back per 60 Hz step (1 = exact every step)",
+      "section": "multi-brush",
+      "consumer": "sim-shader",
+      "gatedBy": "SYMMETRY_HOLD > 0 and paint laid with more than one dab per sample (not Rake). The held transforms are the ones the latest dabs were painted with (05g multiSplat reports mode, arms, stroke mirror), so a replay holds its recorded arm count and mirror; with Gravity Direction on, only the transforms that leave the pull unchanged",
+      "sweepRelevant": false,
+      "expectedEffect": "Multi-Brush panel 'Hold symmetry': the arms' flows stay mirror images. 0 = the pass is skipped. Measured 2026-10-05 (704x561, sim 512x408, a locked circle stroke painted 20 s): Mirror L-R velocity drift 76% off vs under 0.1% at fader 0.14; Radial 6 98% off vs under 0.5% at 0.32. Sweep it with a symmetric Multi-Brush stroke; a single arm shows nothing.",
+      "binding": "js/05h-slider-bindings.js registry simSlider; consumed js/05j-update-loop.js applySymmetryHold (pass 2d) via symmetryHoldGroup()",
+      "registered": true
+    },
+    {
       "id": "colorBlend",
       "kind": "slider",
       "configKey": "COLOR_BLEND",

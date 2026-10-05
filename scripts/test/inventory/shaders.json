@@ -1,6 +1,6 @@
 {
   "generated": "node scripts/test/gen-shader-inventory.js",
-  "shaders": 47,
+  "shaders": 48,
   "collisionGroups": 2,
   "table": {
     "uTexture": {
@@ -330,6 +330,22 @@
         "uObstacle",
         "uPairs",
         "uStep",
+        "uVelocity"
+      ]
+    },
+    "hasObstacle|uCount|uEdge|uExact|uK|uM|uObstacle|uSim|uSq|uVelSq|uVelocity": {
+      "name": "symmetryHold",
+      "uniforms": [
+        "hasObstacle",
+        "uCount",
+        "uEdge",
+        "uExact",
+        "uK",
+        "uM",
+        "uObstacle",
+        "uSim",
+        "uSq",
+        "uVelSq",
         "uVelocity"
       ]
     },

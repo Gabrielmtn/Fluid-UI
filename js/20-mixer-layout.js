@@ -8298,6 +8298,10 @@
         // faceCenterTurn).
         var faceGroup = document.getElementById('symmetryFaceCenterGroup');
         if (faceGroup) panel.appendChild(faceGroup);
+        // ...and how hard the fluid is held to the arms' symmetry (05j pass
+        // 2d, applySymmetryHold).
+        var holdGroup = document.getElementById('symmetryHoldGroup');
+        if (holdGroup) panel.appendChild(holdGroup);
         var symNote = document.createElement('div');
         symNote.className = 'arm-sym-note';
         symNote.style.cssText = 'padding:2px 0 6px;font-size:9px;color:rgba(255,255,255,0.45);';

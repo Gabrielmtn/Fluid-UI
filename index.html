@@ -895,6 +895,13 @@
             <input type="checkbox" id="symmetryFaceCenter">
             <label for="symmetryFaceCenter" style="margin: 0">Stay oriented to the center</label>
         </div>
+        <!-- Hold symmetry (05j pass 2d): keeps the arms' flows mirror images
+             of each other. Moved into the Multi-Brush dropdown with the two
+             groups above. -->
+        <div class="control-group" id="symmetryHoldGroup">
+            <label for="symmetryHold" title="Keeps the arms' swirls mirror images of each other as the fluid moves, so a symmetric painting stays symmetric. 0 lets the fluid drift apart on its own; higher pulls it back harder. Each arm keeps its own color. Near the canvas edges and around colliders the fluid stays free.">Hold symmetry <span id="symmetryHoldValue" class="value-display">0.00</span></label>
+            <input type="range" id="symmetryHold" min="0" max="1" value="0" step="0.01">
+        </div>
         <div class="control-group">
             <label for="timeScale">⏱️ Time <span id="timeScaleValue" class="value-display">1.00x</span></label>
             <input type="range" id="timeScale" min="0.01" max="3" value="1" step="0.01">

@@ -488,6 +488,12 @@
             // told even while the painter holds a mirror-bound button.
             const strokeMir = window.__brushTipOn ? (window.__strokeMirrorPin | 0) : 0;
             const transforms = symmetryTransforms(config.SYMMETRY_MODE, animationMultiplier, dx, dy, strokeMir);
+            // Hold symmetry (05j) holds the symmetry the paint is laid with,
+            // which is this call's and not always the panel's: a replay
+            // paints with the arm count and mirror it was recorded with.
+            if (typeof window.__symHoldNotePaint === 'function') {
+                window.__symHoldNotePaint(config.SYMMETRY_MODE, animationMultiplier, strokeMir);
+            }
             // Stay oriented to the center: the SOURCE dab's pose offset, for
             // splat() to add to BRUSH_ANGLE on every arm. User strokes only —
             // a programmatic source prints gaussian and must not move the

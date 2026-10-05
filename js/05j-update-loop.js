@@ -134,6 +134,250 @@
             _viscKernel = { pairs: pairs, spacing: spacing, falloff: Math.exp(0.5 * (lo + hi)) };
             return _viscKernel;
         }
+        // Hold symmetry (2d, 05b symmetryHoldFrag): the transforms the
+        // velocity is held to. They are the ones the PAINT is laid with
+        // (05g multiSplat reports each dab's mode, arm count and stroke
+        // mirror here), not the panel's: a replay paints with the arm count
+        // and mirror it was recorded with, a mirror-bound button folds a twin
+        // into every dab, a peer's replay pins its own mode. Holding the
+        // panel's instead fought them: a stroke recorded with 6 arms and
+        // replayed with the panel at 4 was pulled toward 4-fold, measured 5%
+        // flow and 12-15% dye drift from the first loop. When dabs of
+        // different symmetries land in one step (a replay under a live
+        // stroke), only the transforms they share are held, since nothing
+        // else is symmetric. A step with no paint keeps the last step's set;
+        // before anything is painted, the panel's. Rake has no centre and
+        // holds nothing. With Gravity Direction on, only the transforms that
+        // leave its pull where it is are kept: a mirror across the vertical
+        // axis survives a downward pull, a turn does not, and holding a turn
+        // would fight the gravity every step. Memoized on the painted set,
+        // the pull and the sizes.
+        const SYM_HOLD_EDGE = 0.08; // edge fade for the inexact transforms, share of the short side
+        let _symHoldKey = '', _symHold = null;
+        // 'mode|arms|mirror' -> [mode, arms, mirror]: what this step's dabs
+        // were painted with, and what the hold follows.
+        let _symPaintNow = null, _symPaintHeld = null;
+        window.__symHoldNotePaint = function (mode, n, mir) {
+            n = Math.max(1, n | 0); mir = mir | 0;
+            const k = mode + '|' + n + '|' + mir;
+            if (!_symPaintNow) _symPaintNow = {};
+            if (!_symPaintNow[k]) _symPaintNow[k] = [mode, n, mir];
+        };
+        function symHoldUnit(q) { return Math.abs(q) < 1e-6 || Math.abs(Math.abs(q) - 1) < 1e-6; }
+        function symmetryHoldGroup() {
+            if (typeof window.symmetryTransforms !== 'function') return null;
+            let painted = _symPaintHeld;
+            if (!painted) {
+                const pm = config.SYMMETRY_MODE || 'radial';
+                const pn = (typeof animationMultiplier === 'number') ? Math.max(1, animationMultiplier | 0) : 1;
+                painted = {};
+                painted[pm + '|' + pn + '|0'] = [pm, pn, 0];
+            }
+            const keys = Object.keys(painted).sort();
+            const ax = (typeof config.AMBIENT_FORCE_X === 'number') ? config.AMBIENT_FORCE_X : 0;
+            const ay = (typeof config.AMBIENT_FORCE_Y === 'number') ? config.AMBIENT_FORCE_Y : 0;
+            let gx = 0, gy = 0;
+            if (config.AMBIENT_FORCE && (ax !== 0 || ay !== 0)) {
+                const gLen = Math.hypot(ax, ay);
+                gx = ax / gLen; gy = ay / gLen;
+            }
+            const cw = canvas.width, ch = canvas.height;
+            const key = keys.join(',') + '|' + gx.toFixed(4) + ',' + gy.toFixed(4)
+                + '|' + cw + 'x' + ch + '|' + simTexWidth + 'x' + simTexHeight;
+            if (key === _symHoldKey) return _symHold;
+            // Linear parts (a, b, c, d) every painted set shares.
+            let list = null;
+            for (let i = 0; i < keys.length; i++) {
+                const p = painted[keys[i]];
+                if (p[0] === 'rake') { list = []; break; }
+                const own = window.symmetryTransforms(p[0], p[1], 0, 0, p[2]).map(function (t) {
+                    return [t.m[0], t.m[1], t.m[3], t.m[4]];
+                });
+                list = list === null ? own : list.filter(function (q) {
+                    return own.some(function (o) {
+                        return Math.abs(q[0] - o[0]) < 1e-6 && Math.abs(q[1] - o[1]) < 1e-6
+                            && Math.abs(q[2] - o[2]) < 1e-6 && Math.abs(q[3] - o[3]) < 1e-6;
+                    });
+                });
+            }
+            list = list || [];
+            const square = cw === ch && simTexWidth === simTexHeight;
+            const m = new Float32Array(31 * 4), exact = new Float32Array(31);
+            let count = 0;
+            for (let i = 0; i < list.length && count < 31; i++) {
+                const t = list[i];
+                const a = t[0], b = t[1], c = t[2], d = t[3]; // canvas px, y down
+                if (Math.abs(a - 1) < 1e-6 && Math.abs(d - 1) < 1e-6
+                    && Math.abs(b) < 1e-6 && Math.abs(c) < 1e-6) continue; // the identity
+                if ((gx !== 0 || gy !== 0)
+                    && (Math.abs(a * gx + b * gy - gx) > 1e-4 || Math.abs(c * gx + d * gy - gy) > 1e-4)) continue;
+                // y down to the sim's y up: the off-diagonal terms change sign.
+                m[count * 4] = a; m[count * 4 + 1] = -b; m[count * 4 + 2] = -c; m[count * 4 + 3] = d;
+                // Texel for texel: a signed permutation, and a quarter turn
+                // only on a square grid.
+                exact[count] = (symHoldUnit(a) && symHoldUnit(b) && symHoldUnit(c) && symHoldUnit(d)
+                    && (Math.abs(b) < 0.5 || square)) ? 1 : 0;
+                count++;
+            }
+            _symHoldKey = key;
+            _symHold = count > 0 ? { count: count, m: m, exact: exact } : null;
+            return _symHold;
+        }
+        function applySymmetryHold(dt, obsActive) {
+            // Taken over every step, the hold on or off, so the set it
+            // follows is always the latest paint's and never an old union.
+            if (_symPaintNow) { _symPaintHeld = _symPaintNow; _symPaintNow = null; }
+            const amt = (typeof config.SYMMETRY_HOLD === 'number') ? Math.max(0, Math.min(1, config.SYMMETRY_HOLD)) : 0;
+            if (!(amt > 0)) return;
+            const g = symmetryHoldGroup();
+            if (!g) return;
+            // The fader squared is the share of the drift taken back per 60 Hz
+            // step at Time 1 (dt 0.016, as the wall brake counts it), so the
+            // hold is the same per simulated second at any frame rate or
+            // sub-step count. Squared because the useful shares are small:
+            // measured on a locked circle stroke, 0.02 (fader 0.14) holds the
+            // mirrors and 0.1 (fader 0.32) the radial arms, while past 0.25
+            // (fader 0.5) there is no drift left to see.
+            const share = amt * amt;
+            const k = share >= 1 ? 1 : 1 - Math.pow(1 - share, dt / 0.016);
+            const cL = Math.max(canvas.width, canvas.height);
+            const sL = Math.max(simTexWidth, simTexHeight);
+            symmetryHoldProg.bind();
+            gl.viewport(0, 0, simTexWidth, simTexHeight);
+            gl.uniform1i(symmetryHoldProg.uniforms.uCount, g.count);
+            gl.uniform4fv(symmetryHoldProg.uniforms['uM[0]'], g.m);
+            gl.uniform1fv(symmetryHoldProg.uniforms['uExact[0]'], g.exact);
+            gl.uniform2f(symmetryHoldProg.uniforms.uSq, canvas.width / cL, canvas.height / cL);
+            // Isotropic velocity is already in long sides/s on both axes;
+            // the legacy per-axis UV/s scales by each side over the long one.
+            if (config.VELOCITY_ISOTROPIC === true) gl.uniform2f(symmetryHoldProg.uniforms.uVelSq, 1, 1);
+            else gl.uniform2f(symmetryHoldProg.uniforms.uVelSq, simTexWidth / sL, simTexHeight / sL);
+            gl.uniform2f(symmetryHoldProg.uniforms.uSim, simTexWidth, simTexHeight);
+            gl.uniform1f(symmetryHoldProg.uniforms.uEdge, SYM_HOLD_EDGE * Math.min(simTexWidth, simTexHeight));
+            gl.uniform1f(symmetryHoldProg.uniforms.uK, k);
+            gl.uniform1i(symmetryHoldProg.uniforms.hasObstacle, obsActive ? 1 : 0);
+            gl.uniform1f(symmetryHoldProg.uniforms.uObsMax, window.__obsStrengthMax || 0.7);
+            gl.uniform1i(symmetryHoldProg.uniforms.uVelocity, 0);
+            // With no obstacle the sampler shares unit 0 (as viscosity's does).
+            gl.uniform1i(symmetryHoldProg.uniforms.uObstacle, obsActive ? 1 : 0);
+            if (obsActive) {
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, obstacle.texture);
+            }
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture);
+            blit(velocity.write.fbo);
+            velocity.swap();
+        }
+        // window.SymmetryHold.measure(): how far the arms have drifted apart.
+        // Reads the velocity (and the dye) back and averages them on the CPU
+        // with the pass's own weights (colliders aside), so it checks the
+        // shader too. Uses the hold's transforms whether or not the hold is
+        // on, so it measures the drift with it off as well.
+        //   vel: RMS of (velocity minus its symmetric average) over the RMS
+        //        velocity. 0 = the arms' flows are exact mirror images.
+        //   dye: share of the ink (r+g+b) that differs from its symmetric
+        //        average. Read with one colour on every arm; differently
+        //        coloured arms differ here by design.
+        function symHoldReadPlanes(fbo, w, h, planes) {
+            const buf = new Float32Array(w * h * 4);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, buf);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return planes(buf, w * h);
+        }
+        function symHoldAsym(P, w, h, g, scale, stride) {
+            const vec = P.length === 2;
+            const cL = Math.max(canvas.width, canvas.height);
+            const sqx = canvas.width / cL, sqy = canvas.height / cL;
+            const edge = SYM_HOLD_EDGE * Math.min(w, h);
+            const square = w === h && canvas.width === canvas.height;
+            const ex = [];
+            for (let t = 0; t < g.count; t++) {
+                const a = g.m[t * 4], b = g.m[t * 4 + 1], c = g.m[t * 4 + 2], d = g.m[t * 4 + 3];
+                ex.push(symHoldUnit(a) && symHoldUnit(b) && symHoldUnit(c) && symHoldUnit(d)
+                    && (Math.abs(b) < 0.5 || square));
+            }
+            const fade = function (u, v) {
+                const s = Math.max(0, Math.min(1, Math.min(Math.min(u, 1 - u) * w, Math.min(v, 1 - v) * h) / edge));
+                return s * s * (3 - 2 * s);
+            };
+            const at = function (A, x, y) {
+                x = x < 0 ? 0 : (x >= w ? w - 1 : x);
+                y = y < 0 ? 0 : (y >= h ? h - 1 : y);
+                return A[y * w + x];
+            };
+            const lin = function (A, u, v) {
+                const x = u * w - 0.5, y = v * h - 0.5;
+                const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
+                return (at(A, x0, y0) * (1 - fx) + at(A, x0 + 1, y0) * fx) * (1 - fy)
+                     + (at(A, x0, y0 + 1) * (1 - fx) + at(A, x0 + 1, y0 + 1) * fx) * fy;
+            };
+            let num = 0, den = 0;
+            for (let j = 0; j < h; j += stride) {
+                for (let i = 0; i < w; i += stride) {
+                    const u = (i + 0.5) / w, v = (j + 0.5) / h;
+                    const px = (u - 0.5) * sqx, py = (v - 0.5) * sqy;
+                    const own = fade(u, v);
+                    const c0 = P[0][j * w + i] * scale[0], c1 = vec ? P[1][j * w + i] * scale[1] : 0;
+                    let s0 = c0, s1 = c1, ws = 1;
+                    for (let t = 0; t < g.count; t++) {
+                        const a = g.m[t * 4], b = g.m[t * 4 + 1], c = g.m[t * 4 + 2], d = g.m[t * 4 + 3];
+                        const qu = (a * px + c * py) / sqx + 0.5, qv = (b * px + d * py) / sqy + 0.5;
+                        let x0, x1 = 0, wt;
+                        if (ex[t]) {
+                            const ii = Math.min(w - 1, Math.max(0, Math.floor(qu * w)));
+                            const jj = Math.min(h - 1, Math.max(0, Math.floor(qv * h)));
+                            x0 = P[0][jj * w + ii] * scale[0];
+                            if (vec) x1 = P[1][jj * w + ii] * scale[1];
+                            wt = 1;
+                        } else {
+                            wt = own * fade(qu, qv);
+                            if (wt <= 0) continue;
+                            x0 = lin(P[0], qu, qv) * scale[0];
+                            if (vec) x1 = lin(P[1], qu, qv) * scale[1];
+                        }
+                        if (vec) { s0 += (a * x0 + b * x1) * wt; s1 += (c * x0 + d * x1) * wt; }
+                        else s0 += x0 * wt;
+                        ws += wt;
+                    }
+                    const r0 = c0 - s0 / ws, r1 = c1 - s1 / ws;
+                    if (vec) { num += r0 * r0 + r1 * r1; den += c0 * c0 + c1 * c1; }
+                    else { num += Math.abs(r0); den += Math.abs(c0); }
+                }
+            }
+            if (den <= 0) return 0;
+            return vec ? Math.sqrt(num / den) : num / den;
+        }
+        window.SymmetryHold = {
+            group: symmetryHoldGroup,
+            measure: function (opts) {
+                opts = opts || {};
+                const g = symmetryHoldGroup();
+                if (!g) return { arms: 1, vel: 0, dye: 0, note: 'nothing to hold (one arm, Rake, or gravity rules every transform out)' };
+                const t0 = performance.now();
+                const out = { transforms: g.count + 1, hold: config.SYMMETRY_HOLD || 0 };
+                const sL = Math.max(simTexWidth, simTexHeight);
+                const vs = config.VELOCITY_ISOTROPIC === true ? [1, 1] : [simTexWidth / sL, simTexHeight / sL];
+                const V = symHoldReadPlanes(velocity.read.fbo, simTexWidth, simTexHeight, function (buf, N) {
+                    const x = new Float32Array(N), y = new Float32Array(N);
+                    for (let k = 0; k < N; k++) { x[k] = buf[k * 4]; y[k] = buf[k * 4 + 1]; }
+                    return [x, y];
+                });
+                out.vel = symHoldAsym(V, simTexWidth, simTexHeight, g, vs, 1);
+                if (opts.dye !== false) {
+                    const D = symHoldReadPlanes(density.read.fbo, dyeTexWidth, dyeTexHeight, function (buf, N) {
+                        const s = new Float32Array(N);
+                        for (let k = 0; k < N; k++) s[k] = Math.max(0, buf[k * 4]) + Math.max(0, buf[k * 4 + 1]) + Math.max(0, buf[k * 4 + 2]);
+                        return [s];
+                    });
+                    const stride = Math.max(1, Math.round(Math.sqrt(dyeTexWidth * dyeTexHeight / 300000)));
+                    out.dye = symHoldAsym(D, dyeTexWidth, dyeTexHeight, g, [1], stride);
+                }
+                out.ms = Math.round(performance.now() - t0);
+                return out;
+            }
+        };
         // Freeze (Space): the velocity rate while frozen, per 1/60 s. Motion
         // eases out over ~0.85 s instead of stopping dead.
         const FREEZE_VELOCITY_BRAKE = 0.9;
@@ -1175,6 +1419,12 @@
                         }
                     }
                 }
+                // 2d. Hold symmetry: the Multi-Brush arms' flows pulled back
+                // toward mirror images of each other (applySymmetryHold above,
+                // 05b symmetryHoldFrag). After the forces and before the
+                // projection, which takes out whatever divergence its filtered
+                // reads leave. Skipped whole at 0 (the default).
+                applySymmetryHold(dt, obsActive);
                 // 3. Divergence
                 // Overflow (open canvas edges). The Effects checkbox owns it
                 // now — it used to be a Tunnel audio-scene toggle, which put a
