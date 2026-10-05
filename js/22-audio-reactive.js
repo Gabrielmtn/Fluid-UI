@@ -427,6 +427,7 @@
         for (var i = 0; i < sourceListeners.length; i++) {
             try { sourceListeners[i](srcKind); } catch (_) {}
         }
+        syncMediaSession();
     }
     function stopFileSource() {
         if (!sourceNode) return;
@@ -458,6 +459,7 @@
         fileStartedAt = audioCtx.currentTime - offset;
         sourceNode = src;
         filePaused = false;
+        syncMediaSession(); // a seek or restart moves the OS timeline too
         return true;
     }
     // Seconds into the track right now, whether playing or paused.
@@ -503,10 +505,115 @@
         return playFileFrom(0);
     }
     function setFileLoop(on) {
+        // Re-base the playhead on the pass now playing. Unlooped, fileTime()
+        // counts from fileStartedAt without wrapping, so turning Loop off on
+        // a track that had already looped read as finished (playhead pinned
+        // at the end) while its last pass played on.
+        if (audioCtx && fileBuffer && !filePaused) fileStartedAt = audioCtx.currentTime - fileTime();
         fileLoop = !!on;
         // Apply to the live source without interrupting playback.
         if (sourceNode && !filePaused) { try { sourceNode.loop = fileLoop; } catch (_) {} }
+        syncMediaSession();
         return fileLoop;
+    }
+
+    // ── OS media session (2026-10-04) ─────────────────────────────────
+    // The track plays through Web Audio, and Web Audio never registers a
+    // media session — measured in Electron 39: a looping buffer source plus
+    // navigator.mediaSession metadata leaves Windows with no session at all,
+    // while a playing <audio> element shows up "Playing" and becomes the
+    // current one. So Swirl Together was missing from the Windows media
+    // flyout, media keys and headset buttons couldn't reach the track, and
+    // Windows never told a Bluetooth headset that anything was playing:
+    // AirPods that go quiet when the system reports no playback (muting a
+    // browser video does it) stayed quiet through our music, where any
+    // other player brings them back. A SILENT looping element now plays and
+    // pauses with the file transport and carries the session; the music
+    // itself still comes out of Web Audio, sample-accurate as before.
+    var sessionAnchor = null;    // the silent element; its play state is the OS's
+    var sessionAnchorUrl = null;
+    var sessionHandlersSet = false;
+    var sessionWrapTimer = null;
+    // 8 kHz 8-bit mono silence. Longer than Chromium's 5 s floor, below which
+    // a player counts as a short sound and never gets media controls.
+    function silentWavUrl(seconds) {
+        var rate = 8000, n = rate * seconds;
+        var buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+        var str = function (o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+        str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE');
+        str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+        v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+        str(36, 'data'); v.setUint32(40, n, true);
+        new Uint8Array(buf, 44).fill(128); // unsigned 8-bit: 128 is zero
+        return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    }
+    // OS play/pause/seek go to the transport, never to the silent element
+    // itself — the element only follows (from notifySourceChanged).
+    function setSessionHandlers(ms) {
+        if (sessionHandlersSet) return;
+        sessionHandlersSet = true;
+        var on = function (action, fn) { try { ms.setActionHandler(action, fn); } catch (_) {} };
+        on('play', function () { resumeFile(); });
+        on('pause', function () { pauseFile(); });
+        on('seekto', function (d) { if (d && typeof d.seekTime === 'number') seekFile(d.seekTime); });
+        on('previoustrack', function () { restartFile(); });
+    }
+    function syncMediaSession() {
+        var ms = navigator.mediaSession;
+        if (!ms || typeof Audio === 'undefined') return;
+        clearTimeout(sessionWrapTimer);
+        var loaded = enabled && srcKind === 'file' && !!fileBuffer;
+        if (!loaded) {
+            // A sourceless element leaves the session, so Windows forgets us
+            // rather than showing a dead "Paused" track after audio is off.
+            if (sessionAnchor && sessionAnchor.getAttribute('src')) {
+                sessionAnchor.pause();
+                sessionAnchor.removeAttribute('src');
+                try { sessionAnchor.load(); } catch (_) {}
+            }
+            try { ms.metadata = null; ms.playbackState = 'none'; } catch (_) {}
+            return;
+        }
+        var playing = !filePaused;
+        setSessionHandlers(ms);
+        if (!sessionAnchor) {
+            sessionAnchor = new Audio();
+            sessionAnchor.loop = true;
+        }
+        if (!sessionAnchor.getAttribute('src')) {
+            sessionAnchor.src = sessionAnchorUrl || (sessionAnchorUrl = silentWavUrl(10));
+        }
+        var title = fileName.replace(/\.[^.]+$/, '') || 'Audio track';
+        try {
+            if (!ms.metadata || ms.metadata.title !== title) {
+                // Artwork must be http(s)/data/blob; the desktop app's file://
+                // icon is refused with a console error, and Windows shows the
+                // app's own icon there anyway.
+                var art = /^https?:$/.test(location.protocol) ? [
+                    { src: 'assets/pwa/icon-192.png', sizes: '192x192', type: 'image/png' },
+                    { src: 'assets/pwa/icon-512.png', sizes: '512x512', type: 'image/png' }
+                ] : [];
+                ms.metadata = new MediaMetadata({ title: title, artist: 'Swirl Together', artwork: art });
+            }
+        } catch (_) {}
+        if (playing && sessionAnchor.paused) {
+            // Refused (autoplay policy on the web) only costs the OS session;
+            // the music itself is on Web Audio and unaffected.
+            var p = sessionAnchor.play();
+            if (p && p.catch) p.catch(function () {});
+        } else if (!playing && !sessionAnchor.paused) {
+            sessionAnchor.pause();
+        }
+        try { ms.playbackState = playing ? 'playing' : 'paused'; } catch (_) {}
+        // The OS draws the timeline from this, not from the silent element.
+        // It extrapolates forward and stops at the end, so a looping track
+        // re-reports itself as each pass begins.
+        var dur = fileBuffer.duration || 0;
+        if (dur > 0) {
+            var pos = Math.min(dur, fileTime());
+            try { ms.setPositionState({ duration: dur, playbackRate: 1, position: pos }); } catch (_) {}
+            if (playing && fileLoop) sessionWrapTimer = setTimeout(syncMediaSession, (dur - pos) * 1000 + 50);
+        }
     }
 
     function ensureContext() {
