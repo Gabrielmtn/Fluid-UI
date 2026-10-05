@@ -1821,7 +1821,7 @@
     // is exactly the state it used to land on. When a look default changes
     // again: bump LOOK_BASELINE_GEN and add that generation's entry to
     // LOOK_BASELINE_MOVES.
-    var LOOK_BASELINE_GEN = 4;
+    var LOOK_BASELINE_GEN = 5;
     // Per generation, the keys whose default it MOVED, at the value they had
     // before the move. A snapshot taken against generation g fills its gaps
     // from every entry newer than g, the oldest value winning when a key
@@ -1847,7 +1847,10 @@
         3: { checkboxes: { symmetrySameAngle: true } },
         // 2026-10-03 (user test 3): the demo opened with Motion Isolation at
         // its max and paint that never faded. Now 2 and 0.99.
-        4: { sliders: { velocityInfluence: 5, densityDissipation: 1 } }
+        4: { sliders: { velocityInfluence: 5, densityDissipation: 1 } },
+        // 2026-10-04: Cap starts on, so a fresh boot and Reset app don't
+        // pile repeated strokes up into white.
+        5: { checkboxes: { colorGate: false } }
     };
     var FILL_SECTIONS = { sliders: 1, checkboxes: 1, selects: 1 };
     // What a snapshot of generation `gen` fills its gaps from, or null when

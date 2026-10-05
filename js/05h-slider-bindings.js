@@ -202,10 +202,9 @@
                 }
             });
             if (window.Settings && typeof window.Settings.loadCheckbox === 'function') {
-                const savedGate = window.Settings.loadCheckbox('colorGate', false);
-                colorGateCheckbox.checked = savedGate;
-                applyGateState(savedGate);
+                colorGateCheckbox.checked = window.Settings.loadCheckbox('colorGate', true);
             }
+            applyGateState(colorGateCheckbox.checked);
         }
         // Resolution dropdowns (absolute resolution, independent of display canvas size)
         // Set a resolution <select> to a value, INJECTING it as an option if it isn't

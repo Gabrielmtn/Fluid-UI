@@ -1222,7 +1222,7 @@
       "min": null,
       "max": null,
       "step": null,
-      "def": false,
+      "def": true,
       "mapping": "applyGateState(checked): config.COLOR_GATE = on; config.BLOOM_CEILING = on ? 1.0 : 0",
       "section": "brush",
       "consumer": "sim-shader",

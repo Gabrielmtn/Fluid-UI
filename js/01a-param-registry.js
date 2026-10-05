@@ -175,7 +175,8 @@
         // Color Gate ("recover faded strokes") — a brush/colour behaviour, not a
         // style variant, so no mutScope. Registered here so presets and session
         // save/load round-trip it (capture derives its id list from this map).
-        colorGate: {def: false, mutScope: null},
+        // On by default since 2026-10-04 (look generation 5).
+        colorGate: {def: true, mutScope: null},
         kaleidoToggle: {def: false, mutScope: "basic"},
         kAnimateRot: {def: false, mutScope: "basic"},
         enableLighting: {def: false, mutScope: "extended"},
