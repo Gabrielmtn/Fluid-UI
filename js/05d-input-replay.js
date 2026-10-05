@@ -1063,9 +1063,11 @@
         function paintCoords(e) {
             const c = getCanvasCoordinates(e);
             // Which pointer (or touch) this is: the lock moves its hand by one
-            // device's own motion, never across from another's position.
+            // device's own motion, never across from another's position. The
+            // sample goes too: while a lock holds the mouse in (Pointer Lock)
+            // its clientX/Y stand still and only its movement says where it went.
             return window.StrokeLock
-                ? window.StrokeLock.apply(c.x, c.y, e.pointerId != null ? e.pointerId : 't' + e.identifier)
+                ? window.StrokeLock.apply(c.x, c.y, e.pointerId != null ? e.pointerId : 't' + e.identifier, e)
                 : c;
         }
         canvas.addEventListener('pointerdown', (e) => {

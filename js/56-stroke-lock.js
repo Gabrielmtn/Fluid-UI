@@ -41,6 +41,11 @@
 // next stretch of travel (GLIDE_*), and the stroke flows back under the
 // hand. A key pressed while the pointer is off the canvas takes its anchor
 // where the brush first lands.
+//
+// While a lock is held a MOUSE stays on the canvas (Pointer Lock, see THE
+// MOUSE STAYS IN): no arrow anywhere, no edge of the canvas or the screen
+// to stop the hand, until the keys and the button are all up. 58 asks for
+// the pointer back when the radial menu opens.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -74,6 +79,7 @@
     var handJump = false;   // that pointer left or came back: its next sample moves nothing
     var lastOut = null;     // where the brush went for it
     var overCanvas = false;
+    var lastType = '';      // the kind of the last real pointer over the canvas
     var listeners = [];
     var handListeners = [];
 
@@ -230,6 +236,11 @@
         locks[kind] = { pending: true };
         var here = brushSpot();
         if (here) settlePending(here);
+        // A fresh press of a key: the mouse may be taken again, even after
+        // the radial menu or a failed ask gave it back.
+        confineAsked = false;
+        noConfine = false;
+        confine(null);
         paintGuide();
         emit();
     }
@@ -242,21 +253,122 @@
         // from where the brush is, not from where it stood before the pin.
         var rest = anchored('distance') ? 'distance' : (anchored('angle') ? 'angle' : null);
         if (rest && lastOut) { locks[rest].hx = lastOut.x; locks[rest].hy = lastOut.y; }
+        // The last key up under a held button: the mouse stays in until the
+        // button comes up, and the brush goes on from where it is (the hand
+        // is wherever the lock was carrying it, nowhere the person can see).
+        if (!anyOn() && confined && strokeLive() && lastOut) lastRaw = { x: lastOut.x, y: lastOut.y };
         rebase();
+        if (!anyOn() && !strokeLive()) freeCursor(false);
         paintGuide();
         emit();
     }
 
     function releaseAll() { KINDS.forEach(disengage); }
 
+    // ─── THE MOUSE STAYS IN ─────────────────────────────────────
+    // While a lock is held the canvas keeps the mouse (Pointer Lock): the
+    // arrow is gone everywhere and cannot leave, however far the hand
+    // pushes, and the lock steers until the keys are up (2026-10-05: "make
+    // sure the mouse doesn't show when it leaves the canvas, and keeps its
+    // behavior until they release"). A held mouse reports only how far it
+    // MOVED — its clientX/Y stand still where the lock took it — so the real
+    // hand is carried on here from those steps, in canvas px, from the last
+    // place it was seen. That is all the HAND needs: it only ever moves by
+    // the hand's steps, and now no screen edge cuts them off.
+    // Asked for on the key's press, on a paint press, or on the first move
+    // over the canvas while a key is held; a mouse only (a pen or a finger
+    // is where it touches). Given back when the keys and the button are all
+    // up, and the browser puts the arrow back where the lock took it. Let go
+    // of the keys mid-stroke and the canvas keeps the mouse until the button
+    // comes up, the brush going on from where it is, never past the canvas's
+    // edge.
+    var SPIKE_PX = 300;         // one sample further than this (CSS px) is a warp, not a hand
+    var confined = false;       // the canvas has the mouse
+    var confineAsked = false;   // ...asked for since the last key or press
+    var noConfine = false;      // given back for the radial menu: not again until the next key or press
+    var lockJump = false;       // just taken: its first sample moves nothing
+    var reseat = false;         // just given back: the arrow is somewhere else
+
+    function confine(e) {
+        if (confined || confineAsked || noConfine || !anyOn()) return;
+        var c = cv();
+        if (!c || typeof c.requestPointerLock !== 'function') return;
+        if (e ? (e.pointerType !== 'mouse' || !e.isTrusted) : lastType !== 'mouse') return;
+        if (!overCanvas && !strokeLive()) return;
+        confineAsked = true;
+        try {
+            var p = c.requestPointerLock();
+            if (p && typeof p.catch === 'function') p.catch(function () {});
+        } catch (_) {}
+    }
+
+    // `hold`: not again until the next key or paint press (the radial menu).
+    function freeCursor(hold) {
+        confineAsked = false;
+        if (hold) noConfine = true;
+        var c = cv();
+        if (c && document.pointerLockElement === c) document.exitPointerLock();
+    }
+
+    // A held mouse's step for sample `e`, in canvas px; null when `e` is not
+    // one (nothing held, a pen, a touch, an event the app made itself).
+    function confinedStep(e) {
+        if (!confined || !e || e.pointerType !== 'mouse' || e.isTrusted === false) return null;
+        if (lockJump) { lockJump = false; return { dx: 0, dy: 0 }; }
+        var mx = +e.movementX || 0, my = +e.movementY || 0;
+        if (Math.abs(mx) > SPIKE_PX || Math.abs(my) > SPIKE_PX) return { dx: 0, dy: 0 };
+        var c = cv(), r = c.getBoundingClientRect();
+        return { dx: mx * (r.width ? c.width / r.width : 1), dy: my * (r.height ? c.height / r.height : 1) };
+    }
+
+    document.addEventListener('pointerlockchange', function () {
+        var c = cv(), now = !!c && document.pointerLockElement === c;
+        if (now === confined) return;
+        confined = now;
+        lockJump = now;
+        reseat = !now;
+    });
+    // The button up with no key held: the stroke the mouse was kept for is
+    // over. (A stroke that ends without one — a chorded lift — is caught by
+    // the next sample, in apply.)
+    function strokeOver(e) {
+        if (confined && !anyOn() && !(e && e.buttons)) freeCursor(false);
+    }
+    window.addEventListener('pointerup', strokeOver);
+    window.addEventListener('pointercancel', strokeOver);
+
     // ─── THE STROKE'S POSITIONS ─────────────────────────────────
     // 05d hands every painted position through here: press, move (each
     // coalesced sample), the live-cursor spot, touch. `who` is the pointer
     // (or touch) it came from: the HAND moves by one pointer's own motion,
     // so a sample from another device, or from a pointer just back over
-    // the canvas, moves it nothing instead of dragging it across.
-    function apply(x, y, who) {
+    // the canvas, moves it nothing instead of dragging it across. `e` is
+    // the sample itself: a held mouse's carries only its step (see THE
+    // MOUSE STAYS IN).
+    function apply(x, y, who, e) {
         if (glide && !strokeLive()) glide = null;   // the stroke it was easing has ended
+        var step = confinedStep(e);
+        if (step) {
+            var from = lastRaw || { x: x, y: y };
+            x = from.x + step.dx;
+            y = from.y + step.dy;
+            // Steering nothing, the hand is the brush: it stops at the
+            // canvas's edge as the arrow would at the screen's (never pulled
+            // in from past it, only kept from going further).
+            if (!anchored('distance') && !anchored('angle')) {
+                var c = cv();
+                x = Math.max(Math.min(0, from.x), Math.min(Math.max(c.width, from.x), x));
+                y = Math.max(Math.min(0, from.y), Math.min(Math.max(c.height, from.y), y));
+            }
+        } else if (reseat && e && e.pointerType === 'mouse') {
+            // The mouse given back mid-stroke (the browser let go of it): the
+            // arrow is where the lock took it, not where the hand was carried,
+            // so the brush stays where it is and eases over.
+            reseat = false;
+            handJump = true;
+            lastRaw = { x: x, y: y };
+            rebase();
+        }
         var jump = !lastRaw || handJump || who !== lastWho;
         handJump = false;
         lastWho = who;
@@ -268,6 +380,11 @@
         lastOut = out;
         if (anyPending()) settlePending(out);
         if (anyOn()) handMoved();
+        if (e && e.isTrusted) {
+            if (e.type === 'pointerdown') { confineAsked = false; noConfine = false; }
+            if (anyOn()) confine(e);
+            else if (confined && !strokeLive() && !e.buttons) freeCursor(false);
+        }
         return out;
     }
 
@@ -285,17 +402,20 @@
         return { hand: { x: L.hx, y: L.hy }, brush: onGuide(kind, L.hx, L.hy) };
     }
 
-    // True while the brush may not be where the hand is.
-    function shaping() { return anyOn() || !!glide; }
+    // True while the brush may not be where the hand is (or where the arrow
+    // would be: a held mouse's clientX/Y stand still).
+    function shaping() { return anyOn() || !!glide || confined; }
 
     // For the brush cursor (31): a viewport point → where the paint goes,
     // through the same box 02's getCanvasCoordinates maps a press with.
+    // While the canvas holds the mouse the point says nothing (it is where
+    // the lock took it): the brush is where the last sample put it.
     function clientPoint(clientX, clientY) {
         var c = cv();
         if (!c || !shaping()) return { x: clientX, y: clientY };
         var r = c.getBoundingClientRect();
         var sx = r.width ? c.width / r.width : 1, sy = r.height ? c.height / r.height : 1;
-        var q = peek((clientX - r.left) * sx, (clientY - r.top) * sy);
+        var q = (confined && lastOut) ? lastOut : peek((clientX - r.left) * sx, (clientY - r.top) * sy);
         return { x: r.left + q.x / sx, y: r.top + q.y / sy };
     }
 
@@ -306,10 +426,13 @@
         // nothing about how far it moved, so its next sample moves the HAND
         // nothing (see apply).
         function away(e) { if (e.pointerId === lastWho) handJump = true; }
-        c.addEventListener('pointerenter', function (e) { overCanvas = true; away(e); });
+        // Only a real mouse is ever held in (THE MOUSE STAYS IN).
+        function kind(e) { if (e.isTrusted) lastType = e.pointerType; }
+        c.addEventListener('pointerenter', function (e) { overCanvas = true; kind(e); away(e); });
         // A pointer already over the canvas when the page loaded never
         // entered it; its first move says it is here.
-        c.addEventListener('pointermove', function () { overCanvas = true; });
+        c.addEventListener('pointermove', function (e) { overCanvas = true; kind(e); });
+        c.addEventListener('pointerdown', kind);
         c.addEventListener('pointerleave', function (e) { overCanvas = false; away(e); });
         // A finger coming down lands anywhere (and touch ids repeat): ahead
         // of 05d's touchstart, which paints its first sample.
@@ -549,6 +672,11 @@
         release: disengage,
         releaseAll: releaseAll,
         isHeld: function (kind) { return !!locks[kind]; },
+        // The canvas has the mouse (Pointer Lock) while a lock is held;
+        // freeCursor() gives it back until the next key or paint press (58:
+        // the radial menu needs the real pointer).
+        confined: function () { return confined; },
+        freeCursor: function () { freeCursor(true); },
         showGuides: function () { return showGuides; },
         setShowGuides: setShowGuides,
         // Other surfaces' guides (47): the marks for a W×H box over the
@@ -567,6 +695,7 @@
                 pin: pin ? { x: pin.x, y: pin.y } : null,
                 hand: hand(),
                 area: areaPx(),
+                confined: confined,
                 glide: glide ? { ox: glide.ox, oy: glide.oy, far: glide.far, span: glide.span } : null
             };
         }

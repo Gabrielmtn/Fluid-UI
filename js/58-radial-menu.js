@@ -635,6 +635,10 @@
         // 05d's touchstart too: that is not a second ask to open it.
         if (typeof opts.button === 'number' && performance.now() - shutAt < SHUT_MS) return false;
         if (st) close();
+        // A held stroke lock keeps the mouse in the canvas (js/56), where its
+        // clientX/Y stand still: the wheel needs the real pointer back. It
+        // comes back where the lock took it, which is where `mouse` still is.
+        if (window.StrokeLock && typeof window.StrokeLock.freeCursor === 'function') window.StrokeLock.freeCursor();
         var x = (typeof opts.x === 'number') ? opts.x : mouse.x;
         var y = (typeof opts.y === 'number') ? opts.y : mouse.y;
         if (!isFinite(x) || !isFinite(y)) {
