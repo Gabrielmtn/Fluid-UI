@@ -77,7 +77,11 @@
         // collapsable (open by default) ... brush size slider is top of the
         // sidebar"): Brush Size on top, the brush's own sections under it.
         const leftBar = buildLeftSidebar(strip);
-        if (leftBar) mainArea.insertBefore(leftBar, canvasArea);
+        if (leftBar) {
+            mainArea.insertBefore(leftBar, canvasArea);
+            // Its fold tab rides the bar's outer edge (see buildLeftSidebar).
+            if (leftBar.__edge) mainArea.insertBefore(leftBar.__edge, canvasArea);
+        }
 
         // Move any remaining dynamic content from .controls to sidebar
         // (e.g., component system)
@@ -2199,14 +2203,21 @@
         var sizeInput = strip.querySelector('#brushSize');
         var sizeChannel = sizeInput ? sizeInput.closest('.mixer-channel') : null;
         if (sizeChannel) head.appendChild(sizeChannel);
+        bar.appendChild(head);
+        // The fold toggle is a tab on the bar's OUTER edge, half way down
+        // (2026-10-04, Gabriel: off the head row, where it took width from the
+        // Size fader). It cannot live inside the bar: the bar scrolls and clips
+        // overflow-x, so anything hanging past its edge would be cut off. It
+        // sits in a zero-width sibling right after the bar in #main-area, so it
+        // follows the bar's width (open, folded, zoomed) with no measuring.
+        // One button for both directions: « folds, » opens.
+        var edge = document.createElement('div');
+        edge.className = 'lsb-edge';
         var fold = document.createElement('button');
         fold.type = 'button';
-        fold.className = 'lsb-collapse btn--icon';
-        fold.textContent = '«';
-        fold.title = 'Fold the brush bar to the side';
-        fold.setAttribute('aria-label', 'Fold the brush bar');
-        head.appendChild(fold);
-        bar.appendChild(head);
+        fold.className = 'lsb-toggle btn--icon';
+        edge.appendChild(fold);
+        bar.__edge = edge;
 
         var body = document.createElement('div');
         body.className = 'lsb-body';
@@ -2214,15 +2225,25 @@
         pendingLeftSections.length = 0;
         bar.appendChild(body);
 
+        // Steady sits right under Brush Size, out of the Brush section
+        // (2026-10-04, Gabriel: "it should be a first class citizen"). Built
+        // by buildBrushPanel with the rest of the stroke controls (its setter,
+        // presets, Reset and the Hide guide row all live there) and moved up
+        // here whole, with Hide guide under it. data-ui-key lets the How-do-I
+        // tour find it the way it finds Brush Size (44 stripCell).
+        var steadyInput = body.querySelector('#brushSteady');
+        if (steadyInput) {
+            var steadyWrap = document.createElement('div');
+            steadyWrap.className = 'lsb-steady';
+            steadyWrap.dataset.uiKey = 'Steady';
+            steadyWrap.appendChild(steadyInput.closest('.control-group'));
+            var guideInput = body.querySelector('#brushSteadyHideGuide');
+            if (guideInput) steadyWrap.appendChild(guideInput.closest('.control-group'));
+            head.appendChild(steadyWrap);
+        }
+
         var rail = document.createElement('div');
         rail.className = 'lsb-rail';
-        var unfold = document.createElement('button');
-        unfold.type = 'button';
-        unfold.className = 'lsb-expand btn--icon';
-        unfold.textContent = '»';
-        unfold.title = 'Open the brush bar';
-        unfold.setAttribute('aria-label', 'Open the brush bar');
-        rail.appendChild(unfold);
         var railSize = document.createElement('span');
         railSize.className = 'lsb-rail-size';
         railSize.title = 'Brush Size';
@@ -2259,11 +2280,15 @@
 
         function set(collapsed, keep) {
             bar.classList.toggle('collapsed', !!collapsed);
+            edge.classList.toggle('collapsed', !!collapsed);
+            fold.textContent = collapsed ? '»' : '«';
+            fold.title = collapsed ? 'Open the brush bar' : 'Fold the brush bar to the side';
+            fold.setAttribute('aria-label', collapsed ? 'Open the brush bar' : 'Fold the brush bar');
+            fold.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
             syncRail();
             if (keep) { try { if (window.settingsManager) window.settingsManager.set(LSB_KEY, !!collapsed); } catch (_) {} }
         }
-        fold.addEventListener('click', function () { set(true, true); });
-        unfold.addEventListener('click', function () { set(false, true); });
+        fold.addEventListener('click', function () { set(!bar.classList.contains('collapsed'), true); });
         railLabel.addEventListener('click', function () { set(false, true); });
 
         var saved = null;
@@ -2289,6 +2314,7 @@
         window.Sidebars.left = {
             el: bar,
             body: body,
+            edge: edge,
             collapse: function () { set(true, true); },
             expand: function () { set(false, true); },
             toggle: function () { set(!bar.classList.contains('collapsed'), true); },
@@ -4357,10 +4383,10 @@
             sel.appendChild(o);
         });
         box.appendChild(sel);
-
-        var hint = document.createElement('div');
-        hint.style.cssText = 'font-size:10px;line-height:1.35;color:rgba(255,255,255,0.45);margin:-2px 0 6px;';
-        box.appendChild(hint);
+        // What the chosen action does rides the dropdown and its label as a
+        // tooltip (2026-10-04, Gabriel: the sidebar was too busy). It was a
+        // paragraph under each dropdown — three of them, ~110px of reading
+        // between the controls. sync() keeps it on the current choice.
 
         // ── Mirror axis (shown for 'mirror') ──────────────────────────
         var mirRow = document.createElement('div');
@@ -4412,9 +4438,11 @@
         shapeRow.className = 'brush-tip-row brush-shapes-row';
         altBox.appendChild(shapeRow);
 
+        // Only the empty state needs a line on the panel; with shapes listed,
+        // where they come from is the row's tooltip.
         var shapeNote = document.createElement('div');
         shapeNote.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.35);margin:-2px 0 6px;';
-        shapeNote.textContent = 'Shapes come from the Brush panel’s library.';
+        shapeRow.title = 'Shapes come from the Brush panel’s library.';
         altBox.appendChild(shapeNote);
 
         // Size override. Off = inherit the main brush's size, which keeps the
@@ -4528,9 +4556,11 @@
             var act = (BM.side(side).alt || {}).BRUSH_SHAPE_ID || null;
             if (!lst.length) {
                 shapeNote.textContent = 'No custom shapes yet — import one in the Brush panel.';
+                shapeNote.style.display = '';
                 return;
             }
-            shapeNote.textContent = 'Shapes come from the Brush panel’s library.';
+            shapeNote.textContent = '';
+            shapeNote.style.display = 'none';
             lst.forEach(function (s) {
                 var b = document.createElement('button');
                 b.type = 'button';
@@ -4565,7 +4595,7 @@
             var st = BM.side(side);
             if (!st) return;
             sel.value = st.mode;
-            hint.textContent = BM.MODE_HINTS[st.mode] || '';
+            sel.title = lbl.title = BM.MODE_HINTS[st.mode] || '';
             mirRow.style.display = (st.mode === 'mirror') ? '' : 'none';
             altBox.style.display = (st.mode === 'alt') ? '' : 'none';
             radialRow.style.display = (st.mode === 'radial') ? '' : 'none';
@@ -4592,14 +4622,17 @@
             // Say what the slot actually overrides — "alternate brush" with an
             // empty slot paints identically to the main brush, and that is a
             // confusing thing to discover by painting.
+            // One short line on the panel; the explanation is its tooltip.
             var n = Object.keys(alt).length;
             if (!n) {
-                altSummary.textContent = 'Nothing set yet — this button paints exactly like the main brush. '
-                    + 'Pick a tip above, or Copy brush.';
+                altSummary.textContent = 'Nothing set yet: paints like the main brush.';
+                altSummary.title = 'This button paints exactly like the main brush until you pick a tip above, or Copy brush.';
             } else if (n <= 2 && !('SPLAT_RADIUS' in alt)) {
-                altSummary.textContent = 'Overrides the tip only; size, flow and feel follow the main brush.';
+                altSummary.textContent = 'Overrides the tip only.';
+                altSummary.title = 'Size, flow and feel follow the main brush.';
             } else {
                 altSummary.textContent = 'Overrides ' + n + ' brush settings.';
+                altSummary.title = '';
             }
         }
         sync();
@@ -4796,7 +4829,8 @@
         // One row, two meanings: the distance modes ramp over TRAVEL (a % of
         // canvas width) and "Over time" ramps over SECONDS, so the row retargets
         // itself rather than adding a second slider that is dead half the time.
-        // It stays dimmed and disabled for Instant, which has nothing to ramp.
+        // It is hidden for Instant, which has nothing to ramp (2026-10-04: it
+        // used to sit there dimmed — Gabriel: hide what is not in use).
         function rampSpec(mode) {
             return (mode === 'time')
                 ? { label: 'Time', min: '0.05', max: '3', step: '0.05' }
@@ -4806,7 +4840,7 @@
         function syncRamp(ramp, sel, kind) {
             var mode = sel.value;
             var on = mode !== 'instant';
-            ramp.row.style.opacity = on ? '1' : '0.4';
+            ramp.row.style.display = on ? 'flex' : 'none';
             ramp.slider.disabled = !on;
             var spec = rampSpec(mode);
             ramp.row.firstChild.textContent = spec.label;
@@ -5054,6 +5088,11 @@
                 if (typeof v !== 'number') return;
                 v = Math.max(min, Math.min(max, v));
                 slider.value = String(v);
+                // The fill is painted from --val (css/slider-styles.css), which
+                // 06-slider-updater only refreshes on a real input event, so a
+                // Reset or a brush preset left the bar where it was while the
+                // thumb and readout moved (Steady read "Off" over a 40% fill).
+                try { slider.style.setProperty('--val', slider.value); } catch (_) {}
                 commit(v);
             };
             group.appendChild(lbl); group.appendChild(slider);
@@ -5135,6 +5174,7 @@
                 flow: num(c.BRUSH_FLOW, 1),
                 hardness: num(c.BRUSH_HARDNESS, 0.8),
                 stabilizer: num(c.BRUSH_STABILIZER, 0),
+                steady: num(c.BRUSH_STEADY, 0),
                 spacing: num(c.BRUSH_SPACING, 0.35),
                 jitter: num(c.BRUSH_JITTER, 0),
                 splatMode: c.BRUSH_CONTINUOUS ? 'constant' : 'move',
@@ -5160,11 +5200,13 @@
                 }
                 if (SETTERS.target) SETTERS.target(p.target);
                 if (SETTERS.tip) SETTERS.tip(p.tip | 0);
-                ['tipTexture', 'angle', 'flow', 'hardness', 'stabilizer', 'spacing', 'jitter',
+                ['tipTexture', 'angle', 'flow', 'hardness', 'stabilizer', 'steady', 'spacing', 'jitter',
                  'eraser', 'splatMode', 'velMode', 'velStrength', 'velOnly', 'shape'
                 ].forEach(function (k) {
                     if (SETTERS[k] && p[k] !== undefined) SETTERS[k](p[k]);
                 });
+                // Presets saved before Steady existed were painted on the hand.
+                if (p.steady === undefined && SETTERS.steady) SETTERS.steady(0);
                 // Migration defaults: presets saved before the splat-mode /
                 // custom-shape controls existed carry neither key — they were
                 // authored with On-Move + no shape, so applying them must
@@ -5293,6 +5335,7 @@
             if (!VALID_TARGETS[t]) t = 'fluid';
             if (window.config) window.config.BRUSH_TARGET = t;
             syncBrushMode();
+            syncSpacingState();   // Collider has no hose: Spacing, not Interval
             try { if (window.settingsManager) window.settingsManager.set('brush.target', t); } catch (_) {}
         }
         SETTERS.target = setBrushTarget;
@@ -5593,19 +5636,25 @@
         // Each mode owns exactly one texture control, and they are twins: Spacing
         // is the gap along TRAVEL, Interval is the gap in TIME. Minimum on either
         // is the fine continuous stroke; every step up is deposits you can see.
-        // Whichever belongs to the inactive mode is greyed rather than hidden, so
-        // the panel never reflows when you switch modes.
+        // Only the one that applies is shown (2026-10-04, Gabriel: hide what is
+        // not in use; they used to grey out so the panel never reflowed). The
+        // hose is fluid-only, so Paint into Collider keeps Spacing in either
+        // mode — that is what a collider stroke is laid by.
         var spacingGroup, intervalGroup; // assigned below — setSplatMode can run first
-        function setGroupEnabled(g, on) {
+        function setGroupEnabled(g, on) {   // syncBrushMode greys controls with this
             if (!g) return;
             g.style.opacity = on ? '1' : '0.4';
             var sl = g.querySelector('input');
             if (sl) sl.disabled = !on;
         }
+        function setGroupShown(g, on) {
+            if (g) g.style.display = on ? '' : 'none';
+        }
         function syncSpacingState() {
-            var cont = !!(window.config && window.config.BRUSH_CONTINUOUS);
-            setGroupEnabled(spacingGroup, !cont);
-            setGroupEnabled(intervalGroup, cont);
+            var c = window.config || {};
+            var hose = !!c.BRUSH_CONTINUOUS && (c.BRUSH_TARGET || 'fluid') === 'fluid';
+            setGroupShown(spacingGroup, !hose);
+            setGroupShown(intervalGroup, hose);
         }
         function setSplatMode(m) {
             if (m !== 'constant') m = 'move';
@@ -5699,10 +5748,42 @@
                 }, 0);
             });
         })();
+        // Steady: the pulled string (05d0, 2026-10-04). Gabriel: "the mouse
+        // moves so fast sometimes, we need to let the user tone it down". One
+        // slider for the whole feel — slack, pull and top speed all rise
+        // together — because three knobs for "calmer" is two too many.
+        var steadyGroup = pSlider('brushSteady', 'Steady', 0, 1, 0.01, 'BRUSH_STEADY',
+            function (v) { return v > 0.001 ? Math.round(v * 100) + '%' : 'Off'; }, 'steady');
+        steadyGroup.title = 'The brush follows your hand on a string. Small wobbles stay inside the slack, '
+            + 'corners round off, and a fast drag is laid down at a calm, even pace. Higher = a longer, '
+            + 'lazier string. It moves with Time too: slow Time, slower brush. When you let go, the brush '
+            + 'finishes the line to where you lifted. Off = the brush sits on the cursor.';
+        // Hide guide: paint without the line and the hand ring (31). Only
+        // shown while Steady is on — with Steady off there is no guide.
+        // A viewing preference, not part of the brush: no preset key.
+        var guideRow = pCheckbox('brushSteadyHideGuide', 'Hide guide', 'BRUSH_STEADY_HIDE_GUIDE');
+        guideRow.title = 'Paint without the Steady guide: the line from the brush back to the ring at your cursor.';
+        function syncGuideRow() {
+            var on = !!(window.config && window.config.BRUSH_STEADY > 0.001);
+            guideRow.style.display = on ? '' : 'none';
+        }
+        var steadyInput = steadyGroup.querySelector('input');
+        if (steadyInput) steadyInput.addEventListener('input', syncGuideRow);
+        // Presets and Reset set the slider through SETTERS, not an input event.
+        var setSteady = SETTERS.steady;
+        SETTERS.steady = function (v) { setSteady(v); syncGuideRow(); };
+        syncGuideRow();
         pSlider('brushJitter', 'Jitter', 0, 1, 0.01, 'BRUSH_JITTER', pct, 'jitter');
         (function restoreSplatMode() {
             var saved = null;
             try { saved = window.settingsManager && window.settingsManager.get('brush.splatMode'); } catch (_) {}
+            // Nothing saved yet: the shipped default (Constant since
+            // 2026-10-04), from the frozen copy, not the live config a preset
+            // may already have touched.
+            if (saved !== 'move' && saved !== 'constant') {
+                var D = window.__CONFIG_DEFAULTS;
+                saved = (D ? D.BRUSH_CONTINUOUS : (window.config && window.config.BRUSH_CONTINUOUS)) ? 'constant' : 'move';
+            }
             setSplatMode(saved);
         })();
 

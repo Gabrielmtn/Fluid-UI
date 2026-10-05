@@ -150,12 +150,17 @@
           target: { strip: 'Fluid', sel: '#materialMode' } },
         { id: 'constant-flow', pillar: 'brush', title: 'Keep painting while holding still',
           tags: ['flow', 'constant', 'hold', 'still', 'spacing', 'interval', 'move'],
-          answer: 'In Brush on the left, switch On Move to Constant. The brush keeps depositing while you hold the button; Interval and Flow set the rate.',
+          answer: 'In Brush on the left, under Stroke, pick Constant (where a new brush starts). The brush keeps depositing while you hold the button; Interval and Flow set the rate.',
           target: inDrawer('.brush-mode-btn', 'Constant'),
           steps: [
-            { say: 'In Brush on the left, switch On Move to Constant.', target: inDrawer('.brush-mode-btn', 'Constant'), until: { active: true } },
+            { say: 'In Brush on the left, under Stroke, pick Constant.', target: inDrawer('.brush-mode-btn', 'Constant'), until: { active: true } },
             { say: 'Hold the button still on the canvas: the brush keeps depositing. Flow sets how much lands per dab.', note: 'On Move is the way back.', target: inDrawer('#brushFlow') }
           ] },
+        { id: 'steady-stroke', pillar: 'brush', title: 'Smooth out a shaky or too-fast stroke',
+          tags: ['steady', 'smooth', 'stabilizer', 'stabiliser', 'lazy', 'string', 'shaky', 'wobbly', 'jitter', 'fast', 'calm', 'slow'],
+          answer: 'Raise Steady, right under Brush Size on the left. The brush follows your cursor on a string: small wobbles vanish, corners round off and a fast drag paints at a calm, even pace. Slowing Time slows it further.',
+          target: { strip: 'Steady', sel: '#brushSteady' },
+          demo: { label: 'Try a steady brush', run() { const el = $('brushSteady'); const was = el ? el.value : null; setCtl('brushSteady', 0.6, 'input'); return () => { if (was != null) setCtl('brushSteady', was, 'input'); }; } } },
         { id: 'pressure-brush', pillar: 'brush', title: 'Move paint around without adding any',
           tags: ['smudge', 'spread', 'gather', 'swirl', 'push', 'pressure', 'stir', 'tab'],
           answer: 'In Brush on the left, choose Pressure and a mode: Smudge drags, Spread pushes out, Gather pulls in, Swirl spins. Nothing new is deposited. Tab switches Fluid, Pressure and Collider from the keyboard.',
@@ -669,16 +674,19 @@
         else sec.classList.remove('collapsed');
         return sec;
     }
+    // Brush Size and Steady head the left sidebar since 2026-10-04.
+    function leftCell(key) {
+        const left = $('sidebar-left');
+        return left ? left.querySelector('[data-ui-key="' + key + '"]') : null;
+    }
     function stripCell(key) {
         const strip = $('mixer-strip');
         const cell = strip ? strip.querySelector('[data-ui-key="' + key + '"]') : null;
         if (cell) return cell;
-        // Brush Size heads the left sidebar since 2026-10-04.
-        const left = $('sidebar-left');
-        const leftCell = left ? left.querySelector('[data-ui-key="' + key + '"]') : null;
-        if (leftCell) {
+        const lc = leftCell(key);
+        if (lc) {
             if (window.Sidebars && window.Sidebars.left && window.Sidebars.left.isCollapsed()) window.Sidebars.left.expand();
-            return leftCell;
+            return lc;
         }
         // A fader the bar could not fit at this width is parked in the More
         // panel (js/46-strip-more.js); reveal() opens that panel to point at it.
@@ -686,10 +694,17 @@
         return more ? more.querySelector('[data-ui-key="' + key + '"]') : null;
     }
     // What the cell is called on screen: its data-ui-label when the name
-    // shown differs from the key (20's CHANNEL_NAMES), else the key.
+    // shown differs from the key (20's CHANNEL_NAMES), else the key. Looked
+    // up without stripCell's unfolding: reading a recipe must not move the UI.
     function stripName(key) {
-        const cell = stripCell(key);
+        const strip = $('mixer-strip'), more = $('mixer-more-panel');
+        const sel = '[data-ui-key="' + key + '"]';
+        const cell = (strip && strip.querySelector(sel)) || leftCell(key) || (more && more.querySelector(sel));
         return (cell && cell.dataset.uiLabel) || key;
+    }
+    // Where a strip-style target lives, for the recipe's "where" line.
+    function stripWhere(key) {
+        return (leftCell(key) ? 'Brush bar · ' : 'Top bar · ') + stripName(key);
     }
     const POPUPS = {
         presets: { trigger: () => $('mixerPresetsTrigger'), panel: () => document.querySelector('.mixer-presets-panel'), isOpen: (p) => p && p.style.display !== 'none' && p.style.display !== '' },
@@ -1233,7 +1248,7 @@
     function renderDetail() {
         const r = results[highlight];
         if (!r) { detailEl.innerHTML = '<div class="recipe-empty">' + (searchEl.value ? 'Nothing matches. Try another word, or clear the search.' : 'Type what you want to do, or pick a topic.') + '</div>'; return; }
-        const where = r.target ? (r.target.section ? r.target.section : r.target.strip ? 'Top bar · ' + stripName(r.target.strip) : r.target.chrome ? 'Bottom-left bar' : r.target.canvas ? 'The canvas' : '') : '';
+        const where = r.target ? (r.target.section ? r.target.section : r.target.strip ? stripWhere(r.target.strip) : r.target.chrome ? 'Bottom-left bar' : r.target.canvas ? 'The canvas' : '') : '';
         const hasSteps = !!(r.steps && r.steps.length);
         const steps = hasSteps
             ? '<ol class="recipe-steps">' + r.steps.map((s) => '<li>' + escapeHtml(s.say) + (s.key ? ' ' + keyCap(s.key) : '') + '</li>').join('') + '</ol>'

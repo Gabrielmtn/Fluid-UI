@@ -148,6 +148,7 @@
         // D1 stroke engine (dynamically-created in buildBrushSection; no mut —
         // input-feel params, not style variants)
         brushStabilizer: {configKey: "BRUSH_STABILIZER", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
+        brushSteady: {configKey: "BRUSH_STEADY", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushSpacing: {configKey: "BRUSH_SPACING", ui: null, hard: {min: 0.001, max: 1}, def: null, decimals: 3, category: "brush", perfTier: 0, simSlider: false},
         brushHardness: {configKey: "BRUSH_HARDNESS", ui: null, hard: {min: 0, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},
         brushFlow: {configKey: "BRUSH_FLOW", ui: null, hard: {min: 0.05, max: 1}, def: null, decimals: 2, category: "brush", perfTier: 0, simSlider: false},

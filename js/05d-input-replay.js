@@ -90,8 +90,10 @@
         // Plans the tail at a release (pointerup/cancel and touchend share it).
         // A cubic ease-out x(u) = L(1 - (1-u)^3) leaves at 3L/N per frame, so a
         // run of N = 3L/s0 frames starts at exactly the release speed s0.
-        function armReleaseTail() {
-            const v = releaseVelocity();
+        // `at` ({x, y, dx, dy}) starts it somewhere other than the hand: a
+        // Steady stroke's head, where it landed and how fast it was going.
+        function armReleaseTail(at) {
+            const v = at ? { dx: at.dx, dy: at.dy } : releaseVelocity();
             moveTrail.length = 0;
             splatOutActive = false;
             const s0 = Math.sqrt(v.dx * v.dx + v.dy * v.dy) / 10;
@@ -109,8 +111,8 @@
             splatUpTime = Date.now();
             splatOutActive = true;
             splatReleaseInMult = getSplatInMult(); // size at release → no jump
-            splatTailX0 = splatOutX = pointer.x;
-            splatTailY0 = splatOutY = pointer.y;
+            splatTailX0 = splatOutX = at ? at.x : pointer.x;
+            splatTailY0 = splatOutY = at ? at.y : pointer.y;
             splatTailUx = v.dx / (s0 * 10);
             splatTailUy = v.dy / (s0 * 10);
             splatTailLen = len;
@@ -261,9 +263,17 @@
             return (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
         }
         let strokeArchived = false;
+        // The history entry the live stroke was archived into. A stroke goes on
+        // painting after the lift — the drain's last dabs, a Steady brush
+        // finishing its line — and those dabs belong to it, so they are added
+        // here as well as to strokeEvents. Without that, a Time replay (which
+        // reads history) stopped where the hand lifted: 51px short of a Steady
+        // stroke's real end, measured 2026-10-04.
+        let archivedEntry = null;
         function archiveCurrentStroke() {
             if (strokeArchived || strokeEvents.length === 0) return;
-            strokeHistory.push({ events: strokeEvents.slice(), startTime: strokeStartTime, endTime: Date.now() });
+            archivedEntry = { events: strokeEvents.slice(), startTime: strokeStartTime, endTime: Date.now() };
+            strokeHistory.push(archivedEntry);
             strokeArchived = true;
             // Cap history at 200 strokes to limit memory (oldest first)
             while (strokeHistory.length > 200) {
@@ -272,6 +282,7 @@
         }
         function startStroke(x, y) {
             archiveCurrentStroke();
+            archivedEntry = null;
             strokeEvents = [];
             strokeStartTime = Date.now();
             strokeArchived = false;
@@ -364,6 +375,10 @@
                 fm: _fm,
                 ra: _ra
             });
+            if (strokeArchived && archivedEntry) {
+                archivedEntry.events.push(strokeEvents[strokeEvents.length - 1]);
+                archivedEntry.endTime = Date.now();
+            }
         }
         function deepCopyEvent(ev) {
             // `head` marks the first dab of a stroke. The replay interpolator
@@ -1161,6 +1176,20 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             moveTrail.length = 0;
+            // The last stroke's deferred arm advance (it waits for its tail or
+            // its Steady catch-up to finish, see 05j) lands NOW if this press
+            // cut that short, so this stroke's arms are this stroke's colours.
+            if (pendingArmAdvance && typeof advanceArmColors === 'function') {
+                advanceArmColors();
+                pendingArmAdvance = false;
+            }
+            // Same for the wire: dabs the cut-short stroke queued (a Steady
+            // finish, a release tail) go out NOW, ahead of this press, so a
+            // peer never paints them after the new stroke has started.
+            if (typeof window.flushDabs === 'function') {
+                window.flushDabs(window.__mpLastDabColor,
+                    (typeof animationMultiplier === 'number' ? animationMultiplier : 1), true);
+            }
             applyPickerColor();
             if (typeof window.pinArmSteps === 'function') window.pinArmSteps();
             // D2/D3 routing: sketch and mask strokes are surface paint — no
@@ -1302,7 +1331,10 @@
                 if (pointer.dx * pointer.dx + pointer.dy * pointer.dy < 1.0) return;
                 pointer.moved = true;
                 const _skT = config.BRUSH_TARGET === 'sketch';
-                if (!_skT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                // A Steady stroke records its HEAD's path from 05j instead (the
+                // hand is not where the paint went).
+                const _stdy = !!(window.BrushEngine && window.BrushEngine.steadyActive && window.BrushEngine.steadyActive());
+                if (!_skT && !_stdy && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
                 // 1.3 parity: when the brush engine drives the stroke it
                 // broadcasts its real dab train from 05j (queueDab/flushDabs).
                 // Sampling here too would double-paint every peer.
@@ -1335,7 +1367,12 @@
             // not arm it — the sketch-only test let a collider stroke's lift
             // squirt a dye tail into the fluid at the wall's end, locally and
             // (once tails rode the wire) on every peer. Audit 2026-08-16.
-            if (wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid') {
+            // A Steady stroke (05d0) is still reeling its head in to this
+            // point, so its tail waits for the head to land and leaves from
+            // there, at the head's speed.
+            const _steady = !!(window.BrushEngine && window.BrushEngine.steadyActive && window.BrushEngine.steadyActive());
+            const _tail = wasDown && window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid';
+            if (_tail && !_steady) {
                 armReleaseTail();
             }
             pointer.down = false;
@@ -1343,7 +1380,10 @@
             if (wasDown) {
                 // Finish the engine stroke: the stabilizer's lagged tail
                 // catches up to the release point (dabs drain in 05j)
-                if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
+                if (window.BrushEngine) {
+                    window.BrushEngine.end(pointer.x, pointer.y,
+                        (_tail && _steady) ? function (at) { armReleaseTail(at); } : null);
+                }
                 archiveCurrentStroke();
                 advanceColor();
                 // Defer arm color advance until ALL painting settles — the
@@ -1812,6 +1852,20 @@
             splatStrokeDist = 0;
             splatOutActive = false;
             moveTrail.length = 0;
+            // The last stroke's deferred arm advance (it waits for its tail or
+            // its Steady catch-up to finish, see 05j) lands NOW if this press
+            // cut that short, so this stroke's arms are this stroke's colours.
+            if (pendingArmAdvance && typeof advanceArmColors === 'function') {
+                advanceArmColors();
+                pendingArmAdvance = false;
+            }
+            // Same for the wire: dabs the cut-short stroke queued (a Steady
+            // finish, a release tail) go out NOW, ahead of this press, so a
+            // peer never paints them after the new stroke has started.
+            if (typeof window.flushDabs === 'function') {
+                window.flushDabs(window.__mpLastDabColor,
+                    (typeof animationMultiplier === 'number' ? animationMultiplier : 1), true);
+            }
             applyPickerColor();
             if (typeof window.pinArmSteps === 'function') window.pinArmSteps();
             // Same sketch/mask routing as the pointerdown press (see the
@@ -1866,7 +1920,8 @@
             if (pointer.down) {
                 pointer.moved = true;
                 const _skTT = config.BRUSH_TARGET === 'sketch';
-                if (!_skTT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
+                const _stdyT = !!(window.BrushEngine && window.BrushEngine.steadyActive && window.BrushEngine.steadyActive());
+                if (!_skTT && !_stdyT && recEnabled) recRecordInteraction(pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color);
                 if (!_skTT && !window.BrushEngine && typeof broadcastSplat === 'function') {
                     const now = Date.now();
                     if (!canvas._lastTouchBroadcast || now - canvas._lastTouchBroadcast > 50) {
@@ -1894,13 +1949,19 @@
                 window._activeReplayEvents = null;
             }
             if (pointer.down) {
-                // Same fluid-only tail gate as finishLeftStroke (audit note there)
-                if (window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid') {
+                // Same fluid-only tail gate as finishLeftStroke (audit note
+                // there), and the same wait for a Steady head to land.
+                const _steadyT = !!(window.BrushEngine && window.BrushEngine.steadyActive && window.BrushEngine.steadyActive());
+                const _tailT = window.splatOutMode !== 'instant' && config.BRUSH_TARGET === 'fluid';
+                if (_tailT && !_steadyT) {
                     armReleaseTail();
                 }
                 pointer.down = false;
                 pointer.moved = false;
-                if (window.BrushEngine) window.BrushEngine.end(pointer.x, pointer.y);
+                if (window.BrushEngine) {
+                    window.BrushEngine.end(pointer.x, pointer.y,
+                        (_tailT && _steadyT) ? function (at) { armReleaseTail(at); } : null);
+                }
                 archiveCurrentStroke();
                 advanceColor();
                 // Same deferred advance as finishLeftStroke: flush on full

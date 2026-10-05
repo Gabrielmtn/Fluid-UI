@@ -83,7 +83,7 @@
     var ALT_KEYS = {
         BRUSH_TIP: 'int', BRUSH_SHAPE_ID: 'idOrNull', SPLAT_RADIUS: 'num',
         BRUSH_TIP_TEXTURE: 'num', BRUSH_ANGLE: 'num', BRUSH_FLOW: 'num',
-        BRUSH_HARDNESS: 'num', BRUSH_STABILIZER: 'num', BRUSH_SPACING: 'num',
+        BRUSH_HARDNESS: 'num', BRUSH_STABILIZER: 'num', BRUSH_STEADY: 'num', BRUSH_SPACING: 'num',
         BRUSH_JITTER: 'num', BRUSH_CONTINUOUS: 'bool', BRUSH_ERASER: 'bool',
         BRUSH_VELOCITY_ONLY: 'bool', BRUSH_VEL_MODE: 'str', BRUSH_VEL_STRENGTH: 'num'
     };
@@ -91,7 +91,7 @@
     // irrelevant (the overlay is applied as a set), but keeping tip/shape
     // first makes a logged slot readable.
     var FULL_KEYS = ['BRUSH_TIP', 'BRUSH_SHAPE_ID', 'SPLAT_RADIUS', 'BRUSH_TIP_TEXTURE',
-        'BRUSH_ANGLE', 'BRUSH_FLOW', 'BRUSH_HARDNESS', 'BRUSH_STABILIZER', 'BRUSH_SPACING',
+        'BRUSH_ANGLE', 'BRUSH_FLOW', 'BRUSH_HARDNESS', 'BRUSH_STABILIZER', 'BRUSH_STEADY', 'BRUSH_SPACING',
         'BRUSH_JITTER', 'BRUSH_CONTINUOUS', 'BRUSH_ERASER', 'BRUSH_VELOCITY_ONLY',
         'BRUSH_VEL_MODE', 'BRUSH_VEL_STRENGTH'];
 
@@ -145,6 +145,7 @@
                 // means the rotation it names (270) rather than being cut off.
                 if (key === 'BRUSH_ANGLE') return ((v % 360) + 360) % 360;
                 if (key === 'BRUSH_VEL_STRENGTH') return Math.max(0, Math.min(5, v));
+                if (key === 'BRUSH_STEADY') return Math.max(0, Math.min(1, v));
                 return Math.max(0, Math.min(10, v));
             case 'bool': return !!v;
             case 'str':

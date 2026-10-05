@@ -1006,14 +1006,26 @@
                                       // sim step clamps to 16ms but the wall delta does not).
                                       // On, playback wall-duration stretches by 1/timeScale —
                                       // the timeline's seconds are simulated seconds.
-            BRUSH_CONTINUOUS: false,  // Splat mode: false = dabs spaced along travel
+            BRUSH_CONTINUOUS: true,   // Splat mode: false = dabs spaced along travel
                                       // ("on move", the classic feel); true = constant
                                       // flow — dye keeps flowing while the pointer is
                                       // held, even standing still, one dab every
                                       // BRUSH_DAB_INTERVAL_MS of simulated time (05j
                                       // synthesizes the dabs; the
                                       // spacing walker is bypassed, fluid target only).
-                                      // Brush panel segmented row.
+                                      // Brush panel segmented row. Constant is the
+                                      // first-boot mode since 2026-10-04 (Gabriel: slow
+                                      // On Move strokes read as jittery); a saved mode
+                                      // and brush presets keep theirs.
+
+            BRUSH_STEADY: 0,          // The pulled string (05d0, 2026-10-04): 0 = the brush
+                                      // sits on the hand; up to 1 = it trails on a string,
+                                      // with a slack that swallows tremble, a pull that eases
+                                      // in and out, and a top speed, all on the Time-scaled
+                                      // clock. Brush panel → Stroke → Steady.
+            BRUSH_STEADY_HIDE_GUIDE: false, // Steady's on-canvas guide (31: the line from the
+                                      // brush back to a ring at the hand). true = paint
+                                      // with the bare dot. "Hide guide", under Steady.
 
             SIM_SUBSTEP: true,        // Run several physics steps per frame when the display
                                       // refresh is below ~50Hz. The dt clamp below caps a

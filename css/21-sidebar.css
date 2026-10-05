@@ -2127,14 +2127,17 @@ select option {
 #sidebar-left.collapsed > .lsb-body { display: none; }
 #sidebar-left > .lsb-rail { display: none; }
 #sidebar-left.collapsed > .lsb-rail { display: flex; }
+/* The head: Brush Size, then Steady under it (2026-10-04). A column now —
+   the fold button moved out to the bar's edge (.lsb-edge). */
 .lsb-head {
     position: sticky;
     top: 0;
     z-index: 2;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     gap: 2px;
-    padding: 6px 4px 6px 0;
+    padding: 6px 0;
     background: rgba(0, 0, 0, 0.92);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -2151,15 +2154,70 @@ select option {
 .lsb-head .ch-fader { flex-wrap: nowrap; gap: 6px; contain: none; }
 .lsb-head .ch-fader .fader-stack { flex: 1 1 auto; min-width: 0; }
 .lsb-head .ch-fader input[type="range"] { width: 100%; }
-.lsb-collapse,
-.lsb-expand {
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-    padding: 0;
+/* Fixed-width readouts: Brush Size reads 0.125 / 1.3 / 11.0 (3 to 5
+   characters) and Steady Off / 5% / 100%, and a box that tracks the text
+   twitches as you drag. Courier is monospaced, so ch is exactly a digit. */
+#mixer-brushValue {
+    min-width: calc(5ch + 2px);
+    text-align: right;
+}
+#brushSteadyValue {
+    display: inline-block;
+    min-width: calc(4ch + 2px);
+    text-align: right;
+}
+/* Steady under Brush Size, dressed like it: same inset, the channel label's
+   type, the channel value's type (css/20-mixer-strip.css .ch-label/.ch-value). */
+.lsb-steady {
+    padding: 2px 6px 0 10px;
+}
+.lsb-steady > .control-group { margin-bottom: 0; }
+#sidebar-left .lsb-steady > .control-group > label {
+    font-size: 11px;
+    letter-spacing: 0.6px;
+    color: rgba(255, 255, 255, 0.55);
+    line-height: 1.2;
+}
+#sidebar-left .lsb-steady > .control-group > label .value-display {
+    font-family: 'Courier New', monospace;
     font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: var(--ink-100, #f2f3f5);
+    opacity: 1;
+}
+.lsb-steady > .checkbox-group { margin: 2px 0 0; }
+/* The empty hotkey slot (js/17) keeps body rows in one column with rows that
+   show a modifier cap; the head's Brush Size has none, so in the head it
+   only pushed Steady's value 38px off Brush Size's. A real cap still shows. */
+.lsb-head .hk-cap-empty { display: none; }
+/* The fold tab: a zero-width strip right after #sidebar-left in #main-area,
+   so it rides the bar's outer edge whatever its width (js/20). The tab hangs
+   off that edge, half way down. Layout only — the colours are 01-buttons'
+   (js/38 audit). */
+.lsb-edge {
+    flex: 0 0 0;
+    width: 0;
+    position: relative;
+    z-index: 101;
+    zoom: var(--ui-scale);
+}
+.lsb-edge > .lsb-toggle {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    width: 14px;
+    min-width: 0;
+    height: 44px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 11px;
     line-height: 1;
 }
+body.focus-mode .lsb-edge,
+body.mobile-mode .lsb-edge { display: none; }
 .lsb-body { display: flex; flex-direction: column; min-height: 0; }
 .lsb-rail {
     flex-direction: column;
@@ -2201,8 +2259,7 @@ body.mobile-mode #sidebar-right > #sidebar-left {
 }
 body.mobile-mode #sidebar-right > #sidebar-left.collapsed > .lsb-head,
 body.mobile-mode #sidebar-right > #sidebar-left.collapsed > .lsb-body { display: flex; }
-body.mobile-mode #sidebar-right > #sidebar-left > .lsb-rail,
-body.mobile-mode #sidebar-right > #sidebar-left .lsb-collapse { display: none; }
+body.mobile-mode #sidebar-right > #sidebar-left > .lsb-rail { display: none; }
 body.mobile-mode #sidebar-right > #sidebar-left > .lsb-head { position: static; background: transparent; }
 
 /* The Brush section (and Multi-Brush) keep the popup skin's classes so the

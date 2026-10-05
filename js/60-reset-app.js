@@ -66,6 +66,7 @@
             tipTexture: D.BRUSH_TIP_TEXTURE, flow: D.BRUSH_FLOW, hardness: D.BRUSH_HARDNESS,
             stabilizer: D.BRUSH_STABILIZER, spacing: D.BRUSH_SPACING, jitter: D.BRUSH_JITTER,
             dabInterval: D.BRUSH_DAB_INTERVAL_MS, splatMode: D.BRUSH_CONTINUOUS ? 'constant' : 'move',
+            steady: D.BRUSH_STEADY,
             velOnly: false, velMode: D.BRUSH_VEL_MODE || 'smudge', velStrength: D.BRUSH_VEL_STRENGTH
         };
         Object.keys(want).forEach(function (k) {

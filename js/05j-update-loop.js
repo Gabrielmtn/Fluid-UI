@@ -424,8 +424,39 @@
                 // then make the FIRST frame of the next click compute dx from
                 // the previous stroke's position (a phantom velocity kick).
                 // Clear it any frame the pointer is up.
-                if (!pointer.down) { window.__contFlowLast = null; window.__contFlowCredit = 0; }
+                // Steady (05d0): after the lift the head is still finishing the
+                // line, and the hose keeps flowing at it until it lands.
+                const _steadyReel = !!(window.BrushEngine && window.BrushEngine.releasing && window.BrushEngine.releasing());
+                if (!pointer.down && !_steadyReel) { window.__contFlowLast = null; window.__contFlowCredit = 0; }
+                // ...and on every new stroke. A press while the last Steady stroke
+                // was still finishing never sees a pointer-up frame in between, so
+                // the hose's first dab spanned from the old head to the new press:
+                // a long line across the canvas.
+                const _strokeId = (window.BrushEngine && window.BrushEngine.stroke) ? window.BrushEngine.stroke() : 0;
+                if (window.__contFlowStroke !== _strokeId) {
+                    window.__contFlowLast = null; window.__contFlowCredit = 0;
+                    window.__contFlowStroke = _strokeId;
+                }
                 if (window.BrushEngine && (window.BrushEngine.isActive() || window.BrushEngine.pending()) && !isReplayActive) {
+                    // Steady: walk the brush head along its string for this
+                    // frame (wall time, scaled by Time inside), feeding the
+                    // walker. Inert unless the stroke started with Steady on.
+                    let _steadyLanded = false;
+                    const _steadyFrom = window.BrushEngine.head ? window.BrushEngine.head() : null;
+                    if (_steadyFrom && window.BrushEngine.tick) {
+                        _steadyLanded = window.BrushEngine.tick(wallDt * 1000, window.timeScale || 1);
+                        // The recorder taps raw pointermoves (05d skips them on a
+                        // Steady stroke): give it the head's path instead, so an
+                        // animation plays back the line that was painted.
+                        const _hTo = window.BrushEngine.head();
+                        const _hx = _hTo ? _hTo.x : _steadyFrom.handX, _hy = _hTo ? _hTo.y : _steadyFrom.handY;
+                        const _hdx = (_hx - _steadyFrom.x) * 10, _hdy = (_hy - _steadyFrom.y) * 10;
+                        if (recEnabled && typeof recRecordInteraction === 'function'
+                            && config.BRUSH_TARGET !== 'sketch' && (_hdx * _hdx + _hdy * _hdy) >= 1.0) {
+                            recRecordInteraction(_hx, _hy, _hdx, _hdy, pointer.color);
+                        }
+                    }
+                    const _steadyHead = window.BrushEngine.head ? window.BrushEngine.head() : null;
                     // D1 brush engine: drain this frame's dab train (distance-
                     // parameterized spacing + stabilizer + gap-fill, built in
                     // 05d0). Replaces the legacy one-splat-per-frame path —
@@ -468,7 +499,7 @@
                         // slower than Time 1) and each dab carries _paceShare of
                         // the dye: the same paint per simulated second, the Time-1
                         // number of dabs.
-                        if (pointer.down && window.BrushEngine.isActive()) {
+                        if ((pointer.down || _steadyReel) && window.BrushEngine.isActive()) {
                             _dabs = [];
                             // Interval -> rate. The control is an interval so its slider reads
                             // like Spacing (minimum = finest); the clock below wants a rate.
@@ -488,7 +519,9 @@
                             let _n = Math.floor(_credit);
                             if (_n > _dabBudget) _n = _dabBudget;   // spike guard
                             if (_n > 0) {
-                                const cx = pointer.x, cy = pointer.y;
+                                // Steady: the hose pours at the head, not the hand.
+                                const cx = _steadyHead ? _steadyHead.x : pointer.x;
+                                const cy = _steadyHead ? _steadyHead.y : pointer.y;
                                 // __contFlowLast is the LAST DAB (2026-09-10), not the
                                 // pointer at the last emitting frame. The segment from
                                 // it to the live pointer is what the credit spans:
@@ -652,7 +685,8 @@
                             // BETWEEN walker dabs, and the walker already carries
                             // the stroke's momentum.
                             if (window.splatInMode === 'time' || _bt > splatStrokeDist + 0.0005) {
-                                _dabs = [{ x: pointer.x, y: pointer.y, dx: 0, dy: 0, p: 1,
+                                _dabs = [{ x: _steadyHead ? _steadyHead.x : pointer.x,
+                                           y: _steadyHead ? _steadyHead.y : pointer.y, dx: 0, dy: 0, p: 1,
                                            travel: _bt * Math.max(1, canvas.width) }];
                             }
                         }
@@ -752,6 +786,18 @@
                     if (_dabs.length && typeof window.flushDabs === 'function') {
                         window.flushDabs(window.__mpLastDabColor,
                             (typeof animationMultiplier === 'number' ? animationMultiplier : 1), false);
+                    }
+                    // The stroke's last dabs are the end of it on the wire too:
+                    // the lift's pointer-up went out before them, and the wire
+                    // only sends every DAB_FLUSH_MS, so the drain's final few
+                    // (a Steady line landing, or just the last frame's dabs after
+                    // an On Move lift — measured 9 dabs) sat in the queue until
+                    // the NEXT stroke. Same rule as the end of the release tail.
+                    const _strokeDone = _steadyLanded || (_dabs.length && !pointer.down
+                        && !window.BrushEngine.isActive() && !window.BrushEngine.pending());
+                    if (_strokeDone && !splatOutActive && typeof window.flushDabs === 'function') {
+                        window.flushDabs(window.__mpLastDabColor,
+                            (typeof animationMultiplier === 'number' ? animationMultiplier : 1), true);
                     }
                     pointer.moved = false;
                 } else if (pointer.moved && pointer.down && !isReplayActive) {

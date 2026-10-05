@@ -51,6 +51,59 @@
     var dotEl = el.querySelector('#brushCursorDot');
     var pEl = el.querySelector('#brushCursorP');
 
+    // ── Steady's string (05d0 BRUSH_STEADY, 2026-10-04) ────────────────
+    // On a Steady stroke the paint lands at the brush HEAD, which trails the
+    // hand on a string. The OS arrow is hidden over the canvas, so without
+    // this the hand would be invisible and the brush would just look late:
+    // the dot moves to the head, a ring marks the hand, and a thin line ties
+    // them. Shown only while a Steady stroke is live (held, or finishing the
+    // line after the lift), and not at all with Hide guide
+    // (config.BRUSH_STEADY_HIDE_GUIDE, under the Steady slider). The ghost and
+    // its arm copies stay hidden for that whole time, after the lift too: the
+    // stroke is still painting, and a ghost riding the moving head read as the
+    // brush "showing up and speeding off" at mouseup (Gabriel, 2026-10-04).
+    var stringEl = document.createElement('div');
+    stringEl.id = 'brushSteadyString';
+    stringEl.style.cssText = 'position:fixed;left:0;top:0;height:1px;width:0;' +
+        'transform-origin:0 50%;pointer-events:none;z-index:10049;display:none;' +
+        'background:rgba(255,255,255,0.6);box-shadow:0 0 2px rgba(0,0,0,0.85);will-change:transform;';
+    document.body.appendChild(stringEl);
+    var handEl = document.createElement('div');
+    handEl.id = 'brushSteadyHand';
+    handEl.style.cssText = 'position:fixed;left:0;top:0;width:9px;height:9px;box-sizing:border-box;' +
+        'border:1.5px solid rgba(255,255,255,0.8);border-radius:50%;pointer-events:none;z-index:10049;' +
+        'display:none;box-shadow:0 0 2px rgba(0,0,0,0.85);will-change:transform;';
+    document.body.appendChild(handEl);
+
+    // The live Steady head and hand in client px, or null.
+    function steadyClient() {
+        var BE = window.BrushEngine;
+        var h = BE && typeof BE.head === 'function' ? BE.head() : null;
+        if (!h || !canvas.width || !canvas.height) return null;
+        var r = canvas.getBoundingClientRect();
+        var kx = r.width / canvas.width, ky = r.height / canvas.height;
+        return {
+            head: { x: r.left + h.x * kx, y: r.top + h.y * ky },
+            hand: { x: r.left + h.handX * kx, y: r.top + h.handY * ky }
+        };
+    }
+    function hideString() {
+        if (stringEl.style.display !== 'none') stringEl.style.display = 'none';
+        if (handEl.style.display !== 'none') handEl.style.display = 'none';
+    }
+    function placeString(head, hand) {
+        var dx = hand.x - head.x, dy = hand.y - head.y;
+        var len = Math.sqrt(dx * dx + dy * dy);
+        handEl.style.display = 'block';
+        handEl.style.transform = 'translate(' + hand.x + 'px,' + hand.y + 'px) translate(-50%,-50%)';
+        // Inside the ring there is nothing to tie: the slack is the ring.
+        if (len < 5) { stringEl.style.display = 'none'; return; }
+        stringEl.style.display = 'block';
+        stringEl.style.width = len + 'px';
+        stringEl.style.transform = 'translate(' + head.x + 'px,' + head.y + 'px) rotate(' +
+            Math.atan2(dy, dx) + 'rad)';
+    }
+
     // ── Live inputs (read lazily; never captured at load) ─────────────
     function cursorEnabled() {
         var t = document.getElementById('cursorToggle');
@@ -566,9 +619,9 @@
     }
 
     var mainGhost = ghostSet(ghostEl, armWrap, ghostClip);
-    function renderGhost(x, y) {
+    function renderGhost(x, y, painting) {
         var r = canvas.getBoundingClientRect();
-        mainGhost.paint(ghostOn && !pressed, radiusRoot() * r.height,
+        mainGhost.paint(ghostOn && !pressed && !painting, radiusRoot() * r.height,
             window.devicePixelRatio || 1, x, y, r);
     }
 
@@ -596,6 +649,12 @@
         if (!cursorEnabled()) { hide(); return; }
 
         var at = brushAt(lastX, lastY);
+        var st = steadyClient();
+        if (st) {
+            at = st.head;
+            if (window.config && window.config.BRUSH_STEADY_HIDE_GUIDE) hideString();
+            else placeString(st.head, st.hand);
+        } else hideString();
         el.style.transform = 'translate(' + at.x + 'px,' + at.y + 'px) translate(-50%,-50%)';
 
         // Pressure mode swaps the dot for the P badge — the brush moves paint
@@ -606,7 +665,7 @@
         // would drift off the hotspot by the font's descent.
         if (dotEl) dotEl.style.display = pOn ? 'none' : 'block';
 
-        renderGhost(at.x, at.y);
+        renderGhost(at.x, at.y, !!st);
 
         rafId = requestAnimationFrame(render);
     }
@@ -631,6 +690,7 @@
     function hide() {
         visible = false;
         el.style.display = 'none';
+        hideString();
         ghostEl.style.display = 'none';
         armWrap.style.display = 'none';
         ghostClip.style.display = 'none';

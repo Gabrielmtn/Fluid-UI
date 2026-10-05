@@ -31,6 +31,7 @@
 //   BRUSH_SPACING      0.001..1 dab spacing as a fraction of brush diameter
 //   BRUSH_SPACING_REF  dye-per-travel anchor for k (default 0.35)
 //   BRUSH_JITTER       0..1   per-dab scatter, fraction of brush diameter
+//   BRUSH_STEADY       0..1   the pulled string (0 = the brush sits on the hand)
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -45,6 +46,85 @@
     var lastP = 1;                // last pressure seen
     var queue = [];               // pending dabs: {x, y, dx, dy, p, travel}
     var MAX_QUEUE = 512;          // spike safety — oldest dabs drop first
+
+    // ── Steady: the pulled string (2026-10-04) ──────────────────────────
+    // Gabriel: "the mouse moves so fast sometimes... a 'pulled string' that
+    // also slows down the input relative to the time slider, so even when
+    // dragging fast it looks smooth and steady."
+    //
+    // With config.BRUSH_STEADY above zero the brush stops sitting on the hand.
+    // It is a head on a string the hand drags:
+    //   - it moves only once the string is taut, so a slack of up to
+    //     STEADY_SLACK_CSS px swallows tremble and the small wobbles that read
+    //     as jitter at low speed;
+    //   - it heads for the hand, not along the hand's exact path, so corners
+    //     round off;
+    //   - its speed grows with how far the string is stretched (it eases in
+    //     and out) and has a ceiling, so a flick is laid down at a steady pace
+    //     instead of all at once;
+    //   - all of that runs in TIME-scaled seconds: at Time 0.25 the brush
+    //     moves at a quarter of the pace, slow motion painting at a slow
+    //     motion pace.
+    // move() only records where the hand is. tick(), once a frame from 05j
+    // before the drain, walks the head and feeds the spacing walker exactly
+    // as a raw sample would, so spacing, the slow-speed floor, the dye share
+    // and the ramp need nothing of their own. The constant-flow hose reads
+    // head() instead of the pointer.
+    //
+    // On release nothing about the pull changes: the hand just stops where it
+    // let go, and the head carries on toward it exactly as if the hand were
+    // still holding still there — same slack, same pull, same top speed — and
+    // the stroke ends once it settles. (The first version reeled the slack in
+    // and put a floor under the speed so the line finished within 1.5 s; both
+    // made the brush visibly speed up at the lift — Gabriel, 2026-10-04.) A
+    // lift with the hand inside the slack ends the stroke on the spot. The
+    // release tail (if any) leaves from where the head settles, at its own
+    // speed. STEADY_RELEASE_MAX_S (wall) stops a crawl at very low Time
+    // where it is rather than hurrying it; a new press abandons it.
+    //
+    // 0 = off: move() feeds the walker directly, bit for bit as before.
+    // Everything scales with ONE eased amount u = Steady², so the bottom of the
+    // slider is realtime and the curve builds toward the full string at 100%:
+    // slack = u × 24 px, lag (the pull's time constant) = u × 200 ms, top speed
+    // = 250 / u px/s. At 10%: 2 ms, no speed limit you could reach; 30%: 18 ms,
+    // 2800 px/s; 50%: 50 ms, 1000 px/s; 100%: 200 ms, 250 px/s. (The first
+    // curve was exponential from a 33 ms lag at 1% — Gabriel: "1% makes it
+    // quite slow"; the jump from Off was the whole problem.)
+    var STEADY_SLACK_CSS = 24;    // string slack at full Steady, CSS px
+    var STEADY_TAU_MAX_S = 0.2;   // the pull's time constant at full Steady
+    var STEADY_VMAX_MIN_CSS = 250; // top speed at full Steady, CSS px/s
+    var STEADY_SUBSTEP_MS = 4;    // the head's path is walked in steps this long
+    var STEADY_MAX_STEPS = 32;    // ...at most this many a frame
+    var STEADY_RELEASE_MAX_S = 3.5; // after the lift, a crawl stops here (wall s) —
+                                  // inside 06c's 4 s one-swirl wait, so a turn never
+                                  // passes with the line still finishing
+    var STEADY_SETTLE_CSS = 1;    // CSS px from the slack's edge: settled
+    var STEADY_TRAIL_MS = 80;     // head motion kept for the release velocity
+    var steadyOn = false;         // latched at begin(): a stroke keeps its mode
+    var hx = 0, hy = 0;           // the head, canvas px (where the paint goes)
+    var tx = 0, ty = 0;           // the hand it is tied to
+    var releasing = false;        // hand lifted, head still finishing the line
+    var releaseWall = 0;          // wall seconds since the lift
+    var cssScale = 1;             // canvas px per CSS px, read at begin()
+    var arriveCb = null;          // called once when the release catch-up lands
+    var headTrail = [];           // {x, y, t} of the head, wall ms
+    var handSamples = [];         // the hand's raw samples since the last tick
+    var px0 = 0, py0 = 0;         // the hand at the end of the last tick
+    var strokeSerial = 0;         // bumped by every begin(): which stroke this is
+
+    function steadyAmount() {
+        var s = cfg('BRUSH_STEADY', 0);
+        return s > 0.001 ? Math.min(1, s) : 0;
+    }
+    // The string at Steady s, in canvas px and (Time-scaled) seconds.
+    function steadyShape(s) {
+        var u = s * s;
+        return {
+            slack: u * STEADY_SLACK_CSS * cssScale,
+            tau: u * STEADY_TAU_MAX_S,
+            vmax: u > 0 ? STEADY_VMAX_MIN_CSS / u * cssScale : Infinity
+        };
+    }
 
     function cfg(key, def) {
         var c = window.config;
@@ -324,6 +404,100 @@
         lastP = p1;
     }
 
+    // Head velocity over the last STEADY_TRAIL_MS, in the units 05d's release
+    // tail takes (px x10 per 60 Hz frame) — the same window its releaseVelocity
+    // reads off the hand.
+    function headVelocity() {
+        var n = headTrail.length;
+        if (n < 2) return { dx: 0, dy: 0 };
+        var last = headTrail[n - 1], first = headTrail[0];
+        var dt = last.t - first.t;
+        if (dt < 4) return { dx: 0, dy: 0 };
+        var k = 10 * (1000 / 60) / dt;
+        return { dx: (last.x - first.x) * k, dy: (last.y - first.y) * k };
+    }
+
+    function noteHead(now) {
+        headTrail.push({ x: hx, y: hy, t: now });
+        while (headTrail.length > 2 && now - headTrail[0].t > STEADY_TRAIL_MS) headTrail.shift();
+    }
+
+    // The release catch-up has landed: the stroke is over.
+    function arrive() {
+        active = false;
+        releasing = false;
+        var cb = arriveCb;
+        arriveCb = null;
+        if (cb) {
+            var v = headVelocity();
+            try { cb({ x: hx, y: hy, dx: v.dx, dy: v.dy }); } catch (_) {}
+        }
+    }
+
+    // One frame of the string. wallMs is the frame's wall time; the head's own
+    // clock is that times the Time slider (clamped so Time 0.01 still moves).
+    // Returns true on the frame the release catch-up lands.
+    function steadyTick(wallMs, timeScale) {
+        var s = steadyAmount();
+        var tf = (typeof timeScale === 'number' && timeScale > 0) ? timeScale : 1;
+        tf = Math.max(0.05, Math.min(4, tf));
+        var sh = steadyShape(s);
+        var wall = Math.max(0, Math.min(50, wallMs || 0)) / 1000;
+        var now = performance.now();
+        // The hand's samples since the last tick, oldest first. The head walks
+        // through them in order across the frame rather than chasing only the
+        // newest, so at a low Steady (a lag of a millisecond or two) it lays
+        // the hand's own path, coalesced detail included, not a once-a-frame
+        // polyline of it.
+        var samples = handSamples;
+        handSamples = [];
+        var count = samples.length;
+        // Off mid-stroke (the slider pulled to 0): the string goes, and the
+        // head joins the hand the way raw samples would.
+        if (!(s > 0)) {
+            for (var k = 0; k < count; k++) emitAlong(samples[k].x, samples[k].y, 1);
+            hx = tx; hy = ty;
+            emitAlong(hx, hy, 1);
+            px0 = tx; py0 = ty;
+            noteHead(now);
+            if (releasing) { arrive(); return true; }
+            return false;
+        }
+        var n = Math.max(1, Math.min(STEADY_MAX_STEPS,
+            Math.max(count, Math.ceil(wall * 1000 / STEADY_SUBSTEP_MS))));
+        var hw = wall / n;          // wall seconds per step
+        var h = hw * tf;            // the head's (Time-scaled) seconds per step
+        var pull = sh.tau > 1e-6 ? 1 - Math.exp(-h / sh.tau) : 1;
+        for (var i = 0; i < n; i++) {
+            // Where the hand was at this step: sample j of the frame's run.
+            var ax = px0, ay = py0;
+            if (count) {
+                var j = Math.floor((i + 1) * count / n) - 1;
+                if (j >= 0) { ax = samples[j].x; ay = samples[j].y; }
+            } else { ax = tx; ay = ty; }
+            var dx = ax - hx, dy = ay - hy;
+            var d = Math.hypot(dx, dy);
+            var e = d - sh.slack;
+            if (!(e > 0)) continue; // slack: the head stays where it is
+            var step = Math.min(e * pull, sh.vmax * h);
+            hx += dx / d * step;
+            hy += dy / d * step;
+            emitAlong(hx, hy, 1);
+        }
+        px0 = tx; py0 = ty;
+        noteHead(now);
+        if (releasing) {
+            releaseWall += wall;
+            if (settled(sh.slack) || releaseWall >= STEADY_RELEASE_MAX_S) { arrive(); return true; }
+        }
+        return false;
+    }
+
+    // The head has come to rest against the slack (or inside it).
+    function settled(slack) {
+        return Math.hypot(tx - hx, ty - hy) - slack <= STEADY_SETTLE_CSS * cssScale;
+    }
+
     window.BrushEngine = {
         // Begin a stroke at raw coords (canvas px). Does NOT emit a press dab —
         // 05d's pointer-down handler fires its immediate press splat for
@@ -337,6 +511,19 @@
             lastEmitSimMs = simNowMs();
             lastP = 1;
             queue.length = 0;
+            // A press while the last stroke was still reeling in abandons it.
+            strokeSerial++;
+            steadyOn = steadyAmount() > 0;
+            hx = tx = px0 = x; hy = ty = py0 = y;
+            handSamples.length = 0;
+            releasing = false;
+            arriveCb = null;
+            headTrail.length = 0;
+            if (steadyOn) {
+                var cv = document.getElementById('canvas');
+                var r = cv ? cv.getBoundingClientRect() : null;
+                cssScale = (r && r.width > 0) ? cv.width / r.width : 1;
+            }
         },
 
         // Total path length walked since begin(), in canvas px. The splat-in
@@ -349,6 +536,18 @@
         // Feed one raw sample (call per pointermove AND per coalesced event).
         move: function (x, y) {
             if (!active) return;
+            // Steady: only the hand moves here; tick() walks the head. Once
+            // the hand has lifted, hovering must not drag the line along.
+            if (steadyOn) {
+                if (!releasing) {
+                    tx = x; ty = y;
+                    // Bounded: a stalled frame keeps the newest, which is
+                    // where the hand is now.
+                    if (handSamples.length >= 256) handSamples.shift();
+                    handSamples.push({ x: x, y: y });
+                }
+                return;
+            }
             var p = 1;
             // Weighted-lag stabilizer: stabilized point chases the raw input.
             // strength 0 → alpha 1 (raw); strength 1 → alpha 0.08 (heavy lag).
@@ -362,8 +561,23 @@
         // End the stroke. Returns the release point + velocity for the
         // splat-out tail. catchUp=true drains the stabilizer lag to the
         // final raw position (Krita finishes the line; we do too).
-        end: function (x, y) {
+        // With Steady, the stroke stays active while the head reels in to
+        // (x, y); onArrive({x, y, dx, dy}) runs once it lands — the release
+        // tail starts there, from the head's speed — and never if a new press
+        // or an abort gets there first. The return says which happened.
+        end: function (x, y, onArrive) {
             if (!active) return null;
+            if (steadyOn) {
+                if (!releasing) {
+                    if (typeof x === 'number' && typeof y === 'number') { tx = x; ty = y; }
+                    releasing = true;
+                    releaseWall = 0;
+                    arriveCb = (typeof onArrive === 'function') ? onArrive : null;
+                    // Lifted with the head already at rest: the stroke ends here.
+                    if (settled(steadyShape(steadyAmount()).slack)) { arrive(); return null; }
+                }
+                return { deferred: true };
+            }
             active = false;
             if (typeof x === 'number' && typeof y === 'number') {
                 emitAlong(x, y, lastP); // catch up: finish the lagged tail
@@ -374,10 +588,34 @@
         },
 
         // Abort without the catch-up tail (window blur, pointercancel).
-        abort: function () { active = false; queue.length = 0; },
+        abort: function () {
+            active = false; queue.length = 0;
+            releasing = false; arriveCb = null;
+        },
 
+        // Still painting: held, or (Steady) reeling in after the lift.
         isActive: function () { return active; },
+        // Which stroke is live: per-stroke state kept outside the engine (05j's
+        // constant-flow hose) resets when this changes.
+        stroke: function () { return strokeSerial; },
         pending: function () { return queue.length; },
+
+        // ── Steady ──
+        // Advance the head one frame (05j, before drain). True on the frame
+        // the release catch-up lands.
+        tick: function (wallMs, timeScale) {
+            if (!active || !steadyOn) return false;
+            return steadyTick(wallMs, timeScale);
+        },
+        // This stroke rides the string (latched at its press).
+        steadyActive: function () { return active && steadyOn; },
+        // Hand lifted, head still finishing the line.
+        releasing: function () { return active && steadyOn && releasing; },
+        // Where the paint goes and where the hand is, canvas px; null when
+        // the brush sits on the hand.
+        head: function () {
+            return (active && steadyOn) ? { x: hx, y: hy, handX: tx, handY: ty, releasing: releasing } : null;
+        },
 
         // Drain up to maxDabs for this frame (update loop calls once/frame).
         drain: function (maxDabs) {

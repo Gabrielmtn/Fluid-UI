@@ -1268,8 +1268,12 @@
         ui.ghost.style.opacity = op;
         ui.ghostArms.style.opacity = op;
         var ghostOn = cursorForced || (shown && BC.ghostEnabled());
+        // A Steady stroke (05d0) is still painting after the lift until its
+        // head settles; the ghost waits for that, as 31's does.
+        var BE = window.BrushEngine;
+        var steadyLive = !!(BE && typeof BE.head === 'function' && BE.head());
         // box.h is the canvas's full height in this window's CSS px.
-        ui.ghostPaint.paint(heldCount === 0 && ghostOn, BC.radiusRoot() * box.h,
+        ui.ghostPaint.paint(heldCount === 0 && !steadyLive && ghostOn, BC.radiusRoot() * box.h,
             (pop && pop.devicePixelRatio) || 1, ringX, ringY,
             { left: box.x, top: box.y, width: box.w, height: box.h });
     }

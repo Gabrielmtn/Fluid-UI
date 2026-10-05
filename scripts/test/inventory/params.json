@@ -842,6 +842,23 @@
       "registered": true
     },
     {
+      "id": "brushSteady",
+      "kind": "slider",
+      "configKey": "BRUSH_STEADY",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "def": 0,
+      "mapping": "config.BRUSH_STEADY = parseFloat(value) (dynamic pSlider, Brush panel → Stroke)",
+      "section": "brush",
+      "consumer": "splat",
+      "gatedBy": "latched per stroke at BrushEngine.begin(); needs pointer motion across frames (05j BrushEngine.tick)",
+      "sweepRelevant": false,
+      "expectedEffect": "Pulled-string stroke: the brush head trails the hand with a slack (up to 24 CSS px), an eased pull and a top speed on the Time-scaled clock; finishes the line after release. Changes stroke geometry and pace, not per-dab physics.",
+      "binding": "js/20-mixer-layout.js (pSlider brushSteady); engine js/05d0-brush-engine.js steadyTick",
+      "registered": true
+    },
+    {
       "id": "brushSpacing",
       "kind": "slider",
       "configKey": "BRUSH_SPACING",
