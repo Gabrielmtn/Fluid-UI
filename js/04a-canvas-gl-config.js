@@ -1355,14 +1355,15 @@
             // dangerous stimulus is >3 flashes/sec, flash = an opposing pair of
             // luminance transitions ≥10% of max with the darker state <0.80,
             // over a meaningful screen area (plus a stricter saturated-red
-            // rule). Two mechanisms: (1) a global luminance slew clamp — a
-            // slew-limited signal at frequency f has peak-to-peak amplitude
-            // ≤ SLEW/(2f), so SLEW=0.5 makes a ≥10% pair at ≥3 Hz
-            // arithmetically impossible at the frame level; (2) block-level
-            // flash detection that engages a temporal smoother (flashes become
-            // fade-in/fade-outs) and disengages to EXACT pass-through when
-            // idle. Default ON; the first-frame warning modal and the Display
-            // checkbox both write the 'fluidui.photoSafe' localStorage key.
+            // rule). Two mechanisms: (1) a global luminance slew clamp, which
+            // dims sudden brightening but works through an exposure ratio
+            // capped at 0.33-1.25x, so it cannot stop a large dark/bright
+            // swing on its own; (2) block-level flash detection that engages
+            // a temporal smoother (flashes become fade-in/fade-outs) and
+            // disengages to EXACT pass-through when idle. What it achieves is
+            // measured, not argued: scripts/test/photosafe. Default ON; the
+            // first-frame warning modal and the Display checkbox both write
+            // the 'fluidui.photoSafe' localStorage key.
             // Deliberately NOT a ParamRegistry-persisted checkbox: safety
             // preferences must never ride presets or multiplayer look mirrors.
 
@@ -1372,8 +1373,9 @@
                 catch (e) { return true; }
             })(),
 
-            PHOTOSAFE_SLEW: 0.5,        // Max global mean-luminance change per second.
-                                        // 0.5/(2·3Hz)=0.083 < the 0.10 flash threshold.
+            PHOTOSAFE_SLEW: 0.5,        // Max global mean-luminance change per second
+                                        // the exposure correction aims for (within
+                                        // its 0.33-1.25x range).
 
             PHOTOSAFE_FLASH_DELTA: 0.10,// Per-block luminance delta that counts as a
                                         // flash transition (fraction of max, WCAG 10%)
@@ -1398,20 +1400,19 @@
             PHOTOSAFE_RELEASE: 1.2,     // Suppression envelope decay time constant (s)
 
             PHOTOSAFE_PAIR_WINDOW: 0.18,// An opposing transition within this window (s)
-                                        // completes a "flash pair" → hard engage.
-                                        // 0.18s = half-period of ~2.8 Hz: pairs slower
-                                        // than the 3-flashes/sec danger line (which the
-                                        // standard PERMITS — e.g. 2.5 Hz music pulses)
-                                        // only get the soft attack, not the hard latch.
+                                        // is flicker: per block (a block reversing its
+                                        // own swing) and for the screen (blocks going
+                                        // the same way, then back). 0.18s = half-period
+                                        // of ~2.8 Hz, so slower pulses (which the
+                                        // standard PERMITS, e.g. 2.5 Hz music) never count.
 
-            PHOTOSAFE_RATE: 5.0,        // Opposing transitions/sec permitted before the
-                                        // history blend engages, ramping to full over the
-                                        // next 4/s. A square-wave flash is TWO transitions,
-                                        // so 6/s is exactly WCAG's 3-flashes-sec line; 5
-                                        // engages just under it. Rate — not per-frame
-                                        // deviation — is what separates a strobe from
-                                        // painting: monotonic change contributes one
-                                        // transition, only real flicker sustains a rate.
+            PHOTOSAFE_RATE: 5.0,        // Counted flash transitions (each already 2.8 Hz
+                                        // or faster) at which suppression is full; it
+                                        // ramps in from 2 fewer. The count decays with a
+                                        // 1 s time constant, so 5 is about the third
+                                        // flash of a strobe. Counting reversals — not
+                                        // per-frame deviation — is what separates a strobe
+                                        // from painting: monotonic change never reverses.
 
             PHOTOSAFE_SPIN_CAP: 90      // Max kaleido spin under protection (deg/s) —
                                         // the "extreme camera shake" clamp; motion, not

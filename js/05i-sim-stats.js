@@ -1386,12 +1386,23 @@
             // limiter's windows behave as they would at real frame cadence.
             if (typeof config.PHOTOSAFE_DT_OVERRIDE === 'number') dt = config.PHOTOSAFE_DT_OVERRIDE;
             gl.disable(gl.BLEND);
-            // 1. block luminance + redness grid
+            // Fallbacks match the 04a defaults; config always carries them.
+            const pairWindow = (config.PHOTOSAFE_PAIR_WINDOW != null) ? config.PHOTOSAFE_PAIR_WINDOW : 0.18;
+            // 1. block luminance + redness grid, and each block's swing state
             photoSafeLumaProg.bind();
             gl.uniform1i(photoSafeLumaProg.uniforms.uTexture, 0);
+            gl.uniform1i(photoSafeLumaProg.uniforms.uPrev, 1);
+            gl.uniform1f(photoSafeLumaProg.uniforms.dt, dt);
+            gl.uniform1f(photoSafeLumaProg.uniforms.flashDelta,
+                (config.PHOTOSAFE_FLASH_DELTA != null) ? config.PHOTOSAFE_FLASH_DELTA : 0.10);
+            gl.uniform1f(photoSafeLumaProg.uniforms.darkFloor,
+                (config.PHOTOSAFE_DARK_FLOOR != null) ? config.PHOTOSAFE_DARK_FLOOR : 0.80);
+            gl.uniform1f(photoSafeLumaProg.uniforms.pairWindow, pairWindow);
             gl.viewport(0, 0, 16, 16);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, safeFrame.texture);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, safeLuma.read.texture);
             blit(safeLuma.write.fbo);
             // 2. limiter state
             photoSafeStatsProg.bind();
@@ -1401,18 +1412,13 @@
             gl.uniform1f(photoSafeStatsProg.uniforms.dt, dt);
             gl.uniform1f(photoSafeStatsProg.uniforms.slew,
                 (config.PHOTOSAFE_SLEW != null) ? config.PHOTOSAFE_SLEW : 0.5);
-            gl.uniform1f(photoSafeStatsProg.uniforms.flashDelta,
-                (config.PHOTOSAFE_FLASH_DELTA != null) ? config.PHOTOSAFE_FLASH_DELTA : 0.10);
-            gl.uniform1f(photoSafeStatsProg.uniforms.darkFloor,
-                (config.PHOTOSAFE_DARK_FLOOR != null) ? config.PHOTOSAFE_DARK_FLOOR : 0.80);
             gl.uniform1f(photoSafeStatsProg.uniforms.redDelta,
                 (config.PHOTOSAFE_RED_DELTA != null) ? config.PHOTOSAFE_RED_DELTA : 0.20);
             gl.uniform1f(photoSafeStatsProg.uniforms.areaFrac,
-                (config.PHOTOSAFE_AREA != null) ? config.PHOTOSAFE_AREA : 0.10);
+                (config.PHOTOSAFE_AREA != null) ? config.PHOTOSAFE_AREA : 0.02);
             gl.uniform1f(photoSafeStatsProg.uniforms.releaseTau,
                 (config.PHOTOSAFE_RELEASE != null) ? config.PHOTOSAFE_RELEASE : 1.2);
-            gl.uniform1f(photoSafeStatsProg.uniforms.pairWindow,
-                (config.PHOTOSAFE_PAIR_WINDOW != null) ? config.PHOTOSAFE_PAIR_WINDOW : 0.35);
+            gl.uniform1f(photoSafeStatsProg.uniforms.pairWindow, pairWindow);
             gl.uniform1f(photoSafeStatsProg.uniforms.rateAllow,
                 (config.PHOTOSAFE_RATE != null) ? config.PHOTOSAFE_RATE : 5.0);
             gl.viewport(0, 0, 2, 1);

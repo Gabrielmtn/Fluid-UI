@@ -4159,8 +4159,10 @@
 
     function buildDisplaySection(controls) {
         const { sec, body } = makeSection('Display', 'system', true);
-        // Photosensitivity protection first — safety leads the section.
+        // Photosensitivity protection first — safety leads the section, with
+        // the start-up warning and where to read more right under it.
         moveCheckboxGroup('photoSafeToggle', body);
+        moveControlGroup('photoWarnShowBtn', body);
 
         // Window mode (Windowed / Borderless / Fullscreen) — first, because it
         // is the only way back out of a fullscreen mode.

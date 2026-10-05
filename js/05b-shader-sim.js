@@ -3259,8 +3259,9 @@
         // limits hold on the FINAL composited frame — whatever produced it
         // (strokes, peers, replay, audio scenes, Glow, Ignite, Light Shift).
         // 1. photoSafeLumaFrag: 16×16 block grid of approximately-linear
-        //    luminance + redness of the rendered frame.
-        // 2. photoSafeStatsFrag: 1×1 state update — flash-area detection,
+        //    luminance + redness of the rendered frame, and each block's
+        //    own flicker state (below).
+        // 2. photoSafeStatsFrag: 2×1 state update — flash-area detection,
         //    suppression envelope, slew-limited global luminance target.
         // 3. photoSafeCompositeFrag: exposure correction + history blend;
         //    EXACT pass-through (mix a=1.0) when the envelope is idle.
@@ -3269,6 +3270,25 @@
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTexture;   // the rendered frame (safeFrame)
+            uniform sampler2D uPrev;      // this grid last frame (safeLuma.read)
+            uniform float dt;             // wall-clock seconds, clamped by caller
+            uniform float flashDelta;     // WCAG 10% swing (0.10)
+            uniform float darkFloor;      // WCAG dark-state condition (0.80)
+            uniform float pairWindow;     // a reversal this soon is flicker (s)
+            //
+            // Out: R luma, G redness, B the block's running luminance
+            // extreme, A its swing state: sign = direction of its last
+            // swing, |A| = 1 + seconds since it (capped), 3 = it REVERSED
+            // this frame within pairWindow of the swing before. 0 = fresh.
+            //
+            // WHY PER BLOCK, BETWEEN EXTREMES: a swing is measured from the
+            // block's own last peak or trough, the way WCAG measures a flash,
+            // not frame to frame. Frame-to-frame deltas missed smooth flicker
+            // whose per-frame step stays under 10% (a 4 Hz sine of 0.4) and
+            // missed more of it the higher the refresh rate. And a flash is a
+            // block going up AND coming back down: painting and fluid motion
+            // move a block one way and leave it, so they almost never reverse
+            // a single block twice inside the window.
             void main() {
                 // 4x4 jittered taps per block; LINEAR filtering widens each
                 // tap to a 2x2 average, so a block integrates ~8x8 samples.
@@ -3284,23 +3304,43 @@
                         // linearization WCAG relative luminance expects.
                         vec3 lin = c * c;
                         luma += dot(lin, vec3(0.2126, 0.7152, 0.0722));
+                        // Redness: an approximation, not the WCAG 2.2 /
+                        // ISO 9241-391 saturated-red test (R/(R+G+B) >= 0.8
+                        // with a u'v' chromaticity change > 0.2). That test
+                        // ignores brightness; this one also needs the red to
+                        // carry light, so very dim red flashes go uncounted.
                         red += max(0.0, lin.r - 0.5 * (lin.g + lin.b));
                     }
                 }
-                fragColor = vec4(luma / 16.0, red / 16.0, 0.0, 1.0);
+                luma /= 16.0;
+                vec4 p = texture(uPrev, vUv);
+                float ext = p.b;
+                float dir = sign(p.a);
+                float age = (abs(p.a) > 2.5) ? 0.0 : max(abs(p.a) - 1.0, 0.0);
+                age += dt;
+                bool reversed = false;
+                if ((dir > 0.5 && luma > ext) || (dir < -0.5 && luma < ext)) {
+                    ext = luma;   // still going the same way: follow the peak
+                } else if (abs(luma - ext) >= flashDelta && min(luma, ext) < darkFloor) {
+                    float nd = (luma > ext) ? 1.0 : -1.0;
+                    reversed = (dir != 0.0 && age <= pairWindow);
+                    dir = nd;
+                    ext = luma;
+                    age = 0.0;
+                }
+                float state = reversed ? 3.0 * dir : dir * (1.0 + min(age, 1.4));
+                fragColor = vec4(luma, red / 16.0, ext, state);
             }
         `;
         const photoSafeStatsFrag = `#version 300 es
             precision ${PRECISION} float;
             in vec2 vUv;
             out vec4 fragColor;
-            uniform sampler2D uLumaCur;   // 16x16 this frame  (r=luma g=red)
+            uniform sampler2D uLumaCur;   // 16x16 this frame  (r=luma g=red a=swing state)
             uniform sampler2D uLumaPrev;  // 16x16 previous frame
             uniform sampler2D uStatsPrev; // 2x1 state, layout below
             uniform float dt;             // wall-clock seconds, clamped by caller
             uniform float slew;           // max luma change per second (global)
-            uniform float flashDelta;     // per-block flash threshold (0.10)
-            uniform float darkFloor;      // WCAG dark-state condition (0.80)
             uniform float redDelta;       // red-transition threshold (0.20)
             uniform float areaFrac;       // min flashing area to count a transition
             uniform float releaseTau;     // envelope decay time constant (s)
@@ -3309,8 +3349,12 @@
             //
             // 2x1 state. Texel 0 (display): R envelope, G slew-limited luma
             // target, B this frame's TRUE mean (the composite needs it to form
-            // a GLOBAL exposure ratio), A init flag. Texel 1 (detector):
-            // R lastSign+1, G pairTimer, B transition-rate accumulator, A init.
+            // a GLOBAL exposure ratio), A 1 + luminance pairTimer (>= 1 also
+            // marks it initialised). Texel 1 (detector): R red lastSign+1,
+            // G red pairTimer, B transition-rate accumulator, A luminance
+            // lastSign+2. Luminance and red pair separately: laying red paint
+            // while other dye drifts away would otherwise alternate a red
+            // "up" with a luminance "down" and read as flicker.
             //
             // WHY RATE, NOT DEVIATION: v1 also flagged a block whose luminance
             // deviated from its own short EMA. Painting does that constantly —
@@ -3326,76 +3370,94 @@
                 vec4 s0 = texture(uStatsPrev, vec2(0.25, 0.5));
                 vec4 s1 = texture(uStatsPrev, vec2(0.75, 0.5));
                 float meanCur = 0.0;
-                float posArea = 0.0;
-                float negArea = 0.0;
+                float flickUp = 0.0, flickDown = 0.0;
+                float redUp = 0.0, redDown = 0.0;
                 for (int i = 0; i < 16; i++) {
                     for (int j = 0; j < 16; j++) {
                         vec2 uv = (vec2(float(i), float(j)) + 0.5) / 16.0;
-                        vec2 cur = texture(uLumaCur, uv).rg;
-                        vec2 prv = texture(uLumaPrev, uv).rg;
+                        vec4 cur = texture(uLumaCur, uv);
+                        float prvRed = texture(uLumaPrev, uv).g;
                         meanCur += cur.r;
-                        float dL = cur.r - prv.r;
-                        float dR = cur.g - prv.g;
-                        // WCAG flash transition: >=10% of max luminance with
-                        // the darker state below 0.80, plus the stricter
-                        // saturated-red rule (isoluminant red counts too).
-                        float sgn = 0.0;
-                        if (abs(dL) >= flashDelta && min(cur.r, prv.r) < darkFloor) sgn = sign(dL);
-                        else if (abs(dR) >= redDelta) sgn = (dR >= 0.0) ? 1.0 : -1.0;
-                        if (sgn > 0.5) posArea += 1.0;
-                        else if (sgn < -0.5) negArea += 1.0;
+                        // Luminance: the luma pass already judged each block
+                        // (WCAG 10% swings between its own extremes) and
+                        // marks one that just reversed inside pairWindow.
+                        if (cur.a > 2.5) flickUp += 1.0;
+                        else if (cur.a < -2.5) flickDown += 1.0;
+                        // The stricter saturated-red rule (isoluminant red
+                        // counts too), frame to frame.
+                        float dR = cur.g - prvRed;
+                        if (dR >= redDelta) redUp += 1.0;
+                        else if (dR <= -redDelta) redDown += 1.0;
                     }
                 }
                 meanCur /= 256.0;
-                posArea /= 256.0;
-                negArea /= 256.0;
+                flickUp /= 256.0; flickDown /= 256.0;
+                redUp /= 256.0; redDown /= 256.0;
                 // Fresh FBO (all zeros): seed from the live scene so boot and
                 // resize never open with a spurious exposure dip.
                 if (s0.a < 0.5) {
-                    if (gl_FragCoord.x < 1.0) fragColor = vec4(0.0, meanCur, meanCur, 1.0);
-                    else fragColor = vec4(1.0, 0.0, 0.0, 1.0);
+                    if (gl_FragCoord.x < 1.0) fragColor = vec4(0.0, meanCur, meanCur, 9.0);
+                    else fragColor = vec4(1.0, 9.0, 0.0, 2.0);
                     return;
                 }
                 float envelope = s0.r;
                 float slewLuma = s0.g;
-                float lastSign = s1.r - 1.0;   // -1 / 0 / +1
-                float pairTimer = s1.g;
+                float lumaSign = s1.a - 2.0;   // -1 / 0 / +1
+                float lumaTimer = s0.a - 1.0;
+                float redSign = s1.r - 1.0;
+                float redTimer = s1.g;
                 float rate = s1.b;
-                // Rate accumulator decays with tau = 1s, so its steady-state
-                // value IS the transitions-per-second of a sustained flicker.
                 rate *= exp(-dt / 1.0);
-                pairTimer += dt;
-                float total = posArea + negArea;
-                // Antiphase strobes (one region up while another goes down)
-                // barely move the global mean, so the dominant side is what
-                // flips: sign(pos-neg) handles both the ordinary and the
-                // antiphase case with one rule.
-                float dir = (total >= areaFrac) ? ((posArea >= negArea) ? 1.0 : -1.0) : 0.0;
-                if (dir != 0.0 && dir != lastSign) {
-                    // An OPPOSING transition inside the window is half of a
-                    // flash pair. Outside the window it just re-arms.
-                    if (lastSign != 0.0 && pairTimer <= pairWindow) rate += 1.0;
-                    lastSign = dir;
-                    pairTimer = 0.0;
-                } else if (pairTimer > pairWindow * 3.0) {
-                    lastSign = 0.0;   // flicker stopped; forget the phase
+                lumaTimer += dt;
+                redTimer += dt;
+                // A flash transition of the screen this frame: enough blocks
+                // going the SAME way, at least three to one. Fast swirling
+                // paint reverses blocks too, but scattered, up and down within
+                // two to one in almost every frame (measured: the hard
+                // scribble in scripts/test/photosafe engaged at 2:1, never at
+                // 3:1), and that is motion, not a strobe. A strobe's blocks
+                // all go together.
+                float lumaDir = 0.0, redDir = 0.0;
+                if (flickUp >= areaFrac && flickUp > 3.0 * flickDown) lumaDir = 1.0;
+                else if (flickDown >= areaFrac && flickDown > 3.0 * flickUp) lumaDir = -1.0;
+                if (redUp >= areaFrac && redUp > 3.0 * redDown) redDir = 1.0;
+                else if (redDown >= areaFrac && redDown > 3.0 * redUp) redDir = -1.0;
+                // An OPPOSING transition inside the window is half of a flash
+                // pair. Outside the window it just re-arms; a long quiet
+                // forgets the phase.
+                if (lumaDir != 0.0 && lumaDir != lumaSign) {
+                    if (lumaSign != 0.0 && lumaTimer <= pairWindow) rate += 1.0;
+                    lumaSign = lumaDir;
+                    lumaTimer = 0.0;
+                } else if (lumaTimer > pairWindow * 3.0) {
+                    lumaSign = 0.0;
+                }
+                if (redDir != 0.0 && redDir != redSign) {
+                    if (redSign != 0.0 && redTimer <= pairWindow) rate += 1.0;
+                    redSign = redDir;
+                    redTimer = 0.0;
+                } else if (redTimer > pairWindow * 3.0) {
+                    redSign = 0.0;
                 }
                 rate = min(rate, 40.0);
-                // Engage on RATE: rateAllow transitions/sec is the permitted
-                // floor (a square-wave flash is TWO transitions, so 6/s == the
-                // 3 flashes/sec danger line), ramping to full 4/s above it.
-                float engage = smoothstep(rateAllow, rateAllow + 4.0, rate);
+                // Every counted transition is already flicker of 2.8 Hz or
+                // faster (it paired inside pairWindow), so what matters is how
+                // many in a row, not how fast: suppression is full once
+                // rateAllow have landed in about a second, ramping in over the
+                // two before. A strobe is caught on its third flash.
+                float engage = smoothstep(rateAllow - 2.0, rateAllow, rate);
                 envelope = max(engage, envelope * exp(-dt / max(releaseTau, 0.05)));
                 if (envelope < 0.004) envelope = 0.0;   // snap to exact pass-through
                 // Global slew clamp \u2014 ALWAYS on, independent of the envelope.
-                // This is the hard guarantee: a slew-limited signal at f has
-                // peak-to-peak <= slew/(2f), so 0.5/s gives 0.083 at 3 Hz,
-                // under the 0.10 threshold, whatever the source. It is also
-                // what covers slow sine/ramp strobes that per-frame deltas are
-                // too coarse to flag.
+                // NOT a guarantee on its own: the composite reaches this target
+                // through an exposure ratio clamped to 0.33-1.25x, so it can
+                // dim a sudden brightening but cannot lift black. Measured
+                // (scripts/test/photosafe): a full black/white 3 Hz square
+                // passes at full swing. Small swings it does hold; large
+                // flicker is the detector's and the history blend's job.
                 slewLuma += clamp(meanCur - slewLuma, -slew * dt, slew * dt);
-                if (gl_FragCoord.x < 1.0) fragColor = vec4(envelope, slewLuma, meanCur, 1.0);
-                else fragColor = vec4(lastSign + 1.0, min(pairTimer, 9.0), rate, 1.0);
+                if (gl_FragCoord.x < 1.0) fragColor = vec4(envelope, slewLuma, meanCur, 1.0 + min(lumaTimer, 8.0));
+                else fragColor = vec4(redSign + 1.0, min(redTimer, 9.0), rate, lumaSign + 2.0);
             }
         `;
         const photoSafeCompositeFrag = `#version 300 es

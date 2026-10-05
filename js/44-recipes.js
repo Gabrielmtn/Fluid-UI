@@ -579,9 +579,13 @@
             { say: 'Draw on the tablet. The paint lands on this monitor, at this monitor\'s frame rate.', target: { canvas: true } }
           ] },
         { id: 'photosafe', pillar: 'interface', title: 'Photosensitivity protection',
-          tags: ['photosensitivity', 'flash', 'epilepsy', 'safe', 'strobe', 'protection', 'seizure'],
-          answer: 'Display → Photosensitivity Protection is on by default: rapid flashes become fades and luminance changes are rate-limited. It only persists when you change it yourself.',
-          target: { section: 'Display', sel: '#photoSafeToggle' } },
+          tags: ['photosensitivity', 'flash', 'flashing', 'epilepsy', 'safe', 'strobe', 'protection', 'seizure', 'warning', 'advisory'],
+          answer: 'Display → Reduce flashing and rapid brightness changes is on by default: rapid flashes become fades, the rate of brightness change is capped and kaleidoscope spin is limited. It lowers the risk; it does not remove it. Show photosensitivity warning, just under it, brings back the start-up warning.',
+          target: { section: 'Display', sel: '#photoSafeToggle' },
+          steps: [
+            { say: 'Display → Reduce flashing and rapid brightness changes. On by default; turning it off asks first.', target: { section: 'Display', sel: '#photoSafeToggle' } },
+            { say: 'Show photosensitivity warning brings back the start-up warning, with a link to read more.', target: { section: 'Display', sel: '#photoWarnShowBtn' } }
+          ] },
         { id: 'text', pillar: 'interface', title: 'Put text on the canvas',
           tags: ['text', 'type', 'word', 'caption', 'title', 'font', 'letters'],
           answer: 'Text → + Add Text. Drag it on the canvas to move; corners resize, the top handle rotates. Its collider option makes the fluid flow around the letters.',

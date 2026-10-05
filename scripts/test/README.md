@@ -18,6 +18,7 @@ words: features misbehaving *in synthesis with others*, and the shader
 | `run-sweep.js` | Parameter response curves: dead zones, non-monotonic response, destruction |
 | `run-regression.js` | Golden-state suite over `scenarios.json` (`--record` / compare) |
 | `run-inputs.js` | Hotkey conformance driven by `inventory/hotkeys.json` |
+| `photosafe/run.js` | Photosensitivity limiter: square, sine and red strobes at 60 and 144 Hz counted as WCAG flashes on the presented frame, plus painting controls. Own headless Chrome, no dev server; `REPORT.md` holds the before/after table |
 | `inventory/` | Machine-readable maps of the app, written by inventory agents from the sources: `params.json` (107 entries), `hotkeys.json` (45 bindings + wheel + pointer lifecycle), `features.json` (18 activation recipes), `determinism.json` (the determinism dossier) |
 | `scenarios.json` | The regression scenarios — grow one per feature system |
 | `goldens/` | Recorded reference hashes (commit these) |

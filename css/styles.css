@@ -1779,3 +1779,21 @@ body.photosafe-on #canvas-area,
 body.photosafe-on canvas {
     transition: background-color 0.4s ease, opacity 0.4s ease;
 }
+
+/* The OS "reduce motion" setting: interface animations and transitions
+   finish at once (transitionend/animationend still fire, so nothing that
+   waits on them hangs). The PhotoSafe guard above is not motion, it is
+   protection, so it keeps its 0.4s; its selectors outrank the universal one. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    body.photosafe-on #canvas-wrapper,
+    body.photosafe-on #canvas-area,
+    body.photosafe-on canvas {
+        transition-duration: 0.4s !important;
+    }
+}

@@ -2021,6 +2021,15 @@ select option {
     line-height: 1.4;
     color: var(--ink-500);
 }
+/* Display → under Show photosensitivity warning. */
+.photo-warn-learn {
+    display: block;
+    margin-top: 6px;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--ink-500);
+}
+.photo-warn-learn:hover { color: var(--ink-300); }
 
 /* Pen Input Window (Display): the screen list — one radio row per display,
    named by size and where it sits relative to the app. Built by js/47. */

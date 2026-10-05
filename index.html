@@ -235,7 +235,7 @@
       #photoWarn {
         position: fixed; inset: 0; z-index: 2147483000;
         display: flex; align-items: center; justify-content: center;
-        background: rgba(6, 8, 12, 0.96);
+        background: #06080c;
         font-family: 'Segoe UI', system-ui, sans-serif;
         color: #e8ecf2;
       }
@@ -246,10 +246,11 @@
         border-radius: 10px; box-shadow: 0 12px 48px rgba(0,0,0,0.6);
       }
       #photoWarn h1 {
-        margin: 0 0 10px; font-size: 15px; letter-spacing: 0.08em;
+        margin: 0 0 10px; font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase;
         color: #ffd76a; display: flex; align-items: center; gap: 8px;
       }
-      #photoWarn p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; color: #c8d0dc; }
+      #photoWarn h1:focus { outline: none; }
+      #photoWarn p { margin: 0 0 10px; font-size: 14px; line-height: 1.45; color: #c8d0dc; }
       #photoWarn .pw-check {
         display: flex; gap: 10px; align-items: flex-start;
         margin: 14px 0; padding: 10px 12px;
@@ -257,12 +258,16 @@
         border-left: 2px solid rgba(100, 150, 255, 0.35); border-radius: 4px;
         cursor: pointer; user-select: none;
       }
-      #photoWarn .pw-check input { width: 17px; height: 17px; margin-top: 1px; flex: none; cursor: pointer; }
-      #photoWarn .pw-check b { display: block; font-size: 13px; color: #e8ecf2; margin-bottom: 3px; }
-      #photoWarn .pw-check span { font-size: 12px; line-height: 1.4; color: #9aa6b6; }
-      #photoWarn .pw-exit-line { font-size: 12.5px; color: #d9a2a2; }
-      #photoWarn .pw-unprotected { display: none; font-size: 12.5px; color: #ffd76a; margin: 0 0 10px; }
-      #photoWarn.pw-off .pw-unprotected { display: block; }
+      #photoWarn .pw-check input { width: 17px; height: 17px; margin-top: 2px; flex: none; cursor: pointer; }
+      #photoWarn .pw-check b { display: block; font-size: 14px; color: #e8ecf2; margin-bottom: 3px; }
+      #photoWarn .pw-check span { font-size: 14px; line-height: 1.4; color: #9aa6b6; }
+      #photoWarn .pw-exit-line { color: #d9a2a2; }
+      /* Always in the accessibility tree (a display:none live region is not
+         reliably announced); empty, and so collapsed, while protection is on. */
+      #photoWarn .pw-unprotected { color: #ffd76a; }
+      #photoWarn .pw-unprotected:empty { margin: 0; }
+      #photoWarn a { color: #8ab4ff; }
+      #photoWarn a:focus-visible { outline: 2px solid #8ab4ff; outline-offset: 2px; }
       #photoWarn .pw-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
       #photoWarn button {
         padding: 9px 16px; font-size: 13px; border-radius: 6px; cursor: pointer;
@@ -279,22 +284,27 @@
     </style>
     <div id="photoWarn" role="dialog" aria-modal="true" aria-labelledby="pwTitle" aria-describedby="pwDesc">
       <div class="pw-card">
-        <h1 id="pwTitle">⚠ PHOTOSENSITIVE SEIZURE WARNING</h1>
-        <p id="pwDesc">This app can produce intense flashing lights and rapidly shifting colors.
-           For your safety, protective visual clamps are turned <b>ON</b> by default.</p>
+        <h1 id="pwTitle" tabindex="-1"><span aria-hidden="true">⚠</span> Photosensitive seizure warning</h1>
+        <p id="pwDesc">A very small number of people may have a seizure when exposed to flashing
+           lights, rapid colour changes or moving repeating patterns. This app can produce all
+           three. Protection that reduces flashing and limits how fast brightness can change is
+           turned <b>ON</b> by default. It lowers the risk; it cannot remove it.</p>
         <label class="pw-check">
           <input type="checkbox" id="pwProtect" checked autocomplete="off">
-          <span><b>Protect with Visual Clamps</b>
-          <span>Eases intense lighting and limits strobe frequencies: rapid flashes of
-          paint or light become smooth fade-ins/fade-outs, and the rate of luminance
-          shift is globally clamped. Changing this checkbox updates your preference in
-          Display settings.</span></span>
+          <span><b>Reduce flashing and rapid brightness changes (recommended)</b>
+          <span>Rapid flashes become gentle fades, the rate of brightness change is capped, and
+          fast kaleidoscope spin is limited. You can change this later in Display settings.</span></span>
         </label>
-        <p class="pw-unprotected" aria-live="polite">Protection off: flashing will <b>not</b> be limited.</p>
-        <p class="pw-exit-line">If you have photosensitive epilepsy, please exit now.</p>
+        <p class="pw-unprotected" aria-live="polite"></p>
+        <p class="pw-symptoms">Stop immediately and consult a doctor if you experience dizziness,
+           altered vision, eye or muscle twitching, loss of awareness, disorientation, or
+           involuntary movements.</p>
+        <p><a id="pwLearn" href="https://www.epilepsy.com/what-is-epilepsy/seizure-triggers/photosensitivity" target="_blank" rel="noopener">Learn more about photosensitivity (Epilepsy Foundation)</a></p>
+        <p class="pw-exit-line">If you or anyone in your family has photosensitive epilepsy or has
+           had a seizure, consult a doctor before using this app, or exit now.</p>
         <div class="pw-buttons">
           <button id="pwExit" type="button">Exit App</button>
-          <button id="pwContinue" type="button" autofocus>Continue with Safety Caps</button>
+          <button id="pwContinue" type="button">Continue with protection on</button>
         </div>
       </div>
     </div>
@@ -310,6 +320,9 @@
       var box = document.getElementById('pwProtect');
       var cont = document.getElementById('pwContinue');
       var exitB = document.getElementById('pwExit');
+      var learn = document.getElementById('pwLearn');
+      var title = document.getElementById('pwTitle');
+      var live = modal.querySelector('.pw-unprotected');
       /* Where these two values come from, and why it is not simply
          localStorage: the FIRST localStorage touch in a renderer blocks it for
          ~490ms while the storage service opens an existing profile (measured —
@@ -351,80 +364,111 @@
           }
         } catch (e) {}
       }
-      if (acked) { modal.hidden = true; return; }
-      box.checked = stored !== '0';
+      /* The warning can be shown again later (Display → Show photosensitivity
+         warning): window.__showPhotoWarn. Only function definitions sit
+         before the acked return, so an acked launch does no extra work. */
+      var lastTrustedChoice = null, atBoot = true, returnFocus = null, wired = false;
       function sync() {
         modal.classList.toggle('pw-off', !box.checked);
-        cont.textContent = box.checked ? 'Continue with Safety Caps' : 'I Understand the Risk';
+        live.textContent = box.checked ? '' : 'Protection off: flashing and rapid brightness changes will not be limited.';
+        cont.textContent = box.checked ? 'Continue with protection on' : 'I understand the risk, continue';
       }
-      /* Fail-safe against synthetic input: consent-banner auto-decliners and
-         other page automation pattern-match this dialog (checkbox + primary
-         button) and will uncheck-then-confirm it. Visuals follow the checkbox
-         either way, but the PERSISTED choice honors only trusted (human)
-         events — synthetic manipulation always lands on the protected side. */
-      /* A previously stored value WAS a trusted choice — honor it as the
-         baseline so Continue without touching the box keeps the user's prior
-         decision instead of silently flipping an opted-out user back on. */
-      var lastTrustedChoice = (stored === '0') ? false : (stored === '1' ? true : null);
-      box.addEventListener('change', function (ev) {
-        if (ev.isTrusted) lastTrustedChoice = box.checked;
+      function show(opts, boot) {
+        atBoot = !!boot;
+        returnFocus = (opts && opts.returnFocus) || null;
+        var s = stored;
+        if (!boot) { try { s = localStorage.getItem(KEY_PROTECT); } catch (e) {} }
+        box.checked = s !== '0';
+        /* A previously stored value WAS a trusted choice — honor it as the
+           baseline so Continue without touching the box keeps the user's prior
+           decision instead of silently flipping an opted-out user back on. */
+        lastTrustedChoice = (s === '0') ? false : (s === '1' ? true : null);
+        wire();
         sync();
-      });
-      sync();
-      cont.addEventListener('click', function (ev) {
-        /* Effective choice: the checkbox state only counts if a human set it.
-           No trusted interaction recorded -> protected, whatever the box shows. */
-        var protect = (lastTrustedChoice === null) ? true : lastTrustedChoice;
-        try {
-          /* Only a human click acknowledges the warning permanently; a
-             synthetic click dismisses for this session but the warning
-             returns on next load. Protection choice same rule. */
-          if (ev && ev.isTrusted) {
-            localStorage.setItem(KEY_ACK, '1');
-            localStorage.setItem(KEY_PROTECT, protect ? '1' : '0');
-            /* Mirror the same trusted decision to main's boot cache, so the
-               next launch does not have to open the store to learn it. Inside
-               the isTrusted branch on purpose: a synthetic click must not be
-               able to persist consent by either route. */
-            try {
-              if (window.IS_ELECTRON) {
-                require('electron').ipcRenderer.send('photo-safe-cache',
-                  { ack: true, protect: protect ? '1' : '0' });
-              }
-            } catch (e2) {}
+        modal.style.removeProperty('display');
+        modal.hidden = false;
+        document.addEventListener('keydown', keyGuard, true);
+        document.addEventListener('focusin', focusGuard, true);
+        /* Focus the title, not Continue: a stray Enter at launch must not
+           acknowledge a warning nobody has read. */
+        title.focus();
+      }
+      function wire() {
+        if (wired) return;
+        wired = true;
+        /* Fail-safe against synthetic input: consent-banner auto-decliners and
+           other page automation pattern-match this dialog (checkbox + primary
+           button) and will uncheck-then-confirm it. Visuals follow the checkbox
+           either way, but the PERSISTED choice honors only trusted (human)
+           events — synthetic manipulation always lands on the protected side. */
+        box.addEventListener('change', function (ev) {
+          if (ev.isTrusted) lastTrustedChoice = box.checked;
+          sync();
+        });
+        cont.addEventListener('click', function (ev) {
+          /* Effective choice: the checkbox state only counts if a human set it.
+             No trusted interaction recorded -> protected, whatever the box shows. */
+          var protect = (lastTrustedChoice === null) ? true : lastTrustedChoice;
+          try {
+            /* Only a human click acknowledges the warning permanently; a
+               synthetic click dismisses for this session but the warning
+               returns on next load. Protection choice same rule. */
+            if (ev && ev.isTrusted) {
+              localStorage.setItem(KEY_ACK, '1');
+              localStorage.setItem(KEY_PROTECT, protect ? '1' : '0');
+              /* Mirror the same trusted decision to main's boot cache, so the
+                 next launch does not have to open the store to learn it. Inside
+                 the isTrusted branch on purpose: a synthetic click must not be
+                 able to persist consent by either route. */
+              try {
+                if (window.IS_ELECTRON) {
+                  require('electron').ipcRenderer.send('photo-safe-cache',
+                    { ack: true, protect: protect ? '1' : '0' });
+                }
+              } catch (e2) {}
+            }
+          } catch (e) {}
+          /* If the app booted while the modal was up, push the choice live. */
+          try {
+            if (window.config) window.config.PHOTOSAFE = protect;
+            var t = document.getElementById('photoSafeToggle');
+            if (t && t.checked !== protect) { t.checked = protect; t.dispatchEvent(new Event('change', { bubbles: true })); }
+          } catch (e) {}
+          teardown();
+        });
+        exitB.addEventListener('click', function () {
+          if (!atBoot) {
+            /* Shown again mid-session: leave the way the window's own close
+               button does, so unsaved work still gets its question. */
+            teardown();
+            if (window.IS_ELECTRON) {
+              try { require('@electron/remote').getCurrentWindow().close(); return; } catch (e) {}
+            }
           }
-        } catch (e) {}
-        /* If the app booted while the modal was up, push the choice live. */
-        try {
-          if (window.config) window.config.PHOTOSAFE = protect;
-          var t = document.getElementById('photoSafeToggle');
-          if (t && t.checked !== protect) { t.checked = protect; t.dispatchEvent(new Event('change', { bubbles: true })); }
-        } catch (e) {}
-        teardown();
-      });
-      exitB.addEventListener('click', function () {
-        /* Electron: destroy the window directly — the main process's polite
-           close-interception handshake (electron-main 'close' → askRenderer)
-           is not wired this early in boot and would leave the click dead. */
-        if (window.IS_ELECTRON) {
-          try { require('@electron/remote').getCurrentWindow().destroy(); return; } catch (e) {}
-          try { window.close(); return; } catch (e) {}
-        }
-        try { window.close(); } catch (e) {}
-        /* Browsers may refuse to close a tab the script didn't open — leave
-           the page entirely so nothing renders or runs. */
-        setTimeout(function () {
-          try { location.replace('about:blank'); } catch (e) {}
-        }, 200);
-      });
+          /* Electron: destroy the window directly — the main process's polite
+             close-interception handshake (electron-main 'close' → askRenderer)
+             is not wired this early in boot and would leave the click dead. */
+          if (window.IS_ELECTRON) {
+            try { require('@electron/remote').getCurrentWindow().destroy(); return; } catch (e) {}
+            try { window.close(); return; } catch (e) {}
+          }
+          try { window.close(); } catch (e) {}
+          /* Browsers may refuse to close a tab the script didn't open — leave
+             the page entirely so nothing renders or runs. */
+          setTimeout(function () {
+            try { location.replace('about:blank'); } catch (e) {}
+          }, 200);
+        });
+      }
       /* Modal guard, document-level CAPTURE while the dialog is open:
          the app wires hotkeys on document, and a canvas click could move
          focus outside — a 3-node Tab trap on the modal alone left both
          paths open. Tab cycles the dialog; Enter/Space operate the focused
-         control natively; everything else stops here. */
+         control natively; browser zoom (Ctrl/Cmd with = + - 0) reaches the
+         browser so the text can be enlarged; everything else stops here. */
       function keyGuard(ev) {
         if (modal.hidden) return;
-        var f = [box, exitB, cont];
+        var f = [box, learn, exitB, cont];
         if (ev.key === 'Tab') {
           ev.preventDefault();
           var i = f.indexOf(document.activeElement);
@@ -432,23 +476,26 @@
           f[(i + (ev.shiftKey ? -1 : 1) + f.length) % f.length].focus();
           return;
         }
+        var zoom = (ev.ctrlKey || ev.metaKey) && (ev.key === '=' || ev.key === '+' || ev.key === '-' ||
+          ev.key === '0' || ev.code === 'NumpadAdd' || ev.code === 'NumpadSubtract');
         var onControl = f.indexOf(ev.target) !== -1;
         var operate = (ev.key === 'Enter' || ev.key === ' ') && onControl;
-        if (!operate) { ev.preventDefault(); }
+        if (!operate && !zoom) { ev.preventDefault(); }
         ev.stopPropagation();
       }
       function focusGuard() {
         if (modal.hidden) return;
-        if (!modal.contains(document.activeElement)) cont.focus();
+        if (!modal.contains(document.activeElement)) title.focus();
       }
-      document.addEventListener('keydown', keyGuard, true);
-      document.addEventListener('focusin', focusGuard, true);
       function teardown() {
         modal.hidden = true;
         document.removeEventListener('keydown', keyGuard, true);
         document.removeEventListener('focusin', focusGuard, true);
+        if (returnFocus) { try { returnFocus.focus(); } catch (e) {} returnFocus = null; }
       }
-      cont.focus();
+      window.__showPhotoWarn = function (opts) { show(opts, false); };
+      if (acked) { modal.hidden = true; return; }
+      show(null, true);
     })();
     </script>
     <!-- Splash Screen -->
@@ -972,7 +1019,11 @@
         </div>
         <div class="control-group checkbox-group" style="margin-top: 5px;">
             <input type="checkbox" id="photoSafeToggle" checked>
-            <label for="photoSafeToggle" style="margin: 0" title="Photosensitivity protection: smooths rapid flashes of paint or light into gentle fades and globally clamps how fast brightness can shift (WCAG 2.3.1 thresholds). On by default.">Photosensitivity Protection</label>
+            <label for="photoSafeToggle" style="margin: 0" title="Photosensitivity protection: rapid flashes become fades, the rate of brightness change is capped and kaleidoscope spin is limited (WCAG 2.3.1 thresholds). It lowers the risk; it does not remove it. On by default.">Reduce flashing and rapid brightness changes</label>
+        </div>
+        <div class="control-group">
+            <button id="photoWarnShowBtn" type="button" style="width:100%">Show photosensitivity warning</button>
+            <a class="photo-warn-learn" href="https://www.epilepsy.com/what-is-epilepsy/seizure-triggers/photosensitivity" target="_blank" rel="noopener">Learn more about photosensitivity (Epilepsy Foundation)</a>
         </div>
         <div class="control-group checkbox-group">
             <input type="checkbox" id="cursorToggle" checked>

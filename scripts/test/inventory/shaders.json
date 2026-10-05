@@ -16,10 +16,6 @@
         {
           "token": "sum * 0.25",
           "name": "glowBlur"
-        },
-        {
-          "token": "1.0 / 16.0",
-          "name": "photoSafeLuma"
         }
       ]
     },
@@ -592,13 +588,22 @@
         "uWall"
       ]
     },
-    "areaFrac|darkFloor|dt|flashDelta|pairWindow|rateAllow|redDelta|releaseTau|slew|uLumaCur|uLumaPrev|uStatsPrev": {
-      "name": "photoSafeStats",
+    "darkFloor|dt|flashDelta|pairWindow|uPrev|uTexture": {
+      "name": "photoSafeLuma",
       "uniforms": [
-        "areaFrac",
         "darkFloor",
         "dt",
         "flashDelta",
+        "pairWindow",
+        "uPrev",
+        "uTexture"
+      ]
+    },
+    "areaFrac|dt|pairWindow|rateAllow|redDelta|releaseTau|slew|uLumaCur|uLumaPrev|uStatsPrev": {
+      "name": "photoSafeStats",
+      "uniforms": [
+        "areaFrac",
+        "dt",
         "pairWindow",
         "rateAllow",
         "redDelta",

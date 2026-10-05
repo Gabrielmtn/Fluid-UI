@@ -204,8 +204,15 @@
         if (photoSafeToggle) {
             photoSafeToggle.checked = !!config.PHOTOSAFE;
             document.body.classList.toggle('photosafe-on', !!config.PHOTOSAFE);
+            let offConfirmed = false, clickTrusted = null;
             photoSafeToggle.addEventListener('change', (e) => {
                 const on = e.target.checked;
+                // A script's el.click() fires an untrusted click but a TRUSTED
+                // change (the browser fires the change), so the change alone
+                // cannot say whether a human did this: the click before it can.
+                const human = (e.isTrusted && clickTrusted !== false) || offConfirmed;
+                offConfirmed = false;
+                clickTrusted = null;
                 config.PHOTOSAFE = on;
                 // Buffers are allocated lazily (05c skips them when booted
                 // with protection off) — build them before the next frame.
@@ -214,12 +221,87 @@
                 // events — extensions, automation, replayed snapshots — may
                 // drive the runtime state for this session but can never
                 // disarm protection across a reload. Fail-safe by design.
-                if (e.isTrusted) {
+                // A trusted "Turn off" in the question below counts as human.
+                if (human) {
                     try { localStorage.setItem('fluidui.photoSafe', on ? '1' : '0'); } catch (err) {}
                 }
                 // DOM-side guard rides the same switch: CSS transitions on the
                 // canvas background/opacity so no non-GL path can strobe.
                 document.body.classList.toggle('photosafe-on', on);
+            });
+            // Turning protection OFF by hand asks first. Caught at the click:
+            // a cancelled click leaves a checkbox as it was and fires no
+            // change, so nothing listening ever sees a half-made choice.
+            // Synthetic clicks pass as before (session only, never persisted).
+            let offModal = null, offKeys = null, offArmedAt = 0;
+            const closeOffQuestion = () => {
+                if (!offModal) return;
+                offModal.classList.remove('show');
+                if (offKeys) { document.removeEventListener('keydown', offKeys, true); offKeys = null; }
+                try { photoSafeToggle.focus({ preventScroll: true }); } catch (_) {}
+            };
+            const askPhotoSafeOff = () => {
+                if (!offModal) {
+                    offModal = document.createElement('div');
+                    offModal.id = 'photoSafeOffModal';
+                    offModal.className = 'delete-modal';
+                    offModal.dataset.group = 'system';   // button tint (css/01-buttons.css)
+                    offModal.setAttribute('role', 'alertdialog');
+                    offModal.setAttribute('aria-modal', 'true');
+                    offModal.setAttribute('aria-labelledby', 'photoSafeOffTitle');
+                    offModal.setAttribute('aria-describedby', 'photoSafeOffMsg');
+                    offModal.innerHTML =
+                        '<div class="delete-modal-content">' +
+                            '<div class="delete-modal-title" id="photoSafeOffTitle">Turn off flashing protection?</div>' +
+                            '<div class="delete-modal-message" id="photoSafeOffMsg">Flashing, rapid brightness changes and fast ' +
+                                'patterns will not be limited. This can trigger seizures in people with photosensitive epilepsy.</div>' +
+                            '<div class="delete-modal-actions">' +
+                                '<button type="button" class="delete-modal-cancel" id="photoSafeOffKeep">Keep protection on</button>' +
+                                '<button type="button" class="delete-modal-confirm btn--destructive" id="photoSafeOffGo">Turn off</button>' +
+                            '</div>' +
+                        '</div>';
+                    document.body.appendChild(offModal);
+                    offModal.querySelector('#photoSafeOffKeep').addEventListener('click', closeOffQuestion);
+                    offModal.querySelector('#photoSafeOffGo').addEventListener('click', (e) => {
+                        if (!e.isTrusted || performance.now() < offArmedAt) return;
+                        closeOffQuestion();
+                        offConfirmed = true;
+                        photoSafeToggle.checked = false;
+                        photoSafeToggle.dispatchEvent(new Event('change', { bubbles: true }));
+                    });
+                    // The scrim answers like Keep.
+                    offModal.addEventListener('mousedown', (e) => { if (e.target === offModal) closeOffQuestion(); });
+                }
+                offModal.classList.add('show');
+                offArmedAt = performance.now() + 400;
+                // Nothing typed at the question reaches the app's hotkeys;
+                // Escape is Keep, Tab stays between the two buttons.
+                if (offKeys) document.removeEventListener('keydown', offKeys, true);
+                offKeys = (e) => {
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeOffQuestion(); return; }
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const keep = offModal.querySelector('#photoSafeOffKeep'), go = offModal.querySelector('#photoSafeOffGo');
+                        (document.activeElement === keep ? go : keep).focus();
+                    }
+                    if (e.key !== 'Enter') e.stopPropagation();
+                };
+                document.addEventListener('keydown', offKeys, true);
+                try { offModal.querySelector('#photoSafeOffKeep').focus({ preventScroll: true }); } catch (_) {}
+            };
+            photoSafeToggle.addEventListener('click', (e) => {
+                clickTrusted = e.isTrusted;
+                // A click has already flipped the box: unchecked now = was on.
+                if (!e.isTrusted || photoSafeToggle.checked) return;
+                e.preventDefault();
+                clickTrusted = null;
+                askPhotoSafeOff();
+            });
+        }
+        const photoWarnShowBtn = document.getElementById('photoWarnShowBtn');
+        if (photoWarnShowBtn) {
+            photoWarnShowBtn.addEventListener('click', () => {
+                if (typeof window.__showPhotoWarn === 'function') window.__showPhotoWarn({ returnFocus: photoWarnShowBtn });
             });
         }
         // DEBUG: Pointer leave tracking removed for performance

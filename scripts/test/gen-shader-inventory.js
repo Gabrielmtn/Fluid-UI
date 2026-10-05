@@ -22,7 +22,7 @@
 // wins.
 //
 // Two groups still tie on the set alone and get a substring tiebreaker:
-//   blurFrag / glowBlurFrag / photoSafeLumaFrag   — all take only uTexture
+//   blurFrag / glowBlurFrag                       — both take only uTexture
 //   memRefreshFrag / captureFrag                  — all take only uDye
 //
 // Re-run whenever a shader is added or its uniforms change:

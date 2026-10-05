@@ -356,7 +356,7 @@
         "localStorage 'fluidui.photoSafe' — persisted preference; also read by 04a config seed and the first-frame warning modal",
         "localStorage 'fluidui.photoWarn.ack.v1' — modal acknowledgement; clear it to re-show the warning on next load",
         "body.photosafe-on class — CSS transitions on canvas background/opacity",
-        "safeFrame/safeOut/safeLuma/safeStats FBOs via window.__getPhotoSafe() — safeStats is 2x1: texel0 {R:envelope, G:slewLuma, B:mean}, texel1 {R:lastSign+1, G:pairTimer, B:transitionRate}"
+        "safeFrame/safeOut/safeLuma/safeStats FBOs via window.__getPhotoSafe() — safeLuma is 16x16 {R:luma, G:redness, B:running extreme, A:swing state (sign = direction, |A| = 1 + seconds since its last swing, 3 = reversed this frame inside the pair window)}; safeStats is 2x1: texel0 {R:envelope, G:slewLuma, B:mean, A:1+luminance pairTimer}, texel1 {R:red lastSign+1, G:red pairTimer, B:transition count, A:luminance lastSign+2}"
       ],
       "knownHazards": [
         "Default ON: A/B captures against pre-feature baselines must disable it OR rely on pass-through bit-identity (verified for static scenes; any detected flash breaks identity BY DESIGN)",
@@ -366,7 +366,7 @@
         "Exports/captures/recordings read the canvas AFTER the limiter: a mid-strobe export is the CLAMPED look (intended — what the viewer was protected into seeing is what ships)",
         "Alpha-channel flashes (backgroundTransparency strobing the DOM composite) are outside the GL limiter; the CSS transition guard on body.photosafe-on covers background-color/opacity of the canvas elements, nothing else",
         "OFF->ON edge clears limiter state via resetPhotoSafeState() (05i, called from 05j); buffers are allocated lazily when booted with protection off — window.__photoSafeEnsure() builds them",
-        "Detection is OSCILLATION RATE, not per-frame deviation: a test that changes the frame monotonically (painting, fades, a single burst) will NOT engage the envelope by design. To exercise suppression, alternate large-area luminance at >2.5Hz for ~1s (engagement ramps over ~0.8s; WCAG permits up to 3 flashes/sec, so onset is not instant).",
+        "Detection is REVERSAL, not per-frame deviation: a block must swing 10% one way and back inside 0.18 s, and enough blocks must do it the same way at once. A test that changes the frame monotonically (painting, fades, a single burst) will NOT engage the envelope by design. To exercise suppression, alternate large-area luminance faster than 2.8 Hz; suppression is full by about the third flash. scripts/test/photosafe/run.js drives applyPhotoSafe() directly per frame and is the reference recipe.",
         "The live rAF loop keeps running between harness tool calls and releases envelope/rate (tau 1s / PHOTOSAFE_RELEASE) — build the strobe AND read the state inside ONE evaluation."
       ]
     },
