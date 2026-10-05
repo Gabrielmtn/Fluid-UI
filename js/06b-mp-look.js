@@ -159,6 +159,9 @@ function captureLookSnapshot() {
     // from the host. Mirror every look section applyPresetSnapshot knows.
     var snap = {
         version: full.version,
+        // The units the sliders are in (12's LOOK_UNIT_MOVES): a watcher on a
+        // later build converts a slider rescaled since.
+        baseline: full.baseline,
         sliders: {},
         checkboxes: {},
         selects: {},
@@ -341,7 +344,7 @@ function toggleSettingsLock() {
 var LOCK_SNAPSHOT_ALLOW = ['sliders', 'checkboxes', 'selects', 'colors', 'savedColors',
     'paletteIndex', 'paletteName', 'armColors', 'brushState', 'lightPos',
     'lightShiftPath', 'kaleido', 'userPalettes', 'ssOrigin', 'material',
-    'brushTip', 'cosOscillator', 'transport', 'resolution', 'gravity'];
+    'brushTip', 'cosOscillator', 'transport', 'resolution', 'gravity', 'baseline'];
 // Bounded recursive clean: primitives-only leaves (no data: URLs, strings
 // capped), depth ≤ 3 so armColors [{mode,color}], lightShiftPath waypoints
 // and userPalettes [{name, colors: [...]}] survive — the old one-level rule
@@ -407,6 +410,10 @@ function setSettingsLockedByHost(locked, snapshot) {
 // take-turns mirror — both ride the same capture/sanitize/apply pipeline).
 function applyRemoteLookSnapshot(snapshot) {
     var safeSnap = sanitizeLockSnapshot(snapshot);
+    // Every build since Vibrance was rescaled (2026-10-05) sends its
+    // generation; a snapshot without one is from a peer on an older build,
+    // whose Vibrance is in the old units.
+    if (safeSnap && typeof safeSnap.baseline !== 'number') safeSnap.baseline = 1;
     if (safeSnap && typeof window.applyPresetSnapshot === 'function') {
         // Transport parity (mirror-only; applyPresetSnapshot ignores it): the
         // painter pausing or freezing the fluid is part of the performance.

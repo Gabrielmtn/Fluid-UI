@@ -403,7 +403,7 @@
                                       // kernels 3 to 24 texels wide and speckled the hue 1-3% wherever a
                                       // brush was laying two colours into each other. false = one tap
 
-            VIBRANCE: 1,              // Selective saturation boost (0 = off, 1.0 = max). Default look 2026-09-24.
+            VIBRANCE: 0.5,            // Selective saturation boost (0 = off, 1.0 = max). 0.5 = the old 1.0 (rescaled 2026-10-05).
 
             DYE_RESOLUTION: 2048,     // Ultra (2K) by default on desktop — the highest real-time tier.
                                       // The governor's boot ascent starts light and ramps up to this;

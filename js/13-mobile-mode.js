@@ -191,7 +191,7 @@
             if (window.config) {
                 savedVibrance = config.VIBRANCE;
                 // Only boost if the value is low — respect user settings if already high
-                if (config.VIBRANCE < 0.4) config.VIBRANCE = 0.4;
+                if (config.VIBRANCE < 0.2) config.VIBRANCE = 0.2;   // the old 0.4 (rescaled 2026-10-05)
                 // Sync the UI slider if it exists
                 var vSlider = document.getElementById('vibrance');
                 if (vSlider) vSlider.value = config.VIBRANCE;

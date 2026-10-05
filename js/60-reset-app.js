@@ -87,6 +87,12 @@
             var snap = window.baselineLookSnapshot();
             if (typeof window.LOOK_BASELINE_GEN === 'number') snap.baseline = window.LOOK_BASELINE_GEN;
             try { window.applyPresetSnapshotFull(snap); } catch (err) { console.warn('[ResetApp] look', err); }
+            // Random Colors is on again: roll its first colour, or the next
+            // stroke paints the defaults' white swatch.
+            var a0 = window.multiArmColors && window.multiArmColors[0];
+            if (a0 && a0.mode === 'random' && typeof window.setActiveBrushColorMode === 'function') {
+                window.setActiveBrushColorMode('random');
+            }
         }
         // 2. The brush drawer's engine settings.
         resetBrushDrawer();

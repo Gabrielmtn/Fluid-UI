@@ -901,7 +901,10 @@
             in vec2 vUv;
             out vec4 fragColor;
             uniform sampler2D uTexture;
-            uniform float vibrance;   // 0â€“1: selective saturation
+            // 0-1 slider. 0.5 is the stock look, the strength the slider's
+            // old top end (1.0 at x1.2) gave; the top half is new headroom
+            // (2026-10-05). imageSplatFrag's unVibrance (05b) uses the same 2.4.
+            uniform float vibrance;
             void main() {
                 vec3 center = texture(uTexture, vUv).rgb;
                 vec3 lumaW = vec3(0.299, 0.587, 0.114);
@@ -921,7 +924,7 @@
                     float maxC = max(result.r, max(result.g, result.b));
                     float minC = min(result.r, min(result.g, result.b));
                     float sat = maxC > 0.001 ? (maxC - minC) / maxC : 0.0;
-                    float boost = vibrance * (1.0 - sat * sat) * 1.2 * lowFade;
+                    float boost = vibrance * (1.0 - sat * sat) * 2.4 * lowFade;
                     result = mix(vec3(gray), result, 1.0 + boost);
                     result = max(result, vec3(0.0));
                 }

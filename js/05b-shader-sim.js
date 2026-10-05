@@ -2811,7 +2811,7 @@
             // Two more grades land on every pixel the same way: Vibrance
             // widens the HDR dye's channel spread before the tone map, and
             // Surface Shading lifts saturation after it. At the stock
-            // Vibrance 1 a poured cream came out pure yellow. Both keep luma
+            // Vibrance a poured cream came out pure yellow. Both keep luma
             // and only scale the spread about it, so each undoes exactly.
             // Surface Shading's lift, undone: the spread over (1 + lift x fade).
             vec3 unShadeLift(vec3 d, float lift) {
@@ -2828,7 +2828,7 @@
             vec3 unVibrance(vec3 t, float v) {
                 float g = dot(t, vec3(0.299, 0.587, 0.114));
                 if (v <= 0.0 || g < 0.001) return t;
-                float K = v * 1.2 * smoothstep(0.003, 0.03, g);
+                float K = v * 2.4 * smoothstep(0.003, 0.03, g);   // microDetailFrag's gain
                 float tMax = max(t.r, max(t.g, t.b));
                 float spread = tMax - min(t.r, min(t.g, t.b));
                 float above = tMax - g;

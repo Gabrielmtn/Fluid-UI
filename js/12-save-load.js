@@ -186,6 +186,7 @@
         if (window.Settings) {
             Settings.savePanel('statsPanel', panels.statsPanel);
             Settings.saveSliders(sliders);
+            sm.set('look.baseline', LOOK_BASELINE_GEN);   // the units they are in (applyFromSettings)
             Settings.saveCheckboxes(checkboxes);
             Object.entries(colors).forEach(([name, val]) => Settings.saveColor(name, val));
             Object.entries(selects).forEach(([name, val]) => Settings.saveSelect(name, val));
@@ -326,10 +327,18 @@
         }
 
         // ── 3. Sliders ──
+        // look.baseline is the defaults generation the sliders were saved
+        // against (written with them below); none = saved before it existed.
+        // A slider rescaled since then converts, as a preset does.
         var sliderCount = 0;
+        var savedGen = sm.get('look.baseline');
+        if (typeof savedGen !== 'number') savedGen = 1;
         SLIDER_IDS.forEach(function(id) {
             var v = sm.get('slider.' + id);
-            if (v !== undefined && v !== null) { applySliderValue(id, v); sliderCount++; }
+            if (v === undefined || v === null) return;
+            var unit = lookUnitScale(id, savedGen);
+            applySliderValue(id, unit === 1 ? v : Number(v) * unit);
+            sliderCount++;
         });
 
         // ── 4. Checkboxes ──
@@ -1041,17 +1050,23 @@
         window.__brushColorRestoring = true;
 
         // ── Sliders ── (clamped through the param registry; unknown ids warn + skip)
+        // A slider rescaled since the snapshot was taken converts after the
+        // clamp (LOOK_UNIT_MOVES), so a halved 0.15 lands as 0.075, not the
+        // nearest step. No baseline = a live capture (the room mirror, Mutate),
+        // already in today's units.
+        var unitGen = (typeof snapshot.baseline === 'number') ? snapshot.baseline : LOOK_BASELINE_GEN;
         try {
             if (snapshot.sliders) {
                 Object.keys(snapshot.sliders).forEach(function(id) {
                     var raw = snapshot.sliders[id];
+                    var unit = lookUnitScale(id, unitGen);
                     if (reg) {
                         var clamped = reg.clampSlider(id, raw);
                         if (clamped === null) { console.warn('[Preset] skipping unknown/invalid slider', id, raw); return; }
                         if (clamped !== Number(raw)) console.warn('[Preset] clamped slider', id, raw, '→', clamped);
-                        applySliderValue(id, clamped);
+                        applySliderValue(id, unit === 1 ? clamped : clamped * unit);
                     } else {
-                        applySliderValue(id, raw);
+                        applySliderValue(id, unit === 1 ? raw : Number(raw) * unit);
                     }
                 });
             }
@@ -1821,7 +1836,7 @@
     // is exactly the state it used to land on. When a look default changes
     // again: bump LOOK_BASELINE_GEN and add that generation's entry to
     // LOOK_BASELINE_MOVES.
-    var LOOK_BASELINE_GEN = 5;
+    var LOOK_BASELINE_GEN = 7;
     // Per generation, the keys whose default it MOVED, at the value they had
     // before the move. A snapshot taken against generation g fills its gaps
     // from every entry newer than g, the oldest value winning when a key
@@ -1850,8 +1865,32 @@
         4: { sliders: { velocityInfluence: 5, densityDissipation: 1 } },
         // 2026-10-04: Cap starts on, so a fresh boot and Reset app don't
         // pile repeated strokes up into white.
-        5: { checkboxes: { colorGate: false } }
+        5: { checkboxes: { colorGate: false } },
+        // 2026-10-05: Random Colors starts on after Reset app, as on a first
+        // boot. The defaults look's arm 0 said 'main', which unticked Rnd.
+        6: { armColors: [{ mode: 'main', color: '#ffffff', stepIndex: 0, push: false }] },
+        // 2026-10-05: Vibrance rescaled (LOOK_UNIT_MOVES below). Held in the
+        // old units like everything a snapshot of that generation carries;
+        // the slider apply converts both alike.
+        7: { sliders: { vibrance: 1 } }
     };
+    // Per generation, the sliders whose SCALE it changed, not just their
+    // default: a value saved against an older generation is multiplied by
+    // this on the way in, so it lands at the strength it was saved at.
+    var LOOK_UNIT_MOVES = {
+        // 2026-10-05: Vibrance's old top end is its new midpoint (05a's gain
+        // doubled), so a saved 1.00 now reads 0.50 and looks the same.
+        7: { vibrance: 0.5 }
+    };
+    function lookUnitScale(id, gen) {
+        if (!(gen >= 1)) gen = 1;
+        var k = 1;
+        for (var g = gen + 1; g <= LOOK_BASELINE_GEN; g++) {
+            var mv = LOOK_UNIT_MOVES[g];
+            if (mv && typeof mv[id] === 'number') k *= mv[id];
+        }
+        return k;
+    }
     var FILL_SECTIONS = { sliders: 1, checkboxes: 1, selects: 1 };
     // What a snapshot of generation `gen` fills its gaps from, or null when
     // it is current.
@@ -1884,7 +1923,7 @@
             colors: { background: '#000000', brush: '#ffffff' },
             kaleido: { mode: 1, segments: 12, angle: 0, twist: 0, zoom: 1, blend: 1 },
             paletteIndex: (typeof window.DEFAULT_PALETTE_INDEX === 'number') ? window.DEFAULT_PALETTE_INDEX : 1,
-            armColors: [{ mode: 'main', color: '#ffffff', stepIndex: 0, push: false }],
+            armColors: [{ mode: 'random', color: '#ffffff', stepIndex: 0, push: false }],
             lightPos: { x: 0.5, y: 0.5 },
             brushState: { replayMode: 'stroke', replayTimePeriod: 2,
                 splatInMode: 'instant', splatOutMode: 'instant',
@@ -1898,6 +1937,10 @@
             Object.keys(d.sliders).forEach(function (k) { if (!BASELINE_SKIP[k]) base.sliders[k] = d.sliders[k]; });
             Object.keys(d.checkboxes).forEach(function (k) { if (!BASELINE_SKIP[k]) base.checkboxes[k] = d.checkboxes[k]; });
             Object.keys(d.selects).forEach(function (k) { if (!BASELINE_SKIP[k]) base.selects[k] = d.selects[k]; });
+            // Arm 0's mode is what the Rnd/Step switches show once applied, so
+            // it follows their defaults (the same derive as a first boot, 6b).
+            base.armColors[0].mode = d.checkboxes.stepPalette ? 'step'
+                : (d.checkboxes.randomColor ? 'random' : 'fixed');
         }
         return base;
     }
@@ -1909,6 +1952,9 @@
         // gaps from the defaults it was taken against (see LOOK_BASELINE_MOVES).
         var legacy = snapshotLegacyFill(snapshot) || {};
         var merged = Object.assign({}, snapshot);
+        // The slider apply converts rescaled sliders by this (LOOK_UNIT_MOVES);
+        // a snapshot without one is from generation 1, like the fill above.
+        merged.baseline = (typeof snapshot.baseline === 'number') ? snapshot.baseline : 1;
         ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
             merged[sec] = Object.assign({}, base[sec], legacy[sec] || {}, snapshot[sec] || {});
         });
@@ -2243,6 +2289,9 @@
                 env = { format: PROJECT_FORMAT, formatVersion: 1, snapshot: env };
             }
             if (env.format !== PROJECT_FORMAT || !env.snapshot) return null;
+            // Saved before snapshots carried their defaults generation
+            // (2026-09-24): its sliders are in generation 1's units.
+            if (typeof env.snapshot.baseline !== 'number') env.snapshot.baseline = 1;
             // Future envelope upgrades gate on env.formatVersion here.
             return env;
         }

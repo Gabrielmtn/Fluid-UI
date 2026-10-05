@@ -118,7 +118,11 @@
         lightShiftThreshold: {configKey: null, ui: {min: 0.5, max: 1, step: 0.01}, hard: {min: 0.5, max: 1}, def: 0.85, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0.5, max: 1, step: 0.01, scope: "extended"}},
         lightShiftIntensity: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.5, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
         lightShiftSaturation: {configKey: null, ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 1, decimals: 2, category: "lightShift", perfTier: 0, simSlider: false, mut: {min: 0, max: 1, step: 0.01, scope: "extended"}},
-        vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.05}, hard: {min: 0, max: 1}, def: 1, decimals: 2, category: "effects", perfTier: 1, simSlider: true, mut: {min: 0, max: 1, step: 0.05, scope: "extended"}},
+        // Rescaled 2026-10-05 (look generation 7): the old full strength 1.0
+        // is the new 0.5 default and the top half is new headroom (05a's gain
+        // doubled). Step 0.01 so a halved old value (0.15 -> 0.075) lands
+        // within half a step of itself. Mutate stays on the old range.
+        vibrance: {configKey: "VIBRANCE", ui: {min: 0, max: 1, step: 0.01}, hard: {min: 0, max: 1}, def: 0.5, decimals: 2, category: "effects", perfTier: 1, simSlider: true, mut: {min: 0, max: 0.5, step: 0.01, scope: "extended"}},
         // step 0.05 -> 0.005 (2026-08-21): 0.05 was the smallest halo you could
         // ask for and it already read as a hard pop off zero. Range, def and
         // LINEAR meaning are deliberately untouched — this value is stored raw

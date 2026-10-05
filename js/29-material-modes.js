@@ -52,10 +52,11 @@
         acrylic: {
             macro: 'Flow', def: 30,
             apply: function (t) {
-                // Paint look: relief shading + maxed vibrance
+                // Paint look: relief shading + vibrance at the old top end
+                // (0.5 since the 2026-10-05 rescale, which was 1 before)
                 setCheckbox('displayShadingToggle', true);
                 setUISlider('shadingIntensity', 0.8);
-                setUISlider('vibrance', 1);
+                setUISlider('vibrance', 0.5);
                 window.displayShadingInvert = 0;
                 // Flow: low = stiff paint (crisp, heavy damping), high = runny
                 // Ridge Strength. Until 2026-09-21 the UI labelled it
