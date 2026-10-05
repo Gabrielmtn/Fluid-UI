@@ -8398,6 +8398,11 @@
         var rowsWrap = document.createElement('div');
         rowsWrap.className = 'arm-colors-rows';
         panel.appendChild(rowsWrap);
+        // What the rows on screen were built from: one repaint per row, the
+        // config object each one edits, and the state they showed (panelSig).
+        // Declared up here: the restore below can rebuild before the
+        // functions further down are reached.
+        var rowPaints = [], rowCfgs = [], lastSig = '';
         // What the row buttons mean, on the panel itself (user test 3: "tooltips
         // on the multi brush items aren't enough").
         var armLegend = document.createElement('div');
@@ -8480,6 +8485,8 @@
 
         function rebuildRows() {
             rowsWrap.innerHTML = '';
+            rowPaints = [];
+            rowCfgs = [];
             var slider = document.getElementById('multiplier');
             var count = slider ? parseInt(slider.value, 10) || 1 : 1;
             // Brush controls exist at EVERY arm count (2026-07-13) — at 1x the
@@ -8534,7 +8541,6 @@
                     // every arm pushes and this one is inert — greyed rather
                     // than hidden, so the rows don't reflow when you switch the
                     // brush over.
-                    var brushPush = !!(window.config && window.config.BRUSH_VELOCITY_ONLY);
                     var pushBtn = document.createElement('button');
                     pushBtn.type = 'button';
                     pushBtn.className = 'arm-mode-btn arm-push-btn';
@@ -8547,6 +8553,9 @@
                     // (css/01-buttons.css) and "selected" is its shared .active
                     // plate — their layout lives in 20-mixer-strip.css.
                     function paintRow() {
+                        // Read live: Tab flips the brush to Pressure under a
+                        // row that is not rebuilt.
+                        var brushPush = !!(window.config && window.config.BRUSH_VELOCITY_ONLY);
                         btns.forEach(function(b) {
                             b.classList.toggle('active', b.dataset.mode === cfg.mode);
                         });
@@ -8657,16 +8666,89 @@
                     row.appendChild(pushBtn);
 
                     rowsWrap.appendChild(row);
+                    rowPaints.push(paintRow);
+                    rowCfgs.push(cfg);
                 })(i);
             }
+            lastSig = panelSig();
+        }
+
+        // ── Live while open ──────────────────────────────────────────
+        // The section used to catch up only on a click: the rows rebuilt on a
+        // real 'input' from the arm-count slider, on opening, and after each
+        // stroke (05g advanceArmColors). Most writers set state by PROPERTY
+        // with no event: hotkeys 1-8 (05e), kaleido (05f), the anim portal
+        // (04e), the saved-multiplier restore (05h), reduced motion (04f),
+        // palette picks moving the brush colour. So pressing 4 left one row on
+        // screen until the next stroke ended. Instead of an event at every
+        // writer (and every future one), the open section compares what it
+        // shows against the live state once a frame and repaints on a change.
+        function panelSig() {
+            var c = window.config || {};
+            var n = mainMult ? (parseInt(mainMult.value, 10) || 1) : 1;
+            var pk = document.getElementById('colorPicker');
+            var s = n + '|' + (c.SYMMETRY_MODE || '') + '|' + (c.BRUSH_VELOCITY_ONLY ? 1 : 0)
+                + '|' + (pk ? pk.value : '');
+            var arr = window.multiArmColors || [];
+            var steps = false;
+            for (var i = 0; i < n && i < arr.length; i++) {
+                var a = arr[i];
+                if (!a) { s += '|-'; continue; }
+                s += '|' + a.mode + ',' + a.color + ',' + (a.push ? 1 : 0);
+                if (a.cachedColor) s += ',' + a.cachedColor[0] + ',' + a.cachedColor[1] + ',' + a.cachedColor[2];
+                if (a.mode === 'step' && i > 0) steps = true;
+            }
+            // A Palette row past arm 0 shows the palette counter's colour.
+            if (steps && typeof window.nextStepHex === 'function') s += '|' + window.nextStepHex();
+            return s;
+        }
+
+        // Rebuild, not repaint, when the arm count moved or the configs the
+        // rows edit were swapped out (a preset or session restore replaces
+        // them): a repainted row would show, and write to, the old object.
+        function rowsStale() {
+            var n = mainMult ? Math.max(1, parseInt(mainMult.value, 10) || 1) : 1;
+            if (rowCfgs.length !== n) return true;
+            var arr = window.multiArmColors || [];
+            for (var i = 0; i < n; i++) if (rowCfgs[i] !== arr[i]) return true;
+            return false;
+        }
+
+        // Repaints in place when it can, so an arm's colour picker is never
+        // torn out from under an open colour dialog.
+        function refreshPanel() {
+            if (!isShown()) return;
+            pullMultiplier();
+            if (rowsStale()) { rebuildRows(); return; }
+            updateSymNote();
+            for (var i = 0; i < rowPaints.length; i++) rowPaints[i]();
+            lastSig = panelSig();
+        }
+
+        var watchRaf = 0;
+        function watchTick() {
+            watchRaf = 0;
+            if (!isShown()) return;   // parked until the section opens again
+            if (rowsStale() || panelSig() !== lastSig) refreshPanel();
+            watchRaf = requestAnimationFrame(watchTick);
+        }
+        function watchPanel() {
+            if (!watchRaf && isShown()) watchRaf = requestAnimationFrame(watchTick);
         }
 
         // The floating window opens, closes and follows its trigger; the
         // section opens and closes like any section, and rebuilds its rows
-        // when it opens.
+        // when it opens. Either way it then stays live (watchPanel).
         if (host) {
             var hostSec = host.closest ? host.closest('.sidebar-section') : null;
-            if (hostSec) hostSec.__onOpen = function () { pullMultiplier(); rebuildRows(); };
+            if (hostSec) {
+                hostSec.__onOpen = function () { pullMultiplier(); rebuildRows(); watchPanel(); };
+                // A section also opens without its header click (the saved
+                // open/closed state, a How-do-I tour), which skips __onOpen.
+                if (typeof MutationObserver === 'function') {
+                    new MutationObserver(watchPanel).observe(hostSec, { attributes: true, attributeFilter: ['class'] });
+                }
+            }
         } else {
             function closePanel() {
                 panel.style.display = 'none';
@@ -8685,6 +8767,7 @@
                     pullMultiplier();
                     positionPanel();
                     rebuildRows();
+                    watchPanel();
                 }
             });
     
@@ -8728,11 +8811,11 @@
     
         }
 
-        // Rebuild when multiplier changes
+        // A drag on the arm count lands in the same frame, not the next one.
         if (mainMult) {
             mainMult.addEventListener('input', function() {
                 pullMultiplier();
-                if (isShown()) rebuildRows();
+                refreshPanel();
             });
         }
 
@@ -8740,10 +8823,9 @@
         window.rebuildArmColorRows = rebuildRows;
         // After each stroke (05g advanceArmColors): the swatches move on with
         // the palette and the Random rolls, while the panel is open.
-        window.refreshArmColorRows = function () {
-            if (isShown()) rebuildRows();
-        };
+        window.refreshArmColorRows = refreshPanel;
 
+        watchPanel();
         return { toggle: toggle };
     }
 
