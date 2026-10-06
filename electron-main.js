@@ -616,7 +616,16 @@ function photoCacheArgs() {
 function editionArgs() {
     const a = [];
     if (EDITION !== 'full') a.push('--swirl-edition=' + EDITION);
-    if (steamClient) a.push('--swirl-steam=1');
+    if (steamClient) {
+        a.push('--swirl-steam=1');
+        // The player's Steam name: a room shows it in place of the Artist-XX
+        // tag (js/06e-mp-panel.js). URI-encoded, since a persona name is free
+        // Unicode text and this rides a command line.
+        try {
+            const name = steamClient.localplayer.getName();
+            if (name) a.push('--swirl-steam-name=' + encodeURIComponent(name));
+        } catch (_) {}
+    }
     return a;
 }
 

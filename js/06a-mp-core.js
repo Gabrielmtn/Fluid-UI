@@ -516,6 +516,8 @@ function onMultiplayerMessage(event) {
                 // is the one who welcomes.
                 startRoomLook();
                 if (myRole === 'host' && connectedClients >= 2) scheduleRoomLookWelcome();
+                // A Steam player tells the room who they are (06e).
+                announceArtistName();
                 updateConnectedView();
                 // Phones in the room say hello again when they see us
                 // arrive; until then the list of them starts over.
@@ -539,6 +541,8 @@ function onMultiplayerMessage(event) {
                     connectedClients = data.count;
                     // ...and the host brings them onto the room's settings.
                     if (myRole === 'host') scheduleRoomLookWelcome();
+                    // Our Steam name, too: they arrived after we said it.
+                    announceArtistName();
                 }
                 connectedClients = data.count;
                 updateConnectedView();
@@ -631,6 +635,7 @@ function onMultiplayerMessage(event) {
                 if (data.clientId) break;
                 if (typeof data.id === 'string' && data.id && data.id !== clientId) {
                     dropPeerAssetsOf(data.id);
+                    peerArtistNames.delete(data.id);
                     if (window.PhonePads) window.PhonePads.onLeft(data.id);
                 }
                 break;
@@ -640,6 +645,12 @@ function onMultiplayerMessage(event) {
                 // phone mark, and the host tells it what this canvas paints
                 // with (js/54-phone-pads.js). Its strokes are plain 'splat's.
                 if (data.clientId !== clientId && window.PhonePads) window.PhonePads.onHello(data);
+                break;
+
+            case 'artist-name':
+                // A Steam player's name, shown in place of their Artist-XX
+                // tag (06e).
+                if (data.clientId !== clientId) onArtistName(data);
                 break;
 
             case 'stroke':
@@ -708,6 +719,7 @@ function onMultiplayerClose(event) {
     // holding GL textures for people who are gone is pure leak. An auto-
     // reconnect below simply re-receives what it needs on the next stroke.
     dropPeerAssets();
+    peerArtistNames.clear();   // connection ids are room-scoped, like the assets
     // Server refused the join (locked room / full room) — don't retry in a loop.
     if (event && (event.code === 4001 || event.code === 4002)) {
         currentRoom = null; lastRoom = null;

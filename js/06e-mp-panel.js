@@ -46,8 +46,56 @@ function colorForClient(id) {
     return 'hsl(' + (hashId(id) % 360) + ', 80%, 62%)';
 }
 function shortName(id) {
+    var named = peerArtistNames.get(String(id)) || (id === clientId ? myArtistName() : '');
+    if (named) return named;
     var s = String(id).replace(/[^a-zA-Z0-9]/g, '');
     return 'Artist-' + (s.slice(-2).toUpperCase() || '??');
+}
+
+// ── Artist names ────────────────────────────────────────────────────
+// A Steam player goes by their Steam name; everyone else (the web build,
+// the itch playtest, a phone brush) keeps the Artist-XX tag above. The
+// desktop app hands the name in on argv (electron-main editionArgs ->
+// index.html -> window.SWIRL_STEAM_NAME), and each Steam client tells the
+// room its own: on joining, and again whenever someone new arrives, since a
+// newcomer has no way to ask (06a). The relay stamps clientId, so a name can
+// only ever be claimed for the sender's own connection — but it is still a
+// peer's free text: cleaned on the way in as well as out, and only ever set
+// as textContent. Clients from before this ignore the message.
+var ARTIST_NAME_MAX = 32;          // Steam's own limit on a persona name
+var peerArtistNames = new Map();   // clientId -> name, for this room only
+
+function cleanArtistName(s) {
+    if (typeof s !== 'string') return '';
+    var out = '';
+    for (var ch of s) {
+        var c = ch.codePointAt(0);
+        // Control characters, zero-width marks and bidi overrides (a name
+        // that turns the rest of the line around it) are dropped.
+        if (c < 32 || (c >= 127 && c < 160) || (c >= 0x200B && c <= 0x200F) ||
+            (c >= 0x2028 && c <= 0x202E) || (c >= 0x2060 && c <= 0x206F) || c === 0xFEFF) continue;
+        out += ch;
+    }
+    var cp = Array.from(out.replace(/\s+/g, ' ').trim());
+    return cp.slice(0, ARTIST_NAME_MAX).join('').trim();
+}
+
+function myArtistName() {
+    return cleanArtistName(window.SWIRL_STEAM_NAME || '');
+}
+
+function announceArtistName() {
+    var name = myArtistName();
+    if (!name || !partySocket || partySocket.readyState !== WebSocket.OPEN) return;
+    try { partySocket.send(JSON.stringify({ type: 'artist-name', name: name })); } catch (_) {}
+}
+
+function onArtistName(data) {
+    if (typeof data.clientId !== 'string' || !data.clientId) return;
+    var name = cleanArtistName(data.name);
+    if (name) peerArtistNames.set(data.clientId, name);
+    else peerArtistNames.delete(data.clientId);
+    renderActivity();
 }
 
 // Update remote cursor display
@@ -251,7 +299,8 @@ function renderActivity() {
     el.style.display = together ? '' : 'none';
     if (!together) return;
     var a = (_activity && Date.now() < _activity.until) ? _activity : null;
-    var key = a ? a.who + '|' + (a.welcome ? '*' : a.names.join('|')) : '';
+    // The name is in the key: a Steam name can land after the line is up.
+    var key = a ? a.who + '|' + shortName(a.who) + '|' + (a.welcome ? '*' : a.names.join('|')) : '';
     if (el.dataset.key === key && el.childNodes.length) return;
     el.dataset.key = key;
     el.textContent = '';

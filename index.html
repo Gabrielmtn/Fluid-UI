@@ -94,16 +94,22 @@
         // five-minute clock (js/52-demo-clock.js); the itch playtest is the
         // whole app plus the web build's playtest label. electron-main.js
         // tells their pages so on argv, and says whether Steamworks started
-        // (--swirl-steam=1: a store link can open in the Steam client).
+        // (--swirl-steam=1: a store link can open in the Steam client) and,
+        // when it did, the player's Steam name (--swirl-steam-name=, which
+        // a room shows in place of Artist-XX — js/06e-mp-panel.js).
         // The full game and the web build are both 'full'.
         window.SWIRL_EDITION = 'full';
         window.SWIRL_STEAM = false;
+        window.SWIRL_STEAM_NAME = '';
         try {
             var editionArgv = (typeof process !== 'undefined' && process.argv) || [];
             for (var ei = 0; ei < editionArgv.length; ei++) {
                 if (editionArgv[ei] === '--swirl-edition=demo') window.SWIRL_EDITION = 'demo';
                 else if (editionArgv[ei] === '--swirl-edition=playtest') window.SWIRL_EDITION = 'playtest';
                 else if (editionArgv[ei] === '--swirl-steam=1') window.SWIRL_STEAM = true;
+                else if (editionArgv[ei].indexOf('--swirl-steam-name=') === 0) {
+                    try { window.SWIRL_STEAM_NAME = decodeURIComponent(editionArgv[ei].slice(19)); } catch (e2) {}
+                }
             }
         } catch (e) {}
 
