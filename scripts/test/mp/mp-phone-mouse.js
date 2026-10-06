@@ -259,10 +259,10 @@ const DOOR = "(function(){ function shown(sel){ var e = document.querySelector(s
         check(!!bm && bm.info.color === '#ffffff', 'and knows the colour the computer paints', bm && bm.info.color);
         const aSees = await until(a, "PhoneMouse.hasPhone() && /Your phone is your mouse/.test(document.getElementById('phonePadStatus').textContent)", 5000);
         check(!!aSees, 'the computer\'s dialog says the phone is its mouse');
-        const aToast = await a.eval("(document.getElementById('mpTurnToast')||{}).textContent || ''");
+        const aToast = await a.eval("(document.getElementById('mpRoomToast')||{}).textContent || ''");
         check(/now your mouse/.test(aToast), 'and says it once, out loud', aToast);
         check(/connected/.test(await a.eval("document.getElementById('phonePadBtn').textContent")), 'the door shows the phone is connected');
-        const menu = await b.eval("({head: document.getElementById('menuHead').textContent, leave: document.getElementById('leaveBtn').textContent, pass: !document.getElementById('passBtn').hidden})");
+        const menu = await b.eval("({head: document.getElementById('menuHead').textContent, leave: document.getElementById('leaveBtn').textContent, pass: !!document.getElementById('passBtn')})");
         check(/Your computer’s mouse/.test(menu.head) && menu.head.indexOf(code.slice(0, 4) + ' ' + code.slice(4)) >= 0 && menu.leave === 'Disconnect' && !menu.pass,
             'the phone\'s menu names the computer link, and offers Disconnect', menu);
         check(await a.eval('!currentRoom'), 'still no room on the computer');
@@ -375,44 +375,11 @@ const DOOR = "(function(){ function shown(sel){ var e = document.querySelector(s
         const labels = await c.eval("Array.prototype.map.call(document.querySelectorAll('.remote-cursor-label'), function(e){ return e.textContent; })");
         check(!labels.some((t) => t.indexOf('📱') === 0), 'no phone cursor on the other canvas', labels);
 
-        // ── Take turns: the computer's turn is the phone's ──────────
-        await a.eval('toggleTurns(); 1');
-        await until(c, 'turnsOn && turnHolderId', 5000);
-        const tMine = await until(b, "(function(){var m=" + MOUSE + "; return m.info && m.info.turn && m.info.turn.mine ? m : null;})()", 5000);
-        check(!!tMine && /Your turn/.test(tMine.main) && tMine.info.can, 'with turns on, the phone shows the computer\'s turn', tMine && tMine.main);
-        check(await b.eval("(function(){var p=document.getElementById('passBtn'); return !p.hidden && !p.classList.contains('is-idle');})()"), 'and a Pass button');
-        await tap(b, '#passBtn');
-        const cHas = await until(c, 'turnHolderId === clientId', 5000);
-        check(!!cHas, 'Pass on the phone passes the computer\'s turn');
-        const tOther = await until(b, "(function(){var m=" + MOUSE + "; return m.info && !m.info.can ? m : null;})()", 5000);
-        check(!!tOther && /’s turn/.test(tOther.main) && /turn/.test(tOther.veil), 'the phone shows whose turn it is instead', tOther && { main: tOther.main, veil: tOther.veil });
-        const sent0 = await b.eval("window.__sent.mouse||0");
-        // (Dye mass drifts while the last stroke still moves — advection is not
-        // conservative — so the proof is what was sent, not the mass.)
-        const cm0 = await c.eval('__e2e.peer[' + JSON.stringify(aId) + '] || 0');
-        const pdOut = await a.eval('__e2e.phonePresses.down');
-        await touchStroke(b, [0.3, 0.3], [0.6, 0.3], 8, 160);
-        await sleep(600);
-        check((await b.eval("window.__sent.mouse||0")) === sent0, 'out of turn the phone sends nothing');
-        const blocked = await b.eval("document.getElementById('toast').hidden ? '' : document.getElementById('toast').textContent");
-        check(/turn/.test(blocked), 'and says why', blocked);
-        const cm1 = await c.eval('__e2e.peer[' + JSON.stringify(aId) + '] || 0');
-        check(cm1 === cm0 && (await a.eval('__e2e.phonePresses.down')) === pdOut, 'and the computer neither presses nor paints', { msgs: cm1 - cm0 });
-        await c.eval('passTurn(); 1');
-        await until(b, "(function(){var m=" + MOUSE + "; return m.info && m.info.can;})()", 5000);
-        await a.eval('toggleTurns(); 1');
-        await until(b, "(function(){var m=" + MOUSE + "; return m.info && !m.info.turn;})()", 5000);
-
-        // Call and return: the computer passes itself once the phone's swirl lands.
-        await a.eval('toggleCallReturn(); 1');
-        await until(b, "(function(){var m=" + MOUSE + "; return m.info && m.info.turn && m.info.turn.call && m.info.turn.mine;})()", 5000);
-        await touchStroke(b, [0.4, 0.4], [0.6, 0.45], 10, 200);
-        const called = await until(c, 'turnHolderId === clientId', 6000);
-        check(!!called, 'call and return: one phone swirl, and the computer passes the brush');
-        await c.eval('passTurn(); 1');
-        await until(a, 'turnHolderId === clientId', 5000);
-        await a.eval('toggleCallReturn(); 1');
-        await until(b, "(function(){var m=" + MOUSE + "; return m.info && !m.info.turn;})()", 5000);
+        // ── No turns ─────────────────────────────────────────────────
+        // Rooms have no turns (2026-10-06): the computer's word carries none,
+        // the phone may paint, and it has no Pass button at all.
+        const noTurn = await b.eval("(function(){var m=" + MOUSE + "; return { info: !!m.info, turn: !!m.info && 'turn' in m.info, can: m.info && m.info.can, pass: !!document.getElementById('passBtn') }; })()");
+        check(noTurn.info && !noTurn.turn && noTurn.can === true && !noTurn.pass, 'no turns: no turn in the computer\'s word, the phone may paint and has no Pass', noTurn);
 
         // ── Clear from the phone ─────────────────────────────────────
         await touchStroke(b, [0.2, 0.2], [0.8, 0.8], 12, 240);

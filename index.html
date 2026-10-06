@@ -44,15 +44,19 @@
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <script>
-    // Phones get the phone brush (phone/), not this app (2026-09-16). On a
-    // phone Swirl Together is a controller: a pad that paints on a computer's
-    // canvas, in the room the computer is in — the room code (#CODE) and any
-    // query ride along. The whole app stays reachable with ?full=1, which the
-    // phone page links to. First script on the page on purpose: nothing
-    // heavy has started yet, and the async chain below checks the flag.
-    // Tablets and small desktop windows are not phones: a phone is a small
-    // screen (short side under 600 CSS px) that is touch-first or says it
-    // is mobile.
+    // Phones and tablets get the phone brush (phone/), not this app
+    // (2026-09-16, tablets 2026-10-06). There Swirl Together is a controller:
+    // a pad that paints on a computer's canvas, in the room the computer is
+    // in — the room code (#CODE) and any query ride along. On a phone or a
+    // tablet the experience is joining as an artist or being the computer's
+    // mouse, not swirling on the device (2026-10-06): the phone page no longer
+    // links here, and ?full=1 is only an unadvertised way past this for
+    // testing. First script on the page on purpose: nothing heavy has started
+    // yet, and the async chain below checks the flag.
+    // Sent: a phone or tablet OS at any size (iPadOS Safari says Macintosh,
+    // but no Mac has a touch screen), or a small touch-first screen (short
+    // side under 600 CSS px). Not sent: desktops, small desktop windows,
+    // Windows and ChromeOS touch laptops.
     (function () {
         try {
             if (typeof process !== 'undefined' && process.versions && process.versions.electron) return;
@@ -62,10 +66,15 @@
             var sw = (window.screen && screen.width) || 0, sh = (window.screen && screen.height) || 0;
             var shortSide = Math.min(sw, sh) || Math.min(window.innerWidth, window.innerHeight);
             var ua = navigator.userAgent || '';
-            var mobileUA = !!(navigator.userAgentData && navigator.userAgentData.mobile === true) ||
-                /iPhone|iPod|Android.+Mobile|Windows Phone|IEMobile|Mobile.+Firefox/i.test(ua);
+            var uad = navigator.userAgentData;
+            var mobileOS = !!(uad && (uad.mobile === true || uad.platform === 'Android')) ||
+                /iPhone|iPod|iPad|Android|Windows Phone|IEMobile|Mobile.+Firefox/i.test(ua) ||
+                (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);
             var touchFirst = mq('(pointer: coarse)') && !mq('(any-pointer: fine)');
-            if (!(shortSide > 0 && shortSide < 600 && (mobileUA || touchFirst))) return;
+            // Chrome on a big Android tablet asks for desktop sites, and then
+            // says Linux: a Linux browser with only a touch screen is one.
+            var desktopModeTablet = /Linux/.test(ua) && !/CrOS/.test(ua) && touchFirst;
+            if (!(mobileOS || desktopModeTablet || (shortSide > 0 && shortSide < 600 && touchFirst))) return;
             window.__swirlToPhone = true;
             document.documentElement.style.display = 'none';
             location.replace(location.pathname.replace(/[^/]*$/, '') + 'phone/' + location.search + location.hash);

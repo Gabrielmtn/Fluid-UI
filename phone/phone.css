@@ -29,12 +29,11 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
-button,
-.menu a {
+button {
     touch-action: manipulation;
     min-height: 44px;
+    border-radius: 10px;
 }
-button { border-radius: 10px; }
 
 /* ── Landing ─────────────────────────────────────────────────────── */
 
@@ -223,12 +222,17 @@ button { border-radius: 10px; }
     width: 100%;
 }
 
+.nearby { margin: 28px 0 0; }
 .fineprint {
-    margin: 28px 0 0;
+    margin: 0;
     font-size: 14px;
     color: var(--ink-300);
 }
-.fineprint a,
+button.send-link {
+    margin-top: 6px;
+    margin-left: calc(var(--btn-pad-x) * -1);
+    color: oklch(82% 0.09 242);
+}
 .veil a { color: oklch(82% 0.09 242); }
 
 /* ── The pad view: the whole screen is the pad ───────────────────── */
@@ -369,14 +373,6 @@ button { border-radius: 10px; }
     border: 1px solid rgba(255, 255, 255, 0.08);
     pointer-events: none;
 }
-/* While turns run the chip keeps one width, so the pad does not jump as the
-   brush moves around the room. */
-.chrome-left.is-turns { min-width: 158px; }
-/* The brush is yours: the chip lights up, so a glance says "go". */
-.chrome-left.is-mine {
-    background: oklch(34% 0.11 242 / 0.95);
-    border-color: oklch(62% 0.13 242 / 0.9);
-}
 .me-dot {
     flex: none;
     width: 12px;
@@ -418,15 +414,6 @@ button { border-radius: 10px; }
     justify-content: center;
 }
 .chrome-more svg { fill: currentColor; }
-.chrome-pass {
-    --btn-pad-y: 8px;
-    min-height: 40px;
-}
-/* Turns running, brush elsewhere: the button keeps its room but not its face. */
-.chrome-pass.is-idle {
-    visibility: hidden;
-    pointer-events: none;
-}
 
 /* ── Menu, confirm sheet, toast ──────────────────────────────────── */
 
@@ -456,8 +443,7 @@ button { border-radius: 10px; }
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .menu-head b { color: var(--ink-100); font-weight: 600; }
-.menu button,
-.menu a {
+.menu button {
     display: flex;
     align-items: center;
     box-sizing: border-box;
@@ -469,12 +455,7 @@ button { border-radius: 10px; }
     background: transparent;
     border: 1px solid transparent;
 }
-.menu a {
-    color: var(--ink-100);
-    text-decoration: none;
-}
-.menu button:active,
-.menu a:active { background: oklch(23% 0.03 var(--sec-h)); }
+.menu button:active { background: oklch(23% 0.03 var(--sec-h)); }
 
 .sheet {
     position: fixed;

@@ -250,7 +250,7 @@ async function tap(b, sel) {
         check(!!open && near(open.pad.w / open.pad.h, cvs.w / cvs.h, 0.02) && open.pad.w > 300, 'the pad has the canvas\'s shape', open && open.pad);
         const aSees = await until(a, "PhonePads.count() === 1 && /A phone is connected/.test(document.getElementById('phonePadStatus').textContent)", 5000);
         check(!!aSees, 'the computer counts the phone in the dialog');
-        const toastTxt = await a.eval("(document.getElementById('mpTurnToast')||{}).textContent || ''");
+        const toastTxt = await a.eval("(document.getElementById('mpRoomToast')||{}).textContent || ''");
         check(/joined from a phone/.test(toastTxt), 'the computer says a phone joined', toastTxt);
         check(await a.eval("myRole === 'host'"), 'the computer stays host');
         await shot(a, 'desktop-dialog-connected.png');
@@ -340,54 +340,11 @@ async function tap(b, sel) {
         await a.eval("setActiveBrushColorMode('fixed', {color: '#ffffff'}); 1");
         await a.eval("(function(){var s=document.getElementById('densityDissipation'); s.value=window.__dd; s.dispatchEvent(new Event('input',{bubbles:true})); clearCanvas(); return 1;})()");
 
-        // ── Take turns ───────────────────────────────────────────────
-        await a.eval('toggleTurns(); 1');
-        const tOn = await until(b, "(function(){var s=SwirlPad.state(); return s.turns.on && s.turns.holder ? s.turns : null;})()", 5000);
-        const aId = await a.eval('clientId');
-        check(!!tOn && tOn.holder === aId, 'the phone sees turns start with the computer holding the brush', tOn);
-        const banner = await b.eval("document.getElementById('chipMain').textContent + ' / ' + document.getElementById('chipSub').textContent");
-        check(/’s turn/.test(banner) && /next/.test(banner), 'the phone says whose turn it is, and that it is next', banner);
-        // Sideways with turns on: the wider chip pushes the pad down, never onto it.
-        await b.send('Emulation.setDeviceMetricsOverride', SIDEWAYS);
-        await sleep(600);
-        const sideTurns = await b.eval(GEOM);
-        check(padClear(sideTurns) && !!sideTurns.chipR && sideTurns.chipR.w > 60, 'sideways with turns: Pass keeps its place and the pad stays clear', sideTurns);
-        await b.send('Emulation.setDeviceMetricsOverride', UPRIGHT);
-        await sleep(600);
-        const sentBefore = await b.eval("window.__sent.splat||0");
-        await touchStroke(b, [0.3, 0.3], [0.6, 0.3], 8, 160);
-        await sleep(400);
-        check((await b.eval("window.__sent.splat||0")) === sentBefore, 'out of turn, the phone sends no paint');
-        const blockedToast = await b.eval("document.getElementById('toast').hidden ? '' : document.getElementById('toast').textContent");
-        check(/turn/.test(blockedToast), 'and says why', blockedToast);
-        await a.eval('passTurn(); 1');
-        const mine = await until(b, "(function(){var s=SwirlPad.state(); return s.turns.holder===s.id;})()", 5000);
-        check(!!mine, 'the brush reaches the phone');
-        check(await b.eval("(function(){var p=document.getElementById('passBtn'); return !p.hidden && !p.classList.contains('is-idle') && getComputedStyle(p).visibility==='visible' && document.getElementById('chipLeft').classList.contains('is-mine');})()"), 'the phone lights up with a Pass button');
-        const m0 = await a.eval('__e2e.fromPad.msgs');
-        await touchStroke(b, [0.3, 0.6], [0.6, 0.6], 10, 200);
-        await sleep(600);
-        check((await a.eval('__e2e.fromPad.msgs')) > m0, 'on its turn the phone paints');
-        await tap(b, '#passBtn');
-        const back = await until(a, 'turnHolderId === clientId', 5000);
-        check(!!back, 'Pass on the phone hands the brush back');
-        await a.eval('toggleTurns(); 1');
-        await until(b, "!SwirlPad.state().turns.on", 5000);
-
-        // ── Call and return ──────────────────────────────────────────
-        await a.eval('toggleCallReturn(); 1');
-        await until(b, "(function(){var s=SwirlPad.state(); return s.turns.on && s.turns.mode==='stroke';})()", 5000);
-        await a.eval('passTurn(); 1');
-        const call = await until(b, "(function(){var s=SwirlPad.state(); return s.turns.holder===s.id;})()", 5000);
-        check(!!call, 'call and return: the phone gets the call');
-        const passes0 = await b.eval("window.__sent['turn-pass']||0");
-        await touchStroke(b, [0.4, 0.4], [0.6, 0.45], 10, 200);
-        const returned = await until(a, 'turnHolderId === clientId', 4000);
-        check(!!returned, 'one swirl, and the brush comes back by itself');
-        check((await b.eval("window.__sent['turn-pass']||0")) === passes0 + 1, 'the phone passed exactly once');
-        check(await until(b, "!SwirlPad.state().spent", 3000), 'the phone\'s next call is open again');
-        await a.eval('toggleCallReturn(); 1');
-        await until(b, "!SwirlPad.state().turns.on", 5000);
+        // ── No turns ─────────────────────────────────────────────────
+        // A room shares its settings and everyone paints at once (2026-10-06):
+        // the phone keeps no turn state and has no Pass button at all.
+        const noTurn = await b.eval("(function(){ var s=SwirlPad.state(); return { turns: 'turns' in s, pass: !!document.getElementById('passBtn') }; })()");
+        check(!noTurn.turns && !noTurn.pass, 'no turns: the phone has no turn state and no Pass button', noTurn);
 
         // ── Clear from the phone ─────────────────────────────────────
         await touchStroke(b, [0.2, 0.2], [0.8, 0.8], 12, 240);
@@ -496,11 +453,55 @@ async function tap(b, sel) {
         check(!!home && !home.card && /Type the code/.test(home.step) && home.label === 'Room code' && !home.fs,
             'from the home screen: no install card, the code is typed, no Full screen item', home);
 
-        // ── The full app is one link away ────────────────────────────
+        // ── No way into the full app from a phone (2026-10-06) ────────
+        // A phone is the artist or the mouse. With no computer nearby the
+        // landing sends the site's link on: the share sheet, else the
+        // clipboard.
+        const noFull = await b.eval("({links: document.querySelectorAll('a[href*=\"full=1\"]').length, menuLinks: document.querySelectorAll('#moreMenu a').length, send: document.getElementById('sendLinkBtn').offsetParent !== null})");
+        check(noFull.links === 0 && noFull.menuLinks === 0 && noFull.send, 'the phone page has no way into the full app, and offers to send the link', noFull);
+        await b.eval("window.__shared = null; Object.defineProperty(navigator, 'share', { value: function (d) { window.__shared = d; return Promise.resolve(); }, configurable: true }); document.getElementById('sendLinkBtn').click(); true");
+        const shared = await until(b, 'window.__shared', 3000);
+        check(!!shared && shared.url === url, 'Send yourself the link hands the site\'s address to the share sheet', shared);
+        await b.eval("window.__copied = null; Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); Object.defineProperty(navigator, 'clipboard', { value: { writeText: function (t) { window.__copied = t; return Promise.resolve(); } }, configurable: true }); document.getElementById('sendLinkBtn').click(); true");
+        const copied = await until(b, "window.__copied && ({url: window.__copied, toast: document.getElementById('toast').hidden ? '' : document.getElementById('toast').textContent})", 3000);
+        check(!!copied && copied.url === url && /Link copied/.test(copied.toast), 'with no share sheet it copies the link and says so', copied);
+
+        // ?full=1 still gets a phone past the redirect (unadvertised, for testing).
         await b.send('Page.navigate', { url: url + '?full=1#' + code });
         await sleep(2500);
         const stay = await b.eval("({path: location.pathname, toPhone: !!window.__swirlToPhone, app: !!document.getElementById('photoWarn')})");
         check(stay.path === '/' && !stay.toPhone && stay.app, '?full=1 keeps a phone on the full app', stay);
+
+        // Phones and tablets at any size get the pad (2026-10-06); a Mac
+        // keeps the full app.
+        const PADDED = "location.pathname.endsWith('/phone/') && !!window.SwirlPad && ({path: location.pathname, w: screen.width, h: screen.height, lead: document.getElementById('lead').textContent, uaMobile: !!(navigator.userAgentData && navigator.userAgentData.mobile), uaPlatform: navigator.userAgentData ? navigator.userAgentData.platform : '', coarse: matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches})";
+        const sentTo = async (ua, platform, metrics, tag) => {
+            await b.send('Emulation.setUserAgentOverride', { userAgent: ua, platform });
+            await b.send('Emulation.setDeviceMetricsOverride', Object.assign({ deviceScaleFactor: 2, mobile: true, screenOrientation: { type: 'portraitPrimary', angle: 0 } }, metrics));
+            await b.send('Page.navigate', { url: url + '?' + tag + '=1' });
+            return until(b, PADDED, 15000);
+        };
+        const fold = await sentTo('Mozilla/5.0 (Linux; Android 14; SM-F956B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36', 'Linux armv8l',
+            { width: 884, height: 1104, screenWidth: 884, screenHeight: 1104 }, 'fold');
+        check(!!fold && Math.min(fold.w, fold.h) >= 600 && /On a phone,/.test(fold.lead), 'a foldable opened flat is sent to the pad, as a phone', fold);
+        const androidTab = await sentTo('Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36', 'Linux armv8l',
+            { width: 800, height: 1280, screenWidth: 800, screenHeight: 1280 }, 'tablet');
+        check(!!androidTab && /On a tablet,/.test(androidTab.lead), 'an Android tablet is sent to the pad, and called a tablet', androidTab);
+        const iPad = await sentTo('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15', 'MacIntel',
+            { width: 820, height: 1180, screenWidth: 820, screenHeight: 1180 }, 'ipad');
+        check(!!iPad && /On a tablet,/.test(iPad.lead), 'an iPad (Safari says Macintosh) is sent to the pad, and called a tablet', iPad);
+        await b.send('Emulation.setEmulatedMedia', { features: [{ name: 'pointer', value: 'coarse' }, { name: 'any-pointer', value: 'coarse' }] }).catch(() => {});
+        const deskMode = await sentTo('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36', 'Linux x86_64',
+            { width: 800, height: 1280, screenWidth: 800, screenHeight: 1280 }, 'deskmode');
+        check(!!deskMode && /On a tablet,/.test(deskMode.lead) && !deskMode.uaMobile && deskMode.uaPlatform !== 'Android' && deskMode.coarse, 'an Android tablet asking for desktop sites (says Linux, touch only) is sent to the pad', deskMode);
+        await b.send('Emulation.setEmulatedMedia', { features: [] }).catch(() => {});
+        await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+        await b.send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15', platform: 'MacIntel' });
+        await b.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 2, mobile: false, screenWidth: 1440, screenHeight: 900 });
+        await b.send('Page.navigate', { url: url + '?mac=1' });
+        await sleep(2500);
+        const mac = await b.eval("({path: location.pathname, toPhone: !!window.__swirlToPhone, app: !!document.getElementById('photoWarn'), touch: navigator.maxTouchPoints})");
+        check(mac.path === '/' && !mac.toPhone && mac.app, 'a Mac keeps the full app', mac);
 
         const errsA = await a.eval('__e2e.errs');
         check(errsA.length === 0, 'no errors on the computer', errsA.slice(0, 3));

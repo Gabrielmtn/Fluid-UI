@@ -15,20 +15,22 @@
 // The page is the pad and nothing else: a surface the shape of the
 // computer's canvas, as big as the screen allows. Size, colour and the rest
 // of the brush are set on the computer, where the controls work better; a
-// status chip and a ⋯ menu sit in the corners the pad leaves free. The full
-// app stays one link away for someone with no computer to watch.
+// status chip and a ⋯ menu sit in the corners the pad leaves free. The page
+// never opens the full app (2026-10-06: on a phone the experience is the
+// artist or the mouse, not swirling on the phone); with no computer nearby
+// it offers to send the site's link on.
 //
-// Phones reach this page from swirltogether.com (index.html sends small
-// touch screens here, code and all) and straight from the QR.
+// Phones reach this page from swirltogether.com (index.html sends phones
+// here, code and all) and straight from the QR.
 //
 // THE MOUSE LINK — /parties/fluid/sys-mouse-<CODE>, a plain relay room
 //   out  'mouse-hello'  take the mouse (the newest phone wins)
 //        'mouse'        {s: [[k, u, v, t], …]}  k 0 press / 1 move / 2 lift,
 //                       u v canvas fractions, t ms since the press
-//        'mouse-beat', 'mouse-bye', 'mouse-clear', 'mouse-pass'
+//        'mouse-beat', 'mouse-bye', 'mouse-clear'
 //   in   'connected', 'client-count', 'mouse-info' (which phone has the
 //        mouse, the canvas shape, the colour, and whether a press would
-//        paint right now — someone else's turn, a paused canvas)
+//        paint right now — a paused canvas, say)
 //
 // THE ROOM WIRE — the room protocol of js/06a–06e, nothing new on the canvas side
 //   out  'splat'       a press stamp (down:true), then dab trains
@@ -38,9 +40,10 @@
 //        'cursor'      where the finger is, so the big screen shows it
 //        'pointer-up'  the stroke is over
 //        'pad-hello'   "I am a phone"; the host answers with 'pad-info'
-//        'turn-pass'   Take turns / Call and return
 //        'clear', 'ping'
-//   in   'connected', 'client-count', 'host-changed', 'turn-state', 'pad-info'
+//   in   'connected', 'client-count', 'host-changed', 'pad-info'
+//   (Rooms have no turns since 2026-10-06: a 'turn-state' from an old
+//   relay, or a 'turn' in an old computer's 'mouse-info', is ignored.)
 //   The relay (party/index.ts) never makes a pad (?kind=pad) the host.
 //
 // THE ARTIST'S BRUSH — the computer's (its size too, live), walked the way
@@ -63,6 +66,21 @@
     var $ = function (id) { return document.getElementById(id); };
     var HEX = /^#[0-9a-f]{6}$/i;
 
+    // Tablets come here too (2026-10-06): the same pad, called a tablet
+    // where the words name the device. iPadOS Safari says Macintosh, but no
+    // Mac has a touch screen; an Android tablet leaves Mobile out, or asks
+    // for desktop sites and says Linux (index.html sends those here).
+    var DEVICE = (function () {
+        var ua = navigator.userAgent || '';
+        var short = Math.min((window.screen && screen.width) || 0, (window.screen && screen.height) || 0);
+        var tablet = /iPad/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1) ||
+            (/Android/.test(ua) && !/Mobile/.test(ua)) ||
+            (/Linux/.test(ua) && !/Android|CrOS/.test(ua) && short >= 600);
+        return tablet ? 'tablet' : 'phone';
+    })();
+    $('lead').textContent = 'On a ' + DEVICE + ', you are the brush. The painting happens on a computer.';
+    $('rotateHint').textContent = 'Turn your ' + DEVICE + ' sideways for a bigger pad.';
+
     // ── Where the rooms are (js/06a-mp-core.js, same rules) ─────────
     function isPlainWsHost(h) {
         return /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/.test(h);
@@ -78,7 +96,7 @@
     })();
 
     // The pad's own device id, deliberately not the app's fluidDeviceId: the
-    // relay keys a member (turn order, a locked room's guest list) by it, and
+    // relay keys a member (the host, a locked room's guest list) by it, and
     // in one browser a pad tab and an app tab would otherwise be one member.
     var UID = (function () {
         var mk = function () { return 'P' + Math.random().toString(36).slice(2, 10).toUpperCase(); };
@@ -152,10 +170,7 @@
         phase: 'idle',       // idle | connecting | open | retrying | lost | refused
         refusal: null,       // 'locked' | 'full'
         attempts: 0,
-        timers: { retry: 0, open: 0, ping: 0, hidden: 0, pass: 0, tick: 0 },
-        turns: null,
-        spent: false,        // Call and return: our one swirl is down
-        passSent: false,
+        timers: { retry: 0, open: 0, ping: 0, hidden: 0 },
         info: null           // the host's 'pad-info', validated
     };
     // The mouse link's side of things.
@@ -166,7 +181,6 @@
         replaced: false,     // another phone took it (only a tap takes it back)
         helloAt: 0
     };
-    resetTurns();
 
     function isMouse() { return room.kind === 'mouse'; }
 
@@ -194,7 +208,6 @@
         room.refusal = null;
         room.attempts = 0;
         brush.fromHost = false;
-        resetTurns();
         resetLink();
         openSocket();
         hintReset();
@@ -284,7 +297,6 @@
         room.id = null;
         room.count = 0;
         room.info = null;
-        resetTurns();
         resetLink();
         letSleep();
         closeMenu();
@@ -342,9 +354,6 @@
                 room.count = num(d.totalClients, 1, 64, 1);
                 room.phase = 'open';
                 room.attempts = 0;
-                // Fresh socket, fresh rotation: when turns are on, the
-                // relay's turn-state follows this message at once.
-                resetTurns();
                 startPing();
                 if (isMouse()) mouseHello(false); else hello();
                 keepAwake();
@@ -359,7 +368,10 @@
                         // Someone arrived — maybe the computer: ask for the
                         // mouse. Someone left — maybe the computer: it has a
                         // moment to say it is still here (it answers a drop).
-                        if (n > room.count) mouseHello(false);
+                        // Not when we already have it: an arrival is as
+                        // likely another phone, and our ask landing after
+                        // its own took the mouse straight back from it.
+                        if (n > room.count && !link.active) mouseHello(false);
                         else if (n < room.count) {
                             send({ type: 'mouse-beat' });
                             link.infoAt = Math.min(link.infoAt, Date.now() - COMPUTER_SILENT_MS + 2500);
@@ -381,10 +393,6 @@
                 break;
             case 'mouse-info':
                 if (isMouse() && d.clientId && d.clientId !== room.id) applyMouseInfo(d.data);
-                break;
-            case 'turn-state':
-                // Server-authored only: a relayed copy carries a clientId.
-                if (!isMouse() && !d.clientId) applyTurnState(d);
                 break;
             case 'clear':
                 if (!isMouse() && d.clientId && d.clientId !== room.id) trailClear();
@@ -447,23 +455,12 @@
             can: p.can !== false,
             why: (typeof p.why === 'string') ? p.why.slice(0, 140) : '',
             people: Math.round(num(p.people, 0, 99, 0)),
-            off: p.off === true,
-            turn: null
+            off: p.off === true
         };
-        if (p.turn && typeof p.turn === 'object') {
-            var left = num(p.turn.left, 0, 3600000, 0);
-            info.turn = {
-                mine: p.turn.mine === true,
-                who: (typeof p.turn.who === 'string') ? p.turn.who.slice(0, 32) : '',
-                call: p.turn.call === true,
-                spent: p.turn.spent === true,
-                deadline: left ? Date.now() + left : 0
-            };
-        }
         // The computer let this phone go (Disconnect on its side): back to
         // the start, with the reason.
         if (info.off && p.forget === true) {
-            leave('Your computer disconnected this phone. To connect again, scan the new code on it.');
+            leave('Your computer disconnected this ' + DEVICE + '. To connect again, scan the new code on it.');
             return;
         }
         var prev = link.info;
@@ -487,7 +484,6 @@
             hintReset();
         }
         if (!link.active && stroke) endStroke(null, true);
-        syncTick();
         render();
         if (!prev || prev.w !== info.w || prev.h !== info.h) layoutPad();
     }
@@ -495,95 +491,6 @@
     function computerHere() {
         return room.phase === 'open' && room.count >= 2 && !!link.info && !link.info.off &&
             Date.now() - link.infoAt < COMPUTER_SILENT_MS;
-    }
-
-    // ── Take turns / Call and return (js/06c-mp-turns.js, the phone half) ──
-    function resetTurns() {
-        room.turns = { on: false, holder: null, order: [], mode: 'timer', deadline: 0 };
-        room.spent = false;
-        room.passSent = false;
-        clearTimeout(room.timers.pass);
-        room.timers.pass = 0;
-        syncTick();
-    }
-    function isMyTurn() {
-        var t = room.turns;
-        return t.on && !!t.holder && t.holder === room.id;
-    }
-    function isCallMode() { return room.turns.on && room.turns.mode === 'stroke'; }
-
-    function applyTurnState(d) {
-        var was = isMyTurn();
-        var t = room.turns;
-        var wasOn = t.on;
-        t.on = !!d.on;
-        t.holder = (typeof d.holder === 'string' && d.holder) ? d.holder : null;
-        t.order = Array.isArray(d.order) ? d.order.filter(function (x) { return typeof x === 'string'; }) : [];
-        t.mode = d.mode === 'stroke' ? 'stroke' : 'timer';
-        // No synchronized clocks: the message's own timestamp gives the skew.
-        t.deadline = (typeof d.deadline === 'number' && d.deadline > 0 && typeof d.timestamp === 'number')
-            ? d.deadline + (Date.now() - d.timestamp) : 0;
-        // The brush moved on mid-stroke: the relay drops anything more.
-        if (was && !isMyTurn() && stroke) endStroke(null, true);
-        // A fresh call opens on the update that answers our pass, and
-        // whenever the brush is not ours (06c's rule).
-        if (room.passSent || !isMyTurn() || t.mode !== 'stroke') {
-            room.spent = false;
-            room.passSent = false;
-            clearTimeout(room.timers.pass);
-            room.timers.pass = 0;
-        }
-        if (!was && isMyTurn()) {
-            buzz([14, 70, 14]);
-            toast(isCallMode() ? 'Your call — one swirl' : 'Your turn to paint');
-        }
-        syncTick();
-        render();
-        // Turns widen the corner chrome (turn text, Pass): the pad may need
-        // to move out from under it.
-        if (wasOn !== t.on) queueLayout();
-    }
-
-    function passTurn() {
-        if (isMouse()) {
-            var mt = mouseTurn();
-            if (mt && mt.mine && !mt.spent) send({ type: 'mouse-pass' });
-            return;
-        }
-        if (!room.turns.on || !isMyTurn()) return;
-        if (isCallMode()) { room.spent = true; room.passSent = true; }
-        send({ type: 'turn-pass' });
-        render();
-    }
-
-    // Call and return: the swirl is down, so the brush moves on. The phone
-    // has no tail to wait for (06c waits for the desktop's), only the
-    // stroke's last message, which is already out.
-    function afterSwirl() {
-        if (!isCallMode() || !isMyTurn() || room.spent) return;
-        room.spent = true;
-        render();
-        room.timers.pass = setTimeout(function () {
-            room.timers.pass = 0;
-            if (!isCallMode() || !isMyTurn()) return;
-            room.passSent = true;
-            send({ type: 'turn-pass' });
-        }, 300);
-    }
-
-    // The computer's turn, as a mouse sees it (the computer runs it).
-    function mouseTurn() { return (isMouse() && link.info && link.info.turn) || null; }
-
-    function syncTick() {
-        var mt = mouseTurn();
-        var want = (room.turns && room.turns.on && room.turns.deadline > 0) || !!(mt && mt.deadline > 0);
-        if (want && !room.timers.tick) room.timers.tick = setInterval(renderChrome, 500);
-        if (!want && room.timers.tick) { clearInterval(room.timers.tick); room.timers.tick = 0; }
-    }
-
-    function holderName() {
-        var h = room.turns.holder;
-        return h ? shortName(h) : 'the next artist';
     }
 
     // Can a touch paint right now? And if not, what to say.
@@ -598,10 +505,6 @@
         }
         if (room.phase !== 'open') return 'Not connected yet.';
         if (room.count < 2) return 'Nobody else is in the room yet.';
-        if (room.turns.on) {
-            if (isMyTurn() && room.spent) return 'Your swirl is down — the brush is moving on.';
-            if (!isMyTurn()) return 'It’s ' + holderName() + '’s ' + (isCallMode() ? 'call' : 'turn') + '.';
-        }
         return null;
     }
 
@@ -1008,7 +911,6 @@
         }
         send({ type: 'pointer-up', timestamp: Date.now() });
         trailEnd();
-        if (!abort) afterSwirl();
     }
 
     pad.addEventListener('pointerup', function (e) { endStroke(e, false); });
@@ -1164,23 +1066,10 @@
     function hintDone() { $('padHint').classList.add('is-gone'); }
 
     // ═══ The page ═══════════════════════════════════════════════════
-    function fullAppHref() {
-        var q = '';
-        try {
-            var sp = new URLSearchParams(location.search);
-            sp.set('full', '1');
-            q = '?' + sp.toString();
-        } catch (_) { q = '?full=1'; }
-        // A room travels along; a mouse link means nothing to the full app.
-        return '../' + q + (room.code && !isMouse() ? '#' + room.code : '');
-    }
-
     function render() {
         var inRoom = !!room.code;
         $('landing').hidden = inRoom;
         $('padView').hidden = !inRoom;
-        $('fullLinkLanding').href = fullAppHref();
-        $('fullLinkRoom').href = fullAppHref();
         if (!inRoom) { renderLanding(); return; }
         renderInstall();
         renderChrome();
@@ -1189,55 +1078,30 @@
         queueLayout();
     }
 
-    function fmtClock(ms) {
-        var s = Math.max(0, Math.round(ms / 1000));
-        return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
-    }
-
     // Short on purpose: in a sideways phone the chip lives in the margin
     // beside the pad, and a longer line would push the pad down.
     function peopleText() {
         return room.count > 1 ? room.count + ' here' : 'Just you';
     }
 
-    // The corner chrome: who is here or whose turn it is (left), Pass and
-    // the menu (right), and in the menu's head the room and which cursor on
-    // the big screen is yours.
+    // The corner chrome: who is here (left), the menu (right), and in the
+    // menu's head the room and which cursor on the big screen is yours.
     function renderChrome() {
         if (isMouse()) { renderMouseChrome(); return; }
-        var t = room.turns;
         var open = room.phase === 'open';
-        var turns = open && t.on;
-        var mine = turns && isMyTurn();
-        var main, sub = '';
+        var main;
         if (!open) {
             main = ({ connecting: 'Joining…', retrying: 'Reconnecting…', lost: 'Disconnected',
                 refused: room.refusal === 'locked' ? 'Room locked' : 'Room full' })[room.phase] || '';
-        } else if (turns) {
-            if (mine && room.spent) main = 'Swirl sent';
-            else if (mine) main = isCallMode() ? 'Your call' : 'Your turn';
-            else main = holderName() + (isCallMode() ? '’s call' : '’s turn');
-            if (t.deadline && !(mine && room.spent)) main += ' · ' + fmtClock(t.deadline - Date.now());
-            var idx = t.order.indexOf(t.holder);
-            var nextId = (idx >= 0 && t.order.length) ? t.order[(idx + 1) % t.order.length] : null;
-            sub = (!mine && nextId === room.id) ? 'You’re next' : peopleText();
         } else {
             main = peopleText();
         }
         $('chipMain').textContent = main;
-        $('chipSub').textContent = sub;
-        chipL.classList.toggle('is-turns', turns);
-        chipL.classList.toggle('is-mine', mine && !room.spent);
+        $('chipSub').textContent = '';
         var dot = $('meDot');
         var col = (open && room.id) ? colorForClient(room.id) : '';
         dot.style.background = col;
         dot.style.color = col || 'transparent';
-        // While turns run, Pass keeps its place (faded out when the brush is
-        // elsewhere), so the pad does not move as the brush goes round.
-        var pass = $('passBtn');
-        pass.hidden = !turns;
-        pass.classList.toggle('is-idle', !(mine && !room.spent));
-        pass.textContent = isCallMode() ? 'Pass my call' : 'Pass';
         var head = $('menuHead');
         head.textContent = '';
         var b = document.createElement('b');
@@ -1247,13 +1111,11 @@
         $('leaveBtn').textContent = 'Leave the room';
     }
 
-    // The same corners for a mouse: the computer's state, and its turn when
-    // its room takes turns (the computer holds the brush, the phone moves it).
+    // The same corners for a mouse: the computer's state.
     function renderMouseChrome() {
         var open = room.phase === 'open';
         var here = computerHere();
         var info = link.info;
-        var mt = (open && here && link.active) ? mouseTurn() : null;
         var main, sub = '';
         if (!open) {
             main = ({ connecting: 'Connecting…', retrying: 'Reconnecting…', lost: 'Disconnected' })[room.phase] || '';
@@ -1263,11 +1125,6 @@
             main = 'Computer away';
         } else if (!link.active) {
             main = 'Connecting…';
-        } else if (mt) {
-            if (mt.mine && mt.spent) main = 'Swirl sent';
-            else if (mt.mine) main = mt.call ? 'Your call' : 'Your turn';
-            else main = (mt.who || 'Someone') + (mt.call ? '’s call' : '’s turn');
-            if (mt.deadline && !(mt.mine && mt.spent)) main += ' · ' + fmtClock(mt.deadline - Date.now());
         } else {
             // Short: upright, the chip has less than half the width.
             main = 'You’re the mouse';
@@ -1275,17 +1132,11 @@
         if (open && here && link.active && info.people > 1) sub = info.people + ' in the room';
         $('chipMain').textContent = main;
         $('chipSub').textContent = sub;
-        chipL.classList.toggle('is-turns', !!mt);
-        chipL.classList.toggle('is-mine', !!(mt && mt.mine && !mt.spent));
         // The dot is the colour the next stroke paints.
         var dot = $('meDot');
         var col = (here && info && info.color) || '';
         dot.style.background = col;
         dot.style.color = col || 'transparent';
-        var pass = $('passBtn');
-        pass.hidden = !mt;
-        pass.classList.toggle('is-idle', !(mt && mt.mine && !mt.spent));
-        pass.textContent = (mt && mt.call) ? 'Pass my call' : 'Pass';
         var head = $('menuHead');
         head.textContent = '';
         var b = document.createElement('b');
@@ -1341,9 +1192,6 @@
                     if (room.count < 2) {
                         text = 'Nobody else is in room ' + room.code + ' yet. Is Swirl Together open on your computer, in this room?';
                         actions = [veilButton('Another code', anotherCode)];
-                    } else if (room.turns.on && !isMyTurn()) {
-                        text = 'Watch the big screen — ' + holderName() + ' has the brush.';
-                        soft = true;
                     }
                     break;
             }
@@ -1376,7 +1224,7 @@
         if (room.phase !== 'open') return out;
         if (link.replaced) {
             out.text = 'Another phone is this computer’s mouse right now.';
-            out.actions = [veilButton('Use this phone', function () { mouseHello(true); render(); }, true)];
+            out.actions = [veilButton('Use this ' + DEVICE, function () { mouseHello(true); render(); }, true)];
         } else if (!computerHere()) {
             out.text = (link.info && link.info.off)
                 ? 'Your computer closed the link. On it, choose Paint from your phone, then As your mouse, to carry on.'
@@ -1385,9 +1233,7 @@
         } else if (!link.active) {
             out.text = 'Connecting to your computer…';
         } else if (!link.info.can) {
-            var mt = mouseTurn();
-            out.text = (link.info.why || 'Your computer can’t take a stroke right now.') +
-                (mt && !mt.mine ? ' Watch the big screen.' : '');
+            out.text = link.info.why || 'Your computer can’t take a stroke right now.';
             out.soft = true;
         }
         return out;
@@ -1435,7 +1281,6 @@
             toast('Canvas cleared');
         }
     });
-    $('passBtn').addEventListener('click', passTurn);
 
     // Full screen, where the browser has it (Android; not iPhone Safari):
     // the pad gets the whole screen, and a wide canvas turns the phone
@@ -1563,6 +1408,36 @@
     $('wayMouse').addEventListener('click', function () { setWay('mouse'); });
     $('wayRoom').addEventListener('click', function () { setWay('room'); });
 
+    // No computer nearby: the phone never opens the painting itself (the
+    // full app on a phone is not the experience, 2026-10-06). It hands the
+    // site's address to the share sheet, to message or mail to oneself, or
+    // copies it where there is no share sheet.
+    function siteUrl() {
+        try { return new URL('../', location.href).href; } catch (_) { return 'https://swirltogether.com/'; }
+    }
+    $('sendLinkBtn').addEventListener('click', function () {
+        var url = siteUrl();
+        var shown = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        function noWay() { toast('Open ' + shown + ' on a computer.'); }
+        function copy() {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(url).then(function () { toast('Link copied: ' + shown); }, noWay);
+                    return;
+                }
+            } catch (_) {}
+            noWay();
+        }
+        try {
+            if (navigator.share) {
+                navigator.share({ title: 'Swirl Together', text: 'Open this on a computer to paint with Swirl Together.', url: url })
+                    .catch(function (e) { if (!e || e.name !== 'AbortError') copy(); });
+                return;
+            }
+        } catch (_) {}
+        copy();
+    });
+
     function landingNote(text) {
         var n = $('landingNote');
         n.textContent = text || '';
@@ -1584,7 +1459,7 @@
         var typeIt = IS_IOS && isInstalled();
         $('step3').textContent = typeIt
             ? 'Type the code shown on the screen below.'
-            : 'Point this phone’s camera at the code on the screen.';
+            : 'Point this ' + DEVICE + '’s camera at the code on the screen.';
         $('codeLabel').textContent = typeIt ? (asMouse ? 'Code' : 'Room code') : 'Or type the code';
         codeInput.placeholder = asMouse ? 'KMP4 QX7R' : 'K7P2QX';
         $('joinBtn').textContent = asMouse ? 'Connect' : 'Join';
@@ -1720,7 +1595,7 @@
         state: function () {
             return {
                 host: HOST, kind: room.kind, code: room.code, phase: room.phase, refusal: room.refusal, id: room.id,
-                count: room.count, turns: JSON.parse(JSON.stringify(room.turns)), spent: room.spent,
+                count: room.count,
                 info: room.info, brush: { radius: radius(), colour: colourMode(), cycle: brush.cycle },
                 mouse: {
                     active: link.active, replaced: link.replaced, computer: computerHere(),

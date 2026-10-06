@@ -39,7 +39,7 @@
         <div class="landing-inner">
             <img class="brand-mark" src="../assets/pwa/icon-192.png" alt="" width="64" height="64">
             <h1>Swirl Together</h1>
-            <p class="lead">On a phone, you are the brush. The painting happens on a computer.</p>
+            <p class="lead" id="lead">On a phone, you are the brush. The painting happens on a computer.</p>
             <p id="landingNote" class="landing-note" role="status" hidden></p>
 
             <!-- What this phone was connected to lately (an app opened from the
@@ -84,7 +84,13 @@
                 <button type="button" id="installBtn" hidden>Add to home screen</button>
             </div>
 
-            <p class="fineprint">No computer nearby? <a id="fullLinkLanding" href="../?full=1">Open the full canvas on this phone</a> instead.</p>
+            <!-- No computer: the phone page does not open the full canvas
+                 (a phone is a brush, not the painting, 2026-10-06); it
+                 hands the site's link to wherever it can be opened later. -->
+            <div class="nearby">
+                <p class="fineprint">No computer nearby? The painting happens on one.</p>
+                <button type="button" id="sendLinkBtn" class="btn--ghost send-link">Send yourself the link</button>
+            </div>
         </div>
     </main>
 
@@ -109,7 +115,7 @@
             </div>
         </section>
 
-        <!-- Top left: who is here, or whose turn it is. The dot is this
+        <!-- Top left: who is here. The dot is this
              phone's cursor colour on the big screen (as the computer's
              mouse: the colour the next stroke paints). -->
         <div id="chipLeft" class="chrome chrome-left" aria-live="polite">
@@ -120,9 +126,8 @@
             </span>
         </div>
 
-        <!-- Top right: Pass (only while turns run) and the menu. -->
+        <!-- Top right: the menu. -->
         <div id="chipRight" class="chrome chrome-right">
-            <button type="button" id="passBtn" class="chrome-pass" hidden>Pass</button>
             <button type="button" id="moreBtn" class="btn--ghost chrome-more" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" aria-label="More">
                 <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
             </button>
@@ -133,7 +138,6 @@
             <button type="button" role="menuitem" id="installMenuBtn" hidden>Add to home screen</button>
             <button type="button" role="menuitem" id="fullscreenBtn" hidden>Full screen</button>
             <button type="button" role="menuitem" id="clearBtn">Clear the canvas</button>
-            <a role="menuitem" id="fullLinkRoom" href="../?full=1">Open the full canvas here</a>
             <button type="button" role="menuitem" id="leaveBtn">Leave the room</button>
         </div>
 
