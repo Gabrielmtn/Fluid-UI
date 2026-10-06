@@ -528,7 +528,7 @@
     {
       "phase": "begin",
       "event": { "type": "pointerdown", "target": "#canvas", "button": 0, "pointerType": "mouse or pen (touch is filtered to the touch path)", "clientXY": "over the canvas" },
-      "guard": "e.button===0 (js/05d-input-replay.js:546); e.target must BE the canvas element (js/05d-input-replay.js:548) — overlays/zoom-mode must not cover the point; !isPaused (js/05d-input-replay.js:548); !window.__mpTurnBlocked (js/05d-input-replay.js:510); zoomMode off (js/35-zoom-view.js:183-189 captures and stops propagation)",
+      "guard": "e.button===0 (js/05d-input-replay.js:546); e.target must BE the canvas element (js/05d-input-replay.js:548) — overlays/zoom-mode must not cover the point; !isPaused (js/05d-input-replay.js:548); zoomMode off (js/35-zoom-view.js:183-189 captures and stops propagation)",
       "effect": "Stroke begins: setPointerCapture, immediate press splat when config.BRUSH_TARGET==='fluid' (multiSplatWithRadius js/05d-input-replay.js:590), sketch/mask stamp for those targets (js/05d-input-replay.js:572-578), BrushEngine.begin, multiplayer broadcastSplat",
       "assertion": "window.pointer.down===true, window.pointer.moved===false, window.pointer.x/y === backing-store coords ((clientX-rect.left)*canvas.width/rect.width — js/02-palettes.js:260-273), window.pointer.dx===0, window.pointer.dy===0, window.__paintPointerId === event.pointerId (js/05d-input-replay.js:553-560)",
       "source": "js/05d-input-replay.js:504-609"
@@ -568,7 +568,7 @@
     {
       "phase": "right-click replay",
       "event": { "type": "pointerdown", "target": "#canvas", "button": 2, "pointerType": "mouse or pen barrel" },
-      "guard": "!window.__mpTurnBlocked (js/05d-input-replay.js:510); contextmenu is preventDefault-ed (js/05d-input-replay.js:781-783)",
+      "guard": "contextmenu is preventDefault-ed (js/05d-input-replay.js:781-783)",
       "effect": "Hold replays the last stroke (replayStroke); while the tip is also down it pauses painting instead. Self-heals if the release is missed (buttons bitmask checks js/05d-input-replay.js:626-630,739-741). Release: button-2 pointerup clears replay, fires the fast-brush burst if tip held with velocity",
       "assertion": "bare-global isRightMouseDown===true and isReplayActive===true while held; both false plus window._activeReplayEvents===null after button-2 pointerup (js/05d-input-replay.js:742-745)",
       "source": "js/05d-input-replay.js:516-539,742-776"

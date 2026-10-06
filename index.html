@@ -1320,8 +1320,8 @@
                      one does lives in its tooltip: the panel is for doing,
                      and three paragraphs of explanation buried the buttons. -->
                 <div class="mp-door-row">
-                    <button id="createRoomBtn" class="mp-btn-primary btn--emphasis" title="Paint on the same canvas as someone else, live. You get a code to send to whoever you want.">Start a room</button>
-                    <button id="strangerBtn" class="mp-btn-primary btn--emphasis" title="Swirl with a stranger: pairs you with one other person who is also looking. When either of you leaves, the swirl ends.">Stranger</button>
+                    <button id="createRoomBtn" class="mp-btn-primary btn--emphasis" title="A room shares one set of settings: whatever anyone changes, changes for everyone, live. You get a code to send to whoever you want.">Start a room</button>
+                    <button id="strangerBtn" class="mp-btn-primary btn--emphasis" title="Swirl with a stranger: pairs you with one other person who is also looking, and you share settings while you paint. When either of you leaves, the swirl ends.">Stranger</button>
                 </div>
                 <div class="mp-join-row">
                     <input type="text" id="joinRoomInput" placeholder="Paste a code" maxlength="48" spellcheck="false" autocomplete="off" aria-label="Room code to join">
@@ -1334,11 +1334,15 @@
             <!-- ── In a room ── -->
             <div id="mpConnected" style="display:none">
                 <!-- One line for the whole room, built by 06e renderRoomStatus:
-                     what is happening, the turn clock, who is here, the locks. -->
+                     what is happening, who is here, the lock. -->
                 <div class="mp-status-row">
                     <div id="connectionDot" class="mp-dot mp-dot-connecting"></div>
                     <span id="multiplayerStatus" role="status">Connecting…</span>
                 </div>
+                <!-- The room shares one set of settings. This line says who
+                     changed what, in their cursor's colour (06e renderActivity),
+                     and what the room is for when nothing has. -->
+                <div id="mpActivity" class="mp-activity" aria-live="polite" style="display:none"></div>
 
                 <!-- Two doors out of the panel: who else comes in (Invite) and
                      the room's own settings (⋯). Both open popovers that 06e
@@ -1349,26 +1353,7 @@
                     <button type="button" id="mpMenuBtn" class="btn--icon mp-room-more" aria-haspopup="menu" aria-expanded="false" aria-controls="mpRoomMenu" aria-label="Room options" title="Room options">⋯</button>
                 </div>
 
-                <!-- How the room paints: one switch, one pressed segment (06c
-                     updateTurnUI). The host picks; a guest sees it disabled;
-                     in a stranger pair either painter picks, and picking asks
-                     the other. Each turn sets the clock before Turns starts. -->
-                <div class="mp-rhythm" id="mpRhythm" role="group" aria-label="How the room paints" style="display:none">
-                    <button type="button" id="togetherBtn" aria-pressed="true">Together</button>
-                    <button type="button" id="turnsBtn" aria-pressed="false">Turns</button>
-                    <button type="button" id="callReturnBtn" aria-pressed="false">Call &amp; return</button>
-                </div>
-                <div class="control-group mp-turn-length" id="turnLengthRow" style="display:none">
-                    <label for="turnLength" title="How long each turn lasts before the brush passes to the next artist">Each turn <span id="turnLengthValue" class="value-display">1:00</span></label>
-                    <input type="range" id="turnLength" min="30" max="300" step="15" value="60" aria-label="Turn length in seconds">
-                </div>
-
-                <div id="turnWheel" class="mp-turn-wheel" style="display:none"></div>
-
-                <!-- Pass only shows while the brush is yours; the host's Skip
-                     for someone else's turn lives in ⋯. -->
                 <div class="mp-foot">
-                    <button id="turnPassBtn" class="mp-btn-pass btn--emphasis" style="display:none" title="Hand the brush to the next artist">Pass</button>
                     <button id="disconnectBtn" class="mp-btn-leave" title="Leave this room. The same code gets you back in">Leave</button>
                 </div>
 
@@ -1409,8 +1394,6 @@
                      switches; 61 adds Copy room report at its foot. -->
                 <div id="mpRoomMenu" class="brush-shape-menu mp-pop mp-room-menu" role="menu" aria-label="Room options" hidden>
                     <button type="button" id="lockRoomBtn" class="btn--ghost mp-menu-item" role="menuitemcheckbox" aria-checked="false" style="display:none" title="Stop anyone new from joining, even with the code">Lock room</button>
-                    <button type="button" id="settingsLockBtn" class="btn--ghost mp-menu-item" role="menuitemcheckbox" aria-checked="false" style="display:none" title="Guests mirror your look settings; their performance controls stay their own">Everyone uses my look</button>
-                    <button type="button" id="turnSkipBtn" class="btn--ghost mp-menu-item" role="menuitem" style="display:none">Skip</button>
                 </div>
             </div>
         </div>
@@ -1755,7 +1738,7 @@
             'js/06-slider-updater.js',
             'js/06a-mp-core.js',
             'js/06b-mp-look.js',
-            'js/06c-mp-turns.js',
+            'js/06c-mp-glide.js',
             'js/06d-mp-paint-wire.js',
             'js/06e-mp-panel.js',
             'js/29-material-modes.js'

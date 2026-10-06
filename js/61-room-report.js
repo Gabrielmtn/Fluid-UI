@@ -105,10 +105,10 @@
                     role: myRole,
                     people: connectedClients,
                     locked: !!roomLocked,
-                    lookLocked: !!window.__mpSettingsLocked,
-                    turns: (typeof turnsOn !== 'undefined') ? !!turnsOn : null,
-                    turnMode: (typeof turnModeLocal !== 'undefined') ? turnModeLocal : null,
-                    holder: (typeof turnHolderId !== 'undefined') ? shortId(turnHolderId) : null
+                    // The room's shared settings: agreed on, and how many
+                    // sliders are gliding to a value someone else set.
+                    sharing: (typeof roomLookBase !== 'undefined') ? !!roomLookBase : null,
+                    gliding: (typeof _glides !== 'undefined') ? _glides.size : null
                 };
             }),
             canvas: {

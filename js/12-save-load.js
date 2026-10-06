@@ -659,10 +659,11 @@
 
     // ── User Presets System ──
 
-    // opts.lookOnly (13.5 host settings lock): skip the heavy sections —
-    // layer/mask/text/recording serialization does full-res GPU readbacks
-    // and dataURL encodes, far too costly for the lock's periodic mirror
-    // broadcasts (and the relay caps messages at 16KB anyway).
+    // opts.lookOnly (the room's shared look in 06b, look links in 50,
+    // Mutate in 20): skip the heavy sections — layer/mask/text/recording
+    // serialization does full-res GPU readbacks and dataURL encodes, far too
+    // costly for the room's frequent look captures (and the relay caps
+    // messages at 16KB anyway).
     function capturePresetSnapshot(opts) {
         var lookOnly = !!(opts && opts.lookOnly);
         var sm = window.settingsManager;
@@ -1023,10 +1024,6 @@
 
     function applyPresetSnapshot(snapshot) {
         if (!snapshot) return;
-        // 13.5: look settings locked by the multiplayer host — local snapshot
-        // applies (user presets, autoload) are gated; the host's lock snapshot
-        // itself arrives under __mpApplyingRemote and passes through.
-        if (window.__mpSettingsLocked && !window.__mpApplyingRemote) return;
         // External-writer flag for 05h's handlers: (a) an active material must
         // YIELD so the snapshot's raw CURL lands as CURL, not as a macro
         // amount (without this, applying a preset while in Gloss Paint - Thickness left

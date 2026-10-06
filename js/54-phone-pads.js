@@ -75,7 +75,7 @@
         return 'Artist-' + String(id).replace(/[^a-zA-Z0-9]/g, '').slice(-2).toUpperCase();
     }
     function announce(text) {
-        try { if (typeof showTurnToast === 'function') { showTurnToast(text); return; } } catch (_) {}
+        try { if (typeof showRoomToast === 'function') { showRoomToast(text); return; } } catch (_) {}
         console.log('[phone] ' + text);
     }
 

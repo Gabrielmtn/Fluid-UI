@@ -1,8 +1,10 @@
 // ================================================================
 // 06e-mp-panel.js — Swirl Together client: the room panel + init.
-// Remote cursors, connection status, the connected / disconnected views,
-// the invite display (Code / QR / Hide), copy, the control listeners, the
-// window.* exposes other modules call, and the init that runs last.
+// Remote cursors, connection status, who changed what (the activity line
+// and the glow on the control they moved), the connected / disconnected
+// views, the invite display (Code / QR / Hide), copy, the control
+// listeners, the window.* exposes other modules call, and the init that
+// runs last.
 //
 // The multiplayer client was one 3,600-line file until 2026-09-11. It is now
 // five classic scripts, loaded in this order by index.html's async chain.
@@ -12,8 +14,8 @@
 // so only the load order matters — nothing here runs at load time except
 // the init at the tail of 06e.
 //   06a-mp-core.js        transport, lifecycle, lobby, message dispatch
-//   06b-mp-look.js        settings lock + look snapshots and mirroring
-//   06c-mp-turns.js       take turns / call and return
+//   06b-mp-look.js        the room's shared settings
+//   06c-mp-glide.js       incoming slider glide
 //   06d-mp-paint-wire.js  dabs, cursors, brush shapes, colliders, replay strokes
 //   06e-mp-panel.js       the room panel, remote cursors, init (runs last)
 // ================================================================
@@ -103,18 +105,13 @@ function clearRemoteCursors() {
 
 // ── The status line ─────────────────────────────────────────────────
 // One line says everything about the room, and it is built here and nowhere
-// else:   {Activity}[ · clock] · {people}[ · lock]
+// else:   {Activity} · {people}[ · locked]
 // The activity is the most important thing that is true right now: getting
-// connected beats everything, then a stranger search, then whose turn it is,
-// then just being together. The clock is the countdown when the rotation has
-// one; people is "just you" or "N here" (left off until the room has
-// answered, when there is no count to give); the lock says nobody new can
-// come in, or whose look the room runs on. The dot is green once someone
-// else is here and amber until then. The room code is never printed: it is
-// an invitation (see renderShareMode), and this line is on screen in every
-// share mode. Until 2026-10-04 the panel said the same things in three
-// places (a status row, a lock badge and a line under the queue), and a turn
-// showed its clock three times.
+// connected beats everything, then a stranger search, then sharing. People
+// is "just you" or "N here" (left off until the room has answered); locked
+// says nobody new can come in. The dot is green once someone else is here
+// and amber until then. The room code is never printed: it is an invitation
+// (see renderShareMode), and this line is on screen in every share mode.
 function roomSocketOpen() {
     return isMultiplayerEnabled && !!partySocket && partySocket.readyState === WebSocket.OPEN;
 }
@@ -124,14 +121,7 @@ function roomActivity() {
     if (!roomSocketOpen()) return 'Connecting…';      // first connect and every reconnect
     var stranger = isStrangerRoom();
     if (stranger && connectedClients < 2) return 'Waiting for a stranger…';
-    if (turnsOn) {
-        var once = isOneSwirlMode();
-        if (isMyTurn()) return once ? (_oneSwirlSpent ? 'Passing…' : 'Your call') : 'Your turn';
-        // No holder is the instant between two painters.
-        if (!turnHolderId) return 'Passing…';
-        return shortName(turnHolderId) + (once ? '’s call' : '’s turn');
-    }
-    if (connectedClients >= 2) return stranger ? 'Swirling with a stranger' : 'Swirling together';
+    if (connectedClients >= 2) return 'Sharing settings';
     return 'Waiting for friends';
 }
 
@@ -140,25 +130,12 @@ function roomActivity() {
 function roomStatusParts() {
     var parts = [], tips = [];
     var open = !!currentRoom && roomSocketOpen();
-    if (open && turnsOn && !isOneSwirlMode() && turnDeadlineLocal) {
-        parts.push(fmtRemaining());
-        tips.push('The brush passes on when the clock runs out.');
-    } else if (open && isOneSwirlMode()) {
-        tips.push('One swirl each, then the brush passes on.');
-    }
     if (open) {
+        tips.push('Everyone here shares one set of settings: what anyone changes, changes for everyone. Each person keeps their own brush.');
         parts.push(connectedClients >= 2 ? connectedClients + ' here' : 'just you');
         if (!isStrangerRoom() && roomLocked) {
             parts.push('locked');
             tips.push('Locked: nobody new can join, even with the code.');
-        }
-        // Turns supersede the look lock (the painter's look is the room's).
-        if (!turnsOn && myRole === 'host' && settingsLockOn) {
-            parts.push('your look');
-            tips.push('Everyone in the room uses your look settings.');
-        } else if (!turnsOn && window.__mpSettingsLocked) {
-            parts.push('host’s look');
-            tips.push('Your look settings follow the host’s while they lock them.');
         }
     }
     return { parts: parts, tip: tips.join('\n'), open: open, together: open && connectedClients >= 2 };
@@ -176,6 +153,148 @@ function renderRoomStatus() {
     // Amber pulses while there is no room yet, and holds steady once we
     // are in one with nobody else.
     if (dot) dot.className = 'mp-dot ' + (p.together ? 'mp-dot-connected' : p.open ? 'mp-dot-alone' : 'mp-dot-connecting');
+    renderActivity();
+}
+
+// ── Who changed what ────────────────────────────────────────────────
+// The room's settings move under your hands when someone else changes
+// them, so the panel says who and what, in their cursor's colour, and the
+// control they moved glows in that colour while it glides. Between changes
+// the line says what the room is for.
+var ACTIVITY_HOLD_MS = 5000;
+var _activity = null;          // { who, names, until }
+var _activityTimer = null;
+var ROOM_SECTION_NAMES = {
+    colors: 'Background', paletteIndex: 'Palette', paletteName: 'Palette', savedColors: 'Palette',
+    lightPos: 'Light', lightShiftPath: 'Light Shift path', gravity: 'Gravity',
+    resolution: 'Resolution', material: 'Material', ssOrigin: 'Shooting Star'
+};
+
+function controlName(id) {
+    var el = document.getElementById(id);
+    if (!el) return id;
+    // A strip channel whose label is a menu (Curl's is the material picker,
+    // reading "Swirl - Vorticity") is called what the menu shows.
+    var ch = el.closest('.mixer-channel');
+    var pick = ch && ch.querySelector('select');
+    if (pick && pick.selectedOptions && pick.selectedOptions[0]) {
+        var shown = pick.selectedOptions[0].textContent.trim();
+        if (shown) return shown;
+    }
+    try {
+        if (window.HotkeyBinds && typeof window.HotkeyBinds.nameOf === 'function') {
+            var n = window.HotkeyBinds.nameOf(el);
+            if (n) return n;
+        }
+    } catch (_) {}
+    var lab = document.querySelector('label[for="' + id + '"]');
+    if (lab) {
+        var t = '';
+        lab.childNodes.forEach(function (c) { if (c.nodeType === 3) t += c.textContent; });
+        t = t.replace(/\s+/g, ' ').trim();
+        if (t) return t;
+    }
+    return id;
+}
+
+// Where a control shows: its strip channel or its sidebar row.
+function controlFace(id) {
+    var el = document.getElementById(id);
+    if (!el) return null;
+    return el.closest('.mixer-channel') || el.closest('.control-group') || el.closest('.checkbox-group') || el;
+}
+
+var _touchTimers = new Map();
+function flashControl(id, col) {
+    var face = controlFace(id);
+    if (!face) return;
+    face.style.setProperty('--mp-peer', col);
+    face.classList.add('mp-peer-touch');
+    // A drag keeps it lit: each update pushes the fade out.
+    clearTimeout(_touchTimers.get(face));
+    _touchTimers.set(face, setTimeout(function () {
+        face.classList.remove('mp-peer-touch');
+        _touchTimers.delete(face);
+    }, 1400));
+}
+
+function onRoomLookChanged(change, fromId, welcome) {
+    var names = [];
+    var add = function (n) { if (n && names.indexOf(n) === -1) names.push(n); };
+    var col = colorForClient(fromId);
+    ['sliders', 'checkboxes', 'selects'].forEach(function (sec) {
+        Object.keys(change[sec] || {}).forEach(function (id) { add(controlName(id)); flashControl(id, col); });
+    });
+    Object.keys(change).forEach(function (k) { if (ROOM_SECTION_NAMES[k]) add(ROOM_SECTION_NAMES[k]); });
+    if (!names.length && !welcome) return;
+    if (welcome) {
+        // Arriving: the room's settings replaced ours in one go. Naming a
+        // dozen controls would say less than whose settings these are.
+        _activity = { who: fromId, names: [], welcome: true };
+    } else if (_activity && !_activity.welcome && _activity.who === fromId && Date.now() < _activity.until) {
+        // A drag is many messages: the same person moving things keeps one
+        // line, newest first, rather than resetting it.
+        _activity.names = names.concat(_activity.names.filter(function (n) { return names.indexOf(n) === -1; }));
+    } else {
+        _activity = { who: fromId, names: names };
+    }
+    _activity.until = Date.now() + ACTIVITY_HOLD_MS;
+    clearTimeout(_activityTimer);
+    _activityTimer = setTimeout(function () { _activity = null; renderActivity(); }, ACTIVITY_HOLD_MS + 50);
+    renderActivity();
+}
+
+function renderActivity() {
+    var el = document.getElementById('mpActivity');
+    if (!el) return;
+    var together = !!currentRoom && roomSocketOpen() && connectedClients >= 2;
+    el.style.display = together ? '' : 'none';
+    if (!together) return;
+    var a = (_activity && Date.now() < _activity.until) ? _activity : null;
+    var key = a ? a.who + '|' + (a.welcome ? '*' : a.names.join('|')) : '';
+    if (el.dataset.key === key && el.childNodes.length) return;
+    el.dataset.key = key;
+    el.textContent = '';
+    el.classList.toggle('live', !!a);
+    if (!a) {
+        el.textContent = 'Change any setting and it changes for everyone here.';
+        return;
+    }
+    var who = document.createElement('span');
+    who.className = 'mp-activity-who';
+    who.style.color = colorForClient(a.who);
+    who.textContent = shortName(a.who);
+    if (a.welcome) {
+        el.appendChild(document.createTextNode('Now on '));
+        el.appendChild(who);
+        el.appendChild(document.createTextNode('’s settings'));
+        el.title = 'You joined, so your settings switched to the room’s: ' + shortName(a.who) + ' is the host.';
+        return;
+    }
+    // The newest first; the rest are counted, since the sidebar has room
+    // for one name (the tooltip has them all).
+    var more = a.names.length - 1;
+    var what = a.names[0] + (more > 0 ? ' and ' + more + ' more' : '');
+    el.appendChild(who);
+    el.appendChild(document.createTextNode(' changed ' + what));
+    el.title = shortName(a.who) + ' changed ' + a.names.join(', ');
+}
+
+// Brief, non-blocking word about something someone else did to your work
+// (06d: a wall or a line of yours edited) or a phone arriving (54, 55).
+function showRoomToast(text) {
+    var el = document.getElementById('mpRoomToast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'mpRoomToast';
+        el.className = 'mp-room-toast';
+        el.setAttribute('role', 'status');
+        document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.style.opacity = '1';
+    if (showRoomToast._t) clearTimeout(showRoomToast._t);
+    showRoomToast._t = setTimeout(function () { el.style.opacity = '0'; }, 2600);
 }
 
 // 06a still calls this with its own words ("Reconnecting (2)..."). The line
@@ -200,7 +319,7 @@ function showMatchmaking() {
     ['roomDisplay', 'shareHint', 'copyRoomRow', 'lockRoomBtn', 'mpMenuBtn'].forEach(function(id) { setShown(id, false); });
     if (_openPop === 'menu') closeRoomPop();
     syncInviteBtn();
-    updateTurnUI();   // no room: the rhythm switch and Pass step away; ends in renderRoomStatus
+    renderRoomStatus();
 }
 
 function showConnecting() {
@@ -210,7 +329,7 @@ function showConnecting() {
     setShown('roomDisplay', !isStrangerRoom());
     if (!isStrangerRoom()) renderShareMode();
     syncInviteBtn();
-    updateTurnUI();   // ends in renderRoomStatus
+    renderRoomStatus();
 }
 
 // Invite ▾ in a private room. A stranger pairing has nobody to invite (and
@@ -288,17 +407,8 @@ function updateConnectedView() {
         lockBtn.style.display = canLock ? '' : 'none';
         lockBtn.setAttribute('aria-checked', String(!!roomLocked));
     }
-    // Settings lock (13.5): the host of a private room — hidden while turns
-    // run, which supersede it. A stranger pair has no real host ("host" is
-    // whoever connected first), so neither half may put the other on their
-    // look; until 2026-10-04 the first to connect could.
-    var sLockBtn = document.getElementById('settingsLockBtn');
-    if (sLockBtn) {
-        sLockBtn.style.display = (isHost && !stranger && !turnsOn) ? '' : 'none';
-        sLockBtn.setAttribute('aria-checked', String(!!settingsLockOn));
-    }
 
-    updateTurnUI();   // ends in renderRoomStatus
+    renderRoomStatus();
     // Host changes, counts and room kind decide the phone door and who
     // answers phones (js/54-phone-pads.js).
     if (window.PhonePads) window.PhonePads.onRoom();
@@ -590,21 +700,9 @@ function wireRoomPops() {
 
 // Initialize multiplayer UI + auto-join from hash
 function initMultiplayerUI() {
-    installWatcherGate(); // 06b: out-of-turn look edits are put back
+    installGlideRelease(); // 06c: a hand on a gliding slider lets go of the glide
     mountRoomPops();
     wireRoomPops();
-    // A guest enters and leaves the host's look lock straight from a socket
-    // message (06a 'settings-lock' → 06b), and nothing on that path redraws
-    // the panel. Wrapped here, once, so the status line's "host's look"
-    // follows the gate however it is set.
-    if (!setSettingsLockedByHost.__mpStatus) {
-        var lockedByHost = setSettingsLockedByHost;
-        setSettingsLockedByHost = function (locked, snapshot) {
-            lockedByHost(locked, snapshot);
-            renderRoomStatus();
-        };
-        setSettingsLockedByHost.__mpStatus = true;
-    }
     // Wire up buttons
     var createBtn = document.getElementById('createRoomBtn');
     if (createBtn) createBtn.addEventListener('click', createRoom);
@@ -657,40 +755,8 @@ function initMultiplayerUI() {
     var lockBtn = document.getElementById('lockRoomBtn');
     if (lockBtn) lockBtn.addEventListener('click', toggleLock);
 
-    var sLockBtn = document.getElementById('settingsLockBtn');
-    if (sLockBtn) sLockBtn.addEventListener('click', toggleSettingsLock);
-
-    // Together | Turns | Call & return (06c pickRhythm).
-    [['togetherBtn', 'free'], ['turnsBtn', 'timer'], ['callReturnBtn', 'stroke']].forEach(function (pair) {
-        var b = document.getElementById(pair[0]);
-        if (b) b.addEventListener('click', function () { pickRhythm(pair[1]); });
-    });
-
-    // Pass is the painter's; Skip (in ⋯) is the host moving someone else's
-    // turn on. Both are the same message: the relay decides who may.
-    var turnPassBtn = document.getElementById('turnPassBtn');
-    if (turnPassBtn) turnPassBtn.addEventListener('click', passTurn);
-    var turnSkipBtn = document.getElementById('turnSkipBtn');
-    if (turnSkipBtn) turnSkipBtn.addEventListener('click', passTurn);
-
-    var turnLength = document.getElementById('turnLength');
-    if (turnLength) {
-        turnLength.addEventListener('input', renderTurnLengthValue);
-        turnLength.addEventListener('change', function () {
-            // The row is hidden once a rotation runs, but a bound hotkey
-            // (49) still moves the slider: a host changing the length
-            // mid-round applies it immediately (restarts the current turn's
-            // clock server-side). Only the timed rhythm has a length; call
-            // and return ignores it.
-            if (turnsOn && turnModeLocal === 'timer' && myRole === 'host' &&
-                partySocket && partySocket.readyState === WebSocket.OPEN) {
-                partySocket.send(JSON.stringify({
-                    type: 'turns', on: true, seconds: turnTimerSeconds(), mode: 'timer'
-                }));
-            }
-        });
-        renderTurnLengthValue();
-    }
+    // Who changed what (06b calls this after every change from the room).
+    window.__mpRoomLookChanged = onRoomLookChanged;
 
     // Auto-join if URL has room hash
     var hashRoom = getRoomFromHash();
@@ -707,7 +773,6 @@ window.flushDabs = flushDabs;
 window.broadcastCursor = broadcastCursor;
 window.broadcastPointerUp = broadcastPointerUp;
 window.broadcastClear = broadcastClear;
-window.broadcastPreset = broadcastPreset;
 window.broadcastReplayStroke = broadcastReplayStroke;
 // 33-brush-shapes calls this when a shape is picked or re-stamped, so peers
 // decode the bitmap before the first dab that references it.
@@ -723,19 +788,14 @@ window.createRoom = createRoom;
 window.joinRoom = joinRoom;
 window.swirlWithStranger = swirlWithStranger;
 window.toggleLock = toggleLock;
-window.toggleTurns = toggleTurns;
-window.toggleCallReturn = toggleCallReturn;
-window.passTurn = passTurn;
 window.copyRoomCode = copyRoomCode;
 window.disconnectMultiplayer = disconnectMultiplayer;
-window.pickRhythm = pickRhythm;
-// The panel's popovers, and whether this person may pick the rhythm, for
-// 44's tours.
+window.showRoomToast = showRoomToast;
+// The panel's popovers, for 44's tours.
 window.MPPanel = {
     open: openRoomPop,
     close: closeRoomPop,
-    isOpen: function (which) { return which ? _openPop === which : !!_openPop; },
-    canPick: function () { return !!currentRoom && roomSocketOpen() && canPickRhythm(); }
+    isOpen: function (which) { return which ? _openPop === which : !!_openPop; }
 };
 
 console.log('Multiplayer module loaded. PartyKit host:', PARTYKIT_HOST);

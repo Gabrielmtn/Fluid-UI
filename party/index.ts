@@ -23,74 +23,16 @@ interface ConnState {
 
 // A pinger silent this long is presumed dead (client pings every ~20s, so
 // this tolerates two missed beats plus jitter). Reaping drives the normal
-// onClose cleanup: counts, host transfer, turn handoff, room reset.
+// onClose cleanup: counts, host transfer, room reset.
 const REAP_SILENCE_MS = 65_000;
-// Stroke mode ("Call and return") has no clock for the PLAYER, but the room
-// still needs a way out of a stuck turn. The painter's own client fires the
-// pass when their swirl has settled; a dead tab, a lost pass, or someone who
-// walked away would otherwise hold the brush until the heartbeat reap above,
-// and a stranger pair has no host to skip them. So the relay keeps a quiet
-// idle backstop: the deadline moves forward on every paint message from the
-// holder, and the brush passes when they have sent nothing for this long.
-const STROKE_IDLE_MS = 45_000;
 const SWEEP_MIN_INTERVAL_MS = 10_000;
 
-// Take-turns mode: message types only the current painter may relay. Cursor and
-// pointer-up stay open so spectators can still point at things while watching.
-const TURN_HOLDER_ONLY = new Set([
-  "splat",
-  "stroke",
-  "stroke-chunk",
-  "clear",
-  "preset",
-  "turn-look",
-  // Colliders shipped after this gate was written (peer collider sync, PR #42,
-  // "zero relay changes") and so escaped it. They belong here: an obstacle
-  // feeds vorticity, pressure and advection every frame on every canvas, so a
-  // watcher placing or deleting a wall rewrites the physics of the painter's
-  // turn — the exact out-of-turn influence the rotation exists to prevent.
-  "collider-add",
-  "collider-remove",
-  // An edit to someone else's wall (2026-09-15) — the holder may reshape any
-  // wall in the room on their turn, and only the holder.
-  "collider-edit",
-  // Text (2026-09-15): a line standing on the canvas is a wall when it is a
-  // collider, and a pour is dye — the same out-of-turn influence as the
-  // two above and a stroke. Watchers' line edits wait on their own client
-  // until the brush reaches them (06c flushStagedWork), so nothing honest
-  // is lost here.
-  "text-line",
-  "text-line-remove",
-  "text-pour",
-]);
-
-// Deliberately NOT gated by the rotation, though it shipped alongside the
-// colliders: brush-shape publishes a peer's stamp BITMAP, it does not paint.
-// A watcher's shape needs to be in everyone's hands before their turn starts —
-// gating it would drop the definition and leave their eventual stroke printing
-// as a plain gaussian for everyone else, which is the known shaped-stroke gap
-// made worse rather than a safety win.
-
-// Message types only this relay may author. A client-sent copy is a forgery —
-// e.g. a fake 'turn-state' would gate every other member's painting and
-// settings — so the relay never forwards one (managed rooms; sys- rooms stay
-// pure passthrough for the legacy sub-app).
-// The messages that mean the holder is actually at work — the ones that push
-// the stroke-mode idle backstop out (see STROKE_IDLE_MS). Painting, and since
-// 2026-09-15 the setup a call is made of: pouring text, typing a line,
-// placing a wall. A painter spending 45 s typing their words is not AFK.
-const PAINT_TYPES = new Set([
-  "splat",
-  "stroke",
-  "stroke-chunk",
-  "text-pour",
-  "text-line",
-  "text-line-remove",
-  "collider-add",
-  "collider-remove",
-  "collider-edit",
-]);
-
+// Message types only this relay may author. A client-sent copy is a forgery,
+// so the relay never forwards one (managed rooms; sys- rooms stay pure
+// passthrough for the legacy sub-app). This relay no longer sends the turn-*
+// ones (see RETIRED below), but a client from before 2026-10-06 still acts
+// on them — a fake 'turn-state' would gate its painting — so a forged copy
+// is dropped all the same.
 const SERVER_AUTHORED = new Set([
   "connected",
   "client-count",
@@ -103,8 +45,27 @@ const SERVER_AUTHORED = new Set([
   "peer-left",
 ]);
 
-// How long a "shall we take turns?" invite stands before it goes stale.
-const INVITE_TTL_MS = 30_000;
+// RETIRED 2026-10-06: take turns, call and return, and the host's look lock
+// ("everyone uses my look"). A room is now a set of people sharing one set
+// of settings — clients send 'room-look' changes to each other through the
+// default relay, so the relay needed nothing new for it. What it needed was
+// to STOP: a client from before the change (the Steam demo, a cached page)
+// can still ask for turns, and a rotation would silently drop every stroke
+// from clients that no longer know turns exist. So the rotation is gone, and
+// these requests from old clients are swallowed: never relayed, never
+// answered with a turn-state. One exception: a stranger's "shall we take
+// turns?" invite gets a plain no (see onMessage), because an unanswered one
+// strands the old client on "Waiting for their answer…". Nothing waits on
+// the rest: an old client only changes its turn state on a 'turn-state',
+// and never gets one now.
+const RETIRED = new Set([
+  "turns",
+  "turn-invite",
+  "turn-invite-response",
+  "turn-pass",
+  "turn-look",
+  "settings-lock",
+]);
 
 // The play-room party. One instance per room id (/parties/fluid/<id>).
 //
@@ -129,37 +90,12 @@ export default class FluidPartyServer implements Party.Server {
   }
 
   // Managed-room state (mirrored in room.storage; rehydrated in onStart).
+  // A room stored before 2026-10-06 may still hold the retired rotation's
+  // keys (turnsOn, turnQueue, ...): nothing reads them, and the deleteAll
+  // when the room empties clears them.
   locked = false;
   hostId: string | null = null;
   members: Set<string> = new Set(); // uids ever admitted = the lock allowlist
-  // Take-turns mode: one member paints at a time, everyone else watches.
-  // Keyed by uid (stable across reconnects); broadcast to clients as connection
-  // ids so members' uids — the lock re-admission key — never reach other clients.
-  turnsOn = false;
-  turnQueue: string[] = []; // uids of connected members, rotation order
-  turnHolder: string | null = null; // uid of the current painter
-  turnMs = 60_000; // host-chosen turn length (0 = no timer)
-  turnDeadline = 0; // epoch ms when the current turn auto-passes (0 = none)
-  // How a turn ENDS. "timer": the alarm auto-passes at turnDeadline. "stroke"
-  // ("Call and return" in the UI): no clock at all — the painter tweaks, lays down one
-  // stroke, and their own client passes the brush when that stroke has fully
-  // landed. The relay stays the authority either way; it just has no deadline
-  // to enforce in stroke mode, so turnMs is pinned to 0 there.
-  turnMode: "timer" | "stroke" = "timer";
-  // Stroke-mode idle backstop (epoch ms; 0 = none). In memory only: it is
-  // refreshed on every paint message while the holder paints, so persisting
-  // it would be a storage write per dab. A wake simply starts a fresh grace
-  // period (see onStart). See STROKE_IDLE_MS for why it exists.
-  turnIdleAt = 0;
-  // Stranger-pair consent, in memory only: it lives ~30s inside a room with two
-  // live connections, so there is nothing worth persisting — and a lost invite
-  // simply reads as "no answer", which the proposer's client already handles.
-  pendingInvite: {
-    from: string;
-    seconds: number;
-    mode: "timer" | "stroke";
-    at: number;
-  } | null = null;
   lastSweep = 0; // zombie-reap rate limit (in-memory; a wake just sweeps again)
   lastAlarmArm = 0;
   loaded = false;
@@ -173,15 +109,6 @@ export default class FluidPartyServer implements Party.Server {
     this.locked = (await this.room.storage.get<boolean>("locked")) || false;
     this.hostId = (await this.room.storage.get<string>("hostId")) || null;
     this.members = new Set((await this.room.storage.get<string[]>("members")) || []);
-    this.turnsOn = (await this.room.storage.get<boolean>("turnsOn")) || false;
-    this.turnQueue = (await this.room.storage.get<string[]>("turnQueue")) || [];
-    this.turnHolder = (await this.room.storage.get<string>("turnHolder")) || null;
-    const tm = await this.room.storage.get<number>("turnMs");
-    this.turnMs = typeof tm === "number" ? tm : 60_000;
-    this.turnDeadline = (await this.room.storage.get<number>("turnDeadline")) || 0;
-    this.turnMode =
-      (await this.room.storage.get<string>("turnMode")) === "stroke" ? "stroke" : "timer";
-    this.armStrokeIdle(); // fresh grace period after a wake
     this.loaded = true;
   }
 
@@ -237,19 +164,10 @@ export default class FluidPartyServer implements Party.Server {
 
     // Dirty-restart self-heal: a cleanly emptied room always resets this state
     // in onClose, so arriving FIRST in a room whose persisted state still names
-    // a host or a running rotation means the previous instance died without
-    // closes (redeploy/eviction). The named members may never return — rebuild
-    // around this member instead of pinning the room on ghosts.
-    if (others === 0) {
-      if (this.hostId && this.hostId !== uid) this.hostId = pad ? null : uid;
-      if (this.turnsOn) {
-        this.turnQueue = [uid];
-        this.turnHolder = uid;
-        this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
-        this.armStrokeIdle();
-        await this.syncTurnAlarm();
-      }
-    }
+    // a host means the previous instance died without closes
+    // (redeploy/eviction). The named host may never return — rebuild around
+    // this member instead of pinning the room on a ghost.
+    if (others === 0 && this.hostId && this.hostId !== uid) this.hostId = pad ? null : uid;
 
     // Host election — synchronous compare-and-set on in-memory state (no await
     // between read and write, so two simultaneous first-joiners can't both win).
@@ -262,9 +180,6 @@ export default class FluidPartyServer implements Party.Server {
     conn.setState({ uid, role, pad } as ConnState);
 
     this.members.add(uid);
-    // Joining while turns are running: append to the rotation (no holder change).
-    if (this.turnsOn && !this.turnQueue.includes(uid)) this.turnQueue.push(uid);
-    if (this.turnsOn && !this.turnHolder) this.turnHolder = uid;
     // Persist BEFORE telling the client it's in: a member must be durably on the
     // allowlist before they rely on being re-admittable to a (future) locked room.
     await this.persist();
@@ -282,9 +197,6 @@ export default class FluidPartyServer implements Party.Server {
       })
     );
     this.broadcastClientCount();
-    // Everyone (including the joiner, and the holder whose conn id may have
-    // changed across a reconnect) re-syncs the rotation.
-    if (this.turnsOn) this.broadcastTurnState();
   }
 
   async onMessage(message: string, sender: Party.Connection) {
@@ -315,7 +227,7 @@ export default class FluidPartyServer implements Party.Server {
         const now = Date.now();
         if (now - this.lastAlarmArm > 25_000) {
           this.lastAlarmArm = now;
-          await this.syncTurnAlarm();
+          await this.syncAlarm();
         }
         return; // heartbeats are point-to-point — never relayed
       }
@@ -340,174 +252,15 @@ export default class FluidPartyServer implements Party.Server {
       return;
     }
 
-    // ── Take-turns toggle (also carries the turn length) ──
-    // Private rooms: host-only, as with the lock. Stranger pairs have no real
-    // host (it is just whoever connected first), so either member may start
-    // turns — but starting requires the partner's consent, so the direct "on"
-    // path is refused there and must go through turn-invite below. Either
-    // member may switch turns OFF: leaving the mode needs no permission.
-    if (data.type === "turns" && this.managed) {
-      await this.ensureLoaded();
-      const st = sender.state as ConnState | null;
-      if (!st) return;
-      const isHost = st.role === "host" || st.uid === this.hostId;
-      const pair = this.kind === "public";
-      const wantOn = !!data.on;
-      if (!isHost && !(pair && !wantOn)) return;
-      if (pair && wantOn && !this.turnsOn) return; // needs consent — use turn-invite
-      if (wantOn) {
-        this.enableTurns(st.uid, data.seconds, data.mode);
-      } else {
-        this.turnsOn = false;
-        this.turnQueue = [];
-        this.turnHolder = null;
-        this.turnDeadline = 0;
-        this.turnMode = "timer";
-        this.turnIdleAt = 0;
-        this.pendingInvite = null;
-      }
-      await this.persist(); // commit before announcing (same rule as the lock)
-      await this.syncTurnAlarm();
-      this.broadcastTurnState();
-      return;
-    }
-
-    // ── Stranger-pair consent: "shall we take turns?" ──
-    // Either member proposes; the partner accepts or declines. Nothing changes
-    // until they agree, so neither person can impose the mode on the other.
-    if (data.type === "turn-invite" && this.kind === "public") {
-      await this.ensureLoaded();
-      const st = sender.state as ConnState | null;
-      if (!st || this.turnsOn) return;
-      // ALWAYS answer the asker. A silent drop here strands them on
-      // "Waiting for their answer…" with no way to tell whether the partner
-      // is ignoring them, absent, or the room simply cannot do this.
-      const others = [...this.room.getConnections()].filter((c) => c.id !== sender.id);
-      const other = others.find((c) => {
-        const cs = c.state as ConnState | null;
-        return !!cs && cs.uid !== st.uid;
-      });
-      if (!other) {
-        // No partner with a DIFFERENT device id. Either we are alone, or both
-        // windows are the same browser profile (they share the localStorage
-        // device id), which turn-taking cannot tell apart into two painters.
-        sender.send(
-          JSON.stringify({
-            type: "turn-invite-result",
-            accepted: false,
-            reason: others.length ? "same-device" : "alone",
-            timestamp: Date.now(),
-          })
-        );
-        return;
-      }
-      const seconds = typeof data.seconds === "number" ? data.seconds : 60;
-      const mode: "timer" | "stroke" = data.mode === "stroke" ? "stroke" : "timer";
-
-      // Crossing invites (both clicked at once): the second one is consent.
-      const p = this.livePendingInvite();
-      const otherState = other.state as ConnState | null;
-      if (p && otherState && p.from === otherState.uid) {
-        this.pendingInvite = null;
-        this.enableTurns(p.from, p.seconds, p.mode);
-        await this.persist();
-        await this.syncTurnAlarm();
-        this.broadcastTurnState();
-        return;
-      }
-
-      this.pendingInvite = { from: st.uid, seconds, mode, at: Date.now() };
-      other.send(
-        JSON.stringify({
-          type: "turn-invite-offer",
-          from: sender.id,
-          seconds,
-          mode,
-          expiresIn: INVITE_TTL_MS,
-          timestamp: Date.now(),
-        })
-      );
-      // Ack the asker: its absence is how a client detects a relay too old to
-      // understand invites (which otherwise looks exactly like a silent partner).
-      sender.send(
-        JSON.stringify({ type: "turn-invite-sent", to: other.id, timestamp: Date.now() })
-      );
-      return;
-    }
-
-    if (data.type === "turn-invite-response" && this.kind === "public") {
-      await this.ensureLoaded();
-      const st = sender.state as ConnState | null;
-      const p = this.livePendingInvite();
-      // Only the person who was ASKED may answer, and only once.
-      if (!st || !p || p.from === st.uid) return;
-      this.pendingInvite = null;
-      if (data.accept) {
-        this.enableTurns(p.from, p.seconds, p.mode);
-        await this.persist();
-        await this.syncTurnAlarm();
-        this.broadcastTurnState();
-      } else {
-        const proposer = this.connForUid(p.from);
-        if (proposer) {
-          proposer.send(
-            JSON.stringify({ type: "turn-invite-result", accepted: false, by: sender.id, timestamp: Date.now() })
-          );
-        }
+    // ── Retired requests from old clients (see RETIRED) ──
+    if (this.managed && RETIRED.has(data.type)) {
+      // A stranger's invite always gets an answer — a silent drop strands the
+      // old client on "Waiting for their answer…" — and this one reads "They
+      // would rather keep painting together" there.
+      if (data.type === "turn-invite" && this.kind === "public") {
+        sender.send(JSON.stringify({ type: "turn-invite-result", accepted: false, timestamp: Date.now() }));
       }
       return;
-    }
-
-    // ── Pass the brush: the painter passes, or the host skips an AFK painter ──
-    if (data.type === "turn-pass" && this.managed) {
-      await this.ensureLoaded();
-      if (!this.turnsOn) return;
-      const st = sender.state as ConnState | null;
-      const isHost = !!st && (st.role === "host" || st.uid === this.hostId);
-      const isHolder = !!st && st.uid === this.turnHolder;
-      if (!isHost && !isHolder) return;
-      this.advanceTurn();
-      this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
-      this.armStrokeIdle();
-      await this.persist();
-      await this.syncTurnAlarm();
-      this.broadcastTurnState();
-      return;
-    }
-
-    // ── Take-turns enforcement: only the painter's actions relay ──
-    // (Belt to the client-side braces: a stale or modified client can't paint,
-    // wipe, or restyle the room out of turn.)
-    if (this.managed) {
-      if (!this.loaded) await this.ensureLoaded();
-      // Only the host may lock the room's look. This gate was missing entirely:
-      // settings-lock predates the take-turns hardening and rode the default
-      // relay, while the CLIENT only checked whether the RECEIVER was the host,
-      // never whether the sender was. Any guest could therefore gate every
-      // other member's settings, restyle them with a snapshot of their
-      // choosing (the snapshot's `transport` section even toggles pause and
-      // freeze), or silently release a genuine host's lock with locked:false.
-      if (data.type === "settings-lock") {
-        const st = sender.state as ConnState | null;
-        if (!st || st.uid !== this.hostId) return;
-      }
-      if (this.turnsOn) {
-        if (data.type === "settings-lock") return; // superseded while taking turns
-        if (TURN_HOLDER_ONLY.has(data.type)) {
-          const st = sender.state as ConnState | null;
-          if (!st || st.uid !== this.turnHolder) return;
-          // The painter is painting: push the stroke-mode backstop out. The
-          // storage alarm is NOT re-armed here (that is a write per dab) — it
-          // fires at the old time, sees the deadline moved, and re-arms then.
-          if (this.turnMode === "stroke" && PAINT_TYPES.has(data.type)) {
-            this.turnIdleAt = Date.now() + STROKE_IDLE_MS;
-          }
-        }
-      } else if (data.type === "turn-look") {
-        // No painter exists while turns are off — a stray or forged look
-        // snapshot must not reach (and restyle) other members.
-        return;
-      }
     }
 
     // ── Default relay: stamp sender id/timestamp + broadcast to everyone else ──
@@ -549,13 +302,6 @@ export default class FluidPartyServer implements Party.Server {
       this.locked = false;
       this.hostId = null;
       this.members.clear();
-      this.turnsOn = false;
-      this.turnQueue = [];
-      this.turnHolder = null;
-      this.turnDeadline = 0;
-      this.turnMode = "timer";
-      this.turnIdleAt = 0;
-      this.pendingInvite = null;
       await this.room.storage.deleteAll();
       try {
         await this.room.storage.deleteAlarm();
@@ -567,17 +313,6 @@ export default class FluidPartyServer implements Party.Server {
     }
 
     const st = conn.state as ConnState | null;
-
-    // A pending invite dies with either party: the asker leaving makes it
-    // moot, and the asked leaving means nobody can answer it.
-    if (this.pendingInvite && st) {
-      const stillHereForInvite = remaining.some((c) => {
-        const cs = c.state as ConnState | null;
-        return !!cs && cs.uid === st.uid;
-      });
-      if (!stillHereForInvite) this.pendingInvite = null;
-    }
-
 
     // Host left but others remain → transfer host so lock/unlock stays usable.
     // Never to a phone brush (see the election in onConnect): with only pads
@@ -591,59 +326,19 @@ export default class FluidPartyServer implements Party.Server {
       this.hostId = nextState ? nextState.uid : null;
       await this.persist();
       if (this.hostId) {
-        // Announce the new host by CONNECTION id, never by uid — the same rule
-        // the rotation already follows, and for a sharper
-        // reason here. A uid is the lock re-admission key (see the allowlist
-        // check in onConnect), and while it is also the current hostId, a
-        // connection presenting it is handed role "host" outright — so
-        // broadcasting it room-wide handed every listener both a way past a
-        // locked room and the credential for lock/turns/pass-skip. Clients
-        // compare this against their own connection id from "connected".
+        // Announce the new host by CONNECTION id, never by uid. A uid is the
+        // lock re-admission key (see the allowlist check in onConnect), and
+        // while it is also the current hostId, a connection presenting it is
+        // handed role "host" outright — so broadcasting it room-wide handed
+        // every listener both a way past a locked room and the credential for
+        // the lock. Clients compare this against their own connection id from
+        // "connected".
         const hostConnId = this.clientIdForUid(this.hostId, conn.id);
         if (hostConnId) {
           this.room.broadcast(
             JSON.stringify({ type: "host-changed", hostId: hostConnId, timestamp: Date.now() })
           );
         }
-      }
-    }
-
-    // Rotation upkeep: a member with no remaining connection leaves the queue;
-    // if the painter left, the brush passes to whoever was next after them.
-    if (this.turnsOn && st) {
-      const stillHere = remaining.some((c) => {
-        const cs = c.state as ConnState | null;
-        return !!cs && cs.uid === st.uid;
-      });
-      if (!stillHere && this.turnQueue.includes(st.uid)) {
-        const wasHolder = st.uid === this.turnHolder;
-        const idx = this.turnQueue.indexOf(st.uid);
-        this.turnQueue = this.turnQueue.filter((u) => u !== st.uid);
-        if (wasHolder) {
-          this.turnHolder = null;
-          if (this.turnQueue.length) {
-            // idx now points at the member who was after the departed painter
-            for (let step = 0; step < this.turnQueue.length; step++) {
-              const cand = this.turnQueue[(idx + step) % this.turnQueue.length];
-              if (this.clientIdForUid(cand, conn.id)) {
-                this.turnHolder = cand;
-                break;
-              }
-            }
-            if (!this.turnHolder) this.turnHolder = this.turnQueue[0];
-          }
-          this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
-          this.armStrokeIdle();
-          await this.syncTurnAlarm();
-        }
-        await this.persist();
-        this.broadcastTurnState(conn.id);
-      } else if (stillHere) {
-        // The uid survives on another connection (second tab, or a zombie
-        // socket outliving a quick reconnect). Uid-keyed state is unchanged,
-        // but clients key on CONNECTION ids — re-advertise so the holder and
-        // order map to live ids, or the room stays keyed to a dead one.
-        this.broadcastTurnState(conn.id);
       }
     }
   }
@@ -655,8 +350,8 @@ export default class FluidPartyServer implements Party.Server {
   // Reap connections that heartbeat once and then went silent — a peer that
   // died without a close frame (sleep, crash, dropped network) otherwise
   // haunts the room for minutes on the platform's TCP timing: it holds the
-  // cap-2 stranger slot, keeps the survivor's count at 2 ("still connected"),
-  // and can capture the turn rotation. close() drives all onClose cleanup.
+  // cap-2 stranger slot and keeps the survivor's count at 2 ("still
+  // connected"). close() drives all onClose cleanup.
   async maybeSweep(): Promise<Set<string>> {
     const reaped = new Set<string>();
     const now = Date.now();
@@ -676,30 +371,13 @@ export default class FluidPartyServer implements Party.Server {
     return reaped;
   }
 
-  // Alarm double-duty: zombie sweep + turn-timer expiry (the brush
-  // auto-passes even if everyone is idle).
+  // The alarm is the guaranteed zombie sweep (see syncAlarm): it runs even
+  // when the room has gone otherwise silent.
   async onAlarm() {
     await this.ensureLoaded();
     this.lastSweep = 0; // the alarm is the guaranteed sweep — never skip it
     await this.maybeSweep();
-    if (this.turnsOn && this.turnDeadline && Date.now() >= this.turnDeadline - 250) {
-      this.advanceTurn();
-      this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
-      await this.persist();
-      this.broadcastTurnState();
-    } else if (
-      this.turnsOn &&
-      this.turnMode === "stroke" &&
-      this.turnIdleAt &&
-      Date.now() >= this.turnIdleAt - 250
-    ) {
-      // Stroke-mode backstop: the holder went quiet (see STROKE_IDLE_MS).
-      this.advanceTurn();
-      this.armStrokeIdle();
-      await this.persist();
-      this.broadcastTurnState();
-    }
-    await this.syncTurnAlarm();
+    await this.syncAlarm();
   }
 
   // ── helpers ──
@@ -727,91 +405,11 @@ export default class FluidPartyServer implements Party.Server {
     return found;
   }
 
-  // The pending invite, or null if there is none / it went stale.
-  livePendingInvite() {
-    const p = this.pendingInvite;
-    if (!p) return null;
-    if (Date.now() - p.at > INVITE_TTL_MS) {
-      this.pendingInvite = null;
-      return null;
-    }
-    return p;
-  }
-
-  // Newest live connection for a uid (see clientIdForUid for why newest).
-  connForUid(uid: string): Party.Connection | null {
-    let found: Party.Connection | null = null;
-    for (const c of this.room.getConnections()) {
-      const cs = c.state as ConnState | null;
-      if (cs && cs.uid === uid) found = c;
-    }
-    return found;
-  }
-
-  // Switch turns on with `starterUid` painting first, then everyone else
-  // connected. Shared by the host toggle and an accepted stranger invite.
-  // Caller persists, syncs the alarm, and broadcasts.
-  enableTurns(starterUid: string, seconds?: unknown, mode?: unknown) {
-    const wasOn = this.turnsOn;
-    this.turnsOn = true;
-    this.pendingInvite = null;
-    this.turnMode = mode === "stroke" ? "stroke" : "timer";
-    // Turn length: 0 = no timer; otherwise clamp to something sane. "One swirl
-    // each" has no clock by definition — the stroke ending is the deadline.
-    if (this.turnMode === "stroke") {
-      this.turnMs = 0;
-    } else if (typeof seconds === "number" && Number.isFinite(seconds)) {
-      const s = Math.floor(seconds);
-      this.turnMs = s <= 0 ? 0 : Math.max(10, Math.min(600, s)) * 1000;
-    }
-    if (!wasOn) {
-      const uids: string[] = [starterUid];
-      for (const c of this.room.getConnections()) {
-        const cs = c.state as ConnState | null;
-        if (cs && !uids.includes(cs.uid)) uids.push(cs.uid);
-      }
-      this.turnQueue = uids;
-      this.turnHolder = uids[0] || null;
-    }
-    // A (re)enable or a timer change restarts the current turn's clock.
-    this.turnDeadline = this.turnMs > 0 ? Date.now() + this.turnMs : 0;
-    this.armStrokeIdle();
-  }
-
-  // (Re)start the stroke-mode idle backstop for the current holder; clears it
-  // whenever it does not apply. Called at every point the brush changes hands.
-  armStrokeIdle() {
-    this.turnIdleAt =
-      this.turnsOn && this.turnMode === "stroke" ? Date.now() + STROKE_IDLE_MS : 0;
-  }
-
-  // Advance the brush to the next connected member after the current holder.
-  advanceTurn() {
-    const q = this.turnQueue;
-    if (!q.length) {
-      this.turnHolder = null;
-      return;
-    }
-    const i = this.turnHolder ? q.indexOf(this.turnHolder) : -1;
-    for (let step = 1; step <= q.length; step++) {
-      const cand = q[(i + step) % q.length];
-      if (this.clientIdForUid(cand)) {
-        this.turnHolder = cand;
-        return;
-      }
-    }
-    this.turnHolder = q[0] || null;
-  }
-
-  // Keep the storage alarm aligned with whichever comes first: the turn
-  // deadline, or the next zombie sweep (needed while any heartbeat-capable
-  // connection exists — with the turn timer off there is no other alarm, and
-  // a silent zombie would otherwise never be reaped in a quiet room).
-  async syncTurnAlarm() {
+  // Keep the storage alarm set for the next zombie sweep while any
+  // heartbeat-capable connection exists — there is no other alarm, and a
+  // silent zombie would otherwise never be reaped in a quiet room.
+  async syncAlarm() {
     try {
-      let next = 0;
-      if (this.turnsOn && this.turnDeadline) next = this.turnDeadline;
-      else if (this.turnsOn && this.turnMode === "stroke" && this.turnIdleAt) next = this.turnIdleAt;
       let hasPinger = false;
       for (const c of this.room.getConnections()) {
         const cs = c.state as ConnState | null;
@@ -821,39 +419,13 @@ export default class FluidPartyServer implements Party.Server {
         }
       }
       if (hasPinger) {
-        const sweepAt = Date.now() + 30_000;
-        next = next ? Math.min(next, sweepAt) : sweepAt;
-      }
-      if (next) {
-        await this.room.storage.setAlarm(next);
+        await this.room.storage.setAlarm(Date.now() + 30_000);
       } else {
         await this.room.storage.deleteAlarm();
       }
     } catch {
-      /* best-effort — a missed alarm only delays the auto-pass/sweep */
+      /* best-effort — a missed alarm only delays the sweep */
     }
-  }
-
-  // Rotation snapshot for clients. Members ride as connection ids (clients
-  // already see those on every relayed message) — never as uids. `timestamp`
-  // doubles as the server-clock reference for the countdown (clients compute
-  // their skew from it, so `deadline` needs no synchronized clocks).
-  broadcastTurnState(excludeConnId?: string) {
-    const order = this.turnQueue
-      .map((u) => this.clientIdForUid(u, excludeConnId))
-      .filter((id): id is string => !!id);
-    this.room.broadcast(
-      JSON.stringify({
-        type: "turn-state",
-        on: this.turnsOn,
-        holder: this.turnHolder ? this.clientIdForUid(this.turnHolder, excludeConnId) : null,
-        order,
-        turnMs: this.turnMs,
-        mode: this.turnMode,
-        deadline: this.turnDeadline || null,
-        timestamp: Date.now(),
-      })
-    );
   }
 
   persist() {
@@ -863,14 +435,6 @@ export default class FluidPartyServer implements Party.Server {
         ? this.room.storage.put("hostId", this.hostId)
         : this.room.storage.delete("hostId"),
       this.room.storage.put("members", [...this.members]),
-      this.room.storage.put("turnsOn", this.turnsOn),
-      this.room.storage.put("turnQueue", this.turnQueue),
-      this.room.storage.put("turnMs", this.turnMs),
-      this.room.storage.put("turnDeadline", this.turnDeadline),
-      this.room.storage.put("turnMode", this.turnMode),
-      this.turnHolder
-        ? this.room.storage.put("turnHolder", this.turnHolder)
-        : this.room.storage.delete("turnHolder"),
     ]);
   }
 

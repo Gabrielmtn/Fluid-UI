@@ -1064,13 +1064,6 @@
 
         let selfWrite = false;
         proxy.addEventListener('input', function () {
-            // Same gate the canonical sim sliders use: a multiplayer host
-            // holding the settings lock owns these, and the proxy is a
-            // second door into the same value.
-            if (window.__mpSettingsLocked && !window.__mpApplyingRemote) {
-                reflect();
-                return;
-            }
             const v = quantizeTo(canonical, curve.toCanonical(parseFloat(proxy.value), canonical));
             selfWrite = true;
             canonical.value = v;
@@ -3876,14 +3869,9 @@
                 }
             } catch (_) {}
         }
-        // The room mirror's way in (06b applyRemoteLookSnapshot): a watcher
-        // takes the painter's gravity exactly, pad and readout included.
+        // The room's way in (06b applyLookSections): a peer's gravity lands
+        // here exactly, pad and readout included.
         window.setGravityField = function (on, x, y) { setVec(x, y); setOn(on); };
-        // Out of turn (or under a host's settings lock) the painter owns this,
-        // the same as the sim sliders (05h). It matters more here than on most
-        // controls: gravity moves the paint itself, so a watcher aiming their
-        // own pulls their canvas away from everyone else's for good.
-        function locked() { return !!window.__mpSettingsLocked && !window.__mpApplyingRemote; }
         var dragging = false;
         function aim(ev) {
             var r = pad.getBoundingClientRect();
@@ -3893,7 +3881,6 @@
         }
         pad.addEventListener('pointerdown', function (ev) {
             ev.preventDefault(); ev.stopPropagation();
-            if (locked()) return;
             dragging = true;
             try { pad.setPointerCapture(ev.pointerId); } catch (_) {}
             // Aiming switches it on: a pad that does nothing until you also find
@@ -3916,11 +3903,9 @@
         // for the exact middle.
         pad.addEventListener('dblclick', function (ev) {
             ev.preventDefault();
-            if (locked()) return;
             setVec(0, 0);
         });
         check.addEventListener('change', function () {
-            if (locked()) { check.checked = !!(window.config && window.config.AMBIENT_FORCE); return; }
             setOn(check.checked);
             // Switching on with the pad centred would do nothing at all, which
             // reads as a dead checkbox. Seed it downward: gravity is the thing
@@ -6098,7 +6083,7 @@
             if (!room.length) return;
             var head = document.createElement('div');
             head.textContent = 'In the room';
-            head.title = 'Other painters’ text. Edit or move it on your turn and the change goes back to them.';
+            head.title = 'Other painters’ text. Edit or move it and the change goes back to them.';
             head.style.cssText = 'font-size:9px;letter-spacing:0.08em;text-transform:uppercase;' +
                 'color:rgba(255,255,255,0.45);margin:6px 4px 2px;';
             listEl.appendChild(head);

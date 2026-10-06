@@ -64,13 +64,10 @@ Then open `http://localhost:8080` and the app will connect to PartyKit at `local
 
 ### Using Multiplayer
 
-1. **Enable Multiplayer**: Check the "Enable Multiplayer" checkbox in the controls panel
-2. **Join a Room**: The room name is shown in the multiplayer section. By default, it's based on the URL hash (e.g., `#my-room`)
-3. **Share with Others**: Click "Copy Room URL" to get a shareable link
-4. **Collaborate**: When multiple users are in the same room, you'll see:
-   - Their cursor positions (blue circles)
-   - Their fluid interactions in real-time
-   - Synchronized clear and preset changes
+1. **Start or join a room**: Swirl Together → **Start a room** (you get a six-character code, and the invite link is copied), **Join** with a code or link, or **Stranger** to be paired with someone who is also looking. A `#CODE` in the URL joins that room.
+2. **Invite**: Invite ▾ shows the code, a QR for phones, or hides it for streaming; Copy link / Copy code work in every mode. **Paint from your phone** makes a phone this canvas's mouse or an artist in the room.
+3. **Share settings**: everyone in a room shares one set of settings. Whatever anyone changes — sliders, switches, the palette, the light, gravity — changes for everyone; incoming slider moves glide into place, and the panel says who changed what. Each person keeps their own brush.
+4. **Paint together**: everyone's strokes, text and walls land on every canvas live, with each painter's cursor in their colour.
 
 ### Custom Room Names
 
@@ -102,7 +99,7 @@ npm run deploy
 │   ├── 03-recording.js     # Recording/playback system
 │   ├── 04-ui-interactions.js # UI controls and interactions
 │   ├── 05-fluid-sim.js     # WebGL fluid simulation engine
-│   └── 06a…06e-mp-*.js     # multiplayer client (core, look, turns, paint wire, panel)
+│   └── 06a…06e-mp-*.js     # multiplayer client (core, shared settings, glide, paint wire, panel)
 ├── party/
 │   └── index.ts            # PartyKit server code
 ├── index.html              # Main HTML file

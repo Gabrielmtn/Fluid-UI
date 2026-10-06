@@ -1082,19 +1082,11 @@
             // this press: it watches the pointer itself until the button
             // comes up, so no stroke state is touched and nothing is
             // captured here. It is not painting, so it opens on a paused
-            // canvas and out of turn alike.
+            // canvas too.
             if (btnMode === 'radial') {
                 if (window.RadialMenu) {
                     window.RadialMenu.open({ x: e.clientX, y: e.clientY, pointerId: e.pointerId, button: e.button });
                 }
-                return;
-            }
-            // Take-turns multiplayer: while it's someone else's turn, both
-            // painting AND replay (which rebroadcasts a stroke) are gated —
-            // the relay would drop them and the local-only paint would
-            // silently desync this client from the room.
-            if (window.__mpTurnBlocked) {
-                if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
                 return;
             }
             // Replay always works, even when paused
@@ -1809,7 +1801,7 @@
             // canvas. Everything below it — the gesture layer included — is a
             // painting-time affordance and keeps its original ordering.
             if (e.touches.length === 1 && !isReplayActive && !TouchGestures.isSuppressed()
-                && !window.__mpTurnBlocked && buttonMode(0) === 'replay') {
+                && buttonMode(0) === 'replay') {
                 touchReplayHold = true;
                 isRightMouseDown = true;   // processReplay loops while this is held
                 isReplayActive = true;
@@ -1831,12 +1823,6 @@
                 return;
             }
             if (TouchGestures.isSuppressed()) return;
-            // Take-turns multiplayer: painting is gated while it's not our turn
-            // (see the pointerdown note).
-            if (window.__mpTurnBlocked) {
-                if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
-                return;
-            }
             const _tMode = buttonMode(0);
             if (!_tMode) return;
             // Pins for this stroke (mirror axis / alternate brush), released at

@@ -225,41 +225,23 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
         const sentN = (await a.eval('__e2e.sent.pour')) - sent0, gotN = (await b.eval('__e2e.got.pour')) - got0;
         check(sentN >= 5 && gotN === sentN, 'a ~0.5 s hold: every pour A laid, B laid', { sent: sentN, landed: gotN });
 
-        // ── 5. Take turns: a watcher's text waits for their turn ─────
-        await a.eval('toggleTurns(); 1');
-        await until(a, 'turnsOn && isMyTurn()', 5000);
-        await until(b, 'turnsOn && !isMyTurn() && window.__mpTurnBlocked', 5000);
+        // ── 5. Everyone's text and walls go out as they are made ─────
+        // (Until 2026-10-06 a watcher's were staged until their turn; rooms
+        // have no turns now.)
         await b.eval("window.__BL = textOverlays.add({content:'WAITING', x:0.25, y:0.25, fontSize:70, collider:true}).id");
-        await sleep(1500);
-        check(await a.eval("!textOverlays.getPeerLines().some(function(p){return p.content==='WAITING';})"), 'turns: B\'s new line does not reach A out of turn');
-        const toast = await b.eval("(document.getElementById('mpTurnToast')||{}).textContent||''");
-        check(/Saved for your turn/.test(toast), 'B is told it is saved for their turn', { toast });
-        check(await b.eval('textOverlays.fluidize(__BL) === false'), 'turns: B cannot pour out of turn');
-        await a.eval('passTurn(); 1');
-        await until(b, 'isMyTurn() && !window.__mpTurnBlocked', 5000);
         const arrived = await until(a, "textOverlays.getPeerLines().some(function(p){return p.content==='WAITING';})", 4000);
-        check(!!arrived, 'the brush reaches B → B\'s line reaches A');
+        check(!!arrived, 'B\'s new line reaches A at once');
         await sleep(700);
         const oA5 = await a.eval('__e2e.obs()'), oB5 = await b.eval('__e2e.obs()');
         check(near(oA5.n, oB5.n, 0.1 * oB5.n) && corr(oA5.grid, oB5.grid) > 0.97, 'both walls stand on both canvases', { A: oA5.n, B: oB5.n, corr: +corr(oA5.grid, oB5.grid).toFixed(3) });
 
-        // B (holder) builds a collider; passes; deletes it out of turn; the
-        // removal waits and lands when the brush comes back.
+        // B builds a collider and deletes it: both land on A.
         await b.eval("window.__BW = collisionLayers.addFromDepth((function(){var w=64,h=40,d=new Uint8Array(w*h); for(var y=8;y<32;y++)for(var x=40;x<60;x++)d[y*w+x]=255; return {data:d,width:w,height:h};})(), {name:'B wall'}); 1");
         const bw = await until(a, "window.layers.some(function(l){return l.__peerOwner && /B wall/.test(l.title);})", 4000);
-        check(!!bw, 'B\'s collider (holder) reaches A');
-        await b.eval('passTurn(); 1');
-        await until(b, 'window.__mpTurnBlocked', 4000);
+        check(!!bw, 'B\'s collider reaches A');
         await b.eval('deleteLayer(__BW); 1');
-        await sleep(1500);
-        check(await a.eval("window.layers.some(function(l){return l.__peerOwner && /B wall/.test(l.title);})"), 'turns: B\'s out-of-turn delete waits (A still has the wall)');
-        await a.eval('passTurn(); 1');
-        await until(b, '!window.__mpTurnBlocked', 4000);
         const removed = await until(a, "!window.layers.some(function(l){return l.__peerOwner && /B wall/.test(l.title);})", 4000);
-        check(!!removed, 'the brush reaches B → the staged delete lands on A');
-        await a.eval('if (turnsOn) toggleTurns(); 1');   // the host stops the rotation
-        await until(a, '!turnsOn', 4000);
-        await until(b, '!turnsOn && !window.__mpTurnBlocked', 4000);
+        check(!!removed, 'B deletes it → it leaves A\'s canvas too');
 
         // ── 6. A Paint Collider wall (GPU-bound Mask) ─────────────────
         await a.eval(String.raw`(function(){
@@ -314,7 +296,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
         await b.eval("(function(){ var l = window.layers.find(function(x){return x.index===" + copyIdx + ";}); l.collisionStrength = 0.35; l.collisionMode = 'slow'; l.x = (l.x||0) + 60; collisionLayers.updateObstacleFromLayers(); return 1; })()");
         const ed = await until(a, "(function(){ var l = window.layers.find(function(x){return x.index===__AW;}); return (l && Math.abs(l.collisionStrength-0.35)<1e-3 && l.collisionMode==='slow') ? {x:l.x, str:l.collisionStrength, mode:l.collisionMode} : null; })()", 4000);
         check(!!ed && Math.abs(ed.x - 60) < 1.5, 'B\'s tweak of A\'s wall lands on A\'s own layer (strength, mode, move)', ed);
-        check(/edited your wall/.test(await a.eval("(document.getElementById('mpTurnToast')||{}).textContent||''")), 'A is told B edited their wall');
+        check(/edited your wall/.test(await a.eval("(document.getElementById('mpRoomToast')||{}).textContent||''")), 'A is told B edited their wall');
         await sleep(900);
         const oA8 = await a.eval('__e2e.obs()'), oB8 = await b.eval('__e2e.obs()');
         check(corr(oA8.grid, oB8.grid) > 0.95, 'and both canvases hold the moved wall', { corr: +corr(oA8.grid, oB8.grid).toFixed(3) });
@@ -351,7 +333,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
         await b.eval("textOverlays.select('" + lkey + "'); textOverlays.update('" + lkey + "', {content:'EDITED', fontSize:72, colliderMode:'block'}); 1");
         const le = await until(a, "(function(){ var o = textOverlays.get(__AL); return (o && o.content==='EDITED') ? {fs:o.fontSize, mode:o.colliderMode, vis:o.visible} : null; })()", 4000);
         check(!!le && Math.abs(le.fs - 72) < 0.01 && le.mode === 'block', 'B edits A\'s text → A\'s own line changes', le);
-        check(/edited your text/.test(await a.eval("(document.getElementById('mpTurnToast')||{}).textContent||''")), 'A is told B edited their text');
+        check(/edited your text/.test(await a.eval("(document.getElementById('mpRoomToast')||{}).textContent||''")), 'A is told B edited their text');
         // Drag it in arrange mode with real mouse input.
         const x0 = await a.eval('textOverlays.get(__AL).x');
         await b.eval("textOverlays.openArrange('" + lkey + "'); 1");
@@ -373,18 +355,10 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
         check(!!hid, 'B removes A\'s line → A keeps it, hidden (the eye brings it back)');
         check(await b.eval("!textOverlays.get('" + lkey + "')"), 'and it leaves B\'s canvas');
 
-        // ── 7d. Out of turn, B's tweak waits for B's turn ──────────────
-        await a.eval('toggleTurns(); 1');
-        await until(b, 'turnsOn && window.__mpTurnBlocked', 5000);
-        await sleep(500);
+        // ── 7d. B's tweak of A's wall lands at once ────────────────────
         await b.eval("(function(){ var l = window.layers.find(function(x){return x.__peerOwner && /A wall/.test(x.title);}); l.collisionStrength = 0.5; collisionLayers.updateObstacleFromLayers(); return 1; })()");
-        await sleep(1500);
-        check(await a.eval("Math.abs(window.layers.find(function(x){return x.index===__AW;}).collisionStrength - 0.5) > 1e-3"), 'turns: B\'s tweak of A\'s wall waits (A unchanged)');
-        await a.eval('passTurn(); 1');
         const landed = await until(a, "Math.abs(window.layers.find(function(x){return x.index===__AW;}).collisionStrength - 0.5) < 1e-3", 4000);
-        check(!!landed, 'the brush reaches B → the tweak lands on A');
-        await a.eval('if (turnsOn) toggleTurns(); 1');
-        await until(b, '!turnsOn && !window.__mpTurnBlocked', 5000);
+        check(!!landed, 'B\'s tweak of A\'s wall lands on A');
 
         // ── 8. A reconnect does not double what B brought ─────────────
         await b.eval("window.__BW2 = collisionLayers.addFromDepth((function(){var w=64,h=40,d=new Uint8Array(w*h); for(var y=20;y<36;y++)for(var x=4;x<20;x++)d[y*w+x]=255; return {data:d,width:w,height:h};})(), {name:'B second'}); 1");

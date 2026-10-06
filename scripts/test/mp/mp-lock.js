@@ -1,7 +1,8 @@
 // Behaviour probe: the host's settings lock, and the identity the relay hands
-// out with it. Answers: can only the HOST lock the room's look, does a guest's
-// forged lock reach anybody, does the relay stamp sender identity it can vouch
-// for, and does a host handover leak the departing/promoted member's uid?
+// out with it. Answers: does anybody's lock reach anybody (since 2026-10-06
+// nobody's does — a room shares its settings instead of locking them), does
+// the relay stamp sender identity it can vouch for, and does a host handover
+// leak the departing/promoted member's uid?
 //
 // Written 2026-08-26 alongside the fixes for all four, none of which had any
 // coverage: settings-lock predates the take-turns hardening and rode the open
@@ -59,15 +60,8 @@ const S = (c, o) => { try { c.ws.send(JSON.stringify(o)); } catch {} };
   console.log('\n== the HOST locks ==');
   S(host, { type: 'settings-lock', locked: true, snapshot: { colors: ['real'] } });
   await wait(300);
-  ok('both guests are gated', g1.locks.length === 1 && g2.locks.length === 1,
+  ok('nobody is gated: the look lock is retired (2026-10-06)', g1.locks.length === 0 && g2.locks.length === 0,
     `g1 ${g1.locks.length}, g2 ${g2.locks.length}`);
-  ok('the lock is stamped with the host', g2.locks[0] && g2.locks[0].clientId === host.id);
-
-  console.log('\n== a guest tries to RELEASE the host\'s lock ==');
-  const before = g2.locks.length;
-  S(g1, { type: 'settings-lock', locked: false });
-  await wait(300);
-  ok('the unlock goes nowhere', g2.locks.length === before, `${g2.locks.length - before} extra`);
 
   console.log('\n== a guest forges another member\'s identity on a paint message ==');
   S(g1, { type: 'splat', clientId: host.id, data: { x: 0.5, y: 0.5, dx: 0, dy: 0, color: [1, 0, 0] } });

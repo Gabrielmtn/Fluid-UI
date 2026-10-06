@@ -28,7 +28,7 @@ type Env = {
 // Hibernation stays OFF, matching the hosted PartyKit deploy (the relay never
 // opted in). Both parties keep deliberate in-memory state that assumes the
 // instance lives as long as a socket is open — the lobby's waiter connection
-// id, a room's pending turn invite, sweep timestamps — and a hibernating
+// id, sweep timestamps — and a hibernating
 // instance can be evicted between two messages, which would silently revive
 // the "stranded seeker" behaviour the lobby was rewritten to close. Turning it
 // on later is a cost optimisation to be done together with those fields.

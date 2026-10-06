@@ -1057,10 +1057,6 @@
         if (typeof id === 'string') return fluidizeRoomLine(id, landed);
         var ov = findOverlay(id);
         if (!ov) return false;
-        // A pour is paint: out of turn in a Swirl Together room it is refused
-        // exactly like a stroke (05d's pointerdown gate), or it would land on
-        // this canvas and on nobody else's.
-        if (mpPaintBlocked()) return false;
         if (typeof window.__splatImageToDye !== 'function' || typeof window.__dyeTexSize !== 'function') {
             tell('The simulation is still starting', 'Give it a moment and try again.');
             return false;
@@ -1949,7 +1945,6 @@
         if (!ov) return;
         endHold(id);
         if (ov.hotkeyAction === 'toggle') { triggerHotkey(id); return; }   // nothing to keep doing
-        if (mpPaintBlocked()) return;                        // someone else's turn: no strike, no flow
         var h = holds[id] = { pace: null, credit: 0, ps: null, last: null, flowing: false };
         // The flow picks up where and when the strike lands; a strike that
         // fails takes its flow with it.
@@ -1988,13 +1983,10 @@
         var share = (typeof window.__paceShare === 'number' && window.__paceShare > 0) ? window.__paceShare : 1;
         var g = colliderGeom();
         var dye = window.__dyeTexSize ? window.__dyeTexSize() : null;
-        // The brush left us mid-hold (the clock ran out, the call was spent,
-        // a host skip): the flow stops where a stroke would have been cut.
-        var blocked = !!window.__mpTurnBlocked;
         ids.forEach(function (key) {
             var h = holds[key];
             var ov = findOverlay(+key);
-            if (!ov || ov.hotkeyAction === 'toggle' || blocked) { endHold(key); return; }
+            if (!ov || ov.hotkeyAction === 'toggle') { endHold(key); return; }
             var dt = (typeof paceNow === 'number' && typeof h.pace === 'number') ? Math.max(0, paceNow - h.pace) : 0;
             h.pace = paceNow;
             // The strike not down yet, or nothing to pour into: no flow, and
@@ -2106,14 +2098,6 @@
     var TEXT_WIRE_MAX = 2000;       // characters of one line a room carries
     var PEER_LINES_PER_OWNER = 64;  // a room is 8 people; this is plenty and bounds a flood
     var PEER_STAMPS_MAX = 12;       // pour bitmaps kept on the GPU, oldest dropped first
-
-    // Out of turn, a pour is refused like a stroke (05d pointerdown), with
-    // the same "it's their turn" hint.
-    function mpPaintBlocked() {
-        if (!window.__mpTurnBlocked) return false;
-        if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
-        return true;
-    }
 
     function round(v, k) { return Math.round(v * k) / k; }
 
@@ -2245,8 +2229,8 @@
         if (prev && prev.el) prev.el.remove();
         peerLines.set(key, line);
         renderPeerLine(line);
-        // The room's version of a line wins over a tweak of ours that is
-        // still waiting for our turn (see mpRoomEdit).
+        // The room's version of a line wins over a tweak of ours that has
+        // not gone out yet (06d's throttle; see mpRoomEdit).
         if (typeof window.__mpRoomLineSettled === 'function') {
             try { window.__mpRoomLineSettled(key); } catch (_) {}
         }
@@ -2262,7 +2246,7 @@
     }
 
     // The room took a line away (its author hid it, someone removed it):
-    // any tweak of ours still waiting for our turn is moot with it.
+    // any tweak of ours not yet sent is moot with it.
     function removePeerLine(owner, id) {
         if (typeof owner !== 'string' || id == null) return;
         var key = owner + '|' + String(id).slice(0, 24);
@@ -2351,9 +2335,9 @@
     // the Text panel lists it under "In the room", arrange mode moves it —
     // and the edit goes back to its author and on to everyone (06d). The
     // line stays the author's: they own it, it is saved on their machine
-    // only, and it leaves with them. Out of turn the tweak shows here and
-    // waits for the brush, and if the author changes the line first, their
-    // version wins (putPeerLine settles it).
+    // only, and it leaves with them. A tweak goes out on 06d's per-line
+    // throttle, and if the author's change arrives first, their version
+    // wins (putPeerLine settles it).
 
     // A room line as the wire carries it: its look, where it stands, and
     // its wall — the same shape a line of our own is sent in.
@@ -2423,14 +2407,13 @@
         return pl;
     }
 
-    // Fluidize on a room line: pour it where it stands (our pour — a turn
-    // gate like any), then it leaves the canvas for everyone, as a Fluidize
-    // of one's own does. Set in the author's type at the author's canvas
-    // size, like every other room line, so the pour lands under the words.
+    // Fluidize on a room line: pour it where it stands (our pour), then it
+    // leaves the canvas for everyone, as a Fluidize of one's own does. Set
+    // in the author's type at the author's canvas size, like every other
+    // room line, so the pour lands under the words.
     function fluidizeRoomLine(key, landed) {
         var pl = peerLines.get(key);
         if (!pl) return false;
-        if (mpPaintBlocked()) return false;
         if (typeof window.__splatImageToDye !== 'function' || typeof window.__dyeTexSize !== 'function') return false;
         var snap = {};
         for (var k in pl) if (pl.hasOwnProperty(k) && k !== 'el') snap[k] = pl[k];

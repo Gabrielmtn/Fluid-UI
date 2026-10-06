@@ -76,12 +76,6 @@
     }
 
     function reset() {
-        // Watching someone else's turn: the canvas is theirs (same gate as
-        // the transport Clear).
-        if (window.__mpTurnBlocked && !window.__mpApplyingRemote) {
-            if (typeof window.__mpTurnHint === 'function') window.__mpTurnHint();
-            return false;
-        }
         // 1. The look, at today's generation (see the header).
         if (typeof window.baselineLookSnapshot === 'function' && typeof window.applyPresetSnapshotFull === 'function') {
             var snap = window.baselineLookSnapshot();

@@ -95,38 +95,15 @@ const drop = async (c) => { c.ws.terminate(); await wait(700); };
   const D3 = await connect('D3', 'desk-3-' + stamp, false);
   check(D3.role === 'host', 'a canvas joining a pads-only room becomes host', D3.role);
 
-  // 7. Turns: pads are in the rotation, the relay gates their paint like anyone's.
+  // 7. Rooms have no turns (2026-10-06): asking starts none, and a pad
+  //    paints like anyone.
   S(D3, { type: 'turns', on: true, seconds: 60, mode: 'timer' });
-  await wait(600);
-  const order = D3.turn && D3.turn.order;
-  check(!!order && order.includes(P1.id) && order.includes(P2.id) && order.includes(D3.id), 'pads are in the turn order', order);
-  check(D3.turn && D3.turn.holder === D3.id, 'the host starts with the brush');
-  const before = got(D3, 'splat').length;
-  S(P2, { type: 'splat', data: { x: 0.2, y: 0.2, dabs: [[0.2, 0.2, 0, 0, 0.01]] } });
   await wait(400);
-  check(got(D3, 'splat').length === before, 'a pad out of turn cannot paint (relay drops it)');
-  // Pass until a pad holds it.
-  for (let i = 0; i < 4 && !(D3.turn && [P1.id, P2.id].includes(D3.turn.holder)); i++) {
-    S(D3, { type: 'turn-pass' });
-    await wait(500);
-  }
-  const padHolder = [P1, P2].find(p => D3.turn && D3.turn.holder === p.id);
-  check(!!padHolder, 'the brush reaches a pad', D3.turn && D3.turn.holder);
-  if (padHolder) {
-    const n0 = got(D3, 'splat').length;
-    S(padHolder, { type: 'splat', data: { x: 0.3, y: 0.3, dabs: [[0.3, 0.3, 0, 0, 0.01]] } });
-    await wait(400);
-    check(got(D3, 'splat').length === n0 + 1, 'the pad holding the brush paints');
-    S(padHolder, { type: 'turn-pass' });
-    await wait(600);
-    check(D3.turn && D3.turn.holder !== padHolder.id, 'the pad can pass the brush on', D3.turn && D3.turn.holder);
-    // A pad cannot switch turns off: that is the host's.
-    S(padHolder, { type: 'turns', on: false });
-    await wait(400);
-    check(D3.turn && D3.turn.on === true, 'a pad cannot stop turns');
-  }
-  S(D3, { type: 'turns', on: false });
+  check(!(D3.turn && D3.turn.on), 'asking for turns starts none');
+  const before = got(D3, 'splat').length;
+  S(P1, { type: 'splat', data: { x: 0.5, y: 0.5, dx: 0, dy: 0 } });
   await wait(300);
+  check(got(D3, 'splat').length === before + 1, 'a pad paints, nothing gates it');
 
   // 8. An ordinary client with no kind is unchanged: first in is host.
   const ROOM2 = ROOM + 'X';

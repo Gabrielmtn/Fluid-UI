@@ -13,8 +13,8 @@
 // so only the load order matters — nothing here runs at load time except
 // the init at the tail of 06e.
 //   06a-mp-core.js        transport, lifecycle, lobby, message dispatch
-//   06b-mp-look.js        settings lock + look snapshots and mirroring
-//   06c-mp-turns.js       take turns / call and return
+//   06b-mp-look.js        the room's shared settings
+//   06c-mp-glide.js       incoming slider glide
 //   06d-mp-paint-wire.js  dabs, cursors, brush shapes, colliders, replay strokes
 //   06e-mp-panel.js       the room panel, remote cursors, init (runs last)
 // ================================================================
@@ -38,17 +38,6 @@ let matchmakingSocket = null;
 let myRole = 'guest';     // 'host' | 'guest' in a managed room
 let roomLocked = false;   // current room's server-confirmed lock state
 
-// ── Take-turns mode (server-confirmed via 'turn-state' broadcasts) ──
-// One member paints at a time; everyone else watches with the painter's look
-// settings mirrored live. The server keys turns by stable uid but talks to
-// clients in connection ids (same ids every relayed message already carries).
-var turnsOn = false;        // room-wide flag
-var turnHolderId = null;    // connection id of the current painter (null = none)
-var turnOrder = [];         // connection ids in rotation order
-var turnMsLocal = 0;        // turn length from the server (0 = no timer)
-var turnDeadlineLocal = 0;  // local-clock time the turn auto-passes (0 = none)
-var turnModeLocal = 'timer'; // 'timer' | 'stroke' ("Call and return": one swirl each)
-window.__mpTurnBlocked = false; // paint gate (read by 05d pointer/touch + 04f clear)
 
 // Stable per-device id (opaque, localStorage). Used to re-admit a dropped
 // member into a locked room and to throttle matchmaking. NOT a security token.
@@ -328,7 +317,7 @@ function scheduleStrangerKeepAlive(first) {
 // is over, and the next one is something you ask for.
 function strangerPartnerLeft() {
     // disconnectMultiplayer owns the whole teardown — socket, room, lobby pin,
-    // keep-alive, turn gates, strangerWasPaired — and lands us back on the
+    // keep-alive, the room's look, strangerWasPaired — and lands us back on the
     // "not in a room" panel with no Reconnect button (there is nothing to
     // reconnect TO: the room's other seat is empty and the lobby has let it go).
     disconnectMultiplayer();
@@ -354,8 +343,7 @@ function connectToRoom(roomCode) {
     myRole = 'guest';
     roomLocked = false;
     strangerWasPaired = false;
-    resetSettingsLock();
-    resetTurnState();
+    stopRoomLook();
 
     // Stranger rooms are ephemeral — keep them out of the shareable URL hash;
     // private/code rooms stay in the hash so a #CODE deep-link auto-joins.
@@ -375,7 +363,7 @@ function doConnect() {
     // room while the previous connection was still CONNECTING. The overwritten
     // socket used to stay alive server-side with its handlers attached, so the
     // tab processed every broadcast twice and the relay saw two connections
-    // per device (which take-turns, keyed to connection ids, cannot tolerate).
+    // per device.
     if (partySocket) {
         try { partySocket.close(); } catch (_) {}
         partySocket = null;
@@ -433,8 +421,7 @@ function disconnectMultiplayer(rememberRoom) {
     myRole = 'guest';
     roomLocked = false;
     strangerWasPaired = false;
-    resetSettingsLock();
-    resetTurnState();
+    stopRoomLook();
     if (partySocket) {
         partySocket.close();
         partySocket = null;
@@ -460,8 +447,8 @@ function disconnectMultiplayer(rememberRoom) {
 // The relay reaps connections that have pinged before and then gone silent
 // (~65s). Without this, a peer that died without a close frame (sleeping
 // laptop, crash, dropped network) haunted the room for minutes: it held the
-// cap-2 stranger slot, kept the survivor's count at 2 ("still connected"),
-// and could capture the turn rotation. Old clients never ping and are never
+// cap-2 stranger slot and kept the survivor's count at 2 ("still
+// connected"). Old clients never ping and are never
 // reaped, so mixed rooms stay safe; a live client wrongly reaped (e.g. on
 // wake from sleep) gets close code 4003, which takes the normal reconnect
 // path.
@@ -502,7 +489,7 @@ function onMultiplayerOpen(event) {
     resetTextWire();
     // Walls and text lines we already have are ours to contribute to the
     // room we just joined; a moment's delay lets the layer system finish
-    // waking up. (Out of turn this stages them for our turn instead.)
+    // waking up.
     setTimeout(function () { try { republishOwnContent(); } catch (_) {} }, 1200);
     startPing();
     // Sync the hidden toggle
@@ -522,15 +509,13 @@ function onMultiplayerMessage(event) {
                 connectedClients = data.totalClients;
                 if (data.role) myRole = data.role;
                 if (typeof data.locked === 'boolean') roomLocked = data.locked;
-                // Fresh socket = fresh room state. An auto-reconnect (doConnect)
-                // can land in a room whose turns/lock were switched off while we
-                // were away — and the server only announces turn-state when
-                // turns are ON — so stale gates must not survive the socket.
-                // When turns ARE on, the authoritative turn-state follows this
-                // message immediately and rebuilds everything. (Host-side
-                // settingsLockOn intent is deliberately left alone.)
-                resetTurnState();
-                setSettingsLockedByHost(false, null);
+                // Fresh socket, fresh agreement: the room's look starts from
+                // ours, and the host's welcome (below, on their side) brings
+                // us onto theirs. A host arriving in a room that already has
+                // people (a room woken from storage with us still its host)
+                // is the one who welcomes.
+                startRoomLook();
+                if (myRole === 'host' && connectedClients >= 2) scheduleRoomLookWelcome();
                 updateConnectedView();
                 // Phones in the room say hello again when they see us
                 // arrive; until then the list of them starts over.
@@ -548,10 +533,12 @@ function onMultiplayerMessage(event) {
                     // Same for walls and text lines — but a newcomer has no
                     // way to ask for them, and nothing else would ever resend,
                     // so push them now rather than waiting for an edit that
-                    // may never come. Forced, with the ledger kept: the people
-                    // already here skip what they hold, and the ledger still
-                    // knows what they hold if we are out of turn right now.
+                    // may never come. Forced: the people already here skip
+                    // what they hold.
                     republishOwnContent();
+                    connectedClients = data.count;
+                    // ...and the host brings them onto the room's settings.
+                    if (myRole === 'host') scheduleRoomLookWelcome();
                 }
                 connectedClients = data.count;
                 updateConnectedView();
@@ -572,10 +559,6 @@ function onMultiplayerMessage(event) {
                 // before that change still learns it was promoted; it grants
                 // nothing on its own, since the relay decides the real role.
                 myRole = (data.hostId === clientId || data.hostId === DEVICE_UID) ? 'host' : 'guest';
-                // Promotion to host frees this client from any settings lock —
-                // but NOT from the turn gates (a promoted watcher still waits
-                // for the brush), so re-derive those after the reset.
-                if (myRole === 'host') { resetSettingsLock(); syncTurnGates(); }
                 updateConnectedView();
                 break;
 
@@ -612,7 +595,7 @@ function onMultiplayerMessage(event) {
 
             case 'collider-edit':
                 // Someone moved, re-weighted or switched a wall that is not
-                // theirs, on their turn — ours included (06d).
+                // theirs — ours included (06d).
                 if (data.clientId !== clientId) {
                     handleColliderEdit(data);
                 }
@@ -692,8 +675,7 @@ function onMultiplayerMessage(event) {
             case 'clear':
                 // Another client cleared the canvas. clearCanvas() itself calls
                 // broadcastClear(), so without this guard every received clear
-                // re-broadcasts and the wipe ping-pongs between clients forever
-                // (same class of bug as the preset loop below).
+                // re-broadcasts and the wipe ping-pongs between clients forever.
                 if (data.clientId !== clientId && typeof clearCanvas === 'function') {
                     window.__mpFlushInbound(); // queued dabs predate the wipe
                     isProcessingRemoteEvent = true;
@@ -703,93 +685,10 @@ function onMultiplayerMessage(event) {
                 }
                 break;
 
-            case 'preset':
-                // Another client applied a preset. applyPreset() itself calls
-                // broadcastPreset(), so without this guard the preset ping-pongs
-                // between clients forever (the "settings jumping around" bug). Mark
-                // it as a remote event so broadcastPreset() skips the re-send.
-                if (data.clientId !== clientId && typeof applyPreset === 'function') {
-                    isProcessingRemoteEvent = true;
-                    window.__mpApplyingRemote = true;
-                    try { applyPreset(data.data.preset); }
-                    finally { isProcessingRemoteEvent = false; window.__mpApplyingRemote = false; }
-                }
-                break;
-
-            case 'settings-lock':
-                // Host locked/unlocked look settings (13.5). Hosts never
-                // gate themselves — only guests enter the locked state.
-                // While turns run the relay refuses these; ignore any that
-                // slip through (e.g. sent just before turns switched on).
-                if (data.clientId !== clientId && myRole !== 'host' && !turnsOn) {
-                    setSettingsLockedByHost(!!data.locked, data.snapshot || null);
-                }
-                break;
-
-            case 'turn-state': {
-                // Server-confirmed rotation update (host toggled turns, a pass,
-                // a join/leave, or a reconnect changed a connection id).
-                // Server-authored broadcasts never carry a clientId; the relay
-                // stamps one onto every client-relayed message — so a clientId
-                // here means a forged copy from a peer (the new relay drops
-                // those, but the previously deployed relay forwards anything).
-                if (data.clientId) break;
-                var wasMyTurn = isMyTurn();
-                turnsOn = !!data.on;
-                turnHolderId = (typeof data.holder === 'string' && data.holder) ? data.holder : null;
-                turnOrder = Array.isArray(data.order)
-                    ? data.order.filter(function (x) { return typeof x === 'string'; })
-                    : [];
-                turnMsLocal = (typeof data.turnMs === 'number' && data.turnMs > 0) ? data.turnMs : 0;
-                // A relay too old to know about "One swirl each" simply omits
-                // mode; those rooms fall back to a timer-less rotation, which
-                // is what its `seconds: 0` companion already asked for.
-                turnModeLocal = data.mode === 'stroke' ? 'stroke' : 'timer';
-                // The countdown needs no synchronized clocks: the message's
-                // server timestamp gives us the skew to shift the deadline
-                // onto the local clock.
-                turnDeadlineLocal = (typeof data.deadline === 'number' && data.deadline > 0 &&
-                    typeof data.timestamp === 'number')
-                    ? data.deadline + (Date.now() - data.timestamp)
-                    : 0;
-                applyTurnState(wasMyTurn);
-                break;
-            }
-
-            case 'turn-invite-offer':
-                // Partner proposed taking turns (stranger pairs only). Server-
-                // authored: the relay never forwards a client-sent copy.
-                if (!turnsOn) showTurnInvitePrompt(data.from, data.seconds, data.mode);
-                break;
-
-            case 'turn-invite-sent':
-                // Relay accepted the invite and delivered it — stop the
-                // old-relay probe, keep waiting for the human.
-                if (inviteAckTimeout) { clearTimeout(inviteAckTimeout); inviteAckTimeout = null; }
-                break;
-
-            case 'turn-invite-result':
-                // Only sent when it did NOT start — an accept arrives as turn-state.
-                if (!data.accepted) {
-                    clearInviteWait();
-                    if (data.reason === 'same-device') {
-                        showTurnToast('Both windows share one device id — open the other in a different browser or a private window.');
-                    } else if (data.reason === 'alone') {
-                        showTurnToast('Nobody else in the room yet.');
-                    } else {
-                        showTurnToast((data.by ? shortName(data.by) : 'They') + ' would rather keep painting together');
-                    }
-                    updateTurnUI();
-                }
-                break;
-
-            case 'turn-look':
-                // The current painter's look snapshot. The relay only forwards
-                // these from the turn holder; the holder check here just guards
-                // against reordered stragglers from a previous painter.
-                if (turnsOn && !isMyTurn() && data.clientId === turnHolderId) {
-                    applyRemoteLookSnapshot(data.snapshot || null);
-                }
+            case 'room-look':
+                // Someone changed the room's settings (or the host is
+                // welcoming us onto them). Sliders glide, the rest lands (06b).
+                if (data.clientId !== clientId) onRoomLook(data);
                 break;
         }
     } catch (error) {
@@ -812,8 +711,7 @@ function onMultiplayerClose(event) {
     // Server refused the join (locked room / full room) — don't retry in a loop.
     if (event && (event.code === 4001 || event.code === 4002)) {
         currentRoom = null; lastRoom = null;
-        resetSettingsLock();
-        resetTurnState(); // never leave turn gates on a client with no room
+        stopRoomLook();
         history.replaceState(null, '', window.location.pathname + window.location.search);
         showMpError(event.code === 4001
             ? 'This room is locked — ask the host for an invite.'
@@ -840,10 +738,7 @@ function giveUpConnection(msg) {
     currentRoom = null;
     closeMatchmaking(); // drop any waiting pin — we're no longer in that room
     stopStrangerKeepAlive();
-    // A watcher whose connection died must not stay gated (or banner-ed)
-    // offline — they're back to painting alone now.
-    resetSettingsLock();
-    resetTurnState();
+    stopRoomLook();
     showMpError(msg);
     showDisconnectedUI();
     var rc = document.getElementById('reconnectBtn');

@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
 // js/55-phone-mouse.js — a phone as THIS computer's mouse (2026-09-17).
 // LOAD ORDER: plain <script> after 54-phone-pads.js (the dialog there drives
-//   it). Reads the room client (06a PARTYKIT_HOST, 06c turn state, 06e …)
+//   it). Reads the room client (06a PARTYKIT_HOST, 06e …)
 //   only at event time, through guarded accessors, like 54.
 // PROVIDES: window.PhoneMouse = { start, stop, isOn, code, url, status,
 //   idleStop, __state }
@@ -25,10 +25,14 @@
 //   phone → computer   'mouse-hello' {tag}   take the mouse (the newest phone wins)
 //                      'mouse' {s: [[k, u, v, t], …]}   k 0 press / 1 move / 2 lift,
 //                          u v canvas fractions, t ms since the press
-//                      'mouse-beat', 'mouse-bye', 'mouse-clear', 'mouse-pass'
+//                      'mouse-beat', 'mouse-bye', 'mouse-clear'
+//                          ('mouse-pass' from a phone page that still has a
+//                          Pass button is ignored: rooms have no turns)
 //   computer → phones  'mouse-info' {active, w, h, color, radius, can, why,
-//                          turn, people, since}   on a hello, on a change,
-//                          and every 5 s while a phone is here
+//                          people, since}   on a hello, on a change, and
+//                          every 5 s while a phone is here (no `turn` since
+//                          rooms dropped turns, 2026-10-06; an old phone page
+//                          reads its absence as none running)
 //
 // PACING: the phone sends a message a frame and the network bunches them.
 //   Each sample plays at its press time + its own t + a small buffer, so the
@@ -79,31 +83,11 @@
         return 'Artist-' + String(id).replace(/[^a-zA-Z0-9]/g, '').slice(-2).toUpperCase();
     }
     function announce(text) {
-        try { if (typeof showTurnToast === 'function') { showTurnToast(text); return; } } catch (_) {}
+        try { if (typeof showRoomToast === 'function') { showRoomToast(text); return; } } catch (_) {}
         console.log('[phone mouse] ' + text);
     }
-    function turnInfo() {
-        try {
-            if (!turnsOn) return null;
-            var mine = !!turnHolderId && turnHolderId === clientId;
-            return {
-                mine: mine,
-                who: turnHolderId ? nameOf(turnHolderId) : '',
-                call: turnModeLocal === 'stroke',
-                left: turnDeadlineLocal ? Math.max(0, Math.round(turnDeadlineLocal - Date.now())) : 0,
-                spent: mine && !!_oneSwirlSpent
-            };
-        } catch (_) { return null; }
-    }
-
     // Why a press would not paint right now, in the phone's words.
     function blockReason() {
-        if (window.__mpTurnBlocked) {
-            var t = turnInfo();
-            if (t && t.mine && t.spent) return 'Your swirl is down. The brush is moving on.';
-            if (t && t.who) return 'It’s ' + t.who + '’s ' + (t.call ? 'call' : 'turn') + '.';
-            return 'Waiting for the next painter.';
-        }
         if (paused()) return 'The canvas is paused on your computer.';
         return null;
     }
@@ -331,9 +315,6 @@
                 if (typeof window.clearCanvas === 'function') window.clearCanvas();
                 sendInfo(true);
                 break;
-            case 'mouse-pass':
-                try { if (turnsOn && turnHolderId === clientId && typeof passTurn === 'function') passTurn(); } catch (_) {}
-                break;
         }
     }
 
@@ -396,15 +377,13 @@
             radius: (typeof cfg.SPLAT_RADIUS === 'number') ? +cfg.SPLAT_RADIUS.toFixed(6) : 0.011,
             can: !why,
             why: why || '',
-            turn: turnInfo(),
             people: roomPeople()
         };
     }
     function sendInfo(force) {
         if (!socketOpen()) return false;
         var info = buildInfo();
-        // The turn clock ticks every call; the phone counts it down itself.
-        var key = JSON.stringify(Object.assign({}, info, { turn: info.turn && Object.assign({}, info.turn, { left: 0 }) }));
+        var key = JSON.stringify(info);
         if (!force && key === lastInfoKey) return false;
         lastInfoKey = key;
         lastInfoAt = Date.now();
@@ -501,7 +480,7 @@
         fire('pointerdown', pt, 1, 0);
         play.down = true;
         play.last = e;
-        // Refused (someone else's turn, a paused canvas, the mouse already
+        // Refused (a paused canvas, the mouse already
         // mid-stroke): the phone should know why at once.
         if (window.__paintPointerId !== PTR_ID) sendInfo(true);
     }

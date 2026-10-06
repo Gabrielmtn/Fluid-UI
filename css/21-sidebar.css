@@ -1386,104 +1386,62 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     width: 100%;
 }
 
-/* ── How the room paints ──
-   Together | Turns | Call & return: one segmented switch, the running rhythm
-   pressed (aria-pressed, 01-buttons). Sized at the container like the
-   Code / QR / Hide modes, and each segment takes the width its word needs. */
-.mp-rhythm {
-    --btn-size: 11px;
-    --btn-pad-y: 6px;
-    --btn-pad-x: 6px;
-    display: flex;
-    gap: 3px;
-    margin-bottom: 10px;
+/* ── Who changed what ──
+   The room shares one set of settings, so they move under your hands when
+   someone else changes them. This line names who and what (06e
+   renderActivity), the name in their cursor's colour; between changes it
+   says what the room is for. */
+.mp-activity {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--ink-300, #b9bec7);
+    margin: -4px 0 12px;
+    /* Two lines, always: a long control name ("Swirl - Vorticity") wraps
+       instead of clipping, and the buttons below never jump as names come
+       and go during someone's drag. */
+    min-height: 34px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
 }
-.mp-rhythm button {
-    flex: 1 1 auto;
-    min-width: 0;
-    white-space: nowrap;
+.mp-activity.live {
+    color: var(--ink-100, #f2f3f5);
 }
-/* A guest's switch is disabled, and a disabled button drops its pressed
-   fill, so the running rhythm would vanish. A bar under the segment keeps
-   it readable without giving the button a colour of its own. */
-.mp-rhythm button:disabled[aria-pressed="true"] {
-    box-shadow: inset 0 -2px 0 currentColor;
-}
-/* Each turn: a sidebar .control-group, so the label, value and fader come
-   from the sidebar rules; only its spacing inside the plate is set here. */
-#multiArtistPanel .mp-turn-length {
-    margin: 0 0 10px;
+.mp-activity-who {
+    font-weight: 700;
 }
 
-/* Pass and Leave share the foot of the panel. Pass only exists while the
-   brush is yours; Leave takes the whole row the rest of the time. */
+/* The control someone else just moved, lit in their cursor's colour while
+   it glides there (06e flashControl sets --mp-peer; a drag keeps it lit).
+   An outline, not a background: it sits on a strip channel or a sidebar
+   row, and neither changes colour or size. */
+.mp-peer-touch {
+    outline: 1px solid var(--mp-peer, #8ab4ff);
+    outline-offset: 1px;
+    border-radius: 6px;
+    animation: mp-peer-touch 1.4s ease-out both;
+}
+@keyframes mp-peer-touch {
+    0%   { box-shadow: 0 0 14px -2px var(--mp-peer, #8ab4ff); }
+    100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Leave takes the foot of the panel. Leaving is reversible — the same code
+   gets you back in — so this is a normal button, not a destructive one. See
+   the reserved-class test in css/01-buttons.css. */
 .mp-foot {
     display: flex;
     gap: 8px;
 }
-/* Pass the brush: the take-turns primary action (.btn--emphasis). */
-.mp-btn-pass {
-    flex: 1 1 0;
-    min-width: 0;
-}
-/* Leaving is reversible — the same code gets you back in — so this is a
-   normal button, not a destructive one. See the reserved-class test in
-   css/01-buttons.css. */
 .mp-btn-leave {
     flex: 1 1 0;
     min-width: 0;
 }
 
-/* "Shall we take turns?" prompt — stranger pairs, shown to the person asked.
-   Sits just under the turn banner so the whole turn conversation is in one
-   place on screen. */
-.mp-turn-invite {
-    /* This banner is a panel, so it declares a tint and its buttons inherit
-       it — the same mechanism the sidebar sections use. It used to be a
-       bright orange plate, which now reads as an alarm next to the reserved
-       red and belonged to no part of the system. */
-    --sec-h: 242;
-    --sec-c: 0.16;
-
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10003;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 11px 14px;
-    border-radius: 10px;
-    /* Registering over ANY painting is still the job. A dark plate with a lit
-       border and a glow does it without borrowing a warning colour: the
-       entrance and the pulse carry the urgency instead of the hue. */
-    background: oklch(18% 0.03 242 / 0.96);
-    border: 1px solid oklch(62% 0.14 242);
-    color: var(--ink-100, #f2f3f5);
-    font-size: 13px;
-    font-weight: 600;
-    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6), 0 0 24px oklch(62% 0.14 242 / 0.45);
-    animation:
-        mpInviteIn 0.55s cubic-bezier(0.2, 1.35, 0.4, 1) both,
-        mpInvitePulse 1.6s ease-in-out 0.6s 4;
-}
-@keyframes mpInviteIn {
-    from { transform: translate(-50%, -160%) scale(0.92); opacity: 0; }
-    to   { transform: translate(-50%, 0) scale(1); opacity: 1; }
-}
-@keyframes mpInvitePulse {
-    0%, 100% { box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6), 0 0 24px oklch(62% 0.14 242 / 0.45); }
-    50%      { box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6), 0 0 40px oklch(70% 0.16 242 / 0.85); }
-}
-.mp-turn-invite button {
-    white-space: nowrap;
-}
-/* Accepting is the answer the banner is asking for, so it carries
-   .btn--emphasis (see css/01-buttons.css). Declining is not destructive —
-   it is just the other answer, so it stays a plain button. */
-/* Transient feedback for invite outcomes (declined / no answer) */
-.mp-turn-toast {
+/* A word about something someone else did to your work — a wall or a line
+   of yours edited — or a phone arriving (06e showRoomToast). */
+.mp-room-toast {
     position: fixed;
     top: 44px;
     left: 50%;
@@ -1500,73 +1458,6 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     transition: opacity 0.3s;
 }
 
-/* Turn queue (2026-08-15, replaces the SVG wheel): Now / Next / 2nd / 3rd
-   as a plain ordered list — no arrows. Transition-free (Electron rule). */
-.mp-turn-wheel {
-    padding: 6px;
-    margin: 2px 0 10px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 8px;
-}
-.mp-turn-queue {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-.mp-turn-qrow {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 8px;
-    border-radius: 6px;
-}
-.mp-turn-qrow.now {
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-}
-.mp-turn-qpos {
-    flex: 0 0 30px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink-300, #b9bec7);
-    text-align: right;
-}
-.mp-turn-qrow.now .mp-turn-qpos { color: #fff; }
-.mp-turn-qdot {
-    flex: 0 0 11px;
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    border: 1px solid rgba(0, 0, 0, 0.35);
-}
-.mp-turn-qrow.now .mp-turn-qdot { flex-basis: 13px; width: 13px; height: 13px; }
-.mp-turn-qname {
-    flex: 1 1 auto;
-    min-width: 0;
-    font-size: 12px;
-    color: var(--ink-100, #f2f3f5);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.mp-turn-qrow.now .mp-turn-qname { color: #fff; font-weight: 700; }
-.mp-turn-qname.you { font-weight: 700; }
-.mp-turn-qwait { color: var(--ink-300, #b9bec7); font-style: italic; }
-/* The "painting" word on the NOW row is built by renderTurnWheel but not
-   shown: the row label already says NOW, the status line under the queue says
-   who is painting, and at the sidebar's width the word was what pushed
-   "Artist-9C (you)" into an ellipsis. Hidden rather than removed in JS so the
-   node stays available if the row ever gets a wider home. */
-.mp-turn-qbrush { display: none; }
-.mp-turn-qhint {
-    font-size: 11px;
-    color: var(--ink-300, #b9bec7);
-    text-align: center;
-    padding: 8px 0 3px;
-}
 /* Name label on a remote user's cursor (positioned beside the colored dot) */
 .remote-cursor-label {
     position: absolute;

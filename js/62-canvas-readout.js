@@ -62,7 +62,7 @@
             barEl.appendChild(barVal);
         }
         if (barEl.parentElement !== bar) {
-            bar.insertBefore(barEl, bar.querySelector('.reset-app-btn, .demo-clock, .playtest-label, #mpTurnChip'));
+            bar.insertBefore(barEl, bar.querySelector('.reset-app-btn, .demo-clock, .playtest-label'));
         }
         return true;
     }

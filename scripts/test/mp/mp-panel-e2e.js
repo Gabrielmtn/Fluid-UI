@@ -1,26 +1,27 @@
-// End-to-end: the Swirl Together room panel (2026-10-04 redesign). Three
-// separate headless Chromes (separate profiles, so three device uids: the
-// relay hands out host by device id, so two tabs of one profile would both
-// be host) run the app from this working tree against a LOCAL relay, and the
+// End-to-end: the Swirl Together room panel (2026-10-04 redesign; since
+// 2026-10-06 a room is one set of shared settings — no turns, no look lock).
+// Three separate headless Chromes (separate profiles, so three device uids:
+// the relay hands out host by device id, so two tabs of one profile would
+// both be host) run the app from this working tree against a relay, and the
 // checks read the panel as each person sees it: the status line, the dot,
-// the controls on screen, the Invite popover and the ⋯ menu.
+// the activity line, the controls on screen, the Invite popover and the ⋯
+// menu.
 //
 //   npx wrangler dev --port 8788 --ip 127.0.0.1     (the relay; reads public/, never builds it)
 //   node scripts/test/mp/mp-panel-e2e.js
 //
 // Walks: not in a room; a private host and two guests (3 here); the invite
 // popover (Code / QR / Hide, copy, phone row); the ⋯ menu for host and guest;
-// Lock room and Everyone uses my look as the status line reports them; Take
-// turns (your turn / their turn, Pass only on your turn, the host's Skip in
-// ⋯); switching to Call and return while turns run; back to Together; and a
-// stranger pair (📱 Phone, no locks, asking the partner, "Asking…").
-// Controls are counted per person, ENABLED ones only, the queue left out and
-// the Together | Turns | Call & return switch counted once: a host sees at
-// most 5, a guest at most 4 (a guest's switch is shown but disabled). Also
-// runs the button audit (js/38) over the panel and both popovers.
+// Lock room as the status line reports it; the activity line naming who
+// changed what; leaving; and a stranger pair (📱 Phone, no locks, sharing).
+// Controls are counted per person, ENABLED ones only: in a room everyone
+// sees the same three (Invite, ⋯, Leave). Also runs the button audit (js/38)
+// over the panel and both popovers. The stranger pair goes through the
+// LOBBY, so it only runs against a local relay (a real stranger waiting on
+// the live one would be paired with the test); STRANGER=1 forces it.
 //
 // Env: MP_HOST (default 127.0.0.1:8788), CHROME (path), SHOTS=<dir> saves a
-// screenshot per state. ~20 s, 79 checks. The static server is built in
+// screenshot per state, STRANGER=0|1. ~20 s. The static server is built in
 // (repo root, no-store), so no dev server is needed.
 'use strict';
 const { spawn } = require('child_process');
@@ -135,22 +136,16 @@ const PANEL = String.raw`(function(){
   function shown(e){ if(!e||!e.getClientRects().length) return false; for(var n=e;n&&n!==document.documentElement;n=n.parentElement){var cs=getComputedStyle(n); if(cs.display==='none'||cs.visibility==='hidden') return false;} return true; }
   var conn = document.getElementById('mpConnected'), disc = document.getElementById('mpDisconnected');
   var view = shown(conn) ? conn : disc;
-  var seg = document.getElementById('mpRhythm');
-  var list = [].slice.call(view.querySelectorAll('button, input, select')).filter(function(e){ return shown(e) && !e.closest('#turnWheel'); });
-  var ctrls = [], segDone = false;
+  var list = [].slice.call(view.querySelectorAll('button, input, select')).filter(shown);
+  var ctrls = [];
   list.forEach(function(e){
-    if (seg && seg.contains(e)) {
-      if (segDone) return; segDone = true;
-      var segs = [].slice.call(seg.querySelectorAll('button'));
-      ctrls.push({ id: 'mpRhythm', label: segs.map(function(b){ return b.textContent.trim() + (b.getAttribute('aria-pressed') === 'true' ? '*' : '') + (b.disabled ? '(off)' : ''); }).join(' | '),
-        enabled: segs.some(function(b){ return !b.disabled; }), title: segs[0] ? segs[0].title : '' });
-      return;
-    }
     ctrls.push({ id: e.id || e.className, label: (e.textContent || e.placeholder || '').trim().slice(0, 40), enabled: !e.disabled });
   });
   var st = document.getElementById('multiplayerStatus');
   var dot = document.getElementById('connectionDot');
+  var act = document.getElementById('mpActivity');
   return { view: view.id, status: st ? st.textContent : null, tip: st ? st.title : null,
+    activity: act && shown(act) ? act.textContent : null,
     dot: dot ? dot.className.replace('mp-dot ', '') : null, controls: ctrls,
     enabled: ctrls.filter(function(c){ return c.enabled; }).length,
     labels: ctrls.filter(function(c){ return c.enabled; }).map(function(c){ return c.label; }) };
@@ -202,7 +197,9 @@ async function realClick(page, sel) {
 }
 const click = (page, sel) => page.eval("(function(){var e=document.querySelector(" + JSON.stringify(sel) + "); if(!e) return false; e.click(); return true;})()");
 
-const HOST_MAX = 5, GUEST_MAX = 4;
+const HOST_MAX = 3, GUEST_MAX = 3;
+const LOCAL_RELAY = /^(127\.|localhost)/.test(RELAY);
+const RUN_STRANGER = process.env.STRANGER ? process.env.STRANGER === '1' : LOCAL_RELAY;
 
 (async () => {
     const srv = await serve();
@@ -245,15 +242,15 @@ const HOST_MAX = 5, GUEST_MAX = 4;
         check(!!three, 'B and C joined: three in the room');
         check(await a.eval("myRole === 'host'") && await b.eval("myRole === 'guest'") && await c.eval("myRole === 'guest'"), 'A is host, B and C are guests');
         const sA3 = await a.eval(PANEL), sB3 = await b.eval(PANEL);
-        check(sA3.status === 'Swirling together · 3 here' && sB3.status === 'Swirling together · 3 here', 'together: "Swirling together · 3 here" on host and guest', [sA3.status, sB3.status]);
+        check(sA3.status === 'Sharing settings · 3 here' && sB3.status === 'Sharing settings · 3 here', 'together: "Sharing settings · 3 here" on host and guest', [sA3.status, sB3.status]);
         check(sA3.dot === 'mp-dot-connected' && sB3.dot === 'mp-dot-connected', 'together: the dot is green', [sA3.dot, sB3.dot]);
-        check(sA3.enabled <= HOST_MAX, 'host: at most ' + HOST_MAX + ' controls (' + sA3.enabled + ')', sA3.labels);
-        check(sB3.enabled <= GUEST_MAX, 'guest: at most ' + GUEST_MAX + ' controls (' + sB3.enabled + ')', sB3.labels);
-        const segB = sB3.controls.find((x) => x.id === 'mpRhythm');
-        check(!!segB && !segB.enabled && segB.title === 'The host picks how the room paints', 'guest: the rhythm switch is there, disabled, and says why', segB);
-        const segA = sA3.controls.find((x) => x.id === 'mpRhythm');
-        check(!!segA && segA.enabled && /Together\*/.test(segA.label), 'host: the switch is live, on Together', segA);
-        check(await a.eval("!document.getElementById('turnStatus')"), 'the line under the queue is gone (#turnStatus)');
+        check(sA3.labels.join(',') === 'Invite ▾,⋯,Leave' && sB3.labels.join(',') === 'Invite ▾,⋯,Leave', 'host and guest see the same three controls: Invite, ⋯, Leave', [sA3.labels, sB3.labels]);
+        check(await a.eval("['mpRhythm','turnsBtn','callReturnBtn','turnWheel','turnPassBtn','turnStatus'].every(function(id){ return !document.getElementById(id); })"), 'no rhythm switch, queue or Pass');
+        check(/^Change any setting/.test(sA3.activity || ''), 'host: the activity line says what the room is for', sA3.activity);
+        const hostName = await a.eval('shortName(clientId)');
+        // The host's welcome goes out half a second after someone arrives.
+        const welcomeB = await until(b, "(function(){var s=" + PANEL + "; return /^Now on /.test(s.activity || '') ? s.activity : null;})()", 3000);
+        check(welcomeB === 'Now on ' + hostName + '’s settings', 'guest, just arrived: "Now on ' + hostName + '’s settings" (even with nothing to change)', welcomeB);
         check(noCode(sA3) && noCode(sB3), 'still no room code in either status line');
         const audit = await a.eval(AUDIT);
         check(!!audit && audit.mine > 15 && audit.bad.length === 0, 'button audit: no button in the panel or its popovers colours itself', audit);
@@ -295,7 +292,7 @@ const HOST_MAX = 5, GUEST_MAX = 4;
         await click(a, '#mpMenuBtn');
         const mA = await until(a, "(function(){var p=" + POP('mpRoomMenu') + "; return p.open ? p : null;})()", 2000) || await a.eval(POP('mpRoomMenu'));
         check(mA.open && mA.parent === 'body', '⋯ opens a menu mounted on body', { open: mA.open, parent: mA.parent });
-        check(mA.items.map((x) => x.label).join(',') === 'Lock room,Everyone uses my look,Copy room report', 'host ⋯: Lock room · Everyone uses my look · Copy room report', mA.items.map((x) => x.label));
+        check(mA.items.map((x) => x.label).join(',') === 'Lock room,Copy room report', 'host ⋯: Lock room · Copy room report', mA.items.map((x) => x.label));
         await shot(A, '06-host-menu.png');
         await click(b, '#mpMenuBtn');
         const mB = await until(b, "(function(){var p=" + POP('mpRoomMenu') + "; return p.open ? p : null;})()", 2000) || await b.eval(POP('mpRoomMenu'));
@@ -307,88 +304,24 @@ const HOST_MAX = 5, GUEST_MAX = 4;
         await click(a, '#lockRoomBtn');
         const lockA = await until(a, "(function(){var s=" + PANEL + "; return / · locked$/.test(s.status) ? s.status : null;})()", 4000);
         const lockB = await until(b, "(function(){var s=" + PANEL + "; return / · locked$/.test(s.status) ? s.status : null;})()", 4000);
-        check(lockA === 'Swirling together · 3 here · locked' && lockB === 'Swirling together · 3 here · locked', 'Lock room: "· locked" on host and guest', [lockA, lockB]);
+        check(lockA === 'Sharing settings · 3 here · locked' && lockB === 'Sharing settings · 3 here · locked', 'Lock room: "· locked" on host and guest', [lockA, lockB]);
         check(await a.eval("document.getElementById('mpRoomMenu').getClientRects().length === 0"), 'picking a ⋯ item closes the menu');
         await click(a, '#mpMenuBtn');
         check(await a.eval("document.getElementById('lockRoomBtn').getAttribute('aria-checked') === 'true'"), 'and the item carries its tick');
         await shot(A, '07-locked-menu.png');
         await click(a, '#lockRoomBtn');
-        check(!!await until(b, "(function(){var s=" + PANEL + "; return s.status === 'Swirling together · 3 here';})()", 4000), 'unlocking takes "locked" off again');
+        check(!!await until(b, "(function(){var s=" + PANEL + "; return s.status === 'Sharing settings · 3 here';})()", 4000), 'unlocking takes "locked" off again');
 
-        // ── 7. Everyone uses my look ──────────────────────────────────
-        await click(a, '#mpMenuBtn');
-        await click(a, '#settingsLockBtn');
-        const lookA = await until(a, "(function(){var s=" + PANEL + "; return / · your look$/.test(s.status) ? s.status : null;})()", 4000);
-        const lookB = await until(b, "(function(){var s=" + PANEL + "; return / · host\u2019s look$/.test(s.status) ? s.status : null;})()", 4000);
-        check(!!lookA && !!lookB, 'Everyone uses my look: "your look" for the host, "host\u2019s look" for a guest', [lookA, lookB]);
-        const tipB = await b.eval(PANEL);
-        check(/follow the host/.test(tipB.tip || ''), 'the status line\'s tooltip says what that means', tipB.tip);
-        await shot(B, '08-guest-hosts-look.png');
-        await click(a, '#mpMenuBtn');
-        await click(a, '#settingsLockBtn');
-        check(!!await until(b, "(function(){var s=" + PANEL + "; return s.status === 'Swirling together · 3 here';})()", 4000), 'switching it off clears it');
-
-        // ── 8. Take turns ─────────────────────────────────────────────
-        await click(a, '#turnsBtn');
-        await until(a, 'turnsOn && isMyTurn()', 5000);
-        await until(b, 'turnsOn && !isMyTurn()', 5000);
-        await sleep(600);
-        const tA = await a.eval(PANEL), tB = await b.eval(PANEL);
-        const aName = await a.eval('shortName(clientId)'), bName = await b.eval('shortName(clientId)');
-        check(/^Your turn · \d:\d\d · 3 here$/.test(tA.status), 'turns, holder: "Your turn · m:ss · 3 here"', tA.status);
-        check(new RegExp('^' + aName + '\u2019s turn · \\d:\\d\\d · 3 here$').test(tB.status), 'turns, watcher: "' + aName + '\u2019s turn · m:ss · 3 here"', tB.status);
-        check(tA.labels.indexOf('Pass') !== -1 && tB.labels.indexOf('Pass') === -1, 'Pass shows only for whoever holds the brush', { A: tA.labels, B: tB.labels });
-        check(tA.enabled <= HOST_MAX && tB.enabled <= GUEST_MAX, 'turns: host ' + tA.enabled + ' / guest ' + tB.enabled + ' controls', { A: tA.labels, B: tB.labels });
-        check(/Turns\*/.test((tA.controls.find((x) => x.id === 'mpRhythm') || {}).label || ''), 'the switch reads Turns', tA.controls.find((x) => x.id === 'mpRhythm'));
-        const q = await b.eval("(function(){ var w=document.getElementById('turnWheel'); return { rows: w.querySelectorAll('.mp-turn-qrow').length, clock: /\\d:\\d\\d/.test(w.textContent) }; })()");
-        check(q.rows === 3 && !q.clock, 'the queue lists all three and carries no clock', q);
-        const chip = await b.eval("(document.getElementById('mpTurnChip')||{}).textContent || ''");
-        check(/\d:\d\d/.test(chip), 'the underbar chip keeps its clock', chip);
-        await click(a, '#mpMenuBtn');
-        const mT = await a.eval(POP('mpRoomMenu'));
-        check(mT.items.map((x) => x.label).join(',') === 'Lock room,Copy room report', 'host ⋯ while holding: no look lock, no Skip', mT.items.map((x) => x.label));
-        await click(a, '#mpMenuBtn');
-        await shot(A, '09-turns-your-turn.png');
-        await shot(B, '09-turns-their-turn.png');
-
-        await click(a, '#turnPassBtn');
-        const bTurn = await until(b, 'isMyTurn()', 5000);
-        check(!!bTurn, 'Pass hands the brush on (to B)');
-        await sleep(400);
-        const tB2 = await b.eval(PANEL), tA2 = await a.eval(PANEL);
-        check(/^Your turn · \d:\d\d · 3 here$/.test(tB2.status), 'guest holding: "Your turn"', tB2.status);
-        check(tB2.labels.indexOf('Pass') !== -1 && tB2.enabled <= GUEST_MAX, 'guest holding: Pass, and still at most ' + GUEST_MAX + ' controls', tB2.labels);
-        check(new RegExp('^' + bName + '\u2019s turn').test(tA2.status) && tA2.labels.indexOf('Pass') === -1, 'host watching: "' + bName + '\u2019s turn", no Pass', tA2);
-        await click(a, '#mpMenuBtn');
-        const mS = await a.eval(POP('mpRoomMenu'));
-        check(mS.items.map((x) => x.label).indexOf('Skip ' + bName) !== -1, 'host ⋯ while someone else paints: "Skip ' + bName + '"', mS.items.map((x) => x.label));
-        await shot(A, '10-host-skip-menu.png');
-        await shot(B, '10-guest-your-turn.png');
-        await click(a, '#turnSkipBtn');
-        const skipped = await until(b, '!isMyTurn()', 4000);
-        check(!!skipped && !(await b.eval('isMyTurn()')), 'Skip moves the brush past B');
-
-        // ── 9. Switch to Call and return while turns run ─────────────
-        await click(a, '#callReturnBtn');
-        const cr = await until(a, "turnsOn && turnModeLocal === 'stroke'", 6000);
-        check(!!cr, 'picking Call & return while Turns runs: stop, then start it');
-        await until(b, "turnsOn && turnModeLocal === 'stroke'", 4000);
-        await sleep(400);
-        const cA = await a.eval(PANEL), cB = await b.eval(PANEL);
-        const holder = await a.eval('turnHolderId'), holderName = await a.eval('shortName(turnHolderId)');
-        const aHolds = holder === (await a.eval('clientId'));
-        check(aHolds ? /^Your call · 3 here$/.test(cA.status) : new RegExp('^' + holderName + '\u2019s call · 3 here$').test(cA.status), 'call and return: "Your call" / "{Name}\u2019s call", no clock', cA.status);
-        check(new RegExp('^(Your call|' + holderName + '\u2019s call) · 3 here$').test(cB.status), 'and the guest\'s line agrees', cB.status);
-        check(/Call & return\*/.test((cA.controls.find((x) => x.id === 'mpRhythm') || {}).label || ''), 'the switch reads Call & return', cA.controls.find((x) => x.id === 'mpRhythm'));
-        await shot(A, '11-call-and-return.png');
-        await shot(B, '11-call-and-return-guest.png');
-
-        // ── 10. Back to Together ─────────────────────────────────────
-        await click(a, '#togetherBtn');
-        const free = await until(b, "!turnsOn && !window.__mpTurnBlocked", 5000);
-        check(!!free, 'Together stops the rotation for everyone');
-        const fA = await until(a, "(function(){var s=" + PANEL + "; return s.status === 'Swirling together · 3 here' ? s : null;})()", 3000);
-        check(!!fA, 'and the line goes back to "Swirling together · 3 here"', fA && fA.status);
+        // ── 7. Who changed what ───────────────────────────────────────
+        const bName = await b.eval('shortName(clientId)');
+        await b.eval("(function(){ var e=document.getElementById('sharpness'); e.value='1.7'; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
+        const sharpName = await a.eval("HotkeyBinds.nameOf(document.getElementById('sharpness'))");
+        const actA = await until(a, "(function(){var s=" + PANEL + "; return s.activity && s.activity.indexOf('changed') !== -1 ? s.activity : null;})()", 4000);
+        const actC = await until(c, "(function(){var s=" + PANEL + "; return s.activity && s.activity.indexOf('changed') !== -1 ? s.activity : null;})()", 4000);
+        check(actA === bName + ' changed ' + sharpName && actC === actA, 'B moves ' + sharpName + ': A and C read "' + actA + '"', [actA, actC]);
+        check(!!await until(a, "Math.abs(config.SHARPNESS - 1.7) < 1e-6", 3000), 'and the setting itself arrives (once its glide lands)');
+        check(await a.eval("getComputedStyle(document.querySelector('#mpActivity .mp-activity-who')).color") === await a.eval("(function(){ var d=document.createElement('div'); d.style.color=colorForClient(" + JSON.stringify(await b.eval('clientId')) + "); document.body.appendChild(d); var c=getComputedStyle(d).color; d.remove(); return c; })()"), 'the name is in B\'s cursor colour');
+        await shot(A, '08-activity.png');
 
         // ── 11. A stranger pair (B and C) ─────────────────────────────
         await click(b, '#disconnectBtn');
@@ -398,6 +331,8 @@ const HOST_MAX = 5, GUEST_MAX = 4;
         check(sAlone.status === 'Waiting for friends · just you' && sAlone.dot === 'mp-dot-alone', 'the others left: back to "Waiting for friends · just you"', sAlone.status);
         await click(a, '#disconnectBtn');
         await sleep(300);
+        if (!RUN_STRANGER) { log('(stranger pair skipped: not a local relay — STRANGER=1 to force)'); }
+        else {
         await click(b, '#strangerBtn');
         const finding = await until(b, "(function(){var s=" + PANEL + "; return /^(Finding a stranger…|Connecting…|Waiting for a stranger…)/.test(s.status) ? s : null;})()", 4000);
         check(!!finding, 'Stranger: the line says it is looking', finding && finding.status);
@@ -412,11 +347,9 @@ const HOST_MAX = 5, GUEST_MAX = 4;
         check(!!paired, 'B and C are paired');
         await sleep(500);
         const pB = await b.eval(PANEL), pC = await c.eval(PANEL);
-        check(pB.status === 'Swirling with a stranger · 2 here' && pC.status === 'Swirling with a stranger · 2 here', 'pair: "Swirling with a stranger · 2 here"', [pB.status, pC.status]);
+        check(pB.status === 'Sharing settings · 2 here' && pC.status === 'Sharing settings · 2 here', 'pair: "Sharing settings · 2 here"', [pB.status, pC.status]);
         check(pB.labels[0] === '📱 Phone' && pC.labels[0] === '📱 Phone', 'pair: Invite becomes "📱 Phone"', [pB.labels, pC.labels]);
         check(pB.enabled <= HOST_MAX && pC.enabled <= HOST_MAX, 'pair: at most ' + HOST_MAX + ' controls each', [pB.labels, pC.labels]);
-        const segP = [pB, pC].map((s) => s.controls.find((x) => x.id === 'mpRhythm'));
-        check(segP.every((x) => x && x.enabled), 'pair: both may pick the rhythm', segP);
         await click(b, '#mpInviteBtn');
         const pInv = await b.eval(POP('mpInvitePop'));
         check(pInv.open && pInv.items.map((x) => x.id).join(',') === 'phonePadRoomBtn', 'pair: the popover is just the phone door', pInv.items);
@@ -428,32 +361,70 @@ const HOST_MAX = 5, GUEST_MAX = 4;
             check(m.items.map((x) => x.label).join(',') === 'Copy room report', 'pair: ' + nm + '\'s ⋯ has no locks', m.items.map((x) => x.label));
             await click(X, '#mpMenuBtn');
         }
-        await click(b, '#turnsBtn');
-        const asking = await until(b, "document.getElementById('turnsBtn').textContent === 'Asking…'", 3000);
-        check(!!asking, 'pair: picking Turns asks the partner ("Asking…")');
-        const offer = await until(c, "!!document.getElementById('mpTurnInvite')", 4000);
-        check(!!offer, 'and C is asked');
-        await shot(B, '14-pair-asking.png');
-        await shot(C, '14-pair-asked.png');
-        await click(c, '#mpTurnInvite .mp-invite-yes');
-        const pairTurns = await until(b, 'turnsOn', 4000) && await until(c, 'turnsOn', 4000);
-        check(!!pairTurns, 'C agrees: the pair takes turns');
-        await sleep(400);
-        const ptB = await b.eval(PANEL), ptC = await c.eval(PANEL);
-        check([ptB.status, ptC.status].some((s) => /^Your turn · \d:\d\d · 2 here$/.test(s)) && [ptB.status, ptC.status].some((s) => /\u2019s turn · \d:\d\d · 2 here$/.test(s)), 'pair turns: one "Your turn", one "{Name}\u2019s turn"', [ptB.status, ptC.status]);
-        // C switches to Call and return mid-rotation: stop (anyone may), then ask B.
-        await click(c, '#callReturnBtn');
-        const asked2 = await until(b, "!!document.getElementById('mpTurnInvite') && /call and return/.test(document.getElementById('mpTurnInvite').textContent)", 6000);
-        check(!!asked2, 'pair: switching rhythm stops turns, then asks for call and return');
-        check(await c.eval("!turnsOn && document.getElementById('callReturnBtn').textContent === 'Asking…'"), 'and C\'s switch reads "Asking…" meanwhile');
-        await click(b, '#mpTurnInvite .mp-invite-no');
-        const declined = await until(c, "!invitePending && document.getElementById('togetherBtn').getAttribute('aria-pressed') === 'true'", 4000);
-        check(!!declined, 'B says no: C is back on Together');
-        await shot(C, '15-pair-declined.png');
+        // The pair shares settings like any room: C's change reaches B.
+        await c.eval("(function(){ var e=document.getElementById('vibrance'); e.value='0.9'; e.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
+        const pairShare = await until(b, "Math.abs(config.VIBRANCE - 0.9) < 1e-6", 4000);
+        check(!!pairShare, 'pair: C\'s Vibrance reaches B');
+        }
 
         const eA = await a.eval('__pe.errs'), eB = await b.eval('__pe.errs'), eC = await c.eval('__pe.errs');
         const real = (arr) => arr.filter((s) => !/favicon|ERR_|net::|Failed to load resource|onnx|ort-wasm|WebGPU|WebSocket/i.test(s));
         check(real(eA).length === 0 && real(eB).length === 0 && real(eC).length === 0, 'no page errors', { A: real(eA).slice(0, 5), B: real(eB).slice(0, 5), C: real(eC).slice(0, 5) });
+
+        // ── 12. Hide sticks until it is changed ───────────────────────
+        // Someone who picks Hide (a streamer) gets it every time they open
+        // Invite, in every room, after a reload, and in the phone dialog,
+        // until they pick Code or QR themselves.
+        const HIDDEN = "(function(){ var b=function(id){ var e=document.getElementById(id); return e && e.getAttribute('aria-pressed'); };" +
+            " return { pressed: b('shareModeHidden'), code: document.getElementById('roomName').textContent, qr: document.getElementById('roomQr').innerHTML.length," +
+            " hasRoom: document.getElementById('roomName').textContent.indexOf(currentRoom || '#') !== -1 }; })()";
+        const hiddenOk = (h) => !!h && h.pressed === 'true' && h.code === '●●●●●●' && h.qr === 0 && !h.hasRoom;
+        await a.eval('createRoom(); 1');
+        await until(a, 'isMultiplayerEnabled && currentRoom', 10000);
+        await click(a, '#mpInviteBtn');
+        await click(a, '#shareModeHidden');
+        await click(a, '#mpInviteBtn');
+        await click(a, '#disconnectBtn');
+        await sleep(300);
+        // As a confirmed close would: no "leave this page?" for the reload.
+        await a.eval('window.__closeApproved = true; 1');
+        await a.send('Page.reload', {});
+        await waitReady(a, { timeoutMs: 90000 });
+        await until(a, "!!(window.__scriptsReady && typeof createRoom==='function' && window.PhonePads && document.getElementById('mixer-strip'))", 30000);
+        await a.eval("(function(){var s=document.getElementById('splash-screen'); if(s) s.style.display='none'; return 1;})()");
+        await a.eval(ERRS);
+        check(await a.eval("localStorage.getItem('swirlShareMode')") === 'hidden', 'Hide is remembered across a reload');
+        await a.eval('createRoom(); 1');
+        await until(a, 'isMultiplayerEnabled && currentRoom', 10000);
+        await click(a, '#mpInviteBtn');
+        const h1 = await a.eval(HIDDEN);
+        check(hiddenOk(h1), 'after a reload, a new room\'s Invite opens on Hide: the code masked, no QR', h1);
+        await click(a, '#mpInviteBtn');
+        await click(a, '#mpInviteBtn');
+        const h2 = await a.eval(HIDDEN);
+        check(hiddenOk(h2), 'and again every time it is opened', h2);
+        await click(a, '#phonePadRoomBtn');
+        await click(a, '#phonePadWayArtist');
+        await sleep(700);
+        const PH = "(function(){ var c=document.getElementById('phonePadCode'), q=document.getElementById('phonePadQr'), r=document.getElementById('phonePadReveal'); return { code: c && c.textContent, qr: q ? q.innerHTML.length : -1, reveal: !!r && !r.hidden }; })()";
+        const p1 = await a.eval(PH);
+        check(!!p1 && p1.code === '●●●●●●' && p1.qr === 0 && p1.reveal, 'the phone dialog honours it too (masked, no QR, "Show the code")', p1);
+        await click(a, '#phonePadReveal');
+        await sleep(200);
+        await click(a, '#phonePadDone');
+        await click(a, '#phonePadRoomBtn');
+        await sleep(700);
+        const p2 = await a.eval(PH);
+        check(!!p2 && /●/.test(p2.code) && p2.qr === 0, 'showing it once is for that look only: the next open is hidden again', p2);
+        await click(a, '#phonePadDone');
+        await click(a, '#mpInviteBtn');
+        await click(a, '#shareModeCode');
+        const back = await a.eval("({ stored: localStorage.getItem('swirlShareMode'), code: document.getElementById('roomName').textContent === currentRoom })");
+        check(back.stored === 'code' && back.code, 'picking Code is what changes it', back);
+        await click(a, '#mpInviteBtn');
+        await click(a, '#disconnectBtn');
+        const eA2 = await a.eval('__pe.errs');
+        check(real(eA2).length === 0, 'no page errors after the reload', real(eA2).slice(0, 5));
     } catch (e) {
         fails++;
         log('ERROR', e && e.stack || e);

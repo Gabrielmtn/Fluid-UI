@@ -75,8 +75,6 @@
         return true;
     }
     function busyReason() {
-        if (window.__mpSettingsLocked) return 'Settings are locked by the host right now.';
-        if (window.__mpTurnBlocked) return 'It is not your turn right now.';
         if (window.fluidExport && window.fluidExport.isExporting && window.fluidExport.isExporting()) return 'An export is running.';
         return null;
     }
@@ -487,29 +485,20 @@
           steps: [
             { say: 'Swirl Together → click Start a room.', target: { section: 'Swirl Together', sel: '#createRoomBtn' }, until: { visible: '#mpConnected' } },
             { say: 'Invite holds the ways to share it: Copy link for a chat, Copy code to read out, or QR for phones. Hide keeps it off a stream.', target: { overlay: 'mp', popup: 'invite', sel: '#copyRoomBtn' }, until: { click: true } },
-            { say: 'Friends paste the code into Join under Swirl Together, and their strokes land on your canvas live.', target: { overlay: 'mp', popup: 'invite', sel: '#roomName', fallback: { overlay: 'mp', sel: '#mpInviteBtn' } } }
+            { say: 'Friends paste the code into Join under Swirl Together. Their strokes land on your canvas live, and the room shares one set of settings.', target: { overlay: 'mp', popup: 'invite', sel: '#roomName', fallback: { overlay: 'mp', sel: '#mpInviteBtn' } } }
+          ] },
+        { id: 'room-settings', pillar: 'together', title: 'Change the look together',
+          tags: ['share', 'settings', 'together', 'same', 'sync', 'look', 'room', 'jam', 'collaborate', 'friends', 'change'],
+          answer: 'In a room everyone shares one set of settings. Move any slider or switch, pick a palette or aim the light, and it changes for everyone: sliders glide into place on their screens, and Swirl Together says who changed what. Your brush stays your own.',
+          target: { section: 'Swirl Together', sel: '#createRoomBtn' },
+          steps: [
+            { say: 'Swirl Together → Start a room, or join one.', target: { section: 'Swirl Together', sel: '#createRoomBtn' }, until: { visible: '#mpConnected' } },
+            { say: 'Change any setting. It changes for everyone here, and when someone else changes one, this line says who and what.', needs: 'connected', target: { overlay: 'mp', sel: '#mpActivity', fallback: { overlay: 'mp', sel: '#multiplayerStatus' } } }
           ] },
         { id: 'phone', pillar: 'together', title: 'Paint from my phone',
           tags: ['phone', 'use', 'mobile', 'iphone', 'android', 'smartphone', 'remote', 'controller', 'control', 'touch', 'pad', 'scan', 'qr', 'couch', 'tv', 'tablet', 'connect', 'mouse', 'artist', 'friends'],
           answer: 'Swirl Together → Paint from your phone (in a room it sits under Invite), then pick how. As your mouse: the phone steers this canvas’s own brush, with all your settings. As an artist: each phone that scans joins your room as a painter of its own. Scan the code with the phone’s camera.',
           target: { section: 'Swirl Together', sel: '#phonePadBtn', fallback: { overlay: 'mp', popup: 'invite', sel: '#phonePadRoomBtn' } } },
-        { id: 'turns', pillar: 'together', title: 'Take turns instead of painting at once',
-          tags: ['turns', 'turn', 'rotation', 'timer', 'host', 'lock', 'whose'],
-          answer: 'Swirl Together → Turns (the host picks). The brush passes around on the length you set under Each turn; the status line and the chip by the bottom bar show whose turn it is.',
-          target: { section: 'Swirl Together', sel: '#turnsBtn' },
-          steps: [
-            // Length first: the row steps away once a rotation runs.
-            { say: 'Each turn sets how long the brush stays with one artist. Set it before you start.', needs: 'host', target: { overlay: 'mp', sel: '#turnLength', fallback: { overlay: 'mp', sel: '#turnsBtn' } } },
-            { say: 'Click Turns. The status line and the chip by the bottom bar show whose turn it is, and Pass hands the brush on early.', needs: 'host', target: { overlay: 'mp', sel: '#turnsBtn' }, until: { click: true } }
-          ] },
-        { id: 'call-return', pillar: 'together', title: 'Play call and return',
-          tags: ['call', 'return', 'response', 'swirl', 'one', 'each', 'turns', 'game', 'back', 'forth'],
-          answer: 'Swirl Together → Call & return. One swirl each, back and forth: make your call, they answer, and the brush comes back to you. No clock.',
-          target: { section: 'Swirl Together', sel: '#callReturnBtn' },
-          steps: [
-            { say: 'Swirl Together → click Call & return. With a stranger this asks them first.', needs: 'host', target: { overlay: 'mp', sel: '#callReturnBtn' }, until: { click: true } },
-            { say: 'Make one swirl. When it settles the brush passes on, and the status line says whose call it is.', target: { overlay: 'mp', sel: '#turnWheel', fallback: { overlay: 'mp', sel: '#callReturnBtn' } } }
-          ] },
 
         // ── Export ──
         { id: 'export-video', pillar: 'export', title: 'Save a video or GIF',
@@ -941,9 +930,7 @@
     const NEEDS = {
         layer:      { ok: () => layerRows('any').length > 0, text: 'You need a layer first.', recipe: 'paste-image', label: 'Paste one' },
         imageLayer: { ok: () => layerRows('image').length > 0, text: 'You need a picture layer first.', recipe: 'paste-image', label: 'Paste one' },
-        connected:  { ok: () => isShown($('mpConnected')), text: 'You need to be in a room first.', recipe: 'room', label: 'Start one' },
-        // The rhythm switch is live for the host, and for both halves of a stranger pair (06e).
-        host:       { ok: () => !!(window.MPPanel && window.MPPanel.canPick && window.MPPanel.canPick()), text: 'Only the host can do this. Start a room and you are the host.', recipe: 'room', label: 'Start one' }
+        connected:  { ok: () => isShown($('mpConnected')), text: 'You need to be in a room first.', recipe: 'room', label: 'Start one' }
     };
     function needGap(need) {
         const n = NEEDS[need];

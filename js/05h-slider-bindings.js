@@ -318,13 +318,6 @@
         if (shadeFormSel) {
             window.setResolutionDropdown(shadeFormSel, config.SHADE_FORM_RESOLUTION || 256);
             shadeFormSel.addEventListener('change', (e) => {
-                // A look param, so the host's settings lock holds it (13.5);
-                // put the pick back so the pill doesn't show a value we ignored.
-                if (window.__mpSettingsLocked && !window.__mpApplyingRemote) {
-                    window.setResolutionDropdown(shadeFormSel, config.SHADE_FORM_RESOLUTION || 256);
-                    e.stopImmediatePropagation();
-                    return;
-                }
                 const v = parseInt(e.target.value, 10);
                 if (!isFinite(v)) return;
                 const res = Math.max(64, Math.min(2048, v)); // 05c's clamp
@@ -337,12 +330,6 @@
         let lastDensitySnapTime = 0;
         canvasArea.addEventListener('wheel', (e) => {
             e.preventDefault();
-            // The four sim shortcuts (Ctrl, Ctrl+Shift, Ctrl+Alt, Alt+Shift)
-            // write config directly, past the sliders' own 13.5 gate, so out
-            // of turn they split the watcher's canvas from the room's. Brush
-            // size and angle (plain / Shift) stay free.
-            if ((e.ctrlKey || (e.altKey && e.shiftKey)) &&
-                window.__mpSettingsLocked && !window.__mpApplyingRemote) return;
             if (e.ctrlKey && e.shiftKey) {
                 // Ctrl+Shift+Scroll: Adjust Motion Isolation (Velocity Influence)
                 // Uses eased acceleration: faster scroll = bigger jumps
@@ -535,13 +522,6 @@
             const valueSpanId = valueSpanMap[id] || (id + 'Value');
             const valueSpan = document.getElementById(valueSpanId);
             slider.addEventListener('input', (e) => {
-                // 13.5: settings locked by the multiplayer host — swallow local
-                // edits on registry-bound sim sliders (host's snapshot re-syncs
-                // the thumb). Painting controls (brushSize etc.) are unaffected.
-                if (window.__mpSettingsLocked && !window.__mpApplyingRemote) {
-                    e.stopImmediatePropagation();
-                    return;
-                }
                 let val = parseFloat(e.target.value);
                 // Clear active preset and performance profile when manually adjusting sliders
                 // (skip if a profile is currently being applied programmatically)

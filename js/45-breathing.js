@@ -221,7 +221,7 @@
         curFrac = radiusFrac(ph);
         const canvas = $('canvas');
         const live = !!(canvas && typeof window.applyRingSplat === 'function'
-            && !window.__fluidFrozen && !paused() && !window.__mpTurnBlocked);
+            && !window.__fluidFrozen && !paused());
         // One step per SIM frame, not per animation frame: on a 144 Hz display
         // rAF runs 2.4× faster than 05j's 60 fps loop (measured), and a push
         // per rAF would inject 2.4× the momentum. 05j bumps __drawSerial once
@@ -230,7 +230,7 @@
         const fresh = serial === -2 || serial !== lastSerial;
         lastSerial = serial;
         if (!live) {
-            lastR = null;                     // paused / frozen / not our turn: resume without a jump
+            lastR = null;                     // paused / frozen: resume without a jump
         } else if (fresh && canvas.width > 8 && canvas.height > 8) {
             const w = canvas.width, h = canvas.height, cx = w / 2, cy = h / 2;
             const g = geom(canvas, curFrac);
