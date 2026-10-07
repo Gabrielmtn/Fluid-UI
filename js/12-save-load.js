@@ -1440,9 +1440,12 @@
                     // reaches them, so they'd otherwise ghost on screen forever)
                     canvasWrapper.querySelectorAll(':scope > .background-layer').forEach(function(d) { d.remove(); });
                 }
-                // Reset pre-existing background-layer divs
-                for (var ri = 0; ri < 10; ri++) {
-                    var resetDiv = document.getElementById('layer' + ri);
+                // Reset every layerN div — the static ten and any made past
+                // them (layers are uncapped, 04f ensureLayerDiv)
+                var _layersHost = document.getElementById('layers-container');
+                var _resetDivs = _layersHost ? _layersHost.querySelectorAll('.background-layer') : [];
+                for (var ri = 0; ri < _resetDivs.length; ri++) {
+                    var resetDiv = _resetDivs[ri];
                     if (resetDiv) {
                         resetDiv.style.backgroundImage = '';
                         resetDiv.style.display = 'none';
@@ -1497,8 +1500,9 @@
                         layerDiv.style.display = ld.visible ? 'block' : 'none';
                         layerDiv.style.opacity = ld.filmData ? '0.3' : '0.55';
                     } else {
-                        // Regular image layers use pre-existing layerN divs
-                        layerDiv = document.getElementById('layer' + ld.index);
+                        // Regular image layers: the static layerN div, or one
+                        // made for a slot past the static ten
+                        layerDiv = window.ensureLayerDiv ? window.ensureLayerDiv(ld.index) : document.getElementById('layer' + ld.index);
                         if (layerDiv) {
                             layerDiv.style.backgroundImage = 'url(' + ld.data + ')';
                             layerDiv.style.display = ld.visible ? 'block' : 'none';

@@ -252,17 +252,21 @@
           answer: 'Drag a PNG or JPG onto the canvas, or use the folder button in Layers. Dropping onto a brush-shape area loads it as a brush shape instead.',
           target: { section: 'Layers', sel: '#uploadBtn' },
           steps: [
-            { say: 'Click the folder button in the Layers header and pick a PNG or JPG.', note: 'Dragging a file onto the canvas does the same.', target: { section: 'Layers', sel: '#uploadBtn' }, until: { layerAdded: true } },
+            { say: 'Click Import in Layers and pick a PNG or JPG.', note: 'Dragging a file onto the canvas does the same.', target: { section: 'Layers', sel: '#uploadBtn' }, until: { layerAdded: true } },
             { say: 'The picture is a layer above the fluid. Transform moves, scales and rotates it.', target: { layer: 'last', sel: '.layer-btn', text: 'Transform', fallback: { section: 'Layers' } } }
           ] },
         { id: 'capture-layer', pillar: 'layers', title: 'Freeze the current painting into a layer',
           tags: ['capture', 'snapshot', 'keep', 'freeze', 'layer', 'save'],
-          answer: 'Capture Layer in Layers takes what is on the canvas and keeps it as an image layer above the fluid. Right Shift+Enter does the same.',
+          answer: 'Visible to layer in Layers takes what is on the canvas and keeps it as an image layer above the fluid. Right Shift+Enter does the same.',
           hotkey: 'R-Shift+Enter', target: { section: 'Layers', sel: '#captureBtn' },
           steps: [
-            { say: 'Click Capture Layer.', key: 'R-Shift+Enter', target: { section: 'Layers', sel: '#captureBtn' }, until: { layerAdded: true } },
+            { say: 'Click Visible to layer.', key: 'R-Shift+Enter', target: { section: 'Layers', sel: '#captureBtn' }, until: { layerAdded: true } },
             { say: 'The snapshot is a layer above the fluid now: hide it, move it, or Fluidize it back in later.', target: { layer: 'last', fallback: { section: 'Layers' } } }
           ] },
+        { id: 'flatten-layers', pillar: 'layers', title: 'Merge layers into one',
+          tags: ['flatten', 'merge', 'combine', 'layers', 'many', 'tidy'],
+          answer: 'Flatten in Layers merges the visible picture layers (captures, imports, cut-outs) into one. The fluid, colliders and hidden layers keep their places between them, so the picture does not change; paint layers stay as they are. Ctrl+Z undoes it.',
+          target: { section: 'Layers', sel: '#flattenLayersBtn' } },
         { id: 'move-layer', pillar: 'layers', title: 'Move, scale or rotate a layer',
           tags: ['move', 'scale', 'rotate', 'transform', 'skew', 'position', 'resize', 'layer'],
           answer: 'Every layer row has a transform button. Drag to move, corners to scale, the handle to rotate; Enter or Done keeps it, Esc cancels.',
@@ -273,10 +277,10 @@
           ] },
         { id: 'collider-from-image', pillar: 'layers', title: 'Make the paint flow around a picture',
           tags: ['collider', 'collision', 'around', 'wall', 'flow', 'image', 'object', 'terrain'],
-          answer: 'Layers → Add Collision Layer: pick a picture, cut the object out with the mask tools, and it becomes a wall. A layer row also has Generate Collision Layer.',
+          answer: 'Layers → Collider: pick a picture, cut the object out with the mask tools, and it becomes a wall. A layer row also has Generate Collision Layer.',
           target: { section: 'Layers', sel: '#addCollisionLayerBtn' },
           steps: [
-            { say: 'Click the 🧱 button in the Layers header.', target: { section: 'Layers', sel: '#addCollisionLayerBtn' }, until: { visible: '.collision-source-menu' } },
+            { say: 'Click Collider in Layers.', target: { section: 'Layers', sel: '#addCollisionLayerBtn' }, until: { visible: '.collision-source-menu' } },
             { say: 'Choose From Image… and pick a picture, or From Canvas to use what is painted right now.', target: { sel: '.collision-source-menu' }, until: { visible: '#maskEditorOverlay' } },
             { say: 'Cut the subject out. On a plain background, drag Filter’s Cut amount until only the shape is left; otherwise open Instant Roto, click the subject, then Instant Roto It.', target: { overlay: 'mask', sel: '#filterThreshold', fallback: { overlay: 'mask', sel: '#smartSelectBtn' } }, until: [{ change: '#filterThreshold' }, { click: '#samSegmentBtn' }, { hidden: '#maskEditorOverlay' }] },
             { say: 'Next softens the edge; Apply Mask finishes. The cut-out becomes a wall.', target: { overlay: 'mask', sel: '.mask-apply-btn', fallback: { overlay: 'mask', sel: '#maskWizardNext' } }, until: { hidden: '#maskEditorOverlay' } },

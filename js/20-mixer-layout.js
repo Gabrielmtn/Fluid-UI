@@ -3240,28 +3240,44 @@
         const { sec, body, header } = makeSection('Layers', 'core', true);
         sec.classList.add('section-layers');
 
-        // Action buttons in header
+        // Toolbar (2026-10-06): "Visible to layer" centred on its own row,
+        // Import / Flatten / Collider beneath it — words, not emoji. The old
+        // ✏️ path-layer button went: Path Layers' own "+ New Path" does it.
         const actions = document.createElement('div');
         actions.className = 'section-header-actions';
+        const mainRow = document.createElement('div');
+        mainRow.className = 'layers-toolbar-main';
+        actions.appendChild(mainRow);
+        const row = document.createElement('div');
+        row.className = 'layers-toolbar-row';
+        actions.appendChild(row);
         const captureBtn = document.getElementById('captureBtn');
-        if (captureBtn) { captureBtn.style.cssText = ''; captureBtn.textContent = 'Capture Layer'; actions.appendChild(captureBtn); }
+        if (captureBtn) {
+            captureBtn.style.cssText = '';
+            captureBtn.textContent = 'Visible to layer';
+            captureBtn.title = 'Copy what is on the canvas into a new layer (Right Shift+Enter)';
+            mainRow.appendChild(captureBtn);
+        }
         const uploadBtn = document.getElementById('uploadBtn');
-        if (uploadBtn) { uploadBtn.style.cssText = ''; uploadBtn.textContent = '📁'; actions.appendChild(uploadBtn); }
+        if (uploadBtn) {
+            uploadBtn.style.cssText = '';
+            uploadBtn.textContent = 'Import';
+            uploadBtn.title = 'Import a picture as a new layer';
+            row.appendChild(uploadBtn);
+        }
 
-        // Path layer button
-        var pathBtn = document.createElement('button');
-        pathBtn.type = 'button';
-        pathBtn.textContent = '✏️';
-        pathBtn.title = 'Add Path Layer';
-        pathBtn.style.cssText = 'cursor:pointer;';
-        pathBtn.addEventListener('click', function(e) {
+        var flattenBtn = document.createElement('button');
+        flattenBtn.type = 'button';
+        flattenBtn.id = 'flattenLayersBtn';
+        flattenBtn.textContent = 'Flatten';
+        flattenBtn.title = 'Merge the visible picture layers into one. The fluid, colliders and hidden layers keep their places, so the picture does not change. Ctrl+Z undoes it.';
+        flattenBtn.addEventListener('click', function (e) {
             e.stopPropagation();
-            if (window.pathLayers) {
-                window.pathLayers.create();
-                window.pathLayers.render();
-            }
+            if (typeof window.flattenLayers !== 'function') return;
+            flattenBtn.disabled = true;
+            window.flattenLayers().finally(function () { flattenBtn.disabled = false; });
         });
-        actions.appendChild(pathBtn);
+        row.appendChild(flattenBtn);
 
         // Collision layer button with source picker
         var collisionBtn = document.createElement('button');
@@ -3269,10 +3285,10 @@
         // The id is what tours and hotkeys find it by, so its title can be
         // reworded freely.
         collisionBtn.id = 'addCollisionLayerBtn';
-        collisionBtn.textContent = '🧱';
+        collisionBtn.textContent = 'Collider';
         collisionBtn.title = 'Add Collision Layer — pick a picture, cut the subject out, get a wall';
-        collisionBtn.style.cssText = 'cursor:pointer;position:relative;';
-        actions.appendChild(collisionBtn);
+        collisionBtn.style.cssText = 'position:relative;';
+        row.appendChild(collisionBtn);
 
         var collisionMenu = document.createElement('div');
         collisionMenu.className = 'collision-source-menu';
@@ -8947,7 +8963,8 @@
         header.className = 'section-header';
         header.title = SECTION_HINT;
         header.addEventListener('click', function (e) {
-            // Layers puts real command buttons (Capture / 📁 / ✏️ / 🧱) inside
+            // Layers puts real command buttons (Visible to layer / Import /
+            // Flatten / Collider) inside
             // its header. A click on one of those is a command, not a toggle —
             // and under the accordion it would collapse the whole sidebar.
             if (e.target && e.target.closest && e.target.closest('.section-header-actions')) return;

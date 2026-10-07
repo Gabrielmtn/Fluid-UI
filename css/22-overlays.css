@@ -528,13 +528,9 @@ body.focus-mode #canvas {
     cursor: grabbing;
 }
 
-.path-layer-thumb {
-    font-size: 16px;
-    flex-shrink: 0;
-}
-
 .path-layer-header .layer-title {
     flex: 1;
+    min-width: 0;
     background: transparent;
     border: none;
     color: #e6edf3;
@@ -552,10 +548,17 @@ body.focus-mode #canvas {
     display: flex;
     gap: 4px;
 }
+/* The image-layer rows size .layer-controls as one checkbox column
+   (init-responsive.css, --layer-ctl-col); a path row's controls are four
+   worded buttons, so they take their own width. */
+#sidebar-right .path-layer-header .layer-controls {
+    width: auto;
+}
 .path-layer-header .layer-btn {
-    width: 26px;
+    min-width: 26px;
     height: 26px;
-    padding: 0;
+    padding: 0 6px;
+    font-size: 11px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -647,16 +650,17 @@ body.focus-mode #canvas {
 }
 /* Shape preset buttons */
 .path-shapes-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 5px;
     margin-top: 6px;
     padding: 6px 0;
 }
 .path-shape-btn {
-    width: 32px;
-    height: 32px;
-    padding: 0;
+    min-width: 0;
+    height: 26px;
+    padding: 0 4px;
+    font-size: 11px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -944,11 +948,6 @@ body.focus-mode #canvas {
     border: 1px dashed var(--ground-500, #2a2e37);
     border-radius: 0;
     background: rgba(255, 255, 255, 0.02);
-}
-.path-empty-icon {
-    font-size: 20px;
-    opacity: 0.6;
-    margin-bottom: 6px;
 }
 .path-empty-text {
     font-size: 12px;

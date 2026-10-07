@@ -46,19 +46,6 @@
         return out;
     }
 
-    // How many of `n` incoming images there is room for. Trimming here is
-    // what makes a big batch yield ONE aggregate message instead of an
-    // alert per rejected file (04f still alerts per-file as a fallback if
-    // a race over-admits).
-    function admitCount(n) {
-        var free = (typeof window.layerSlotsFree === 'function') ? window.layerSlotsFree() : n;
-        var take = Math.max(0, Math.min(n, free));
-        if (take < n) {
-            alert((n - take) + ' of ' + n + ' images skipped — 10-layer maximum. Delete some layers to add more.');
-        }
-        return take;
-    }
-
     // Which drop zone (if any) the pointer is over. `hl` is the element that
     // gets the hover highlight — for the canvas that's the wrapper (the
     // visible frame), not the whole padded area.
@@ -123,7 +110,7 @@
                 window.BrushShapes.beginImportFile(files[0]);
             }
         } else {
-            files.slice(0, admitCount(files.length)).forEach(function (f) {
+            files.forEach(function (f) {
                 if (typeof window.createLayerFromFile === 'function') window.createLayerFromFile(f);
             });
         }
@@ -307,10 +294,9 @@
     // One way in for all three routes: the paste event, the Electron
     // watchdog and the async clipboard read.
     function intake(blobs, mode) {
-        var take = blobs.slice(0, admitCount(blobs.length));
-        if (!take.length) return;
-        take.forEach(function (b) { layerFromBlob(b, titleFor(b), mode); });
-        flash(pasteMessage(take.length, mode));
+        if (!blobs.length) return;
+        blobs.forEach(function (b) { layerFromBlob(b, titleFor(b), mode); });
+        flash(pasteMessage(blobs.length, mode));
     }
 
     document.addEventListener('paste', function (e) {
@@ -476,7 +462,6 @@
                 if (f) { url = f.url; title = f.title; }
             }
             if (url) {
-                if (!admitCount(1)) return;
                 if (toLayer(url, title, mode)) flash(pasteMessage(1, mode));
                 return;
             }

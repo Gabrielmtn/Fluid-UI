@@ -120,7 +120,7 @@ images with a line of context under each.
   | 24 kaleido segments, 5 modes | `#kaleidoSegments` max 24, `#kaleidoMode` — `index.html:767` |
   | 24 mandala wedges | `#mandalaWedges` max 24 — `index.html:722` |
   | 8 physics presets | `applyPreset()` buttons — `index.html` |
-  | 10 layers | `MAX_LAYERS = 10` — `js/01-config.js:1` |
+  | 10 layers | STALE 2026-10-06: image layers are uncapped now (`freeImageLayerIndex`, `js/04f-canvas-actions.js`) |
   | 6 colour-shift blend modes | `#lightShiftMode` — `index.html:922` |
   | 2 on-device models | SlimSAM + Depth-Anything-Small (see §10 of the pack) |
 

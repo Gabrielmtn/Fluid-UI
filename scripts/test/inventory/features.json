@@ -113,13 +113,13 @@
       "activeCheck": "(window.layers || []).some(function (l) { return !l.isRaster && !l.isCollision; })",
       "touchesSharedState": [
         "window.layers[] / layerOrder[] (shared registry with raster paint layers, collision layers and the sim's z-order entry, js/01-config.js:1-31)",
-        "DOM: .background-layer divs #layer0..#layer9 stacked under/over the GL canvas; canvas inline z-index rewritten by updateLayerZIndices (js/05k-layers-render.js)",
-        "MAX_LAYERS = 10 total across image+raster+collision (js/01-config.js:1, guard at js/04f-canvas-actions.js:354)",
+        "DOM: .background-layer divs #layer<N> stacked under/over the GL canvas (#layer0..#layer9 static in index.html, higher slots made on demand by window.ensureLayerDiv, js/04f-canvas-actions.js); canvas inline z-index rewritten by updateLayerZIndices (js/05k-layers-render.js)",
+        "No layer cap since 2026-10-06: image layers take window.freeImageLayerIndex() (first index no layer holds and no decoding upload has reserved, js/04f-canvas-actions.js)",
         "Mask system: layer.clipMaskId/clipInvert -> CSS mask via window.applyLayerClip (js/05m-layer-masks.js:17-46); legacy layer.mask.shapes consumed by colliders and Masks.importFromLayer (js/05o-masks.js:196-224)",
         "window.LayerGeometry.retarget runs every frame to carry layers with canvas-box resizes (js/05j-update-loop.js:166)"
       ],
       "knownHazards": [
-        "Creation is async (image decode) with a _pendingLayerSlots reservation - firing many creates in one tick can exhaust slots (js/04f-canvas-actions.js:354-407)",
+        "Creation is async (image decode) with a _pendingLayerSlots reservation so creates fired in one tick never share an index (js/04f-canvas-actions.js)",
         "Image layers are browser-composited DOM, invisible to GL readbacks: dye/velocity FBO measurements never see them; only drawing-buffer screenshots do, and only where fluid alpha lets them through (preserveFluidOpacity path)",
         "gl context flags alpha:true + desynchronized:false are load-bearing for layer compositing - desync presents expose the layer divs as flashes (js/04a-canvas-gl-config.js:196-204)",
         "Deleting a layer that is a live collider source strands/unbinds the binding via polled hook installation (js/23-depth-collision.js:1521-1527)"
@@ -134,7 +134,7 @@
         "Display pass raster slots: texture units 3-6 + clip units 8-11, uRasterP/uRasterC uniforms (js/05j-update-loop.js:1260-1311)",
         "config.SKETCH_VISIBLE (master gate), config.BRUSH_TARGET, config.BRUSH_ERASER/BRUSH_FLOW/BRUSH_HARDNESS (stamp params, js/05i-sim-stats.js:282-301)",
         "window.sketch alias (active raster FBO) - also the default collider source when no binding is set (js/23-depth-collision.js:884-890)",
-        "layers[]/layerOrder[] registry (isRaster entries) and MAX_LAYERS budget",
+        "layers[]/layerOrder[] registry (isRaster entries); only 4 visible paint layers composite at once (RASTER_SLOTS, js/05l-layers-transform.js)",
         "Shared undo ring with mask painting (window.__sketchUndoPush / __sketchStrokeEnd, stroke boundary closed by the update loop's idle gate js/05j-update-loop.js:491-494)",
         "Masks: layer.clipMaskId gates the layer through a Mask coverage FBO in-shader (js/05l-layers-transform.js:739-743)"
       ],

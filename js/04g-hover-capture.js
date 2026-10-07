@@ -470,50 +470,19 @@
 
             }
 
-            // Create a new layer from this capture.
-            //
-            // Capacity here is the ten static `layerN` divs (index 0-9), NOT
-            // layers.length: paint layers and colliders live in the same array
-            // at index >= 100 (05l _nextIndex) and back onto no div at all, so
-            // the old length test spent a capture slot on every one of them —
-            // three paint layers left room for seven captures instead of ten,
-            // and the message blamed a "maximum" the user could not see in the
-            // panel. Ask the slots directly, and honour the reservation an
-            // image upload that is still decoding holds (04f).
+            // Create a new layer from this capture, in the first free slot
+            // (uncapped; 04f freeImageLayerIndex honours the reservation an
+            // image upload that is still decoding holds).
 
-            let availableIndex = -1;
+            const availableIndex = window.freeImageLayerIndex();
 
-            for (let i = 0; i < MAX_LAYERS; i++) {
+            const layerDiv = window.ensureLayerDiv(availableIndex);
 
-                if (!layers.find(l => l.index === i) && !_pendingLayerSlots.has(i)) { availableIndex = i; break; }
+            layerDiv.style.backgroundImage = `url(${dataUrl})`;
 
-            }
+            layerDiv.style.zIndex = availableIndex;
 
-            if (availableIndex === -1) {
-
-                const msg = 'All ' + MAX_LAYERS + ' image-layer slots are in use. Delete a capture or image layer to make room. (Paint layers and colliders do not use these slots.)';
-
-                if (typeof window.appAlert === 'function') window.appAlert('No free layer slot', msg);
-
-                else alert(msg);
-
-                return false;
-
-            }
-
-
-
-            const layerDiv = document.getElementById(`layer${availableIndex}`);
-
-            if (layerDiv) {
-
-                layerDiv.style.backgroundImage = `url(${dataUrl})`;
-
-                layerDiv.style.zIndex = availableIndex;
-
-                layerDiv.style.display = 'block';
-
-            }
+            layerDiv.style.display = 'block';
 
             const layer = {
 

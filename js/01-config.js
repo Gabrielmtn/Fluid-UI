@@ -1,4 +1,3 @@
-        const MAX_LAYERS = 10;
         let layers = []; // Array of layer objects
         let layerOrder = []; // Array of items in visual order: [{type: 'sim'} or {type: 'layer', id: layerIndex}]
         let currentLayerIndex = 0;

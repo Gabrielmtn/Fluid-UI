@@ -128,7 +128,10 @@
             });
             return { add: add };
         };
-        window.deleteLayer = (index) => {
+        // The removal itself, shared by Delete and Flatten: no re-render and
+        // no history entry (deleteLayer records one delete; flattenLayers
+        // records its whole merge as one action). Returns what an undo needs.
+        function __removeLayer(index) {
             // D6: snapshot for undo BEFORE anything is freed
             const _removed = layers.find(l => l.index === index);
             const _orderIdx = layerOrder.findIndex(item => item.type === 'layer' && item.id === index);
@@ -170,16 +173,165 @@
             // Remove from layerOrder array
             layerOrder = layerOrder.filter(item => !(item.type === 'layer' && item.id === index));
             window.layerOrder = layerOrder;
+            return { removed: _removed, orderIdx: _orderIdx, orderEntry: _orderEntry };
+        }
+        window.deleteLayer = (index) => {
+            const rec = __removeLayer(index);
             // Re-render and update z-indices
             renderLayers();
             // D6: record the delete as undoable (skipped while applying undo/redo)
-            if (_removed && window.__layerHistory) {
+            if (rec.removed && window.__layerHistory) {
                 window.__layerHistory.push({
                     label: 'delete layer',
-                    undo: function () { __restoreDeletedLayer(_removed, _orderIdx, _orderEntry); },
+                    undo: function () { __restoreDeletedLayer(rec.removed, rec.orderIdx, rec.orderEntry); },
                     redo: function () { window.deleteLayer(index); }
                 });
             }
+        };
+        // ── Flatten (2026-10-06) ─────────────────────────────────────────
+        // Merges the visible picture layers (captures, imports, cut-outs)
+        // into one per RUN: picture layers next to each other in the list.
+        // The sim, a collider's film and a hidden layer each end a run and
+        // keep their place, so nothing on screen moves and a hidden layer
+        // comes back where it was. Paint layers are left alone and do not
+        // break a run: they are GPU buffers composited inside the sim canvas,
+        // never between the divs.
+        //
+        // The merged picture is what the screen shows: each div's current
+        // background (05m bakes mask + threshold into it), its CSS clip, its
+        // opacity and transform, replayed the way the export compositor does
+        // (24 captureCompositeFrame). The whole merge is one undo entry.
+        let _flattening = false;
+        window.flattenLayers = function () {
+            if (_flattening) return Promise.resolve(false);
+            if (window.LayerTransform && window.LayerTransform.isOpen()) window.LayerTransform.close();
+            const urlOf = (css) => { const m = (css || '').match(/url\(["']?(.+?)["']?\)/); return m ? m[1] : null; };
+            const runs = [[]];   // each top first, like layerOrder
+            layerOrder.forEach((it) => {
+                if (it.type !== 'layer') { runs.push([]); return; }
+                const l = layers.find(x => x.index === it.id);
+                if (!l || l.isRaster) return;
+                const div = document.getElementById('layer' + l.index);
+                if (!l.visible || l.isCollision || !div || !urlOf(div.style.backgroundImage)) { runs.push([]); return; }
+                runs[runs.length - 1].push(l);
+            });
+            const groups = runs.filter(g => g.length >= 2);
+            if (!groups.length) {
+                const msg = 'Flatten merges visible picture layers that sit next to each other in the list. The fluid, colliders and hidden layers keep their places between them, and paint layers stay as they are.';
+                if (typeof window.appAlert === 'function') window.appAlert('Nothing to flatten', msg);
+                else alert(msg);
+                return Promise.resolve(false);
+            }
+            // Layer x/y are CSS px of the box the divs fill; draw that box at
+            // device resolution (long side capped) so the merge stays sharp.
+            const host = document.getElementById('layers-container');
+            const bw = (host && host.clientWidth) || canvas.width;
+            const bh = (host && host.clientHeight) || canvas.height;
+            const k = Math.min(Math.max(1, window.devicePixelRatio || 1), 4096 / Math.max(bw, bh));
+            const W = Math.max(1, Math.round(bw * k)), H = Math.max(1, Math.round(bh * k));
+            const load = (src) => new Promise((res) => {
+                if (!src) { res(null); return; }
+                const im = new Image();
+                im.onload = () => res(im);
+                im.onerror = () => res(null);
+                im.src = src;
+            });
+            const jobs = groups.map(g => Promise.all(g.map(l => {
+                const div = document.getElementById('layer' + l.index);
+                const op = parseFloat(div.style.opacity);
+                return Promise.all([
+                    load(urlOf(div.style.backgroundImage)),
+                    load(urlOf(div.style.webkitMaskImage || div.style.maskImage))
+                ]).then(([img, maskImg]) => ({ l, img, maskImg, opacity: isNaN(op) ? 1 : op }));
+            })));
+            _flattening = true;
+            return Promise.all(jobs).then((decoded) => {
+                // Anything deleted while the pictures decoded: leave it be.
+                if (groups.some(g => g.some(l => !layers.includes(l)))) return false;
+                const merged = decoded.map((tasks) => {
+                    const out = document.createElement('canvas');
+                    out.width = W; out.height = H;
+                    const ctx = out.getContext('2d');
+                    let scratch = null;
+                    for (let i = tasks.length - 1; i >= 0; i--) {   // bottom → top
+                        const t = tasks[i];
+                        if (!t.img) continue;
+                        let source = t.img;
+                        if (t.maskImg) {
+                            // CSS mask-image applies in the div's own box
+                            // before its transform: clip first, then place.
+                            if (!scratch) { scratch = document.createElement('canvas'); scratch.width = W; scratch.height = H; }
+                            const s = scratch.getContext('2d');
+                            s.globalCompositeOperation = 'source-over';
+                            s.clearRect(0, 0, W, H);
+                            s.drawImage(t.img, 0, 0, W, H);
+                            s.globalCompositeOperation = 'destination-in';
+                            s.drawImage(t.maskImg, 0, 0, W, H);
+                            source = scratch;
+                        }
+                        ctx.save();
+                        ctx.globalAlpha = t.opacity;
+                        ctx.translate(W / 2 + (t.l.x || 0) * k, H / 2 + (t.l.y || 0) * k);
+                        ctx.rotate((t.l.rotation || 0) * Math.PI / 180);
+                        window.LayerXform.shearCtx(ctx, t.l);
+                        ctx.scale(t.l.scaleX || 1, t.l.scaleY || 1);
+                        ctx.drawImage(source, -W / 2, -H / 2, W, H);
+                        ctx.restore();
+                    }
+                    return out.toDataURL('image/png');
+                });
+                // Swap: sources out top-first, then the merge goes in where
+                // the topmost one stood. ops replays forward for redo and
+                // backward for undo, so every recorded slot stays exact.
+                const ops = [];
+                groups.forEach((g, gi) => {
+                    const recs = g.map(l => __removeLayer(l.index));
+                    recs.forEach(r => ops.push(r));
+                    const index = window.freeImageLayerIndex();
+                    const flat = {
+                        index: index, title: 'Flattened',
+                        data: merged[gi], originalData: merged[gi],
+                        visible: true, threshold: 0, active: false,
+                        mask: { enabled: false, mode: 'show', shapes: [] },
+                        x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, skewX: 0, skewY: 0,
+                        clipMaskId: null, clipInvert: false
+                    };
+                    window.ensureLayerDiv(index);
+                    const add = { added: flat, orderIdx: recs[0].orderIdx, orderEntry: { type: 'layer', id: index } };
+                    __restoreDeletedLayer(flat, add.orderIdx, add.orderEntry);
+                    ops.push(add);
+                });
+                renderLayers();
+                window.__unsavedWork = true;
+                if (window.__layerHistory) {
+                    window.__layerHistory.push({
+                        label: 'flatten layers',
+                        undo: function () {
+                            for (let i = ops.length - 1; i >= 0; i--) {
+                                const o = ops[i];
+                                if (o.added) __removeLayer(o.added.index);
+                                else __restoreDeletedLayer(o.removed, o.orderIdx, o.orderEntry);
+                            }
+                            renderLayers();
+                        },
+                        redo: function () {
+                            ops.forEach(function (o) {
+                                if (o.added) __restoreDeletedLayer(o.added, o.orderIdx, o.orderEntry);
+                                else __removeLayer(o.removed.index);
+                            });
+                            renderLayers();
+                        }
+                    });
+                }
+                return true;
+            }).catch((err) => {
+                // A picture from another origin taints the canvas (toDataURL
+                // throws) — say so rather than fail silently.
+                console.warn('[layers] flatten failed', err);
+                const msg = 'These layers could not be merged into one picture.';
+                if (typeof window.appAlert === 'function') window.appAlert('Flatten failed', msg);
+                return false;
+            }).finally(() => { _flattening = false; });
         };
         // Image layer mask functions
         window.toggleImageLayerMask = (index) => {

@@ -340,9 +340,29 @@
         // grab the same index while the first is still decoding.
         const _pendingLayerSlots = new Set();
 
-        // Free image-layer capacity (32-file-drop trims multi-file drops to
-        // this so the user gets ONE aggregate message, not an alert per file)
-        window.layerSlotsFree = () => Math.max(0, MAX_LAYERS - layers.length - _pendingLayerSlots.size);
+        // Image layers are uncapped (2026-10-06; the cap was ten). index.html
+        // still ships layer0-layer9; any slot past those gets its div made
+        // here, in #layers-container with the class the static ones carry.
+        // The first free index wins — paint layers (>= 100, 05l _nextIndex)
+        // and colliders (max + 1, 23) pick theirs above whatever exists, so
+        // a slot is free exactly when no layer holds it and no decoding
+        // upload has reserved it.
+        window.ensureLayerDiv = (index) => {
+            let div = document.getElementById('layer' + index);
+            if (div) return div;
+            div = document.createElement('div');
+            div.id = 'layer' + index;
+            div.className = 'background-layer';
+            const host = document.getElementById('layers-container')
+                || document.getElementById('canvas-wrapper');
+            if (host) host.appendChild(div);
+            return div;
+        };
+        window.freeImageLayerIndex = () => {
+            for (let i = 0; ; i++) {
+                if (!layers.some(l => l.index === i) && !_pendingLayerSlots.has(i)) return i;
+            }
+        };
 
         // `onCreated(layer)` fires once the image has decoded and the layer
         // object exists — the slot isn't known before that, and the decode is
@@ -356,41 +376,7 @@
         // itself here, so Ctrl+Z takes it back.
         window.createLayerFromDataUrl = (dataUrl, title, onCreated) => {
 
-            if (layers.length + _pendingLayerSlots.size >= MAX_LAYERS) {
-
-                alert('Maximum 10 layers reached. Delete some layers to create new ones.');
-
-                return false;
-
-            }
-
-
-
-            // Find first available slot
-
-            let availableIndex = -1;
-
-            for (let i = 0; i < MAX_LAYERS; i++) {
-
-                if (!layers.find(l => l.index === i) && !_pendingLayerSlots.has(i)) {
-
-                    availableIndex = i;
-
-                    break;
-
-                }
-
-            }
-
-
-
-            if (availableIndex === -1) {
-
-                alert('No available layer slots.');
-
-                return false;
-
-            }
+            const availableIndex = window.freeImageLayerIndex();
 
             {
 
@@ -426,7 +412,7 @@
 
                 }
 
-                const layerDiv = document.getElementById(`layer${availableIndex}`);
+                const layerDiv = window.ensureLayerDiv(availableIndex);
 
                 layerDiv.style.backgroundImage = `url(${dataUrl})`;
 

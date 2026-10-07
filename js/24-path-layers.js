@@ -582,7 +582,6 @@
             const empty = document.createElement('div');
             empty.className = 'path-empty-state';
             empty.innerHTML = `
-                <div class="path-empty-icon">✏️</div>
                 <div class="path-empty-text">No path layers yet</div>
                 <div class="path-empty-hint">Paths trace shapes into the fluid automatically</div>
                 <button type="button" class="path-empty-create" data-action="create">+ Create Path Layer</button>
@@ -602,13 +601,12 @@
 
             el.innerHTML = `
                 <div class="path-layer-header" draggable="true">
-                    <div class="path-layer-thumb">✏️</div>
                     <input type="text" class="layer-title" value="${window.escHtml(layer.name)}" data-action="rename">
                     <div class="layer-controls">
-                        <button class="layer-btn" data-action="toggle-visibility" title="${layer.visible ? 'Hide' : 'Show'}">${layer.visible ? '👁️' : '👁️‍🗨️'}</button>
-                        <button class="layer-btn" data-action="toggle-play" title="${layer.isPlaying ? 'Pause' : 'Play'}" ${!hasPath ? 'disabled' : ''}>${layer.isPlaying ? '⏸' : '▶'}</button>
+                        <button class="layer-btn" data-action="toggle-visibility" title="${layer.visible ? 'Hide this path layer' : 'Show this path layer'}">${layer.visible ? 'Hide' : 'Show'}</button>
+                        <button class="layer-btn" data-action="toggle-play" title="${layer.isPlaying ? 'Pause' : 'Play'}" ${!hasPath ? 'disabled' : ''}>${layer.isPlaying ? 'Pause' : 'Play'}</button>
                         <button class="layer-btn" data-action="collapse" title="${layer.collapsed ? 'Expand' : 'Collapse'}">${layer.collapsed ? '▼' : '▲'}</button>
-                        <button class="layer-btn" data-action="delete" title="Delete">🗑️</button>
+                        <button class="layer-btn" data-action="delete" title="Delete this path layer">Delete</button>
                     </div>
                 </div>
                 <div class="path-layer-body">
@@ -632,7 +630,7 @@
                         <div class="path-control-row">
                             <label>Color</label>
                             <input type="color" class="path-color-picker" value="${rgbToHex(layer.color)}" data-action="color">
-                            <button class="path-use-brush-btn" data-action="use-brush" title="Use current brush color">🎨</button>
+                            <button class="path-use-brush-btn" data-action="use-brush" title="Use current brush color">From brush</button>
                         </div>
                         <div class="path-control-row">
                             <label>Mode</label>
@@ -643,14 +641,14 @@
                             </select>
                         </div>
                         <div class="path-shapes-row">
-                            <button class="path-shape-btn" data-shape="circle" title="Circle">⭕</button>
-                            <button class="path-shape-btn" data-shape="rectangle" title="Rectangle">⬜</button>
-                            <button class="path-shape-btn" data-shape="triangle" title="Triangle">🔺</button>
-                            <button class="path-shape-btn" data-shape="star" title="Star">⭐</button>
-                            <button class="path-shape-btn" data-shape="heart" title="Heart">❤️</button>
-                            <button class="path-shape-btn" data-shape="infinity" title="Infinity">∞</button>
-                            <button class="path-shape-btn" data-shape="spiral" title="Spiral">🌀</button>
-                            <button class="path-shape-btn" data-shape="wave" title="Wave">〰️</button>
+                            <button class="path-shape-btn" data-shape="circle" title="Add a circle path">Circle</button>
+                            <button class="path-shape-btn" data-shape="rectangle" title="Add a rectangle path">Rect</button>
+                            <button class="path-shape-btn" data-shape="triangle" title="Add a triangle path">Triangle</button>
+                            <button class="path-shape-btn" data-shape="star" title="Add a star path">Star</button>
+                            <button class="path-shape-btn" data-shape="heart" title="Add a heart path">Heart</button>
+                            <button class="path-shape-btn" data-shape="infinity" title="Add an infinity path">Infinity</button>
+                            <button class="path-shape-btn" data-shape="spiral" title="Add a spiral path">Spiral</button>
+                            <button class="path-shape-btn" data-shape="wave" title="Add a wave path">Wave</button>
                         </div>
                         <div class="path-action-row">
                             <button class="path-draw-btn" data-action="draw">Draw</button>
