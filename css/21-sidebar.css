@@ -1162,13 +1162,12 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     flex: 0 0 auto;
 }
 
-/* The third way in (54 mounts it): a ghost row under the join box, quieter
-   than the two doors, since pairing your own phone is not meeting anyone. */
+/* The third way in (54 mounts it): a full-width button under the join box,
+   at the default size, so it stays quieter than the two doors above it. */
 .mp-btn-phone-door {
     display: block;
     width: 100%;
     margin: 8px 0 0;
-    text-align: left;
 }
 
 .mp-error {

@@ -65,7 +65,7 @@ Then open `http://localhost:8080` and the app will connect to PartyKit at `local
 ### Using Multiplayer
 
 1. **Start or join a room**: Swirl Together → **Start a room** (you get a six-character code, and the invite link is copied), **Join** with a code or link, or **Stranger** to be paired with someone who is also looking. A `#CODE` in the URL joins that room.
-2. **Invite**: Invite ▾ shows the code, a QR for phones, or hides it for streaming; Copy link / Copy code work in every mode. **Paint from your phone** makes a phone this canvas's mouse or an artist in the room.
+2. **Invite**: Invite ▾ shows the code, a QR for phones, or hides it for streaming; Copy link / Copy code work in every mode. **Sync phone** makes a phone this canvas's mouse or an artist in the room.
 3. **Share settings**: everyone in a room shares one set of settings. Whatever anyone changes — sliders, switches, the palette, the light, gravity — changes for everyone; incoming slider moves glide into place, and the panel says who changed what. Each person keeps their own brush.
 4. **Paint together**: everyone's strokes, text and walls land on every canvas live, with each painter's cursor in their colour.
 

@@ -13,7 +13,7 @@
 // Walks: not in a room; a private host and two guests (3 here); the invite
 // popover (Code / QR / Hide, copy, phone row); the ⋯ menu for host and guest;
 // Lock room as the status line reports it; the activity line naming who
-// changed what; leaving; and a stranger pair (📱 Phone, no locks, sharing).
+// changed what; leaving; and a stranger pair (Sync phone, no locks, sharing).
 // Controls are counted per person, ENABLED ones only: in a room everyone
 // sees the same three (Invite, ⋯, Leave). Also runs the button audit (js/38)
 // over the panel and both popovers. The stranger pair goes through the
@@ -215,7 +215,7 @@ const RUN_STRANGER = process.env.STRANGER ? process.env.STRANGER === '1' : LOCAL
         // ── 1. Not in a room ──────────────────────────────────────────
         const s0 = await a.eval(PANEL);
         check(s0.view === 'mpDisconnected', 'not in a room: the door view shows', s0.view);
-        check(s0.labels.join(',') === 'Start a room,Stranger,Paste a code,Join,📱 Paint from your phone',
+        check(s0.labels.join(',') === 'Start a room,Stranger,Paste a code,Join,Sync phone',
             'not in a room: Start a room, Stranger, the code box, Join, the phone door', s0.labels);
         const blurbs = await a.eval("(function(){ var d=document.getElementById('mpDisconnected'); return { prose: d.querySelectorAll('.mp-hint, .mp-sub, .mp-or').length," +
             " tips: ['createRoomBtn','strangerBtn','phonePadBtn','joinRoomBtn'].map(function(id){ var e=document.getElementById(id); return !!(e && e.title && e.title.length > 20); }) }; })()");
@@ -339,7 +339,7 @@ const RUN_STRANGER = process.env.STRANGER ? process.env.STRANGER === '1' : LOCAL
         const bWait = await until(b, "(function(){var s=" + PANEL + "; return /^Waiting for a stranger… · just you$/.test(s.status) ? s : null;})()", 8000);
         check(!!bWait, 'B waits: "Waiting for a stranger… · just you"', bWait && bWait.status);
         if (bWait) {
-            check(bWait.labels.join(',') === '📱 Phone,Leave', 'waiting: just the phone door and Leave', bWait.labels);
+            check(bWait.labels.join(',') === 'Sync phone,Leave', 'waiting: just the phone door and Leave', bWait.labels);
             await shot(B, '12-waiting-for-stranger.png');
         }
         await click(c, '#strangerBtn');
@@ -348,7 +348,7 @@ const RUN_STRANGER = process.env.STRANGER ? process.env.STRANGER === '1' : LOCAL
         await sleep(500);
         const pB = await b.eval(PANEL), pC = await c.eval(PANEL);
         check(pB.status === 'Sharing settings · 2 here' && pC.status === 'Sharing settings · 2 here', 'pair: "Sharing settings · 2 here"', [pB.status, pC.status]);
-        check(pB.labels[0] === '📱 Phone' && pC.labels[0] === '📱 Phone', 'pair: Invite becomes "📱 Phone"', [pB.labels, pC.labels]);
+        check(pB.labels[0] === 'Sync phone' && pC.labels[0] === 'Sync phone', 'pair: Invite becomes "Sync phone"', [pB.labels, pC.labels]);
         check(pB.enabled <= HOST_MAX && pC.enabled <= HOST_MAX, 'pair: at most ' + HOST_MAX + ' controls each', [pB.labels, pC.labels]);
         await click(b, '#mpInviteBtn');
         const pInv = await b.eval(POP('mpInvitePop'));

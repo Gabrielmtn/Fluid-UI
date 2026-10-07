@@ -4,7 +4,7 @@
 // A phone does not run the painting. It paints on a computer's canvas, one
 // of two ways (the landing offers both; a scanned code already knows which):
 //   • AS THE COMPUTER'S MOUSE (2026-09-17): an 8-character code from
-//     Paint from your phone → As your mouse. The phone sends its touches
+//     Sync phone → As your mouse. The phone sends its touches
 //     over a private link and the computer plays them as its own pointer
 //     (js/55-phone-mouse.js), so its own brush, settings and room do the
 //     rest. The phone draws nothing but a trail for itself.
@@ -498,7 +498,7 @@
         if (isMouse()) {
             if (room.phase !== 'open') return 'Not connected to your computer yet.';
             if (link.replaced) return 'Another phone is this computer’s mouse right now.';
-            if (!computerHere()) return 'Your computer isn’t connected. On it, choose Paint from your phone.';
+            if (!computerHere()) return 'Your computer isn’t connected. On it, choose Sync phone.';
             if (!link.active) return 'Connecting to your computer…';
             if (!link.info.can) return link.info.why || 'Your computer can’t take a stroke right now.';
             return null;
@@ -1227,8 +1227,8 @@
             out.actions = [veilButton('Use this ' + DEVICE, function () { mouseHello(true); render(); }, true)];
         } else if (!computerHere()) {
             out.text = (link.info && link.info.off)
-                ? 'Your computer closed the link. On it, choose Paint from your phone, then As your mouse, to carry on.'
-                : 'Waiting for your computer. On it, open Swirl Together, choose Paint from your phone, then As your mouse.';
+                ? 'Your computer closed the link. On it, choose Sync phone, then As your mouse, to carry on.'
+                : 'Waiting for your computer. On it, open Swirl Together, choose Sync phone, then As your mouse.';
             out.actions = [veilButton('Another code', anotherCode)];
         } else if (!link.active) {
             out.text = 'Connecting to your computer…';
@@ -1453,7 +1453,7 @@
         var asMouse = way === 'mouse';
         $('wayMouse').setAttribute('aria-pressed', asMouse ? 'true' : 'false');
         $('wayRoom').setAttribute('aria-pressed', asMouse ? 'false' : 'true');
-        $('step2').innerHTML = 'Choose <b>Paint from your phone</b>, then <b>' + (asMouse ? 'As your mouse' : 'As an artist') + '</b>.';
+        $('step2').innerHTML = 'Choose <b>Sync phone</b>, then <b>' + (asMouse ? 'As your mouse' : 'As an artist') + '</b>.';
         // An app on an iPhone's home screen is not where the camera sends a
         // scanned link (that opens Safari), so there the code is typed.
         var typeIt = IS_IOS && isInstalled();

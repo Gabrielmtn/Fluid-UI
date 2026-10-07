@@ -190,7 +190,7 @@ const DIALOG = "(function(){var m=document.getElementById('phonePadModal'); if(!
     " status: m.querySelector('#phonePadStatus').textContent, note: m.querySelector('#phonePadNote').hidden ? '' : m.querySelector('#phonePadNote').textContent," +
     " body: !m.querySelector('#phonePadBody').hidden, stop: !m.querySelector('#phonePadStop').hidden};})()";
 // The door in a room. Since the 2026-10-04 panel redesign it lives in the
-// Invite popover (#mpInvitePop, on <body>), whose button reads "📱 Phone"
+// Invite popover (#mpInvitePop, on <body>), whose button reads "Sync phone"
 // in a stranger pair: the door is reachable when that button is on screen.
 // "Shown" is judged only as far as the panel or the popover itself, so a
 // collapsed sidebar section, or the popover being closed, never reads as

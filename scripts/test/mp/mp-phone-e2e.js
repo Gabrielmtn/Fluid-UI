@@ -211,7 +211,7 @@ async function tap(b, sel) {
         // the computer's brush) and a local stroke paint the same dye.
         await a.eval("setActiveBrushColorMode('fixed', {color: '#ffffff'}); 1");
         check(await a.eval('window.__swirlToPhone !== true'), 'a desktop browser is not sent to the phone page');
-        check(await a.eval("!!document.querySelector('#mpDisconnected #phonePadBtn')"), 'Swirl Together shows "Paint from your phone"');
+        check(await a.eval("!!document.querySelector('#mpDisconnected #phonePadBtn')"), 'Swirl Together shows "Sync phone"');
 
         // ── The door: As an artist is a room and a QR, no clipboard ──
         // (The dialog opens on As your mouse; mp-phone-mouse.js covers that way.)

@@ -497,7 +497,7 @@
           ] },
         { id: 'phone', pillar: 'together', title: 'Paint from my phone',
           tags: ['phone', 'use', 'mobile', 'iphone', 'android', 'smartphone', 'remote', 'controller', 'control', 'touch', 'pad', 'scan', 'qr', 'couch', 'tv', 'tablet', 'connect', 'mouse', 'artist', 'friends'],
-          answer: 'Swirl Together → Paint from your phone (in a room it sits under Invite), then pick how. As your mouse: the phone steers this canvas’s own brush, with all your settings. As an artist: each phone that scans joins your room as a painter of its own. Scan the code with the phone’s camera.',
+          answer: 'Swirl Together → Sync phone (in a room it sits under Invite), then pick how. As your mouse: the phone steers this canvas’s own brush, with all your settings. As an artist: each phone that scans joins your room as a painter of its own. Scan the code with the phone’s camera.',
           target: { section: 'Swirl Together', sel: '#phonePadBtn', fallback: { overlay: 'mp', popup: 'invite', sel: '#phonePadRoomBtn' } } },
 
         // ── Export ──

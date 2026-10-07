@@ -388,11 +388,11 @@ function syncInviteBtn() {
     var b = document.getElementById('mpInviteBtn');
     if (!b) return;
     var phoneOnly = !currentRoom || isStrangerRoom();
-    var label = phoneOnly ? '📱 Phone' : 'Invite ▾';
+    var label = phoneOnly ? 'Sync phone' : 'Invite ▾';
     if (b.textContent !== label) b.textContent = label;
-    b.setAttribute('aria-label', phoneOnly ? 'Paint from your phone' : 'Invite');
+    b.setAttribute('aria-label', phoneOnly ? 'Sync phone' : 'Invite');
     b.title = phoneOnly
-        ? 'Paint from your phone: it becomes this canvas’s mouse'
+        ? 'Sync your phone: it becomes this canvas’s mouse'
         : 'The code, a QR or a link to send, and your phone';
 }
 

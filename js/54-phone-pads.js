@@ -244,16 +244,17 @@
         return e;
     }
 
-    var PHONE_DOOR = '📱 Paint from your phone';
+    var PHONE_DOOR = 'Sync phone';
 
     function mountButtons() {
         var disc = document.getElementById('mpDisconnected');
         if (disc && !document.getElementById('phonePadBtn')) {
-            // The third way in, a step quieter than the two doors above it
-            // (ghost: no plate until hover). What it does is the tooltip;
-            // the line of explanation under it went with the panel's others.
+            // The third way in, under the join box: a plain button like Join
+            // beside it (2026-10-06: the ghost, with no plate until hover,
+            // read as a caption rather than something to press). What it
+            // does is the tooltip.
             var before = document.getElementById('mpError');
-            var btn = el('button', 'btn--ghost mp-btn-phone-door', PHONE_DOOR);
+            var btn = el('button', 'mp-btn-phone-door', PHONE_DOOR);
             btn.id = 'phonePadBtn';
             btn.type = 'button';
             btn.title = 'Use your phone as this canvas’s mouse, or let phones join your room as artists. Scan a code, paint on the phone, watch it here. Nothing to install.';
@@ -271,7 +272,7 @@
         // popover rather than stacking on it.
         var pop = document.getElementById('mpInvitePop');
         if (pop && !document.getElementById('phonePadRoomBtn')) {
-            var b2 = el('button', 'mp-btn-share mp-btn-phone', 'Paint from your phone');
+            var b2 = el('button', 'mp-btn-share mp-btn-phone', PHONE_DOOR);
             b2.id = 'phonePadRoomBtn';
             b2.type = 'button';
             b2.setAttribute('data-pop-close', '');
@@ -298,7 +299,7 @@
         var parts = [];
         if (mouseOn) parts.push('your mouse');
         if (pads.size) parts.push(pads.size + (pads.size === 1 ? ' artist' : ' artists'));
-        b.textContent = 'Paint from your phone' + (parts.length ? ' · ' + parts.join(', ') : '');
+        b.textContent = PHONE_DOOR + (parts.length ? ' · ' + parts.join(', ') : '');
     }
 
     // ── The dialog ──────────────────────────────────────────────────
