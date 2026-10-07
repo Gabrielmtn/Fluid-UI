@@ -82,6 +82,17 @@
     // speed. STEADY_RELEASE_MAX_S (wall) stops a crawl at very low Time
     // where it is rather than hurrying it; a new press abandons it.
     //
+    // Let go off the canvas and the line ends at the canvas's edge
+    // (2026-10-07). The head used to carry on to the lift point, out past
+    // the edge, and the hose kept pouring there until it settled — up to
+    // 3.5 s of paint centred outside the canvas, piling into the wall as a
+    // bright crescent: "it creates artifacts after release" (Gabriel). Now
+    // the head stops on the frame it runs off, and a head already out there
+    // with the hand out too ends the stroke at the lift. Either way there
+    // is no release tail: it would only squirt into the wall. While the
+    // button is held nothing changes (a held brush off the canvas pours at
+    // the edge exactly as it does without the string).
+    //
     // 0 = off: move() feeds the walker directly, bit for bit as before.
     // Everything scales with ONE eased amount u = Steady², so the bottom of the
     // slider is realtime and the curve builds toward the full string at 100%:
@@ -422,13 +433,47 @@
         while (headTrail.length > 2 && now - headTrail[0].t > STEADY_TRAIL_MS) headTrail.shift();
     }
 
-    // The release catch-up has landed: the stroke is over.
-    function arrive() {
+    // The canvas in canvas px: the head's own coordinate space.
+    function canvasBox() {
+        var c = document.getElementById('canvas');
+        return { w: (c && c.width) || 0, h: (c && c.height) || 0 };
+    }
+    function offCanvas(x, y, box) {
+        return box.w > 0 && (x < 0 || y < 0 || x > box.w || y > box.h);
+    }
+    // How far along (x0,y0) → (x1,y1), 0..1, the segment crosses the
+    // canvas's edge. (x0,y0) is inside; (x1,y1) is not.
+    function edgeT(x0, y0, x1, y1, box) {
+        var t = 1, dx = x1 - x0, dy = y1 - y0;
+        if (x1 < 0 && dx < 0) t = Math.min(t, -x0 / dx);
+        if (x1 > box.w && dx > 0) t = Math.min(t, (box.w - x0) / dx);
+        if (y1 < 0 && dy < 0) t = Math.min(t, -y0 / dy);
+        if (y1 > box.h && dy > 0) t = Math.min(t, (box.h - y0) / dy);
+        return Math.max(0, Math.min(1, t));
+    }
+    // After the lift, walk the head to (x, y) unless that crosses the
+    // canvas's edge: then to the edge, and say so (the line is over).
+    function releaseStep(x, y, box) {
+        if (offCanvas(x, y, box) && !offCanvas(hx, hy, box)) {
+            var t = edgeT(hx, hy, x, y, box);
+            hx += (x - hx) * t;
+            hy += (y - hy) * t;
+            emitAlong(hx, hy, 1);
+            return true;
+        }
+        hx = x; hy = y;
+        emitAlong(hx, hy, 1);
+        return false;
+    }
+
+    // The release catch-up has landed: the stroke is over. Off the canvas's
+    // edge (offEdge) it ends without its release tail.
+    function arrive(offEdge) {
         active = false;
         releasing = false;
         var cb = arriveCb;
         arriveCb = null;
-        if (cb) {
+        if (cb && !offEdge) {
             var v = headVelocity();
             try { cb({ x: hx, y: hy, dx: v.dx, dy: v.dy }); } catch (_) {}
         }
@@ -456,11 +501,12 @@
         // head joins the hand the way raw samples would.
         if (!(s > 0)) {
             for (var k = 0; k < count; k++) emitAlong(samples[k].x, samples[k].y, 1);
-            hx = tx; hy = ty;
-            emitAlong(hx, hy, 1);
+            var offEdge = false;
+            if (releasing) offEdge = releaseStep(tx, ty, canvasBox());
+            else { hx = tx; hy = ty; emitAlong(hx, hy, 1); }
             px0 = tx; py0 = ty;
             noteHead(now);
-            if (releasing) { arrive(); return true; }
+            if (releasing) { arrive(offEdge); return true; }
             return false;
         }
         var n = Math.max(1, Math.min(STEADY_MAX_STEPS,
@@ -468,6 +514,9 @@
         var hw = wall / n;          // wall seconds per step
         var h = hw * tf;            // the head's (Time-scaled) seconds per step
         var pull = sh.tau > 1e-6 ? 1 - Math.exp(-h / sh.tau) : 1;
+        // After the lift the line ends where the head runs off the canvas.
+        var box = releasing ? canvasBox() : null;
+        var ranOff = false;
         for (var i = 0; i < n; i++) {
             // Where the hand was at this step: sample j of the frame's run.
             var ax = px0, ay = py0;
@@ -480,6 +529,10 @@
             var e = d - sh.slack;
             if (!(e > 0)) continue; // slack: the head stays where it is
             var step = Math.min(e * pull, sh.vmax * h);
+            if (box) {
+                if (releaseStep(hx + dx / d * step, hy + dy / d * step, box)) { ranOff = true; break; }
+                continue;
+            }
             hx += dx / d * step;
             hy += dy / d * step;
             emitAlong(hx, hy, 1);
@@ -488,6 +541,7 @@
         noteHead(now);
         if (releasing) {
             releaseWall += wall;
+            if (ranOff) { arrive(true); return true; }
             if (settled(sh.slack) || releaseWall >= STEADY_RELEASE_MAX_S) { arrive(); return true; }
         }
         return false;
@@ -573,6 +627,11 @@
                     releasing = true;
                     releaseWall = 0;
                     arriveCb = (typeof onArrive === 'function') ? onArrive : null;
+                    // Lifted off the canvas with the head out there too: the
+                    // line already left the canvas, so nothing is left to
+                    // finish (a head still inside runs to the edge in tick).
+                    var box = canvasBox();
+                    if (offCanvas(hx, hy, box) && offCanvas(tx, ty, box)) { arrive(true); return null; }
                     // Lifted with the head already at rest: the stroke ends here.
                     if (settled(steadyShape(steadyAmount()).slack)) { arrive(); return null; }
                 }

@@ -2234,7 +2234,7 @@
         if (steadyInput) {
             var steadyWrap = document.createElement('div');
             steadyWrap.className = 'lsb-steady';
-            steadyWrap.dataset.uiKey = 'Steady';
+            steadyWrap.dataset.uiKey = 'Stabilization';
             steadyWrap.appendChild(steadyInput.closest('.control-group'));
             var guideInput = body.querySelector('#brushSteadyHideGuide');
             if (guideInput) steadyWrap.appendChild(guideInput.closest('.control-group'));
@@ -5845,17 +5845,22 @@
         // moves so fast sometimes, we need to let the user tone it down". One
         // slider for the whole feel — slack, pull and top speed all rise
         // together — because three knobs for "calmer" is two too many.
-        var steadyGroup = pSlider('brushSteady', 'Steady', 0, 1, 0.01, 'BRUSH_STEADY',
+        // Shown as "Stabilization" since 2026-10-07 (Gabriel: "the steady is
+        // actually stabilization"). Only the words changed: the id, the
+        // config key and the preset key stay 'steady', so saved presets,
+        // look links and hotkey binds keep finding it.
+        var steadyGroup = pSlider('brushSteady', 'Stabilization', 0, 1, 0.01, 'BRUSH_STEADY',
             function (v) { return v > 0.001 ? Math.round(v * 100) + '%' : 'Off'; }, 'steady');
         steadyGroup.title = 'The brush follows your hand on a string. Small wobbles stay inside the slack, '
             + 'corners round off, and a fast drag is laid down at a calm, even pace. Higher = a longer, '
             + 'lazier string. It moves with Time too: slow Time, slower brush. When you let go, the brush '
-            + 'finishes the line to where you lifted. Off = the brush sits on the cursor.';
+            + 'finishes the line to where you lifted, or to the edge if you let go off the canvas. '
+            + 'Off = the brush sits on the cursor.';
         // Hide guide: paint without the line and the hand ring (31). Only
         // shown while Steady is on — with Steady off there is no guide.
         // A viewing preference, not part of the brush: no preset key.
         var guideRow = pCheckbox('brushSteadyHideGuide', 'Hide guide', 'BRUSH_STEADY_HIDE_GUIDE');
-        guideRow.title = 'Paint without the Steady guide: the line from the brush back to the ring at your cursor.';
+        guideRow.title = 'Paint without the Stabilization guide: the line from the brush back to the ring at your cursor.';
         function syncGuideRow() {
             var on = !!(window.config && window.config.BRUSH_STEADY > 0.001);
             guideRow.style.display = on ? '' : 'none';
