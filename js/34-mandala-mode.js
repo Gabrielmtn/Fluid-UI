@@ -78,6 +78,15 @@
         el.value = String(v);
         el.dispatchEvent(new Event('change', { bubbles: true }));
     }
+    // Mirror a value onto a panel slider WITHOUT dispatching (that would echo
+    // back into the control it came from). The fill is painted from --val,
+    // which 06 only refreshes on input/change, so a bare .value write moved
+    // the thumb and left the bar behind: Kaleido's first-enable 16 showed as
+    // a thumb at 16 over a fill still at 12.
+    function mirrorRange(el, v) {
+        el.value = String(v);
+        try { el.style.setProperty('--val', el.value); } catch (_) {}
+    }
 
     function active() { return !!toggleEl.checked; }
 
@@ -95,7 +104,7 @@
         });
         targetEl.addEventListener('input', function (e) {
             if (src.value !== e.target.value) {
-                src.value = e.target.value;
+                mirrorRange(src, e.target.value);
                 paint(parseFloat(e.target.value));
             }
         });
@@ -394,7 +403,7 @@
     });
     if (kSegments) kSegments.addEventListener('input', function (e) {
         if (wedgesEl && wedgesEl.value !== e.target.value) {
-            wedgesEl.value = e.target.value;
+            mirrorRange(wedgesEl, e.target.value);
             if (wedgesValEl) wedgesValEl.textContent = e.target.value;
             if (active() && !pinning) pinAngle();
         }
