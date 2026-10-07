@@ -991,6 +991,10 @@
                     <option value="0">Off</option>
                 </select>
             </div>
+            <div class="control-group checkbox-group">
+                <input type="checkbox" id="kaleidoShowGuides">
+                <label for="kaleidoShowGuides" style="margin: 0" title="Draw the mirror lines over the canvas and tint the area the kaleidoscope copies from. Paint inside the tint and it shows in every copy. Saved pictures and videos never include guides.">Show Guides</label>
+            </div>
             <div class="control-group">
                 <label for="kAngle">Angle <span id="kAngleValue" class="value-display">0°</span></label>
                 <input type="range" id="kAngle" min="-180" max="180" value="0" step="1">
@@ -1875,6 +1879,10 @@
     <script src="js/32-file-drop.js"></script>
     <script src="js/33-brush-shapes.js"></script>
     <script src="js/34-mandala-mode.js"></script>
+    <!-- Kaleidoscope → Show Guides: the fold lines and the area the mirrored
+         picture is copied from, over the canvas. Steps aside for Mandala
+         Studio's own guides (34). -->
+    <script src="js/63-kaleido-guides.js"></script>
     <script src="js/35-zoom-view.js"></script>
     <script src="js/36-display-mode.js"></script>
     <!-- Pen Input Window (Display → Pen Input Window): a pop-out input surface

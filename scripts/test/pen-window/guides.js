@@ -8,8 +8,9 @@
 // c button hides the cursor for both)", and "the guides should have small
 // indicators to ID where the mouse is, and prevent it from leaving the guide
 // area, no matter how far the mouse moves". Checks: the toolbar's Guides menu
-// and Always show cursor (both ways, persisted), the Stroke locks and Mandala
-// Studio guides drawn over the popout's box, the lock's hand kept inside its
+// and Always show cursor (both ways, persisted), the Stroke locks, Mandala
+// Studio and Kaleidoscope guides drawn over the popout's box (the last one
+// turning with a spin, 2026-10-06), the lock's hand kept inside its
 // band (hover, and a pen stroke dragged off the box) and pulled back in by
 // the first move back, drifting laps turning the brush one way with no jumps,
 // and a press that dismisses the menu painting nothing.
@@ -134,7 +135,7 @@ async function openPopup(env) {
 
         // ── Toolbar ──
         const tb = await pop.eval("({ btn: document.getElementById('guidesBtn').textContent, cb: document.getElementById('cursorBox').checked, menuHidden: document.getElementById('guidesMenu').hidden, rows: document.querySelectorAll('#guidesMenu input[data-guide]').length })");
-        check('toolbar: Guides button reads "Guides: all", cursor box ticked, menu built with 2 rows and closed', /Guides: all/.test(tb.btn) && tb.cb && tb.menuHidden && tb.rows === 2, tb);
+        check('toolbar: Guides button reads "Guides: all", cursor box ticked, menu built with 3 rows and closed', /Guides: all/.test(tb.btn) && tb.cb && tb.menuHidden && tb.rows === 3, tb);
 
         // ── Cursor override ──
         const ST = "(function(){ var g=document.getElementById('ghost'), r=document.getElementById('ring'); return { ghost: g.style.display, ring: r.style.display, vis: r.style.visibility || 'visible' }; })()";
@@ -239,11 +240,68 @@ async function openPopup(env) {
         check('Keep angle: popout draws the spoke', g3.disp === 'block' && g3.line, g3);
         await main.eval("window.StrokeLock.release('angle'); 1");
 
+        // ── Kaleidoscope guide (2026-10-06) ──
+        // Drawn here while the main window's Show Guides is ticked; this
+        // window's menu can still hide it. Its fold turns with a spin: to the
+        // angle of the frame the mirror last copied, or every frame with the
+        // mirror off.
+        const POP_ANGLE = "(function(){ var g=document.querySelector('#guide-kaleido > g'); var f=g && g.children[1]; var t=f && f.getAttribute('transform'); if (!t) return null; var m=t.slice(7, -1).split(' ').map(Number); return Math.atan2(-m[1], m[0]); })()";
+        const SEAMS = "(function(r){ var p=r && r.children[1] && r.children[1].querySelectorAll('path')[1]; return p ? p.getAttribute('d').split('M').length - 1 : 0; })";
+        await main.eval("(function(){ window._kaleidoBootstrapped = true; var k=document.getElementById('kaleidoToggle'); if (!k.checked) { k.checked=true; k.dispatchEvent(new Event('change',{bubbles:true})); } return 1; })()");
+        await sleep(400);
+        const k0 = await pop.eval("document.getElementById('guide-kaleido').style.display");
+        check("Kaleido on, main 'Show Guides' off: no kaleidoscope guide here", k0 !== 'block', k0);
+        await setMain('kaleidoShowGuides', true);
+        await sleep(500);
+        const k1 = await pop.eval("(function(){ var s=document.getElementById('guide-kaleido'), r=s.querySelector('g'); return { disp: s.style.display, vb: s.getAttribute('viewBox'), paths: r.querySelectorAll('path').length, seams: " + SEAMS + "(r) }; })()");
+        const km = await main.eval("(function(){ var r=document.querySelector('#kaleidoGuides > g'); return { disp: document.getElementById('kaleidoGuides').style.display, seams: " + SEAMS + "(r), n: window.kaleidoSegments }; })()");
+        check("main 'Show Guides' ticked: popout draws the main window's seams (2 a facet) and the source", k1.disp === 'block' && km.disp === 'block' && k1.seams === km.seams && k1.seams === 2 * km.n && k1.paths >= 5 && k1.vb === '0 0 ' + bw + ' ' + bh, { k1, km });
+        // Spin, mirror on (Light, idle 2 fps here): the fold sits at the angle the mirror copied.
+        await main.eval("(function(){ var s=document.getElementById('kSpinSpeed'); s.value='90'; s.dispatchEvent(new Event('input',{bubbles:true})); var r=document.getElementById('kAnimateRot'); if (!r.checked) { r.checked=true; r.dispatchEvent(new Event('change',{bubbles:true})); } return 1; })()");
+        await sleep(800);
+        let synced = null;
+        for (let i = 0; i < 6 && !synced; i++) {
+            const a1 = await pop.eval(POP_ANGLE);
+            const mk = await main.eval("window.PenWindow.__state().mirror.kAngle");
+            const a2 = await pop.eval(POP_ANGLE);
+            if (a1 === a2 && mk !== null) {
+                let d = a1 - mk; d = Math.atan2(Math.sin(d), Math.cos(d));
+                synced = { a1, mk, diff: Math.abs(d) };
+            } else await sleep(50);
+        }
+        const aA = await pop.eval(POP_ANGLE); await sleep(1100); const aB = await pop.eval(POP_ANGLE);
+        check('spinning, mirror on: the fold turns, at the angle of the frame the mirror copied', synced && synced.diff < 1e-4 && aA !== aB, { synced, aA, aB });
+        // Mirror off: over the blank surface it follows every frame.
+        await main.eval("(function(){ var s=document.getElementById('penWindowMirror'); s.value='off'; s.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
+        await sleep(300);
+        const seen = new Set();
+        for (let i = 0; i < 12; i++) { seen.add(await pop.eval(POP_ANGLE)); await sleep(25); }
+        check('spinning, mirror off: the fold follows frame by frame (not the 4 Hz poll)', seen.size >= 6, { distinct: seen.size, of: 12 });
+        await main.eval("(function(){ var s=document.getElementById('penWindowMirror'); s.value='light'; s.dispatchEvent(new Event('change',{bubbles:true})); var r=document.getElementById('kAnimateRot'); r.checked=false; r.dispatchEvent(new Event('change',{bubbles:true})); var p=document.getElementById('kSpinSpeed'); p.value='30'; p.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
+        await sleep(300);
+        // This window's menu hides it here only.
+        await click('#guidesBtn');
+        await click('#guidesMenu input[data-guide="kaleido"]');
+        const k5 = await pop.eval("({ disp: document.getElementById('guide-kaleido').style.display, btn: document.getElementById('guidesBtn').textContent })");
+        const k5m = await main.eval("({ disp: document.getElementById('kaleidoGuides').style.display, saved: window.settingsManager.get('display.penWindowGuides', null) })");
+        check('unticking Kaleidoscope hides it here only, button reads "Guides: Stroke locks, Mandala Studio", saved', k5.disp === 'none' && /Guides: Stroke locks, Mandala Studio/.test(k5.btn) && k5m.disp === 'block' && k5m.saved && k5m.saved.kaleido === false, { k5, k5m });
+        await click('#guidesMenu input[data-guide="kaleido"]');
+        await click('#guidesBtn');
+        await sleep(300);
+        const k6 = await pop.eval("({ disp: document.getElementById('guide-kaleido').style.display, btn: document.getElementById('guidesBtn').textContent, menu: !document.getElementById('guidesMenu').hidden })");
+        check('ticked back: shown again, "Guides: all", menu closed', k6.disp === 'block' && /Guides: all/.test(k6.btn) && !k6.menu, k6);
+        await setMain('kaleidoShowGuides', false);
+        await sleep(400);
+        const k7 = await pop.eval("document.getElementById('guide-kaleido').style.display");
+        check("main 'Show Guides' unticked: gone here too", k7 === 'none', k7);
+        await setMain('kaleidoShowGuides', true);
+        await sleep(400);
+
         // ── Mandala guide ──
         await main.eval("(function(){ var t=document.getElementById('mandalaToggle'); t.checked=true; t.dispatchEvent(new Event('change',{bubbles:true})); return 1; })()");
         await sleep(600);
-        const m1 = await pop.eval("(function(){ var s=document.getElementById('guide-mandala'); return { disp: s.style.display, lines: s.querySelectorAll('line').length, paths: s.querySelectorAll('path').length }; })()");
-        check('Mandala Studio on: popout shows its wedge, seams and rings', m1.disp === 'block' && m1.lines >= 6 && m1.paths >= 2, m1);
+        const m1 = await pop.eval("(function(){ var s=document.getElementById('guide-mandala'); return { disp: s.style.display, lines: s.querySelectorAll('line').length, paths: s.querySelectorAll('path').length, kaleido: document.getElementById('guide-kaleido').style.display }; })()");
+        check('Mandala Studio on: popout shows its wedge, seams and rings, and the kaleidoscope guide steps aside', m1.disp === 'block' && m1.lines >= 6 && m1.paths >= 2 && m1.kaleido === 'none', m1);
         // Main Hide Guides does not hide the popout's (its own choice).
         await setMain('mandalaHideGuides', true);
         await sleep(400);
@@ -261,7 +319,7 @@ async function openPopup(env) {
         await click('#guidesMenu input[data-guide="mandala"]');
         const m3 = await pop.eval("({ disp: document.getElementById('guide-mandala').style.display, btn: document.getElementById('guidesBtn').textContent, open: !document.getElementById('guidesMenu').hidden })");
         const saved = await main.eval("window.settingsManager.get('display.penWindowGuides', null)");
-        check('unticking Mandala Studio hides it here, button reads "Guides: Stroke locks", saved', m3.disp === 'none' && /Guides: Stroke locks/.test(m3.btn) && m3.open && saved && saved.mandala === false && saved.strokeLock === true, { m3, saved });
+        check('unticking Mandala Studio hides it here, button reads "Guides: Stroke locks, Kaleidoscope", saved', m3.disp === 'none' && /Guides: Stroke locks, Kaleidoscope/.test(m3.btn) && m3.open && saved && saved.mandala === false && saved.strokeLock === true && saved.kaleido === true, { m3, saved });
         // Dismiss by pressing on the surface: no stroke.
         await pop.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy + 40, button: 'left', buttons: 1, clickCount: 1, pointerType: 'pen', force: 0.5 });
         await sleep(60);

@@ -18,8 +18,11 @@ Neither ships (electron-builder drops `scripts/`).
   once. 14 of its 15 checks fail on the code before 2026-09-14.
 - `node scripts/test/pen-window/guides.js` — the popup toolbar's Guides menu
   (Stroke locks + Mandala Studio drawn over the box, each on or off here
-  whatever the main window shows, persisted) and Always show cursor (C and
-  Show Brush Ghost off hide the popup cursor only when it is unticked), plus
+  whatever the main window shows, persisted; Kaleidoscope too, while the main
+  window's Show Guides is ticked, its fold turning with a spin at the angle
+  the mirror copied, or every frame with the mirror off) and Always show
+  cursor (C and Show Brush Ghost off hide the popup cursor only when it is
+  unticked), plus
   the stroke locks' confined hand: pushed far off the circle or the spoke
   (hovering, and a pen stroke dragged off the box) it stops at the band's
   edge with the paint still on the guide, the first move back pulls it in,

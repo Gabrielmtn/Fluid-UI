@@ -141,12 +141,25 @@
     var screenDetails = null;   // Window Management API details, when granted
     var guideTimer = 0;
     var guideHooks = false;     // StrokeLock listeners registered (once; they check isOpen)
+    var kaleidoHook = false;    // ...and KaleidoGuides' frame listener
+    var mirrorKAngle = null;    // window.kAngle when the mirror last copied the canvas
 
     // The guides this window can draw over its mirror, bottom to top. Each
     // `markup(W, H)` is the owning module's own marks for a W×H box over the
     // whole canvas ('' while that guide has nothing to show), so the two
-    // windows cannot disagree about where a line is.
+    // windows cannot disagree about where a line is. Kaleidoscope `paint`s
+    // into its group instead: a spin turns it every frame, and a rewrite of
+    // every mark per frame would be the wrong price for that.
     var GUIDES = [
+        { id: 'kaleido', name: 'Kaleidoscope',
+          about: "The mirror lines and the area the copies come from, while Kaleido's Show Guides is ticked.",
+          paint: function (g, W, H) {
+              var K = window.KaleidoGuides;
+              if (!K || typeof K.paint !== 'function') return false;
+              // Turned to the angle the mirror last copied, while it runs: the
+              // picture under the lines is that frame, not the live one.
+              return K.paint(g, W, H, (mirrorCtx && mirrorKAngle !== null) ? mirrorKAngle : undefined);
+          } },
         { id: 'mandala', name: 'Mandala Studio',
           about: 'The wedge you paint in, its seams and rings, while Mandala Studio is on.',
           markup: function (W, H) {
@@ -160,8 +173,8 @@
               return (L && typeof L.guideMarkup === 'function') ? L.guideMarkup(W, H) : '';
           } }
     ];
-    var MENU_ORDER = ['strokeLock', 'mandala'];
-    var guidesOn = { strokeLock: true, mandala: true };
+    var MENU_ORDER = ['strokeLock', 'mandala', 'kaleido'];
+    var guidesOn = { strokeLock: true, mandala: true, kaleido: true };
     var cursorForced = true;
 
     // ── Self-test: does a constructed event carry its coalesced samples? ──
@@ -304,6 +317,7 @@
             '<div id="stage"><div id="box">',
             '<canvas id="mirror" width="16" height="9"></canvas>',
             '<div id="blank" hidden><div><b>Mirror off</b>Draw here and watch your main monitor.</div></div>',
+            '<svg class="guide" id="guide-kaleido" aria-hidden="true"><g></g></svg>',
             '<svg class="guide" id="guide-mandala" aria-hidden="true"><g></g></svg>',
             '<svg class="guide" id="guide-strokeLock" aria-hidden="true"><g></g><g></g></svg>',
             '</div><div id="ghostArms"></div><canvas id="ghost"></canvas><div id="ring"></div></div>',
@@ -314,7 +328,7 @@
             // down), and a <select> needs focus to open. The Guides menu is
             // our own list of checkboxes for the same reason; a checkbox
             // toggles on its click, focus or not.
-            '<button id="guidesBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Guides drawn over this window, whatever the main window shows">Guides: all &#9662;</button>',
+            '<button id="guidesBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Guides drawn over this window. What you pick here applies to this window only.">Guides: all &#9662;</button>',
             '<label title="Keep the brush cursor in this window even when the main window hides it (C, Focus mode, Show Brush Ghost off). Untick to follow the main window.">',
             '<input type="checkbox" id="cursorBox" checked>Always show cursor</label>',
             '<button id="mirrorBtn" type="button" title="Mirror: what this window shows under the pen. Click to cycle Light / Smooth / Off.">Mirror: Light</button>',
@@ -1334,20 +1348,32 @@
     // (no lock held, Mandala Studio off), is hidden.
     function guidesSync() {
         if (!ui || !ui.guides) return;
-        var vb = '0 0 ' + box.w + ' ' + box.h;
-        for (var i = 0; i < GUIDES.length; i++) {
-            var d = GUIDES[i], g = ui.guides[d.id];
-            if (!g || !g.svg || !g.marks) continue;
-            var mk = '';
-            if (guideOn(d.id)) {
-                try { mk = d.markup(box.w, box.h) || ''; } catch (e) { console.warn('Pen window: ' + d.id + ' guide failed', e); }
-            }
-            if (g.vb !== vb) { g.svg.setAttribute('viewBox', vb); g.vb = vb; }
-            if (g.last !== mk) { g.marks.innerHTML = mk; g.last = mk; }
-            var disp = mk ? 'block' : 'none';
-            if (g.svg.style.display !== disp) g.svg.style.display = disp;
-        }
+        for (var i = 0; i < GUIDES.length; i++) guideSync(GUIDES[i]);
         lockHandSync();
+    }
+    function guideSync(d) {
+        var g = ui && ui.guides && ui.guides[d.id];
+        if (!g || !g.svg || !g.marks) return;
+        var vb = '0 0 ' + box.w + ' ' + box.h;
+        if (g.vb !== vb) { g.svg.setAttribute('viewBox', vb); g.vb = vb; }
+        var shown = false;
+        try {
+            if (d.paint) {
+                shown = guideOn(d.id) && !!d.paint(g.marks, box.w, box.h);
+            } else {
+                var mk = guideOn(d.id) ? (d.markup(box.w, box.h) || '') : '';
+                if (g.last !== mk) { g.marks.innerHTML = mk; g.last = mk; }
+                shown = !!mk;
+            }
+        } catch (e) { console.warn('Pen window: ' + d.id + ' guide failed', e); }
+        var disp = shown ? 'block' : 'none';
+        if (g.svg.style.display !== disp) g.svg.style.display = disp;
+    }
+    // The kaleidoscope's fold turns with a spin, so it follows the picture
+    // under it: each mirror copy while the mirror runs (drawMirror), and
+    // every frame over the blank surface with the mirror off.
+    function kaleidoSync() {
+        if (ui && pdoc && pdoc.visibilityState === 'visible') guideSync(guideDef('kaleido'));
     }
     // The stroke lock's hand ring moves with every sample, not on a change:
     // 56 draws it into our group by attribute writes. Run from each pen move
@@ -1364,6 +1390,11 @@
         L.paintHand(g.hand, box.w, box.h);
     }
     function hookGuides() {
+        var K = window.KaleidoGuides;
+        if (!kaleidoHook && K && typeof K.onFrame === 'function') {
+            kaleidoHook = true;
+            K.onFrame(function () { if (isOpen() && !mirrorCtx) kaleidoSync(); });
+        }
         var L = window.StrokeLock;
         if (guideHooks || !L || typeof L.onChange !== 'function') return;
         guideHooks = true;
@@ -1437,6 +1468,7 @@
     function stopMirror() {
         clearTimeout(mirrorTimer); mirrorTimer = 0;
         mirrorCtx = null; mirrorSpec = null;
+        mirrorKAngle = null;
     }
     // What sits under the paint on the main screen: Display → Background
     // Color (CSS on #canvas-area, never in the GL buffer), or black under
@@ -1510,6 +1542,10 @@
         var dt = performance.now() - t0;
         mirrorStats.draws++;
         mirrorStats.drawMs = mirrorStats.draws === 1 ? dt : mirrorStats.drawMs * 0.9 + dt * 0.1;
+        // The frame just copied was drawn at this angle (05j steps the spin
+        // and draws in one callback; this runs between frames).
+        mirrorKAngle = window.kAngle || 0;
+        kaleidoSync();
         return true;
     }
     function mirrorTick() {
@@ -1807,7 +1843,8 @@
                     activeFps: spec ? spec.active : 0, idleFps: spec ? spec.idle : 0,
                     rate: mirrorStats.lastRate, draws: mirrorStats.draws,
                     drawMs: Math.round(mirrorStats.drawMs * 1000) / 1000,
-                    backing: ui ? [ui.mirror.width, ui.mirror.height] : null
+                    backing: ui ? [ui.mirror.width, ui.mirror.height] : null,
+                    kAngle: mirrorKAngle
                 }
             };
         }

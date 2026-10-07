@@ -15,7 +15,8 @@
         "window.kaleidoEnabled / kaleidoSegments / kaleidoMode / kAngle / kTwist / kZoom / kBlend / kAnimateRot (display-pass uniforms, js/05j-update-loop.js:1286-1298)",
         "animationMultiplier + #multiplier slider (first-enable bootstrap writes 8; toggle-off restores _prevMultiplier; js/05f-kaleido-controls.js:37-66)",
         "window.kAngle is ALSO written by: the update loop when kAnimateRot (js/05j-update-loop.js:150-152, sim-clock frameDt so deterministic), audio-reactive mid->kaleido mapping (js/22-audio-reactive.js:791-797, wall-clock), and mandala's pinAngle (js/34-mandala-mode.js:144-153)",
-        "window._kaleidoBootstrapped / window._prevMultiplier"
+        "window._kaleidoBootstrapped / window._prevMultiplier",
+        "DOM: #kaleidoGuides SVG overlay appended to #canvas-wrapper while #kaleidoShowGuides is ticked (js/63-kaleido-guides.js, settingsManager 'kaleido.showGuides', not in the param registry); reads the kaleido globals once a frame and hides while Mandala Studio is on"
       ],
       "knownHazards": [
         "First-enable bootstrap mutates multi-arm state (multiplier 8x, segments 16) - js/05f-kaleido-controls.js:37-55; suppress with window._kaleidoBootstrapped = true (mandala does exactly this, js/34-mandala-mode.js:406)",
