@@ -615,7 +615,8 @@
                     window.collisionLayers.updateObstacleFromLayers();
                 }
             }
-            // Process replay even when paused so right-click replay always works
+            // Outside the isPaused block for the peers' replays; this canvas's
+            // own replay holds while paused (05d processReplay).
             processReplay();
             // Dab budget for this frame, in dabs — BRUSH_DAB_BUDGET is per
             // SIMULATED second, so a 33ms frame retires twice what a 16ms one

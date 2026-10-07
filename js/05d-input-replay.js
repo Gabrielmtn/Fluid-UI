@@ -884,6 +884,14 @@
         function processReplay() {
             processPeerReplays();
             if (!isReplayActive) return;
+            // Pause (Shift+Space) holds the replay where it is, the way it
+            // holds the sim and the Animations: a replay running on a paused
+            // field stacked every dab in place, since nothing moved them on.
+            // The playhead's clock is re-armed each paused frame so the
+            // resume picks up exactly where it stopped. Peers' replays above
+            // keep landing, like their live paint (05j: pausing freezes your
+            // sim, it does not mute the room).
+            if (isPaused) { replayHead.lastMs = Date.now(); return; }
             var events = window._activeReplayEvents;
             if (!events || !events.length) { isReplayActive = false; return; }
             try {
@@ -1099,8 +1107,10 @@
                 }
                 return;
             }
-            // Replay always works, even when paused
+            // Replay is paint, so a paused canvas ignores it the way it
+            // ignores a paint press (2026-10-06; it used to be exempt).
             if (btnMode === 'replay') {
+                if (isPaused) return;
                 isRightMouseDown = true;
                 replayPointerId = e.pointerId;
                 replayButton = e.button;
@@ -1806,11 +1816,10 @@
         let touchReplayHold = false;
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            // Replay sits above the isPaused gate, exactly as it does on the
-            // mouse path: a rehearsed motion must be re-triggerable on a frozen
-            // canvas. Everything below it — the gesture layer included — is a
-            // painting-time affordance and keeps its original ordering.
-            if (e.touches.length === 1 && !isReplayActive && !TouchGestures.isSuppressed()
+            // Replay is paint, so a paused canvas ignores it exactly as the
+            // mouse path does (2026-10-06; it used to sit above the isPaused
+            // gate). A replay touch while paused falls through to that gate.
+            if (e.touches.length === 1 && !isPaused && !isReplayActive && !TouchGestures.isSuppressed()
                 && buttonMode(0) === 'replay') {
                 touchReplayHold = true;
                 isRightMouseDown = true;   // processReplay loops while this is held

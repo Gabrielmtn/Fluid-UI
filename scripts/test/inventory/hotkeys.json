@@ -568,7 +568,7 @@
     {
       "phase": "right-click replay",
       "event": { "type": "pointerdown", "target": "#canvas", "button": 2, "pointerType": "mouse or pen barrel" },
-      "guard": "contextmenu is preventDefault-ed (js/05d-input-replay.js:781-783)",
+      "guard": "!isPaused (2026-10-06: a paused canvas ignores a replay press, and a replay already running holds until resume); contextmenu is preventDefault-ed (js/05d-input-replay.js:781-783)",
       "effect": "Hold replays the last stroke (replayStroke); while the tip is also down it pauses painting instead. Self-heals if the release is missed (buttons bitmask checks js/05d-input-replay.js:626-630,739-741). Release: button-2 pointerup clears replay, fires the fast-brush burst if tip held with velocity",
       "assertion": "bare-global isRightMouseDown===true and isReplayActive===true while held; both false plus window._activeReplayEvents===null after button-2 pointerup (js/05d-input-replay.js:742-745)",
       "source": "js/05d-input-replay.js:516-539,742-776"
