@@ -126,31 +126,67 @@
     // get back. The badge shows the live scale, names the two keys, and is
     // itself a reset button. No CSS transition (transitions on overlay elements
     // corrupt the GL canvas in the Electron build).
-    var badge = null;
+    //
+    // Zoom Mode itself has to be LOUD: while it is on, a stroke does nothing,
+    // and a small grey pill was easy to miss, so it read as "painting broke".
+    // In the mode the pill turns accent-filled and an accent ring frames the
+    // whole canvas area, so the state reads from wherever you are looking.
+    // Zoomed with the mode off keeps the quiet grey pill.
+    var badge = null, badgeHead = null, badgeTail = null, frame = null;
     function ensureBadge() {
         if (badge) return badge;
         badge = document.createElement('div');
         badge.id = 'zoomBadge';
-        badge.style.cssText = 'position:absolute;top:10px;left:50%;transform:translateX(-50%);' +
-            'z-index:60;pointer-events:auto;cursor:pointer;user-select:none;' +
-            'padding:4px 10px;border-radius:999px;font:600 11px/1.4 "Segoe UI",sans-serif;' +
-            'letter-spacing:0.3px;color:#f2f3f5;background:rgba(18,20,24,0.82);' +
-            'border:1px solid rgba(255,255,255,0.14);display:none';
+        badge.style.cssText = 'position:absolute;top:12px;left:50%;transform:translateX(-50%);' +
+            'z-index:60;pointer-events:auto;cursor:pointer;user-select:none;white-space:nowrap;' +
+            'border-radius:999px;font-family:"Segoe UI",sans-serif;letter-spacing:0.3px;display:none';
+        badgeHead = document.createElement('span');
+        badgeTail = document.createElement('span');
+        badge.appendChild(badgeHead);
+        badge.appendChild(badgeTail);
         badge.title = 'Click to reset the view (0)';
         badge.addEventListener('click', function (e) {
             e.preventDefault(); e.stopPropagation();
             ZoomView.reset();
         });
+        frame = document.createElement('div');
+        frame.id = 'zoomModeFrame';
+        frame.style.cssText = 'position:absolute;inset:0;z-index:59;pointer-events:none;' +
+            'box-shadow:inset 0 0 0 3px var(--accent, #ec3013);display:none';
+        (area || document.body).appendChild(frame);
         (area || document.body).appendChild(badge);
         return badge;
     }
     function syncBadge() {
         var b = ensureBadge();
         var zoomed = scale !== 1;
+        frame.style.display = zoomMode ? 'block' : 'none';
         if (!zoomed && !zoomMode) { b.style.display = 'none'; return; }
         b.style.display = 'block';
-        b.textContent = (zoomed ? Math.round(scale * 100) + '%' : 'Zoom Mode')
-            + (zoomMode ? ' · drag to pan · Z to paint' : ' · 0 to reset');
+        var pct = Math.round(scale * 100) + '%';
+        if (zoomMode) {
+            b.style.padding = '7px 16px';
+            b.style.font = '700 14px/1.4 "Segoe UI",sans-serif';
+            b.style.color = '#fff';
+            b.style.background = 'var(--accent, #ec3013)';
+            b.style.border = '1px solid rgba(255,255,255,0.35)';
+            b.style.boxShadow = '0 2px 14px rgba(0,0,0,0.55)';
+            badgeHead.textContent = 'ZOOM MODE' + (zoomed ? ' ' + pct : '');
+            // "drag to pan" only once there is something to pan: at 1:1
+            // panBy is a no-op.
+            badgeTail.textContent = ' · scroll to zoom' + (zoomed ? ' · drag to pan' : '') + ' · Z to paint';
+            badgeTail.style.fontWeight = '500';
+        } else {
+            b.style.padding = '5px 12px';
+            b.style.font = '600 12px/1.4 "Segoe UI",sans-serif';
+            b.style.color = '#f2f3f5';
+            b.style.background = 'rgba(18,20,24,0.82)';
+            b.style.border = '1px solid rgba(255,255,255,0.14)';
+            b.style.boxShadow = '';
+            badgeHead.textContent = pct;
+            badgeTail.textContent = ' · 0 to reset';
+            badgeTail.style.fontWeight = '';
+        }
     }
 
     function setZoomMode(on) {
