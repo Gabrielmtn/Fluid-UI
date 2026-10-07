@@ -2394,6 +2394,7 @@ body.mobile-mode #sidebar-right > #mixer-strip.ui-hidden { display: none !import
 .reset-app-modal { z-index: 10045; }
 .reset-app-modal .delete-modal-content { max-width: 420px; }
 .reset-app-modal .delete-modal-message { line-height: 1.5; }
+.reset-app-modal .delete-modal-actions { flex-wrap: wrap; }
 /* The one-time note above the button, pointing down at it. */
 .reset-app-hint {
     position: fixed;

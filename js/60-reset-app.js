@@ -21,10 +21,16 @@
 // current look generation so nothing is filled from an older one); the
 // brush drawer's engine settings, which the registry keeps no default for
 // (Spacing, Interval, Texture, Flow... from 04a's literal); Replay Speed;
-// running again (unfrozen, unpaused); and a clean canvas, pressure
-// included. What it keeps: presets, palettes, hotkeys, mouse-button roles,
-// the layout, PhotoSafe, image and motion resolution, the fps cap, layers,
-// text and recordings — the machine and the player's own work.
+// running again (unfrozen, unpaused); the view (zoom back to 1:1, Zoom
+// Mode off); and a clean canvas, pressure included. What it keeps:
+// presets, palettes, hotkeys, mouse-button roles, the layout, PhotoSafe,
+// image and motion resolution, the fps cap and animations — the machine
+// and the player's libraries.
+//
+// The question asks about the player's work (2026-10-06): Keep layers
+// leaves the Layers panel (images, paint layers, colliders, path layers,
+// masks) and the Text panel's lines where they are; Reset all deletes
+// them too, each through its own Delete.
 //
 // The button lives on the right of the quality underbar, before the demo
 // clock (or the playtest label). The first time the app has finished its
@@ -75,7 +81,49 @@
         });
     }
 
-    function reset() {
+    // Zoom is not a setting the look carries, so it outlived every reset:
+    // the canvas came back clean at 4x, or still in Zoom Mode, where the
+    // brush does not paint.
+    function resetView() {
+        if (typeof window.setZoomMode === 'function') window.setZoomMode(false);
+        if (window.ZoomView) window.ZoomView.reset();
+    }
+
+    // Reset all: each kind goes through its own Delete, so GPU buffers,
+    // clip bindings, collider walls and the room are freed the way a row's
+    // × frees them. Layers before masks: a collider or a clip may be bound
+    // to a mask, and unbinds as its layer goes.
+    function clearLayers() {
+        if (typeof window.deleteLayer === 'function' && Array.isArray(window.layers)) {
+            window.layers.map(function (l) { return l.index; }).forEach(function (i) {
+                try { window.deleteLayer(i); } catch (err) { console.warn('[ResetApp] layer', i, err); }
+            });
+        }
+        // Each Delete above was recorded for Ctrl+Z; a reset is not undone
+        // one layer at a time.
+        if (window.__layerHistory) window.__layerHistory.clear();
+        var P = window.pathLayers;
+        if (P && typeof P.getLayers === 'function' && typeof P.delete === 'function') {
+            P.getLayers().map(function (l) { return l.id; }).forEach(function (id) {
+                try { P.delete(id); } catch (err) { console.warn('[ResetApp] path', id, err); }
+            });
+        }
+        var M = window.Masks;
+        if (M && typeof M.list === 'function' && typeof M.remove === 'function') {
+            M.list().forEach(function (m) {
+                try { M.remove(m.id); } catch (err) { console.warn('[ResetApp] mask', m.id, err); }
+            });
+        }
+        if (window.textOverlays && typeof window.textOverlays.clearAll === 'function') {
+            try { window.textOverlays.clearAll(); } catch (err) { console.warn('[ResetApp] text', err); }
+        }
+    }
+
+    // opts.layers: Reset all (the player's layers, paths, masks and text go
+    // too). Without it, Keep layers.
+    function reset(opts) {
+        // 0. Reset all: the player's layers first, so nothing below re-reads them.
+        if (opts && opts.layers) clearLayers();
         // 1. The look, at today's generation (see the header).
         if (typeof window.baselineLookSnapshot === 'function' && typeof window.applyPresetSnapshotFull === 'function') {
             var snap = window.baselineLookSnapshot();
@@ -101,6 +149,9 @@
         var fz = document.getElementById('freezeBtn');
         if (fz && fz.classList.contains('active') && typeof window.toggleFreeze === 'function') window.toggleFreeze();
         if (typeof isPaused !== 'undefined' && isPaused && typeof window.togglePause === 'function') window.togglePause();
+        // 4b. The view: 1:1, Zoom Mode off. After the look, which may have
+        //     stood Mandala's Fill framing down on its own way out.
+        resetView();
         // 5. A clean canvas — the room sees the Clear — and pressure, which
         //    Clear leaves.
         if (typeof window.clearCanvas === 'function') window.clearCanvas();
@@ -128,19 +179,23 @@
             '<div class="delete-modal-content">' +
                 '<div class="delete-modal-title" id="resetAppTitle">Reset Swirl Together?</div>' +
                 '<div class="delete-modal-message" id="resetAppMsg">Clears the canvas and puts every setting ' +
-                    'back the way the app starts. Your presets, palettes, hotkeys, layers and animations stay.</div>' +
+                    'back the way the app starts. Presets, palettes, hotkeys and animations always stay.' +
+                    '<br><br>Keep your layers, text and paths, or remove them too?</div>' +
                 '<div class="delete-modal-actions">' +
                     '<button type="button" class="delete-modal-cancel" id="resetAppCancel">Cancel</button>' +
-                    '<button type="button" class="delete-modal-confirm btn--destructive" id="resetAppGo">Reset</button>' +
+                    '<button type="button" class="btn--emphasis" id="resetAppKeep">Keep layers</button>' +
+                    '<button type="button" class="delete-modal-confirm btn--destructive" id="resetAppAll">Reset all</button>' +
                 '</div>' +
             '</div>';
         document.body.appendChild(modal);
         modal.querySelector('#resetAppCancel').addEventListener('click', close);
-        modal.querySelector('#resetAppGo').addEventListener('click', function () {
+        function answer(layers) {
             if (performance.now() < armedAt) return;
             close();
-            reset();
-        });
+            reset({ layers: layers });
+        }
+        modal.querySelector('#resetAppKeep').addEventListener('click', function () { answer(false); });
+        modal.querySelector('#resetAppAll').addEventListener('click', function () { answer(true); });
         // The scrim answers like Cancel; a stroke's tail must not reset anything.
         modal.addEventListener('mousedown', function (e) { if (e.target === modal) close(); });
     }
@@ -179,7 +234,7 @@
             btn.className = 'btn--ghost reset-app-btn';
             btn.textContent = 'Reset app';
             btn.title = 'Reset app: a clean canvas and every setting back to how Swirl Together starts. ' +
-                'Presets, palettes, hotkeys and layers stay.';
+                'Asks whether your layers stay.';
             btn.addEventListener('click', function () { if (!modalUp()) ask(); });
         }
         if (btn.parentElement !== bar) {
