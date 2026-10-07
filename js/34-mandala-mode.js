@@ -413,6 +413,19 @@
     // ── Enter / exit ─────────────────────────────────────────────────
     let saved = null;
 
+    // The kaleido half of the rig. Runs on the way in, and again whenever
+    // Kaleido comes back on inside the mode, so the source wedge renders
+    // as itself whichever way you got here.
+    function rigKaleido() {
+        setSelect(kMode, 1);                                    // Wedge
+        setRange(kSegments, wedgesEl ? parseInt(wedgesEl.value, 10) || 12 : 12);
+        setRange(kTwistEl, 0);                                  // identity needs no twist
+        setRange(kZoomEl, 1);                                   // ...and zoom exactly 1
+        setRange(kBlendEl, 1);
+        setCheck(kAnimRotEl, false);                            // a painting rig holds still
+        pinAngle();
+    }
+
     function enterMandala() {
         ensureWrapped();
         // Only snapshot on the way IN. A second 'change' on an already-checked
@@ -437,25 +450,24 @@
             wetDry: wetDryEl ? wetDryEl.value : null,
             // Restored on the way out too, so using this mode once doesn't
             // permanently suppress Kaleido's own first-enable behaviour.
-            bootstrapped: window._kaleidoBootstrapped
+            bootstrapped: window._kaleidoBootstrapped,
+            // 05f's arm count for its next Kaleido-off. 05f leaves it alone
+            // while the mode is on, so the one from before is still right.
+            prevMultiplier: window._prevMultiplier
         };
         // Suppress 05f's first-enable bootstrap — it forces 16 segments and
         // an 8× multiplier, both of which fight this rig.
         window._kaleidoBootstrapped = true;
-        setCheck(kToggle, true);
-        setSelect(kMode, 1);                                    // Wedge
-        setRange(kSegments, wedgesEl ? parseInt(wedgesEl.value, 10) || 12 : 12);
-        setRange(kTwistEl, 0);                                  // identity needs no twist
-        setRange(kZoomEl, 1);                                   // ...and zoom exactly 1
-        setRange(kBlendEl, 1);
-        setCheck(kAnimRotEl, false);                            // a painting rig holds still
+        // Switching Kaleido on rigs it (the listener further down); one that
+        // was already on is rigged here.
+        if (kToggle && !kToggle.checked) setCheck(kToggle, true);
+        else rigKaleido();
         setRange(multiplierEl, 1);                              // one brush, not 8 arms —
                                                                 // the mirroring is the display's job
         // The default brush (11) paints a ~330px dab — wider than a whole
         // wedge at mid-radius, so the mode opens on a detail tip instead.
         // Restored on exit; the Size fader still goes anywhere from here.
         setRange(brushSizeEl, 0.05);
-        pinAngle();
         // Painterly sim: pigment that stays where you put it.
         setRange(densityEl, 1);                                 // never fades
         setRange(isolationEl, 5);                               // strokes don't shove settled paint
@@ -475,6 +487,9 @@
     function exitMandala() {
         clearFill();
         if (saved) {
+            // Kaleido first: switching it off makes 05f put back an arm count
+            // of its own, and the multiplier restore below has to land last.
+            setCheck(kToggle, saved.kaleidoOn);
             setSelect(kMode, saved.mode);
             setRange(kSegments, saved.segments);
             writeAngle(saved.angle);
@@ -488,8 +503,8 @@
             if (saved.isolation != null) setRange(isolationEl, saved.isolation);
             if (saved.wetInf != null) setRange(wetInfEl, saved.wetInf);
             if (saved.wetDry != null) setRange(wetDryEl, saved.wetDry);
-            setCheck(kToggle, saved.kaleidoOn);
             window._kaleidoBootstrapped = saved.bootstrapped;
+            window._prevMultiplier = saved.prevMultiplier;
             saved = null;
         }
         syncGuides();
@@ -508,32 +523,33 @@
         if (e.target.checked) enterMandala(); else exitMandala();
     });
 
-    // Turning raw Kaleido off underneath the mode drops out of it cleanly
-    // rather than leaving guides over an unmirrored canvas.
+    // Kaleido inside the mode is a view switch. Off by hand (the checkbox,
+    // the K key, a bound hotkey) shows the unmirrored canvas and leaves the
+    // mode on, guides, wedge, brush and sim included; on again re-rigs it so
+    // strokes land under the pen. It used to drop out of the mode entirely,
+    // so Mandala on with Kaleido off was a state you could not reach.
+    // Closing the mode still gives Kaleido back as it was before.
     //
-    // This fires far more often than it looks: kaleidoToggle is preset-backed
-    // (mandala's own toggle is not), and a preset apply re-dispatches 'change'
-    // on every checkbox — so every preset that lands with Kaleido off kicks
-    // the mode out from under the user. It used to drop the flag and nothing
-    // else, leaving the canvas magnified into a wedge, the Fill radio lit, a
-    // 0.05 detail brush and the painterly sim — and, because `saved` was gone,
-    // the Mandala toggle could no longer restore any of it.
+    // A preset is different. kaleidoToggle is preset-backed (mandala's own
+    // toggle is not) and a preset apply re-dispatches 'change' on every
+    // checkbox, so one that lands with Kaleido off has replaced the rig's
+    // sliders wholesale: the mode steps aside. Restoring the pre-mandala
+    // sliders over the top would fight the thing the user just picked, so
+    // give back only what belongs to this mode: the framing and the guides.
     if (kToggle) kToggle.addEventListener('change', function (e) {
-        if (e.target.checked || !active() || !saved) return;
-        saved.kaleidoOn = false;              // an explicit off stays off
-        toggleEl.checked = false;
-        showPanel(false);
+        if (!active() || !saved) return;
         if (window._profileApplying) {
-            // The preset owns the sliders now; restoring the pre-mandala ones
-            // over the top would fight the thing the user just picked. Give
-            // back only what belongs to this mode: the framing and the guides.
+            if (e.target.checked) return;
+            toggleEl.checked = false;
+            showPanel(false);
             window._kaleidoBootstrapped = saved.bootstrapped;
             saved = null;
             clearFill();
             syncGuides();
-        } else {
-            exitMandala();                    // a hand-thrown switch gets the full unwind
+            return;
         }
+        if (e.target.checked) rigKaleido();
+        refresh();
     });
 
     // ── Capture ──────────────────────────────────────────────────────

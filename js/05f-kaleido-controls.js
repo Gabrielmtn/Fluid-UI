@@ -34,6 +34,11 @@
                     if (e.target.checked) window._prevMultiplier = animationMultiplier;
                     return;
                 }
+                // Mandala Studio (34) holds its one-brush rig while it is on,
+                // and Kaleido is a view switch inside it: flipping it to see
+                // the unmirrored wedge must not swap the arm count. 34 hands
+                // the arm count back when the mode closes.
+                if (window.MandalaStudio && window.MandalaStudio.active()) return;
                 if (e.target.checked) {
                     window._prevMultiplier = animationMultiplier;
                     if (!window._kaleidoBootstrapped) {
