@@ -38,7 +38,7 @@ const E = ['e', 'KeyE', 69];
         const note = () => d.ev(`(function(){ var n = document.querySelector('.radial-block > .hk-picker-note'); return n ? { text: n.textContent, hidden: n.hidden, tone: n.dataset.tone || '' } : null; })()`);
         const bar = () => d.ev(`(function(){ var b = document.getElementById('hkBindBar'); if (!b) return null; return { step: b.dataset.step, steps: [].map.call(b.querySelectorAll('.hk-step-label'), function(s){ return s.textContent; }), say: b.querySelector('.hk-say').textContent, chip: (b.querySelector('.hk-chip-name') || {}).textContent || null }; })()`);
         const toast = () => d.ev(`(function(){ var t = document.getElementById('hkToast'); return t && !t.hidden ? t.textContent : ''; })()`);
-        const tagSection = (title, id) => d.ev(`(function(){ var s = [].filter.call(document.querySelectorAll('#sidebar-right .sidebar-section'), function(x){ var t = x.querySelector('.section-title'); return t && t.textContent.trim() === ${JSON.stringify(title)}; })[0]; if (!s) return false; s.querySelector('.section-header').id = ${JSON.stringify(id)}; return s.classList.contains('collapsed'); })()`);
+        const tagSection = (title, id) => d.ev(`(function(){ var s = [].filter.call(document.querySelectorAll('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section'), function(x){ var t = x.querySelector('.section-title'); return t && t.textContent.trim() === ${JSON.stringify(title)}; })[0]; if (!s) return false; s.querySelector('.section-header').id = ${JSON.stringify(id)}; return s.classList.contains('collapsed'); })()`);
 
         const bm = await d.ev('JSON.parse(JSON.stringify(window.ButtonModes.state()))');
         check('M1 old saved buttons kept, middle gets the menu', bm.left.mode === 'mirror' && bm.left.mirror === 'y' && bm.right.mode === 'replay' && bm.middle.mode === 'radial', bm);
@@ -58,14 +58,25 @@ const E = ['e', 'KeyE', 69];
         check('S1 Edit the menu opens Settings → Radial Menu on screen', blk && blk.y > 60 && blk.y < 805, blk);
         await d.shot('settings-block.png');
         const rows0 = await d.ev(`[].map.call(document.querySelectorAll('.radial-block .radial-row'), function(r){ return [r.querySelector('.hk-row-name').textContent, r.querySelector('.hk-row-sub').textContent]; })`);
-        check('S1 nine rows, the top bar\'s sliders', rows0.length === 9 && rows0[0][0] === 'Brush Size' && rows0[7][0] === 'Density' && rows0.every(r => r[1] === 'Slider · Top bar'), rows0.map(r => r[0]));
+        // Two left the top bar for the left sidebar (2026-10-04): Brush Size
+        // heads the brush bar, Multi-Brush is a section of its own there.
+        const HOME = { 'Brush Size': 'Brush bar', 'Multi-Brush': 'Multi-Brush' };
+        check('S1 nine rows, the main sliders, each saying where it lives', rows0.length === 9 && rows0[0][0] === 'Brush Size' && rows0[7][0] === 'Density' && rows0.every(r => r[1] === 'Slider · ' + (HOME[r[0]] || 'Top bar')), rows0);
         check('S1 reset hidden while the list is the starting one', await d.ev(`document.querySelector('.radial-reset').hidden`));
+
+        // Stroke and replay is still open from the door above: it lives in the
+        // left sidebar now, and each sidebar keeps its own accordion, so
+        // Settings opening on the right left it alone. Fold it shut here, so
+        // the click under bind mode below has a section to fold open.
+        if (!(await tagSection('Stroke and replay', 'secStroke'))) { await d.ev(`document.getElementById('secStroke').click()`); await sleep(600); }
 
         // ── + Add from the interface: what opens or folds is never taken ──
         await clickSel('.radial-pick-btn'); await sleep(250);
         const b1 = await bar();
         check('A1 bind mode opens with the menu as its destination: two steps', b1 && b1.step === '1' && b1.steps.join('|') === 'Choose a control|Done' && /on the radial menu/.test(b1.say), b1);
 
+        // More only shows on a narrower window since those two moved out of the top bar.
+        await d.send('Emulation.setDeviceMetricsOverride', { width: 1300, height: 900, deviceScaleFactor: 1, mobile: false }); await sleep(800);
         const more = await rect('.mixer-more-btn');
         if (more && more.hit) {
             await d.click(more.x, more.y); await sleep(300);
@@ -76,11 +87,12 @@ const E = ['e', 'KeyE', 69];
         } else {
             check('A2 More is on screen to test', false, more);
         }
+        await d.send('Emulation.clearDeviceMetricsOverride'); await sleep(800);
         await clickSel('#mixerPresetsTrigger'); await sleep(300);
         check('A2 the Presets menu opens and adds nothing', (await items()).length === 9 && (await bar()).step === '1' && !!(await d.ev(`!!document.querySelector('.mixer-presets-panel')`)));
         await clickSel('#mixerPresetsTrigger'); await sleep(300);
 
-        const wasCollapsed = await tagSection('Stroke and replay', 'secStroke');
+        const wasCollapsed = await d.ev(`document.getElementById('secStroke').parentElement.classList.contains('collapsed')`);
         await d.ev(`document.getElementById('secStroke').scrollIntoView({block:'center'})`); await sleep(900);
         await clickSel('#secStroke'); await sleep(1500);
         const opened = await d.ev(`!document.getElementById('secStroke').parentElement.classList.contains('collapsed')`);

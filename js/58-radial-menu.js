@@ -956,13 +956,15 @@
         }
     };
 
-    // Where a slider lives, for its row: the top bar, or its section.
+    // Where a slider lives, for its row: its section (in either sidebar, as
+    // 49's whereOf names the other rows), the brush bar's head, or the top bar.
     function sliderHome(e) {
-        if (e.closest('#sidebar-left')) return 'Brush bar';
-        if (e.closest('.mixer-channel')) return 'Top bar';
         var sec = e.closest('#sidebar-right .sidebar-section, #sidebar-left .sidebar-section');
         var t = sec ? sec.querySelector('.section-title') : null;
-        return t ? t.textContent.replace(/\s+/g, ' ').trim() : '';
+        if (t) return t.textContent.replace(/\s+/g, ' ').trim();
+        if (e.closest('#sidebar-left')) return 'Brush bar';
+        if (e.closest('.mixer-channel')) return 'Top bar';
+        return '';
     }
 
     function onAdd() {
