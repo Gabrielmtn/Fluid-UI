@@ -449,6 +449,10 @@
             animationFrame = requestAnimationFrame(animate);
 
             if (!window.lightShift.enabled || window.lightShift.colorPath.length === 0) return;
+            // Pausing the sim holds the colour too (01-config's flag, shared by
+            // every classic script). The playhead steps per tick, not per ms,
+            // so resuming picks up exactly where the pause caught it.
+            if (typeof isPaused !== 'undefined' && isPaused) return;
             const _advNow = performance.now();
             if (_advNow - _lsAdvanceLast < 15) return;
             _lsAdvanceLast = _advNow;
