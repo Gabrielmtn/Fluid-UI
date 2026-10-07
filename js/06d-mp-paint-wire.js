@@ -1649,6 +1649,11 @@ function broadcastReplayStroke(events) {
         // same class of gap the footprint fields above close. The receiver's
         // emitReplayDab range-checks the value (05d).
         if (ev.mir) o.mir = ev.mir | 0;
+        // Stroke boundary (05d deepCopyEvent). Without it a peer's replay
+        // interpolator draws across the gap between two strokes of a Time
+        // replay, held back only by the pause/distance guards. Sent only
+        // where true; an older peer ignores it.
+        if (ev.head) o.head = 1;
         return o;
     });
     const meta = replayWireMeta();

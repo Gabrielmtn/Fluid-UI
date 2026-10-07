@@ -570,6 +570,16 @@
                         tip: ev.tip,
                         shape: ev.shape || null
                     };
+                    // Push (velocity-only) dabs deposit no dye. 06 quantizes
+                    // `push` and `ap` onto the wire and scheduleStrokeReplay
+                    // maps them back, but neither ever got here, so a Pressure
+                    // stroke's broadcast replay repainted as dye on every peer.
+                    // Sent only when set; an older peer ignores both and paints
+                    // dye, which is what it did before.
+                    if (ev.push) o.push = { m: ev.push.m, s: ev.push.s };
+                    // ...and WHICH arms pushed, for a stroke whose brush was
+                    // painting (bitmask, see pushStrokeEvent).
+                    if (ev.ap) o.ap = ev.ap | 0;
                     // Where the stroke actually landed, not how it looked: a
                     // mirrored stroke replayed to the room without this comes
                     // out as half the mark the painter made. Sent only when
