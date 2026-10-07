@@ -71,8 +71,9 @@
         //                      path keeps weak walls — see obsTexStrength).
         //   B = Σcov·S·stick   Block = 1 (no-slip: the damp pass kills a
         //                      wide apron, flow sticks), Deflect = 0
-        //                      (interior-only damp, the projection's
-        //                      tangential slip shows: flow slides around).
+        //                      (free slip: only the flow into the wall is
+        //                      stopped, the face carries the flow along
+        //                      it — obstacleDampFrag + gradientFrag).
         //   A = Σcov·S·(1−solid)  the Slow channel: a drag field the damp
         //                      pass applies at a strength-graded half-life
         //                      — fluid and paint ENTER and decelerate,
@@ -103,6 +104,14 @@
             }
             float obsTexStick(vec4 t) {
                 return (t.x > 1e-5) ? clamp(t.z / t.x, 0.0, 1.0) : 1.0;
+            }
+            float obsTexSlip(vec4 t) {
+                // How Deflect a wall texel is (1 - stick), and EXACTLY 0 on
+                // a pure Block texel (B == R) and off the walls. z / x is not
+                // exact on every GPU — under ANGLE/D3D a pure Block texel's
+                // ratio came back 0.99999994 — and that sliver was enough to
+                // wake the Deflect path on Block walls and change them.
+                return (t.x > 1e-5 && t.z < t.x) ? 1.0 - t.z / t.x : 0.0;
             }
             float obsStrengthCurve(float s) {
                 ${obsStrengthCurveGLSL}
@@ -590,7 +599,7 @@
             // The curve itself lives in obsTexResponse (obsTexelGLSL) and
             // is now evaluated per texel: each collider gets its own
             // slider's response, not the strongest scene collider's.
-            float solidity(vec2 uv) {
+            float solidityOf(vec4 obT) {
                 // COVERAGE and STRENGTH are different quantities (D0.5 rev 3,
                 // 2026-07-14). The obstacle texel stores coverage*strength; a
                 // fixed absolute smoothstep window therefore changed the
@@ -604,7 +613,6 @@
                 //  - the interior response keeps the EXACT legacy strength
                 //    curve smoothstep(0.25, 0.5, strength): 0.7 → fully
                 //    blocking, ≤0.25 → fluid, between → permeable wall.
-                vec4 obT = texture(uObstacle, uv);
                 float cov = obsTexCoverage(obT, uObsMax);
                 // Ramp window 0.35→0.85 (was 0.2→0.8): the compositor's
                 // sim-scale blur bleeds coverage INTO narrow unmasked channels
@@ -653,6 +661,9 @@
                 float slow = 0.45 * obsTexResponse(obT, uObsMax)
                            * smoothstep(0.35, 0.85, obsTexSlowCoverage(obT, uObsMax));
                 return min(0.995, max(wall, slow));
+            }
+            float solidity(vec2 uv) {
+                return solidityOf(texture(uObstacle, uv));
             }
         `;
         // ─── Wetness → dye mobility (P15-1) ─────────────────────────────
@@ -2588,6 +2599,7 @@
                                      // 0 / unset = the historic full difference
             uniform float uBrakeK;   // dt / 0.016 for the in-wall kill below
                                      // (config.COLLIDER_BRAKE_DT); 0 / unset = per step
+            uniform float uSlip;     // Deflect free slip (config.OBS_DEFLECT_SLIP, 0 = off)
             uniform int hasObstacle;
             ${obstacleSolidityGLSL}
             void main() {
@@ -2598,12 +2610,15 @@
                 float pB = texture(uPressure, B).x;
                 float pT = texture(uPressure, T).x;
                 float sL = 0.0, sR = 0.0, sB = 0.0, sT = 0.0;
+                vec4 oL = vec4(0.0), oR = vec4(0.0), oB = vec4(0.0), oT = vec4(0.0);
                 if (hasObstacle == 1) {
                     // Mirror the pressure pass's Neumann treatment so the
                     // gradient this pass subtracts is the same one the solve
                     // converged with — mismatched stencils leak flow into walls.
-                    sL = solidity(L); sR = solidity(R);
-                    sB = solidity(B); sT = solidity(T);
+                    oL = texture(uObstacle, L); oR = texture(uObstacle, R);
+                    oB = texture(uObstacle, B); oT = texture(uObstacle, T);
+                    sL = solidityOf(oL); sR = solidityOf(oR);
+                    sB = solidityOf(oB); sT = solidityOf(oT);
                     float pC = texture(uPressure, vUv).x;
                     pL = mix(pL, pC, sL);
                     pR = mix(pR, pC, sR);
@@ -2636,6 +2651,7 @@
                     if (vUv.y > 1.0 - texelSize.y)  vel.y = min(vel.y, 0.0);
                 }
                 if (hasObstacle == 1) {
+                    vec2 v0 = vel;
                     // No-penetration at solid faces, same max/min trick as the
                     // domain edges above but blended by the face's solidity so
                     // antialiased mask edges stay soft.
@@ -2650,9 +2666,41 @@
                     // damp pass (see obstacleDampFrag): in a leaky wall this is
                     // a brake, and per step it braked harder at 144 Hz or a
                     // low Time setting.
-                    float keepV = 1.0 - solidity(vUv);
+                    vec4 oC = texture(uObstacle, vUv);
+                    float keepV = 1.0 - solidityOf(oC);
                     if (uBrakeK > 0.0 && abs(uBrakeK - 1.0) > 1e-6) keepV = pow(max(keepV, 0.0), uBrakeK);
                     vel *= keepV;
+                    // DEFLECT (2026-10-06): the clamps above are per AXIS, so
+                    // on any face that is not axis-aligned — a disc, a slanted
+                    // edge, every letter — they also cut the flow running
+                    // ALONG the wall: beside a 45° face both axes count as
+                    // "into the wall" and half the tangential speed goes
+                    // each step. For Block that drag is in character. For
+                    // Deflect it was most of the reason flow would not slide
+                    // round a shape (with the damp pass's free slip alone,
+                    // flow beside a disc ran at 0.40 of the free stream; with
+                    // this as well, 0.68). So near a Deflect wall the same
+                    // no-penetration is taken along the wall's own normal
+                    // (the coverage gradient): only the part of the velocity
+                    // heading INTO the wall is removed, at the solidity one
+                    // texel in. Where there is no clear normal (the middle of
+                    // a thin stroke, open fluid), the axis clamps stand.
+                    if (uSlip > 0.0) {
+                        float slipness = uSlip * obsTexSlip(max(oC, max(max(oL, oR), max(oB, oT))));
+                        if (slipness > 0.0) {
+                            vec2 g = vec2(obsTexCoverage(oR, uObsMax) - obsTexCoverage(oL, uObsMax),
+                                          obsTexCoverage(oT, uObsMax) - obsTexCoverage(oB, uObsMax)) * 0.5;
+                            float gLen = length(g);
+                            float w = slipness * smoothstep(0.03, 0.10, gLen);
+                            if (w > 0.0) {
+                                vec2 n = -g / gLen;
+                                float sIn = solidity(clamp(vUv - n * texelSize, 0.0, 1.0));
+                                float vn = dot(v0, n);
+                                vec2 slid = ((vn < 0.0 ? vn * (1.0 - sIn) : vn) * n + (v0 - vn * n)) * keepV;
+                                vel = mix(vel, slid, w);
+                            }
+                        }
+                    }
                 }
                 fragColor = vec4(vel, 0.0, 1.0);
             }
@@ -2698,6 +2746,7 @@
             uniform float dt;       // sim step (s) — the Slow drag is a half-life
             uniform float uHalo;    // Block boundary-layer halo strength (config.OBS_BLOCK_HALO, 0 = off)
             uniform float uBrakeK;  // dt / 0.016 (config.COLLIDER_BRAKE_DT); 0 = per-step braking
+            uniform float uSlip;    // Deflect free slip (config.OBS_DEFLECT_SLIP, 0 = off)
             ${obsTexelGLSL}
             void main() {
                 vec2 vel = texture(uVelocity, vUv).xy;
@@ -2723,10 +2772,9 @@
                 // The apron width is the collider's MODE (2026-09-09): Block
                 // (stick 1) damps the full coverage ramp — a no-slip wall the
                 // flow piles up against; Deflect (stick 0) damps the interior
-                // only, leaving the tangential flow the obstacle-aware
-                // projection preserves, so the fluid slides around the shape.
-                // (This was the global config.WALL_SLIP knob, 0.6 for every
-                // collider; the two modes are its endpoints.)
+                // only, and its face is then made free slip at the end of
+                // this pass. (This was the global config.WALL_SLIP knob, 0.6
+                // for every collider; the two modes are its endpoints.)
                 float covAvg = obsTexCoverage(obs, uObsMax);
                 float osr = obsTexResponse(obs, uObsMax);
                 float stick = obsTexStick(halo);
@@ -2737,8 +2785,8 @@
                 // per frame (graded by the wall's own strength response),
                 // so a jet stalls against the face and dye piles up there
                 // instead of skating along it. Deflect has no band (stick
-                // 0): the projection's tangential slip is all the edge
-                // does, and the flow slides around.
+                // 0): its face is free slip (below), and the flow slides
+                // around.
                 float haloWin = stick * uHalo * smoothstep(0.05, 0.5, obsTexCoverage(halo, uObsMax));
                 float damp = 1.0 - max(osr * wallWin, obsTexResponse(halo, uObsMax) * haloWin);
                 // Per simulated second, not per step (2026-09-25). The factor
@@ -2763,6 +2811,76 @@
                     damp *= mix(1.0, keep, smoothstep(0.0, 0.5, covSlow));
                 }
                 vel *= damp;
+                // DEFLECT = FREE SLIP (2026-10-06). Everything above brakes a
+                // wall texel's velocity whole — this pass, and the in-wall
+                // kill in gradientFrag before it — so the texels at a
+                // Deflect wall's face sat near zero exactly like Block's.
+                // Every advection that reads across the face then dragged
+                // the passing flow toward zero: a no-slip wall in all but
+                // name. Measured in a wind tunnel round a strength-0.9
+                // disc, the flow 1-4 texels off its side ran at 0.07 of the
+                // free stream for Block and 0.24 for Deflect, and the two
+                // pictures were the same (now 0.68, and the streams close
+                // in behind the disc). A free-slip wall stops only the
+                // NORMAL flow: here the face texels keep their own (braked)
+                // normal velocity and take the TANGENTIAL velocity of the
+                // fluid just outside, so whatever reads across the face
+                // sees the flow sliding past, not a dead layer.
+                //   n      = outward normal, from this texel's coverage
+                //            gradient (one texel each side);
+                //   fluid  = the velocity found by stepping out along n,
+                //            a texel at a time, to the first spot under
+                //            0.40 coverage (solidity() reads open below 0.35);
+                //   weight = how Deflect the wall is (1 - stick) × how far
+                //            into the face (in from 0.30-0.60 coverage, out
+                //            again by 0.90-0.98) × how sure the normal is.
+                // Built to fail SAFE in tight places. A stroke too thin to
+                // have an inside and an outside (the middle of a 1-2 texel
+                // letter stem) has no gradient, so no normal, and keeps
+                // the braked velocity. A gap that never opens below 0.40
+                // (two colliders a texel apart) finds no fluid, and the
+                // texel keeps the braked velocity. Stepping out along n
+                // reaches the NEAR side's fluid first, so a thin wall never
+                // hands one side's flow to the other, and only the edge
+                // ramp (coverage 0.30-0.90) takes part: letting a wall's
+                // solid core take the flow too put a moving layer in the
+                // middle of the wall. Measured at strength 1: past walls 1,
+                // 2, 3 and 6 texels thick the far side picks up 2.0, 2.3,
+                // 1.2 and 0.6% of the speed running along the near face
+                // (Block 5.4, 3.1, 2.2, 0.9; old Deflect 3.4, 3.7, 2.1,
+                // 1.6), and among five tightly packed capsules (strength
+                // 0.9 and 1) the velocity noise beside the walls fell from
+                // 0.07 to under 0.03. Open
+                // fluid and Block walls are never touched: bit-identical.
+                if (uSlip > 0.0) {
+                    float covC = obsTexCoverage(c, uObsMax);
+                    float slipW = uSlip * obsTexSlip(obs)
+                                * smoothstep(0.30, 0.60, covC) * (1.0 - smoothstep(0.90, 0.98, covC));
+                    if (slipW > 0.0) {
+                        vec2 g = vec2(obsTexCoverage(r, uObsMax) - obsTexCoverage(l, uObsMax),
+                                      obsTexCoverage(t, uObsMax) - obsTexCoverage(b, uObsMax)) * 0.5;
+                        float gLen = length(g);
+                        slipW *= smoothstep(0.03, 0.10, gLen);
+                        if (slipW > 0.0) {
+                            vec2 n = -g / gLen;
+                            vec2 stepUv = n * texelSize;
+                            float found = 0.0;
+                            vec2 vf = vec2(0.0);
+                            for (int k = 1; k <= 4; k++) {
+                                vec2 p = clamp(vUv + stepUv * float(k), 0.0, 1.0);
+                                if (obsTexCoverage(texture(uObstacle, p), uObsMax) < 0.40) {
+                                    vf = texture(uVelocity, p).xy;
+                                    found = 1.0;
+                                    break;
+                                }
+                            }
+                            if (found > 0.0) {
+                                vec2 slid = dot(vel, n) * n + (vf - dot(vf, n) * n);
+                                vel = mix(vel, slid, slipW);
+                            }
+                        }
+                    }
+                }
                 fragColor = vec4(vel, 0.0, 1.0);
             }
         `;

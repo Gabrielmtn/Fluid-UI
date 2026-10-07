@@ -458,7 +458,7 @@
         "uPressure"
       ]
     },
-    "hasObstacle|openBoundary|pScale|texelSize|uBrakeK|uHalfGrad|uObstacle|uPressure|uVelocity": {
+    "hasObstacle|openBoundary|pScale|texelSize|uBrakeK|uHalfGrad|uObstacle|uPressure|uSlip|uVelocity": {
       "name": "gradient",
       "uniforms": [
         "hasObstacle",
@@ -469,6 +469,7 @@
         "uHalfGrad",
         "uObstacle",
         "uPressure",
+        "uSlip",
         "uVelocity"
       ]
     },
@@ -480,7 +481,7 @@
         "value"
       ]
     },
-    "dt|texelSize|uBrakeK|uHalo|uObsMax|uObstacle|uVelocity": {
+    "dt|texelSize|uBrakeK|uHalo|uObsMax|uObstacle|uSlip|uVelocity": {
       "name": "obstacleDamp",
       "uniforms": [
         "dt",
@@ -489,6 +490,7 @@
         "uHalo",
         "uObsMax",
         "uObstacle",
+        "uSlip",
         "uVelocity"
       ]
     },

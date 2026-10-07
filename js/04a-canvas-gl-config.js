@@ -782,8 +782,25 @@
 
             WALL_SLIP: 0.6,           // RETIRED 2026-09-09 (kept so saved settings load):
                                       // slip is now each collider's MODE — Block = 0
-                                      // (sticky apron), Deflect = 1 (interior-only damp)
-                                      // — see the damp shader in 05b. No longer read.
+                                      // (sticky apron), Deflect = free slip (see
+                                      // OBS_DEFLECT_SLIP) — the damp shader in 05b.
+                                      // No longer read.
+            OBS_DEFLECT_SLIP: true,   // Deflect walls are FREE SLIP (2026-10-06): they stop
+                                      // only the flow heading into them, and the flow along
+                                      // the face slides past. Before, a Deflect wall braked
+                                      // its face texels to zero like Block and the
+                                      // projection's per-axis clamps cut the along-wall flow
+                                      // on every slanted face, so the two modes looked the
+                                      // same (wind past a disc: flow 1-4 texels off its side
+                                      // at 0.07 of the free stream for Block, 0.24 for
+                                      // Deflect; now 0.68). Two parts, both in 05b: the
+                                      // damp pass gives the wall's edge texels the
+                                      // along-wall velocity of the fluid just outside, and
+                                      // the gradient pass removes only the into-the-wall
+                                      // part of the velocity next to a Deflect face. Thin
+                                      // strokes without a clear inside/outside and gaps
+                                      // that never open keep the old braking. A number
+                                      // 0-1 scales it; false = the old Deflect.
 
             OBS_VEL_COVERAGE_BLOCK: true, // Brush VELOCITY is blocked by wall coverage,
                                       // the same rule dye adopted 2026-08-16. The old s³

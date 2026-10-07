@@ -1547,6 +1547,11 @@
                 // obstacleDampFrag): one 60 Hz step at Time 1 is dt 0.016.
                 const _brakeK = config.COLLIDER_BRAKE_DT === false ? 0.0 : dt / 0.016;
                 gl.uniform1f(gradientProg.uniforms.uBrakeK, _brakeK);
+                // Deflect walls are free slip (05b gradientFrag + obstacleDampFrag,
+                // OBS_DEFLECT_SLIP); a number scales it, false is the old Deflect.
+                const _deflectSlip = config.OBS_DEFLECT_SLIP === false ? 0.0
+                    : (typeof config.OBS_DEFLECT_SLIP === 'number' ? Math.max(0, Math.min(1, config.OBS_DEFLECT_SLIP)) : 1.0);
+                gl.uniform1f(gradientProg.uniforms.uSlip, _deflectSlip);
                 gl.uniform1f(gradientProg.uniforms.openBoundary, _openBoundary);
                 gl.uniform1i(gradientProg.uniforms.hasObstacle, obsActive ? 1 : 0);
                 gl.uniform1i(gradientProg.uniforms.uPressure, 0);
@@ -1572,6 +1577,7 @@
                     gl.uniform1f(obstacleDampProg.uniforms.uHalo,
                         (typeof config.OBS_BLOCK_HALO === 'number') ? Math.max(0, Math.min(1, config.OBS_BLOCK_HALO)) : 0.35);
                     gl.uniform1f(obstacleDampProg.uniforms.uBrakeK, _brakeK);
+                    gl.uniform1f(obstacleDampProg.uniforms.uSlip, _deflectSlip);
                     gl.uniform2f(obstacleDampProg.uniforms.texelSize, 1.0 / simTexWidth, 1.0 / simTexHeight);
                     gl.uniform1i(obstacleDampProg.uniforms.uVelocity, 0);
                     gl.uniform1i(obstacleDampProg.uniforms.uObstacle, 1);
