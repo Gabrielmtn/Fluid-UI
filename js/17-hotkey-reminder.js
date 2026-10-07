@@ -16,7 +16,7 @@
  * in normal flow, so every Ctrl hold pushed the canvas down and back up
  * again. Its "F1 — ALL HOTKEYS" pill was also the only VISIBLE way into the
  * hotkey reference on desktop — F1 and Shift+? are now keyboard-only there
- * (mobile keeps 13-mobile-mode's ? button). Worth replacing when the way
+ * (the How-do-I modal's Hotkeys button opens it too). Worth replacing when the way
  * hotkeys are surfaced gets its rethink.
  *
  * ALSO REMOVED 2026-08-17: the dim pass. A held combo used to drop every

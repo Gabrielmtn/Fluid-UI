@@ -34,8 +34,8 @@
         function showHotkeys() { if (hotkeyOverlay) { chipHotkeyList(); hotkeyOverlay.style.display = 'flex'; } }
         function hideHotkeys() { if (hotkeyOverlay) hotkeyOverlay.style.display = 'none'; }
         function toggleHotkeys() { if (!hotkeyOverlay) return; chipHotkeyList(); hotkeyOverlay.style.display = (hotkeyOverlay.style.display === 'flex' ? 'none' : 'flex'); }
-        // Exposed for the non-keyboard opener: 13-mobile-mode's '?' button
-        // (toggle), which must route through here so the chip pass runs.
+        // Exposed so a non-keyboard opener routes through here and the chip
+        // pass runs (13's phone-layout '?' button was one, until 2026-10-07).
         // showHotkeys is kept for the same reason — 17-hotkey-reminder's
         // 'F1 — ALL HOTKEYS' pill used it before that bar was removed, and
         // whatever replaces it will want the same entry point.

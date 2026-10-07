@@ -208,16 +208,14 @@ button.btn--ghost:hover,
    menu — where a plate would be chrome in the way. */
 .titlebar-button,
 #quality-underbar .qub-dd-btn,
-.collision-source-menu button,
-#mobileMenuToggle {
+.collision-source-menu button {
     background: transparent;
     border-color: transparent;
 }
 .titlebar-button:hover,
 #quality-underbar .qub-dd-btn:hover,
 #quality-underbar .qub-dd.open .qub-dd-btn,
-.collision-source-menu button:hover,
-#mobileMenuToggle:hover {
+.collision-source-menu button:hover {
     background: oklch(19% var(--c) var(--sec-h));
     border-color: oklch(40% var(--c) var(--sec-h));
 }

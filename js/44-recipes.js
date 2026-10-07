@@ -683,7 +683,11 @@
     function stripCell(key) {
         const strip = $('mixer-strip');
         const cell = strip ? strip.querySelector('[data-ui-key="' + key + '"]') : null;
-        if (cell) return cell;
+        if (cell) {
+            // A compact window (js/13) carries the strip in the right bar.
+            if (cell.closest('#sidebar-right') && window.Sidebars && window.Sidebars.right && window.Sidebars.right.isCollapsed()) window.Sidebars.right.expand();
+            return cell;
+        }
         const lc = leftCell(key);
         if (lc) {
             if (window.Sidebars && window.Sidebars.left && window.Sidebars.left.isCollapsed()) window.Sidebars.left.expand();
@@ -743,10 +747,6 @@
         if (!target) return null;
         const UV = window.UIVisibility;
         if (!target.keepFocus && document.body.classList.contains('focus-mode') && window.focusMode) window.focusMode.toggle();
-        if (document.body.classList.contains('mobile-mode') && !target.canvas) {
-            const sb = $('sidebar-right');
-            if (sb && !sb.classList.contains('visible')) { const mt = $('mobileMenuToggle'); if (mt) mt.click(); }
-        }
         let container = null;
         if (target.canvas) {
             const c = $('canvas');

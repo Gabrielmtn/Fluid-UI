@@ -82,6 +82,9 @@
             // Its fold tab rides the bar's outer edge (see buildLeftSidebar).
             if (leftBar.__edge) mainArea.insertBefore(leftBar.__edge, canvasArea);
         }
+        // The right bar folds only in a compact window (js/13); its tab rides
+        // the bar's inner edge (see buildRightFold).
+        mainArea.insertBefore(buildRightFold(sidebar), sidebar);
 
         // Move any remaining dynamic content from .controls to sidebar
         // (e.g., component system)
@@ -2182,6 +2185,9 @@
     // #canvas-area), the same cost as a window resize; it snaps, never
     // animates (05j: per-frame resizes are the worst jank there is).
     var LSB_KEY = 'ui.leftSidebar.collapsed';
+    // A compact window (js/13-compact-mode.js) folds both bars and has room
+    // for one open at a time; folds made there are never kept.
+    function compactUI() { return document.body.classList.contains('compact-ui'); }
     // Sections built for the left sidebar while the right one is being built
     // (buildSidebar runs first); buildLeftSidebar moves them in, in order.
     var pendingLeftSections = [];
@@ -2279,14 +2285,19 @@
             fold.setAttribute('aria-label', collapsed ? 'Open the brush bar' : 'Fold the brush bar');
             fold.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
             syncRail();
-            if (keep) { try { if (window.settingsManager) window.settingsManager.set(LSB_KEY, !!collapsed); } catch (_) {} }
+            if (keep && !compactUI()) { try { if (window.settingsManager) window.settingsManager.set(LSB_KEY, !!collapsed); } catch (_) {} }
+            if (!collapsed && compactUI() && window.Sidebars && window.Sidebars.right) window.Sidebars.right.fold(true);
         }
         fold.addEventListener('click', function () { set(!bar.classList.contains('collapsed'), true); });
         railLabel.addEventListener('click', function () { set(false, true); });
 
-        var saved = null;
-        try { saved = window.settingsManager ? window.settingsManager.get(LSB_KEY, null) : null; } catch (_) {}
-        set(saved === null || saved === undefined ? window.innerWidth < 1280 : !!saved, false);
+        // The fold you keep, or folded below ~1280 CSS px until you pick.
+        function restore() {
+            var saved = null;
+            try { saved = window.settingsManager ? window.settingsManager.get(LSB_KEY, null) : null; } catch (_) {}
+            set(saved === null || saved === undefined ? window.innerWidth < 1280 : !!saved, false);
+        }
+        restore();
 
         window.Sidebars = window.Sidebars || {};
         // Every sidebar section, left and right, and finding one by title
@@ -2311,17 +2322,96 @@
             collapse: function () { set(true, true); },
             expand: function () { set(false, true); },
             toggle: function () { set(!bar.classList.contains('collapsed'), true); },
-            isCollapsed: function () { return bar.classList.contains('collapsed'); }
+            isCollapsed: function () { return bar.classList.contains('collapsed'); },
+            // js/13: fold or open without keeping it, and back to the kept fold.
+            fold: function (collapsed) { set(!!collapsed, false); },
+            restore: restore
         };
         return bar;
+    }
+
+    // ── RIGHT SIDEBAR FOLD (compact windows only, 2026-10-07) ─────────────
+    // A compact window (js/13) folds both bars and moves the top bar in here,
+    // under the rail. The left bar's tab and rail, mirrored: the tab rides
+    // the bar's inner edge in a zero-width sibling, and the folded rail keeps
+    // a way into what a painter reaches for first (Color, Presets, Together:
+    // the old phone layout's bottom row). Outside a compact window the bar
+    // never folds and none of this shows (21-sidebar.css). Never kept: every
+    // compact window starts folded.
+    function buildRightFold(bar) {
+        var edge = document.createElement('div');
+        edge.className = 'rsb-edge';
+        var tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'rsb-toggle btn--icon';
+        edge.appendChild(tab);
+
+        // A strip cell hidden under Settings → Interface comes back first,
+        // the way 44-recipes' reveal does: a hidden target has no box.
+        function unhide(key) {
+            var uv = window.UIVisibility;
+            if (uv && typeof uv.isHidden === 'function' && uv.isHidden(key)) uv.show(key);
+        }
+        var rail = document.createElement('div');
+        rail.className = 'rsb-rail';
+        function railButton(label, title, section, action) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'rsb-rail-label btn--ghost' + (section ? ' rsb-rail-section' : '');
+            b.textContent = label;
+            b.title = title;
+            b.addEventListener('click', function () {
+                set(false);
+                // After this click has bubbled: a popup it opens (the presets
+                // list) would otherwise be shut by its own click-outside rule.
+                if (action) setTimeout(action, 0);
+            });
+            rail.appendChild(b);
+        }
+        railButton('Controls', 'Open the controls', false);
+        railButton('Color', 'Brush colour and palette', true, function () {
+            unhide('strip:Color');
+            var cell = document.querySelector('#sidebar-right [data-ui-key="Color"]');
+            if (cell) { try { cell.scrollIntoView({ block: 'start' }); } catch (_) {} }
+        });
+        railButton('Presets', 'Pick a preset: colours, brush and finish together', true, function () {
+            unhide('strip:Presets');
+            var t = document.getElementById('mixerPresetsTrigger');
+            if (t && !t.classList.contains('active')) t.click();   // the trigger toggles: open, never shut
+        });
+        railButton('Together', 'Start a room or join one: paint on the same canvas as someone else', true, function () {
+            if (window.Sidebars && window.Sidebars.open) window.Sidebars.open('Swirl Together');
+        });
+        bar.insertBefore(rail, bar.firstChild);
+
+        function set(collapsed) {
+            bar.classList.toggle('collapsed', !!collapsed);
+            edge.classList.toggle('collapsed', !!collapsed);
+            tab.textContent = collapsed ? '«' : '»';
+            tab.title = collapsed ? 'Open the controls' : 'Fold the controls to the side';
+            tab.setAttribute('aria-label', collapsed ? 'Open the controls' : 'Fold the controls');
+            tab.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            if (!collapsed && compactUI() && window.Sidebars && window.Sidebars.left) window.Sidebars.left.fold(true);
+        }
+        tab.addEventListener('click', function () { set(!bar.classList.contains('collapsed')); });
+        set(false);
+
+        window.Sidebars = window.Sidebars || {};
+        window.Sidebars.right = {
+            el: bar,
+            edge: edge,
+            fold: function (collapsed) { set(!!collapsed); },
+            collapse: function () { set(true); },
+            expand: function () { set(false); },
+            toggle: function () { set(!bar.classList.contains('collapsed')); },
+            isCollapsed: function () { return bar.classList.contains('collapsed'); }
+        };
+        return edge;
     }
 
     function buildSidebar(controls) {
         const sidebar = document.createElement('div');
         sidebar.id = 'sidebar-right';
-
-        // Mobile close button (keep at top)
-        moveEl('mobileMenuClose', sidebar);
 
         // Clustered into three colour groups (Gabriel, 2026-08-22). The nav had
         // 16 flat sections in 7 accent colours, which read as 16 unrelated
@@ -8950,6 +9040,8 @@
         if (!sec) return false;
         // A section in the folded left bar: open the bar first.
         if (sec.closest && sec.closest('#sidebar-left') && window.Sidebars && window.Sidebars.left && window.Sidebars.left.isCollapsed()) window.Sidebars.left.expand();
+        // Or in the folded right bar (compact window, js/13).
+        if (sec.closest && sec.closest('#sidebar-right') && window.Sidebars && window.Sidebars.right && window.Sidebars.right.isCollapsed()) window.Sidebars.right.expand();
         if (sec.classList.contains('collapsed')) toggleSection(sec, false);
         return true;
     };

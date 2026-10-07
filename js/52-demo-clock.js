@@ -412,7 +412,7 @@
         el.style.bottom = '';                 // measure from the corner spot
         var bottom = '';
         var wrap = document.getElementById('canvas-wrapper');
-        if (wrap && !document.body.classList.contains('mobile-mode')) {
+        if (wrap) {
             var w = wrap.getBoundingClientRect();
             var r = el.getBoundingClientRect();
             var se = wrap.querySelector('.resize-se');

@@ -1,5 +1,5 @@
 /* ================================================================
-   RIGHT SIDEBAR - main area, sections, controls, layers, brush, mobile overrides
+   RIGHT SIDEBAR - main area, sections, controls, layers, brush, compact window
    (part of former mixer-layout.css, lines 405-1254; cascade order preserved)
    ================================================================ */
 /* ── MAIN AREA ── */
@@ -723,66 +723,14 @@
        shrink the frame out from under its own centring). */
 }
 
-/* Prevent sidebar flash on mobile before JS adds .mobile-mode:
-   hide off-screen by default on phone-sized screens (portrait + landscape).
-   body.mobile-mode rules below take over once JS runs. */
-@media (max-width: 768px), (max-height: 500px) and (max-width: 1200px) {
-    #sidebar-right {
-        position: fixed;
-        right: 0;
-        top: 0;
-        height: 100vh;
-        height: 100dvh;
-        transform: translateX(100%);
-        z-index: 1000;
-    }
-    #sidebar-right.visible {
-        transform: translateX(0);
-    }
-    #main-area {
-        flex-direction: column;
-    }
-    #mixer-strip {
-        display: none;
-    }
-}
-
-/* Mobile mode (JS-toggled) */
-body.mobile-mode #mixer-strip {
-    display: none;
-}
-body.mobile-mode #main-area {
-    flex-direction: column;
-}
-body.mobile-mode #sidebar-right {
-    position: fixed;
-    right: 0;
-    top: 0;
-    width: min(92vw, 380px);
-    height: 100vh;
-    height: 100dvh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    transform: translateX(100%);
-    z-index: 10000;
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
-    transition: transform 0.3s ease;
-}
-body.mobile-mode #sidebar-right.visible {
-    transform: translateX(0);
-}
-body.mobile-mode #canvas-wrapper {
-    max-width: 100vw !important;
-    max-height: 100vh !important;
-    max-height: 100dvh !important;   /* exclude mobile URL bar */
-}
-
-/* The mixer strip is relocated into the slide-out menu on mobile (JS, 13-mobile-mode).
-   This selector out-specifies "body.mobile-mode #mixer-strip { display:none }
-" above,
-   and reflows the horizontal strip into a wrapping grid that fits the menu. */
-body.mobile-mode #sidebar-right > #mixer-strip {
-    display: flex !important;
+/* ── Compact window (js/13-compact-mode.js, 2026-10-07) ──
+   A small desktop window keeps the desktop layout: both sidebars fold to
+   their rails and the top bar moves into the right sidebar, so the canvas
+   gets the whole height. Phones and tablets never get here (index.html sends
+   them to phone/). The strip's rules below reflow its horizontal bar into a
+   wrapping grid that fits the sidebar. */
+body.compact-ui #sidebar-right > #mixer-strip {
+    display: flex;
     flex-wrap: wrap;
     overflow: visible;
     width: 100%;
@@ -792,7 +740,7 @@ body.mobile-mode #sidebar-right > #mixer-strip {
     box-shadow: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-channel {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-channel {
     min-width: 0;
     max-width: none;
     flex: 1 1 calc(50% - 6px);   /* ~2 faders per row */
@@ -802,7 +750,7 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-channel {
    it wraps into stacked rows each one claims a whole line and contributes
    its 6px top/bottom margins plus two row gaps — 20px of slack between rows
    for a 1px rule that no longer divides anything. */
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-divider {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-divider {
     display: none;
 }
 /* Presets + action buttons span full width. `.mixer-presets` is a stale
@@ -810,12 +758,12 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-divider {
    `flex: 0 0 auto`), so this never matched and Presets rendered as a stub
    wedged beside the colour cluster. Both names kept in case older markup
    is still around. */
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-presets,
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-presets-channel {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-presets,
+body.compact-ui #sidebar-right > #mixer-strip .mixer-presets-channel {
     flex: 1 1 100%;
     justify-content: stretch;
 }
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-presets-trigger {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-presets-trigger {
     width: 100%;
     max-width: none;
     height: 32px;                /* full-width row deserves a real hit box */
@@ -828,7 +776,7 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-presets-trigger {
    the full width and lays out as a grid — swatch in its own column (sized
    up to a proper touch target), Rnd/Step/Rainbow/Gate directly above
    Ignite, latch beside it. */
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-channel.ch-wide {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-channel.ch-wide {
     flex: 1 1 100%;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -846,19 +794,19 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-channel.ch-wide {
 }
 /* Space the four mode toggles apart from each other, and keep Gate visibly
    detached from the Rnd/Step/Rainbow group it isn't part of. */
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-seg-switch {
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-seg-switch {
     gap: 8px;
 }
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row {
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row {
     gap: 14px;
 }
 /* The colour label is hidden here, so its grid row is empty — collapse it
    rather than paying a full row-gap for nothing. */
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-color-head:empty {
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-color-head:empty {
     display: none;
 }
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-color-head { grid-area: head; }
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row {
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-color-head { grid-area: head; }
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row {
     grid-area: toggles;
     margin: 0;
     width: 100%;
@@ -867,26 +815,26 @@ body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row {
    channel — that's what lets the swatch span both rows. The element stays in
    the tree, so the .holding/.armed classes the Ignite hold-gesture sets still
    drive their descendant styles, and the latch measures its own rect. */
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-nudge-row { display: contents; }
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-color-input,
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide input[type="color"] {
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-nudge-row { display: contents; }
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-color-input,
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide input[type="color"] {
     grid-area: well;
     width: 44px;
     height: 44px;
     justify-self: center;
 }
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-nudge-btn {
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-nudge-btn {
     grid-area: ignite;
     width: 100%;
     height: 26px;
 }
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-ignite-lock {
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-ignite-lock {
     grid-area: lock;
     width: 30px;
     height: 26px;
 }
 /* Toggles get the taller touch height now that they own a full row */
-body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row .ch-text-toggle {
+body.compact-ui #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row .ch-text-toggle {
     height: 26px;
 }
 
@@ -895,7 +843,7 @@ body.mobile-mode #sidebar-right > #mixer-strip .ch-wide .ch-toggle-row .ch-text-
    fader height, which in the menu left a cramped little column hugging the
    left edge. With a full row to work with, put all three side by side and
    centre them. */
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-actions {
     flex: 1 1 100%;
     flex-direction: row;
     align-items: center;
@@ -903,19 +851,19 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions {
     gap: 14px;                   /* Clear sits next to record — worth the room */
     padding: 2px 8px;
 }
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions .transport-row {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-actions .transport-row {
     gap: 14px;
 }
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions button {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-actions button {
     height: 28px;                /* matches the Ignite row's touch height */
 }
 /* The strip shrinks pause/record to 16px icon buttons to save horizontal
    room it doesn't have. In the menu there's space, and 16px is well under
    a usable touch target. */
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions .transport-row button {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-actions .transport-row button {
     min-width: 44px;
 }
-body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
+body.compact-ui #sidebar-right > #mixer-strip .mixer-actions > button {
     min-width: 88px;
 }
 
@@ -2146,10 +2094,10 @@ select option {
     font-size: 11px;
     line-height: 1;
 }
-body.focus-mode .lsb-edge,
-body.mobile-mode .lsb-edge { display: none; }
+body.focus-mode .lsb-edge { display: none; }
 .lsb-body { display: flex; flex-direction: column; min-height: 0; }
-.lsb-rail {
+.lsb-rail,
+.rsb-rail {
     flex-direction: column;
     align-items: center;
     gap: 10px;
@@ -2162,8 +2110,10 @@ body.mobile-mode .lsb-edge { display: none; }
     writing-mode: vertical-rl;
     transform: rotate(180deg);
 }
-.lsb-rail-section { font-weight: 600; opacity: 0.85; }
-.lsb-rail-label {
+.lsb-rail-section,
+.rsb-rail-section { font-weight: 600; opacity: 0.85; }
+.lsb-rail-label,
+.rsb-rail-label {
     padding: 6px 2px;
     min-height: 0;
     font-size: 10px;
@@ -2173,24 +2123,41 @@ body.mobile-mode .lsb-edge { display: none; }
     writing-mode: vertical-rl;
     transform: rotate(180deg);
 }
-/* The phone layout: no room beside the canvas. js/13 moves the bar into the
-   slide-out menu, under the strip, always unfolded; there it is plain
-   content (the menu is already zoomed, so its own zoom would double). */
-body.mobile-mode #main-area > #sidebar-left { display: none; }
-body.mobile-mode #sidebar-right > #sidebar-left {
-    display: flex;
-    flex: none;
-    zoom: 1;
-    position: static;
-    overflow: visible;
-    background: transparent;
-    border-right: 0;
-    backdrop-filter: none;
+/* ── RIGHT SIDEBAR FOLD (compact windows only, 2026-10-07) ──
+   The left bar's tab and rail, mirrored (js/20 buildRightFold). Only a
+   compact window folds this bar (js/13), so outside one none of it shows.
+   The tab sits in a zero-width sibling just before #sidebar-right and hangs
+   off its inner edge. Folded, everything but the rail is display:none — the
+   strip's own display:flex above included. */
+.rsb-edge {
+    display: none;
+    flex: 0 0 0;
+    width: 0;
+    position: relative;
+    z-index: 101;
+    zoom: var(--ui-scale);
 }
-body.mobile-mode #sidebar-right > #sidebar-left.collapsed > .lsb-head,
-body.mobile-mode #sidebar-right > #sidebar-left.collapsed > .lsb-body { display: flex; }
-body.mobile-mode #sidebar-right > #sidebar-left > .lsb-rail { display: none; }
-body.mobile-mode #sidebar-right > #sidebar-left > .lsb-head { position: static; background: transparent; }
+body.compact-ui .rsb-edge { display: block; }
+.rsb-edge > .rsb-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    width: 14px;
+    min-width: 0;
+    height: 44px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 6px 0 0 6px;
+    font-size: 11px;
+    line-height: 1;
+}
+body.focus-mode .rsb-edge { display: none; }
+#sidebar-right > .rsb-rail { display: none; }
+/* min-width: 0 beats init-responsive.css's 220px floor for the open bar. */
+body.compact-ui #sidebar-right.collapsed { flex-basis: 32px; min-width: 0; overflow: hidden; }
+body.compact-ui #sidebar-right.collapsed > :not(.rsb-rail) { display: none !important; }
+body.compact-ui #sidebar-right.collapsed > .rsb-rail { display: flex; }
 
 /* The Brush section (and Multi-Brush) keep the popup skin's classes so the
    row styles built for them apply; here they are plain section content.

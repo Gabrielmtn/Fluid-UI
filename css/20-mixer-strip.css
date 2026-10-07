@@ -199,10 +199,8 @@
     background: var(--accent, #ec3013);
     color: #fff;
 }
-/* Mobile: strip + sidebar are drawers — keep the canvas clean */
-@media (max-width: 768px), (max-height: 500px) and (max-width: 1200px) {
-    #quality-underbar { display: none; }
-}
+/* Compact window (js/13): the height goes to the canvas. */
+body.compact-ui #quality-underbar { display: none; }
 
 /* ── BODY LAYOUT: column instead of row ── */
 body {
@@ -337,7 +335,8 @@ body > .controls {
        touch/pen drag starting on a fader was claimed as a strip pan and
        the slider only ever saw taps. Strip channels get no row-drag
        forwarding (it's .control-group-scoped), so the CSS must carry it.
-       pan-y keeps vertical drawer scrolling alive in mobile mode. */
+       pan-y keeps the sidebar scrolling when the strip rides in it
+       (compact window, js/13). */
     touch-action: pan-y;
 }
 /* No printed scale in the strip: the channel already shows its value in
@@ -846,8 +845,7 @@ body > .controls {
     border-radius: 0;
     padding: 10px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    /* above the mobile menu sidebar (z 10000) — these popups can be opened
-       from inside it and were rendering underneath */
+    /* above the sidebars — these popups can be opened from inside them */
     z-index: 10005;
 }
 .arm-colors-header {
@@ -983,8 +981,7 @@ body > .controls {
     overscroll-behavior: contain;
 }
 /* Drawer variant: pinned to the left edge, slides in/out. visibility flips
-   after the slide-out so the close animation stays visible (same pattern as
-   the mobile sidebar in 21-sidebar.css). */
+   after the slide-out so the close animation stays visible. */
 .brush-settings-panel.slide-left {
     transform: translateX(-105%);
     visibility: hidden;

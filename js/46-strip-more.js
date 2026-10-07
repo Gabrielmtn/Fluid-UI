@@ -36,8 +36,8 @@
 // mobile relocation), any fader cell's size (fonts landing, the material
 // select re-fitting, a readout growing) and ui-hidden flips from 43.
 //
-// OFF in mobile mode: 13-mobile-mode relocates the whole strip into the
-// drawer, where 21-sidebar.css wraps it into a grid — nothing to park.
+// OFF in a compact window: 13-compact-mode moves the whole strip into the
+// right sidebar, where 21-sidebar.css wraps it into a grid — nothing to park.
 (function () {
     'use strict';
 
@@ -141,9 +141,9 @@
     function measure() {
         raf = 0;
         if (!built || !strip.isConnected) return;
-        var mobile = document.body.classList.contains('mobile-mode');
-        if (!enabled || mobile) { restoreAll(); sync(); return; }
-        // display:none (focus mode, mobile before the relocation): nothing
+        var compact = document.body.classList.contains('compact-ui');
+        if (!enabled || compact) { restoreAll(); sync(); return; }
+        // display:none (focus mode, a folded right bar): nothing
         // to measure — keep the layout for when it comes back.
         if (strip.clientWidth === 0) return;
 
@@ -304,7 +304,7 @@
         // ── Re-measure triggers ──
         window.addEventListener('resize', schedule);
         if ('ResizeObserver' in window) {
-            // The strip's own width: focus mode / mobile flip it 0 ↔ W.
+            // The strip's own width: focus mode / a compact window flip it 0 ↔ W.
             var stripRO = new ResizeObserver(function () {
                 var w = strip.clientWidth;
                 if (w !== lastStripW) { lastStripW = w; schedule(); }
@@ -315,7 +315,7 @@
             var cellRO = new ResizeObserver(schedule);
             candidates.forEach(function (c) { cellRO.observe(c); });
         }
-        // ui-hidden flips on the cells (43) and mobile-mode on <body> (13).
+        // ui-hidden flips on the cells (43) and compact-ui on <body> (13).
         var mo = new MutationObserver(schedule);
         candidates.forEach(function (c) { mo.observe(c, { attributes: true, attributeFilter: ['class'] }); });
         mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });

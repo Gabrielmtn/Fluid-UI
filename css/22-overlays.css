@@ -10,7 +10,6 @@ body.focus-mode #sidebar-right,
 body.focus-mode #sidebar-left,
 body.focus-mode .title-bar,
 body.focus-mode #statsPanel,
-body.focus-mode #mobileMenuToggle,
 /* The strip popups live on <body>, so hiding the strip does not hide them —
    without these the brush drawer / presets list / arm colors stayed pinned
    over the otherwise-empty canvas with no visible trigger to close them. */
@@ -1958,10 +1957,6 @@ body.text-arrange-active #canvas-size-display {
    #quality-underbar is fixed — display:none has to win over all of them
    without knowing which one it is on. */
 .ui-hidden { display: none !important; }
-/* Mobile relocates the strip into the drawer with its own !important flex
-   rule (21-sidebar.css) that out-specifies a bare class; an all-channels-
-   hidden strip would otherwise sit there as an empty padded box. */
-body.mobile-mode #sidebar-right > #mixer-strip.ui-hidden { display: none !important; }
 
 /* ── Settings → Interface ── */
 .ui-vis-block {
@@ -2431,11 +2426,6 @@ body.mobile-mode #sidebar-right > #mixer-strip.ui-hidden { display: none !import
     bottom: 8px;
     z-index: 1200;
     pointer-events: none;
-}
-/* Clear of the mobile bottom action row (13-mobile-mode). */
-body.mobile-mode .demo-clock.floating,
-body.mobile-mode .playtest-label.floating {
-    bottom: calc(max(10px, env(safe-area-inset-bottom, 10px)) + 60px);
 }
 /* The playtest label is the clock's digits without the pill: same size,
    weight and colour as the ghost pill's text, on the pills' line rather than

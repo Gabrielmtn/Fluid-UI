@@ -33,12 +33,6 @@
             background: rgba(11, 14, 20, 0.97);
         }
 
-        /* Minimize/maximize/close are desktop-window controls — meaningless on
-           mobile/web, so hide the whole titlebar there and give the canvas the space. */
-        body.mobile-mode #custom-titlebar {
-            display: none !important;
-        }
-
         /* Browser build: there's no OS window to control, so drop the titlebar AND
            the frameless-window resize handles (invisible, but they'd still capture
            pointer events along the canvas edges), and reclaim the titlebar's 32px. */
@@ -225,7 +219,7 @@
             overscroll-behavior: none;
         }
 
-        /* Accidental page-zoom guard, CSS half (JS half: 13-mobile-mode.js
+        /* Accidental page-zoom guard, CSS half (JS half: 13-compact-mode.js
            pinch guards). manipulation keeps pan/scroll but kills double-tap
            zoom on the UI chrome — the canvas is already touch-action:none,
            and faders carry their own stricter pan-y (slider-styles.css).
@@ -1454,168 +1448,6 @@
     user-select: none;
     touch-action: none;
 }
-
-/* Mobile Mode */
-body.mobile-mode {
-    overflow: hidden;
-}
-
-body.mobile-mode #canvas-area {
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    /* JS sets --app-height from window.visualViewport (the exact area BETWEEN iOS's
-       top URL bar and bottom toolbar) — more reliable than dvh on iOS Chrome, which
-       still let the canvas run under the bottom bar. Falls back to dvh/vh. */
-    height: var(--app-height, 100dvh);
-}
-
-body.mobile-mode #canvas-wrapper {
-    width: 100vw !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-    left: 0 !important;
-    top: 0 !important;
-}
-
-body.mobile-mode .resize-handle {
-    display: none !important;
-}
-
-body.mobile-mode #canvas-size-display {
-    display: none !important;
-}
-
-body.mobile-mode .controls {
-    position: fixed;
-    right: 0;
-    top: 0;
-    transform: translateX(100%);
-    z-index: 10000;
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
-}
-
-body.mobile-mode .controls.visible {
-    transform: translateX(0);
-}
-
-#mobileMenuToggle {
-    display: none;
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 60px;
-    height: 60px;
-    z-index: 9998;
-    cursor: pointer;
-    display: none;
-    pointer-events: none;
-}
-
-body.mobile-mode #mobileMenuToggle {
-    display: block;
-}
-
-#mobileMenuToggle.show {
-    display: block;
-    pointer-events: auto;
-}
-
-#mobileMenuToggle::after {
-    content: '☰';
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    font-size: 24px;
-    color: rgba(255, 255, 255, 0.8);
-    background: rgba(11, 14, 20, 0.92);
-    border-radius: 8px;
-    padding: 8px 12px;
-}
-
-body.mobile-mode .controls.visible ~ #mobileMenuToggle::after {
-    content: '✕';
-}
-
-/* Mobile '?' → hotkeys modal (created by 13-mobile-mode; the only mobile
-   entry point — F1 is keyboard-only and the reminder row is hidden <768px).
-   Sits under the ☰ pill. Layout only: its dark plate is the standard button
-   from 01-buttons.css, tinted by the :root system fallback (it is a <body>
-   child, outside any panel). */
-#mobileHotkeysBtn {
-    display: none;
-    position: fixed;
-    top: 68px;
-    right: 15px;
-    z-index: 9998;
-    width: 44px;
-    height: 40px;
-    font-size: 18px;
-    font-weight: 700;
-    border-radius: 8px;
-    cursor: pointer;
-}
-body.mobile-mode #mobileHotkeysBtn {
-    display: block;
-}
-body.focus-mode #mobileHotkeysBtn {
-    display: none;
-}
-
-/* Mobile bottom action row (13-mobile-mode): Look · Color · Together · Save,
-   reachable without the drawer. Under the drawer (10000) and the modals,
-   above the canvas. Buttons take the core tint from data-group on the row
-   (css/01-buttons.css), never per button. */
-#mobileActionRow {
-    display: none;
-    position: fixed;
-    left: 50%;
-    bottom: max(10px, env(safe-area-inset-bottom, 10px));
-    transform: translateX(-50%);
-    z-index: 9998;
-    gap: 6px;
-    padding: 6px;
-    border-radius: 12px;
-    background: rgba(11, 14, 20, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-    touch-action: manipulation;
-}
-body.mobile-mode #mobileActionRow {
-    display: flex;
-}
-body.focus-mode #mobileActionRow {
-    display: none;
-}
-#mobileActionRow button {
-    min-width: 64px;
-    height: 40px;
-    padding: 0 12px;
-    font-size: 13px;
-    font-weight: 600;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.mobile-menu-close {
-    display: none;
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    font-size: 20px;
-    cursor: pointer;
-    z-index: 1;
-    padding: 0;
-    line-height: 1;
-}
-
-body.mobile-mode .controls.visible .mobile-menu-close {
-    display: block;
-}
-
 
 /* ── Hotkey caps + appended reminder row (design handoff Task 9) ── */
 /* NOTE: No CSS transitions or will-change here — those create compositor layers

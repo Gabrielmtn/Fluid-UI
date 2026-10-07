@@ -401,7 +401,7 @@
       "knownHazards": [
         "Re-measure rides requestAnimationFrame + ResizeObserver + the window resize event — all three are paused or throttled in a hidden/occluded tab, so after resize_window call StripMore.measure() yourself (synchronous) instead of waiting",
         "measure() moves real nodes only when the parked set changes; 'would it fit back' is asked with a throwaway clone (.mixer-more-probe, ids stripped) inserted and removed inside one synchronous block — a MutationObserver that reacts to added range inputs sees the detached clone afterwards (06-slider-updater does; it no-ops)",
-        "body.mobile-mode restores everything and disables parking — the whole strip is relocated into the drawer there (13-mobile-mode)",
+        "body.compact-ui restores everything and disables parking — the whole strip moves into the right sidebar there (13-compact-mode)",
         "Focus mode hides the strip and the panel (clientWidth 0) — no measure runs until it comes back; the parked set is kept"
       ]
     },
