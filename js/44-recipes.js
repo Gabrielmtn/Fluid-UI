@@ -495,6 +495,10 @@
             { say: 'Swirl Together → Start a room, or join one.', target: { section: 'Swirl Together', sel: '#createRoomBtn' }, until: { visible: '#mpConnected' } },
             { say: 'Change any setting. It changes for everyone here, and when someone else changes one, this line says who and what.', needs: 'connected', target: { overlay: 'mp', sel: '#mpActivity', fallback: { overlay: 'mp', sel: '#multiplayerStatus' } } }
           ] },
+        { id: 'share-settings', pillar: 'together', title: 'Share my settings as a link',
+          tags: ['share', 'settings', 'current', 'link', 'look', 'url', 'send', 'copy', 'post', 'aesthetic', 'style', 'friend', 'discord', 'chat'],
+          answer: 'Swirl Together → Link to current settings copies a link that opens Swirl Together with every look setting you have now: fluid, colours, brush, symmetry, light and gravity, in the browser or the desktop app. It fits in one chat message. In a room, Invite → Room link + current settings sends the room and your settings in one link.',
+          target: { section: 'Swirl Together', sel: '#shareLookBtn', fallback: { overlay: 'mp', popup: 'invite', sel: '#copyRoomLookBtn' } } },
         { id: 'phone', pillar: 'together', title: 'Paint from my phone',
           tags: ['phone', 'use', 'mobile', 'iphone', 'android', 'smartphone', 'remote', 'controller', 'control', 'touch', 'pad', 'scan', 'qr', 'couch', 'tv', 'tablet', 'connect', 'mouse', 'artist', 'friends'],
           answer: 'Swirl Together → Sync phone (in a room it sits under Invite), then pick how. As your mouse: the phone steers this canvas’s own brush, with all your settings. As an artist: each phone that scans joins your room as a painter of its own. Scan the code with the phone’s camera.',

@@ -1342,6 +1342,10 @@
                     <input type="text" id="joinRoomInput" placeholder="Paste a code" maxlength="48" spellcheck="false" autocomplete="off" aria-label="Room code to join">
                     <button id="joinRoomBtn" title="Join a friend's room with the code or link they sent you">Join</button>
                 </div>
+                <!-- Link to current settings (06e copyLookLink → js/50-look-links.js):
+                     no room needed, the link itself carries the look. 54
+                     puts Sync phone above it; errors show below both. -->
+                <button type="button" id="shareLookBtn" class="mp-btn-share-look" title="Copies a link to your current settings: fluid, colours, brush, symmetry, light and gravity. It opens Swirl Together with them, in the browser or the desktop app. It shares your settings, not your painting.">Link to current settings</button>
                 <div id="mpError" class="mp-error" style="display:none" role="alert"></div>
                 <button id="reconnectBtn" style="display:none; width:100%; margin-top:8px;">Reconnect</button>
             </div>
@@ -1402,6 +1406,10 @@
                             <button id="copyRoomBtn" class="mp-btn-share" title="Copy the invite link. Paste it into any chat and it opens this room">Copy link</button>
                             <button id="copyRoomCodeBtn" class="mp-btn-share mp-btn-share-code" title="Copy just the six-character room code">Copy code</button>
                         </div>
+                        <!-- The invite with your settings packed in (06e
+                             copyLookLink): they land even if the room has
+                             closed by the time the link is opened. -->
+                        <button type="button" id="copyRoomLookBtn" class="mp-btn-share mp-btn-share-look" title="Copies the room link with your current settings packed in. It joins this room, and if the room has closed by then, it still opens your settings, brush included.">Room link + current settings</button>
                     </div>
                 </div>
 

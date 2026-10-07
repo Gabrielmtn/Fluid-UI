@@ -253,7 +253,9 @@
             // beside it (2026-10-06: the ghost, with no plate until hover,
             // read as a caption rather than something to press). What it
             // does is the tooltip.
-            var before = document.getElementById('mpError');
+            // Above Link to current settings (06e) when it is there, so
+            // the two full-width rows read as one stack under Join.
+            var before = document.getElementById('shareLookBtn') || document.getElementById('mpError');
             var btn = el('button', 'mp-btn-phone-door', PHONE_DOOR);
             btn.id = 'phonePadBtn';
             btn.type = 'button';

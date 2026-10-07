@@ -19,6 +19,7 @@ words: features misbehaving *in synthesis with others*, and the shader
 | `run-regression.js` | Golden-state suite over `scenarios.json` (`--record` / compare) |
 | `run-inputs.js` | Hotkey conformance driven by `inventory/hotkeys.json` |
 | `photosafe/run.js` | Photosensitivity limiter: square, sine and red strobes at 60 and 144 Hz counted as WCAG flashes on the presented frame, plus painting controls. Own headless Chrome, no dev server; `REPORT.md` holds the before/after table |
+| `look-links/run.js` | Links to current settings (js/50 packed `2.` format, Swirl Together's two buttons in 06e): every built-in look lands exactly as the old JSON link did at ~35% of its length, a stress look stays inside one chat message, newer and corrupted links are handled, the link opens over another look with the saved session untouched, a room link + settings joins only after the settings are on, deep links, layout and the button audit. Own headless Chrome, no dev server; `MP_HOST=<local relay>` adds a live-room check (the room's settings arrive, the link's brush stays). ~16 s, 29 checks |
 | `inventory/` | Machine-readable maps of the app, written by inventory agents from the sources: `params.json` (107 entries), `hotkeys.json` (45 bindings + wheel + pointer lifecycle), `features.json` (18 activation recipes), `determinism.json` (the determinism dossier) |
 | `scenarios.json` | The regression scenarios — grow one per feature system |
 | `goldens/` | Recorded reference hashes (commit these) |

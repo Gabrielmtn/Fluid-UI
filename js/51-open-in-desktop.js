@@ -15,8 +15,10 @@
 // DESKTOP: the renderer end of a deep link. Asks main for a link that
 //   arrived on the command line (deep-link-ready → deep-link), takes later
 //   ones from a second launch, and turns them into window.joinRoom(code)
-//   or LookLinks.applyPayload(settings) once the app is ready.
-// Scheme: swirltogether://join/ABC123  ·  swirltogether://look/1.<encoded settings>
+//   or LookLinks.applyPayload(settings) once the app is ready — or both,
+//   settings first, for a room invite that carries them (2026-10-07).
+// Scheme: swirltogether://join/ABC123  ·  swirltogether://look/2.<encoded settings>
+//   ·  swirltogether://join/ABC123?look=2.<encoded settings>
 // ═══════════════════════════════════════════════════════════════════
 (function () {
     'use strict';
@@ -29,6 +31,9 @@
     var isElectron = !!window.IS_ELECTRON;
 
     // ── The link itself ─────────────────────────────────────────────
+    // The encoded settings (js/50-look-links.js): base64url is
+    // case-sensitive and never percent-encoded, so they are taken verbatim.
+    var LOOK_RE = /^[012]\.[A-Za-z0-9_-]{2,12000}$/;
     function parseDeepLink(raw) {
         var m = /^swirltogether:\/\/(join|look)\/([^/?#\s]+)(?:\?([^#\s]*))?/i.exec(String(raw || '').trim());
         if (!m) return null;
@@ -37,15 +42,18 @@
         try { val = decodeURIComponent(m[2]); } catch (_) { return null; }
         if (kind === 'join') {
             var code = val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-            return code.length === 6 ? { kind: 'join', code: code } : null;
+            if (code.length !== 6) return null;
+            // An invite with settings: ?look=<encoded settings>. A broken
+            // one still joins.
+            var lm = /(?:^|&)look=([^&#\s]*)/.exec(m[3] || '');
+            return (lm && LOOK_RE.test(lm[1])) ? { kind: 'join', code: code, payload: lm[1] } : { kind: 'join', code: code };
         }
-        // The encoded settings (js/50-look-links.js): base64url is
-        // case-sensitive and never percent-encoded, so it is taken verbatim.
-        return /^[01]\.[A-Za-z0-9_-]{8,12000}$/.test(m[2]) ? { kind: 'look', payload: m[2] } : null;
+        return LOOK_RE.test(m[2]) ? { kind: 'look', payload: m[2] } : null;
     }
 
-    function deepLinkUrl(kind, value) {
-        if (kind === 'join') return SCHEME + '://join/' + encodeURIComponent(value);
+    // look: the encoded settings an invite carries too (join only).
+    function deepLinkUrl(kind, value, look) {
+        if (kind === 'join') return SCHEME + '://join/' + encodeURIComponent(value) + (look ? '?look=' + look : '');
         return SCHEME + '://look/' + value;
     }
 
@@ -121,10 +129,10 @@
         clearHandoff();
     }
 
-    function show(kind, value) {
+    function show(kind, value, look) {
         build();
         try { sessionStorage.setItem(SS_ASKED, kind + ':' + value); } catch (_) {}
-        var what = (kind === 'join') ? 'This room' : 'These settings';
+        var what = (kind === 'join') ? (look ? 'This room, with the settings in the link,' : 'This room') : 'These settings';
         els.title.textContent = 'Open in the desktop app?';
         els.msg.textContent = what + ' can open in Swirl Together for Windows — the desktop app runs at full speed, with your pen and your screens. Or keep going right here.';
         els.go.textContent = 'Open in desktop';
@@ -135,7 +143,7 @@
         els.store.style.display = 'none';
         els.remember.style.display = '';
         els.never.checked = false;
-        els.go.onclick = function () { launch(deepLinkUrl(kind, value)); };
+        els.go.onclick = function () { launch(deepLinkUrl(kind, value, look)); };
         els.stay.onclick = function () { close(); };
         els.store.onclick = function () { window.open(STORE_URL, '_blank', 'noopener'); close(); };
         // The app's hotkeys listen on document; nothing typed at this
@@ -204,12 +212,14 @@
         finally { window.__closeApproved = prevApproved; }
     }
 
-    // Programmatic: offer('join', 'ABC123') / offer('look', '<encoded settings>').
-    function offer(kind, value) {
+    // Programmatic: offer('join', 'ABC123'[, '<encoded settings>']) /
+    // offer('look', '<encoded settings>').
+    function offer(kind, value, look) {
         if (isElectron) return false;
         if (kind === 'join' && !/^[A-Z0-9]{6}$/.test(String(value || ''))) return false;
-        if (kind === 'look' && !/^[01]\.[A-Za-z0-9_-]{8,12000}$/.test(String(value || ''))) return false;
-        show(kind, value);
+        if (kind === 'look' && !LOOK_RE.test(String(value || ''))) return false;
+        if (look && (kind !== 'join' || !LOOK_RE.test(String(look)))) look = null;
+        show(kind, value, look || null);
         return true;
     }
 
@@ -223,6 +233,8 @@
         if (!room && !look) return;
         var kind = room ? 'join' : 'look';
         var value = room || look.payload;
+        // A room link with settings (?look=…#CODE, 50) hands both over.
+        var withLook = (room && look && look.room === room) ? look.payload : null;
         // Once per tab per link: a reload in the room (F5, a context-loss
         // restart) keeps #CODE in the URL and must not ask again.
         try { if (sessionStorage.getItem(SS_ASKED) === kind + ':' + value) return; } catch (_) {}
@@ -236,7 +248,7 @@
                 return;
             }
             var go = function () {
-                setTimeout(function () { show(kind, value); }, 700);
+                setTimeout(function () { show(kind, value, withLook); }, 700);
             };
             var uv = window.UIVisibility;
             if (uv && typeof uv.forkPending === 'function' && uv.forkPending() && uv.EVENT) {
@@ -277,8 +289,13 @@
                 if (d.kind === 'join') {
                     // A link to the room this app is already in is a no-op:
                     // joinRoom would leave and rejoin, resetting host state.
-                    if (roomNow() !== d.code && typeof window.joinRoom === 'function') window.joinRoom(d.code);
-                    openRoomPanel();
+                    if (roomNow() === d.code || typeof window.joinRoom !== 'function') { openRoomPanel(); return; }
+                    if (!d.payload || !window.LookLinks) { window.joinRoom(d.code); openRoomPanel(); return; }
+                    // With settings: out of any other room first (they are
+                    // never applied inside one), settings on, then in.
+                    if (roomNow() && typeof window.disconnectMultiplayer === 'function') window.disconnectMultiplayer();
+                    var go = function () { if (!roomNow()) window.joinRoom(d.code); openRoomPanel(); };
+                    window.LookLinks.applyPayload(d.payload, { room: d.code }).then(go, go);
                 } else if (window.LookLinks && typeof window.LookLinks.applyPayload === 'function') {
                     window.LookLinks.applyPayload(d.payload);
                 }

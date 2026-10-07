@@ -1169,6 +1169,23 @@ body.mobile-mode #sidebar-right > #mixer-strip .mixer-actions > button {
     width: 100%;
     margin: 8px 0 0;
 }
+/* Link to current settings (06e copyLookLink). Out of a room it is the last
+   row, under Sync phone: the two full-width rows stand as tall as the Join
+   row above them (its field sets 33px), so the stack keeps one rhythm. In
+   the Invite popover it is the second row of the copy grid, Copy link and
+   Copy code above it: the same 6px gap and the same width. */
+#mpDisconnected .mp-btn-phone-door,
+#mpDisconnected .mp-btn-share-look {
+    min-height: 33px;
+}
+.mp-btn-share-look {
+    display: block;
+    width: 100%;
+    margin: 8px 0 0;
+}
+.mp-share-row + .mp-btn-share-look {
+    margin-top: 6px;
+}
 
 .mp-error {
     color: var(--danger, #ff6b6b);

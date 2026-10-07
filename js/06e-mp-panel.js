@@ -618,6 +618,23 @@ function copyRoomCode(fromCreate, what) {
     }
 }
 
+// Links to current settings (js/50-look-links.js, 2026-10-07): out of a
+// room, #shareLookBtn (Link to current settings) copies a link that opens
+// them anywhere; in one, #copyRoomLookBtn (Room link + current settings)
+// copies the invite with them packed in, so the link still lands on your
+// look after the room has closed (and brings your brush, which a room
+// never shares). The button flashes; 50's toast says how many settings
+// went in and how long the link is.
+function copyLookLink(btn, room) {
+    if (!btn || btn.disabled || !window.LookLinks) return;
+    var idle = btn.textContent;
+    btn.disabled = true;
+    window.LookLinks.copyCurrent(room ? { room: room } : null).then(function (ok) {
+        if (ok) btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = idle; btn.disabled = false; }, ok ? 2000 : 0);
+    });
+}
+
 // ── The Invite popover and the ⋯ menu ───────────────────────────────
 // Two body-mounted popovers in the .brush-shape-menu skin (20 openShapeMenu):
 // clear of the sidebar's overflow and stacking, closed by a press outside,
@@ -775,6 +792,12 @@ function initMultiplayerUI() {
     if (copyBtn) copyBtn.addEventListener('click', function() { copyRoomCode(false); });
     var copyCodeBtn = document.getElementById('copyRoomCodeBtn');
     if (copyCodeBtn) copyCodeBtn.addEventListener('click', function() { copyRoomCode(false, 'code'); });
+    var copyRoomLookBtn = document.getElementById('copyRoomLookBtn');
+    if (copyRoomLookBtn) copyRoomLookBtn.addEventListener('click', function() {
+        if (currentRoom) copyLookLink(copyRoomLookBtn, currentRoom);
+    });
+    var shareLookBtn = document.getElementById('shareLookBtn');
+    if (shareLookBtn) shareLookBtn.addEventListener('click', function() { copyLookLink(shareLookBtn, null); });
 
     // Code / QR / Hide. Re-rendered rather than toggled so the QR is only
     // ever built when it is about to be looked at.
@@ -807,9 +830,13 @@ function initMultiplayerUI() {
     // Who changed what (06b calls this after every change from the room).
     window.__mpRoomLookChanged = onRoomLookChanged;
 
-    // Auto-join if URL has room hash
+    // Auto-join if URL has room hash. Not when the link carries settings as
+    // well (?look=…#CODE, Room link + current settings): 50 puts them on first
+    // and then joins, since they are never applied inside a room. The test
+    // reads the URL like 50's, so it holds whichever of the two loads first.
     var hashRoom = getRoomFromHash();
-    if (hashRoom && hashRoom !== 'DEFAULT-ROOM') {
+    var lookFirst = /^[A-Z0-9]{6}$/.test(hashRoom || '') && /(?:^\?|&)look=/.test(window.location.search || '');
+    if (hashRoom && hashRoom !== 'DEFAULT-ROOM' && !lookFirst) {
         connectToRoom(hashRoom);
     }
 }

@@ -215,8 +215,8 @@ const RUN_STRANGER = process.env.STRANGER ? process.env.STRANGER === '1' : LOCAL
         // ── 1. Not in a room ──────────────────────────────────────────
         const s0 = await a.eval(PANEL);
         check(s0.view === 'mpDisconnected', 'not in a room: the door view shows', s0.view);
-        check(s0.labels.join(',') === 'Start a room,Stranger,Paste a code,Join,Sync phone',
-            'not in a room: Start a room, Stranger, the code box, Join, the phone door', s0.labels);
+        check(s0.labels.join(',') === 'Start a room,Stranger,Paste a code,Join,Sync phone,Link to current settings',
+            'not in a room: Start a room, Stranger, the code box, Join, the phone door, Link to current settings', s0.labels);
         const blurbs = await a.eval("(function(){ var d=document.getElementById('mpDisconnected'); return { prose: d.querySelectorAll('.mp-hint, .mp-sub, .mp-or').length," +
             " tips: ['createRoomBtn','strangerBtn','phonePadBtn','joinRoomBtn'].map(function(id){ var e=document.getElementById(id); return !!(e && e.title && e.title.length > 20); }) }; })()");
         check(blurbs.prose === 0 && blurbs.tips.every(Boolean), 'the blurbs are tooltips now, not lines of text', blurbs);
@@ -262,8 +262,8 @@ const RUN_STRANGER = process.env.STRANGER ? process.env.STRANGER === '1' : LOCAL
         const inv = await until(a, "(function(){var p=" + POP('mpInvitePop') + "; return p.open ? p : null;})()", 3000) || await a.eval(POP('mpInvitePop'));
         check(inv.open && inv.parent === 'body', 'Invite opens a popover mounted on body', { open: inv.open, parent: inv.parent });
         const invIds = (inv.items || []).map((x) => x.id);
-        check(['shareModeCode', 'shareModeQr', 'shareModeHidden', 'copyRoomBtn', 'copyRoomCodeBtn', 'phonePadRoomBtn'].every((id) => invIds.indexOf(id) !== -1),
-            'it holds Code | QR | Hide, Copy link, Copy code and the phone row', invIds);
+        check(['shareModeCode', 'shareModeQr', 'shareModeHidden', 'copyRoomBtn', 'copyRoomCodeBtn', 'copyRoomLookBtn', 'phonePadRoomBtn'].every((id) => invIds.indexOf(id) !== -1),
+            'it holds Code | QR | Hide, Copy link, Copy code, Room link + current settings and the phone row', invIds);
         check(await a.eval("document.getElementById('roomName').textContent === currentRoom && document.getElementById('mpInvitePop').contains(document.getElementById('roomName'))"), 'and the code itself (#roomName)');
         await shot(A, '04-invite-code.png');
         await click(a, '#shareModeQr');
