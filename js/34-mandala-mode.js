@@ -143,15 +143,16 @@
     // exact one — a rounded 0.5° would visibly misregister at the rim.
     let pinning = false;
 
-    // 05f's angle slider sticks to 0 for 1.5s after any near-zero write, and
-    // rewrites the input's own value when it does — a nicety for dragging past
-    // the detent, but it silently swallows a programmatic angle. The pin then
-    // landed on the slider as 0 while window.kAngle held the real pin (so the
-    // slider read a lie), and on the way out it could zero the very angle being
-    // restored. Whether it bit depended on how recently the angle passed 0,
-    // which is what made leaving the mode unreliable rather than broken.
-    // So every angle write from this file lands on BOTH: dispatch first, so
-    // 05f and the guides run, then say what we actually meant.
+    // 05f's angle slider used to stick to 0 for 1.5s after any near-zero write,
+    // and rewrite the input's own value when it did, which silently swallowed
+    // a programmatic angle. The pin then landed on the slider as 0 while
+    // window.kAngle held the real pin (so the slider read a lie), and on the
+    // way out it could zero the very angle being restored. Whether it bit
+    // depended on how recently the angle passed 0, which is what made leaving
+    // the mode unreliable rather than broken. Since 2026-10-06 the stick only
+    // holds a hand drag, but every angle write from this file still lands on
+    // BOTH: dispatch first, so 05f and the guides run, then say what we
+    // actually meant (the slider is step=1; the pin is often fractional).
     function writeAngle(deg) {
         const d = Number(deg) || 0;
         setRange(kAngleEl, d);

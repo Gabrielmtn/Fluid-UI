@@ -21,7 +21,7 @@
       "knownHazards": [
         "First-enable bootstrap mutates multi-arm state (multiplier 8x, segments 16) - js/05f-kaleido-controls.js:37-55; suppress with window._kaleidoBootstrapped = true (mandala does exactly this, js/34-mandala-mode.js:406)",
         "Preset applies re-dispatch 'change' on the checkbox; the handler early-returns during window._profileApplying to stop it clobbering the snapshot's arm count - js/05f-kaleido-controls.js:26-36",
-        "kAngle slider sticks to 0 for 1500ms after a near-zero write and rewrites the input's value (ANGLE_STICK_MS) - programmatic angle writes through the slider can be silently swallowed; write window.kAngle directly too - js/05f-kaleido-controls.js:88-111 and the workaround at js/34-mandala-mode.js:123-142",
+        "kAngle and kSpinSpeed sliders have a sticky zero (stickyZero, STICK_TOL 3, STICK_MS 600) that holds ONLY a pointer drag on the slider's row and rewrites the input's value to 0 - keyboard steps and programmatic writes pass through, but a synthetic row drag (PointerEvents on .control-group) is held like a real one; mandala still writes window.kAngle directly after its slider write because the slider is step=1 - js/05f-kaleido-controls.js:93-142 and js/34-mandala-mode.js:156-166",
         "Kaleido is display-only: dye/velocity FBO contents are NOT affected, so state-measuring tests that read FBOs see no difference; only the drawing-buffer output changes"
       ]
     },

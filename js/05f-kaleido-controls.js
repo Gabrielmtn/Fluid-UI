@@ -90,28 +90,62 @@
             syncKaleidoPanel();
             kaleidoToggleEl.addEventListener('change', () => syncKaleidoPanel());
         }
-        let lastAngleSnapTime = 0;
-        const ANGLE_STICK_MS = 1500;
-        const ANGLE_STICK_TOL = 1.0;
+        // Sticky zero for Angle and Spin Speed (2026-10-06). 360 steps across
+        // a sidebar row is under two pixels a step, so landing on 0 took a
+        // lucky pixel. During a hand drag the value catches on 0 when it
+        // comes within STICK_TOL, or jumps across 0 between two moves (a fast
+        // flick skips the window), and stays there while the pointer is in
+        // the window or for STICK_MS, so the overshoot of letting go still
+        // lands on 0. It only catches a drag that has been outside the
+        // window, so a drag that STARTS at 0 can still leave it for a small
+        // value. Keyboard steps and programmatic writes are never held: the
+        // old Angle stick held ANY near-zero write for 1.5 s, which trapped
+        // the arrow keys at 0 and swallowed Mandala Studio's angle pin.
+        const STICK_MS = 600;
+        const STICK_TOL = 3;
+        function stickyZero(el) {
+            let drag = false, armed = false, stuck = false, holdUntil = 0, last = null;
+            // Window capture runs before 06's row forwarder (document
+            // capture), which writes the first value of a row press itself.
+            window.addEventListener('pointerdown', (e) => {
+                const row = el.closest('.control-group') || el;
+                if (!row.contains(e.target)) return;
+                drag = true;
+                stuck = false;
+                last = null;
+                armed = Math.abs(parseFloat(el.value)) > STICK_TOL;
+            }, true);
+            const end = () => { drag = false; };
+            window.addEventListener('pointerup', end, true);
+            window.addEventListener('pointercancel', end, true);
+            window.addEventListener('blur', end);
+            // The input's raw value in, the value to keep out. A snapshot
+            // apply (preset, Mutate variant, look mirror) takes its value as
+            // given even mid-drag.
+            return function (v) {
+                if (!drag || window._profileApplying || !isFinite(v)) return v;
+                const now = performance.now();
+                const inZone = Math.abs(v) <= STICK_TOL;
+                // The first move of a drag can be a track click's jump,
+                // which is a choice of value, not a pass over 0.
+                const crossed = last !== null && last * v < 0;
+                if (stuck) {
+                    if (now >= holdUntil && !inZone) stuck = false;
+                } else if (armed && (inZone || crossed)) {
+                    stuck = true;
+                    holdUntil = now + STICK_MS;
+                }
+                if (!inZone) armed = true;
+                last = v;
+                return stuck ? 0 : v;
+            };
+        }
         const kAngleEl = document.getElementById('kAngle');
         const kAngleValueEl = document.getElementById('kAngleValue');
         if (kAngleEl) {
+            const stickAngle = stickyZero(kAngleEl);
             kAngleEl.addEventListener('input', (e) => {
-                let deg = parseFloat(e.target.value);
-                const now = Date.now();
-                const withinTol = Math.abs(deg) <= ANGLE_STICK_TOL;
-                const stickActive = (now - lastAngleSnapTime) < ANGLE_STICK_MS;
-                // The sticky zero is a drag aid. A snapshot apply (preset,
-                // Mutate variant, look mirror) takes its angle as given:
-                // every apply re-writes a 0° angle, which armed the stick,
-                // and the next variant picked within 1.5 s came out at 0°.
-                const applying = !!window._profileApplying;
-                if (!applying && !stickActive && withinTol) {
-                    deg = 0;
-                    lastAngleSnapTime = now;
-                } else if (!applying && stickActive) {
-                    deg = 0;
-                }
+                const deg = stickAngle(parseFloat(e.target.value));
                 if (!Number.isNaN(deg)) {
                     e.target.value = String(deg);
                     try { e.target.style.setProperty('--val', deg); } catch (_){}
@@ -123,8 +157,14 @@
         const kSpinSpeedEl = document.getElementById('kSpinSpeed');
         const kSpinSpeedValueEl = document.getElementById('kSpinSpeedValue');
         if (kSpinSpeedEl) {
+            const stickSpin = stickyZero(kSpinSpeedEl);
             kSpinSpeedEl.addEventListener('input', (e) => {
-                const degs = parseFloat(e.target.value);
+                const raw = parseFloat(e.target.value);
+                const degs = stickSpin(raw);
+                if (degs === 0 && raw !== 0) {
+                    e.target.value = '0';
+                    try { e.target.style.setProperty('--val', 0); } catch (_){}
+                }
                 window.kSpinSpeed = degs;
                 if (kSpinSpeedValueEl) kSpinSpeedValueEl.textContent = degs + '°/s';
             });
