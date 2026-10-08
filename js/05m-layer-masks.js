@@ -339,7 +339,9 @@
                 // fainter ghost. 1 = the picture at full strength.
                 const amount = (window.config && typeof config.SPLAT_TO_FLUID_AMOUNT === 'number')
                     ? config.SPLAT_TO_FLUID_AMOUNT : 1;
-                if (!window.__splatImageToDye(out, amount)) {
+                // Full Flow: the brush's Flow paces dabs that build up, and
+                // this is one pour (05i opts.flow).
+                if (!window.__splatImageToDye(out, amount, null, { flow: 1 })) {
                     say('Could not fluidize that layer', 'The simulation refused the image. Try again, or reload if it keeps happening.');
                     return;
                 }

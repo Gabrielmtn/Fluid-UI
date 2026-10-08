@@ -787,7 +787,11 @@
         // from the TOP-left, like a canvas. Omitted, the image covers the whole
         // dye at 1:1 — the one placement there used to be. A small bitmap at a
         // rect is what lets a line of text pour without a dye-sized upload.
-        window.__splatImageToDye = function (src, amount, rect) {
+        // opts.flow (optional): the Gate convergence to pour at, in place of
+        // the brush's Flow. A layer's Fluidize is one pour, not a dab that
+        // builds over many frames, so it pours at 1: under Limit at Flow 5%
+        // it landed at 5% of the picture, near black (2026-10-08).
+        window.__splatImageToDye = function (src, amount, rect, opts) {
             if (!density || !src) return false;
             const stamp = (src.tex !== undefined && typeof src.dispose === 'function') ? src : null;
             let tex = null;
@@ -857,10 +861,10 @@
             // The same two knobs a dab reads, so a poured image lands with the
             // brush settings that are live right now (05i splat()).
             gl.uniform1i(imageSplatProg.uniforms.gateColor, config.COLOR_GATE ? 1 : 0);
+            const _flow = (opts && typeof opts.flow === 'number') ? opts.flow
+                : (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1;
             gl.uniform1f(imageSplatProg.uniforms.gateFlow,
-                config.COLOR_GATE
-                    ? Math.max(0, Math.min(1, (typeof config.BRUSH_FLOW === 'number') ? config.BRUSH_FLOW : 1))
-                    : 1);
+                config.COLOR_GATE ? Math.max(0, Math.min(1, _flow)) : 1);
             // Pre-compensate for the display's tone map (same white point 05j
             // hands displayFrag) so the picture lands looking like the picture.
             // config.FLUIDIZE_HDR_CEIL = 0 turns it off and pours raw values.
