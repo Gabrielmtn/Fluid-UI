@@ -359,6 +359,12 @@ class DepthEstimator {
             return setCoverage(layerIndex, depth, threshold, invert);
         },
 
+        // The colour a collider's film is drawn in (looks only). colourOf
+        // answers the default for a layer that never had one picked.
+        colourOf: colliderColourOf,
+        setColour: setColliderColour,
+        DEFAULT_COLOUR: '#ff3b30',
+
         // Mode vocabulary + the fillStyle a procedural source must draw its
         // coverage with so the wall carries its mode and strength (see
         // wallBytes above). Draw with globalAlpha = strength as well.
@@ -750,7 +756,7 @@ class DepthEstimator {
             var layersHost = document.getElementById('layers-container') || canvasWrapper;
             layersHost.appendChild(layerDiv);
         }
-        var filmDataUrl = _depthToFilmUrl(depth);
+        var filmDataUrl = _depthToFilmUrl(depth, DEFAULT_COLLIDER_COLOUR);
         layerDiv.style.backgroundImage = 'url(' + filmDataUrl + ')';
         // Stretch to the div (which fills the wrapper) — same mapping the
         // obstacle compositor uses, so preview and collision stay aligned.
@@ -893,7 +899,7 @@ class DepthEstimator {
         try {
             layer.data = _depthToOpaqueUrl(depth);
             layer.thumb = layer.data;
-            layer.filmData = _depthToFilmUrl(depth);
+            layer.filmData = _depthToFilmUrl(depth, colliderColourOf(layer));
             _setColliderFilm(layer.index, layer.filmData);
         } catch (_) {}
         if (typeof window.renderLayers === 'function') window.renderLayers();
@@ -1149,7 +1155,7 @@ class DepthEstimator {
         var opaqueUrl = _depthToOpaqueUrl(built.depth);
         layer.data = opaqueUrl;                // panel thumbnail source
         layer.originalData = built.previewUrl; // alpha-coverage mask (data)
-        layer.filmData = _depthToFilmUrl(built.depth); // on-canvas film (tinted coverage)
+        layer.filmData = _depthToFilmUrl(built.depth, colliderColourOf(layer)); // on-canvas film (tinted coverage)
         _setColliderFilm(layer.index, layer.filmData);
         // Update the Layers-panel thumbnail IN PLACE (no full re-render per
         // stroke — renderLayers rebuilds the whole panel and would fight
@@ -1173,18 +1179,103 @@ class DepthEstimator {
     // this div agrees — creation, live stroke refresh, preset load and undo all
     // used to set it separately and only one of them was ever fixed.
     var COLLIDER_FILM_OPACITY = '0.3';
-    function _depthToFilmUrl(depth) {
+    function _depthToFilmUrl(depth, colour) {
+        var rgb = _hexRgb(colour || DEFAULT_COLLIDER_COLOUR);
         var pc = document.createElement('canvas');
         pc.width = depth.width; pc.height = depth.height;
         var ctx = pc.getContext('2d');
         var img = ctx.createImageData(depth.width, depth.height);
         for (var i = 0, m = depth.width * depth.height; i < m; i++) {
             var v = depth.data[i], o = i << 2;
-            img.data[o] = 255; img.data[o + 1] = 59; img.data[o + 2] = 48; // #ff3b30
+            img.data[o] = rgb[0]; img.data[o + 1] = rgb[1]; img.data[o + 2] = rgb[2];
             img.data[o + 3] = v;                                            // coverage
         }
         ctx.putImageData(img, 0, 0);
         return pc.toDataURL('image/png');
+    }
+
+    // ── The film's colour ──────────────────────────────────────────────
+    // Each collider wears its own colour (layer.colliderColour, the swatch
+    // in its Collision group); this red is only the default. Everything
+    // that paints the film (this file, 05m applyLayerMask, the collider
+    // editor in 15) asks colourOf, so a re-bake never snaps a recoloured
+    // wall back to red. Looks only: the obstacle never reads it.
+    var DEFAULT_COLLIDER_COLOUR = '#ff3b30';
+    function colliderColourOf(layer) {
+        var c = layer && layer.colliderColour;
+        return (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) ? c.toLowerCase() : DEFAULT_COLLIDER_COLOUR;
+    }
+    function _hexRgb(hex) {
+        var n = parseInt(hex.slice(1), 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+
+    // Recolour in place. The film's alpha IS the wall's coverage, so a new
+    // colour is a flat fill through it (source-in): whatever made the film
+    // (a depth bake, a mask composite, a live mask readback) keeps its exact
+    // shape, and nothing is re-derived from the source. One repaint in
+    // flight per layer; a picker drag that outruns it gets one more pass at
+    // the end, in the latest colour.
+    var _recolouring = {};   // layer index → 'busy' | 'again'
+    function setColliderColour(layerIndex, colour) {
+        var layer = (window.layers || []).find(function (l) { return l.index === layerIndex; });
+        if (!layer || !layer.isCollision) return false;
+        var hex = String(colour || '').toLowerCase();
+        if (!/^#[0-9a-f]{6}$/.test(hex)) return false;
+        layer.colliderColour = hex;
+        _recolourFilm(layer);
+        return true;
+    }
+    function _cssUrl(bg) {
+        var s = String(bg || '');
+        if (s.slice(0, 4) !== 'url(') return null;
+        s = s.slice(4, -1);
+        var q = s.charAt(0);
+        if ((q === '"' || q === "'") && s.charAt(s.length - 1) === q) s = s.slice(1, -1);
+        return s || null;
+    }
+    function _fillThroughAlpha(url, colour) {
+        return new Promise(function (resolve) {
+            var img = new Image();
+            img.onload = function () {
+                var c = document.createElement('canvas');
+                c.width = img.naturalWidth || 1; c.height = img.naturalHeight || 1;
+                var cx = c.getContext('2d');
+                cx.drawImage(img, 0, 0);
+                cx.globalCompositeOperation = 'source-in';
+                cx.fillStyle = colour;
+                cx.fillRect(0, 0, c.width, c.height);
+                resolve(c.toDataURL('image/png'));
+            };
+            img.onerror = function () { resolve(null); };
+            img.src = url;
+        });
+    }
+    function _recolourFilm(layer) {
+        var key = layer.index;
+        if (_recolouring[key]) { _recolouring[key] = 'again'; return; }
+        _recolouring[key] = 'busy';
+        var colour = colliderColourOf(layer);
+        var div = document.getElementById('layer' + layer.index);
+        var shownBg = div ? div.style.backgroundImage : '';
+        var shown = _cssUrl(shownBg);
+        var film = layer.filmData || null;
+        var jobs = [];
+        if (shown) jobs.push(_fillThroughAlpha(shown, colour).then(function (u) {
+            // Repainted meanwhile (a re-bake, which already used the new
+            // colour): leave the newer picture alone.
+            if (!u || div.style.backgroundImage !== shownBg) return;
+            div.style.backgroundImage = 'url(' + u + ')';
+            if (film === shown && layer.filmData === film) layer.filmData = u;
+        }));
+        if (film && film !== shown) jobs.push(_fillThroughAlpha(film, colour).then(function (u) {
+            if (u && layer.filmData === film) layer.filmData = u;   // what save and undo restore
+        }));
+        Promise.all(jobs).then(function () {
+            var again = _recolouring[key] === 'again';
+            delete _recolouring[key];
+            if (again) _recolourFilm(layer);
+        });
     }
     // Point a collider layer's on-canvas div at the film. url may be a prebuilt
     // coverage PNG (preset/undo restore, where only the stored image survives).

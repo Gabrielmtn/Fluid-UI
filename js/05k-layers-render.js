@@ -197,6 +197,41 @@
                 H.push({ label: 'layer opacity', undo: () => set(from), redo: () => set(to) });
             });
         }
+        // Colour, on colliders: the colour its film is drawn in (23 setColour
+        // recolours the film in place). The well opens the app's picker (64)
+        // and must stay in the DOM while it is open, so nothing here
+        // re-renders the panel — undo writes the well's value directly.
+        function colliderColourOf(layer) {
+            const cl = window.collisionLayers;
+            return (cl && cl.colourOf) ? cl.colourOf(layer) : '#ff3b30';
+        }
+        function wireColliderColour(element, layer) {
+            const well = element.querySelector('.collider-colour-input');
+            const cl = window.collisionLayers;
+            if (!well || !cl || !cl.setColour) return;
+            keepPresses(well);
+            let before = null;
+            const apply = () => {
+                if (before === null) before = colliderColourOf(layer);
+                cl.setColour(layer.index, well.value);
+            };
+            well.addEventListener('input', apply);
+            // One Ctrl+Z step per pick, recorded when the picker commits.
+            well.addEventListener('change', () => {
+                apply();
+                const from = before, to = colliderColourOf(layer);
+                before = null;
+                if (from === to) return;
+                const H = window.__layerHistory;
+                if (!H || H.isApplying()) return;
+                const set = (v) => {
+                    cl.setColour(layer.index, v);
+                    const w = document.querySelector(`.layer-item[data-layer-index="${layer.index}"] .collider-colour-input`);
+                    if (w) w.value = v;
+                };
+                H.push({ label: 'collider colour', undo: () => set(from), redo: () => set(to) });
+            });
+        }
         function renderLayers() {
             // Ensure all layers have mask property
             if (typeof ensureLayerMasks === 'function') {
@@ -414,6 +449,8 @@
                                 ${fieldRowHTML('layer-row-invert', 'Invert', `<label class="layer-vis" title="Swap which side of the threshold is wall"><input type="checkbox" class="collision-invert-cb" data-cinv="${layer.index}" ${depthShape?.invert ? 'checked' : ''}><span class="layer-vis-box"></span></label>`)}
                                 `}
                                 ${keyRow}
+                                ${fieldRowHTML('layer-row-colour', 'Colour', `<input type="color" class="collider-colour-input text-swatch" value="${colliderColourOf(layer)}" aria-label="Collider colour" title="The colour this wall is drawn in on the canvas">`,
+                                    'The colour this wall is drawn in on the canvas. Looks only: the fluid behaves the same.')}
                             </div>
                             <div class="layer-action-row layer-mask-controls">
                             ${painted ? `
@@ -508,6 +545,7 @@
                                 if (layer.visible && typeof window.applyLayerMask === 'function') window.applyLayerMask(layer.index);
                             });
                         }
+                        wireColliderColour(element, layer);
                         // Refresh button
                         const refreshBtn = element.querySelector('.collision-refresh-btn');
                         if (refreshBtn) {

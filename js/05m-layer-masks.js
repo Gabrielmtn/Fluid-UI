@@ -194,10 +194,15 @@
             img.onload = () => {
                 const maskCanvas = composeMaskedLayer(layer, img);
                 if (layer.isCollision) {
-                    // Tint the preview orange so it reads as an obstacle, not artwork
+                    // One flat colour through the wall's shape, so it reads as
+                    // an obstacle, not artwork: the collider's own colour (23
+                    // colourOf, the swatch in its Collision group), exactly the
+                    // one picked. It was an orange glaze over the source
+                    // picture, which no picked colour would ever match.
                     const ctx = maskCanvas.getContext('2d');
-                    ctx.globalCompositeOperation = 'source-atop';
-                    ctx.fillStyle = 'rgba(255, 140, 60, 0.55)';
+                    ctx.globalCompositeOperation = 'source-in';
+                    ctx.fillStyle = (window.collisionLayers && window.collisionLayers.colourOf)
+                        ? window.collisionLayers.colourOf(layer) : '#ff3b30';
                     ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
                     ctx.globalCompositeOperation = 'source-over';
                 }

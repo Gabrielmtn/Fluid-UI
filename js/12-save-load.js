@@ -857,6 +857,7 @@
                         isCollision: !!layer.isCollision,
                         collisionMode: layer.collisionMode || 'block',
                         collisionStrength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7,
+                        colliderColour: (typeof layer.colliderColour === 'string') ? layer.colliderColour : null,
                         isRaster: !!layer.isRaster,
                         opacity: typeof layer.opacity === 'number' ? layer.opacity : 1,
                         blendMode: layer.blendMode || 'normal',
@@ -1547,6 +1548,9 @@
                         isCollision: !!ld.isCollision,
                         collisionMode: ld.collisionMode || 'block',
                         collisionStrength: typeof ld.collisionStrength === 'number' ? ld.collisionStrength : 0.7,
+                        // Absent on saves from before colliders had a colour:
+                        // the film then paints in the default (23 colourOf).
+                        colliderColour: (typeof ld.colliderColour === 'string') ? ld.colliderColour : undefined,
                         isRaster: !!ld.isRaster,
                         // Force a pixel upload even when an FBO already exists at
                         // this index. reconcile() otherwise only restores MISSING

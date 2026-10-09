@@ -3442,15 +3442,16 @@
         }).catch(function () { renderMaskEditor(); });
     }
 
-    // The coverage preview is white-on-transparent; paint it red so it reads
-    // as the same "wall" film the canvas shows while collider painting.
+    // The coverage preview is white-on-transparent; paint it the collider's
+    // own colour so it reads as the same "wall" film the canvas shows.
     function tintColliderFilm(img) {
         var c = document.createElement('canvas');
         c.width = img.width; c.height = img.height;
         var cx = c.getContext('2d');
         cx.drawImage(img, 0, 0);
         cx.globalCompositeOperation = 'source-in';
-        cx.fillStyle = '#ff3b30';
+        var cl = window.collisionLayers;
+        cx.fillStyle = (cl && cl.colourOf) ? cl.colourOf(colliderLayer()) : '#ff3b30';
         cx.fillRect(0, 0, c.width, c.height);
         return c;
     }

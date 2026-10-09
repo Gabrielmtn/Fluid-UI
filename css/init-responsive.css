@@ -481,6 +481,17 @@ html.boot-fade.booting #canvas-area {
     color: var(--ink-100, #f2f3f5);
     font-weight: 600;
 }
+/* A setting whose control is a colour (collider Colour): a flat well as
+   wide as a dropdown, not the round pigment disc colour wells are elsewhere
+   (.text-swatch squares its inner swatch, css/22-overlays). */
+#sidebar-right .layer-prop input[type="color"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
 /* A setting whose control is a single checkbox (collider Invert). */
 #sidebar-right .layer-prop .layer-vis {
     padding: 2px 0;
