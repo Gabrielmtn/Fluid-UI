@@ -837,6 +837,15 @@
         // poured picture. `strength` hands back the amount it used (0 where
         // the dye is too faint to sharpen).
         const ridgesSharpenGLSL = `
+            uniform float ridgesFine; // 1 = take the detail from a tent-smoothed copy (RIDGES_FINE_GUARD)
+            // 3x3 tent ([1 2 1] each way) round uv: four bilinear taps on the
+            // corners of the texel, each the mean of a 2x2 block.
+            vec3 ridgesTent(sampler2D tex, vec2 uv, vec2 px) {
+                return 0.25 * (texture(tex, uv + vec2( 0.5,  0.5) * px).rgb +
+                               texture(tex, uv + vec2(-0.5,  0.5) * px).rgb +
+                               texture(tex, uv + vec2( 0.5, -0.5) * px).rgb +
+                               texture(tex, uv + vec2(-0.5, -0.5) * px).rgb);
+            }
             vec3 ridgesSharpen(sampler2D tex, sampler2D velTex, vec2 uv, vec2 off, float sharpness, out float strength) {
                 vec3 center = texture(tex, uv).rgb;
                 float centerIntensity = dot(center, vec3(0.299, 0.587, 0.114));
@@ -847,16 +856,34 @@
                 if (centerIntensity < 0.001) return center;
                 float lowFade = smoothstep(0.003, 0.03, centerIntensity);
                 // Sample neighbors for detail extraction (unsharp mask technique)
-                vec3 blur = vec3(0.0);
-                blur += texture(tex, uv + vec2(off.x, 0.0)).rgb;
-                blur += texture(tex, uv - vec2(off.x, 0.0)).rgb;
-                blur += texture(tex, uv + vec2(0.0, off.y)).rgb;
-                blur += texture(tex, uv - vec2(0.0, off.y)).rgb;
-                blur *= 0.25;
+                vec3 detail;
+                if (ridgesFine > 0.5) {
+                    // Fine guard (2026-10-09): the same centre-minus-four-taps
+                    // detail, taken from a tent-smoothed copy of the dye. Bands
+                    // a few texels wide and up come out as before (the tent
+                    // keeps 93% of the radius-6 scale). Grain finer than ~3
+                    // texels is left at its own contrast: centre minus four
+                    // single texels one radius away handed it on up to 5x and
+                    // drew a copy of every hairline a radius off on each side,
+                    // which under Laminar read as striations everywhere.
+                    vec2 px = 1.0 / vec2(textureSize(tex, 0));
+                    vec3 far = ridgesTent(tex, uv + vec2(off.x, 0.0), px)
+                             + ridgesTent(tex, uv - vec2(off.x, 0.0), px)
+                             + ridgesTent(tex, uv + vec2(0.0, off.y), px)
+                             + ridgesTent(tex, uv - vec2(0.0, off.y), px);
+                    detail = ridgesTent(tex, uv, px) - 0.25 * far;
+                } else {
+                    vec3 blur = vec3(0.0);
+                    blur += texture(tex, uv + vec2(off.x, 0.0)).rgb;
+                    blur += texture(tex, uv - vec2(off.x, 0.0)).rgb;
+                    blur += texture(tex, uv + vec2(0.0, off.y)).rgb;
+                    blur += texture(tex, uv - vec2(0.0, off.y)).rgb;
+                    blur *= 0.25;
+                    detail = center - blur;
+                }
                 // Extract high-frequency detail, bounded to the local
                 // intensity so faint dye is never more than ~doubled
                 // (quantization steps would otherwise amplify into speckle)
-                vec3 detail = center - blur;
                 detail = clamp(detail, vec3(-centerIntensity), vec3(centerIntensity));
                 // Velocity-adaptive sharpening (sharpen more where fluid moves),
                 // faded out smoothly at low intensities so faint dye is never

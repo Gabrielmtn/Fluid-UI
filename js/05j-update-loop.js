@@ -1999,9 +1999,14 @@
                 // Color Blend on: round the store to the nearest half float, so
                 // a truncating GPU does not drain the paint the blend keeps
                 // smooth (advectionFrag, COLOR_BLEND_HOLD_PAINT). The eased
-                // value, so it holds while a blend eases in or out.
+                // value, so it holds while a blend eases in or out. Laminar's
+                // fine floor too (LAMINAR_FINE_FLOOR): it leaves soft ramps
+                // where the grain was, and the truncating store took paint off
+                // them at 144 Hz as fast as Grain Cleanup did (2026-10-09).
+                const _fineFloorOn = _laminar > 0 && colorBlendEff < 0 &&
+                    ((typeof config.LAMINAR_FINE_FLOOR === 'number') ? config.LAMINAR_FINE_FLOOR : 0.1) > 0;
                 gl.uniform1f(advectionProg.uniforms.dyeRoundNearest,
-                    (colorBlendEff > 0 && config.COLOR_BLEND_HOLD_PAINT !== false) ? 1 : 0);
+                    ((colorBlendEff > 0 || _fineFloorOn) && config.COLOR_BLEND_HOLD_PAINT !== false) ? 1 : 0);
                 // Pigment memory + Ignite restore (see advectionFrag). memDiss
                 // 1.0 would make memory immortal; the default half-life lets
                 // work you deliberately let go stay gone.
@@ -2018,6 +2023,12 @@
                 gl.uniform1f(advectionProg.uniforms.hfFloorDye, (config.HF_FLOOR_DYE || 0.0) * (1 - _laminar));
                 gl.uniform1f(advectionProg.uniforms.hfFloorDyeWall,
                     (config.LAMINAR_WALL_FLOOR === false) ? (config.HF_FLOOR_DYE || 0.0) * (1 - _laminar) : (config.HF_FLOOR_DYE || 0.0));
+                // ...and in its place Laminar's fine floor, which takes only the
+                // texel-scale grain (bi-Laplacian, advectionFrag hfFloorFine), so
+                // folds stay crisp without filling with hairlines. Rises with
+                // _laminar as the plain floor falls; 0 at Laminar / Blend 0.
+                gl.uniform1f(advectionProg.uniforms.hfFloorFine,
+                    Math.max(0, (typeof config.LAMINAR_FINE_FLOOR === 'number') ? config.LAMINAR_FINE_FLOOR : 0.1) * _laminar);
                 // Wall-drain flow gate: spare dye that is still moving past a
                 // collider (see the drain in advectionFrag). 0 = legacy drain.
                 gl.uniform1f(advectionProg.uniforms.obsFlowKeep,

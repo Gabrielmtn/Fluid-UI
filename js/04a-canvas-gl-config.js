@@ -367,6 +367,11 @@
                                       // of a collider or the canvas edge (advectionFrag hfFloorDyeWall),
                                       // where wall-made speckle and bright edge lines grew without it
                                       // (2026-10-02). false = the floor follows the fader everywhere
+            LAMINAR_FINE_FLOOR: 0.1,  // In open fluid Laminar swaps Grain Cleanup's floor for this one, which
+                                      // removes only grain a texel or two wide (advectionFrag hfFloorFine, a
+                                      // bi-Laplacian; 2026-10-09). Without it moving paint filled with
+                                      // hairlines and hatching (striations). Scales with the fader's Laminar
+                                      // share, so 0 at Laminar / Blend 0. 0 = off
             COLOR_BLEND_LENGTH: 0.02, // The mixing length l at COLOR_BLEND 1 (it scales with the fader),
                                       // as a fraction of the canvas's SHORT side
             COLOR_BLEND_CONTACT: 2,   // The stir wet paint counts as having, moving or not (1/s): wet
@@ -1295,6 +1300,12 @@
                                       // look, >1 = coarse emboss ridges. NOTE: the
                                       // Ridge Strength slider (SHARPNESS) only acts
                                       // when this is > 0.
+            RIDGES_FINE_GUARD: true,  // Ridges sharpens the swirl's features, not pixel-scale grain
+                                      // (05a ridgesSharpen, 2026-10-09): the detail is taken from a
+                                      // 3x3-tent copy of the dye on both sides, so hairlines finer than
+                                      // ~3 texels are neither amplified nor echoed one radius away.
+                                      // Under Laminar they were (striations, up to 5x in fast flow).
+                                      // false = the old centre-minus-4-taps detail
 
 
 

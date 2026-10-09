@@ -726,13 +726,17 @@
                 // governor) — resolution now only affects fidelity, not
                 // character. RIDGES > 1 recreates the coarse emboss (the
                 // boot-ascent "ridges" look) deliberately.
-                kernelScale: Math.max(1, ridges) * (Math.max(dyeTexWidth, dyeTexHeight) / 2048)
+                kernelScale: Math.max(1, ridges) * (Math.max(dyeTexWidth, dyeTexHeight) / 2048),
+                // Detail from a tent-smoothed copy, so pixel-scale grain is not
+                // amplified or echoed (05a ridgesSharpen, RIDGES_FINE_GUARD).
+                fine: config.RIDGES_FINE_GUARD !== false
             };
         }
         function bindSharpenUniforms(prog, p) {
             gl.uniform1f(prog.uniforms.sharpness, p.sharpness);
             gl.uniform2f(prog.uniforms.texelSize, 1.0 / dyeTexWidth, 1.0 / dyeTexHeight);
             gl.uniform1f(prog.uniforms.kernelScale, p.kernelScale);
+            gl.uniform1f(prog.uniforms.ridgesFine, p.fine ? 1.0 : 0.0);
         }
         // Uploads a canvas/image on unit 2, the way the image splat samples
         // it. Null if the upload throws.

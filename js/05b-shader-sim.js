@@ -759,6 +759,8 @@
             uniform float hfFloorDye; // M2: dye Nyquist-removal strength (0 = off)
             uniform float hfFloorDyeWall; // ...within a few texels of a collider or the canvas
                                           // edge; above hfFloorDye only under Laminar (05j)
+            uniform float hfFloorFine;    // Laminar's own floor: removes only texel-scale grain
+                                          // (bi-Laplacian), 0 = off (05j, LAMINAR_FINE_FLOOR)
             uniform float frozen; // 1.0 = freeze mode (preserve artwork, skip drains)
             uniform float dyeRoundNearest; // 1 = round the dye to the nearest half float before the store (Color Blend on)
             uniform float bloomCeiling; // >0: cap dye's max channel here (Gate breathing safety)
@@ -956,6 +958,36 @@
                         // dye carries, not something the eye ever sees.
                         color.rgb -= hfc.rgb * kD;
                         color.rgb = max(color.rgb, 0.0);
+                    }
+                    // Laminar's fine floor (2026-10-09). Laminar turns the floor
+                    // above down in open fluid so folds stay crisp, but then
+                    // nothing removed grain a texel or two wide either, and moving
+                    // paint filled with hairlines and hatching that Ridges then
+                    // outlined (striations). This removes the Laplacian of the
+                    // Laplacian instead: it takes one-texel lines at full weight
+                    // (the checkerboard at 4x) but a band 3 texels wide at 1/16
+                    // and a 6-texel one at 1/220, where the plain floor takes 1/4
+                    // and 1/15. Same motion gate, so still dye and frozen artwork
+                    // are untouched. 13 taps of the source round coord.
+                    if (hfFloorFine > 0.0 && frozen < 0.5) {
+                        float mGateF = smoothstep(0.03, 0.3, length(disp / srcTexelSize));
+                        if (mGateF > 0.0) {
+                            vec2 ex = vec2(srcTexelSize.x, 0.0), ey = vec2(0.0, srcTexelSize.y);
+                            vec3 c0 = texture(uSource, coord).rgb;
+                            vec3 n1 = texture(uSource, clamp(coord + ex, 0.0, 1.0)).rgb + texture(uSource, clamp(coord - ex, 0.0, 1.0)).rgb
+                                    + texture(uSource, clamp(coord + ey, 0.0, 1.0)).rgb + texture(uSource, clamp(coord - ey, 0.0, 1.0)).rgb;
+                            vec3 dg = texture(uSource, clamp(coord + ex + ey, 0.0, 1.0)).rgb + texture(uSource, clamp(coord - ex + ey, 0.0, 1.0)).rgb
+                                    + texture(uSource, clamp(coord + ex - ey, 0.0, 1.0)).rgb + texture(uSource, clamp(coord - ex - ey, 0.0, 1.0)).rgb;
+                            vec3 n2 = texture(uSource, clamp(coord + 2.0 * ex, 0.0, 1.0)).rgb + texture(uSource, clamp(coord - 2.0 * ex, 0.0, 1.0)).rgb
+                                    + texture(uSource, clamp(coord + 2.0 * ey, 0.0, 1.0)).rgb + texture(uSource, clamp(coord - 2.0 * ey, 0.0, 1.0)).rgb;
+                            // D(D(f)) with D = f - mean of the 4 neighbours; weights sum to 0
+                            vec3 biLap = 1.25 * c0 - 0.5 * n1 + 0.125 * dg + 0.0625 * n2;
+                            // Capped at 0.2 a step: the checkerboard's weight is 4, so
+                            // up to 0.25 it decays without flipping sign.
+                            float kF = min(hfFloorFine * mGateF * (dt * 60.0), 0.2);
+                            color.rgb -= effectiveDecay * biLap * kF;
+                            color.rgb = max(color.rgb, 0.0);
+                        }
                     }
                     // ── Ignite: restore the color it was PAINTED at ────────
                     // The multiplier is memory/current, so it is exactly 1.0
