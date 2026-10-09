@@ -858,6 +858,7 @@
                         collisionMode: layer.collisionMode || 'block',
                         collisionStrength: typeof layer.collisionStrength === 'number' ? layer.collisionStrength : 0.7,
                         colliderColour: (typeof layer.colliderColour === 'string') ? layer.colliderColour : null,
+                        colliderOpacity: (typeof layer.colliderOpacity === 'number') ? layer.colliderOpacity : null,
                         isRaster: !!layer.isRaster,
                         opacity: typeof layer.opacity === 'number' ? layer.opacity : 1,
                         blendMode: layer.blendMode || 'normal',
@@ -1512,7 +1513,8 @@
                         layerDiv.style.backgroundSize = '100% 100%';
                         layerDiv.style.backgroundPosition = 'center';
                         layerDiv.style.display = ld.visible ? 'block' : 'none';
-                        layerDiv.style.opacity = ld.filmData ? '0.3' : '0.55';
+                        layerDiv.style.opacity = (typeof ld.colliderOpacity === 'number') ? String(ld.colliderOpacity)
+                            : (ld.filmData ? '0.3' : '0.55');
                     } else {
                         // Regular image layers: the static layerN div, or one
                         // made for a slot past the static ten
@@ -1551,6 +1553,7 @@
                         // Absent on saves from before colliders had a colour:
                         // the film then paints in the default (23 colourOf).
                         colliderColour: (typeof ld.colliderColour === 'string') ? ld.colliderColour : undefined,
+                        colliderOpacity: (typeof ld.colliderOpacity === 'number') ? ld.colliderOpacity : undefined,
                         isRaster: !!ld.isRaster,
                         // Force a pixel upload even when an FBO already exists at
                         // this index. reconcile() otherwise only restores MISSING

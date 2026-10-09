@@ -154,22 +154,32 @@
                 ['click','mousedown','pointerdown','touchstart'].forEach(evt => el.addEventListener(evt, stop));
             });
         }
-        // Opacity, on picture and paint layers. A paint layer composites in
+        // Opacity, on every layer but the Sim. A paint layer composites in
         // the GL canvas and reads layer.opacity there (05l collectSlots). A
         // picture layer is a div, so its opacity is the div's own — which is
         // what export (24 captureCompositeFrame) and Flatten (05l) already
-        // read back, so neither needed to learn about it. Colliders keep
-        // their fixed film (23 COLLIDER_FILM_OPACITY): that is a guide to
-        // where the wall is, not artwork.
+        // read back, so neither needed to learn about it. A collider's is
+        // how strongly its colour film shows (layer.colliderOpacity, 30%
+        // when never set; see 23 colliderOpacityOf): a tint by default, and
+        // exactly the picked colour at 100%.
         function layerOpacityOf(layer) {
+            if (layer.isCollision) {
+                const cl = window.collisionLayers;
+                return (cl && cl.opacityOf) ? cl.opacityOf(layer) : 0.3;
+            }
             return (typeof layer.opacity === 'number') ? Math.max(0, Math.min(1, layer.opacity)) : 1;
         }
+        function setLayerOpacity(layer, v) {
+            if (layer.isCollision) layer.colliderOpacity = v;
+            else layer.opacity = v;
+            window.applyLayerOpacity(layer);
+        }
         window.applyLayerOpacity = function applyLayerOpacity(layer) {
-            if (!layer || layer.isRaster || layer.isCollision) return;
+            if (!layer || layer.isRaster) return;
             const div = document.getElementById('layer' + layer.index);
             if (!div) return;
             const o = layerOpacityOf(layer);
-            div.style.opacity = o < 1 ? String(o) : '';
+            div.style.opacity = (o < 1 || layer.isCollision) ? String(o) : '';
         };
         function wireOpacitySlider(element, layer) {
             let before = null;
@@ -177,8 +187,7 @@
                 { min: 0, max: 100, value: Math.round(layerOpacityOf(layer) * 100) },
                 (s, valueEl) => {
                     if (before === null) before = layerOpacityOf(layer);
-                    layer.opacity = parseInt(s.value, 10) / 100;
-                    window.applyLayerOpacity(layer);
+                    setLayerOpacity(layer, parseInt(s.value, 10) / 100);
                     if (valueEl) valueEl.textContent = s.value + '%';
                 });
             if (!slider) return;
@@ -190,8 +199,7 @@
                 const H = window.__layerHistory;
                 if (!H || H.isApplying()) return;
                 const set = (v) => {
-                    layer.opacity = v;
-                    window.applyLayerOpacity(layer);
+                    setLayerOpacity(layer, v);
                     if (layers.includes(layer)) renderLayers();
                 };
                 H.push({ label: 'layer opacity', undo: () => set(from), redo: () => set(to) });
@@ -449,8 +457,6 @@
                                 ${fieldRowHTML('layer-row-invert', 'Invert', `<label class="layer-vis" title="Swap which side of the threshold is wall"><input type="checkbox" class="collision-invert-cb" data-cinv="${layer.index}" ${depthShape?.invert ? 'checked' : ''}><span class="layer-vis-box"></span></label>`)}
                                 `}
                                 ${keyRow}
-                                ${fieldRowHTML('layer-row-colour', 'Colour', `<input type="color" class="collider-colour-input text-swatch" value="${colliderColourOf(layer)}" aria-label="Collider colour" title="The colour this wall is drawn in on the canvas">`,
-                                    'The colour this wall is drawn in on the canvas. Looks only: the fluid behaves the same.')}
                             </div>
                             <div class="layer-action-row layer-mask-controls">
                             ${painted ? `
@@ -470,14 +476,17 @@
                             thumbStyle: `background-image: url('${window.safeImageUrl(layer.thumb || layer.data)}')`
                         })}
                         <div class="layer-item-body">
-                        ${isCol ? '' : sliderRowHTML('layer-row-opacity', 'Opacity', Math.round(layerOpacityOf(layer) * 100) + '%')}
+                        ${sliderRowHTML('layer-row-opacity', 'Opacity', Math.round(layerOpacityOf(layer) * 100) + '%',
+                            isCol ? 'How strongly the colour shows: a tint over what is under the wall, or at 100% exactly the colour picked' : '')}
+                        ${isCol ? fieldRowHTML('layer-row-colour', 'Colour', `<input type="color" class="collider-colour-input text-swatch" value="${colliderColourOf(layer)}" aria-label="Collider colour" title="The colour this wall is drawn in on the canvas">`,
+                            'The colour this wall is drawn in on the canvas. Looks only: the fluid behaves the same.') : ''}
                         <div class="layer-action-row">${actionBtns}</div>
                         ${isCol ? collisionGroup : maskGroup}
                         </div>
                     `;
                     const headerEl = element.querySelector('.layer-item-header');
                     if (headerEl) headerEl.draggable = true;
-                    if (!isCol) wireOpacitySlider(element, layer);
+                    wireOpacitySlider(element, layer);
                     mountLayerSlider(element, 'layer-row-key', { min: 0, max: 100, value: layer.threshold }, (s, valueEl) => {
                         if (valueEl) valueEl.textContent = s.value + '%';
                         updateLayerThreshold(layer.index, s.value);

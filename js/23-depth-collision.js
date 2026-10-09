@@ -364,6 +364,8 @@ class DepthEstimator {
         colourOf: colliderColourOf,
         setColour: setColliderColour,
         DEFAULT_COLOUR: '#ff3b30',
+        // How strongly that colour shows (0-1, 0.3 when never set).
+        opacityOf: colliderOpacityOf,
 
         // Mode vocabulary + the fillStyle a procedural source must draw its
         // coverage with so the wall carries its mode and strength (see
@@ -1205,6 +1207,15 @@ class DepthEstimator {
         var c = layer && layer.colliderColour;
         return (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) ? c.toLowerCase() : DEFAULT_COLLIDER_COLOUR;
     }
+    // How strongly the film shows (layer.colliderOpacity, the row's Opacity).
+    // 30% by default: a tint, so the picture a wall was cut from still shows
+    // through it. At 100% the wall is exactly the colour picked. Its own
+    // field, not layer.opacity: every save has written opacity 1 for
+    // colliders too, and that would load every old wall solid.
+    function colliderOpacityOf(layer) {
+        var o = layer && layer.colliderOpacity;
+        return (typeof o === 'number' && isFinite(o)) ? Math.max(0, Math.min(1, o)) : +COLLIDER_FILM_OPACITY;
+    }
     function _hexRgb(hex) {
         var n = parseInt(hex.slice(1), 16);
         return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -1283,7 +1294,8 @@ class DepthEstimator {
         var d = document.getElementById('layer' + layerIndex);
         if (!d) return;
         d.style.backgroundImage = 'url(' + url + ')';
-        d.style.opacity = COLLIDER_FILM_OPACITY;
+        var layer = (window.layers || []).find(function (l) { return l.index === layerIndex; });
+        d.style.opacity = String(colliderOpacityOf(layer));
     }
     window.__setColliderFilm = _setColliderFilm;
 

@@ -78,7 +78,8 @@
                 div.style.display = removed.visible === false ? 'none' : 'block';
                 if (removed.isCollision) {
                     div.style.backgroundSize = '100% 100%';
-                    div.style.opacity = removed.filmData ? '0.3' : '0.55';
+                    div.style.opacity = (typeof removed.colliderOpacity === 'number') ? String(removed.colliderOpacity)
+                        : (removed.filmData ? '0.3' : '0.55');
                 }
             }
             if (typeof renderLayers === 'function') renderLayers();
